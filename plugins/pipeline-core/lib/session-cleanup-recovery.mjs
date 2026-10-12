@@ -44,6 +44,10 @@ import {
 } from "./windows-private-state.mjs";
 import { hasExpectedSpawnStatus } from "./successful-spawn.mjs";
 
+import { fsyncSync as sdcFsync } from "node:fs";
+import { canonical as sdcCanonical, createPoApprovalIntent as sdcCreateIntent, verifyPoApprovalProof as sdcVerifyProof } from "./po-approval-proof.mjs";
+import { inspectSignedDescriptorCustodyInputs, inspectSignedDescriptorCustodyRepository, inspectSessionOwnerRuntime, withSignedDescriptorCustodyManifestLock } from "./worktree-lifecycle.mjs";
+
 export const SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA = "pipeline.session-cleanup-recovery-plan.v1";
 export const SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA = "pipeline.session-cleanup-recovery-apply.v1";
 
@@ -2706,3 +2710,303 @@ export const sessionCleanupRecoveryInternals = {
   backupOnboardingPrivateState,
   externalRetirementManifestPath,
 };
+
+
+const SDC_SCHEMA = "pipeline.descriptor-custody.v1";
+const SDC_KINDS = ["continuity", "override", "ceremony", "dispatch", "armed-capability"];
+const sdcSha = value => createHash("sha256").update(value).digest("hex");
+const sdcDigest = value => sdcSha(sdcCanonical(value));
+const sdcOwn = (value, keys) => isObject(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+const sdcId = value => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/u.test(value);
+const sdcTime = value => typeof value === "string" && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+const sdcRelative = value => typeof value === "string" && value.length > 0 && !isAbsolute(value) && !value.includes("\\") && !value.includes("\0") && value.split("/").every(p => p && p !== "." && p !== "..");
+const sdcRef = value => sdcOwn(value, ["path", "sha256", "size"]) && sdcRelative(value.path) && SHA256.test(value.sha256) && Number.isSafeInteger(value.size) && value.size >= 0;
+const sdcTarget = value => sdcOwn(value, ["path", "schema", "sha256", "size", "identity"]) && sdcRelative(value.path) && typeof value.schema === "string" && SHA256.test(value.sha256) && Number.isSafeInteger(value.size) && value.size > 0
+  && sdcOwn(value.identity, ["dev", "ino", "mode", "nlink"]) && /^\d+$/u.test(value.identity.dev) && /^\d+$/u.test(value.identity.ino) && Number.isSafeInteger(value.identity.mode) && value.identity.mode >= 0 && value.identity.nlink === 1;
+const sdcRepository = value => sdcOwn(value, ["primaryRoot", "commonDir", "candidate"]) && isAbsolute(value.primaryRoot) && isAbsolute(value.commonDir) && sdcOwn(value.candidate, ["commit", "tree"]) && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value.candidate.commit) && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value.candidate.tree) && value.candidate.commit.length === value.candidate.tree.length && value.candidate.commit !== value.candidate.tree;
+const sdcManifest = value => value?.state === "present" ? sdcOwn(value, ["state", "target", "revision"]) && sdcTarget(value.target) && value.target.schema === "pipeline.session-cleanup-manifest.v1" && Number.isSafeInteger(value.revision) && value.revision >= 0 : sdcOwn(value, ["state", "path"]) && value.state === "absent" && sdcRelative(value.path);
+const sdcInventory = value => Array.isArray(value) && value.length === 5 && value.every((entry, i) => sdcOwn(entry, ["kind", "status", "producer", "sourceRefs", "bindingSha256", "assurance"]) && entry.kind === SDC_KINDS[i] && ["absent", "cleared", "held", "unavailable"].includes(entry.status) && typeof entry.producer === "string" && entry.producer.length > 0 && Array.isArray(entry.sourceRefs) && entry.sourceRefs.every(sdcRef) && (entry.status === "unavailable" || entry.sourceRefs.length > 0) && (entry.bindingSha256 === null || SHA256.test(entry.bindingSha256)) && ["physical-readback", "controlled-unit-method"].includes(entry.assurance));
+const sdcConfirmation = value => sdcOwn(value, ["sessionId", "ownerNonceSha256", "confirmedEnded"]) && sdcId(value.sessionId) && SHA256.test(value.ownerNonceSha256) && value.confirmedEnded === true;
+const sdcRequesterShape = r => sdcOwn(r, ["sessionId", "descriptorSha256", "ownerNonceSha256", "transportRef", "assurance"]) && sdcId(r.sessionId) && SHA256.test(r.descriptorSha256) && SHA256.test(r.ownerNonceSha256) && sdcRef(r.transportRef) && ["native-bound", "controlled-unit-method"].includes(r.assurance);
+const sdcOwnerShape = o => sdcOwn(o, ["schema", "sessionId", "descriptorSha256", "status", "assurance"]) && o.schema === "pipeline.session-owner-observation.v1" && sdcId(o.sessionId) && SHA256.test(o.descriptorSha256) && ["unavailable", "unobserved", "live", "reused", "not-live"].includes(o.status) && ["native-observed", "controlled-unit-method"].includes(o.assurance);
+function sdcStop(code, status = "refused") { const error = new Error(code); error.code = code; error.sdcStatus = status; throw error; }
+function sdcEnvelope(kind, status, code, extra = {}) {
+  return { schema: `pipeline.descriptor-custody-${kind}-result.v1`, status, code, ...extra,
+    nextAction: status === "interrupted" ? "resume-signed-descriptor-custody" : status === "prepared" ? "obtain-descriptor-custody-proof" : status === "refused" || status === "unavailable" ? "inspect-descriptor-custody" : null };
+}
+function sdcPath(repository, path) {
+  if (!sdcRelative(path) || !path.startsWith(".git/agent-pipeline/")) sdcStop("SDC-PRIVATE-PATH");
+  const result = join(repository.commonDir, path.slice(5));
+  for (let cursor = result; cursor !== repository.commonDir; cursor = dirname(cursor)) {
+    if (existsSync(cursor) && (lstatSync(cursor).isSymbolicLink() || realpathSync(cursor) !== resolve(cursor))) sdcStop("SDC-PRIVATE-PATH");
+    if (dirname(cursor) === cursor) sdcStop("SDC-PRIVATE-PATH");
+  }
+  return result;
+}
+function sdcRead(repository, path) {
+  const physical = sdcPath(repository, path), before = lstatSync(physical);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || (process.platform !== "win32" && (before.mode & 0o077))) sdcStop("SDC-PRIVATE-PATH");
+  if (process.platform === "win32" && (assessWindowsPrivatePath(physical).status !== "secure" || assessWindowsPrivatePath(dirname(physical)).status !== "secure")) sdcStop("SDC-PRIVATE-PATH");
+  if (before.size > 1024 * 1024) sdcStop("SDC-SHAPE");
+  const bytes = readFileSync(physical), after = lstatSync(physical);
+  if (before.dev !== after.dev || before.ino !== after.ino || before.mode !== after.mode || before.nlink !== after.nlink || sdcSha(bytes) !== sdcSha(readFileSync(physical))) sdcStop("SDC-PRIVATE-PATH");
+  return { bytes, ref: { path, sha256: sdcSha(bytes), size: bytes.length } };
+}
+function sdcCheckRef(repository, ref) {
+  if (!sdcRef(ref)) sdcStop("SDC-SHAPE");
+  const observed = sdcRead(repository, ref.path);
+  if (observed.ref.sha256 !== ref.sha256 || observed.ref.size !== ref.size) sdcStop("SDC-AUTHORITY-CAS");
+  return observed;
+}
+function sdcRequester(value, repository) {
+  if (!sdcOwn(value, ["status", "requester"]) || value.status !== "bound") sdcStop("SDC-REQUESTER-UNAVAILABLE", "unavailable");
+  const r = value.requester;
+  if (!sdcOwn(r, ["sessionId", "descriptorSha256", "ownerNonceSha256", "transportRef", "assurance"]) || !sdcId(r.sessionId) || !SHA256.test(r.descriptorSha256) || !SHA256.test(r.ownerNonceSha256) || !sdcRef(r.transportRef) || !["native-bound", "controlled-unit-method"].includes(r.assurance)) sdcStop("SDC-REQUESTER-UNAVAILABLE", "unavailable");
+  sdcCheckRef(repository, r.transportRef);
+  const loaded = loadSessionDescriptor(repository.primaryRoot, r.sessionId, { expectedDescriptorSha256: r.descriptorSha256 });
+  if (sdcSha(loaded.ownerNonce) !== r.ownerNonceSha256) sdcStop("SDC-REQUESTER-UNAVAILABLE", "unavailable");
+  return r;
+}
+function sdcObserve(rootDir, sessionId, deps, packet = null, journal = null, underLock = false) {
+  let physical;
+  try { physical = inspectSignedDescriptorCustodyInputs(rootDir, sessionId, { archivedDescriptorSha256: journal ? packet.descriptor.sha256 : null }); }
+  catch (error) { if (error.code?.startsWith("SDC-")) throw error; sdcStop(packet ? "SDC-DESCRIPTOR-CAS" : "SDC-DESCRIPTOR-UNAVAILABLE", packet ? "refused" : "unavailable"); }
+  const repository = physical.repository;
+  // Refuse physical drift before calling an observation adapter bound to the old target.
+  if (packet) {
+    if (repository.primaryRoot !== packet.repository.primaryRoot || repository.commonDir !== packet.repository.commonDir) sdcStop("SDC-ROOT");
+    if (sdcDigest(repository.candidate) !== sdcDigest(packet.repository.candidate)) sdcStop("SDC-CANDIDATE");
+    if (sdcSha(physical.ownerNonce) !== packet.session.ownerNonceSha256 || physical.descriptor.sha256 !== packet.descriptor.sha256 || physical.descriptor.size !== packet.descriptor.size || (physical.activePresent && sdcDigest(physical.descriptor) !== sdcDigest(packet.descriptor))) sdcStop("SDC-DESCRIPTOR-CAS");
+    if (sdcDigest(physical.manifest) !== sdcDigest(packet.manifest)) sdcStop("SDC-MANIFEST-CAS");
+  }
+  let requester, owner, authorities;
+  try {
+    requester = sdcRequester((deps.observeRequester ?? (() => ({ status: "unavailable", code: "SDC-REQUESTER-UNAVAILABLE" })))({ repository }), repository);
+    if (requester.sessionId === sessionId || requester.ownerNonceSha256 === sdcSha(physical.ownerNonce)) sdcStop("SDC-OWN-SESSION");
+    owner = deps.observeOwner ? deps.observeOwner({ rootDir: repository.primaryRoot, sessionId, descriptorSha256: physical.descriptor.sha256 })
+      : { ...inspectSessionOwnerRuntime(rootDir, sessionId), schema: "pipeline.session-owner-observation.v1", assurance: "native-observed" };
+    if (!sdcOwn(owner, ["schema", "sessionId", "descriptorSha256", "status", "assurance"]) || owner.schema !== "pipeline.session-owner-observation.v1" || owner.sessionId !== sessionId || owner.descriptorSha256 !== physical.descriptor.sha256 || !["unavailable", "unobserved", "live", "reused", "not-live"].includes(owner.status) || !["native-observed", "controlled-unit-method"].includes(owner.assurance)) sdcStop("SDC-OWNER-UNAVAILABLE", "unavailable");
+    if (owner.status === "live") sdcStop("SDC-OWNER-LIVE");
+    if (owner.status === "reused") sdcStop("SDC-OWNER-REUSED");
+    authorities = deps.observeAuthorities ? deps.observeAuthorities({ repository, sessionId, ownerNonceSha256: sdcSha(physical.ownerNonce), descriptorSha256: physical.descriptor.sha256 })
+      : SDC_KINDS.map(kind => ({ kind, status: "unavailable", producer: "session-cleanup-recovery#unwired-authority-observer", sourceRefs: [], bindingSha256: null, assurance: "physical-readback" }));
+    if (!sdcInventory(authorities)) sdcStop("SDC-AUTHORITY-UNAVAILABLE", "unavailable");
+    for (const entry of authorities) {
+      if (entry.status === "unavailable") sdcStop("SDC-AUTHORITY-UNAVAILABLE", "unavailable");
+      if (entry.status === "held") sdcStop("SDC-AUTHORITY-HELD");
+      for (const ref of entry.sourceRefs) sdcCheckRef(repository, ref);
+    }
+  } catch (error) { if (error.code?.startsWith("SDC-")) throw error; sdcStop("SDC-OBSERVATION-UNAVAILABLE", "unavailable"); }
+  const observedAt = (deps.now ?? (() => new Date().toISOString()))();
+  if (!sdcTime(observedAt)) sdcStop("SDC-OBSERVATION-UNAVAILABLE", "unavailable");
+  if (!underLock && physical.manifestLock.status !== "absent") sdcStop("SDC-LOCK-HELD");
+  const observation = { repository, requester, sessionId, ownerNonceSha256: sdcSha(physical.ownerNonce), descriptor: physical.descriptor,
+    manifest: physical.manifest, owner, authorities, authoritySha256: sdcDigest(authorities), manifestLock: physical.manifestLock, observedAt };
+  if (packet) {
+    if (repository.primaryRoot !== packet.repository.primaryRoot || repository.commonDir !== packet.repository.commonDir) sdcStop("SDC-ROOT");
+    if (sdcDigest(repository.candidate) !== sdcDigest(packet.repository.candidate)) sdcStop("SDC-CANDIDATE");
+    if (observation.ownerNonceSha256 !== packet.session.ownerNonceSha256 || physical.descriptor.sha256 !== packet.descriptor.sha256 || physical.descriptor.size !== packet.descriptor.size || (physical.activePresent && sdcDigest(physical.descriptor) !== sdcDigest(packet.descriptor))) sdcStop("SDC-DESCRIPTOR-CAS");
+    if (sdcDigest(physical.manifest) !== sdcDigest(packet.manifest)) sdcStop("SDC-MANIFEST-CAS");
+    if (observation.authoritySha256 !== packet.authority.sha256) sdcStop("SDC-AUTHORITY-CAS");
+  }
+  // Adapters may observe concurrently changing state, but cannot waive physical CAS.
+  const latest = inspectSignedDescriptorCustodyInputs(rootDir, sessionId, { archivedDescriptorSha256: journal ? packet.descriptor.sha256 : null });
+  if (sdcDigest(latest.repository) !== sdcDigest(repository)) sdcStop("SDC-CANDIDATE");
+  if (sdcDigest(latest.descriptor) !== sdcDigest(physical.descriptor) || latest.activePresent !== physical.activePresent) sdcStop("SDC-DESCRIPTOR-CAS");
+  if (sdcDigest(latest.manifest) !== sdcDigest(physical.manifest)) sdcStop("SDC-MANIFEST-CAS");
+  for (const entry of authorities) for (const ref of entry.sourceRefs) sdcCheckRef(repository, ref);
+  sdcCheckRef(repository, requester.transportRef);
+  return { physical: latest, observation };
+}
+export function prepareSignedDescriptorCustody({ rootDir, sessionId } = {}, deps = {}) {
+  try {
+    if (typeof rootDir !== "string" || !isAbsolute(rootDir) || !sdcId(sessionId)) sdcStop("SDC-SHAPE");
+    const { observation } = sdcObserve(rootDir, sessionId, deps);
+    return sdcEnvelope("prepare", "prepared", "SDC-PREPARED", { observation });
+  } catch (error) { return sdcEnvelope("prepare", error.sdcStatus ?? "unavailable", error.code?.startsWith("SDC-") ? error.code : "SDC-OBSERVATION-UNAVAILABLE", { observation: null }); }
+}
+function sdcValidPacket(p) {
+  return sdcOwn(p, ["schema", "repository", "session", "descriptor", "manifest", "authority", "sessionEndedConfirmation", "classification", "disposition", "archiveDestination", "expiresAt", "casPrecondition"])
+    && p.schema === SDC_SCHEMA && sdcRepository(p.repository) && sdcOwn(p.session, ["sessionId", "ownerNonceSha256"]) && sdcId(p.session.sessionId) && SHA256.test(p.session.ownerNonceSha256)
+    && sdcTarget(p.descriptor) && ["pipeline.session-descriptor.v1", "pipeline.session-descriptor.v2"].includes(p.descriptor.schema)
+    && p.descriptor.path === `.git/agent-pipeline/session-descriptors/active/${p.session.sessionId}.json`
+    && sdcManifest(p.manifest) && (p.manifest.state === "present" ? p.manifest.target.path : p.manifest.path) === `.git/agent-pipeline/session-cleanup/active/${p.session.sessionId}.json`
+    && sdcOwn(p.authority, ["entries", "sha256"]) && sdcInventory(p.authority.entries) && p.authority.entries.every(e => ["absent", "cleared"].includes(e.status)) && p.authority.sha256 === sdcDigest(p.authority.entries)
+    && sdcConfirmation(p.sessionEndedConfirmation) && p.sessionEndedConfirmation.sessionId === p.session.sessionId && p.sessionEndedConfirmation.ownerNonceSha256 === p.session.ownerNonceSha256
+    && p.classification === "authority-descriptor" && p.disposition === "archive-descriptor-custody-retain-resources"
+    && p.archiveDestination === `.git/agent-pipeline/session-descriptors/signed-custody/archived/${p.session.sessionId}.${p.descriptor.sha256}.json` && sdcTime(p.expiresAt)
+    && sdcOwn(p.casPrecondition, ["descriptorSha256", "manifestSha256", "authoritySha256", "archiveExpected"]) && p.casPrecondition.descriptorSha256 === p.descriptor.sha256 && p.casPrecondition.manifestSha256 === (p.manifest.state === "present" ? p.manifest.target.sha256 : null) && p.casPrecondition.authoritySha256 === p.authority.sha256
+    && sdcOwn(p.casPrecondition.archiveExpected, ["state", "archiveRef", "dispositionRef", "journalRef"]) && p.casPrecondition.archiveExpected.state === "absent" && p.casPrecondition.archiveExpected.archiveRef === null && p.casPrecondition.archiveExpected.dispositionRef === null && p.casPrecondition.archiveExpected.journalRef === null;
+}
+function sdcIntent(packet) {
+  return sdcCreateIntent({ kind: "descriptor-custody", featureId: "descriptor-custody", planSha256: sdcSha(SDC_SCHEMA),
+    specSha256: "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468", candidate: packet.repository.candidate,
+    policyRevision: "descriptor-custody-v1", subjectSha256: sdcDigest(packet), decision: "archive-descriptor-custody" });
+}
+export function buildSignedDescriptorCustodyPackage({ observation: o, sessionEndedConfirmation, expiresAt } = {}) {
+  try {
+    if (!sdcOwn(o, ["repository", "requester", "sessionId", "ownerNonceSha256", "descriptor", "manifest", "owner", "authorities", "authoritySha256", "manifestLock", "observedAt"]) || !sdcTime(o.observedAt) || !sdcTime(expiresAt) || Date.parse(expiresAt) <= Date.parse(o.observedAt) || !sdcConfirmation(sessionEndedConfirmation)
+      || !sdcRepository(o.repository) || !sdcRequesterShape(o.requester) || !sdcOwnerShape(o.owner) || o.owner.sessionId !== o.sessionId || o.owner.descriptorSha256 !== o.descriptor?.sha256
+      || !sdcOwn(o.manifestLock, ["status", "path"]) || !sdcRelative(o.manifestLock.path) || !["unavailable", "unobserved", "not-live"].includes(o.owner.status) || o.requester.sessionId === o.sessionId || o.requester.ownerNonceSha256 === o.ownerNonceSha256 || o.manifestLock.status !== "absent") sdcStop("SDC-SHAPE");
+    const packet = { schema: SDC_SCHEMA, repository: structuredClone(o.repository), session: { sessionId: o.sessionId, ownerNonceSha256: o.ownerNonceSha256 }, descriptor: structuredClone(o.descriptor), manifest: structuredClone(o.manifest), authority: { entries: structuredClone(o.authorities), sha256: o.authoritySha256 }, sessionEndedConfirmation: structuredClone(sessionEndedConfirmation), classification: "authority-descriptor", disposition: "archive-descriptor-custody-retain-resources", archiveDestination: `.git/agent-pipeline/session-descriptors/signed-custody/archived/${o.sessionId}.${o.descriptor.sha256}.json`, expiresAt,
+      casPrecondition: { descriptorSha256: o.descriptor.sha256, manifestSha256: o.manifest.state === "present" ? o.manifest.target.sha256 : null, authoritySha256: o.authoritySha256, archiveExpected: { state: "absent", archiveRef: null, dispositionRef: null, journalRef: null } } };
+    if (!sdcValidPacket(packet)) sdcStop("SDC-SHAPE");
+    return sdcEnvelope("build", "built", "SDC-BUILT", { package: packet, intent: sdcIntent(packet).value });
+  } catch (error) { return sdcEnvelope("build", "refused", "SDC-SHAPE", { package: null, intent: null }); }
+}
+function sdcPaths(packet, subjectSha256) {
+  const prefix = ".git/agent-pipeline/session-descriptors/signed-custody";
+  return { archive: packet.archiveDestination, journal: `${prefix}/journals/${subjectSha256}.json`, disposition: `${prefix}/dispositions/${subjectSha256}.json` };
+}
+function sdcJournal(packet, subject, proofSha, paths) {
+  if (!existsSync(sdcPath(packet.repository, paths.journal))) {
+    if (existsSync(sdcPath(packet.repository, paths.archive))) sdcStop("SDC-ARCHIVE-CONFLICT");
+    if (existsSync(sdcPath(packet.repository, paths.disposition))) sdcStop("SDC-DISPOSITION-CONFLICT");
+    return null;
+  }
+  const read = sdcRead(packet.repository, paths.journal); let value;
+  try { value = JSON.parse(read.bytes); } catch { sdcStop("SDC-JOURNAL-CONFLICT"); }
+  if (!sdcOwn(value, ["schema", "subjectSha256", "proofSha256", "repository", "sessionId", "descriptor", "manifest", "authoritySha256", "step", "archiveRef", "dispositionRef", "createdAt", "updatedAt"]) || value.schema !== "pipeline.descriptor-custody-journal.v1" || value.subjectSha256 !== subject || value.proofSha256 !== proofSha || sdcDigest(value.repository) !== sdcDigest(packet.repository) || value.sessionId !== packet.session.sessionId || sdcDigest(value.descriptor) !== sdcDigest(packet.descriptor) || sdcDigest(value.manifest) !== sdcDigest(packet.manifest) || value.authoritySha256 !== packet.authority.sha256 || !["prepared", "archive-published", "disposition-published", "active-removed", "completed"].includes(value.step) || !sdcTime(value.createdAt) || !sdcTime(value.updatedAt)) sdcStop("SDC-JOURNAL-CONFLICT");
+  const steps = ["prepared", "archive-published", "disposition-published", "active-removed", "completed"], index = steps.indexOf(value.step);
+  if (index >= 1) {
+    if (!sdcRef(value.archiveRef) || value.archiveRef.path !== paths.archive || value.archiveRef.sha256 !== packet.descriptor.sha256 || value.archiveRef.size !== packet.descriptor.size) sdcStop("SDC-ARCHIVE-CONFLICT");
+    sdcCheckRef(packet.repository, value.archiveRef);
+  } else if (value.archiveRef !== null) sdcStop("SDC-JOURNAL-CONFLICT");
+  if (index >= 2) {
+    if (!sdcRef(value.dispositionRef) || value.dispositionRef.path !== paths.disposition) sdcStop("SDC-DISPOSITION-CONFLICT");
+    const disposition = JSON.parse(sdcCheckRef(packet.repository, value.dispositionRef).bytes);
+    const expected = sdcDisposition(packet, subject, proofSha, disposition.keyReference, value.archiveRef, value.createdAt);
+    if (sdcDigest(disposition) !== sdcDigest(expected)) sdcStop("SDC-DISPOSITION-CONFLICT");
+  } else if (value.dispositionRef !== null) sdcStop("SDC-JOURNAL-CONFLICT");
+  // A crash may occur after exclusive publication but before its journal update.
+  // Recognize only exact files bound by this already validated full-subject prefix.
+  if (value.archiveRef === null && existsSync(sdcPath(packet.repository, paths.archive))) {
+    const archived = sdcRead(packet.repository, paths.archive);
+    if (archived.ref.sha256 !== packet.descriptor.sha256 || archived.ref.size !== packet.descriptor.size) sdcStop("SDC-ARCHIVE-CONFLICT");
+    value = { ...value, archiveRef: archived.ref, step: "archive-published" };
+  }
+  if (value.dispositionRef === null && existsSync(sdcPath(packet.repository, paths.disposition))) {
+    if (value.archiveRef === null) sdcStop("SDC-DISPOSITION-CONFLICT");
+    const observed = sdcRead(packet.repository, paths.disposition), disposition = JSON.parse(observed.bytes);
+    if (sdcDigest(disposition) !== sdcDigest(sdcDisposition(packet, subject, proofSha, disposition.keyReference, value.archiveRef, value.createdAt))) sdcStop("SDC-DISPOSITION-CONFLICT");
+    value = { ...value, dispositionRef: observed.ref, step: "disposition-published" };
+  }
+  return { value, ref: read.ref };
+}
+function sdcVerifyInternal(args, deps, underLock = false) {
+  const { rootDir, package: packet, proof, anchor } = args;
+  if (!sdcValidPacket(packet) || typeof rootDir !== "string" || !isAbsolute(rootDir)) sdcStop("SDC-SHAPE");
+  if (!proof) sdcStop("SDC-PROOF");
+  if (!sdcOwn(anchor, ["keyReference", "publicKeySha256"]) || typeof anchor.keyReference !== "string" || !anchor.keyReference || !SHA256.test(anchor.publicKeySha256)) sdcStop("SDC-ANCHOR");
+  const intent = sdcIntent(packet);
+  if (proof.intentSha256 !== intent.sha256) sdcStop("SDC-DOMAIN");
+  const verified = sdcVerifyProof({ intent, trustPolicy: anchor, proof });
+  if (!verified.verified) sdcStop(verified.code === "PO-APPROVAL-TRUST-MISMATCH" || proof.keyReference !== anchor.keyReference ? "SDC-ANCHOR" : "SDC-PROOF");
+  const clock = (deps.now ?? (() => new Date().toISOString()))();
+  if (!sdcTime(clock)) sdcStop("SDC-OBSERVATION-UNAVAILABLE", "unavailable");
+  if (Date.parse(clock) >= Date.parse(packet.expiresAt)) sdcStop("SDC-EXPIRED");
+  if (realpathSync(rootDir) !== rootDir || packet.repository.primaryRoot !== rootDir) sdcStop("SDC-ROOT");
+  const repository = inspectSignedDescriptorCustodyRepository(rootDir);
+  if (repository.primaryRoot !== packet.repository.primaryRoot || repository.commonDir !== packet.repository.commonDir) sdcStop("SDC-ROOT");
+  if (sdcDigest(repository.candidate) !== sdcDigest(packet.repository.candidate)) sdcStop("SDC-CANDIDATE");
+  const subject = sdcDigest(packet), paths = sdcPaths(packet, subject), proofSha = verified.proofSha256;
+  const journal = sdcJournal(packet, subject, proofSha, paths);
+  if (journal?.value.dispositionRef) {
+    const disposition = JSON.parse(sdcCheckRef(packet.repository, journal.value.dispositionRef).bytes);
+    if (disposition.keyReference !== anchor.keyReference) sdcStop("SDC-DISPOSITION-CONFLICT");
+  }
+  const observed = sdcObserve(rootDir, packet.session.sessionId, deps, packet, journal, underLock);
+  if (!observed.physical.activePresent && (!journal || !["disposition-published", "active-removed", "completed"].includes(journal.value.step))) sdcStop("SDC-DESCRIPTOR-CAS");
+  if (observed.physical.activePresent && journal && ["active-removed", "completed"].includes(journal.value.step)) sdcStop("SDC-DESCRIPTOR-CAS");
+  return { packet, subject, proofSha, paths, journal, ...observed, clock };
+}
+export function verifySignedDescriptorCustodyPackage(args = {}, deps = {}) {
+  try { const context = sdcVerifyInternal(args, deps); return sdcEnvelope("verify", "verified", "SDC-VERIFIED", { subjectSha256: context.subject, proofSha256: context.proofSha }); }
+  catch (error) { return sdcEnvelope("verify", error.sdcStatus ?? "refused", error.code?.startsWith("SDC-") ? error.code : "SDC-OBSERVATION-UNAVAILABLE", { subjectSha256: null, proofSha256: null }); }
+}
+function sdcDisposition(packet, subject, proofSha, keyReference, archiveRef, createdAt) {
+  return { schema: "pipeline.descriptor-custody-disposition.v1", subjectSha256: subject, proofSha256: proofSha, keyReference, sessionId: packet.session.sessionId, ownerNonceSha256: packet.session.ownerNonceSha256, descriptorSha256: packet.descriptor.sha256, archiveRef, manifestSha256: packet.casPrecondition.manifestSha256, authoritySha256: packet.authority.sha256, sessionEndedConfirmationSha256: sdcDigest(packet.sessionEndedConfirmation), disposition: packet.disposition, createdAt };
+}
+function sdcPublish(repository, path, bytes, previous = null) {
+  const physical = sdcPath(repository, path), parent = dirname(physical);
+  let ancestor = parent;
+  while (!existsSync(ancestor)) ancestor = dirname(ancestor);
+  for (const part of relative(ancestor, parent).split(sep).filter(Boolean)) {
+    ancestor = join(ancestor, part); mkdirSync(ancestor, { mode: 0o700 });
+  }
+  if (process.platform === "win32" && hardenWindowsPrivateDirectory(parent).status !== "secure") sdcStop("SDC-PRIVATE-PATH");
+  if (previous && sdcRead(repository, path).ref.sha256 !== previous.sha256) sdcStop("SDC-JOURNAL-CONFLICT");
+  if (!previous) {
+    const fd = openSync(physical, "wx", 0o600);
+    try { writeFileSync(fd, bytes); sdcFsync(fd); } finally { closeSync(fd); }
+  } else {
+    const temporary = `${physical}.${randomBytes(12).toString("hex")}.tmp`, fd = openSync(temporary, "wx", 0o600);
+    try { writeFileSync(fd, bytes); sdcFsync(fd); } finally { closeSync(fd); }
+    try { if (sdcRead(repository, path).ref.sha256 !== previous.sha256) sdcStop("SDC-JOURNAL-CONFLICT"); renameSync(temporary, physical); }
+    finally { if (existsSync(temporary)) unlinkSync(temporary); }
+  }
+  sdcFlushDirectory(parent);
+  const read = sdcRead(repository, path);
+  if (read.ref.sha256 !== sdcSha(bytes)) sdcStop("SDC-PRIVATE-PATH");
+  return read.ref;
+}
+function sdcFlushDirectory(path) {
+  let fd;
+  try { fd = openSync(path, "r"); sdcFsync(fd); }
+  catch (error) { if (!(process.platform === "win32" && ["EPERM", "EINVAL", "EISDIR", "EACCES", "ENOTSUP"].includes(error.code))) throw error; }
+  finally { if (fd !== undefined) closeSync(fd); }
+}
+export function applySignedDescriptorCustody(args = {}, deps = {}) {
+  let context, mutated = false, archiveRef = null, dispositionRef = null, journalRef = null;
+  const output = (status, code) => sdcEnvelope("apply", status, code, { subjectSha256: context?.subject ?? null, proofSha256: context?.proofSha ?? null, mutated, archiveRef, dispositionRef, journalRef });
+  const stage = name => {
+    if (deps.onCustodyStage) {
+      const event = Object.freeze({ stage: name, subjectSha256: context.subject, sessionId: context.packet.session.sessionId,
+        descriptorPath: sdcPath(context.packet.repository, context.packet.descriptor.path), manifestPath: sdcPath(context.packet.repository, context.packet.manifest.state === "present" ? context.packet.manifest.target.path : context.packet.manifest.path), archivePath: sdcPath(context.packet.repository, context.paths.archive), journalPath: sdcPath(context.packet.repository, context.paths.journal), dispositionPath: sdcPath(context.packet.repository, context.paths.disposition) });
+      try { const returned = deps.onCustodyStage(event); if (returned !== undefined) sdcStop("SDC-SHAPE"); }
+      catch { sdcStop("SDC-INTERRUPTED", "interrupted"); }
+    }
+  };
+  try {
+    context = sdcVerifyInternal(args, deps);
+    if (context.journal?.value.step === "completed" && !context.physical.activePresent) {
+      archiveRef = context.journal.value.archiveRef; dispositionRef = context.journal.value.dispositionRef; journalRef = context.journal.ref;
+      return output("already-archived", "SDC-ALREADY-ARCHIVED");
+    }
+    stage("before-manifest-lock");
+    return withSignedDescriptorCustodyManifestLock(args.rootDir, context.packet.session.sessionId, () => {
+      context = sdcVerifyInternal(args, deps, true);
+      stage("after-revalidation-before-journal");
+      context = sdcVerifyInternal(args, deps, true);
+      let journal = context.journal?.value ?? { schema: "pipeline.descriptor-custody-journal.v1", subjectSha256: context.subject, proofSha256: context.proofSha, repository: context.packet.repository, sessionId: context.packet.session.sessionId, descriptor: context.packet.descriptor, manifest: context.packet.manifest, authoritySha256: context.packet.authority.sha256, step: "prepared", archiveRef: null, dispositionRef: null, createdAt: context.clock, updatedAt: context.clock };
+      journalRef = context.journal?.ref ?? null; archiveRef = journal.archiveRef; dispositionRef = journal.dispositionRef;
+      const update = step => {
+        journal = { ...journal, step, archiveRef, dispositionRef, updatedAt: (deps.now ?? (() => new Date().toISOString()))() };
+        // Count every durable transaction write, even if its following readback interrupts.
+        mutated = true; journalRef = sdcPublish(context.packet.repository, context.paths.journal, sdcCanonical(journal), journalRef);
+      };
+      if (!journalRef) { update("prepared"); stage("after-journal-prepared"); }
+      if (!archiveRef) {
+        mutated = true; archiveRef = sdcPublish(context.packet.repository, context.paths.archive, context.physical.bytes);
+        update("archive-published"); stage("after-archive-published");
+      }
+      if (!dispositionRef) {
+        mutated = true; dispositionRef = sdcPublish(context.packet.repository, context.paths.disposition, sdcCanonical(sdcDisposition(context.packet, context.subject, context.proofSha, args.anchor.keyReference, archiveRef, journal.createdAt)));
+        update("disposition-published"); stage("after-disposition-published");
+      }
+      stage("before-active-remove");
+      const fresh = sdcVerifyInternal(args, deps, true);
+      if (fresh.physical.activePresent) {
+        unlinkSync(fresh.physical.activePath); mutated = true; sdcFlushDirectory(dirname(fresh.physical.activePath));
+        if (existsSync(fresh.physical.activePath)) sdcStop("SDC-DESCRIPTOR-CAS");
+        update("active-removed"); stage("after-active-remove");
+      }
+      // Authenticate exact archive/disposition/prefix and all retained preimages again.
+      sdcVerifyInternal(args, deps, true);
+      update("completed"); stage("after-journal-complete");
+      const complete = sdcVerifyInternal(args, deps, true);
+      if (complete.journal?.value.step !== "completed" || complete.physical.activePresent) sdcStop("SDC-JOURNAL-CONFLICT");
+      return output("archived", "SDC-ARCHIVED");
+    }, { archivedDescriptorSha256: context.journal ? context.packet.descriptor.sha256 : null });
+  } catch (error) { return output(error.sdcStatus ?? "refused", error.code?.startsWith("SDC-") ? error.code : "SDC-OBSERVATION-UNAVAILABLE"); }
+}

@@ -19,7 +19,7 @@ import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCo
 import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
 import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
 import { blocked, boundAuthorityDocumentPath, humanOverrideRoute, protectedAuthorityDocumentWriteOnly, protectedStateWriterOnly } from "./denial-route.mjs";
-import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation } from "./sanctioned-args-scripts.mjs";
+import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation, isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
 import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
 import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
 import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
@@ -28,6 +28,7 @@ import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyCl
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
 import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
 import { devPlanShellBlocked, devPlanShellFaultBlocked, devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
+import { isSourceOwnedContinuityVerificationCommand, isFixedOwningVerificationControllerCandidate, acquireSourceOwnedOwningControllerCommandAdmission, releaseSourceOwnedOwningControllerCommandAdmission } from "./command-catalogue.mjs";
 import { evaluateAfterGrammarAdmission } from "./lifecycle-gate.mjs";
 import { powerShellScopeVerdict, sanctionedPowerShellNodeCall } from "./powershell-dialect.mjs";
 import { envDumpClassifierErrorRefusal, envDumpShellRefusal } from "./env-dump-lane.mjs";
@@ -60,10 +61,11 @@ function withRebaseAuthorityDisclosure(result, dependencies, memo) {
 }
 
 export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
-  if (!observeGovernanceScope({ rootDir: dependencies.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return verdict(0);
+  if (!(dependencies.observeGovernanceScopeFn ?? observeGovernanceScope)({ rootDir: dependencies.projectDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return verdict(0);
   const memo = { resolved: false, value: null };
-  const scoped = { ...dependencies, rebaseAuthorityMemo: memo };
-  return withRebaseAuthorityDisclosure(evaluateLifecycleReadyGuardCore(input, scoped), dependencies, memo);
+  const scoped = { ...dependencies, rebaseAuthorityMemo: memo, sourceOwnedOwningControllerCommandAdmissionHandle: undefined };
+  try { return withRebaseAuthorityDisclosure(evaluateLifecycleReadyGuardCore(input, scoped), dependencies, memo); }
+  finally { releaseSourceOwnedOwningControllerCommandAdmission(scoped.sourceOwnedOwningControllerCommandAdmissionHandle); }
 }
 
 function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
@@ -101,6 +103,25 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   } catch {
     return blocked();
   }
+
+  // Only this synchronous evaluation creates its private readonly Controller observation.
+  if (toolName === "Bash" && isFixedOwningVerificationControllerCandidate(input.tool_input.command ?? input.tool_input.CommandLine, root)) {
+    const handle = acquireSourceOwnedOwningControllerCommandAdmission(input.tool_input.command ?? input.tool_input.CommandLine, root);
+    if (handle === null) return verdict(2, "OSV-CONTROLLER-INVOCATION-INVALID: fixed approved Controller inputs are unavailable.\n");
+    dependencies.sourceOwnedOwningControllerCommandAdmissionHandle = handle;
+  }
+
+  // Only the genuine requester consumer can issue this process-local brand.
+  // No supplied boolean, input field or copied exchange substitutes for it.
+  if (dependencies.sourceOwnedVerificationGuardContextHandle !== undefined
+    && (toolName !== "Bash" || !isSourceOwnedContinuityVerificationCommand(
+      input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,
+    ))) return verdict(2, "OSV-GUARD-CONTEXT-INVALID: owning verification context is unavailable or does not match the fixed command.\n");
+
+  // Dedicated passive endpoint after environment/root checks, before receipts or telemetry.
+  if (toolName === "Bash" && isSanctionedGovernanceScopeDiagnosticInvocation(
+    input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,
+  )) return verdict(0);
 
   // These event observers receive native host input. A ready lifecycle does
   // not allow an agent to invoke them with self-authored event JSON.

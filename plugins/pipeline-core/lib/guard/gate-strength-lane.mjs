@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "gate-strength-lane" (layer 3), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
-import { physicalQualityPackageFile, validateQualityPackageCommandArgs } from "../signed-quality-package.mjs";
+import { physicalQualityPackageFile, validateQualityPackageCommandArgs, relatedCommittedQualityPackageCommandAdmission } from "../signed-quality-package.mjs";
 import { isBoundedScratchOnlyWords } from "../physical-scratch-boundary.mjs";
 import { realpathSync } from "node:fs";
 import { basename, isAbsolute, join, resolve } from "node:path";
@@ -303,7 +303,9 @@ export function signedQualityPackageCommandAdmission(command, root, dependencies
         && physicalQualityPackageFile(words[1], pluginRoot, 1024 * 1024)
       : words[1] === script;
     if (!sameScript || !physicalQualityPackageFile(script, pluginRoot, 1024 * 1024)) return false;
-    return validateQualityPackageCommandArgs(words.slice(2), root);
+    const args = words.slice(2);
+    return validateQualityPackageCommandArgs(args, root)
+      || relatedCommittedQualityPackageCommandAdmission(args, root);
   } catch { return false; }
 }
 

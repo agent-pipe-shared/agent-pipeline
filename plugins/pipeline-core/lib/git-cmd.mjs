@@ -1032,103 +1032,77 @@ export function hasFailClosedMarker(cmd) {
   );
 }
 
-// ---- GREP-PUSH-F (PO Ruling 157, built on Ruling 81): the marker exemption for a plain read/commit subcommand ------------------
-// Option B keeps $, a backtick, { , ( and ) fail-closed for every command that names git. Ruling 157 accepts, for ONE shape,
-// that those characters are data: a single-line command that is exactly "git <sub> ..." with <sub> one of commit, grep, log,
-// show, diff or status written literally right after the git word, and in which every marker character sits inside a quoted
-// span. The trade is bought back by three conditions, each one a place a push could still hide:
-//   - the text is ONE simple command: outside quotes there is no ; & | < > # and none of the five characters, and the text
-//     holds no backslash and no line break, so there is no second command, no redirect, no process substitution, no brace
-//     expansion and no here-document;
-//   - the git word is followed DIRECTLY by the subcommand: a global option before it (-c alias.x=!..., -C, --git-dir) is never
-//     exempt, so an alias cannot rename a push;
-//   - every command substitution inside a double-quoted span ($( ) or a backtick pair) is a SIMPLE command of plain word
-//     characters that commandIsGitPushAt itself classifies as not a push; a substitution with quotes, a nested one, an
-//     assignment form (the dollar-brace default-assign) or any other construct is not modelled and is not exempt. A
-//     single-quoted span is literal text.
-// Only the MARKER reason is lifted. A non-character marker (non-ASCII quote, nested shell, here-document receiver) is never
-// exempt here, and the rest of commandIsGitPushAt (runner receivers, env -S, classifyPush under three readings) still runs.
-const MARKER_EXEMPT_SUBCOMMANDS = new Set(["commit", "grep", "log", "show", "diff", "status"]);
-const MARKER_EXEMPT_UNQUOTED_FORBIDDEN_RE = /[$`{}()<>;&|#\\\r\n]/u;
-const MARKER_EXEMPT_PAYLOAD_RE = /^[A-Za-z0-9_./:@%+,\- ]*$/u;
-const MARKER_EXEMPT_MAX_LENGTH = 8192;
+// ---- M6A: narrow literal/data routing proof; reader admission remains separate --------
+// Rejected Ruling 157 grants no quoted-substitution exemption. Prove raw lexical
+// boundaries and operand roles here, never caller argv or stripped quoted spans.
+const LITERAL_READ_MAX_LENGTH = 4096;
+const LITERAL_PATTERN_MAX_LENGTH = 2048;
+const LITERAL_RG_FLAGS = new Set([
+  "-n", "--line-number", "-S", "--smart-case", "-i", "--ignore-case",
+  "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
+  "-x", "--line-regexp", "-l", "--files-with-matches", "-L",
+  "--files-without-match", "--no-messages", "-o", "--only-matching",
+]);
 
-/** The payloads of the command substitutions inside one double-quoted span, or null when the span holds anything this rule does not model. */
-function doubleQuotedSubstitutions(content) {
-  const payloads = [];
-  let parenDepth = 0;
-  for (let i = 0; i < content.length; i += 1) {
-    const ch = content[i];
-    if (ch === "`") {
-      const close = content.indexOf("`", i + 1);
-      if (close === -1) return null;
-      payloads.push(content.slice(i + 1, close));
-      i = close;
-    } else if (ch === "$") {
-      const next = content[i + 1];
-      if (next === "(") {
-        let depth = 1;
-        let j = i + 2;
-        for (; j < content.length && depth > 0; j += 1) {
-          if (content[j] === "(") depth += 1;
-          else if (content[j] === ")") depth -= 1;
-        }
-        if (depth !== 0) return null;
-        payloads.push(content.slice(i + 2, j - 1));
-        i = j - 1;
-      } else if (next === undefined || !/[A-Za-z_]/u.test(next)) return null;
-      // A plain $NAME is data: a variable can only be read here, never assigned.
-    } else if (ch === "(") parenDepth += 1;
-    else if (ch === ")") {
-      if (parenDepth === 0) return null;
-      parenDepth -= 1;
-    }
-  }
-  return parenDepth === 0 ? payloads : null;
-}
-
-/** True when the marker characters of cmd are inert data (see the block comment above); the caller still runs the rest of the rule. */
-function markerRuleIsInert(cmd, depth) {
-  if (depth >= INNER_COMMAND_MAX_DEPTH || cmd.length > MARKER_EXEMPT_MAX_LENGTH) return false;
-  if (/[\\\r\n‘-‟]/u.test(cmd)) return false;
-  if (NESTED_POSIX_SHELL_RE.test(cmd) || NESTED_WINDOWS_SHELL_RE.test(cmd) || hasShellHeredocReceiver(cmd)) return false;
-  const words = [];
-  const payloads = [];
-  let word = "";
-  const endWord = () => {
-    if (word !== "") words.push(word);
-    word = "";
-  };
-  for (let i = 0; i < cmd.length; ) {
-    const ch = cmd[i];
-    if (ch === " " || ch === "\t") {
-      endWord();
-      i += 1;
-      continue;
-    }
-    if (ch === "'" || ch === '"') {
-      const close = cmd.indexOf(ch, i + 1);
+/** Only complete ordinary single-quoted patterns may contain marker data. */
+function literalReadMarkersAreData(cmd) {
+  if (cmd.length > LITERAL_READ_MAX_LENGTH || /[^\x20-\x7e\t]/u.test(cmd)) return false;
+  if (/^[ \t]*git[ \t]+rev-parse[ \t]+HEAD[ \t]+HEAD\^\{tree\}[ \t]*$/u.test(cmd)) return true;
+  const tokens = [];
+  for (let index = 0; index < cmd.length;) {
+    if (cmd[index] === " " || cmd[index] === "\t") { index += 1; continue; }
+    const quoted = cmd[index] === "'";
+    let value;
+    if (quoted) {
+      const close = cmd.indexOf("'", index + 1);
       if (close === -1) return false;
-      if (ch === '"') {
-        const found = doubleQuotedSubstitutions(cmd.slice(i + 1, close));
-        if (found === null) return false;
-        payloads.push(...found);
-      }
-      word += cmd.slice(i, close + 1);
-      i = close + 1;
+      value = cmd.slice(index + 1, close);
+      if (!value || value.length > LITERAL_PATTERN_MAX_LENGTH || value.includes("\\")) return false;
+      index = close + 1;
+      // Adjacent quoted/unquoted fragments and escaped delimiters are unproven.
+      if (index < cmd.length && cmd[index] !== " " && cmd[index] !== "\t") return false;
+    } else {
+      const begin = index;
+      while (index < cmd.length && cmd[index] !== " " && cmd[index] !== "\t") index += 1;
+      value = cmd.slice(begin, index);
+      if (!/^[A-Za-z0-9_./:@%+,=^~-]+$/u.test(value)) return false;
+    }
+    tokens.push({ value, quoted });
+  }
+  if (tokens.length < 2 || tokens[0].quoted || tokens[0].value !== "rg") return false;
+  let patternSeen = false;
+  let paths = 0;
+  let afterDashDash = false;
+  const seen = new Set();
+  for (let index = 1; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (!afterDashDash && !token.quoted && token.value === "--") {
+      if (!patternSeen) return false;
+      afterDashDash = true;
       continue;
     }
-    if (MARKER_EXEMPT_UNQUOTED_FORBIDDEN_RE.test(ch)) return false;
-    word += ch;
-    i += 1;
+    if (!afterDashDash && !token.quoted && token.value.startsWith("-")) {
+      if (seen.has(token.value)) return false;
+      seen.add(token.value);
+      if (LITERAL_RG_FLAGS.has(token.value)) continue;
+      if (token.value !== "-e" && token.value !== "--regexp") return false;
+      if (patternSeen || !tokens[index + 1]?.quoted) return false;
+      patternSeen = true;
+      index += 1;
+      continue;
+    }
+    if (!patternSeen) {
+      if (!token.quoted || token.value.startsWith("-")) return false;
+      patternSeen = true;
+    } else {
+      // Quotes in options, executables and paths never earn the pattern exemption.
+      if (token.quoted || token.value.startsWith("-")) return false;
+      paths += 1;
+    }
   }
-  endWord();
-  if (words.length < 2 || words[0] !== "git" || !MARKER_EXEMPT_SUBCOMMANDS.has(words[1])) return false;
-  for (const payload of payloads) {
-    if (!MARKER_EXEMPT_PAYLOAD_RE.test(payload)) return false;
-    if (commandIsGitPushAt(payload.trim(), depth + 1)) return false;
-  }
-  return true;
+  // The existing read grammar independently checks these physical public paths,
+  // host rg configuration, readiness and scope. This is routing proof only.
+  return patternSeen && paths > 0;
 }
 
 // ---- GITCLS-F: a command line handed to a shell by `env -S` or by the ex bang of an editor --------------------------
@@ -1295,15 +1269,9 @@ function innerCommandIsPush(cmd, depth) {
  * (`git commit -m '{"a":1}'`, a here-document commit message whose body holds a parenthesis), a `-c` after a shell word
  * (`bash -lc 'git status'`), a data here-document in a unit that also names a shell word (`git add -- node <<EOF`).
  *
- * GREP-PUSH-F (PO Ruling 157, on top of Ruling 81): the five characters $ ` { ( ) are NOT a marker when the whole text is ONE
- * single-line command "git <sub> ..." with <sub> literally commit, grep, log, show, diff or status right after the git word and
- * every one of the characters sits inside a quoted span (see markerRuleIsInert). Outside quotes the command has no ; & | < > #
- * and no backslash, so there is no second command, redirect, process substitution or brace expansion; a global option before
- * the subcommand (git -c alias.x=... x) is never exempt; a command substitution inside a double-quoted span is exempt only when
- * it is a simple command of plain word characters that this function classifies recursively as not a push. So the quoted
- * git commit -m "$(date)" and git grep "(a|b)" are no longer false positives, while an unquoted $(...), a push hidden in a
- * substitution, a push-capable subcommand (push, remote, config, an alias form) and every non-character marker keep failing
- * closed. Only the MARKER reason is lifted: the rules after the marker rule still run on the same text.
+ * M6A lifts the marker reason only for the exact direct literal object reader
+ * and complete ordinary single-quoted rg pattern/regexp operands proven above.
+ * Active quoted substitution retains Q12 fallback; reader admission is separate.
  *
  * Without a marker the three branches of `classifyPush` apply (extracted VERBATIM from guard-push.mjs's own `isPush`
  * computation): branch 1 tests `/\bgit\s+push\b/` against the quote-stripped, lowercased, global-option-normalized view
@@ -1353,7 +1321,7 @@ export function commandIsGitPush(cmd) {
 /** `commandIsGitPush` at a recursion `depth` (0 for the caller's text, +1 per `env -S` string or ex bang payload). */
 function commandIsGitPushAt(cmd, depth) {
   if (typeof cmd !== "string" || cmd === "") return false;
-  if (hasGitWord(cmd) && hasFailClosedMarker(cmd) && !markerRuleIsInert(cmd, depth)) return true;
+  if (hasGitWord(cmd) && hasFailClosedMarker(cmd) && !literalReadMarkersAreData(cmd)) return true;
   // Decision AF: a here-document fed to a command runner is a program the runner executes, so it is treated like one fed to a
   // shell. The git word it needs is read more loosely than the marker rule's (see `hasRunnerGitWord`): `ed` runs `!git push`.
   if (hasRunnerHeredocReceiver(cmd) && hasRunnerGitWord(cmd)) return true;

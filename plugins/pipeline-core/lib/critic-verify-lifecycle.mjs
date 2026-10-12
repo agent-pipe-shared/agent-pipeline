@@ -9,12 +9,17 @@
  * caller-supplied `{ status: "passed" }` object.
  */
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+import { canonicalJson as canonicalCourseJson, sha256Canonical } from "./review-economy.mjs";
+import { validateCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
 import { canonicalJson, sha256 } from "../scripts/critic-packet-preflight.mjs";
-import { readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
-import { validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
+import { readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
 import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
 
 export const CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v1";
@@ -283,4 +288,165 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
   // plan-verifier has no lifecycle slot; readiness has no observation seam in this reader.
   const roleRoutes = Object.freeze({ critic: bound.roleRoute, "plan-verifier": ROUTE_NOT_REGISTERED, readiness: ROUTE_NO_OBSERVATION });
   return Object.freeze({ receipt, receiptSha256: bytesSha256(canonicalJson(receipt)), path: target, roleRoutes });
+}
+
+/** Pure projection; only readConsumedCriticCourseResult supplies journal authority. */
+export function projectConsumedCriticFindings({ packetId, findings }) {
+  if (!PACKET.test(packetId ?? "") || !Array.isArray(findings)) fail("CVL-COURSE-FINDINGS", "Invalid consumed finding projection.");
+  const severity = { blocker: "critical", major: "high", minor: "medium" };
+  return findings.map((finding, index) => {
+    if (!exact(finding, ["gap", "risk", "severity", "evidence", "spec_ref"])
+      || !Object.hasOwn(severity, finding.severity)
+      || ["gap", "risk", "evidence", "spec_ref"].some(key => typeof finding[key] !== "string")) {
+      fail("CVL-COURSE-FINDINGS", "Invalid raw consumed finding.");
+    }
+    return Object.freeze({ id: `CRF-${packetId}-${index + 1}`, priorFindingId: null,
+      severity: severity[finding.severity], status: "open", evidenceSha256: sha256Canonical(finding) });
+  });
+}
+
+function courseGitBytes(root, args) {
+  const result = spawnSync("git", ["-C", root, ...args], { shell: false, encoding: null,
+    timeout: 10000, maxBuffer: 1024 * 1024, env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C",
+      GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: process.platform === "win32" ? "NUL" : "/dev/null",
+      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" } });
+  if (!isSuccessfulSpawn(result) || result.signal !== null) fail("CVL-COURSE-REGISTRATION-UNAVAILABLE", "Registered course observation unavailable.");
+  return result.stdout;
+}
+function coursePath(path) {
+  return typeof path === "string" && path.length <= 256 && !isAbsolute(path)
+    && !path.includes("\\") && !path.includes("\0") && path.split("/").every(part => part !== "" && part !== "." && part !== "..");
+}
+function courseRecordAt(repository, expected) {
+  if (!exact(expected, ["path", "sha256", "recordSha256", "reviewId", "courseKey"])
+    || !coursePath(expected.path) || !SHA.test(expected.sha256 ?? "") || !SHA.test(expected.recordSha256 ?? "")
+    || typeof expected.reviewId !== "string" || !(expected.courseKey === null || SHA.test(expected.courseKey ?? ""))) {
+    fail("CVL-COURSE-RECORD", "Expected retained record locator is invalid.");
+  }
+  const match = /^specs\/([^/]+)\/evidence\//u.exec(expected.path);
+  if (!match || !FEATURE_ID.test(match[1])) fail("CVL-COURSE-RECORD", "Retained record path is invalid.");
+  const root = repository.repoRoot, commit = repository.registrationCommit;
+  const manifest = JSON.parse(courseGitBytes(root, ["show", `${commit}:specs/${match[1]}/lifecycle.json`]));
+  const registrations = manifest?.artifacts?.filter(row => row.path === expected.path) ?? [];
+  if (manifest.schema !== "pipeline.feature-package.v1" || manifest.feature?.id !== match[1] || registrations.length !== 1) {
+    fail("CVL-COURSE-REGISTRATION", "Retained record is not uniquely registered.");
+  }
+  const registration = registrations[0];
+  if (registration.class !== "candidate-evidence" || registration.authority !== false || registration.mutability !== "immutable"
+    || registration.retention !== "retain" || registration.sha256 !== expected.sha256) fail("CVL-COURSE-REGISTRATION", "Retained registration is invalid.");
+  const treeRow = courseGitBytes(root, ["ls-tree", "-z", commit, "--", expected.path]).toString("utf8");
+  if (!/^100644 blob (?:[a-f0-9]{40}|[a-f0-9]{64})\t[^\0]+\0$/u.test(treeRow)
+    || !treeRow.endsWith(`\t${expected.path}\0`)) fail("CVL-COURSE-REGISTRATION", "Retained record must be a regular nonexecuting Git blob.");
+  const bytes = courseGitBytes(root, ["show", `${commit}:${expected.path}`]);
+  if (bytesSha256(bytes) !== expected.sha256) fail("CVL-COURSE-RECORD", "Retained record digest differs.");
+  const retained = JSON.parse(bytes);
+  if (!validateCriticReviewLineage(retained).ok || retained.reviewId !== expected.reviewId
+    || retained.recordSha256 !== expected.recordSha256 || (retained.courseBinding?.courseKey ?? null) !== expected.courseKey) {
+    fail("CVL-COURSE-RECORD", "Retained course record binding differs.");
+  }
+  return retained;
+}
+
+/** Re-read the actual consumed journal and the exact registered terminal record. */
+export function readConsumedCriticCourseResult(input) {
+  try {
+    if (!exact(input, ["resolvedRepository", "packetId", "expectedCandidate", "expectedRange", "expectedRecord"])
+      || !PACKET.test(input.packetId ?? "") || !candidate(input.expectedCandidate)
+      || !exact(input.expectedRange, ["base", "commit", "diffSha256"])
+      || !OID.test(input.expectedRange.base ?? "") || !OID.test(input.expectedRange.commit ?? "")
+      || !SHA.test(input.expectedRange.diffSha256 ?? "")) fail("CVL-COURSE-INPUT", "Consumed course input is invalid.");
+    const repository = input.resolvedRepository;
+    if (!exact(repository, ["repoRoot", "gitCommonDir", "controlRoot", "registrationCommit"])
+      || !isAbsolute(repository.repoRoot) || !isAbsolute(repository.gitCommonDir) || !OID.test(repository.registrationCommit ?? "")) {
+      fail("CVL-COURSE-INPUT", "Resolved repository is invalid.");
+    }
+    const root = realpathSync(repository.repoRoot);
+    const common = realpathSync(resolve(root, courseGitBytes(root, ["rev-parse", "--git-common-dir"]).toString("utf8").trim()));
+    if (root !== repository.repoRoot || common !== repository.gitCommonDir
+      || repository.controlRoot !== join(common, "agent-pipeline", "critic-packets")) fail("CVL-COURSE-INPUT", "Resolved journal boundary differs.");
+    let consumed;
+    try { consumed = readConsumedCandidateResult({ controlRoot: repository.controlRoot, packetId: input.packetId }); }
+    catch (error) {
+      if (error?.code === "ENOENT" || error?.code === "CPP-ABSENT" || /UNAVAILABLE|NOT-FOUND|READ/u.test(error?.code ?? "")) {
+        return Object.freeze({ ok: false, status: "unavailable", code: "CVL-COURSE-JOURNAL-UNAVAILABLE" });
+      }
+      fail("CVL-COURSE-JOURNAL", "Consumed journal is contradictory or unavailable.");
+    }
+    const { packet, receipt, result } = consumed;
+    validateSessionCriticResult(result, packet);
+    validateSessionCriticReceipt(receipt);
+    if (canonicalCourseJson(sessionCriticReceiptForResult(result)) !== canonicalCourseJson(receipt)
+      || packet.packetId !== input.packetId || packet.candidate.commit !== input.expectedCandidate.commit
+      || packet.candidate.tree !== input.expectedCandidate.tree
+      || canonicalCourseJson(result.reviewRange) !== canonicalCourseJson(input.expectedRange)) fail("CVL-COURSE-BINDING", "Consumed packet/result/receipt binding differs.");
+    const receiptSha256 = sha256Canonical(receipt), resultSha256 = sha256Canonical(result);
+    const findings = projectConsumedCriticFindings({ packetId: input.packetId, findings: result.verdict.findings });
+    let recordSha256 = null;
+    if (input.expectedRecord !== null) {
+      const retained = courseRecordAt(repository, input.expectedRecord);
+      if (retained.request.packetId !== input.packetId || retained.candidate.commit !== packet.candidate.commit
+        || retained.candidate.tree !== packet.candidate.tree || retained.diff.base !== packet.diff.base
+        || retained.diff.sha256 !== packet.diff.sha256
+        || retained.verdict.resultSha256 !== resultSha256 || !retained.verdict.schemaValid
+        || retained.verdict.status !== (result.verdict.pass ? "no-findings" : "findings")
+        || retained.references.packetSha256 !== sha256Canonical(packet)
+        || retained.references.requestSha256 !== packet.bindings.requestSha256
+        || retained.coverage.complete !== true || retained.coverage.receiptSha256 !== receiptSha256
+        || retained.lane.laneId !== result.session.id || retained.lane.contextSha256 !== sha256Canonical(result.session)) {
+        fail("CVL-COURSE-RECORD", "Retained record is not bound to the genuine consumed result.");
+      }
+      if (retained.schema === "pipeline.critic-review-lineage.v2") {
+        const claim = readConsumedCourseClaimBinding({ resolvedRepository: repository, packetId: input.packetId, expectedCandidate: input.expectedCandidate });
+        if (!claim.ok) return claim;
+        if (retained.courseBinding.courseSourceSha256 !== claim.value.courseSourceSha256
+          || retained.courseBinding.courseDecisionSha256 !== claim.value.courseDecisionSha256) fail("CVL-COURSE-RECORD", "Retained course digests differ from actual consumed admission.");
+        const bindings = result.verdict.findings.map((finding,index) => ({ findingId: findings[index].id, index, sha256: sha256Canonical(finding) }));
+        const expected = { packetId: input.packetId, packetDigest: receipt.packetDigest, receiptSha256,
+          resultSha256, verdictSha256: receipt.verdictSha256, findingBindings: bindings };
+        if (canonicalCourseJson(retained.consumedResult) !== canonicalCourseJson(expected)) fail("CVL-COURSE-RECORD", "Retained consumed-result bindings differ.");
+      }
+      for (const finding of findings) {
+        const rows = retained.findings.filter(row => row.evidenceSha256 === finding.evidenceSha256 && row.severity === finding.severity && row.status === "open"
+          && (retained.schema !== "pipeline.critic-review-lineage.v2" || row.id === finding.id));
+        if (rows.length !== 1 || (retained.schema === "pipeline.critic-review-lineage.v2" && rows[0].id !== finding.id)) fail("CVL-COURSE-FINDINGS", "Retained raw finding binding differs.");
+      }
+      recordSha256 = retained.recordSha256;
+    }
+    return Object.freeze({ ok: true, value: Object.freeze({ packet, receipt, result,
+      receiptSha256, resultSha256, recordSha256, findings }) });
+  } catch (error) {
+    return Object.freeze({ ok: false, status: /UNAVAILABLE/u.test(error?.code ?? "") ? "unavailable" : "refused",
+      code: typeof error?.code === "string" && /^(?:CVL|SCF)-/u.test(error.code) ? error.code : "CVL-COURSE-INVALID" });
+  }
+}
+
+/** Observe the real consumed admission; serialized caller course claims are not inputs. */
+export function readConsumedCourseClaimBinding(input) {
+  try {
+    if (!exact(input, ["resolvedRepository", "packetId", "expectedCandidate"])) fail("CVL-COURSE-INPUT", "Claim-binding input is invalid.");
+    const repository = input.resolvedRepository;
+    if (!exact(repository, ["repoRoot", "gitCommonDir", "controlRoot", "registrationCommit"])
+      || !isAbsolute(repository.repoRoot) || !isAbsolute(repository.gitCommonDir)
+      || !OID.test(repository.registrationCommit ?? "") || !PACKET.test(input.packetId ?? "")
+      || !candidate(input.expectedCandidate)) fail("CVL-COURSE-INPUT", "Claim-binding repository is invalid.");
+    const root = realpathSync(repository.repoRoot);
+    const common = realpathSync(resolve(root, courseGitBytes(root, ["rev-parse", "--git-common-dir"]).toString("utf8").trim()));
+    if (root !== repository.repoRoot || common !== repository.gitCommonDir
+      || repository.controlRoot !== join(common, "agent-pipeline", "critic-packets")) fail("CVL-COURSE-INPUT", "Claim journal boundary differs.");
+    const actual = readConsumedSessionAdmission({ controlRoot: repository.controlRoot, packetId: input.packetId });
+    validateSessionCriticResult(actual.result, actual.packet);
+    validateSessionCriticReceipt(actual.receipt);
+    if (canonicalCourseJson(sessionCriticReceiptForResult(actual.result)) !== canonicalCourseJson(actual.receipt)
+      || actual.packet.candidate.commit !== input.expectedCandidate.commit
+      || actual.packet.candidate.tree !== input.expectedCandidate.tree) fail("CVL-COURSE-BINDING", "Consumed claim candidate/result differs.");
+    return Object.freeze({ ok: true, value: Object.freeze({
+      courseSourceSha256: actual.admission.courseSourceSha256,
+      courseDecisionSha256: actual.admission.courseDecisionSha256,
+      preflightSha256: actual.admission.preflightSha256,
+      admissionSha256: sha256Canonical(actual.admission) }) });
+  } catch (error) {
+    return Object.freeze({ ok: false, status: error?.code === "ENOENT" || error?.code === "CPP-ABSENT"
+      || /UNAVAILABLE/u.test(error?.code ?? "") ? "unavailable" : "refused",
+      code: /^(?:CVL|CPP|SCF)-/u.test(error?.code ?? "") ? error.code : "CVL-COURSE-INVALID" });
+  }
 }

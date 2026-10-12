@@ -1,3 +1,6 @@
+
+import {fileURLToPath as authorityFileURLToPath} from 'node:url';
+import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest} from './session-authority-domain-owner.mjs';
 // SPDX-License-Identifier: SUL-1.0
 /**
  * Functional Nova B1-I same-host worker supervisor.
@@ -16,6 +19,7 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
+  opendirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -1088,7 +1092,7 @@ async function waitForWorkers({ request, runtimes, record, recordPath, cancelPat
   if (persistenceFailure) throw persistenceFailure;
 }
 
-export async function runLocalWorkerSupervisor({
+async function runLocalWorkerSupervisorUnregistered({
   request,
   stateRoot,
   expectedPlanSha256,
@@ -1218,7 +1222,7 @@ function inspectProcess(identity, verifyNonce = true) {
   }
 }
 
-export function cancelLocalWorkerSupervisor({
+function cancelLocalWorkerSupervisorUnregistered({
   stateRoot,
   expectedRecordSha256,
   activate = false,
@@ -1308,7 +1312,7 @@ function validMarker(marker, record, worker, workspacePath) {
     && sha(marker.markerSha256) && unsignedDigest(marker, "markerSha256") === marker.markerSha256;
 }
 
-export function cleanupLocalWorkerSupervisor({
+function cleanupLocalWorkerSupervisorUnregistered({
   stateRoot,
   expectedRecordSha256,
   activate = false,
@@ -1362,3 +1366,69 @@ export function cleanupLocalWorkerSupervisor({
 export function localWorkerSupervisorFixturePath() {
   return FIXTURE_WORKER;
 }
+
+const workerAuthorityOwners=new Map(),workerAuthorityPorts=new WeakMap(),workerAuthorityReposByRoot=new Map();
+function workerAuthorityOwner(repository){
+  const repo=authorityActualRepository(repository),key=JSON.stringify(repo);if(workerAuthorityOwners.has(key))return workerAuthorityOwners.get(key);
+  const namespaces=['registered-external-state-roots','supervisor-state','supervisor-lifecycle'];
+  const scan=()=>{
+    // External-root absence cannot establish legacy completeness. Owner registration
+    // is required; no home glob or reconstructed path grants negative authority.
+    const roots=[];
+    const registered=authorityScanDomain({rootPath:join(repo.commonDir,'agent-pipeline','local-worker-supervisor'),namespaceIds:namespaces,classifyEntry(entry){if(/^authority-lifetimes\/[a-f0-9]{64}\.json$/.test(entry.relativePath))return authorityClassifyLifetime(entry,'local-worker-supervisor',namespaces[2],repo);const value=entry.value;if(/^external-roots\/[a-f0-9]{64}\.json$/.test(entry.relativePath)&&value?.schema==='pipeline.source-owned-authority-root.v1'&&Object.keys(value).sort().join(',')===['schema','repositorySha256','rootPath','rootPathSha256','rootRecordSha256'].sort().join(',')&&value.repositorySha256===authorityDigest({primaryRoot:repo.primaryRoot,commonDir:repo.commonDir})&&value.rootPathSha256===authorityDigest(value.rootPath)&&entry.relativePath==='external-roots/'+value.rootPathSha256+'.json'){roots.push(value);return {namespaceId:namespaces[0],active:false,semantic:value};}authorityOwnerFailure('local-worker-supervisor:unregistered-external-root');}});
+    if(!roots.length){
+      const namespaceRoot=join(repo.commonDir,'agent-pipeline','local-worker-supervisor');
+      if(registered.entries.length===0&&registered.memberships.every(m=>m.entryCount===0)){
+        // Empty greenfield is a physical baseline, not external-root authority.
+        // Even a nested empty legacy directory is an artifact and stays held.
+        let directory;
+        try{directory=opendirSync(namespaceRoot,{bufferSize:1});if(directory.readSync()!==null)authorityOwnerFailure('local-worker-supervisor:external-root-migration-required');}
+        catch(error){if(error.code!=='ENOENT')throw error;}
+        finally{if(directory)directory.closeSync();}
+        const fresh=authorityScanDomain({rootPath:namespaceRoot,namespaceIds:namespaces,classifyEntry(){authorityOwnerFailure('local-worker-supervisor:empty-baseline-changed');}});
+        if(authorityDigest(fresh)!==authorityDigest(registered))authorityOwnerFailure('local-worker-supervisor:empty-baseline-CAS');
+      }else{
+        // The first real reservation publishes its lifetime before registry
+        // advance. Only this owner's current private reservation/execution can
+        // observe it; a well-shaped, parked, copied or foreign row is insufficient.
+        if(typeof owner.readCurrentInitialLifetime!=='function')authorityOwnerFailure('local-worker-supervisor:initial-lifetime-owner-unavailable');
+        const initial=owner.readCurrentInitialLifetime();
+        if(!exact(initial,['identity','bindingSha256','sourceFact'])||!exact(initial.identity,['enrollment','requestSha256','stateRoot'])||initial.identity.enrollment!==true||!sha(initial.identity.requestSha256)||!sha(initial.bindingSha256)||typeof initial.identity.stateRoot!=='string'||!isAbsolute(initial.identity.stateRoot)||resolve(initial.identity.stateRoot)!==initial.identity.stateRoot||registered.entries.length!==1)authorityOwnerFailure('local-worker-supervisor:external-root-migration-required');
+        const lifetimeRelative='authority-lifetimes/'+initial.bindingSha256+'.json',entry=registered.entries[0];
+        if(entry.relativePath!==lifetimeRelative||entry.path!==join(namespaceRoot,lifetimeRelative)||entry.value.phase!=='armed'||entry.value.bindingSha256!==initial.bindingSha256||entry.value.identitySha256!==authorityDigest(initial.identity)||authorityDigest(entry.sourceFact)!==authorityDigest(initial.sourceFact))authorityOwnerFailure('local-worker-supervisor:initial-lifetime-CAS');
+        const anchorBefore=workerExternalSnapshot(repo,initial.identity.stateRoot,namespaces);
+        if(!anchorBefore.entries.some(row=>row.relativePath==='state.json'&&validateLocalSupervisorState(row.value).ok))authorityOwnerFailure('local-worker-supervisor:anchor-unavailable');
+        const exactNames=(directoryPath,expected)=>{
+          let directory;
+          try{
+            const identity=lstatSync(directoryPath);if(!identity.isDirectory()||identity.isSymbolicLink())authorityOwnerFailure('local-worker-supervisor:initial-directory-identity');
+            directory=opendirSync(directoryPath,{bufferSize:1});const names=[];
+            for(let i=0;i<=expected.length;i++){const next=directory.readSync();if(next===null)break;names.push(next.name);}
+            if(authorityDigest(names.sort())!==authorityDigest([...expected].sort()))authorityOwnerFailure('local-worker-supervisor:external-root-migration-required');
+          }finally{if(directory)directory.closeSync();}
+        };
+        // Full directory inventory matters even when an unknown directory is empty.
+        exactNames(namespaceRoot,['authority-lifetimes']);
+        exactNames(join(namespaceRoot,'authority-lifetimes'),[initial.bindingSha256+'.json']);
+        const fresh=authorityScanDomain({rootPath:namespaceRoot,namespaceIds:namespaces,classifyEntry(row){if(row.relativePath!==lifetimeRelative)authorityOwnerFailure('local-worker-supervisor:initial-baseline-changed');return authorityClassifyLifetime(row,'local-worker-supervisor',namespaces[2],repo);}});
+        const current=owner.readCurrentInitialLifetime(),anchorAfter=workerExternalSnapshot(repo,initial.identity.stateRoot,namespaces);
+        if(current===null||authorityDigest(current)!==authorityDigest(initial)||authorityDigest(fresh)!==authorityDigest(registered)||authorityDigest(anchorAfter)!==authorityDigest(anchorBefore))authorityOwnerFailure('local-worker-supervisor:initial-baseline-CAS');
+      }
+    }
+    const snapshots=[registered];for(const root of roots){const state=authorityReadSource({namespaceId:namespaces[1],filePath:join(root.rootPath,'state.json'),semantic:({value})=>{if(!validateLocalSupervisorState(value).ok||authorityDigest(value)!==root.rootRecordSha256)authorityOwnerFailure('local-worker-supervisor:external-anchor-drift');return value;}});workerAuthorityReposByRoot.set(root.rootPath,repo);snapshots.push(authorityScanDomain({rootPath:root.rootPath,namespaceIds:namespaces,classifyEntry(entry){const {relativePath:p,value}=entry;if(p==='state.json'&&validateLocalSupervisorState(value).ok)return {namespaceId:namespaces[1],active:value.owner!==null||value.status!=='ready',semantic:value};if(p==='supervisor.json'&&validateLocalWorkerSupervisorRecord(value).ok)return {namespaceId:namespaces[2],active:value.workers.some(w=>w.cleanupState!=='cleaned'),semantic:value};if(p==='supervisor-cancel.json'&&validateLocalWorkerSupervisorCancel(value).ok)return {namespaceId:namespaces[2],active:true,semantic:value};authorityOwnerFailure('local-worker-supervisor:retained-or-unknown-external-entry');}}));}
+    return authorityMergeSnapshots(snapshots,namespaces);
+  };
+  const owner=authorityCreateDomainOwner({repository:repo,producerId:'local-worker-supervisor',kinds:['dispatch','armed-capability'],namespaceIds:namespaces,scan,transitionScope(identity){const rootPath=identity?.stateRoot;if(typeof rootPath!=='string')authorityOwnerFailure('local-worker-supervisor:owning-root-required');const spec={mutablePaths:['supervisor.json','supervisor-cancel.json'].map(p=>join(rootPath,p)),creations:[{rootPath,relativePattern:'^supervisor(?:-cancel)?\\.json$'}]};if(identity.enrollment){const snapshot=workerExternalSnapshot(repo,rootPath,namespaces),anchor=snapshot.entries.find(e=>e.relativePath==='state.json');if(!anchor)authorityOwnerFailure('local-worker-supervisor:anchor-unavailable');const registrationPath=join(repo.commonDir,'agent-pipeline','local-worker-supervisor','external-roots',authorityDigest(rootPath)+'.json');if(!existsSync(registrationPath))spec.enrollment={rootPath,registrationPath,snapshot,anchorSourceFact:anchor.sourceFact};}return spec;},sourceModulePaths:[import.meta.url,...['local-supervisor-state.mjs','session-authority-domain-owner.mjs','session-authority-registry.mjs'].map(p=>new URL(p,import.meta.url).href)].map(authorityFileURLToPath),terminalObservation(result,identity){const enrollment=workerEnrollmentTerminals.get(result);if(enrollment){if(enrollment.stateRoot!==identity?.stateRoot||JSON.stringify(enrollment.repository)!==JSON.stringify(repo))return null;const registration=authorityReadSource({namespaceId:'registered-external-state-roots',filePath:enrollment.registrationPath,semantic:({value})=>value}),anchor=authorityReadSource({namespaceId:'supervisor-state',filePath:join(enrollment.stateRoot,'state.json'),semantic:({value})=>value});if(authorityDigest(registration.sourceFact)!==authorityDigest(enrollment.registration)||authorityDigest(anchor.sourceFact)!==authorityDigest(enrollment.anchor))return null;return {terminal:'completed',sourceFacts:[registration.sourceFact,anchor.sourceFact]};}const snapshot=scan();const supervisor=snapshot.entries.filter(e=>e.value?.schema===LOCAL_WORKER_SUPERVISOR_RECORD_SCHEMA);if(!supervisor.length||supervisor.some(e=>e.value.workers.some(w=>w.cleanupState!=='cleaned'))||snapshot.activeFacts.some(f=>f.namespaceId!==namespaces[2]))return null;return {terminal:'completed',sourceFacts:supervisor.map(e=>e.sourceFact)};}});
+  workerAuthorityOwners.set(key,owner);workerAuthorityPorts.set(owner.port,repo);return owner;
+}
+export function createLocalWorkerSupervisorAuthorityProducerPort({repository}){return workerAuthorityOwner(repository).port;}
+export function isOwnedLocalWorkerSupervisorAuthorityProducerPort(port,{repository}){try{return JSON.stringify(workerAuthorityPorts.get(port))===JSON.stringify(authorityActualRepository(repository));}catch{return false;}}
+function workerExternalSnapshot(repo,rootPath,namespaces){return authorityScanDomain({rootPath,namespaceIds:namespaces,classifyEntry(entry){const {relativePath:p,value}=entry;if(p==='state.json'&&validateLocalSupervisorState(value).ok)return {namespaceId:namespaces[1],active:value.owner!==null||value.status!=='ready',semantic:value};if(p==='supervisor.json'&&validateLocalWorkerSupervisorRecord(value).ok)return {namespaceId:namespaces[2],active:value.workers.some(w=>w.cleanupState!=='cleaned'),semantic:value};if(p==='supervisor-cancel.json'&&validateLocalWorkerSupervisorCancel(value).ok)return {namespaceId:namespaces[2],active:true,semantic:value};authorityOwnerFailure('local-worker-supervisor:retained-or-unknown-external-entry');}});}
+function withWorkerAuthority(request,stateRoot,operation){enrollLocalWorkerSupervisorAuthorityRoot({request,stateRoot});authorityOwnerFailure('local-worker-supervisor:async-native-journal-phase-unavailable');}
+const workerEnrollmentTerminals=new WeakMap();
+export function enrollLocalWorkerSupervisorAuthorityRoot({request,stateRoot}){const repo=authorityRepositoryFromRoot(request.repository.sourceRoot),anchor=readBoundedJson(join(stateRoot,'state.json'));if(!validateStateRoot(request,stateRoot)||!validateLocalSupervisorState(anchor).ok)authorityOwnerFailure('local-worker-supervisor:actual-root-required');const registrationPath=join(repo.commonDir,'agent-pipeline','local-worker-supervisor','external-roots',authorityDigest(stateRoot)+'.json'),owner=workerAuthorityOwner(repo);if(existsSync(registrationPath)){const current=authorityReadSource({namespaceId:'registered-external-state-roots',filePath:registrationPath,semantic:({value})=>value});if(current.value?.rootRecordSha256!==authorityDigest(anchor)||current.value.rootPath!==stateRoot)authorityOwnerFailure('local-worker-supervisor:registration-drift');workerAuthorityReposByRoot.set(stateRoot,repo);return {ok:true,code:'LWS-AUTHORITY-ROOT-ALREADY-ENROLLED'};}const token=Object.freeze({});return owner.run({requestSha256:localWorkerSupervisorSha256(request),stateRoot,enrollment:true},()=>{authorityPublishRoot({repository:repo,producerId:'local-worker-supervisor',rootPath:stateRoot,rootRecord:anchor});const registration=authorityReadSource({namespaceId:'registered-external-state-roots',filePath:registrationPath,semantic:({value})=>value}).sourceFact;const actual=authorityReadSource({namespaceId:'supervisor-state',filePath:join(stateRoot,'state.json'),semantic:({value})=>value});if(actual.sourceFact.semanticSha256!==authorityDigest(anchor))authorityOwnerFailure('local-worker-supervisor:enrollment-anchor-drift');workerEnrollmentTerminals.set(token,{repository:repo,stateRoot,registrationPath,registration,anchor:actual.sourceFact});workerAuthorityReposByRoot.set(stateRoot,repo);return {ok:true,code:'LWS-AUTHORITY-ROOT-ENROLLED'};},()=>token);}
+function withExistingWorkerAuthority(stateRoot,operation){const repo=workerAuthorityReposByRoot.get(stateRoot);if(!repo)authorityOwnerFailure('local-worker-supervisor:owning-root-entry-required');return workerAuthorityOwner(repo).run({stateRoot},operation);}
+
+export async function runLocalWorkerSupervisor(input){const planned=planLocalWorkerSupervisor(input);if(!planned.ok||planned.plan?.status!=='ready'||input.activate!==true)return runLocalWorkerSupervisorUnregistered(input);return withWorkerAuthority(input.request,input.stateRoot,async()=>runLocalWorkerSupervisorUnregistered(input));}
+export function cancelLocalWorkerSupervisor(input){return withExistingWorkerAuthority(input?.stateRoot,()=>cancelLocalWorkerSupervisorUnregistered(input));}
+export function cleanupLocalWorkerSupervisor(input){return withExistingWorkerAuthority(input?.stateRoot,()=>cleanupLocalWorkerSupervisorUnregistered(input));}

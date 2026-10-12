@@ -196,6 +196,16 @@ Your judgement is your *entire* deliverable. A Goldfish that loses its report st
   effective provider model were prevented or known.
   Cite findings as exactly one public repo-relative `path:line[-line]`; never
   return an absolute path, URL, email address, credential, or private locator.
+- **Batch review course:** the Elephant predeclares a meaningful delivery batch
+  and review unit before the first item dispatch. After integration it freezes
+  actual members and integrated scope before the full review; item completion
+  does not automatically trigger a Critic. The batch permits one full
+  independent review and at most three fresh correction-diff reviews, stopping
+  on genuine PASS. A later review starts at the exact immediately preceding
+  reviewed candidate and covers only the correction and direct regressions.
+  Four calls total is the maximum; there is no full-review rerun. Renaming or
+  splitting the batch does not reset its budget. This prose states the selected
+  method; source/runtime admission still needs qualification.
 - **Bounded review mode:** round 1 is full. A later dispatch marked `delta` is
   valid only with the packet's exact base/head/tree, prior receipt ID/digest,
   changed paths/behaviour claims and affected invariant IDs. Review that delta

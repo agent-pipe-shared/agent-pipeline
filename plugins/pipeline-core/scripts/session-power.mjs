@@ -41,6 +41,8 @@ import {
   writeFrame,
 } from "./session-power-controller.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { authorityRepositoryFromRoot } from "../lib/session-authority-domain-owner.mjs";
+import { inspectSourceOwnedCurrentAuthorityContext, spawnSessionPowerControllerChild, readSourceOwnedSessionPowerControllerStartupAcknowledgement } from "../lib/session-requester-bridge.mjs";
 
 const USAGE = "Usage: session-power.mjs <start|status|recover|stop> --session-id <id> --expected-descriptor-sha256 <sha256>";
 const OPERATIONS = new Set(["start", "status", "recover", "stop"]);
@@ -156,131 +158,122 @@ function assertFixedStarterFile(path, label) {
  * overrides; `deps` is test-only dependency injection.
  */
 export async function launchLinuxController(context, { now = new Date(), deps = {} } = {}) {
-  const spawnController = deps.spawnController ?? spawn;
-  const identityForPid = deps.identityForPid ?? readLinuxProcessIdentity;
-  const controllerPath = deps.controllerPath ?? CONTROLLER_PATH;
-  const helperPath = deps.helperPath ?? HELPER_PATH;
-  const nodePath = deps.nodePath ?? process.execPath;
-  assertFixedStarterFile(nodePath, "Node executable");
-  assertFixedStarterFile(controllerPath, "controller");
-  assertFixedStarterFile(helperPath, "helper");
-  const child = spawnController(nodePath, [controllerPath], {
-    shell: false,
-    detached: true,
-    stdio: ["ignore", "ignore", "ignore", "pipe"],
-    windowsHide: true,
-  });
-  if (!child?.pid || !child.stdio?.[3]) throw new SessionPowerError("SP-START", "controller did not expose its private pipe");
-  const controller = identityForPid(child.pid);
-  if (controller.platform !== "linux") throw new SessionPowerError("SP-START", "controller platform identity is not Linux");
+  if (!deps || typeof deps !== "object" || Object.keys(deps).length !== 0) throw new SessionPowerError("SP-START", "controller runtime overrides are unavailable");
+  const repository = authorityRepositoryFromRoot(context.repo.primaryRoot);
+  const requester = inspectSourceOwnedCurrentAuthorityContext({ repository });
+  if (requester.status !== "bound" || requester.currentInvocationHandle === null
+    || requester.currentRequester.sessionId !== context.sessionId || requester.currentRequester.descriptorSha256 !== context.descriptorSha256) {
+    throw new SessionPowerError("SP-START", "source-owned parent requester is unavailable");
+  }
+  assertFixedStarterFile(process.execPath, "Node executable");
+  assertFixedStarterFile(CONTROLLER_PATH, "controller");
+  assertFixedStarterFile(HELPER_PATH, "helper");
+  const spawned = await spawnSessionPowerControllerChild({ repository, requesterHandle: requester.requesterHandle }, requester.runtimePort);
+  if (spawned.status !== "spawned" || !spawned.child?.stdio?.[3]) throw new SessionPowerError("SP-START", "source-owned Power child is unavailable");
+  const child = spawned.child, controller = readLinuxProcessIdentity(child.pid);
   const config = {
-    schema: "pipeline.session-power-controller-config.v1",
+    schema: "pipeline.session-power-controller-config.v2",
     activationNonce: nonce(),
     controller: { pid: child.pid, start: controller.start, executableSha256: controller.executableSha256 },
-    context: {
-      repoFingerprint: context.repoFingerprint,
-      sessionId: context.sessionId,
-      descriptorSha256: context.descriptorSha256,
-      directory: context.directory,
-      recordPath: context.recordPath,
-      lockPath: context.lockPath,
-      controlPath: context.controlPath,
-    },
-    nodePath,
-    helperPath,
-    controlPath: context.controlPath,
-    leaseSeconds: 43_200,
+    context: { repoRoot: context.repo.primaryRoot, repoFingerprint: context.repoFingerprint, sessionId: context.sessionId, descriptorSha256: context.descriptorSha256,
+      directory: context.directory, recordPath: context.recordPath, lockPath: context.lockPath, controlPath: context.controlPath },
+    nodePath: process.execPath, helperPath: HELPER_PATH, controlPath: context.controlPath, leaseSeconds: 43_200,
   };
+  let startupRefused = false;
   try {
     writeFrame(child.stdio[3], config);
-    const ack = validateStartupAcknowledgement(await readFrame(child.stdio[3], { timeoutMs: 5_000 }), config);
-    const starting = createStartingSessionPowerRecord({
-      repoFingerprint: context.repoFingerprint,
-      sessionId: context.sessionId,
-      descriptorSha256: context.descriptorSha256,
-    }, tupleFromAck(ack), now);
-    writeSessionPowerRecord(context, starting);
-    writeFrame(child.stdio[3], { type: "commit", activationNonce: ack.activationNonce, ...endpointProof(starting) });
+    const startup = await readSourceOwnedSessionPowerControllerStartupAcknowledgement({ repository, controllerIdentity: config.controller }, requester.runtimePort);
+    if (startup?.status === "unavailable") {
+      startupRefused = true;
+      throw new SessionPowerError("SP-START", "source-owned startup acknowledgement is unavailable");
+    }
+    const ack = validateStartupAcknowledgement(startup, config);
+    const starting = readSessionPowerRecord(context);
+    if (!starting || starting.status !== "starting" || Object.entries(endpointProof(ack)).some(([key, value]) => starting[key] !== value)) {
+      throw new SessionPowerError("SP-START", "controller-owned starting record is unavailable");
+    }
+    writeFrame(child.stdio[3], { type: "commit", ...endpointProof(ack) });
     const committed = await readFrame(child.stdio[3], { timeoutMs: 5_000 });
-    if (!committed || committed.type !== "committed-ack" || Object.entries(endpointProof(starting)).some(([key, value]) => committed[key] !== value)) {
+    if (!committed || committed.type !== "committed-ack" || Object.entries(endpointProof(ack)).some(([key, value]) => committed[key] !== value)) {
       throw new SessionPowerError("SP-START", "controller commit acknowledgement is invalid");
     }
-    const active = activateSessionPowerRecord(starting, { expectedRevision: starting.revision, now });
-    writeSessionPowerRecord(context, active);
-    child.unref?.();
+    const active = readSessionPowerRecord(context);
+    if (!active || active.status !== "active" || Object.entries(endpointProof(ack)).some(([key, value]) => active[key] !== value)) {
+      throw new SessionPowerError("SP-START", "controller-owned active record is unavailable");
+    }
+    child.stdio[3].destroy();
+    child.stdout?.resume(); child.stderr?.resume(); child.unref();
     return active;
   } catch (error) {
-    child.stdio[3].destroy?.();
+    if (startupRefused) {
+      // Startup remains refused at the original ACK deadline. Allow only the
+      // already captured owner to finish its genuine failure settlement.
+      // Child close is not a record, member-release or native-success proof.
+      let settlementTimer;
+      try {
+        await Promise.race([spawned.terminal, new Promise((resolveSettlement) => {
+          settlementTimer = setTimeout(resolveSettlement, 10_000);
+        })]);
+      } catch {
+        // Unknown settlement preserves the original startup refusal.
+      } finally { clearTimeout(settlementTimer); }
+    }
+    child.stdio[3].destroy();
+    // The original controller retains every uncertain partial effect. The
+    // starter must not turn a failed handshake into a guessed zero record.
     throw error;
   }
+}
+
+async function requestOwnedTransition(context, current, type) {
+  if (!current || current.activationNonce === null) return current;
+  if (type === "disable") {
+    assertPrivateSocket(context.controlPath);
+    const socket = net.createConnection(context.controlPath);
+    try {
+      await new Promise((resolveConnect, reject) => { socket.once("connect", resolveConnect); socket.once("error", reject); });
+      writeFrame(socket, { type, ...endpointProof(current) });
+      await new Promise((resolveEnd, reject) => { const timer = setTimeout(() => reject(new SessionPowerError("SP-ENDPOINT", "owning disable timed out")), 2_000);
+        socket.once("end", () => { clearTimeout(timer); resolveEnd(); }); socket.once("error", error => { clearTimeout(timer); reject(error); }); });
+    } finally { socket.destroy(); }
+    // An early EOF is not a terminal proof; read the actual no-context record.
+    const deadline = Date.now() + 2_000;
+    while (Date.now() < deadline) {
+      const observed = readSessionPowerRecord(context);
+      if (observed && ["disabled", "unavailable"].includes(observed.status) && !existsSync(context.controlPath)) return observed;
+      await new Promise(resolveWait => setTimeout(resolveWait, 10));
+    }
+    throw new SessionPowerError("SP-ENDPOINT", "owning no-context terminal is unavailable");
+  }
+  const response = await controllerEndpointRequest(context.controlPath, { type, ...endpointProof(current) });
+  if (!response || response.type !== (type === "stop" ? "stopped" : "recovered") || Object.entries(endpointProof(current)).some(([key, value]) => response[key] !== value)) {
+    throw new SessionPowerError("SP-ENDPOINT", "owning controller transition proof is unavailable");
+  }
+  return readSessionPowerRecord(context);
 }
 
 export async function main(argv = process.argv.slice(2), { rootDir = process.cwd(), now = new Date() } = {}) {
   const { operation, flags } = parseArgs(argv);
   const context = resolveSessionPowerContext(rootDir, flags["session-id"], flags["expected-descriptor-sha256"]);
-  const record = await withSessionPowerLock(context, async () => {
-    const current = readSessionPowerRecord(context);
-    if (operation === "status") return current ?? initial(context, now);
-    if (operation === "start") {
-      if (current?.status === "cleanup-pending") return current;
-      if (!projectedKeepAwake(context.repo.primaryRoot)) {
-        const disabled = await disableProjectedSessionPower(current, context, { now });
-        if (disabled && JSON.stringify(disabled) !== JSON.stringify(current)) writeSessionPowerRecord(context, disabled);
-        return disabled ?? initial(context, now);
-      }
-      if (process.platform !== "linux") {
-        const unavailable = createUnavailableSessionPowerRecord({
-          repoFingerprint: context.repoFingerprint,
-          sessionId: context.sessionId,
-          descriptorSha256: context.descriptorSha256,
-        }, "platform-unsupported", { observed: { platform: process.platform }, now });
-        if (current) unavailable.revision = current.revision + 1;
-        writeSessionPowerRecord(context, unavailable);
-        return unavailable;
-      }
-      if (current?.status === "active" || current?.status === "starting") {
-        let proof = null;
-        try {
-          proof = await controllerEndpointRequest(context.controlPath, { type: "proof", activationNonce: current.activationNonce });
-          if (proof.committed !== true) proof = null;
-        } catch { proof = null; }
-        const recovered = recoverSessionPowerRecord(current, { now, endpointProof: proof });
-        if (JSON.stringify(recovered) !== JSON.stringify(current)) writeSessionPowerRecord(context, recovered);
-        return recovered;
-      }
-      try {
-        return await launchLinuxController(context, { now });
-      } catch {
-        const observed = readSessionPowerRecord(context);
-        if (observed?.status === "starting") {
-          const pending = recoverSessionPowerRecord(observed, { now, endpointProof: null });
-          writeSessionPowerRecord(context, pending);
-          return pending;
-        }
-        const unavailable = createUnavailableSessionPowerRecord({
-          repoFingerprint: context.repoFingerprint,
-          sessionId: context.sessionId,
-          descriptorSha256: context.descriptorSha256,
-        }, "startup-failed", { observed: { platform: "linux" }, now });
-        if (current) unavailable.revision = current.revision + 1;
-        writeSessionPowerRecord(context, unavailable);
-        return unavailable;
-      }
+  const current = readSessionPowerRecord(context);
+  let record = current ?? initial(context, now);
+  if (operation === "start") {
+    if (!projectedKeepAwake(context.repo.primaryRoot)) {
+      if (current && !["disabled", "unavailable"].includes(current.status)) record = await requestOwnedTransition(context, current, "disable");
+    } else if (current?.status === "cleanup-pending") {
+      record = current;
+    } else if (current && ["starting", "active"].includes(current.status)) {
+      record = await requestOwnedTransition(context, current, "recover");
+    } else if (process.platform !== "linux") {
+      record = createUnavailableSessionPowerRecord(context, "platform-unsupported", { observed: { platform: process.platform }, now });
+    } else {
+      if (current?.status === "stopped") await requestOwnedTransition(context, current, "disable");
+      try { record = await launchLinuxController(context); }
+      catch (error) { const observed = readSessionPowerRecord(context); if (observed?.status === "unavailable") record = observed; else throw error; }
     }
-    if (!current) return initial(context, now);
-    let proof = null;
-    try {
-      proof = await controllerEndpointRequest(context.controlPath, operation === "stop"
-        ? { type: "stop", ...endpointProof(current) }
-        : { type: "proof", activationNonce: current.activationNonce });
-      if (operation === "recover" && proof.committed !== true) proof = null;
-    } catch { proof = null; }
-    const next = operation === "recover"
-      ? recoverSessionPowerRecord(current, { now, endpointProof: proof })
-      : stopSessionPowerRecord(current, { now, endpointProof: proof });
-    if (JSON.stringify(next) !== JSON.stringify(current)) writeSessionPowerRecord(context, next);
-    return next;
-  });
+  } else if (operation !== "status" && current && !["disabled", "unavailable"].includes(current.status)) {
+    record = await requestOwnedTransition(context, current, operation);
+  }
   process.stdout.write(`${JSON.stringify(sessionPowerCommandResult(operation, record))}\n`);
   return resultExit(record);
 }

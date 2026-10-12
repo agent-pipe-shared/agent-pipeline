@@ -14,7 +14,7 @@
       "additionalProperties": false,
       "required": ["round", "requestedMode", "effectiveMode", "base", "head", "tree", "changedPaths", "changedBehaviorClaims", "affectedInvariantIds", "priorReceipt", "pathInvariantMap", "pathInvariantMapSha256", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"],
       "properties": {
-        "round": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "round": { "type": "integer", "minimum": 1, "maximum": 4 },
         "requestedMode": { "enum": ["full", "delta"] },
         "effectiveMode": { "enum": ["full", "delta"] },
         "base": { "$ref": "#/$defs/sha40" },
@@ -71,8 +71,8 @@
       "additionalProperties": false,
       "required": ["criticRounds", "correctionCommits", "productRetries", "environmentReroutes", "elapsedResourceCapMs"],
       "properties": {
-        "criticRounds": { "type": "integer", "minimum": 0, "maximum": 2 },
-        "correctionCommits": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "criticRounds": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "correctionCommits": { "type": "integer", "minimum": 0, "maximum": 3 },
         "productRetries": { "type": "integer", "minimum": 0, "maximum": 1 },
         "environmentReroutes": { "type": "integer", "minimum": 0, "maximum": 1 },
         "elapsedResourceCapMs": { "type": "integer", "minimum": 1 }

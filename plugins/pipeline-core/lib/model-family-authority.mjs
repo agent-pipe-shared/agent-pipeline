@@ -4,6 +4,8 @@ import { createHash } from "node:crypto";
 import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
 import { verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+import { readApprovedDesignDecisionBindingsHandle, readDesignModelPolicyPredecessor } from "./design-decision-bindings.mjs";
+import { registeredModelFamilyTaskRoutes } from "./model-family-route-source.mjs";
 import { verifyModelRoleApprovedPolicy } from "./model-role-approved-policy.mjs";
 
 const SHA = /^[a-f0-9]{64}$/u;
@@ -200,7 +202,7 @@ function successorValid(predecessor, expectedSha256) {
     && predecessor.authoritySha256 === expectedSha256
     && SHA.test(predecessor.authoritySha256)
     && digest(predecessor.authority) === predecessor.authoritySha256
-    && predecessor.authority?.schema === "pipeline.model-family-approved-policy.v2"
+    && ["pipeline.model-family-approved-policy.v2", "pipeline.aggregate-design-model-family-authority.v1"].includes(predecessor.authority?.schema)
     && predecessor.authority?.subject?.revision === "model-family-v2";
 }
 
@@ -288,4 +290,43 @@ function verifyModelFamilyPinDecisionInternal({ decision, authority, previousDec
 export function verifyModelFamilyPinDecision(input = {}) {
   try { return verifyModelFamilyPinDecisionInternal(input); }
   catch { return fail("MODEL-FAMILY-PIN-INVALID"); }
+}
+
+/** Inert existing policy gates. This never creates a verified authority. */
+export function validateModelFamilyAuthoritySubject({subject,routeSource,trustAnchors=[],predecessor=null}={}) {
+  try {
+    if(!own(subject,["revision","predecessorAuthoritySha256","routeSourceSha256","assignments","migration"])
+      || subject.revision!=="model-family-v2" || !SHA.test(subject.routeSourceSha256)
+      || (subject.predecessorAuthoritySha256!==null && !SHA.test(subject.predecessorAuthoritySha256))) return fail("MODEL-FAMILY-AUTHORITY-SHAPE");
+    const bundle={subject};
+  const expanded = expandAssignments(bundle.subject.assignments, routeSource);
+  if (!expanded) return fail("MODEL-FAMILY-AUTHORITY-ASSIGNMENTS");
+  const routeSha = digest({ taskRoutes: routeSource.taskRoutes, configuredRoutes: routeSource.configuredRoutes });
+  if (routeSha !== bundle.subject.routeSourceSha256) return fail("MODEL-FAMILY-AUTHORITY-SOURCE");
+  if (bundle.subject.predecessorAuthoritySha256 === null) {
+    const migration = migrationValid(bundle.subject.migration, predecessor, expanded, routeSource, routeSha, trustAnchors);
+    if (!migration) return fail(bundle.subject.migration === null ? "MODEL-FAMILY-AUTHORITY-PREDECESSOR" : "MODEL-FAMILY-MIGRATION-INVALID");
+  } else if (bundle.subject.migration !== null
+    || !successorValid(predecessor, bundle.subject.predecessorAuthoritySha256)) {
+    return fail("MODEL-FAMILY-AUTHORITY-PREDECESSOR");
+  }
+
+    return {ok:true,assignments:expanded};
+  } catch {return fail("MODEL-FAMILY-AUTHORITY-INVALID");}
+}
+/** A DAB proof remains design-approval; its genuine owned subset is a distinct basis. */
+export function verifyAggregateDesignModelFamilyAuthority({handle,predecessor=null}={}) {
+  try {
+    const read=readApprovedDesignDecisionBindingsHandle(handle);
+    if(!read.ok || read.area!=="model-policy" || !read.modelRequest) return fail(read.code??"MODEL-FAMILY-AGGREGATE-MODEL-REQUIRED");
+    const routeSource=registeredModelFamilyTaskRoutes(),subject=read.modelRequest.subject;
+    const history=subject.predecessorAuthoritySha256===null?readDesignModelPolicyPredecessor(handle):{ok:true,predecessor};
+    if(!history.ok) return fail(history.code);
+    const checked=validateModelFamilyAuthoritySubject({subject,routeSource,trustAnchors:read.trustAnchors,predecessor:history.predecessor});
+    if(!checked.ok) return checked;
+    const authority={schema:"pipeline.aggregate-design-model-family-authority.v1",candidateAtApproval:read.approvalBasis.candidateAtApproval,
+      subject,designApprovalBasis:read.approvalBasis};
+    const value=frozenClone({authoritySha256:digest(authority),authority,assignments:checked.assignments,hostAdmission:"not-created"});
+    verifiedAuthorities.add(value); return {ok:true,code:"MODEL-FAMILY-AGGREGATE-AUTHORITY-VERIFIED",value,trustAnchors:read.trustAnchors};
+  } catch {return fail("MODEL-FAMILY-AGGREGATE-AUTHORITY-INVALID");}
 }

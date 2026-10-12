@@ -111,16 +111,29 @@ USAGE (Elephant)
    tier only for the one batched critical architecture/security Critic).
    `claude -p --bare` and corresponding runner-native launchers are optional
    explicit escalations, not cross-runner defaults or PO gates.
-5. Phase-2.6 bounded re-review: the initial architecture/security review is
-   `full`. Every follow-up examines only the exact immediately previous reviewed
+5. Phase-2.6 bounded re-review: declare one meaningful review batch before
+   implementation items begin and freeze its membership after Main integration
+   and its tests. The initial architecture/security review covers that integrated
+   batch as `full`; do not dispatch a Critic automatically per mini-item. Every
+   correction belongs to one fresh Correction Goldfish that keeps ownership of
+   the batch through targeted fixes and retests. Re-review only when the batch's
+   review trigger applies, in a fresh Critic context, on the exact immediately
+   previous reviewed commit through the new integrated correction candidate.
+   The full review examines
+   the declared batch. Every follow-up examines only the exact immediately previous reviewed
    commit through the new correction candidate, its fixes and direct
    regressions. Read unchanged direct contracts only to understand the change;
    do not reopen unchanged cleared areas or run another current-artifact hunt.
    A `delta` mode requires the transport's bound impact/invariant proof; absent
    proof is not permission to widen scope. An admitted `full` exact-range mode
-   fully examines that range only. QG-13 defaults to two rounds; further fresh
-   correction reviews require an explicit actual-PASS delivery criterion and
-   remain subject to execution/cost/course budgets. The Coordinator reconciles
+   fully examines that range only within the prospective batch budget: one
+   full review and at most three correction-diff reviews (four reviews total).
+   There is no fifth-round exception, including the former QG-13 actual-PASS
+   exception. Each correction review starts at the immediately previous
+   reviewed candidate; PASS stops, and restarting, renaming, or repartitioning
+   cannot reset the budget. Historical evidence stays readable and grants no
+   new round.
+   The Coordinator reconciles
    exact ranges and retains receipt/source coverage lineage and finding
    dispositions. Do not request or read prior verdict prose or findings.
    If the range itself contains retained prior results, prepare the exact
@@ -194,6 +207,8 @@ reviewer. You see neither chat history nor the implementor's reasoning — by
 design. Your input is EXCLUSIVELY what you construct yourself from:
 
 ## Fail-closed reference boundary (MUST)
+
+**Prospective review budget:** each declared and frozen work batch permits one full independent Critic review and at most three correction-diff reviews, for four reviews total. Every correction review starts at the exact immediately previous reviewed candidate; the prior review must be genuinely consumed and non-PASS, and PASS stops. No fifth review is permitted, including the former QG-13 actual-PASS exception. The Coordinator declares a meaningful batch before implementation items begin and freezes membership after Main integration and its tests; do not run automatic Critic reviews per mini-item. A fresh Correction Goldfish owns the integrated correction batch through targeted fixes and retests, retaining the same owner identity across all three correction rounds. Renaming, changing the candidate/task/record/session, repartitioning the batch, or restarting does not reset its budget. Historical receipts remain readable but cannot authorize another new round. Generic exact-range work and registered FeatureV2 courses retain their applicable source-issued admission and receipt checks. Semantic work membership is declared by the Coordinator, not authenticated by native host identity. Current-artifact inspection remains advisory. The documentation Reader keeps its separate two-plus-one budget.
 
 <!-- CRITIC-FAIL-CLOSED: reference-only-stop -->
 
@@ -275,10 +290,10 @@ Dispatch metadata (`roles/goldfish.md` GF-01 field 6, critic variant):
   Elephant) — `CRITIC-BOOTSTRAP-ROLE-CLOSED`
 - Ruleset SHA: {{RULESET_SHA}} (echo in your confirmation line)
 - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "genuinely critical architecture or security change, ONE batched Critic → higher-capability review model at max in the standing fresh session functional-equivalent lane" or "standard (including a guardrail diff that is not security-critical) → review-tier model at max" or "class-mittel → review-tier model at max (no per-diff escalation)" or "mechanical auto-pass (T0) → no critic dispatched"}}
-- Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. EVERY Critic is ONE overall Critic per batch, never one per slice or per diff, and every follow-up Critic is a RE-CRITIC on the delta diff only (Ruling 158). A Design-tier (Opus) Critic is dispatched additionally ONLY for genuinely critical architecture or security, as that one batched Critic; every other Critic runs on the review-tier model (Sonnet). A RE-CRITIC names the delta range since the reviewed candidate as its ONLY search surface and reads nothing outside it.}}
+- Batch scope (MP-07): {{BATCH_SCOPE: declare the meaningful acceptance criteria, slice ids, and evidence boundary before implementation items begin; freeze membership after Main integration and its tests. This one Critic covers the entire integrated candidate, never one Critic per slice or mini-item. The batch allows one full review and at most three correction-diff reviews. A Design-tier (Opus) Critic is used only for genuinely critical architecture or security; every other review uses the review-tier model (Sonnet). Each correction review is a new independent Critic context and names only the delta from the immediately previous reviewed candidate as its search surface.}}
 - Requested route: {{MODEL_ID}} at {{EFFORT}} — the CONCRETE model identifier resolved from the tier above (e.g. "claude-opus-5 at max"), not the tier name. The report-header requirement below asks the Critic to open with this exact value; a dispatch that states only the tier and never the identifier gives the Critic nothing to echo (2026-08-06 Critic round, F1).
 - T1 isolation/assurance: {{T1_ASSURANCE e.g. "runner-native: <runner adapter/capability>; OS-isolation claim only as evidenced" or "functional-equivalent-read-only; OS isolation not asserted"}}
-- **Tool budget (hard cap, first-class field):** {{TOOL_BUDGET default: "≤30 tool uses"}} for the review itself, plus a **closing allowance of +5 tool uses** spendable on closing only (mechanics under "Closing allowance" in the report-format section below). The stated number is the base cap: reaching it ends the REVIEW, not the dispatch — stop reviewing there, then close out through the allowance. Never carry the review itself past the base cap. **A second, harder limit exists above this one, and it is enforced.** The Critic agent definition (`plugins/pipeline-core/agents/critic.md`) carries `maxTurns: 50` — the harness cuts the run off there, mid-sentence, with no report and no closing handover. The default base cap above (30) plus the closing allowance (5) = 35 is scoped to fit under that shipped `maxTurns: 50` with 15 in reserve (the guard's cap is `min(30, 50 − 5 − 10) = 30`) — a wide margin below it (e.g. the template's own earlier default of 45) leaves no room and reliably truncates the review before it can close out; if a different Critic-tier definition carries a different `maxTurns`, rescale the base cap so base + 5 stays safely under it. **Runner support:** Claude Code's installed hook counts authenticated subagent calls and restricts an over-cap review to closing acts. The runner-neutral policy core is shipped for other adapters, but Codex and Antigravity do not yet provide authenticated live-call adapters, so on those runners the base cap remains a briefing duty rather than an enforced count. Do not claim cross-runner enforcement from the shared core alone. `maxTurns` itself is a real harness cliff wherever the runner exposes it — treat reaching it as data loss, not merely a missed target (`backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`).
+- **Tool budget (hard cap, first-class field):** {{TOOL_BUDGET default: "≤30 tool uses"}} for the review itself, plus a **closing allowance of +5 tool uses** spendable on closing only (mechanics under "Closing allowance" in the report-format section below). The stated number is the base cap: reaching it ends the REVIEW, not the dispatch — stop reviewing there, then close out through the allowance. Never carry the review itself past the base cap. **Shipped harness limit and effective working cap:** the selected Critic agent definition (`plugins/pipeline-core/agents/critic.md`) ships `maxTurns: 65`. The guard reserves five closing calls and ten safety calls, so its effective working cap is at most 50: `min(briefed base cap, 65 − 5 − 10)`. The default base cap here remains 30, with five closing calls; a briefed base cap of 50 uses the full effective working allowance. Neither 50 nor 30 is the shipped `maxTurns` value. If an actual selected definition differs, derive its working cap from that definition and retain the closing/safety reserve. **Runner support:** Claude Code's installed hook counts authenticated subagent calls and restricts an over-cap review to closing acts. The runner-neutral policy core is shipped for other adapters, but Codex and Antigravity do not yet provide authenticated live-call adapters, so on those runners the base cap remains a briefing duty rather than an enforced count. Do not claim cross-runner enforcement from the shared core alone. `maxTurns` itself is a real harness cliff wherever the runner exposes it — treat reaching it as data loss, not merely a missed target (`backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`).
 - **80 % checkpoint (all runners, all dispatches):** at about 80 % of the base tool budget, if the task is not done, stop editing, commit what is already green, write an interim report (done / remaining / next step) into the dispatch record (Critic: into its own `critic-notes.md`) and end the turn with that report; the dispatcher decides whether to grant more budget or dispatch a follow-up. Claude enforces this with a hook notice from `guard-dispatch-budget.mjs`; Codex and Antigravity have no authenticated budget adapter yet, so there it is this briefing duty.
 - {{ADVISOR_DEMAND_LINE: if the Elephant has a current bounded Advisor demand, include verbatim: "Do not invoke or reuse the Advisor; consultation ownership remains with the Elephant" (MP-26) — else delete this line.}}
 
@@ -361,18 +376,7 @@ with your Read/Grep/Glob/Bash grant, so `scratch/dispatch/` content —
 including another in-flight dispatch's subdirectory or residue left by a
 crashed session — is something you CAN see if you look; isolation means
 staying inside your own subdirectory and never reading a sibling's content as
-evidence, not that the rest of `scratch/dispatch/` does not exist. Never
-`.git/` for this purpose. Before building any evidence (fixtures, repros,
-baselines), create your own fresh subdirectory
-`scratch/dispatch/critic-<task-or-codename>-a1/` with a bare `mkdir` (not
-`mkdir -p`) so the filesystem enforces atomicity — if it already exists, use
-the next suffix (`-a2`, `-a3`, …), never adopt a directory you did not create;
-no random-number command is needed. Notes are written ONLY with the
-Write/Edit tools to `critic-notes.md` inside that directory; there is no Bash
-route for notes. Work
-ONLY inside your own subdirectory; if you find pre-existing scratch state
-from a prior or concurrent dispatch, name it as a disclosure item rather than
-silently building evidence on top of it.
+evidence, not that the rest of `scratch/dispatch/` does not exist. Never use `.git/` for this purpose. The only notes target is `scratch/dispatch/critic-<authenticated-native-agent-id>/critic-notes.md`, selected by the existing native dispatch identity and counter binding. Use the actual ID from the runtime or the guard's typed notes-target diagnostic; a task name, codename, guessed ID or sibling directory cannot substitute. Write/Edit only; no Bash notes or random-name command. On the first admitted Write/Edit attempt, the native dispatch guard creates the exact private notes directory exclusively and records its binding to the authenticated dispatch and counter. Use Write to create the notes file and Edit to append within that same directory. An existing unowned directory, changed binding or unsafe alias is refused; do not adopt it or retry through Bash. If source-owned allocation or Write/Edit admission is unavailable, return the report as text and disclose persistence as unavailable. This route does not certify a foreign runtime or native Windows behavior.
 
 **Directory contract, beyond your own scratch subdirectory (ADR-0063):**
 `docs/adr/0063-repository-directory-contract.md`'s directory-kinds table
@@ -604,3 +608,15 @@ or through the independently briefed contractual read-only Critic.
 }
 OPEN (Phase 4): versioned runner-adapter schema files with exactly this shape;
 the comment above is the binding contract until then. -->
+
+## Generic exact-range batch registration (Coordinator only)
+
+The Coordinator performs this bounded metadata step inline. It creates no additional Human approval, signing ceremony, product-write permission or reviewer dialogue. Retain the returned source-issued batch reference across restarts and corrections. Do not place private registration, parent verdict, accounting metadata or implementer reasoning in the Critic's refs-only input.
+
+For a new generic batch, call the shipped `scripts/session-critic-finalizer.mjs register-batch --root <physical repository> --request scratch/<registration>.json` before `admit`. The closed request has schema `pipeline.critic-generic-batch-registration-request.v1` and exactly `schema` and `declaration`. Its declaration contains `taskId`, `baseCommit`, `candidateCommit`, sorted unique `logicalWorkIds`, `specPath`, sorted unique `guardrailPaths`, `signedQualityImportAnchor` (null for authored delivery, otherwise the existing signed-import anchor), and `reviewUnitPath`. Declare the meaningful acceptance-criterion batch before its implementation items begin; this registration binds the already-declared scope to the integrated candidate and cannot retroactively create scope. These fields describe genuine retained local dispatch or signed-import origin; arbitrary target JSON is never authority. The source rederives actual candidate/public references and returns `batchRef: {batchId, registrationSha256}`, `memberSha256` and `replay`. Colliding logical work/origin is an existing batch or a conflict, never a fresh budget.
+
+Generic `admit` and `finalize` use `pipeline.session-critic-finalization-request.v3`. Preserve the ordinary outer request fields and the existing review fields; add only `review.genericBatchRef: {batchId, registrationSha256, memberSha256}`. This is distinct from FeatureV2 `review.courseContext`. The source claims the real packet and durably reserves ordinal 1/full before returning `admitted`. An exact already-admitted replay returns `already-admitted` with `replay:true`; it does not authorize another child. Unknown reservations remain held. Missing generic registration is a typed prelaunch refusal. The ordinary fresh read-only Critic and genuine finalizer result/claim/consume/receipt checks remain required.
+
+After an actual consumed non-PASS review, the Coordinator calls `append-correction` using a closed `pipeline.critic-generic-batch-correction-request.v1` request with exactly `schema`, the original `batchRef`, `parent: {packetId, packetDigest, receiptSha256}` and `correction`. Correction retains the original logical work and declaration fields, uses the consumed candidate as its base, and additionally supplies `changedBehaviorClaims`, `pathInvariantMap`, `coordinatorImpactConfirmed`, `trustBoundaryChanged`, `impactAmbiguous` and `evidencePaths`. The source derives the actual changed paths/correction commits and reuses existing impact/invariant and executed-diagnostic predicates. Public parent/PASS flags, fake receipt JSON, widened range and missing or failed diagnostics grant nothing. The returned correction member retains the same batch and supports ordinal 2, 3, or 4 as a delta, provided every immediately previous review was consumed and non-PASS. The Correction Goldfish identity is fixed after ordinal 2; later correction members must retain it. A fifth attempt or second full is refused.
+
+Registration, immutable membership, origin/logical indexes and exclusive launch slots live in the canonical private Git-common-dir packet store. Read-only inspection never creates empty history or refunds a reservation. Existing in-flight generic packets require a demonstrably complete adoption; this implementation conservatively holds them instead of silently registering a fresh budget. Historic four-round validators and retained FeatureV2 security/approval paths stay unchanged. This is Source enforcement of Coordinator-declared membership, not universal host enforcement or proof of semantic novelty.

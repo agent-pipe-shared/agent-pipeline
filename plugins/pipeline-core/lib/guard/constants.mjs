@@ -30,6 +30,8 @@ import { loadRuntimeProjectionV3OwnedKeys } from "../runtime-projection-v3.mjs";
 // (plugin install/remove, marketplace metadata, the in-root shapes) get the full route
 // today. Closing the residual half is an eligibility() change in lib/human-guard-override.mjs,
 // which is out of scope for this file.
+export const GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../scripts/governance-scope-diagnose.mjs", import.meta.url));
+
 export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 // GF-078 bug 2 / NVA-B-READCONTAIN-1 (restoring the floor c8c7f449 removed): the one
@@ -282,3 +284,5 @@ export const ARCHITECTURE_ADOPTION_DENIAL_CODE = "GUARD-ARCHITECTURE-ADOPTION-UN
 export const ARCHITECTURE_FITNESS_DENIAL_CODE = "GUARD-ARCHITECTURE-FITNESS-NON-GREEN";
 
 export const MINIMUM_RIGOR_ADVISORY_CODE = "GUARD-MINIMUM-RIGOR-ADVISORY";
+
+export const DOC_READER_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/doc-reader-course.mjs", import.meta.url));

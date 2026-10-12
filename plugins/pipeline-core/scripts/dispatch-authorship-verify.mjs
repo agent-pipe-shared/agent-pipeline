@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { hasAdministrativeDispatch, inspectAdministrativeCommit } from "../lib/administrative-commit-policy.mjs";
 // SPDX-License-Identifier: SUL-1.0
 /**
  * Verify that a commit's authorship trailer BINDS to the dispatch record it names.
@@ -339,6 +340,10 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.pass, "signed-artifact-integration", verified.code);
   }
 
+  if (hasAdministrativeDispatch(message)) {
+    const inspected = inspectAdministrativeCommit({repoRoot:deps.repoRoot,message,commitSha:sha});
+    return result(sha,inspected.ok ? VERDICT.pass : VERDICT.fail,"elephant-administrative",inspected.code);
+  }
   const dispatch = parseDispatchTrailer(message);
   if (!dispatch) {
     return result(

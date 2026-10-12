@@ -357,7 +357,9 @@
  */
 import {
   closeSync,
+  constants,
   existsSync,
+  fstatSync,
   fchmodSync,
   fsyncSync,
   ftruncateSync,
@@ -366,6 +368,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readSync,
   readdirSync,
   realpathSync,
   renameSync,
@@ -375,11 +378,15 @@ import {
   writeSync,
 } from "node:fs";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture } from "../lib/critic-accepted-contract.mjs";
+import { resolveCanonicalArtifactIdentity as acceptedContractArtifactIdentity } from "../lib/feature-package-topology.mjs";
+import { verifyAgainstTrustAnchors as verifyAcceptedTrustAnchors } from "../lib/critical-human-proof-policy.mjs";
 import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
 import { spawnSync } from "node:child_process";
 import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
 import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
 import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
+import { inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
 import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -430,7 +437,7 @@ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnr
 import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
 import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
-import { inspectArchitectureDesign, inspectArchitectureDesignDraft } from "../lib/architecture-design.mjs";
+import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
 import { rebindApproval } from "../lib/rebind-approval.mjs";
 import { designWorkflowAdvisorExceptionBinding, readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
 import {
@@ -439,9 +446,9 @@ import {
   validateDesignWorkflowPackageApprovalRequest,
   verifyDesignWorkflowPackageApproval,
 } from "../lib/design-workflow-approval.mjs";
-import { materializeArchitectureDesign } from "../lib/architecture-design.mjs";
+import { materializeArchitectureDesign as materializeArchitectureDesignSource } from "../lib/architecture-design.mjs";
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
-import { publishRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
+import { publishRuntimeNextAction as publishRuntimeNextActionSource } from "../lib/runtime-handover-projection.mjs";
 import {
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
@@ -483,9 +490,12 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
+import { collectRigorJournalEntry, rigorVerifyRows } from "../lib/rigor-lifecycle.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
-import { discoverRepository, inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
+import { discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { withSessionAuthorityBoundary, executeSourceOwnedSessionAuthorityStateWrite, executeSourceOwnedSessionAuthorityCompanionWrite, executeSourceOwnedRetiredSessionAuthorityCloseWrite, inspectSourceOwnedSessionAuthorityCompanionRefresh, reserveSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityStateRefresh } from "../lib/session-authority-registry.mjs";
+import { readSourceOwnedAuthorityContext, inspectSourceOwnedCurrentAuthorityContext, createSignedCleanupRequesterObserver } from "../lib/session-requester-bridge.mjs";
 import {
   PUBLICATION_AUTHORITY_REFERENCE_SCHEMA,
   approvePublicationAuthority,
@@ -517,7 +527,7 @@ import {
   readCriticalHumanProofPolicy,
   readHumanApprovalMode,
 } from "../lib/critical-human-proof-policy.mjs";
-import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+import { chatAttributionRecord, isAttendedTerminal, requireAttendedChatGateConfirmation, runRegisteredAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import { criticalPushScratchArtifactPaths, resolvePoKeyDirectory } from "./po-human-approval.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
@@ -528,16 +538,27 @@ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
+  KickoffError as OnboardingContinuityKickoffError,
   applyOrphanSessionCleanupBindingRelease,
+  readSourceOwnedOnboardingContinuityCompanionContext,
+  isOwnedOnboardingContinuityCompanionContextHandle,
+  readOnboardingSessionCleanupBinding,
+  bindOnboardingContinuityStateWriterLockWitness,
+  assertOnboardingContinuityStateWriterLockWitness,
+  clearOnboardingContinuityStateWriterLockWitness,
   nextActionSection,
   observeBootstrapBindAcknowledgement,
   observeOnboardingBootstrapPlanApproval,
   planOrphanSessionCleanupBindingRelease,
   readOnboardingIntakeCheckpoint,
+  readSourceOwnedOnboardingAfkProjectionForState,
+  observeSourceOwnedControlledMethodAfkStateRename,
   syncStateMdNextAction,
 } from "../lib/onboarding-continuity.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
+
+import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout } from "../lib/calibration-verify-commit-transition.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -713,7 +734,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // `materialize-push-threat-model` was absent from it while another refusal named
 // that exact command as the way out of a stuck approval.
 const PIPELINE_STATE_COMMANDS = Object.freeze([
-  "materialize-architecture",
+  "materialize-architecture", "afk-project",
   "inspect", "rebind-approval",
   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
@@ -879,6 +900,30 @@ export function readState(dir = projectDir()) {
 }
 
 function writeState(dir, state, expectedState, options = {}) {
+  const frame = stateAuthorityInvocation;
+  if(frame?.deferredCompanion && !frame.validatingCompanion) {
+    if(!frame.sourceDefaults || options.reuseLock || options.afterCommit) return {ok:false,committed:false,code:"SDC-AUTHORITY-UNAVAILABLE"};
+    return withSessionAuthorityBoundary({repository:frame.repository},boundary=>{
+      if(!stateCataloguePresent(frame.repository)) stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-catalogue-disappeared");
+      const previousBoundary=frame.boundary;frame.boundary=boundary;frame.validatingCompanion=true;
+      try { return writeState(dir,state,expectedState,options); }
+      finally { frame.validatingCompanion=false;frame.boundary=previousBoundary; }
+    });
+  }
+  if (frame?.cataloguePresent && !frame.executingWrite && !frame.executingCompanion && !frame.validatingCompanion) {
+    const entry = frame.push ? `state.approve-push.${frame.push.effect}` : STATE_AUTHORITY_ENTRIES.get(frame.sub);
+    if (!entry || !frame.sourceDefaults || options.reuseLock || options.afterValidation || options.afterCommit) {
+      return {ok:false,committed:false,code:"SDC-AUTHORITY-UNAVAILABLE"};
+    }
+    const publish = boundary => {
+      const previousBoundary=frame.boundary;frame.boundary=boundary;
+      try {
+        const handle=prepareStateAuthorityWrite(frame,entry,dir,state,expectedState,options);
+        return executeSourceOwnedSessionAuthorityStateWrite({boundary,stateWriteHandle:handle});
+      } finally { frame.boundary=previousBoundary; }
+    };
+    return frame.push ? withSessionAuthorityBoundary({repository:frame.repository},publish) : publish(frame.boundary);
+  }
   // `options.reuseLock`, when supplied, is an already-acquired, still-held lock on this
   // exact `dir` (PHX-WP-PAC08-LOCK-REENTRANCY): the caller verified the resolved paths
   // match before handing it in (see `defaultFeaturePackageReconcileApproval`). Reusing it
@@ -887,8 +932,16 @@ function writeState(dir, state, expectedState, options = {}) {
   const reusedLock = options.reuseLock;
   const lock = reusedLock ?? acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
   if (!lock.ok) return { ok: false, committed: false, code: lock.code };
+  let stateLockWitness = null;
   let externalMutation = false;
   try {
+    if (frame?.deferredCompanion && frame.validatingCompanion && frame.sub === "approve-plan" && !reusedLock) {
+      stateLockWitness = bindOnboardingContinuityStateWriterLockWitness({
+        repository: frame.repository, contextHandle: frame.approvalContextHandle, boundary: frame.boundary, dir, lock: Object.freeze(lock),
+      });
+      stateBoundContinuityReleaseWitnesses.set(lock,Object.freeze({dir,fact:stateLockWitness.lockFact}));
+      assertOnboardingContinuityStateWriterLockWitness(stateLockWitness);
+    }
     const observed = readState(dir);
     const observedBase = observed.status === "ok" ? observed.state : observed.status === "absent" ? { schema: SCHEMA_ID } : null;
     if (observedBase === null || JSON.stringify(observedBase) !== JSON.stringify(expectedState)) {
@@ -931,69 +984,87 @@ function writeState(dir, state, expectedState, options = {}) {
         return { ok: false, committed: false, code: "PS-STATE-CONTINUITY" };
       }
     }
-    // Callers that couple a protected companion write to a State transition
-    // must run it only after the lock-held CAS, lifecycle transition, and all
-    // State validation above have succeeded. This remains before the State
-    // replacement, so a State I/O failure can still leave that companion write
-    // durable; callers must report that disposition truthfully.
-    if (options.afterValidation) {
-      let gate;
-      try {
-        gate = options.afterValidation();
-      } catch {
-        return { ok: false, committed: false, code: "PS-AFTER-VALIDATION" };
-      }
-      if (!gate?.ok) return {
-        ok: false,
-        committed: false,
-        code: gate?.code ?? "PS-AFTER-VALIDATION",
-        externalMutation: gate?.externalMutation === true,
-      };
-      externalMutation = gate.externalMutation === true;
-    }
-    if (transition?.replay) return { ok: true, committed: true, code: "PS-STATE-REPLAY", replay: true, transition };
-    const written = atomicWriteContinuityState(dir, nextState, lock, {
-      preserveGateEstimate: options.preserveGateEstimate === true,
-    });
-    if (written.ok && options.requirePhysicalReadback === true) {
-      const expectedPostimage = options.preserveGateEstimate === true
-        ? nextState
-        : clearGateEstimateForMutation(nextState);
-      let readback;
-      try { readback = (options.physicalReadback ?? readState)(dir); }
-      catch { readback = null; }
-      if (readback?.status !== "ok"
-        || JSON.stringify(readback.state) !== JSON.stringify(expectedPostimage)) {
-        const failed = { ok: false, committed: true, code: "PS-STATE-POSTIMAGE-READBACK" };
-        return transition === undefined ? failed : { ...failed, transition };
-      }
-    }
-    let afterCommit;
-    if (written.ok && options.afterCommit) {
-      try {
-        afterCommit = options.afterCommit({
-          state: options.preserveGateEstimate === true
-            ? nextState
-            : clearGateEstimateForMutation(nextState),
-        });
-      } catch (error) {
-        afterCommit = {
+    const publishValidated = () => {
+      // Callers that couple a protected companion write to a State transition
+      // must run it only after the lock-held CAS, lifecycle transition, and all
+      // State validation above have succeeded. This remains before the State
+      // replacement, so a State I/O failure can still leave that companion write
+      // durable; callers must report that disposition truthfully.
+      if (options.afterValidation) {
+        let gate;
+        try {
+          gate = options.afterValidation();
+        } catch {
+          return { ok: false, committed: false, code: "PS-AFTER-VALIDATION" };
+        }
+        if (!gate?.ok) return {
           ok: false,
-          status: "failed",
-          code: typeof error?.code === "string" ? error.code : "PS-AFTER-COMMIT",
-          privateCommitted: error?.committed === true,
+          committed: false,
+          code: gate?.code ?? "PS-AFTER-VALIDATION",
+          externalMutation: gate?.externalMutation === true,
         };
+        externalMutation = gate.externalMutation === true;
       }
-      if (!afterCommit?.ok) {
-        const failed = { ok: false, committed: true, code: afterCommit?.code ?? "PS-AFTER-COMMIT", afterCommit };
-        return transition === undefined ? failed : { ...failed, transition };
+      if (transition?.replay) {
+        if (stateAuthorityInvocation?.executingWrite) stateAuthorityInvocation.executingWrite.sealedBytes = stateAuthorityInvocation.executingWrite.preBytes;
+        return { ok: true, committed: true, code: "PS-STATE-REPLAY", replay: true, transition };
       }
-    }
-    if (afterCommit !== undefined) written.afterCommit = afterCommit;
-    const result = externalMutation && !written.ok ? { ...written, externalMutation: true } : written;
-    return transition === undefined ? result : { ...result, transition };
+      if (stateAuthorityInvocation?.executingWrite) {
+        const handle = stateAuthorityInvocation.executingWrite;
+        const postState = options.preserveGateEstimate === true ? nextState : clearGateEstimateForMutation(nextState);
+        handle.sealedBytes = Buffer.from(`${JSON.stringify(postState, null, 2)}\n`);
+      }
+      const written = atomicWriteContinuityState(dir, nextState, lock, {
+        preserveGateEstimate: options.preserveGateEstimate === true,
+      });
+      if (written.ok && options.requirePhysicalReadback === true) {
+        const expectedPostimage = options.preserveGateEstimate === true
+          ? nextState
+          : clearGateEstimateForMutation(nextState);
+        let readback;
+        try { readback = (options.physicalReadback ?? readState)(dir); }
+        catch { readback = null; }
+        if (readback?.status !== "ok"
+          || JSON.stringify(readback.state) !== JSON.stringify(expectedPostimage)) {
+          const failed = { ok: false, committed: true, code: "PS-STATE-POSTIMAGE-READBACK" };
+          return transition === undefined ? failed : { ...failed, transition };
+        }
+      }
+      let afterCommit;
+      if (written.ok && options.afterCommit) {
+        try {
+          afterCommit = options.afterCommit({
+            state: options.preserveGateEstimate === true
+              ? nextState
+              : clearGateEstimateForMutation(nextState),
+          });
+        } catch (error) {
+          afterCommit = {
+            ok: false,
+            status: "failed",
+            code: typeof error?.code === "string" ? error.code : "PS-AFTER-COMMIT",
+            privateCommitted: error?.committed === true,
+          };
+        }
+        if (!afterCommit?.ok) {
+          const failed = { ok: false, committed: true, code: afterCommit?.code ?? "PS-AFTER-COMMIT", afterCommit };
+          return transition === undefined ? failed : { ...failed, transition };
+        }
+      }
+      if (afterCommit !== undefined) written.afterCommit = afterCommit;
+      const result = externalMutation && !written.ok ? { ...written, externalMutation: true } : written;
+      return transition === undefined ? result : { ...result, transition };
+    };
+    if(frame?.deferredCompanion) return executeValidatedStateCompanion(frame,dir,nextState,options,publishValidated);
+    return publishValidated();
   } finally {
-    if (!reusedLock) releaseContinuityLock(lock);
+    try {
+      if (!reusedLock) releaseContinuityLock(lock);
+    } finally {
+      try {
+        if (stateLockWitness) clearOnboardingContinuityStateWriterLockWitness(stateLockWitness);
+      } finally { stateBoundContinuityReleaseWitnesses.delete(lock); }
+    }
   }
 }
 
@@ -1130,6 +1201,7 @@ function syncStatePhaseMarker(dir, state) {
  * exit 0 by the time this runs.
  */
 function syncNextActionDocs(dir, state) {
+  if(stateAuthorityInvocation?.completedCompanionProjection === sha256CanonicalJson(state)) return;
   // State is canonical. Git-backed projects keep this advisory projection in
   // private metadata so a lifecycle transition cannot dirty tracked docs.
   const projected = publishRuntimeNextAction({ rootDir: dir, state,
@@ -1255,6 +1327,17 @@ function releaseRecoveryGuard(guard) {
  * only by the same caller-supplied token. A new internal nonce prevents the old
  * owner from releasing the recovered lock.
  */
+const acquiredContinuityLockObjects = new WeakSet();
+const stateBoundContinuityReleaseWitnesses = new WeakMap();
+function continuityLockReleaseWitnessMatches(lock,witness) {
+  const current=inspectOwnedContinuityStateWriterLock({dir:witness.dir,lock});
+  return current!==null&&sha256CanonicalJson(current)===sha256CanonicalJson(witness.fact);
+}
+function rememberAcquiredContinuityLock(lock) {
+  if (lock?.ok) acquiredContinuityLockObjects.add(lock);
+  return lock;
+}
+
 export function acquireContinuityLock(dir, token, deps = {}) {
   if (!LOCK_TOKEN_RE.test(token ?? "")) return { ok: false, code: "PS-CONTINUITY-LOCK-TOKEN" };
   const authorityDir = stateDirectory(dir);
@@ -1270,7 +1353,7 @@ export function acquireContinuityLock(dir, token, deps = {}) {
   if (existsSync(lockRecoveryPath(dir))) return { ok: false, code: "PS-CONTINUITY-RECOVERY-IN-PROGRESS" };
   const published = publishExclusiveRecord(path, record, authorityDir);
   if (published.ok) {
-    return { ok: true, code: "PS-CONTINUITY-LOCKED", path, token, ownerNonce, recovered: false };
+    return rememberAcquiredContinuityLock({ ok: true, code: "PS-CONTINUITY-LOCKED", path, token, ownerNonce, recovered: false });
   }
   if (published.code !== "PS-CONTINUITY-LOCKED") return published;
 
@@ -1306,12 +1389,37 @@ export function acquireContinuityLock(dir, token, deps = {}) {
   } finally {
     if (recoveryComplete) releaseRecoveryGuard(recoveryGuard);
   }
-  return { ok: true, code: "PS-CONTINUITY-LOCK-RECOVERED", path, token, ownerNonce, recovered: true };
+  return rememberAcquiredContinuityLock({ ok: true, code: "PS-CONTINUITY-LOCK-RECOVERED", path, token, ownerNonce, recovered: true });
 }
 
 /** Release only a lock whose caller token and internal nonce both still match. */
+export function inspectOwnedContinuityStateWriterLock({ dir, lock } = {}) {
+  try {
+    if (!lock?.ok || !acquiredContinuityLockObjects.has(lock) || typeof dir !== "string" || realpathSync(dir) !== resolve(dir)) return null;
+    const expectedPath = continuityLockPath(dir);
+    if (lock.path !== expectedPath || resolve(expectedPath) !== expectedPath || realpathSync(expectedPath) !== expectedPath) return null;
+    const before = lstatSync(expectedPath);
+    if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.size < 1 || before.size > 4096) return null;
+    const rel = relative(resolve(dir), expectedPath).split(sep).join("/");
+    const read = calibrationApprovalFile(dir, rel, { privateState: true });
+    const after = lstatSync(expectedPath);
+    if (!read?.bytes || !after.isFile() || after.isSymbolicLink() || after.dev !== before.dev || after.ino !== before.ino
+      || after.mode !== before.mode || after.nlink !== before.nlink || after.size !== before.size
+      || after.uid !== before.uid || after.gid !== before.gid || realpathSync(expectedPath) !== expectedPath || read.bytes.length !== before.size) return null;
+    const record = parseLockRecord(read.bytes.toString("utf8"));
+    if (!record || record.token !== lock.token || record.ownerNonce !== lock.ownerNonce
+      || !Number.isSafeInteger(record.acquiredAtMs)) return null;
+    return Object.freeze({ path: expectedPath, bytesSha256: read.ref.sha256, size: read.bytes.length,
+      identity: Object.freeze({ dev: String(before.dev), ino: String(before.ino), mode: before.mode,
+        nlink: before.nlink, uid: before.uid, gid: before.gid }), recordSha256: sha256CanonicalJson(record) });
+  } catch { return null; }
+}
+
 export function releaseContinuityLock(lock) {
   if (!lock?.ok) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+  const releaseWitness=stateBoundContinuityReleaseWitnesses.get(lock);
+  if(releaseWitness&&!continuityLockReleaseWitnessMatches(lock,releaseWitness))
+    return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
   let current;
   try {
     current = parseLockRecord(readFileSync(lock.path, "utf8"));
@@ -1322,6 +1430,8 @@ export function releaseContinuityLock(lock) {
     return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
   }
   try {
+    if(releaseWitness&&!continuityLockReleaseWitnessMatches(lock,releaseWitness))
+      return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
     unlinkSync(lock.path);
     return { ok: true, code: "PS-CONTINUITY-UNLOCKED" };
   } catch {
@@ -1343,6 +1453,7 @@ export function atomicWriteContinuityState(dir, state, lock, deps = {}) {
   // CAS producer has explicitly prepared the exact replacement below.
   const stateToWrite = deps.preserveGateEstimate === true ? state : clearGateEstimateForMutation(state);
   const text = JSON.stringify(stateToWrite, null, 2) + "\n";
+  sealStateCompanion("repository",relative(realpathSync(dir),target).split(sep).join("/"),Buffer.from(text));
   let fd;
   let renamed = false;
   try {
@@ -1354,6 +1465,11 @@ export function atomicWriteContinuityState(dir, state, lock, deps = {}) {
     if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
     (deps.renameSync ?? renameSync)(tmp, target);
     renamed = true;
+    const frame=stateAuthorityInvocation;
+    if(frame?.sub === "afk-project" && frame.sourceDefaults && frame.executingCompanion
+        && !Object.hasOwn(deps,"renameSync") && !Object.hasOwn(deps,"replaceStateFdContents")
+        && !Object.hasOwn(deps,"syncDirectory"))
+      observeSourceOwnedControlledMethodAfkStateRename({rootDir:realpathSync(dir),target,lock,bytes:Buffer.from(text)});
     const synced = deps.syncDirectory?.(stateDirectory(dir)) ?? syncDirectory(stateDirectory(dir));
     if (!synced.ok) {
       return { ok: false, committed: true, code: "PS-CONTINUITY-COMMITTED-DURABILITY-UNKNOWN" };
@@ -3453,32 +3569,10 @@ function readCalibrationVerifyStatus(dir) {
   return status === "configured" ? { status, command } : { status };
 }
 
-/**
- * The late recovery must not repair calibration drift while configuring verify.
- * It therefore requires the two ordinary compatibility twins to exist, parse as
- * plain JSON objects, be structurally identical, and carry the same verify
- * classification. This validates the complete write set before the canonical
- * writer below is invoked, so a missing or malformed sibling never results in a
- * partial configuration write.
- */
+/** Reopen the actual committed neutral tier and any present legacy peer;
+ * missing/unsafe/uncommitted peers never become a configuration repair. */
 function readIdenticalCalibrationVerifyTwins(dir) {
-  const parsed = [];
-  for (const relPath of [AUTHORITY_ARTIFACTS.calibration.neutral, AUTHORITY_ARTIFACTS.calibration.legacy]) {
-    const path = join(dir, relPath);
-    if (!existsSync(path)) return { status: "missing" };
-    try {
-      const value = JSON.parse(readFileSync(path, "utf8"));
-      if (value === null || typeof value !== "object" || Array.isArray(value)) return { status: "malformed" };
-      parsed.push(value);
-    } catch {
-      return { status: "malformed" };
-    }
-  }
-  if (!sameJson(parsed[0], parsed[1])) return { status: "drifted" };
-  const status = classifyVerifyCommand(parsed[0].verify);
-  return status === "configured"
-    ? { status, command: parsed[0].verify }
-    : { status };
+  return inspectCommittedCalibrationVerifyLayout({ rootDir: dir });
 }
 
 /**
@@ -5728,6 +5822,7 @@ function atomicAppendResultBootstrap(result, bytes, lock, deps = {}) {
     closeSync(fd); fd = undefined;
     const rechecked = observeCanonicalResultBootstrap(result.root, result.path);
     if (!sameBootstrapResultPreimage(rechecked, result)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-RACE" };
+    sealStateCompanion("repository",result.path,bytes);
     (deps.renameResultSync ?? renameSync)(tmp, result.absolute);
     const synced = deps.syncResultDirectory?.(result.parent) ?? syncDirectory(result.parent);
     const observed = physicalRebindFile(result.root, result.path);
@@ -5847,6 +5942,7 @@ function observeBootstrapPrivateDirectory(paths, deps = {}) {
 }
 
 function writePrivateBootstrap(path, bytes, replace = false) {
+  sealSourceBootstrapPrivatePublication(path,bytes,replace);
   let fd;
   try {
     fd = openSync(path, replace ? "w" : "wx", 0o600);
@@ -5903,6 +5999,7 @@ function publishBootstrapJournal(dir, plan, deps = {}) {
 }
 
 function retireBootstrapJournal(paths, deps = {}) {
+  sealSourceBootstrapJournalRetirement(paths,deps);
   try { return ensureBootstrapPrivateDirectory(paths, deps) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
 }
 
@@ -8910,24 +9007,143 @@ function readDesignApprovalInputs(dir, submission, paths) {
   } catch { return { ok: false, code: "DCC-INPUT" }; }
 }
 
+
+function acceptedContractBlob(bytes, length = 40) {
+  const raw = Buffer.from(bytes);
+  return createHash(length === 64 ? "sha256" : "sha1").update(Buffer.from("blob " + raw.length + "\0")).update(raw).digest("hex");
+}
+function acceptedContractFile(dir, path, maxBytes = 1048576) {
+  const root = realpathSync(resolve(dir));
+  if (typeof path !== "string" || !/^(?:specs\/[A-Za-z0-9_-]+\/evidence\/accepted-delivery-contract-[a-f0-9]{64}\.json)$/u.test(path)) throw Error("unsafe retained path");
+  let target = root;
+  for (const part of path.split("/")) {
+    target = join(target, part);
+    const stat = lstatSync(target);
+    if (stat.isSymbolicLink() || realpathSync(target) !== target) throw Error("unsafe retained component");
+    if (target === join(root,path) && (!stat.isFile() || stat.nlink !== 1 || stat.size > maxBytes)) throw Error("unsafe retained file");
+  }
+  return readFileSync(target);
+}
+function acceptedCandidateFile({dir,candidate,path}) {
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate?.commit ?? "") || typeof path !== "string" || path.startsWith("/") || path.split("/").some(part=>part === ".." || part === "")) throw Error("unsafe candidate source");
+  const result = spawnSync("git",["show",candidate.commit + ":" + path],{cwd:dir,maxBuffer:1048576});
+  if (result.status !== 0) throw Error("original source unavailable");
+  return result.stdout;
+}
+function acceptedCandidateAt({dir,candidate}) {
+  const result = spawnSync("git",["rev-parse",candidate.commit,candidate.commit + "^{tree}"],{cwd:dir,encoding:"utf8"});
+  const values = result.stdout?.trim().split(/\s+/u);
+  return result.status === 0 && values?.length === 2 ? {ok:true,commit:values[0],tree:values[1]} : {ok:false};
+}
+function acceptedOriginalPolicy({dir,candidate,path}, reader) {
+  const bytes = acceptedCandidateFile({dir,candidate,path});
+  const physical = physicalRebindFile(dir,path);
+  if (!physical || !Buffer.from(physical.bytes).equals(Buffer.from(bytes))) throw Error("current policy differs from original approval policy");
+  return reader(dir);
+}
+function acceptedOriginalMode({dir,candidate}) {
+  const selected = readHumanApprovalMode(dir);
+  if (selected.scope === "default" && selected.source === "default") {
+    // Default approval KEY may coexist with a committed language policy file.
+    // Preserve original/current file equality before accepting that same mode.
+    if (existsSync(join(dir,"pipeline.user.yaml"))) return acceptedOriginalPolicy({dir,candidate,path:"pipeline.user.yaml"},readHumanApprovalMode);
+    const listed = spawnSync("git",["ls-tree",candidate.commit,"--","pipeline.user.yaml"],{cwd:dir,encoding:"utf8"});
+    if (listed.status !== 0 || listed.stdout.trim() !== "") throw Error("original selected mode differs");
+    return selected;
+  }
+  return acceptedOriginalPolicy({dir,candidate,path:"pipeline.user.yaml"},readHumanApprovalMode);
+}
+export function readAcceptedDeliveryContract({dir,envelopePath} = {}, deps = {}) {
+  try {
+    const raw = (deps.readRetainedEnvelope ?? (({dir,path})=>acceptedContractFile(dir,path)))({dir,path:envelopePath});
+    const envelope = JSON.parse(Buffer.from(raw).toString("utf8"));
+    const made = createAcceptedDeliveryContractEnvelope(envelope && Object.fromEntries(Object.entries(envelope).filter(([key])=>key !== "schema")));
+    if (!made.ok || envelope.schema !== "pipeline.accepted-delivery-contract-evidence.v1" || made.path !== envelopePath || !Buffer.from(raw).equals(Buffer.from(canonicalDesignApproval(envelope)))) return {ok:false,code:"CAC-ENVELOPE-UNAVAILABLE"};
+    const registration = (deps.resolveCanonicalArtifactIdentity ?? acceptedContractArtifactIdentity)(dir,envelopePath);
+    const id = registration?.identity;
+    if (registration?.status !== "resolved" || !id || id.featureId !== envelope.featureId || id.manifest !== envelope.manifestPath || id.path !== envelopePath || id.sha256 !== made.sha256
+      || id.class !== "candidate-evidence" || id.authority !== false || id.mutability !== "immutable" || id.retention !== "retain") return {ok:false,code:"CAC-REGISTRATION-INVALID"};
+    const current = (deps.readState ?? readState)(dir);
+    const currentLifecycle = current?.status === "ok" ? derivePlanLifecycle(current.state) : null;
+    if (current?.status !== "ok" || current.state?.planApproved !== true || !currentLifecycle?.ok || currentLifecycle.approvalCurrent !== true || !["approved", "implementing"].includes(currentLifecycle.status)) return {ok:false,code:"CAC-APPROVAL-STALE"};
+    const candidate = envelope.request.approvalIntent.value.candidate;
+    const candidateAt = (deps.gitCandidateAt ?? acceptedCandidateAt)({dir,candidate});
+    if (!candidateAt?.ok || candidateAt.commit !== candidate.commit || candidateAt.tree !== candidate.tree) return {ok:false,code:"CAC-SOURCE-UNAVAILABLE"};
+    const read = path => Buffer.from((deps.readCandidateFile ?? acceptedCandidateFile)({dir,candidate,path}));
+    const policyBytes = read(envelope.policyBinding.path);
+    if (sha256Bytes(policyBytes) !== envelope.policyBinding.sha256 || acceptedContractBlob(policyBytes,envelope.policyBinding.blobOid.length) !== envelope.policyBinding.blobOid) return {ok:false,code:"CAC-POLICY-BINDING-MISMATCH"};
+    const selectedModeRaw = (deps.readOriginalApprovalMode ?? acceptedOriginalMode)({dir,candidate});
+    const selectedMode = {mode:selectedModeRaw.mode,scope:selectedModeRaw.scope,source:selectedModeRaw.source};
+    const policy = envelope.policyBinding.mode === "chat"
+      ? (deps.readOriginalProofPolicy ? deps.readOriginalProofPolicy({dir,candidate}) : readCriticalHumanProofPolicy(dir))
+      : (deps.readOriginalProofPolicy ?? ((request)=>acceptedOriginalPolicy({...request,path:"project/critical-human-proof.json"},readCriticalHumanProofPolicy)))({dir,candidate});
+    const original = envelope.request.binding.sources;
+    const source = entry => ({path:entry.path,sha256:sha256Bytes(read(entry.path))});
+    const currentSources = {prd:source(original.prd),spec:source(original.spec),companions:original.companions.map(source)};
+    const receipts = envelope.request.binding.reviewReceipts.map(entry=>({path:entry.path,bytes:read(entry.path)}));
+    // Default runtime also rejects current source drift. Controlled fixture observations replace only public reads.
+    if (!deps.readCandidateFile && [currentSources.prd,currentSources.spec,...currentSources.companions].some(entry=>physicalRebindFile(dir,entry.path)?.sha256 !== entry.sha256)) return {ok:false,code:"CAC-SOURCE-BINDING-MISMATCH"};
+    const observedAuthority = deps.readState ? current.state.planApproval?.poGateAuthority : checkPoGateAuthority({repoRoot:dir}, deps)?.value;
+    return verifyAcceptedDeliveryContract({envelope,observations:{repositoryFingerprint:observedAuthority?.repositoryFingerprint,manifestPath:id.manifest,submission:current.state.planSubmission,approval:current.state.planApproval,candidate:{commit:candidateAt.commit,tree:candidateAt.tree},receipts,currentSources,policy,policyBinding:envelope.policyBinding,selectedMode}});
+  } catch { return {ok:false,code:"CAC-SOURCE-UNAVAILABLE"}; }
+}
+function persistAcceptedContractEnvelope({dir,path,sha256,envelope}) {
+  let created = false, fd;
+  try {
+    const root = realpathSync(resolve(dir));
+    if (path !== "specs/" + envelope.featureId + "/evidence/accepted-delivery-contract-" + sha256 + ".json") throw Error("capture path mismatch");
+    const made = createAcceptedDeliveryContractEnvelope(Object.fromEntries(Object.entries(envelope).filter(([key])=>key !== "schema")));
+    if (!made.ok || made.sha256 !== sha256) throw Error("capture digest mismatch");
+    let cursor = root;
+    for (const part of path.split("/").slice(0,-1)) {
+      cursor = join(cursor,part);
+      if (!existsSync(cursor)) mkdirSync(cursor,{mode:0o700});
+      const stat = lstatSync(cursor);
+      if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(cursor) !== cursor) throw Error("unsafe capture parent");
+    }
+    const target = join(root,path), bytes = Buffer.from(canonicalDesignApproval(envelope));
+    sealStateCompanion("repository",path,bytes);
+    if (!existsSync(target)) {
+      fd = openSync(target,"wx",0o444); created = true;
+      writeFileSync(fd,bytes); fsyncSync(fd); closeSync(fd); fd = undefined;
+      const directory = openSync(dirname(target),"r"); try { fsyncSync(directory); } finally { closeSync(directory); }
+    }
+    if (!acceptedContractFile(dir,path).equals(bytes)) throw Error("capture readback mismatch");
+    return {ok:true,path,sha256,externalMutation:created};
+  } catch { return {ok:false,code:"CAC-CAPTURE-READBACK",externalMutation:created}; }
+  finally { if (fd !== undefined) closeSync(fd); }
+}
+function acceptedContractPolicyBinding(dir,request,mode) {
+  const path = mode === "chat" ? "pipeline.user.yaml" : "project/critical-human-proof.json";
+  const candidate = request.approvalIntent.value.candidate;
+  const bytes = acceptedCandidateFile({dir,candidate,path});
+  const physical = physicalRebindFile(dir,path);
+  if (!physical || !Buffer.from(physical.bytes).equals(Buffer.from(bytes))) throw Error("approval policy drift");
+  return {path,blobOid:acceptedContractBlob(bytes,candidate.commit.length),sha256:sha256Bytes(bytes),mode};
+}
+
 function observeDesignApprovalRequest({ dir, presentation, submission, deps = {}, signature = false }) {
   const requestPath = presentation?.designApprovalRequestPath;
   const request = readPhysicalScratchJson(dir, requestPath);
   if (!request || !validPlanPresentation(presentation) || presentation.schema !== PLAN_PRESENTATION_DESIGN_SCHEMA) return { ok: false, code: "DAB-REQUEST-UNAVAILABLE" };
   const inputs = readDesignApprovalInputs(dir, submission, request.binding?.reviewReceipts?.map(entry => entry.path));
   if (!inputs.ok) return inputs;
+  const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});
+  if (!decisionDraft.ok) return {ok:false,code:decisionDraft.code};
   const checked = verifyDesignApprovalRequest({ request, featureId: submission.featureId, receipts: inputs.receipts, currentSources: inputs.currentSources });
   if (!checked.ok) return checked;
   if (canonicalDesignApproval(request.binding) !== canonicalDesignApproval(presentation.designApprovalBinding)
     || canonicalDesignApproval(checked.candidate) !== canonicalDesignApproval(designWorkflowGitCandidate(dir, deps))) return { ok: false, code: "DAB-CANDIDATE-DRIFT" };
-  if (!signature) return { ...checked, request };
+  if (!signature) return { ...checked, request, decisionBindingsRequired:decisionDraft.required, decisionBindingsDisclosure:decisionDraft.disclosure ?? null };
   const proof = readPhysicalScratchJson(dir, requestPath.replace("request-", "proof-"));
   const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(dir);
   if (!policy?.ok) return { ok: false, code: policy?.code ?? "DAB-TRUST-POLICY" };
   const anchors = policy.trustAnchors ?? (policy.trustAnchor ? [policy.trustAnchor] : []);
-  const verified = anchors.map(trustPolicy => verifyPoApprovalProof({ intent: request.approvalIntent, trustPolicy, proof })).find(value => value.verified);
-  if (!verified) return { ok: false, code: "DAB-APPROVAL-PROOF-INVALID" };
-  return { ...checked, request, proof, proofSha256: verified.proofSha256, signer: { keyReference: proof.keyReference } };
+  const verified = Array.isArray(policy.trustAnchors)
+    ? verifyAcceptedTrustAnchors({ intent: request.approvalIntent, anchors: policy.trustAnchors, proof })
+    : anchors.map(trustPolicy => verifyPoApprovalProof({ intent: request.approvalIntent, trustPolicy, proof })).find(value => value.verified);
+  if (!verified?.verified) return { ok: false, code: "DAB-APPROVAL-PROOF-INVALID" };
+  return { ...checked, request, proof, proofSha256: verified.proofSha256, signer: { keyReference: proof.keyReference }, decisionBindingsRequired:decisionDraft.required, decisionBindingsDisclosure:decisionDraft.disclosure ?? null };
 }
 
 function approveDesignSubmittedPlan({ state, expectedSubmissionSha256, profileSha256, authority, by, at, binding, approval }) {
@@ -8963,6 +9179,7 @@ function writeDesignWorkflowApprovalRequest(dir, request) {
       : `design-workflow-approval-request-${request.packageSha256}.json`;
     const target = join(scratch, name);
     const bytes = Buffer.from(`${JSON.stringify(request, null, 2)}\n`, "utf8");
+    sealStateCompanion("repository",relative(root,target).split(sep).join("/"),bytes);
     if (existsSync(target)) {
       const stat = lstatSync(target);
       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || realpathSync(target) !== target
@@ -10100,7 +10317,7 @@ function runEnrollmentRetirement(sub,rest){
  }catch(error){console.error(`Enrollment retirement refused: ${error.code??error.message}`);return 2;}
 }
 
-export function run(argv = process.argv.slice(2), deps = {}) {
+function runStateSource(argv = process.argv.slice(2), deps = {}) {
   const dir = deps.dir ?? projectDir();
   const now = deps.now ?? (() => new Date().toISOString());
   const gitHead = deps.gitHead ?? defaultGitHead;
@@ -10190,6 +10407,30 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const base = existing.status === "ok" ? existing.state : { schema: SCHEMA_ID };
 
   switch (sub) {
+    case "afk-project": {
+      const parsed=parseAllowedOptionalFlags(rest,new Set(["activation-id","ledger-head-sha256"]));
+      const activationId=parsed.ok?parsed.value["activation-id"]:null;
+      const ledgerHeadSha256=parsed.ok?parsed.value["ledger-head-sha256"]:null;
+      const frame=stateAuthorityInvocation;
+      if(!parsed.ok||Object.keys(parsed.value).length!==2||! /^[a-f0-9]{32}$/u.test(activationId??'')
+          ||! /^[a-f0-9]{64}$/u.test(ledgerHeadSha256??'')||!frame||frame.sub!=="afk-project"
+          ||!frame.boundary||!frame.sourceDefaults||!frame.executingCompanion)
+        stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","afk-projection-owning-state-context-required");
+      const contextHandle=readSourceOwnedOnboardingContinuityCompanionContext({repository:frame.repository,entry:"afk-project"});
+      if(!contextHandle||!isOwnedOnboardingContinuityCompanionContextHandle(contextHandle,{repository:frame.repository,entry:"afk-project"}))
+        stateAuthorityFailure("SDC-AUTHORITY-CAS","afk-projection-owning-companion-changed");
+      const projection=readSourceOwnedOnboardingAfkProjectionForState({repository:frame.repository,entry:"afk-project"});
+      if(!projection||projection.schema!=="pipeline.afk-projection.v1"||projection.activationId!==activationId
+          ||projection.ledgerHeadSha256!==ledgerHeadSha256
+          ||!exactObjectKeys(projection,["schema","activationId","status","ledgerSequence","ledgerHeadSha256","privateRefOid","updatedAt"])
+          ||!new Set(["active","complete"]).has(projection.status)||!Number.isSafeInteger(projection.ledgerSequence)
+          ||projection.ledgerSequence<1||! /^[a-f0-9]{64}$/u.test(projection.ledgerHeadSha256)
+          ||! /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(projection.privateRefOid)
+          ||typeof projection.updatedAt!=="string"||!Number.isFinite(Date.parse(projection.updatedAt)))
+        stateAuthorityFailure("SDC-AUTHORITY-CAS","afk-projection-source-binding-changed");
+      const next=clearGateEstimateForMutation({...base,afk:projection});
+      return writeState(dir,next,base);
+    }
     case "set-feature": {
       const id = flags.id;
       const planPath = flags["plan-path"];
@@ -10425,22 +10666,37 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 0;
       }
       if (twins.status !== "baseline-only") {
-        console.error(`Error: configure-verify requires two intact, identical baseline-only calibration twins (${twins.status}); zero calibration write.`);
+        console.error(`Error: configure-verify requires intact, identical committed baseline-only calibration tiers (${twins.status}); zero calibration write.`);
+        return 2;
+      }
+      const commitTransition = prepareCalibrationVerifyCommitTransition({rootDir: dir, verifyCommand: command});
+      if (!commitTransition?.ok || !commitTransition.preparedHandle
+        || !sameJson(commitTransition.paths, twins.paths)) {
+        console.error(`Error: configure-verify commit route unavailable (${commitTransition?.code ?? "CVCT-PREPARE-UNAVAILABLE"}); zero calibration write.`);
         return 2;
       }
       const written = writeCalibrationVerifyCommand(dir, command);
       if (!written.ok
-        || written.written.length !== 2
-        || written.written[0] !== AUTHORITY_ARTIFACTS.calibration.neutral
-        || written.written[1] !== AUTHORITY_ARTIFACTS.calibration.legacy) {
+        || !sameJson(written.written, commitTransition.paths)) {
         // The full write set was validated immediately above. This defensive
         // failure is retained for an unexpected filesystem race; callers must
         // inspect the durable files rather than treating an incomplete result
         // as a successful recovery.
-        console.error("Error: configure-verify could not write both calibration twins; inspect calibration before retrying.");
+        console.error("Error: configure-verify could not write the exact committed calibration tiers; inspect calibration before retrying.");
+        return 2;
+      }
+      const commitReady = completeCalibrationVerifyCommitTransition({preparedHandle: commitTransition.preparedHandle});
+      if (!commitReady?.ok || commitReady.code !== "CVCT-COMMIT-READY"
+        || !Array.isArray(commitReady.paths)
+        || !sameJson(commitReady.paths, commitTransition.paths)) {
+        console.error(`Error: verify twins were configured, but their normal commit route is unavailable (${commitReady?.code ?? "CVCT-COMPLETE-UNAVAILABLE"}); calibration mutation occurred. Inspect the twins before retrying; no commit seal is reported.`);
         return 2;
       }
       console.log("Verify command configured for the established implementation lifecycle.");
+      console.log("Commit exactly the selected verification tiers through the normal hooks:");
+      console.log(`git add -- ${commitReady.paths.join(" ")}`);
+      console.log('git commit -m "chore: configure project verification"');
+      console.log("Keep the private State untracked; the normal hook rechecks this exact transition at commit time.");
       return 0;
     }
 
@@ -10509,15 +10765,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedSpecSha256 = authority.value.specSha256;
       let submittedAt;
       let submittedBriefing;
-      if (profileName === "mini") {
-        const historical = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
-        if (!historical?.ok) {
-          console.log(JSON.stringify({ schema: SUBMIT_PLAN_STOP_SCHEMA, command: "submit-plan", code: historical?.code ?? "PO-GATE-AUTHORITY-INVALID",
-            nextAction: { kind: "collect-input", mutation: false, requiresConfirmation: false,
-              guidance: `The mini plan at ${authority.value.planPath} (sha256 ${expectedPlanSha256}) and specification at ${authority.value.specPath} (sha256 ${expectedSpecSha256}) require their historical acknowledgement. ${historical?.reason ?? ""} ${historical?.repair ?? ""}` } }));
-          return 2;
-        }
-      }
+      let submittedRigor;
+      // Submission does not request a human content acknowledgement.
       // Submission records agent-authored content; human judgement belongs only to final approval.
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
@@ -10550,7 +10799,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             profile: transition.submission.profile,
             profileSha256: transition.submission.profileSha256,
           });
-          return { ...transition, state: { ...transition.state, selectedProfile: profileName, updatedAt: submittedAt, planApprovalBriefing: submittedBriefing } };
+          // AC07: derive from owner ports while the ordinary State lock is held.
+          // This is an advisory journal, never profile or implementation authority.
+          submittedRigor = collectRigorJournalEntry({ rootDir: dir, state: observed,
+            boundary: "plan-submission", selectedProfile: profileName, observedAt: submittedAt });
+          return { ...transition, state: { ...transition.state, selectedProfile: profileName, updatedAt: submittedAt,
+            planApprovalBriefing: submittedBriefing, rigorHistory: [...(observed.rigorHistory ?? []), submittedRigor] } };
         },
         beforeCommit: () => {
           const currentSelection = inspectSelectedPlanProfile(dir, base);
@@ -10558,7 +10812,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           if (currentSelection.profile !== null && currentSelection.profile !== profileName) {
             return { ok: false, code: "PROFILE-CHANGE-REQUIRES-PO" };
           }
-          const nextAuthority = poGateAuthority({ repoRoot: dir, ...(profileName === "mini" ? { expectedPlanSha256, expectedSpecSha256 } : {}) });
+          const rigorReadback = collectRigorJournalEntry({ rootDir: dir, state: base,
+            boundary: "plan-submission", selectedProfile: profileName, observedAt: submittedAt });
+          if (rigorReadback.entrySha256 !== submittedRigor.entrySha256) return { ok: false, code: "RIGOR-INPUT-STALE" };
+          const nextAuthority = poGateAuthority({ repoRoot: dir });
           const nextProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
           return nextAuthority?.ok
             && JSON.stringify(nextAuthority.value) === JSON.stringify(authority.value)
@@ -10695,7 +10952,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       const parsedPresentation = parseAllowedOptionalFlags(presentationArgv, new Set(["by"]));
       if (!parsedPresentation.ok) {
-        console.error("Error: present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.");
+        console.error("Error: present-plan accepts only --by <name> and --review-receipt <repo-relative-json-path> (one or two receipts for epic/feature; none for mini).");
         return 2;
       }
       const presentationFlags = parsedPresentation.value;
@@ -10717,6 +10974,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (requiresWorkflowPackage) {
         const inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
         if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
+        const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});
+        if (!decisionDraft.ok) { console.error(`Error: present-plan refused (${decisionDraft.code}); repair the signed design decision subjects.`); return 2; }
         const binding = createDesignApprovalBinding({ featureId: submitted.featureId, receipts: inputs.receipts, currentSources: inputs.currentSources });
         if (!binding.ok) { console.error(binding.code); return 2; }
         const result = createDesignApprovalRequest({ binding: binding.binding, candidate: designWorkflowGitCandidate(dir, deps) });
@@ -10992,6 +11251,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedSubmissionSha256 = lifecycle.submissionSha256;
       const approvalMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
+      if (designRead?.decisionBindingsRequired && approvalMode?.mode !== "signature") { console.error("DDB-WHOLE-DESIGN-SIGNATURE-REQUIRED"); return 2; }
       // The global policy is authoritative even for states created before
       // bootstrapAcknowledgementRequired existed.  Otherwise an old-shaped
       // state in a signature repository could accept `--by` and bypass the
@@ -11068,7 +11328,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           by = `verified:${designRead.signer.keyReference}`;
         } else if (approvalMode?.mode === "chat") {
           const challenge = `approve-${designRead.bindingSha256.slice(0, 12)}`;
-          const confirmed = requireAttendedChatGateConfirmation({ summaryLines: ["FINAL DESIGN APPROVAL", JSON.stringify(designRead.request.binding, null, 2), `actor: ${by}`, `confirmation value: ${challenge}`], expected: challenge, dependencies: deps });
+          const confirmed = approvalMode.scope === "global" && approvalMode.source === "pipeline.user.yaml"
+            ? { ok: true } // ADR0076: --by attributes the already selected explicit chat decision; no second TTY ceremony.
+            : confirmStateCompanionApproval({ summaryLines: ["FINAL DESIGN APPROVAL", JSON.stringify(designRead.request.binding, null, 2), `actor: ${by}`, `confirmation value: ${challenge}`], expected: challenge, dependencies: deps });
           if (!confirmed.ok) { console.error(confirmed.code); return 2; }
         } else { console.error("DAB-APPROVAL-MODE-UNAVAILABLE"); return 2; }
         designApproval = { schema: "pipeline.design-approval.v1", mode: approvalMode.mode, approvedBy: by, approvedAt: now(), bindingSha256: designRead.bindingSha256,
@@ -11079,6 +11341,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // the weaker global-chat basis in an adjacent, explicit record instead.
       const globalChat = committedGlobalChatHumanApproval(dir, deps);
       let approvedAt;
+      let acceptedCapture = null;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           approvedAt = now();
@@ -11093,6 +11356,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             binding: designRead?.request.binding ?? null,
             approval: designApproval,
           });
+          if (transition.ok && advisorRequired) {
+            try {
+              const made = createAcceptedDeliveryContractEnvelope({repositoryFingerprint:authority.value.repositoryFingerprint,featureId:base.planSubmission.featureId,manifestPath:`specs/${base.planSubmission.featureId}/lifecycle.json`,submission:base.planSubmission,approval:transition.approval,request:designRead.request,policyBinding:acceptedContractPolicyBinding(dir,designRead.request,approvalMode.mode)});
+              if (!made.ok) return made;
+              acceptedCapture = prepareAcceptedContractCapture({state:observed,expectedStateSha256:sha256CanonicalJson(observed),approval:transition.approval,envelope:made.envelope});
+              if (!acceptedCapture.ok) return acceptedCapture;
+              transition.state = acceptedCapture.state; transition.approval = acceptedCapture.state.planApproval;
+            } catch { return {ok:false,code:"CAC-SOURCE-UNAVAILABLE"}; }
+          }
           return transition.ok
             ? {
               ...transition,
@@ -11123,10 +11395,51 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             ? { ok: true }
             : { ok: false, code: observed?.code ?? "PO-GATE-AUTHORITY-STALE" };
         },
+        sourceCompanionCapture: () => acceptedCapture,
+        afterValidation: () => {
+          if (!acceptedCapture) return {ok:true};
+          const stored = (deps.persistAcceptedContractEnvelope ?? persistAcceptedContractEnvelope)({dir,path:acceptedCapture.path,sha256:acceptedCapture.sha256,envelope:acceptedCapture.envelope});
+          return stored?.ok && stored.path === acceptedCapture.path && stored.sha256 === acceptedCapture.sha256
+            ? {ok:true,externalMutation:stored.externalMutation === true}
+            : {ok:false,code:stored?.code ?? "CAC-CAPTURE-READBACK",externalMutation:stored?.externalMutation === true};
+        },
+        requirePhysicalReadback: true,
       });
       if (!stateWriteSucceeded(written)) {
         console.error(`Error: approve-plan authority or v2 transition failed before commit (${written.code}); no approval was recorded.`);
         return 2;
+      }
+      const aggregateArchitecture=inspectApprovedDesignDecisionBindings({rootDir:dir,area:'architecture'});
+      const aggregateModel=inspectApprovedDesignDecisionBindings({rootDir:dir,area:'model-policy'});
+      if(!aggregateArchitecture.ok || !aggregateModel.ok) {
+        console.error(`Plan approval was committed, but aggregate design binding recheck is incomplete (${aggregateArchitecture.code ?? aggregateModel.code ?? 'DDB-RECHECK'}); no aggregate authority is inferred.`);
+      } else if(aggregateModel.required) {
+        const modelDecision=readApprovedDesignDecisionBindingsHandle(aggregateModel.handle);
+        if(!modelDecision.ok) console.error(`Plan approval was committed, but model-policy recheck failed (${modelDecision.code}); model authority is unavailable.`);
+        else if(modelDecision.modelRequest) {
+          const retained=retainApprovedDesignModelPolicyReference(aggregateModel.handle);
+          if(!retained.ok) console.error(`Plan approval was committed, but durable model-policy reference retention failed (${retained.code}); model authority is unavailable.`);
+          else {
+            const requestPath=written.transition.state.planPresentation.designApprovalRequestPath;
+            const requestFile=physicalRebindFile(dir,requestPath);
+            const request=requestFile ? readPhysicalScratchJson(dir,requestPath) : null;
+            let sealed=!!requestFile && !!request && Array.isArray(request.binding?.reviewReceipts);
+            const sealedPaths=new Map();
+            const sealRetained=(path,expectedSha)=>{
+              const retainedFile=physicalRebindFile(dir,path);
+              if(!retainedFile || retainedFile.sha256!==expectedSha) { sealed=false; return; }
+              if(sealedPaths.has(path)) { if(sealedPaths.get(path)!==expectedSha) sealed=false; return; }
+              sealStateCompanion("repository",path,retainedFile.bytes);
+              sealedPaths.set(path,expectedSha);
+            };
+            if(sealed) {
+              sealRetained(`project/design-approval-evidence/${requestFile.sha256}.json`,requestFile.sha256);
+              for(const receipt of request.binding.reviewReceipts) sealRetained(`project/design-approval-evidence/${receipt.sha256}.json`,receipt.sha256);
+              sealRetained(retained.referencePath,retained.referenceSha256);
+            }
+            if(!sealed) console.error("Plan approval was committed, but retained model-policy effects did not pass companion readback sealing.");
+          }
+        }
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
@@ -11930,7 +12243,27 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.planCancellation;
       delete next.planMixedStateRecovery;
       delete next.continuity;
-      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+      // AC07: preserve the full feature floor through interruptions. The close
+      // still requires the exact existing coordinator/audit/continuity bindings.
+      let closedRigor;
+      try {
+        closedRigor = collectRigorJournalEntry({ rootDir: dir, state: base, boundary: "pre-close",
+          selectedProfile: base.selectedProfile ?? base.planSubmission?.profile, observedAt: closedAt });
+        next.rigorHistory = [...(base.rigorHistory ?? []), closedRigor];
+        closedEntry.rigorObservationSha256 = closedRigor.entrySha256;
+        closedEntry.rigorVerifyRows = rigorVerifyRows(next).filter(row => row.featureId === activeFeature.id);
+      } catch {
+        console.error("Error: RIGOR-HISTORY-INVALID: existing floor history cannot be authenticated; zero State mutation.");
+        return 2;
+      }
+      if (!stateWriteSucceeded(writeState(dir, next, base, {
+        beforeCommit: () => {
+          const readback = collectRigorJournalEntry({ rootDir: dir, state: base, boundary: "pre-close",
+            selectedProfile: base.selectedProfile ?? base.planSubmission?.profile, observedAt: closedAt });
+          return readback.entrySha256 === closedRigor.entrySha256 ? { ok: true } : { ok: false, code: "RIGOR-INPUT-STALE" };
+        },
+        requirePhysicalReadback: true,
+      }))) {
         return 2;
       }
       syncNextActionDocs(dir, next);
@@ -12020,7 +12353,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const applyRelease = deps.applyOrphanSessionCleanupBindingReleaseFn
         ?? applyOrphanSessionCleanupBindingRelease;
       let releasePlan;
-      if (deps.planOrphanSessionCleanupBindingReleaseFn === undefined && (base.continuity === undefined || base.continuity?.runtime?.sessionCleanup == null)) {
+      if (retainOwnedLiveDiscardBinding(dir, base)) {
+        // Only the genuine original I03 lifecycle retains its own live binding.
+        // The registry witnesses conserve that physical authority as held orphan;
+        // no cleanup release, descriptor mutation or terminal grant occurs here.
+        releasePlan = { status: "not-needed" };
+      } else if (deps.planOrphanSessionCleanupBindingReleaseFn === undefined && (base.continuity === undefined || base.continuity?.runtime?.sessionCleanup == null)) {
         // Legacy state without a declared cleanup binding carries no private
         // cleanup-binding contract, so there is no truthful release to plan.
         releasePlan = { status: "not-needed" };
@@ -12378,6 +12716,1075 @@ const isDirectRun = (() => {
     return false;
   }
 })();
+
+
+// The fixed source entry owns the transform. Public run dependency seams do not
+// create a State write capability. No observation evaluates a transition.
+const STATE_AUTHORITY_ENTRIES = new Map([
+  ["set-feature", "state.set-feature"],
+  ["cancel-submitted-plan", "state.cancel-submitted-plan"],
+  ["cancel-mixed-plan-state", "state.cancel-mixed-plan-state"],
+  ["reopen-design", "state.reopen-design"],
+  ["seal-plan-approval", "state.seal-plan-approval"],
+  ["set-gate-estimate", "state.set-gate-estimate"],
+  ["revoke-plan", "state.revoke-plan"],
+  ["set-phase", "state.set-phase-no-calibration"],
+]);
+const stateAuthorityWriteBrands = new WeakMap();
+let stateAuthorityInvocation = null;
+const stateOwnedCompanionFailureFrames = new WeakSet();
+function stateAuthorityFailure(code, reason) {
+  const error = new Error(reason);
+  error.name = "SessionAuthorityError";
+  error.code = code;
+  error.reason = reason;
+  throw error;
+}
+function stateRepositoryDigest(repository) {
+  return sha256CanonicalJson({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir});
+}
+function stateCataloguePresent(repository) {
+  let cursor = repository.commonDir;
+  const parts = ["agent-pipeline", "session-authority", "catalogue.json"];
+  for (let index = 0; index < parts.length; index++) {
+    cursor = join(cursor, parts[index]);
+    let stat;
+    try { stat = lstatSync(cursor); }
+    catch (error) {
+      if (error?.code === "ENOENT") return false;
+      stateAuthorityFailure("SDC-PRIVATE-PATH", "state-catalogue-unreadable");
+    }
+    if (stat.isSymbolicLink() || realpathSync(cursor) !== cursor
+      || (index === parts.length - 1 ? !stat.isFile() || stat.nlink !== 1 : !stat.isDirectory())
+      || (typeof process.getuid === "function" && stat.uid !== process.getuid())
+      || (process.platform !== "win32" && (stat.mode & 0o077) !== 0)) {
+      stateAuthorityFailure("SDC-PRIVATE-PATH", "state-catalogue-unsafe");
+    }
+  }
+  return true;
+}
+function stateAuthorityImage(repository) {
+  const selected = statePath(repository.primaryRoot);
+  const path = relative(repository.primaryRoot, selected).split(sep).join("/");
+  const beforeStat = lstatSync(selected);
+  const read = calibrationApprovalFile(repository.primaryRoot, path, {privateState:true});
+  const stat = lstatSync(selected);
+  if (beforeStat.dev !== stat.dev || beforeStat.ino !== stat.ino || beforeStat.mode !== stat.mode
+    || beforeStat.nlink !== stat.nlink || beforeStat.size !== stat.size || beforeStat.uid !== stat.uid) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS", "selected-state-physical-image-changed");
+  }
+  let value;
+  try { value = JSON.parse(read.bytes.toString("utf8")); }
+  catch { stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "selected-state-invalid-json"); }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "selected-state-invalid-object");
+  }
+  return {
+    path:selected,
+    bytes:read.bytes,
+    value,
+    image:Object.freeze({sha256:read.ref.sha256,size:read.bytes.length,
+      identity:Object.freeze({dev:String(stat.dev),ino:String(stat.ino),mode:stat.mode,nlink:stat.nlink}),
+      semanticSha256:sha256CanonicalJson(value)}),
+  };
+}
+function prepareStateAuthorityWrite(frame, entry, dir, state, expectedState, options) {
+  if (frame !== stateAuthorityInvocation || !frame.boundary || !frame.cataloguePresent
+    || !frame.sourceDefaults || resolve(dir) !== frame.repository.primaryRoot
+    || (frame.push ? frame.sub !== "approve-push" || entry !== `state.approve-push.${frame.push.effect}`
+      : !STATE_AUTHORITY_ENTRIES.has(frame.sub) || entry !== STATE_AUTHORITY_ENTRIES.get(frame.sub))) {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-source-entry-unavailable");
+  }
+  const before = stateAuthorityImage(frame.repository);
+  if (JSON.stringify(before.value) !== JSON.stringify(expectedState)) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS", "state-source-preimage-stale");
+  }
+  const handle = Object.freeze({});
+  stateAuthorityWriteBrands.set(handle, {
+    frame, entry, repository:frame.repository, dir, state, expectedState, options,
+    selectedPathSha256:sha256CanonicalJson(before.path), preimage:before.image,
+    preBytes:Buffer.from(before.bytes), sealedBytes:null, attempted:false, terminal:null,
+  });
+  return handle;
+}
+function ownedStateAuthorityWrite(handle) {
+  const data = stateAuthorityWriteBrands.get(handle);
+  if (!data || data.frame !== stateAuthorityInvocation || !data.frame.boundary) {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-write-handle-unavailable");
+  }
+  return data;
+}
+export function isOwnedStateAuthorityWriteHandle(handle, {repository}) {
+  const data = stateAuthorityWriteBrands.get(handle);
+  return !!data && data.frame === stateAuthorityInvocation
+    && sha256CanonicalJson(data.repository) === sha256CanonicalJson(repository)
+    && sha256CanonicalJson(inspectSignedDescriptorCustodyRepository(repository.primaryRoot)) === sha256CanonicalJson(repository);
+}
+export function observeStateAuthorityWrite(handle) {
+  const data = ownedStateAuthorityWrite(handle);
+  const before = stateAuthorityImage(data.repository);
+  if (before.path !== statePath(data.dir) || !before.bytes.equals(data.preBytes)
+    || sha256CanonicalJson(before.image) !== sha256CanonicalJson(data.preimage)) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS", "state-write-preimage-changed");
+  }
+  return Object.freeze({entry:data.entry,repositorySha256:stateRepositoryDigest(data.repository),
+    selectedPathSha256:data.selectedPathSha256,preimage:data.preimage,
+    affectedProducerIds:Object.freeze(["onboarding-continuity","state-push-challenge"])});
+}
+export function executeStateAuthorityWrite(handle) {
+  const data = ownedStateAuthorityWrite(handle);
+  if (data.attempted || data.frame.executingWrite) stateAuthorityFailure("SDC-AUTHORITY-CAS", "state-write-already-attempted");
+  observeStateAuthorityWrite(handle);
+  data.attempted = true;
+  data.frame.executingWrite = data;
+  let result;
+  try { result = writeState(data.dir,data.state,data.expectedState,data.options); }
+  finally { data.frame.executingWrite = null; }
+  if (!data.sealedBytes && result?.ok === false && result.committed === false && result.externalMutation !== true) {
+    data.sealedBytes = data.preBytes;
+  }
+  if (!data.sealedBytes) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-write-no-valid-terminal");
+  const after = stateAuthorityImage(data.repository);
+  if (!after.bytes.equals(data.sealedBytes) || sha256CanonicalJson(after.path) !== data.selectedPathSha256) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS", "state-write-sealed-postimage-mismatch");
+  }
+  statePushAfterWrite(data,result);
+  data.terminal = Object.freeze({entry:data.entry,selectedPathSha256:data.selectedPathSha256,
+    preimage:data.preimage,postimage:after.image,result});
+  return result;
+}
+export function observeStateAuthorityWriteTerminal(handle) {
+  const data = ownedStateAuthorityWrite(handle);
+  if (!data.terminal || !data.sealedBytes) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-write-terminal-unavailable");
+  const after = stateAuthorityImage(data.repository);
+  if (!after.bytes.equals(data.sealedBytes) || sha256CanonicalJson(after.image) !== sha256CanonicalJson(data.terminal.postimage)) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS", "state-write-terminal-changed");
+  }
+  return data.terminal;
+}
+export function run(argv = process.argv.slice(2), deps = {}) {
+  const sub = argv[0];
+  // This read-only command owns its exact explicit root; ambient projectDir
+  // discovery must not replace the target before its existing journal checks.
+  if (sub === "inspect-enrollment-retirement") {
+    const exact = parseExactFlags(argv.slice(1), new Set(["root"]));
+    if (!exact.ok || Object.keys(exact.value).length !== 1) return 2;
+    try {
+      const root = resolve(exact.value.root);
+      return runStateSource(argv, { ...deps, dir: root });
+    } catch { return 2; }
+  }
+  // Read-only and the State-read-only P16 twin writer retain their exact routes.
+  if (["inspect","help","-h","--help","configure-verify"].includes(sub)) return runStateSource(argv,deps);
+  const dir = deps.dir ?? projectDir();
+  const previous = stateAuthorityInvocation;
+  let owningFailureFrame = null;
+  try {
+    const repository = inspectSignedDescriptorCustodyRepository(dir);
+    if(sub === "approve-push") {
+      const present=withSessionAuthorityBoundary({repository},()=>stateCataloguePresent(repository));
+      if(!present) return runStateSource(argv,deps);
+      if(!Object.keys(deps).every(key=>key === "dir" || key === "now")) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-injected-route");
+      return runStatePushSource(argv,repository);
+    }
+    if (STATE_COMPANION_ENTRIES.has(sub)) {
+      const cataloguePresent=withSessionAuthorityBoundary({repository},()=>stateCataloguePresent(repository));
+      if(!cataloguePresent) return runStateSource(argv,deps);
+      if(sub === "approve-plan") {
+        const frame={repository,boundary:null,cataloguePresent,sub,deps,sourceDefaults:Object.keys(deps).every(key=>key === "dir" || key === "now"),deferredCompanion:true,validatingCompanion:false,executingWrite:null,executingCompanion:null};
+        if(!frame.sourceDefaults) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-injected-approval-route");
+        const contextHandle=readSourceOwnedOnboardingContinuityCompanionContext({repository,entry:sub});
+        if(!contextHandle || !isOwnedOnboardingContinuityCompanionContextHandle(contextHandle,{repository,entry:sub})) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-approval-owning-context-required");
+        frame.approvalContextHandle=contextHandle;stateAuthorityInvocation=frame;
+        stateOwnedCompanionFailureFrames.add(frame);owningFailureFrame=frame;
+        return runStateSource(argv,deps);
+      }
+      return withSessionAuthorityBoundary({repository}, boundary => {
+        if(!stateCataloguePresent(repository)) stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-catalogue-disappeared");
+        const frame={repository,boundary,cataloguePresent,sub,deps,sourceDefaults:Object.keys(deps).every(key=>key === "dir" || key === "now"),executingWrite:null,executingCompanion:null};
+        stateAuthorityInvocation=frame;
+        const handle=prepareStateCompanion(frame,argv);
+        if(sub === "afk-project") {
+          if(!isOwnedStateAuthorityCompanionWriteHandle(handle,{repository})
+              || getOwnedStateAuthorityCompanionContextHandle(handle)!==readSourceOwnedOnboardingContinuityCompanionContext({repository,entry:sub}))
+            stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","afk-projection-owning-state-handle-required");
+          stateOwnedCompanionFailureFrames.add(frame);owningFailureFrame=frame;
+        }
+        const result = sub === "close-feature"
+          ? executeSourceOwnedRetiredSessionAuthorityCloseWrite({boundary,companionWriteHandle:handle})
+          : executeSourceOwnedSessionAuthorityCompanionWrite({boundary,companionWriteHandle:handle});
+        if(sub === "afk-project") {
+          // Registry has validated the original writer JSON, complete effects,
+          // owner refresh and final physical inventory before this adapter runs.
+          const terminal=observeStateAuthorityCompanionWriteTerminal(handle);
+          const data=ownedStateCompanion(handle),effect=terminal.effects[0];
+          const selectedPath=relative(repository.primaryRoot,statePath(repository.primaryRoot)).split(sep).join("/");
+          if(result?.ok!==true || result.committed!==true || result.code!=="PS-CONTINUITY-WRITTEN"
+              || terminal.result!==result || terminal.entry!==sub || terminal.effects.length!==1
+              || effect.scope!=="repository" || effect.path!==selectedPath)
+            stateAuthorityFailure("SDC-AUTHORITY-HELD","afk-projection-success-terminal-required");
+          const seal=data.seals.get("repository/"+selectedPath),actual=stateCompanionImage(repository,effect);
+          if(!Buffer.isBuffer(seal) || !actual.bytes?.equals(seal) || !statePushEqual(actual.image,effect.postimage))
+            stateAuthorityFailure("SDC-AUTHORITY-HELD","afk-projection-success-readback-required");
+          // Preserve terminal.result for every owner; only the owning CLI
+          // adapter returns the genuine successful exit expected by I03.
+          return 0;
+        }
+        return result;
+      });
+    }
+    if (!STATE_AUTHORITY_ENTRIES.has(sub) || (sub === "set-phase" && argv.includes("--verify-command"))) {
+      // The original legacy route may contain an attended prompt. Inspect the
+      // catalogue under common lock, then release it BEFORE that original route.
+      withSessionAuthorityBoundary({repository}, () => {
+        if (stateCataloguePresent(repository)) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-outer-companion-route-not-adopted");
+      });
+      return runStateSource(argv,deps);
+    }
+    return withSessionAuthorityBoundary({repository}, boundary => {
+      const cataloguePresent = stateCataloguePresent(repository);
+      if (cataloguePresent && (!STATE_AUTHORITY_ENTRIES.has(sub)
+        || (sub === "set-phase" && argv.includes("--verify-command")))) {
+        stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-outer-companion-route-not-adopted");
+      }
+      const frame = {repository,boundary,cataloguePresent,sub,
+        sourceDefaults:Object.keys(deps).every(key => key === "dir" || key === "now"),executingWrite:null};
+      stateAuthorityInvocation = frame;
+      return runStateSource(argv,deps);
+    });
+  } catch (error) {
+    if(owningFailureFrame!==null&&stateAuthorityInvocation===owningFailureFrame
+        &&stateOwnedCompanionFailureFrames.has(owningFailureFrame)
+        &&(error?.name==="SessionAuthorityError"||error instanceof OnboardingContinuityKickoffError))throw error;
+    console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}); no success is reported.`);
+    return 2;
+  } finally {
+    if(owningFailureFrame!==null)stateOwnedCompanionFailureFrames.delete(owningFailureFrame);
+    stateAuthorityInvocation = previous;
+  }
+}
+
+// Source-owned State push lifetime. The opaque handles below are minted only
+// after the original selected policy, candidate and exact CLI grammar are read.
+const statePushPorts = new Map();
+const statePushPortBrands = new WeakMap();
+const statePushOperations = new WeakMap();
+const statePushExecutions = new WeakMap();
+const statePushTerminals = new WeakMap();
+const statePushWitnesses = new WeakMap();
+const STATE_PUSH_NAMESPACE = "selected-state-push-challenge";
+function statePushEqual(a,b) { return sha256CanonicalJson(a) === sha256CanonicalJson(b); }
+function statePushOpaque(map,data) { const handle=Object.freeze({}); map.set(handle,data); return handle; }
+function statePushOwnedPort(port) {
+  const data=statePushPortBrands.get(port);
+  if (!data || !statePushEqual(data.repository,inspectSignedDescriptorCustodyRepository(data.repository.primaryRoot))) {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-owner-unavailable");
+  }
+  return data;
+}
+function statePushFact(data) {
+  const actual=stateAuthorityImage(data.repository);
+  return Object.freeze({namespaceId:STATE_PUSH_NAMESPACE,pathSha256:sha256CanonicalJson(actual.path),...actual.image});
+}
+function statePushMembership(data) {
+  const sourceFacts=[statePushFact(data)];
+  return Object.freeze([{namespaceId:STATE_PUSH_NAMESPACE,
+    rootSha256:sha256CanonicalJson({primaryRoot:data.repository.primaryRoot,commonDir:data.repository.commonDir,namespaceId:STATE_PUSH_NAMESPACE}),
+    entrySetSha256:sha256CanonicalJson(sourceFacts),entryCount:1,sourceFacts:Object.freeze(sourceFacts)}]);
+}
+function statePushPending(data) {
+  const pending=stateAuthorityImage(data.repository).value.pendingPushChallenge;
+  if (pending === undefined) return null;
+  if (!pending || typeof pending !== "object" || Array.isArray(pending)
+    || !statePushEqual(Object.keys(pending).sort(),["code","destination","expiresAt","forCommit","remote"])
+    || typeof pending.code !== "string" || !/^PO-[A-F0-9]{4}$/u.test(pending.code)
+    || typeof pending.forCommit !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(pending.forCommit)
+    || typeof pending.remote !== "string" || !/^[A-Za-z0-9._-]{1,80}$/u.test(pending.remote)
+    || typeof pending.destination !== "string" || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(pending.destination)
+    || typeof pending.expiresAt !== "string" || !Number.isFinite(Date.parse(pending.expiresAt))) {
+    stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-pending-invalid");
+  }
+  // Expiry never retires an actual retained challenge.
+  return pending;
+}
+function statePushBinding(data,association,tuple) {
+  return sha256CanonicalJson({repositorySha256:stateRepositoryDigest(data.repository),association,
+    candidateCommit:tuple.forCommit,remote:tuple.remote,destination:tuple.destination});
+}
+function statePushOperation(data,handle) {
+  const operation=statePushOperations.get(handle);
+  if (!operation || operation.owner!==data) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-unowned-operation");
+  return operation;
+}
+function statePushObservation(data,handle) {
+  const operation=statePushOperation(data,handle),pending=statePushPending(data);
+  if (["armed","running"].includes(operation.phase)
+    && (!pending || !statePushEqual(pending,operation.pending))) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-challenge-changed");
+  }
+  if (operation.phase==="terminal-observed") {
+    const actual=stateAuthorityImage(data.repository);
+    if (pending || !operation.approval || !statePushEqual(actual.value.pushApproval?.lastApproved,operation.approval)) {
+      stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-terminal-changed");
+    }
+  }
+  return Object.freeze({association:operation.association,kinds:Object.freeze(["ceremony"]),phase:operation.phase,
+    bindingSha256:operation.bindingSha256,sourceFacts:Object.freeze([statePushFact(data)])});
+}
+function statePushLegacy(data) {
+  const pending=statePushPending(data);
+  if (pending && ![...data.operations].some(handle=>{
+    const operation=statePushOperations.get(handle);
+    return operation && operation.pending && statePushEqual(operation.pending,pending);
+  })) {
+    const association=Object.freeze({state:"unbound",target:null});
+    const operation={owner:data,association,phase:"armed",pending,tuple:pending,
+      bindingSha256:statePushBinding(data,association,pending),memberHandle:null,expectedMemberRef:null};
+    const handle=statePushOpaque(statePushOperations,operation); data.operations.add(handle);
+  }
+  return [...data.operations].filter(handle=>!statePushOperations.get(handle).released);
+}
+function statePushValidateInput(data,entry,input) {
+  if (entry!=="approve-push" || !input || !statePushEqual(Object.keys(input),["argv"])
+    || !Array.isArray(input.argv) || input.argv[0]!=="approve-push"
+    || input.argv.some(value=>typeof value!=="string")) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-input");
+  const parsed=parseExactFlags(input.argv.slice(1),new Set(["by","remote","destination"]));
+  if (!parsed.ok || isBlank(parsed.value.by)
+    || !/^[A-Za-z0-9._-]{1,80}$/u.test(parsed.value.remote)
+    || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(parsed.value.destination)) {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-grammar");
+  }
+  const mode=criticalProofWaiverFor(data.repository.primaryRoot,"push");
+  if (mode.code || mode.waived!==true || mode.waiver?.mode==="chat-attributed-unattested") {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-pending-route-not-selected");
+  }
+  const candidate=gitCandidate(data.repository.primaryRoot);
+  if (!candidate.ok || candidate.commit!==data.repository.candidate.commit || candidate.tree!==data.repository.candidate.tree) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-candidate-changed");
+  }
+  return {argv:[...input.argv],by:parsed.value.by,
+    tuple:{forCommit:candidate.commit,remote:parsed.value.remote,destination:parsed.value.destination}};
+}
+export function createStatePushChallengeAuthorityProducerPort({repository}) {
+  const observed=inspectSignedDescriptorCustodyRepository(repository.primaryRoot);
+  if (!statePushEqual(observed,repository)) stateAuthorityFailure("SDC-ROOT","state-push-repository");
+  const key=sha256CanonicalJson(repository);
+  if (statePushPorts.has(key)) { const port=statePushPorts.get(key); statePushOwnedPort(port); return port; }
+  const data={repository:observed,operations:new Set(),port:null};
+  const port=Object.freeze({
+    readBaseline() { statePushOwnedPort(port); return Object.freeze({memberships:statePushMembership(data),legacyOperations:Object.freeze(statePushLegacy(data))}); },
+    observeOperation(handle) { statePushOwnedPort(port); return statePushObservation(data,handle); },
+    observeTerminal(handle) {
+      statePushOwnedPort(port); const terminal=statePushTerminals.get(handle);
+      if (!terminal || terminal.owner!==data) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-unowned-terminal");
+      statePushObservation(data,terminal.operationHandle);
+      return Object.freeze({terminal:"consumed",sourceFacts:Object.freeze([statePushFact(data)])});
+    },
+    reconcile({producerRecord,memberRecords,releaseRecords}) {
+      statePushOwnedPort(port);
+      if (producerRecord.producerId!=="state-push-challenge" || !Array.isArray(memberRecords) || !Array.isArray(releaseRecords)) {
+        stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-reconciliation-input");
+      }
+      for (const member of memberRecords) {
+        if (member.phase==="released") {
+          // Source facts in an authenticated release remain historical snapshots.
+          if (!releaseRecords.some(release=>release.memberId===member.memberId
+            && release.memberGeneration===member.memberGeneration && release.bindingSha256===member.bindingSha256
+            && statePushEqual(release.sourceFacts,member.sourceFacts))) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-history-incomplete");
+          continue;
+        }
+        const known=[...data.operations].find(handle=>!statePushOperations.get(handle).released && statePushOperations.get(handle).bindingSha256===member.bindingSha256);
+        if (known && !statePushEqual(statePushObservation(data,known),{
+          association:member.association,kinds:member.kinds,phase:member.phase,bindingSha256:member.bindingSha256,sourceFacts:member.sourceFacts})) {
+          stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-live-member-changed");
+        }
+        if (!known) {
+          const pending=statePushPending(data);
+          if (!pending || member.phase!=="armed" || member.bindingSha256!==statePushBinding(data,member.association,pending)
+            || !statePushEqual(member.sourceFacts,[statePushFact(data)])) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-live-member-unavailable");
+        }
+      }
+      return statePushMembership(data);
+    },
+    readAssurance() {
+      statePushOwnedPort(port);const context=readSourceOwnedAuthorityContext({repository:data.repository});
+      if(context.status!=="bound") return "physical-readback";
+      const actual=createSignedCleanupRequesterObserver({repository:data.repository,requesterHandle:context.requesterHandle})({repository:data.repository});
+      if(actual.status!=="bound") stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-requester-unavailable");
+      return actual.requester.assurance;
+    },
+    prepareOperation({requesterHandle,entry,input}) {
+      statePushOwnedPort(port);const validated=statePushValidateInput(data,entry,input);
+      if(statePushPending(data)) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-existing-challenge");
+      const context=readSourceOwnedAuthorityContext({repository:data.repository});
+      if(context.status!=="bound" || context.requesterHandle!==requesterHandle) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-requester-context");
+      const actual=createSignedCleanupRequesterObserver({repository:data.repository,requesterHandle})({repository:data.repository});
+      if(actual.status!=="bound") stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-requester-binding");
+      const {sessionId,descriptorSha256,ownerNonceSha256}=actual.requester;
+      const association=Object.freeze({state:"bound",target:Object.freeze({sessionId,descriptorSha256,ownerNonceSha256})});
+      const operation={owner:data,...validated,association,requesterHandle,phase:"reserved",pending:null,
+        bindingSha256:statePushBinding(data,association,validated.tuple),memberHandle:null,expectedMemberRef:null};
+      const operationHandle=statePushOpaque(statePushOperations,operation);data.operations.add(operationHandle);
+      return Object.freeze({status:"prepared",operationHandle});
+    },
+    executeOperation({operationHandle,memberHandle,expectedMemberRef}) {
+      statePushOwnedPort(port);const operation=statePushOperation(data,operationHandle);
+      if(operation.phase!=="reserved" || operation.attempted) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-already-attempted");
+      return statePushRun(data,operationHandle,memberHandle,expectedMemberRef,"challenge");
+    },
+    finishOperation({operationHandle,executionHandle,entry,input,expectedMemberRef}) {
+      statePushOwnedPort(port);const operation=statePushOperation(data,operationHandle),execution=statePushExecutions.get(executionHandle);
+      if(entry!=="confirm-push" || !execution || execution.operationHandle!==operationHandle
+        || operation.phase!=="armed" || !statePushEqual(input,{argv:operation.argv})) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-finish-input");
+      return statePushRun(data,operationHandle,operation.memberHandle,expectedMemberRef,"confirmation");
+    },
+    recoverOperation({memberRef}) {
+      statePushOwnedPort(port);
+      return withSessionAuthorityBoundary({repository:data.repository},boundary=>{
+        const actual=inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef}),m=actual.record;
+        const pending=statePushPending(data);
+        if(m.phase!=="armed" || !pending || m.bindingSha256!==statePushBinding(data,m.association,pending)
+          || !statePushEqual(m.sourceFacts,[statePushFact(data)])) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-recovery-unavailable");
+        const context=readSourceOwnedAuthorityContext({repository:data.repository});
+        if(context.status!=="bound") stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-recovery-requester");
+        const observed=createSignedCleanupRequesterObserver({repository:data.repository,requesterHandle:context.requesterHandle})({repository:data.repository});
+        const {sessionId,descriptorSha256,ownerNonceSha256}=observed.requester??{};
+        if(observed.status!=="bound" || !statePushEqual(m.association,{state:"bound",target:{sessionId,descriptorSha256,ownerNonceSha256}})) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-recovery-owner");
+        // Replace only this source-created provisional unbound observation after
+        // the actual registry read-only inspector and current owner have joined.
+        for(const oldHandle of data.operations) {
+          const old=statePushOperations.get(oldHandle);
+          if(old.association.state==="unbound" && old.pending && statePushEqual(old.pending,pending)) data.operations.delete(oldHandle);
+        }
+        const operationHandle=statePushOpaque(statePushOperations,{owner:data,association:m.association,phase:"armed",pending,tuple:pending,
+          bindingSha256:m.bindingSha256,requesterHandle:context.requesterHandle,expectedMemberRef:memberRef,memberHandle:null});
+        data.operations.add(operationHandle);return Object.freeze({status:"recovered",operationHandle});
+      });
+    },
+    observeCompanionStateWrite(handle,context) { return statePushPrepareWitness(data,handle,context,true); },
+    verifyCompanionStateWrite(handle,witness) { return statePushVerifyWitness(data,handle,witness); },
+    refreshCompanionStateMemberRefs(handle,witness,{boundary}) {
+      const owned=statePushWitnesses.get(witness);
+      if(!owned || !owned.companion || owned.owner!==data || owned.handle!==handle || owned.boundary!==boundary) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-companion-ref-witness");
+      const actual=inspectSourceOwnedSessionAuthorityCompanionRefresh({boundary,producerPort:port,companionWriteHandle:handle,ownerWitness:witness});
+      for(const refresh of actual.members) for(const opHandle of data.operations) {
+        const op=statePushOperations.get(opHandle);
+        if(op.expectedMemberRef && statePushEqual(op.expectedMemberRef,refresh.previousMemberRef)) op.expectedMemberRef=refresh.memberRef;
+      }
+    },
+    observeSharedStateWrite(handle,context) { return statePushPrepareWitness(data,handle,context); },
+    verifySharedStateWrite(handle,witness) { return statePushVerifyWitness(data,handle,witness); },
+    refreshSharedStateMemberRefs(handle,witness,{boundary}) {
+      const owned=statePushWitnesses.get(witness);
+      if(!owned || owned.owner!==data || owned.handle!==handle || owned.boundary!==boundary) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-ref-witness");
+      const actual=inspectSourceOwnedSessionAuthorityStateRefresh({boundary,producerPort:port,stateWriteHandle:handle,ownerWitness:witness});
+      for(const refresh of actual.members) for(const opHandle of data.operations) {
+        const op=statePushOperations.get(opHandle);
+        if(op.expectedMemberRef && statePushEqual(op.expectedMemberRef,refresh.previousMemberRef)) op.expectedMemberRef=refresh.memberRef;
+      }
+    },
+  });
+  data.port=port;statePushPortBrands.set(port,data);statePushPorts.set(key,port);return port;
+}
+export function isOwnedStatePushChallengeAuthorityProducerPort(port,{repository}) {
+  const data=statePushPortBrands.get(port);
+  return !!data && statePushEqual(data.repository,repository)
+    && statePushEqual(repository,inspectSignedDescriptorCustodyRepository(repository.primaryRoot));
+}
+function statePushRun(data,operationHandle,memberHandle,expectedMemberRef,effect) {
+  const operation=statePushOperation(data,operationHandle),previous=stateAuthorityInvocation;
+  const context=readSourceOwnedAuthorityContext({repository:data.repository});
+  if(context.status!=="bound" || context.requesterHandle!==operation.requesterHandle) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-execution-requester");
+  if(effect==="confirmation" && operation.confirmationAttempted) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-confirmation-already-attempted");
+  // No common lock is held while the original attended confirmation reads.
+  const status=withSessionAuthorityBoundary({repository:data.repository},boundary=>{
+    const member=inspectSourceOwnedSessionAuthorityMember({boundary,producerPort:data.port,operationHandle,memberHandle,expectedMemberRef});
+    operation.memberId=member.memberId;operation.memberGeneration=member.memberGeneration;
+    operation.memberHandle=memberHandle;operation.expectedMemberRef=expectedMemberRef;
+    return stateCataloguePresent(data.repository);
+  });
+  if(!status) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-catalogue-required");
+  const frame={repository:data.repository,boundary:null,cataloguePresent:true,sub:"approve-push",sourceDefaults:true,
+    executingWrite:null,push:{producerPort:data.port,operationHandle,memberHandle,expectedMemberRef,effect}};
+  stateAuthorityInvocation=frame;operation.attempted=true;
+  if(effect==="confirmation") operation.confirmationAttempted=true;
+  let result;try { result=runStateSource(operation.argv,{dir:data.repository.primaryRoot}); }
+  finally { stateAuthorityInvocation=previous; }
+  if(effect==="challenge") {
+    if(result!==1 || operation.phase!=="armed") stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-challenge-not-armed");
+    const executionHandle=statePushOpaque(statePushExecutions,{operationHandle});
+    return Object.freeze({status:"executed",executionHandle});
+  }
+  if(result!==0 || operation.phase!=="terminal-observed" || !operation.terminalHandle) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-confirmation-not-terminal");
+  withSessionAuthorityBoundary({repository:data.repository},boundary=>{
+    const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:data.port});
+    const released=producer.record.members.map(index=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:data.port,memberRef:index.memberRef}))
+      .filter(item=>item.record.memberId===operation.memberId && item.record.memberGeneration===operation.memberGeneration
+        && item.record.bindingSha256===operation.bindingSha256 && item.record.phase==="released"
+        && item.releaseRef && item.releaseRecord && item.releaseRecord.terminal==="consumed");
+    if(released.length!==1) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-release-not-read-back");
+    operation.released=true;
+  });
+  return Object.freeze({status:"observed",terminalHandle:operation.terminalHandle,
+    sourceRefs:Object.freeze([{path:relative(data.repository.primaryRoot,statePath(data.repository.primaryRoot)).split(sep).join("/"),
+      sha256:statePushFact(data).sha256,size:statePushFact(data).size}])});
+}
+export function inspectOwnedStatePushWrite(handle,{repository}) {
+  const data=ownedStateAuthorityWrite(handle),push=data.frame.push;
+  if(!push || !statePushEqual(data.repository,repository)) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-write-unowned");
+  statePushOwnedPort(push.producerPort);statePushOperation(statePushPortBrands.get(push.producerPort),push.operationHandle);
+  return Object.freeze({...push});
+}
+export function inspectOwnedStatePushTerminal(handle,{repository}) {
+  const push=inspectOwnedStatePushWrite(handle,{repository});
+  const operation=statePushOperation(statePushPortBrands.get(push.producerPort),push.operationHandle);
+  if(push.effect!=="confirmation" || !operation.terminalHandle) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-terminal-unavailable");
+  return operation.terminalHandle;
+}
+function statePushPrepareWitness(data,handle,context,companion=false) {
+  statePushOwnedPort(data.port);
+  if(!(companion ? isOwnedStateAuthorityCompanionWriteHandle(handle,{repository:data.repository}) : isOwnedStateAuthorityWriteHandle(handle,{repository:data.repository}))) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-write-witness-unowned");
+  const fact=statePushFact(data);
+  const effect=companion ? observeStateAuthorityCompanionWrite(handle).effects.find(e=>e.scope === "repository" && join(data.repository.primaryRoot,e.path) === statePath(data.repository.primaryRoot)) : null;
+  if(companion && !effect) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-companion-selected-effect");
+  const observation=companion ? {selectedPathSha256:fact.pathSha256,preimage:effect.preimage} : observeStateAuthorityWrite(handle);
+  if(observation.selectedPathSha256!==fact.pathSha256 || !statePushEqual(observation.preimage,{
+    sha256:fact.sha256,size:fact.size,identity:fact.identity,semanticSha256:fact.semanticSha256})) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-witness-preimage");
+  if(!context || !context.boundary || context.producerRecord.producerId!=="state-push-challenge"
+    || !Array.isArray(context.memberRecords) || !Array.isArray(context.releaseRecords)) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-witness-context");
+  const live=[];
+  for(const member of context.memberRecords) {
+    if(member.phase==="released") {
+      if(!context.releaseRecords.some(release=>release.memberId===member.memberId && release.memberGeneration===member.memberGeneration
+        && release.bindingSha256===member.bindingSha256 && statePushEqual(release.sourceFacts,member.sourceFacts))) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-history-incomplete");
+      continue;
+    }
+    if(!statePushEqual(member.sourceFacts,[fact])) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-witness-member-preimage");
+    const indexed=context.producerRecord.members.find(item=>item.memberId===member.memberId && item.memberGeneration===member.memberGeneration);
+    if(!indexed) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-witness-member-index");
+    live.push({memberRef:indexed.memberRef,association:member.association,kinds:member.kinds,phase:member.phase,
+      bindingSha256:member.bindingSha256,sourceFacts:member.sourceFacts});
+  }
+  const legacy=statePushLegacy(data).map(op=>statePushObservation(data,op));
+  return statePushOpaque(statePushWitnesses,{owner:data,handle,boundary:context.boundary,live,legacy,companion,
+    selectedPathSha256:fact.pathSha256,preimage:observation.preimage});
+}
+function statePushVerifyWitness(data,handle,witness) {
+  const before=statePushWitnesses.get(witness);
+  if(!before || before.owner!==data || before.handle!==handle) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-witness-unowned");
+  const fact=statePushFact(data);
+  const effect=before.companion ? observeStateAuthorityCompanionWriteTerminal(handle).effects.find(e=>e.scope === "repository" && join(data.repository.primaryRoot,e.path) === statePath(data.repository.primaryRoot)) : null;
+  if(before.companion && !effect) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-companion-terminal-effect");
+  const terminal=before.companion ? {selectedPathSha256:fact.pathSha256,preimage:effect.preimage,postimage:effect.postimage} : observeStateAuthorityWriteTerminal(handle);
+  if(!statePushEqual(terminal.preimage,before.preimage) || terminal.selectedPathSha256!==before.selectedPathSha256
+    || terminal.postimage.sha256!==fact.sha256) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-witness-postimage");
+  const push=before.companion ? null : stateAuthorityWriteBrands.get(handle).frame.push;
+  const memberObservations=before.live.map(member=>{
+    const op=push && statePushOperation(data,push.operationHandle);
+    const phase=op && op.bindingSha256===member.bindingSha256 ? op.phase : member.phase;
+    return Object.freeze({...member,phase,sourceFacts:Object.freeze([fact])});
+  });
+  const legacy=statePushLegacy(data).map(op=>statePushObservation(data,op)).map(value=>{
+    const initial=before.legacy.find(item=>item.bindingSha256===value.bindingSha256
+      && statePushEqual(item.association,value.association) && statePushEqual(item.kinds,value.kinds));
+    if(!initial) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-witness-new-operation");
+    const phase=push && statePushOperation(data,push.operationHandle).bindingSha256===value.bindingSha256 ? initial.phase : value.phase;
+    return {...value,phase,sourceFacts:value.sourceFacts.filter(item=>item.pathSha256!==before.selectedPathSha256)};
+  }).map(value=>canonicalJson(value)).sort();
+  return Object.freeze({memberships:statePushMembership(data),memberObservations:Object.freeze(memberObservations),
+    legacyOperationsSha256:sha256CanonicalJson(legacy)});
+}
+function statePushAfterWrite(data,result) {
+  const push=data.frame.push;
+  if(!push || result?.ok!==true || result.committed!==true) return;
+  const owner=statePushPortBrands.get(push.producerPort),operation=statePushOperation(owner,push.operationHandle);
+  const actual=stateAuthorityImage(owner.repository),pending=statePushPending(owner);
+  if(push.effect==="challenge") {
+    if(operation.phase!=="reserved" || !pending || pending.forCommit!==operation.tuple.forCommit
+      || pending.remote!==operation.tuple.remote || pending.destination!==operation.tuple.destination) stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-challenge-postimage");
+    operation.pending=pending;operation.phase="armed";
+  } else {
+    const approval=actual.value.pushApproval?.lastApproved;
+    if(operation.phase!=="armed" || pending || !approval || approval.forCommit!==operation.tuple.forCommit
+      || approval.remote!==operation.tuple.remote || approval.destination!==operation.tuple.destination
+      || approval.criticalProof!==null || !approval.criticalProofWaiver || approval.criticalProofWaiver.mode==="chat-attributed-unattested") {
+      stateAuthorityFailure("SDC-AUTHORITY-CAS","state-push-confirmation-postimage");
+    }
+    operation.approval=approval;operation.phase="terminal-observed";
+    operation.terminalHandle=statePushOpaque(statePushTerminals,{owner,operationHandle:push.operationHandle});
+  }
+}
+function runStatePushSource(argv,repository) {
+  const port=createStatePushChallengeAuthorityProducerPort({repository}),data=statePushPortBrands.get(port);
+  const context=readSourceOwnedAuthorityContext({repository});
+  if(context.status!=="bound") stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","state-push-source-requester");
+  if(!statePushPending(data)) {
+    const prepared=port.prepareOperation({requesterHandle:context.requesterHandle,entry:"approve-push",input:{argv}});
+    const reservation=withSessionAuthorityBoundary({repository},boundary=>reserveSessionAuthorityMember({boundary,producerPort:port,
+      association:port.observeOperation(prepared.operationHandle).association,operationHandle:prepared.operationHandle}));
+    port.executeOperation({operationHandle:prepared.operationHandle,memberHandle:reservation.memberHandle,expectedMemberRef:reservation.memberRef});
+    return 1;
+  }
+  const validated=statePushValidateInput(data,"approve-push",{argv});
+  const operationHandle=withSessionAuthorityBoundary({repository},boundary=>{
+    const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
+    const candidates=producer.record.members.map(index=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:index.memberRef}))
+      .filter(item=>item.record.phase==="armed" && item.record.bindingSha256===statePushBinding(data,item.record.association,validated.tuple));
+    if(candidates.length!==1) stateAuthorityFailure("SDC-AUTHORITY-HELD","state-push-current-member-ambiguous");
+    const actual=candidates[0],recovered=port.recoverOperation({memberRef:actual.memberRef});
+    const op=statePushOperation(data,recovered.operationHandle);op.argv=validated.argv;op.by=validated.by;
+    const member=recoverSessionAuthorityMember({boundary,producerPort:port,operationHandle:recovered.operationHandle,expectedMemberRef:actual.memberRef});
+    op.memberHandle=member.memberHandle;op.expectedMemberRef=member.memberRef;return recovered.operationHandle;
+  });
+  const operation=statePushOperation(data,operationHandle);
+  statePushRun(data,operationHandle,operation.memberHandle,operation.expectedMemberRef,"confirmation");return 0;
+}
+
+
+// Private source invocation custody; public observations cannot mint this handle.
+const stateCompanionBrands = new WeakMap();
+const STATE_COMPANION_ENTRIES = new Set([
+  "discard-feature", "set-feature", "continuity-init", "submit-plan", "present-plan", "afk-project",
+  "approve-plan", "materialize-architecture", "continuity-result-bootstrap-plan",
+  "continuity-result-bootstrap-apply", "continuity-result-rebind-plan",
+  "continuity-result-rebind-apply", "continuity-result-close-plan",
+  "continuity-result-close-apply", "close-feature",
+]);
+const STATE_COMPANION_RESULT_SELECTED_ONLY = new Set([
+  "continuity-result-bootstrap-plan", "continuity-result-rebind-plan",
+  "continuity-result-rebind-apply", "continuity-result-close-plan", "continuity-result-close-apply",
+]);
+const STATE_COMPANION_SUPPORTED = new Set(["set-feature","submit-plan","present-plan","materialize-architecture","continuity-init","close-feature","discard-feature","afk-project","continuity-result-bootstrap-apply",...STATE_COMPANION_RESULT_SELECTED_ONLY]);
+function stateCompanionImage(repository, effect) {
+  const root = effect.scope === "repository" ? repository.primaryRoot : repository.commonDir;
+  const parts = effect.path.split("/");
+  if (!parts.length || parts.some(p => !p || p === "." || p === ".." || p.includes("\\") || p.includes("\0"))) {
+    stateAuthorityFailure("SDC-PRIVATE-PATH", "companion-effect-path");
+  }
+  let path = root;
+  for (let index = 0; index < parts.length; index++) {
+    path = join(path, parts[index]);
+    let stat;
+    try { stat = lstatSync(path); }
+    catch (error) {
+      if (error?.code === "ENOENT") return {image:null,bytes:null};
+      stateAuthorityFailure("SDC-PRIVATE-PATH", "companion-effect-unreadable");
+    }
+    if (stat.isSymbolicLink() || realpathSync(path) !== path
+      || (index < parts.length - 1 ? !stat.isDirectory() : !stat.isFile() || stat.nlink !== 1)
+      || (typeof process.getuid === "function" && stat.uid !== process.getuid())) {
+      stateAuthorityFailure("SDC-PRIVATE-PATH", "companion-effect-unsafe");
+    }
+  }
+  const before = lstatSync(path);
+  if (before.size > 4 * 1024 * 1024) stateAuthorityFailure("SDC-PRIVATE-PATH", "companion-effect-size");
+  const bytes = readFileSync(path), after = lstatSync(path);
+  if (before.dev !== after.dev || before.ino !== after.ino || before.mode !== after.mode
+    || before.nlink !== after.nlink || before.size !== after.size || before.uid !== after.uid
+    || bytes.length !== after.size) stateAuthorityFailure("SDC-AUTHORITY-CAS", "companion-effect-read-race");
+  const sha256 = sha256Bytes(bytes);
+  let semanticSha256 = sha256;
+  const text = bytes.toString("utf8");
+  if (Buffer.from(text).equals(bytes)) {
+    try { semanticSha256 = sha256CanonicalJson(JSON.parse(text)); } catch { /* non-JSON binds raw bytes */ }
+  }
+  return {bytes,image:Object.freeze({sha256,size:bytes.length,
+    identity:Object.freeze({dev:String(after.dev),ino:String(after.ino),mode:after.mode,nlink:after.nlink}),semanticSha256})};
+}
+function ownedStateCompanion(handle) {
+  const data = stateCompanionBrands.get(handle);
+  if (!data || data.frame !== stateAuthorityInvocation || !data.frame.boundary
+    || !isOwnedOnboardingContinuityCompanionContextHandle(data.contextHandle,{repository:data.repository,entry:data.entry})) {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "companion-source-context-unavailable");
+  }
+  return data;
+}
+function retainOwnedLiveDiscardBinding(dir, base) {
+  const frame = stateAuthorityInvocation;
+  if (!frame?.executingCompanion || frame.sub !== "discard-feature") return false;
+  const data = frame.executingCompanion;
+  if (data.entry !== "discard-feature" || data.frame !== frame
+    || !isOwnedOnboardingContinuityCompanionContextHandle(data.contextHandle,{repository:frame.repository,entry:data.entry})) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS","discard-owning-context-changed");
+  }
+  const current = inspectSourceOwnedCurrentAuthorityContext({repository:frame.repository});
+  const binding = readOnboardingSessionCleanupBinding({rootDir:dir});
+  const requester = current.currentRequester;
+  const tuple = requester && {sessionId:requester.sessionId,descriptorSha256:requester.descriptorSha256};
+  if (current.status !== "bound" || !tuple || binding.status !== "bound"
+    || binding.root !== frame.repository.primaryRoot
+    || binding.stateSha256 !== sha256Bytes(readFileSync(statePath(dir)))
+    || sha256CanonicalJson(binding.sessionCleanup) !== sha256CanonicalJson(tuple)) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS","discard-original-live-binding-changed");
+  }
+  return true;
+}
+function prepareStateCompanion(frame, argv) {
+  if (!STATE_COMPANION_SUPPORTED.has(frame.sub) || !frame.sourceDefaults) {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "companion-entry-effect-closure-not-adopted");
+  }
+  const contextHandle = readSourceOwnedOnboardingContinuityCompanionContext({repository:frame.repository,entry:frame.sub});
+  if (!contextHandle || !isOwnedOnboardingContinuityCompanionContextHandle(contextHandle,{repository:frame.repository,entry:frame.sub})) {
+    stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "companion-owning-lifecycle-context-required");
+  }
+  const projectionRootSha256 = sha256Bytes(Buffer.from(frame.repository.primaryRoot));
+  let materialization = null;
+  let sourceEffects;
+  if(frame.sub === "materialize-architecture") {
+    materialization=inspectArchitectureMaterializationTargets(frame.repository.primaryRoot);
+    if(!materialization.ok || !Array.isArray(materialization.sealedTargets)) {
+      stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-materialization-source-inventory-unavailable");
+    }
+    const targets=materialization.sealedTargets;
+    sourceEffects=targets.map(target=>({scope:"repository",path:target.path}));
+    materialization={targets};
+  } else {
+    sourceEffects=[
+      {scope:"repository",path:relative(frame.repository.primaryRoot,statePath(frame.repository.primaryRoot)).split(sep).join("/")},
+      {scope:"common",path:`agent-pipeline/handover-projections/${projectionRootSha256}.json`},
+    ];
+  }
+  if(STATE_COMPANION_RESULT_SELECTED_ONLY.has(frame.sub) || frame.sub === "continuity-init" || frame.sub === "afk-project") {
+    // The three actual plan routes are read-only. Rebind/close apply and init
+    // write only selected State through the original sealed atomic writer.
+    // Original Result/request bytes and all lifecycle gates remain unchanged.
+    sourceEffects=sourceEffects.filter(effect=>effect.scope === "repository");
+  }
+  if(frame.sub === "continuity-result-bootstrap-apply") {
+    const apply=parseResultBootstrapApply(argv.slice(1));
+    const source=readStateRaw(frame.repository.primaryRoot);
+    const paths=resultBootstrapPrivatePaths(frame.repository.primaryRoot);
+    const resultPath=source.status === "ok"
+      ? resultBootstrapPath(frame.repository.primaryRoot,source.state.continuity?.authority?.prd?.path) : null;
+    if(!apply || !paths || paths.root !== frame.repository.commonDir || !resultPath
+      || !physicalRebindFile(frame.repository.primaryRoot,resultPath)) {
+      stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-bootstrap-original-source-scope-unavailable");
+    }
+    sourceEffects=[sourceEffects[0],{scope:"repository",path:resultPath},
+      {scope:"common",path:"agent-pipeline/result-bootstrap/key"},
+      {scope:"common",path:"agent-pipeline/result-bootstrap/journal"}];
+  }
+  if(frame.sub === "present-plan") {
+    const source=readState(frame.repository.primaryRoot);
+    if(source.status !== "ok") stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-presentation-state-unavailable");
+    const submitted=source.state.planSubmission,lifecycle=derivePlanLifecycle(source.state);
+    if(!lifecycle.ok || lifecycle.status !== "awaiting-approval") stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-presentation-submission-unavailable");
+    const reviewPaths=[],presentationArgv=[];
+    const rest=argv.slice(1);
+    for(let index=0;index<rest.length;index++) {
+      if(rest[index] === "--review-receipt" && typeof rest[index+1] === "string" && !rest[index+1].startsWith("--")) reviewPaths.push(rest[++index]);
+      else presentationArgv.push(rest[index]);
+    }
+    const flags=parseAllowedOptionalFlags(presentationArgv,new Set(["by"]));
+    if(!flags.ok || isBlank(flags.value.by)) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-presentation-original-grammar");
+    if(["epic","feature"].includes(submitted?.profile)) {
+      const inputs=readDesignApprovalInputs(frame.repository.primaryRoot,submitted,reviewPaths);
+      if(!inputs.ok) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-presentation-original-receipts");
+      const decisionDraft=inspectDesignDecisionBindingsDraft({rootDir:frame.repository.primaryRoot,sources:inputs.currentSources});
+      if(!decisionDraft.ok) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-presentation-decision-binding");
+      const binding=createDesignApprovalBinding({featureId:submitted.featureId,receipts:inputs.receipts,currentSources:inputs.currentSources});
+      if(!binding.ok) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-presentation-original-binding");
+      const request=createDesignApprovalRequest({binding:binding.binding,candidate:designWorkflowGitCandidate(frame.repository.primaryRoot,{})});
+      if(!request.ok) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-presentation-original-request");
+      sourceEffects.push({scope:"repository",path:`scratch/design-approval-request-${request.request.bindingSha256}.json`});
+    } else if(reviewPaths.length) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-mini-review-receipt-refused");
+  }
+  if(new Set(sourceEffects.map(effect=>effect.scope+"/"+effect.path)).size !== sourceEffects.length) stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-duplicate-source-effects");
+  const effects=sourceEffects.map(effect=>({...effect,preimage:stateCompanionImage(frame.repository,effect).image,postimage:null}));
+  const handle = Object.freeze({});
+  const data = {frame,repository:frame.repository,entry:frame.sub,argv:Object.freeze([...argv]),contextHandle,
+    effects,projectionRootSha256,materialization,seals:new Map(),attempted:false,terminal:null};
+  stateCompanionBrands.set(handle,data);
+  frame.companion = data;
+  return handle;
+}
+export function isOwnedStateAuthorityCompanionWriteHandle(handle,{repository}) {
+  const data = stateCompanionBrands.get(handle);
+  return !!data && data.frame === stateAuthorityInvocation && !!data.frame.boundary
+    && statePushEqual(data.repository,repository)
+    && statePushEqual(repository,inspectSignedDescriptorCustodyRepository(repository.primaryRoot))
+    && isOwnedOnboardingContinuityCompanionContextHandle(data.contextHandle,{repository,entry:data.entry}) === true;
+}
+export function getOwnedStateAuthorityCompanionContextHandle(handle) { return ownedStateCompanion(handle).contextHandle; }
+export function observeStateAuthorityCompanionWrite(handle) {
+  const data = ownedStateCompanion(handle);
+  for (const effect of data.effects) if (!statePushEqual(stateCompanionImage(data.repository,effect).image,effect.preimage)) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS", "companion-preimage-changed");
+  }
+  return Object.freeze({entry:data.entry,repositorySha256:stateRepositoryDigest(data.repository),
+    effects:Object.freeze(data.effects.map(e => Object.freeze({...e}))),
+    affectedProducerIds:Object.freeze(data.materialization ? [] : ["onboarding-continuity","state-push-challenge"])});
+}
+function sealStateCompanion(scope,path,bytes) {
+  const data = stateAuthorityInvocation?.executingCompanion;
+  if (!data) return;
+  const effect = data.effects.find(e => e.scope === scope && e.path === path);
+  if (!effect || data.seals.has(scope+"/"+path)) stateAuthorityFailure("SDC-AUTHORITY-CAS", "companion-unscoped-or-repeated-publication");
+  data.seals.set(scope+"/"+path,Buffer.from(bytes));
+}
+function sealSourceBootstrapPrivatePublication(path,bytes,replace) {
+  const data=stateAuthorityInvocation?.executingCompanion;
+  if(!data)return;
+  if(data.entry !== "continuity-result-bootstrap-apply" || replace)
+    stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-private-source-entry");
+  const relativePath=relative(data.repository.commonDir,path).split(sep).join("/");
+  if(!["agent-pipeline/result-bootstrap/key","agent-pipeline/result-bootstrap/journal"].includes(relativePath)
+    || resolve(data.repository.commonDir,relativePath)!==path)
+    stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-private-source-path");
+  sealStateCompanion("common",relativePath,bytes);
+}
+function sealSourceBootstrapJournalRetirement(paths,deps) {
+  const data=stateAuthorityInvocation?.executingCompanion;
+  if(!data)return;
+  if(data.entry !== "continuity-result-bootstrap-apply" || paths.root !== data.repository.commonDir
+    || paths.journal !== join(data.repository.commonDir,"agent-pipeline","result-bootstrap","journal"))
+    stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-retirement-source-path");
+  const apply=parseResultBootstrapApply(data.argv.slice(1));
+  const authenticated=loadBootstrapJournal(data.repository.primaryRoot,deps);
+  const effect=data.effects.find(effect=>effect.scope === "common" && effect.path === "agent-pipeline/result-bootstrap/journal");
+  const physical=stateCompanionImage(data.repository,effect);
+  const key="common/agent-pipeline/result-bootstrap/journal",published=data.seals.get(key);
+  const state=readStateRaw(data.repository.primaryRoot);
+  const result=authenticated.journal && physicalRebindFile(data.repository.primaryRoot,authenticated.journal.result.path);
+  if(!apply || !authenticated.ok || !authenticated.journal || !physical.bytes
+    || authenticated.journal.planSha256!==apply.planSha256
+    || authenticated.journal.stateSha256!==apply.expectedStateSha256
+    || authenticated.journal.postStateSha256!==apply.expectedPostStateSha256
+    || state.status!=="ok" || sha256Bytes(state.raw)!==apply.expectedPostStateSha256
+    || !result || result.sha256!==authenticated.journal.result.sha256
+    || (published ? !physical.bytes.equals(published) : !statePushEqual(physical.image,effect.preimage)))
+    stateAuthorityFailure("SDC-AUTHORITY-HELD","companion-bootstrap-authenticated-retirement-unavailable");
+  if(data.bootstrapJournalRetired)stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-repeated-retirement");
+  data.bootstrapJournalRetired=true;
+}
+export function executeStateAuthorityCompanionWrite(handle) {
+  const data = ownedStateCompanion(handle);
+  if (data.attempted || data.frame.executingCompanion) stateAuthorityFailure("SDC-AUTHORITY-CAS", "companion-already-attempted");
+  observeStateAuthorityCompanionWrite(handle);
+  data.attempted = true;
+  data.frame.executingCompanion = data;
+  let result;
+  try {
+    result=data.publishValidated ? data.publishValidated() : runStateSource(data.argv,{...data.frame.deps,dir:data.repository.primaryRoot});
+    if(data.publishValidated && result?.ok === true) {
+      syncNextActionDocs(data.repository.primaryRoot,data.validatedState);
+      data.frame.completedCompanionProjection=sha256CanonicalJson(data.validatedState);
+    }
+  }
+  finally { data.frame.executingCompanion = null; }
+  const readbacks=data.effects.map(effect=>stateCompanionImage(data.repository,effect));
+  const unchanged=readbacks.every((actual,index)=>statePushEqual(actual.image,data.effects[index].preimage));
+  const succeeded=typeof result === "number" ? result === 0 : result?.ok === true;
+  if(!succeeded && !unchanged) stateAuthorityFailure("SDC-AUTHORITY-HELD","companion-original-refusal-with-retained-effects");
+  const effects = data.effects.map((effect,index) => {
+    const actual=readbacks[index], seal=data.seals.get(effect.scope+"/"+effect.path);
+    const authenticatedRetirement=data.entry === "continuity-result-bootstrap-apply"
+      && data.bootstrapJournalRetired === true && effect.scope === "common"
+      && effect.path === "agent-pipeline/result-bootstrap/journal";
+    if (!unchanged && (authenticatedRetirement ? actual.image !== null
+      : seal ? !actual.bytes?.equals(seal) : !statePushEqual(actual.image,effect.preimage))) {
+      stateAuthorityFailure("SDC-AUTHORITY-HELD", "companion-partial-or-unsealed-postimage");
+    }
+    return Object.freeze({...effect,postimage:actual.image});
+  });
+  data.terminal = Object.freeze({entry:data.entry,effects:Object.freeze(effects),result});
+  return result;
+}
+export function observeStateAuthorityCompanionWriteTerminal(handle) {
+  const data = ownedStateCompanion(handle);
+  if (!data.terminal) stateAuthorityFailure("SDC-AUTHORITY-HELD", "companion-terminal-unavailable");
+  for (const effect of data.terminal.effects) if (!statePushEqual(stateCompanionImage(data.repository,effect).image,effect.postimage)) {
+    stateAuthorityFailure("SDC-AUTHORITY-CAS", "companion-terminal-changed");
+  }
+  return data.terminal;
+}
+function confirmStateCompanionApproval(input) {
+  const frame=stateAuthorityInvocation;
+  if(frame?.deferredCompanion) {
+    if(frame.boundary || frame.sub !== "approve-plan") stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-prompt-held-common-lock");
+    return runRegisteredAttendedChatGateConfirmation({repository:frame.repository,summaryLines:input.summaryLines,expected:input.expected});
+  }
+  return requireAttendedChatGateConfirmation(input);
+}
+function executeValidatedStateCompanion(frame,dir,nextState,options,publishValidated) {
+  if(frame !== stateAuthorityInvocation || frame.sub !== "approve-plan" || !frame.validatingCompanion || !frame.boundary
+    || !frame.sourceDefaults || realpathSync(dir)!==frame.repository.primaryRoot
+    || !isOwnedOnboardingContinuityCompanionContextHandle(frame.approvalContextHandle,{repository:frame.repository,entry:frame.sub})) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-validated-approval-context");
+  const projectionRootSha256=sha256Bytes(Buffer.from(frame.repository.primaryRoot));
+  const paths=[{scope:"repository",path:relative(frame.repository.primaryRoot,statePath(dir)).split(sep).join("/")},
+    {scope:"common",path:`agent-pipeline/handover-projections/${projectionRootSha256}.json`}];
+  const capture=options.sourceCompanionCapture?.();
+  if(capture) {
+    const bytes=Buffer.from(canonicalDesignApproval(capture.envelope));
+    if(capture.ok !== true || capture.path !== `specs/${capture.envelope.featureId}/evidence/accepted-delivery-contract-${capture.sha256}.json`
+      || sha256Bytes(bytes)!==capture.sha256) stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-original-capture-binding");
+    paths.push({scope:"repository",path:capture.path});
+  }
+  if(frame.sub === "approve-plan" && nextState.planApproval?.designApprovalBinding) {
+    const designBinding=nextState.planApproval.designApprovalBinding;
+    const decisionDraft=inspectDesignDecisionBindingsDraft({rootDir:frame.repository.primaryRoot,sources:designBinding.sources});
+    if(!decisionDraft.ok) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE","companion-approval-decision-binding");
+    if(decisionDraft.required && decisionDraft.disclosure?.modelPolicy) {
+      const requestPath=nextState.planPresentation?.designApprovalRequestPath;
+      const requestFile=physicalRebindFile(frame.repository.primaryRoot,requestPath);
+      const request=requestFile ? readPhysicalScratchJson(frame.repository.primaryRoot,requestPath) : null;
+      if(!request || canonicalDesignApproval(request.binding)!==canonicalDesignApproval(designBinding)
+        || !Array.isArray(request.binding.reviewReceipts))
+        stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-approval-request-binding");
+      paths.push({scope:"repository",path:`project/design-approval-evidence/${requestFile.sha256}.json`});
+      for(const receipt of request.binding.reviewReceipts) {
+        if(!SHA256_RE.test(receipt.sha256 ?? "")) stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-approval-receipt-reference");
+        paths.push({scope:"repository",path:`project/design-approval-evidence/${receipt.sha256}.json`});
+      }
+      paths.push({scope:"repository",path:"project/aggregate-design-model-policy-reference.json"});
+    }
+  }
+  const uniquePaths=[...new Map(paths.map(effect=>[effect.scope+"/"+effect.path,effect])).values()];
+  const effects=uniquePaths.map(effect=>({...effect,preimage:stateCompanionImage(frame.repository,effect).image,postimage:null}));
+  const handle=Object.freeze({});
+  const data={frame,repository:frame.repository,entry:frame.sub,contextHandle:frame.approvalContextHandle,effects,
+    projectionRootSha256,materialization:null,seals:new Map(),attempted:false,terminal:null,publishValidated,validatedState:nextState};
+  stateCompanionBrands.set(handle,data);frame.companion=data;
+  return executeSourceOwnedSessionAuthorityCompanionWrite({boundary:frame.boundary,companionWriteHandle:handle});
+}
+function materializeArchitectureDesign(rootDir,options) {
+  const aggregate=inspectApprovedDesignDecisionBindings({rootDir,area:'architecture'});
+  if(!aggregate.ok) return {ok:false,status:'refused',code:aggregate.code};
+  if(aggregate.required) {
+    const current=readApprovedDesignDecisionBindingsHandle(aggregate.handle);
+    if(!current.ok) return {ok:false,status:'refused',code:current.code};
+  }
+  const data=stateAuthorityInvocation?.executingCompanion;
+  if(data) {
+    if(data.entry !== "materialize-architecture" || realpathSync(rootDir)!==data.repository.primaryRoot
+      || !data.materialization) stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-materializer-source-entry");
+    for(const target of data.materialization.targets) sealStateCompanion("repository",target.path,target.bytes);
+  }
+  return materializeArchitectureDesignSource(rootDir,options);
+}
+function publishRuntimeNextAction(input) {
+  const data = stateAuthorityInvocation?.executingCompanion;
+  if (data) {
+    if (realpathSync(input.rootDir) !== data.repository.primaryRoot) stateAuthorityFailure("SDC-AUTHORITY-CAS", "companion-projection-root");
+    const record = {schema:"pipeline.runtime-next-action-projection.v1",rootSha256:data.projectionRootSha256,
+      stateSha256:sha256Bytes(Buffer.from(JSON.stringify(input.state))),sectionText:input.sectionText,authority:"advisory-only"};
+    sealStateCompanion("common",`agent-pipeline/handover-projections/${data.projectionRootSha256}.json`,Buffer.from(JSON.stringify(record,null,2)+"\n"));
+  }
+  return publishRuntimeNextActionSource(input);
+}
+
 if (isDirectRun) {
   process.exit(run());
+}
+
+
+// P16: factual source approval observation for the narrow normal calibration
+// commit route. No caller observations, injected proof readers or native grant.
+function calibrationApprovalFile(root, path, {privateState = false} = {}) {
+  if (typeof path !== "string" || !path || path.length > 240 || isAbsolute(path)
+    || path.includes("\\") || path.includes("\0") || path.split("/").some(part => !part || part === "." || part === "..")) throw Error("CVCT-PATH");
+  let target = root;
+  for (const part of path.split("/")) {
+    target = join(target, part);
+    const info = lstatSync(target);
+    if (info.isSymbolicLink() || realpathSync(target) !== target) throw Error("CVCT-PATH");
+  }
+  const before = lstatSync(target);
+  if (!before.isFile() || before.nlink !== 1 || before.size < 1 || before.size > 1048576
+    || (typeof process.getuid === "function" && before.uid !== process.getuid())
+    || (privateState && process.platform !== "win32" && (before.mode & 0o077) !== 0)) throw Error("CVCT-FILE");
+  if (privateState && process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") throw Error("CVCT-FILE");
+  const same = info => info.isFile() && info.dev === before.dev && info.ino === before.ino
+    && info.mode === before.mode && info.nlink === 1 && info.size === before.size;
+  const fd = openSync(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+  let bytes;
+  try {
+    if (!same(fstatSync(fd))) throw Error("CVCT-CAS");
+    const first = Buffer.alloc(before.size + 1), second = Buffer.alloc(before.size + 1);
+    const one = readSync(fd, first, 0, first.length, 0), two = readSync(fd, second, 0, second.length, 0);
+    if (one !== before.size || two !== before.size || !first.equals(second) || !same(fstatSync(fd)) || !same(lstatSync(target))) throw Error("CVCT-CAS");
+    bytes = first.subarray(0, one);
+  } finally { closeSync(fd); }
+  return {bytes,ref:Object.freeze({path,sha256:sha256Bytes(bytes),size:bytes.length})};
+}
+
+export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
+  const unavailable = code => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable."});
+  try {
+    const root = resolve(rootDir);
+    if (realpathSync(root) !== root || !lstatSync(root).isDirectory()) return unavailable("CVCT-ROOT");
+    const repository = discoverRepository(root, {timeout:5000});
+    if (!repository?.primaryRoot || !repository?.commonDir) return unavailable("CVCT-ROOT");
+    const selected = stateRelativePath(root);
+    const physical = calibrationApprovalFile(root, selected, {privateState:true});
+    const state = JSON.parse(physical.bytes.toString("utf8"));
+    const lifecycle = derivePlanLifecycle(state);
+    if (!isLateVerifyRecoveryLifecycle(lifecycle) || !validCurrentPlanApproval(state.planApproval)
+      || !validPlanSubmission(state.planSubmission)) return unavailable("CVCT-APPROVAL-UNAVAILABLE");
+    const authority = checkPoGateAuthority({repoRoot:root});
+    if (!authority?.ok || authority.divergences?.length !== 0
+      || !authority.prdCardinality?.head?.ok || !authority.prdCardinality?.worktree?.ok
+      || canonicalDesignApproval(authority.value) !== canonicalDesignApproval(state.planApproval.poGateAuthority)) return unavailable("CVCT-AUTHORITY-STALE");
+    const candidate = defaultGitCandidate(root);
+    if (!candidate.ok || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.commit)
+      || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.tree)) return unavailable("CVCT-HEAD-UNAVAILABLE");
+    const profile = validatePoGateProfileForRepository({repoRoot:root});
+    if (!profile?.ok || sha256CanonicalJson(profile.value) !== state.planSubmission.profileSha256) return unavailable("CVCT-PROFILE-STALE");
+    const mode = readHumanApprovalMode(root);
+    if (!mode || !["signature","chat"].includes(mode.mode)) return unavailable("CVCT-MODE-UNAVAILABLE");
+    const refs = [physical.ref];
+    const retain = path => { const read = calibrationApprovalFile(root,path); refs.push(read.ref); return read; };
+    retain(state.planSubmission.planPath); retain(state.planSubmission.specPath);
+    if (existsSync(join(root,"pipeline.user.yaml"))) retain("pipeline.user.yaml");
+    let approvalBasis;
+    if (state.planApproval.schema === "pipeline.plan-approval.v9") {
+      const observed = readAcceptedDeliveryContract({dir:root,envelopePath:state.planApproval.acceptedContract.path});
+      if (!observed.ok || observed.authorityBasis !== (mode.mode === "signature" ? "signature" : "chat-attributed-unattested")) return unavailable(observed.code ?? "CVCT-APPROVAL-UNAVAILABLE");
+      retain(state.planApproval.acceptedContract.path);
+      const envelope = JSON.parse(calibrationApprovalFile(root,state.planApproval.acceptedContract.path).bytes.toString("utf8"));
+      retain(envelope.policyBinding.path);
+      for (const entry of envelope.request.binding.reviewReceipts) retain(entry.path);
+      for (const entry of envelope.request.binding.sources.companions) retain(entry.path);
+      approvalBasis = observed.authorityBasis;
+    } else if (["epic","feature"].includes(state.planSubmission.profile)) {
+      const observed = observeDesignApprovalRequest({dir:root,presentation:state.planPresentation,submission:state.planSubmission,signature:mode.mode === "signature"});
+      const stored = state.planApproval.designApproval;
+      if (!observed.ok || !stored || stored.mode !== mode.mode
+        || stored.bindingSha256 !== observed.bindingSha256 || stored.intentSha256 !== observed.intentSha256
+        || canonicalDesignApproval(state.planApproval.designApprovalBinding) !== canonicalDesignApproval(observed.request.binding)
+        || (mode.mode === "signature" && (stored.proofSha256 !== observed.proofSha256
+          || canonicalDesignApproval(stored.proof) !== canonicalDesignApproval(observed.proof)
+          || stored.approvedBy !== `verified:${observed.signer.keyReference}`))
+        || (mode.mode === "chat" && (mode.scope !== "global" || mode.source !== "pipeline.user.yaml"
+          || stored.proof !== null || stored.proofSha256 !== null))) return unavailable("CVCT-APPROVAL-UNAVAILABLE");
+      retain(state.planPresentation.designApprovalRequestPath);
+      if (mode.mode === "signature") retain(state.planPresentation.designApprovalRequestPath.replace("request-","proof-"));
+      for (const entry of observed.request.binding.reviewReceipts) retain(entry.path);
+      for (const entry of observed.request.binding.sources.companions) retain(entry.path);
+      retain(mode.mode === "chat" ? "pipeline.user.yaml" : "project/critical-human-proof.json");
+      approvalBasis = mode.mode === "signature" ? "signature" : "chat-attributed-unattested";
+    } else if (state.planSubmission.profile === "mini") {
+      const observed = observeOnboardingBootstrapPlanApproval({rootDir:root,authority:{planPath:authority.value.planPath,specPath:authority.value.specPath}});
+      if ((mode.mode === "signature" && (observed.status !== "verified" || state.planApproval.approvedBy !== `verified:${observed.signer?.keyReference}`))
+        || (mode.mode === "chat" && (mode.scope !== "global" || mode.source !== "pipeline.user.yaml" || observed.status !== "chat"))) return unavailable("CVCT-ORIGINAL-APPROVAL-UNAVAILABLE");
+      retain(observed.receiptPath);
+      if (mode.mode === "signature") { retain(observed.proofPath); retain("project/critical-human-proof.json"); }
+      else retain("pipeline.user.yaml");
+      approvalBasis = mode.mode === "signature" ? "signature" : "chat-attributed-unattested";
+    } else return unavailable("CVCT-ORIGINAL-APPROVAL-UNAVAILABLE");
+    const after = calibrationApprovalFile(root,selected,{privateState:true});
+    const finalCandidate = defaultGitCandidate(root);
+    if (after.ref.sha256 !== physical.ref.sha256 || !finalCandidate.ok
+      || finalCandidate.commit !== candidate.commit || finalCandidate.tree !== candidate.tree) return unavailable("CVCT-APPROVAL-CAS");
+    for (const ref of refs) {
+      const current = calibrationApprovalFile(root,ref.path,{privateState:ref.path === selected});
+      if (current.ref.sha256 !== ref.sha256 || current.ref.size !== ref.size) return unavailable("CVCT-APPROVAL-CAS");
+    }
+    return Object.freeze({status:"eligible",rootDir:root,statePath:selected,stateSha256:physical.ref.sha256,
+      stateRevision:Number.isSafeInteger(state.continuity?.revision) ? state.continuity.revision : null,
+      candidate:Object.freeze({commit:candidate.commit,tree:candidate.tree}),
+      submissionSha256:sha256CanonicalJson(state.planSubmission),approvalSha256:sha256CanonicalJson(state.planApproval),
+      authoritySha256:sha256CanonicalJson(authority.value),approvalBasis,
+      sourceRefs:Object.freeze([...new Map(refs.map(ref=>[ref.path,ref])).values()].sort((a,b)=>a.path.localeCompare(b.path)))});
+  } catch { return unavailable("CVCT-APPROVAL-UNAVAILABLE"); }
 }

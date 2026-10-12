@@ -1270,15 +1270,64 @@ export function applyItemHashAmendment(root = DEFAULT_ROOT, input, options = {})
   return { ...current, ok: remaining.length === 0, findings: remaining, wrote: true, transition: planned.event };
 }
 
+/** Readonly first leg of GIT-09: only genuinely added open registrations.
+ * The source ledger and projections remain the exact committed baseline until
+ * the item commit supplies the real reconciliation evidence OID. No finding
+ * except each admitted new item's missing initial event is deferred.
+ */
+export function checkBacklogRegistrationCommit(root = DEFAULT_ROOT) {
+  try {
+    const git=(args)=>{const r=spawnSync("git",args,{cwd:root,timeout:10000,maxBuffer:16*1024*1024});if(!isSuccessfulSpawn(r)||!Buffer.isBuffer(r.stdout))throw new Error("Git unavailable");return new TextDecoder("utf-8",{fatal:true}).decode(r.stdout);};
+    const head=git(["rev-parse","--verify","HEAD"]).trim();
+    if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(head))throw new Error("HEAD unavailable");
+    const before=git(["ls-files","--stage","-z"]);
+    const listing=git(["diff","--cached","--name-status","--no-renames","-z"]);
+    if(!listing.endsWith("\0"))throw new Error("empty stage");
+    const fields=listing.slice(0,-1).split("\0");
+    if(fields.length%2)throw new Error("malformed status list");
+    const candidates=[];
+    for(let i=0;i<fields.length;i+=2){
+      const status=fields[i],path=fields[i+1];
+      if(status==="A" && /^backlog\/items\/[^/]+\.md$/u.test(path) && path!=="backlog/items/TEMPLATE.md") candidates.push(path);
+      else if(!/^[AMD]$/u.test(status) || !/^specs\/(?:[A-Za-z0-9._-]+\/)+(?:prd|spec|design|sdp|plan|acceptance|readiness)(?:_[A-Za-z0-9._-]+)?\.md$/u.test(path) || path.split("/").includes("evidence")) throw new Error("not an open-registration commit");
+    }
+    if(!candidates.length || new Set(candidates).size!==candidates.length)throw new Error("no unique registrations");
+    const current=loadBacklogState(root);
+    const pending=[];
+    for(const path of candidates){
+      const mode=git(["ls-files","--stage","-z","--",path]);
+      if(!/^100644 [a-f0-9]+ 0\t/u.test(mode)||mode.split("\0").filter(Boolean).length!==1)throw new Error("unsafe index entry");
+      const bytes=git(["show",":0:"+path]);
+      if(bytes!==readFileSync(join(root,path),"utf8") || !regularFile(root,path))throw new Error("item index/worktree mismatch");
+      const parsed=parseBacklogItem(bytes,{path});
+      if(!parsed.ok || parsed.item.metadata.status!=="open" || Object.keys(parsed.item.metadata).some((key)=>key.startsWith("closure_")) || current.events.some((event)=>event.id===parsed.item.metadata.id))throw new Error("not a new schema-valid open item");
+      pending.push({path,id:parsed.item.metadata.id,sha256:createHash("sha256").update(bytes).digest("hex")});
+    }
+    // The baseline must still be ordinary strict state. Existing item/schema,
+    // source-ledger and generated-projection bytes cannot change in this leg.
+    const baseline=git(["ls-tree","-r","--name-only","-z",head,"--","backlog/items/","backlog/schemas/",LEDGER_PATH,STATUS_PATH,INDEX_PATH]).split("\0").filter(Boolean);
+    for(const path of baseline){if(!regularFile(root,path)||git(["show",head+":"+path])!==readFileSync(join(root,path),"utf8"))throw new Error("baseline changed");}
+    const deferred=new Set(pending.map((item)=>`items: ${item.id} has no transition-ledger entry`));
+    const findings=current.findings.filter((finding)=>!deferred.has(finding));
+    if(pending.some((item)=>!current.findings.includes(`items: ${item.id} has no transition-ledger entry`)))throw new Error("missing exact registration finding");
+    const ids=new Set(pending.map((item)=>item.id));
+    const projection=projectBacklog(current.items.filter((item)=>!ids.has(item.metadata.id)),current.events);
+    if(readFileSync(join(root,STATUS_PATH),"utf8")!==projection.statusText || readFileSync(join(root,INDEX_PATH),"utf8")!==projection.indexText)findings.push("committed baseline projection drift");
+    if(before!==git(["ls-files","--stage","-z"]) || head!==git(["rev-parse","--verify","HEAD"]).trim())throw new Error("Git input drift");
+    return {...current,ok:findings.length===0,findings,projection:null,pendingRegistration:pending,registrationCommitOnly:true};
+  } catch {return {ok:false,findings:["open-registration precheck requires exact new open items, unchanged committed baseline, and stable genuine Git index"],drift:[],pendingRegistration:[],registrationCommitOnly:true};}
+}
+
 function cli() {
   const args = process.argv.slice(2);
   const write = args.includes("--write");
-  const unsupported = args.filter((arg) => arg !== "--write");
-  if (unsupported.length > 0) {
-    console.error(`Usage: node plugins/pipeline-core/scripts/check-backlog-state.mjs [--write]`);
+  const registrationCommit = args.length === 1 && args[0] === "--registration-commit";
+  const unsupported = args.filter((arg) => arg !== "--write" && arg !== "--registration-commit");
+  if (unsupported.length > 0 || (args.includes("--registration-commit") && !registrationCommit)) {
+    console.error(`Usage: node plugins/pipeline-core/scripts/check-backlog-state.mjs [--write | --registration-commit]`);
     process.exit(2);
   }
-  const result = write ? writeBacklogProjections() : checkBacklogState();
+  const result = registrationCommit ? checkBacklogRegistrationCommit() : write ? writeBacklogProjections() : checkBacklogState();
   // Drift is reported unconditionally — whether the run is otherwise green or
   // not — so it is never silently swallowed just because it does not block.
   for (const entry of result.drift ?? []) {
@@ -1295,6 +1344,7 @@ function cli() {
     for (const finding of result.findings) console.error(`FAIL backlog state: ${finding}`);
     process.exit(2);
   }
+  if (registrationCommit) { console.log("Open-registration commit inputs valid; initial ledger entries remain pending until the item commit and official reconciliation."); return; }
   console.log(write
     ? "Backlog state valid; deterministic STATUS.md and index.json regenerated."
     : "Backlog state, transition ledger, closure evidence, and generated projections are valid.");

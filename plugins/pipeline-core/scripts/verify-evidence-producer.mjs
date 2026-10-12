@@ -62,6 +62,7 @@ import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
@@ -309,10 +310,11 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     try { configuration = readConsumerVerifyConfiguration(root); }
     catch (error) { fail("VEP-CALIBRATION", error.message); }
   }
-  const { fullCommand: command, project } = configuration;
+  const { fullCommand: command, project, projectIdentity } = configuration;
   if (command === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
   started ??= candidateIdentity(root);
   startedAt ??= new Date().toISOString();
+  const rigorObservations = readRigorVerifyObservation(root);
 
   if (started.status === "dirty") {
     // Same convention as this repository's own verify entry point: the dirty
@@ -320,6 +322,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     const evidence = {
       schema: VERIFY_EVIDENCE_SCHEMA,
       project,
+      projectIdentity,
       command,
       commit: started.commit,
       tree: started.tree,
@@ -327,6 +330,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
       startedAt,
       finishedAt: new Date().toISOString(),
       steps: [{ name: "candidate-preflight", exitCode: 1 }],
+      rigorObservations,
       exitCode: 1,
     };
     writeEvidence(root, target, evidence);
@@ -411,6 +415,8 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   if (run.terminal.status !== "passed" && eventPlan === null) {
     fail("VEP-VERIFY-FAILED", `Required consumer Verify checks failed; no success evidence was written. Private diagnostic run: ${run.runId}. Failed checks: ${JSON.stringify(failures)}`);
   }
+  const rigorReadback = readRigorVerifyObservation(root);
+  if (JSON.stringify(rigorReadback) !== JSON.stringify(rigorObservations)) fail("VEP-RIGOR-DRIFT", "Report-only floor history changed during Verify; no success evidence was written.");
   if (JSON.stringify(consumerVerifyPolicy(root)) !== JSON.stringify(policyInputs)) fail("VEP-DRIFT", "Installed implementation or declared inputs changed during Verify.");
 
   const finished = candidateIdentity(root);
@@ -442,6 +448,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   const evidence = {
     schema: VERIFY_EVIDENCE_SCHEMA,
     project,
+    projectIdentity,
     command,
     commit: started.commit,
     tree: started.tree,
@@ -458,6 +465,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     }),
     selection,
     coverage: "project-calibrated",
+    rigorObservations,
     exitCode: 0,
   };
   writeEvidence(root, target, evidence);

@@ -937,3 +937,8 @@ export function resolveOnboardingIntakeScope(rootDir,repositoryCapability='local
  }
  return {schema:'pipeline.onboarding-intake-scope.v2',root,rootIdentity,commonIdentity,scopeKey,directory,legacyDirectory:legacy.directory};
 }
+
+/** Onboarding tickets/readbacks are not an interactive current requester carrier. */
+export function observeInteractiveCodexRequesterAuthority(){
+  return Object.freeze({status:'unavailable',code:'SDC-REQUESTER-UNAVAILABLE'});
+}

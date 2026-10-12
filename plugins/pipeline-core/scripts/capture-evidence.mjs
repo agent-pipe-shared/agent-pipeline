@@ -41,9 +41,9 @@
  * here and write NO artifact at all -- never a truncated-but-plausible-looking capture, never a
  * fabricated exit code. `maxBuffer` defaults to 64 MiB and is caller-overridable.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, win32 } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -243,6 +243,149 @@ export function formatJsonArtifact({ command, label, exitCode, stdout, stderr, c
   }, null, 2) + "\n";
 }
 
+const WINDOWS_NPM_LAUNCH_PREFIX = "CAPTURE-EVIDENCE-WINDOWS-";
+const WINDOWS_NPM_DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
+const WINDOWS_NPM_BATCH_UNSUPPORTED = /[\0\r\n"%!^&|<>()]/u;
+const WINDOWS_NPM_MAX_COMMAND_CHARS = 8191;
+
+function windowsNpmLaunchError(suffix) {
+  const code = `${WINDOWS_NPM_LAUNCH_PREFIX}${suffix}`;
+  const error = new Error(code);
+  error.code = code;
+  return error;
+}
+
+function windowsNpmSelector(value) {
+  if (typeof value !== "string") return null;
+  const hasPath = /[\\/]/u.test(value);
+  if (!hasPath && ["npm", "npm.cmd"].includes(value.toLowerCase())) return value.toLowerCase();
+  return hasPath && win32.basename(value).toLowerCase() === "npm.cmd" ? "explicit" : null;
+}
+
+function windowsNpmEnvironmentValue(environment, name) {
+  if (environment === null || typeof environment !== "object" || Array.isArray(environment)) {
+    throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+  }
+  const keys = Object.keys(environment).filter((key) => key.toLowerCase() === name.toLowerCase());
+  if (keys.length === 0) return undefined;
+  const values = keys.map((key) => environment[key]);
+  if (values.some((value) => typeof value !== "string") || values.some((value) => value !== values[0])) {
+    throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+  }
+  return values[0];
+}
+
+function windowsNpmRegularFile(path, lstatSyncFn, missingCode) {
+  let stat;
+  try { stat = lstatSyncFn(path); }
+  catch (error) {
+    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") return null;
+    throw windowsNpmLaunchError(missingCode);
+  }
+  if (!stat.isFile() || stat.isSymbolicLink()) throw windowsNpmLaunchError("NPM-LAUNCHER-UNSUPPORTED");
+  return path;
+}
+
+function windowsNpmSearchDirectories(cwd, environment) {
+  const value = windowsNpmEnvironmentValue(environment, "PATH") ?? "";
+  const entries = value.split(";");
+  if (entries.length > 256) throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+  const result = [cwd];
+  for (let entry of entries) {
+    if (entry.length > 32768 || /[\0\r\n]/u.test(entry)) throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+    if (entry === "") continue;
+    if (entry.startsWith('"') && entry.endsWith('"')) entry = entry.slice(1, -1);
+    if (entry === "" || entry.includes('"') || /^[A-Za-z]:(?![\\/])/u.test(entry)) throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+    result.push(win32.resolve(cwd, entry));
+  }
+  return result;
+}
+
+/**
+ * A finite Windows npm adapter, not a general batch/shell launcher. The actual
+ * selected npm.cmd is retained; npm-cli.js or a different Node installation is
+ * never silently substituted. Unknown interpolation/quoting shapes fail before
+ * a child exists. Portable plans do not prove native cmd.exe argument behavior.
+ */
+export function planEvidenceCommandLaunch(command, {
+  cwd = process.cwd(),
+  platform = process.platform,
+  environment = process.env,
+  lstatSyncFn = lstatSync,
+} = {}) {
+  const direct = { executable: command[0], args: command.slice(1), windowsBatch: false };
+  if (platform !== "win32") return direct;
+  const selector = windowsNpmSelector(command[0]);
+  if (selector === null) return direct;
+  if (typeof cwd !== "string" || !win32.isAbsolute(cwd) || win32.parse(cwd).root.length < 2 || /[\0\r\n]/u.test(cwd)) {
+    throw windowsNpmLaunchError("CWD-UNSUPPORTED");
+  }
+  const root = win32.resolve(cwd);
+  let launcher = null;
+  if (selector === "explicit") {
+    if (/^[A-Za-z]:(?![\\/])/u.test(command[0])) throw windowsNpmLaunchError("NPM-LAUNCHER-UNSUPPORTED");
+    launcher = windowsNpmRegularFile(win32.resolve(root, command[0]), lstatSyncFn, "NPM-LAUNCHER-UNAVAILABLE");
+  } else {
+    const extensions = selector === "npm.cmd" ? [""]
+      : (windowsNpmEnvironmentValue(environment, "PATHEXT") ?? WINDOWS_NPM_DEFAULT_PATHEXT).split(";");
+    if (extensions.length === 0 || extensions.length > 16
+      || (selector === "npm" && extensions.some((extension) => ![".COM", ".EXE", ".BAT", ".CMD"].includes(extension.toUpperCase())))) {
+      throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+    }
+    for (const directory of windowsNpmSearchDirectories(root, environment)) {
+      for (const extension of extensions) {
+        const candidate = win32.join(directory, selector === "npm.cmd" ? "npm.cmd" : `npm${extension}`);
+        launcher = windowsNpmRegularFile(candidate, lstatSyncFn, "NPM-LAUNCHER-UNAVAILABLE");
+        if (launcher !== null) break;
+      }
+      if (launcher !== null) break;
+    }
+  }
+  if (launcher === null) throw windowsNpmLaunchError("NPM-LAUNCHER-MISSING");
+  const extension = win32.extname(launcher).toLowerCase();
+  if ([".exe", ".com"].includes(extension)) return { ...direct, executable: launcher };
+  if (extension !== ".cmd") throw windowsNpmLaunchError("NPM-LAUNCHER-UNSUPPORTED");
+  const tokens = [launcher, ...direct.args];
+  if (tokens.some((token) => typeof token !== "string" || WINDOWS_NPM_BATCH_UNSUPPORTED.test(token))
+    || direct.args.some((token) => token.endsWith("\\"))) {
+    throw windowsNpmLaunchError("NPM-ARGUMENT-UNSUPPORTED");
+  }
+  const systemRoot = windowsNpmEnvironmentValue(environment, "SystemRoot");
+  if (typeof systemRoot !== "string" || !win32.isAbsolute(systemRoot) || win32.parse(systemRoot).root.length < 2 || /[\0\r\n]/u.test(systemRoot)) {
+    throw windowsNpmLaunchError("CMD-UNAVAILABLE");
+  }
+  const cmd = win32.join(win32.resolve(systemRoot), "System32", "cmd.exe");
+  let cmdStat;
+  try { cmdStat = lstatSyncFn(cmd); } catch { throw windowsNpmLaunchError("CMD-UNAVAILABLE"); }
+  if (!cmdStat.isFile() || cmdStat.isSymbolicLink()) throw windowsNpmLaunchError("CMD-UNAVAILABLE");
+  const serialized = `"${tokens.map((token) => `"${token}"`).join(" ")}"`;
+  if (serialized.length > WINDOWS_NPM_MAX_COMMAND_CHARS) throw windowsNpmLaunchError("NPM-ARGUMENT-UNSUPPORTED");
+  return { executable: cmd, args: ["/d", "/s", "/v:off", "/c", serialized], windowsBatch: true };
+}
+
+/** Returns the actual spawn result unchanged; this helper never writes evidence. */
+export function spawnEvidenceCommand(command, {
+  cwd = process.cwd(),
+  maxBuffer = 64 * 1024 * 1024,
+  platform = process.platform,
+  environment,
+  lstatSyncFn = lstatSync,
+  spawnSyncFn = spawnSync,
+} = {}) {
+  // One snapshot is both resolver input and the actual child environment.
+  // POSIX and other commands keep their historical implicit environment/options.
+  const normalized = platform === "win32" && windowsNpmSelector(command[0]) !== null;
+  if (normalized && environment !== undefined && (environment === null || typeof environment !== "object" || Array.isArray(environment))) {
+    throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+  }
+  const childEnvironment = normalized ? Object.freeze({ ...(environment ?? process.env) }) : environment;
+  const plan = planEvidenceCommandLaunch(command, { cwd, platform, environment: childEnvironment, lstatSyncFn });
+  const options = { cwd, encoding: "utf8", maxBuffer };
+  if (childEnvironment !== undefined) options.env = childEnvironment;
+  if (plan.windowsBatch) { options.shell = false; options.windowsVerbatimArguments = true; }
+  return spawnSyncFn(plan.executable, plan.args, options);
+}
+
 /**
  * Run `command` (an argv array), capture and redact its stdout/stderr, and write the artifact to
  * `out`. Returns `{ exitCode, out }`; `exitCode` is always the wrapped command's own exit code
@@ -269,7 +412,7 @@ export function captureEvidence({
   const root = repoRoot ?? findRepoRoot(cwd);
   const startedCandidate = format === "json" ? cleanCandidateIdentity(cwd) : null;
   const identity = readHeadIdentity(cwd);
-  const result = spawnSync(command[0], command.slice(1), { cwd, encoding: "utf8", maxBuffer });
+  const result = spawnEvidenceCommand(command, { cwd, maxBuffer });
   if (result.error) {
     // The wrapped command never produced a real exit code -- a spawn failure (e.g. ENOENT), or a
     // `maxBuffer` overflow (Node reports this as an ENOBUFS-shaped `error`, with `status: null`

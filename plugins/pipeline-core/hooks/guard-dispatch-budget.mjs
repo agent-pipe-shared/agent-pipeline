@@ -110,6 +110,15 @@
  *   binding stays one per role per parent call and is consumed by its child; binding a second child would need a
  *   change to `lib/dispatch-budget-binding.mjs` and would contradict the consumption pins of this suite.
  *
+ * ## Claude terminal-record closing writer (P21, 2026-10-10)
+ * - A plain canonical installed dispatch-record-write.mjs CLI may publish a
+ *   validated terminal report within the same five counted closing attempts.
+ *   Its current physical repository, role, request and exact record target
+ *   are checked read-only; the actual writer independently checks authority.
+ *   No taskId-to-live-child cryptographic association or native proof is claimed.
+ *   Unknown shell shapes, new work openings and nonexistent checkpoint flags
+ *   remain refused. The CRT035 observer, counter and quota are unchanged.
+ *
  * ## Parallel tool calls of one agent (Spec 22.11 R7-11, PO decision #26)
  * The counter lock is per agent (`<agentId>.json.binding.lock`), so parallel
  * dispatches of different agents never contend. Parallel tool calls of ONE
@@ -200,31 +209,35 @@
  *   own stderr -- the one channel guaranteed to exist for a PreToolUse hook
  *   regardless of git state -- without changing the exit code.
  */
-import { existsSync, linkSync, lstatSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { hostname, uptime } from "node:os";
-import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
+import { normalizeDispatchRecordPath, validateDispatchRecord, isTerminalOutcome } from "../lib/dispatch-record.mjs";
+import { parseStrictJson } from "../lib/governance-event.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { consumePendingDispatchBudgetBinding, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
+import { bindDispatchBudget, consumePendingDispatchBudgetBinding, persistPendingDispatchBudgetBindings, readAgentMaxTurns, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
 import {
   CLOSING_ALLOWANCE,
   DENIAL_CODE,
   INVALID_INPUT_CODE,
   SAFETY_MARGIN,
+  appendGrant,
   classifyDispatchBudgetCaller,
   decideDispatchBudgetCall,
   dispatchCheckpointDecision,
   dispatchWorkingCap,
+  effectiveDispatchWorkingCap,
   isValidGrantAgentId,
   validateGrantRecord,
 } from "../lib/dispatch-budget-core.mjs";
-import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { createGovernanceScopeController, observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
@@ -251,6 +264,7 @@ function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, s
       // TR-G-F4 (Ruling 150, Finding 1): a refusal that only says "from the plugin scripts directory" leaves the agent to guess
       // the spelling; the one admitted absolute path is named, and a relative spelling (a different program) is said to stay refused.
       + (producerPath === null ? "" : `The only admitted spelling of the producer is \`node "${producerPath}" <args>\` -- exactly this absolute path below the plugin root this guard resolves. A relative spelling names a different program and stays refused; on win32 a bare (unquoted) token containing a backslash is refused too, so quote the path or write it with forward slashes.\n`)
+      + (producerPath === null || isCriticAgentType(agentType) ? "" : `A validated terminal record can instead use the sanctioned public writer: \`node "${join(dirname(producerPath), DISPATCH_RECORD_WRITER_SCRIPT)}" --repo-root "<absolute current physical repository>" --request "<literal repository-relative JSON>"\`. This one plain invocation uses the same counted closing allowance; it cannot update an existing record or grant host authorship. Checkpoint/internal host routes have no added CLI flags here.\n`)
       + "Stop working and emit the closing report when finished.\n"
     : `The closing allowance of ${CLOSING_ALLOWANCE} tool calls is exhausted. No further tool calls are permitted for this dispatch.\n`
       + "Emit the closing report without another tool call.\n";
@@ -535,17 +549,111 @@ function criticWriteConfined({ agentId, agentType }) {
     "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
       + `${CRITIC_WRITE_CONFINED_CODE}: this dispatch (${agentType}, agent ${agentId}) tried to write a file other than its own notes file. `
       + "A Critic is read-only toward the repository; its one writable file is scratch/dispatch/critic-<id>/critic-notes.md (Write or Edit, that exact file name only). "
-      + "Persist your material there, or return your report as text.\n",
+      + `Source-owned notes target: ${ownedCriticNotesPath({ agentId, agentType }) ?? "unavailable"}. Use that target only when its creation route is admitted; otherwise return your report as text.\n`,
   );
 }
 
 /** Does this Write/Edit/NotebookEdit call aim anywhere but the Critic's own notes file? An empty target path is outside it. */
-function writesOutsideCriticNotes(input, rootDir) {
+function ownedCriticNotesPath(identity) {
+  // Called only after the existing source-owned native dispatch counter binding.
+  // A caller path or directory name never chooses the owning dispatch.
+  const id = identity?.agentId;
+  if (!isCriticAgentType(identity?.agentType) || !isValidGrantAgentId(id)) return null;
+  const path = `scratch/dispatch/critic-${id}/critic-notes.md`;
+  return CRITIC_NOTES_PATTERN.test(path) ? path : null;
+}
+
+function isOwnedCriticNotesTarget(input, rootDir, identity, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
-  if (!WRITE_TOOLS.includes(toolName)) return false;
+  if (toolName !== "Write" && toolName !== "Edit") return false;
+  const expected = ownedCriticNotesPath(identity);
+  if (expected === null) return false;
   const filePath = String(writeTargetPath(input?.tool_input, toolName) ?? "");
   const rel = (isAbsolute(filePath) ? relative(rootDir, filePath) : filePath).replaceAll("\\", "/");
-  return !CRITIC_NOTES_PATTERN.test(rel);
+  if (rel !== expected) return false;
+  const inspect = dependencies.lstatSyncFn ?? lstatSync;
+  const root = resolve(rootDir);
+  // Existing aliases cannot redirect a notes preflight into a sibling or outside root.
+  // Missing parents do not certify a host's directory-creation behavior.
+  const segments = expected.split("/");
+  let selected = root;
+  for (let index = 0; index < segments.length; index++) {
+    selected = join(selected, segments[index]);
+    try {
+      const info = inspect(selected);
+      if (info.isSymbolicLink()) return false;
+      if (index < segments.length - 1 ? !info.isDirectory() : !info.isFile() || info.nlink !== 1) return false;
+    } catch (error) {
+      if (error?.code === "ENOENT") return true;
+      return false;
+    }
+  }
+  return true;
+}
+
+
+const CRITIC_NOTES_DIRECTORY_SCHEMA = "pipeline.critic-notes-directory.v1";
+function prepareOwnedCriticNotesDirectory({ path, counter, identity, input, rootDir, dependencies }) {
+  // No public issuer: only advanceCounter calls this after its real counter binding
+  // and counted admission, while its existing counter lock is held.
+  const notesPath = ownedCriticNotesPath(identity);
+  if (notesPath === null) return { ok: false, code: "critic-notes-identity" };
+  const native = resolveParentDispatchToolUseId(input, identity, dependencies);
+  if (native.status !== "prepared") return { ok: false, code: "critic-notes-native-binding" };
+  let meta;
+  try { meta = launchRead(native.metaPath); } catch { return { ok: false, code: "critic-notes-native-binding" }; }
+  if (meta === null) return { ok: false, code: "critic-notes-native-binding" };
+  const binding = { agentId: identity.agentId, agentType: identity.agentType,
+    toolUseId: native.toolUseId, metaSha256: launchHash(meta.bytes), rootDir: resolve(rootDir),
+    counterPath: path, maxTurns: counter.maxTurns, baseCalls: counter.baseCalls,
+    workingCap: counter.workingCap, notesPath };
+  const receiptPath = path + ".notes-directory.json";
+  const directory = join(resolve(rootDir), dirname(notesPath));
+  const image = info => ({ dev: String(info.dev), ino: String(info.ino), mode: info.mode & 0o7777 });
+  let created = false;
+  try {
+    // Only fixed shared ancestors may exist without a notes ownership receipt.
+    for (const parent of [join(resolve(rootDir), "scratch"), join(resolve(rootDir), "scratch", "dispatch")]) {
+      try { mkdirSync(parent, { mode: 0o700 }); } catch (error) { if (error?.code !== "EEXIST") throw error; }
+      const info = lstatSync(parent);
+      if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("critic-notes-parent");
+    }
+    const retained = launchRead(receiptPath);
+    if (retained !== null) {
+      const receipt = JSON.parse(retained.bytes.toString("utf8"));
+      if ((retained.identity.mode & 0o7777) !== 0o600 || !launchExact(receipt, ["schema", "binding", "directoryIdentity"])
+        || receipt.schema !== CRITIC_NOTES_DIRECTORY_SCHEMA
+        || launchCanonical(receipt.binding) !== launchCanonical(binding)) throw new Error("critic-notes-receipt");
+      const info = lstatSync(directory);
+      if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o7777) !== 0o700
+        || launchCanonical(image(info)) !== launchCanonical(receipt.directoryIdentity)) throw new Error("critic-notes-directory-drift");
+      return { ok: true, notesPath };
+    }
+    // Bare exclusive mkdir: never adopt a foreign or interrupted directory.
+    mkdirSync(directory, { mode: 0o700 }); created = true;
+    const info = lstatSync(directory);
+    if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o7777) !== 0o700) throw new Error("critic-notes-directory");
+    const receipt = { schema: CRITIC_NOTES_DIRECTORY_SCHEMA, binding, directoryIdentity: image(info) };
+    const bytes = Buffer.from(launchCanonical(receipt) + "\n", "utf8");
+    let fd = null;
+    try {
+      fd = openSync(receiptPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
+      const opened = fstatSync(fd);
+      if (!opened.isFile() || opened.nlink !== 1 || (opened.mode & 0o7777) !== 0o600) throw new Error("critic-notes-receipt");
+      writeFileSync(fd, bytes); fsyncSync(fd);
+    } finally { if (fd !== null) closeSync(fd); }
+    const observed = launchRead(receiptPath), fresh = lstatSync(directory);
+    if (observed === null || !observed.bytes.equals(bytes) || launchCanonical(image(fresh)) !== launchCanonical(image(info))) throw new Error("critic-notes-publication");
+    return { ok: true, notesPath };
+  } catch (error) {
+    return { ok: false, code: created ? "critic-notes-partial-held" : error?.code === "EEXIST" ? "critic-notes-directory-owned-elsewhere" : "critic-notes-binding-unavailable" };
+  }
+}
+
+/** Budget-independent path custody check; current guard still owns budget/order. */
+function writesOutsideCriticNotes(input, rootDir, identity, dependencies) {
+  if (!WRITE_TOOLS.includes(String(input?.tool_name ?? ""))) return false;
+  return !isOwnedCriticNotesTarget(input, rootDir, identity, dependencies);
 }
 
 /**
@@ -671,19 +779,162 @@ function isSingleGitClosingCommand(command) {
   return typeof command === "string" && GIT_CLOSING_VERB_PATTERN.test(command) && !PRODUCER_ARGS_CONTROL_PATTERN.test(command);
 }
 
-function isClosingAct(input, rootDir, agentType, dependencies = {}) {
+const DISPATCH_RECORD_WRITER_SCRIPT = "dispatch-record-write.mjs";
+const CLOSING_WRITER_MAX_COMMAND_CHARS = 16384;
+const CLOSING_WRITER_MAX_REQUEST_BYTES = 2 * 1024 * 1024;
+const CLOSING_WRITER_SHELL_CONTROL = /[\0\r\n;&|<>`$()*?{}[\]~!]/u;
+
+/** A deliberately small literal shell grammar, not a general shell parser. */
+function parseClosingWriterCommand(command) {
+  if (typeof command !== "string" || command.length === 0
+    || command.length > CLOSING_WRITER_MAX_COMMAND_CHARS || CLOSING_WRITER_SHELL_CONTROL.test(command)) return null;
+  const tokens = [];
+  let at = 0;
+  while (at < command.length) {
+    while (/[ \t]/u.test(command[at] ?? "")) at += 1;
+    if (at === command.length) break;
+    const quote = ["'", '"'].includes(command[at]) ? command[at++] : null;
+    let token = "";
+    if (quote !== null) {
+      while (at < command.length && command[at] !== quote) {
+        const char = command[at++];
+        // Quoted native win32 separators only. Never interpret shell escapes.
+        if (char === "\\" && (process.platform !== "win32" || command[at] === quote)) return null;
+        token += char;
+      }
+      if (at === command.length || command[at++] !== quote) return null;
+      if (at < command.length && !/[ \t]/u.test(command[at])) return null;
+    } else {
+      while (at < command.length && !/[ \t]/u.test(command[at])) {
+        const char = command[at++];
+        if (["'", '"', "\\"].includes(char)) return null;
+        token += char;
+      }
+    }
+    if (token === "") return null;
+    tokens.push(token);
+    if (tokens.length > 6) return null;
+  }
+  if (tokens.length !== 6 || !(tokens[0] === "node" || (process.platform === "win32" && tokens[0] === "node.exe"))) return null;
+  const values = {};
+  for (let index = 2; index < tokens.length; index += 2) {
+    const key = tokens[index];
+    if (!["--repo-root", "--request"].includes(key) || Object.hasOwn(values, key)) return null;
+    values[key] = tokens[index + 1];
+  }
+  if (!Object.hasOwn(values, "--repo-root") || !Object.hasOwn(values, "--request")) return null;
+  return { scriptPath: tokens[1], repoRoot: values["--repo-root"], requestPath: values["--request"] };
+}
+
+function closingWriterSnapshotEqual(left, right) {
+  return ["dev", "ino", "mode", "nlink", "size", "mtimeMs", "ctimeMs"].every((key) => left[key] === right[key]);
+}
+
+function physicalClosingWriterDirectory(path, dependencies) {
+  const info = (dependencies.lstatSyncFn ?? lstatSync)(path);
+  if (!info.isDirectory() || info.isSymbolicLink()
+    || comparableScriptPath((dependencies.realpathSyncFn ?? realpathSync)(path)) !== comparableScriptPath(path)) return null;
+  return info;
+}
+
+function readClosingWriterRequest(root, requestPath, dependencies) {
+  const normalized = normalizeDispatchRecordPath(requestPath, "closing writer request path");
+  if (isAbsolute(normalized) || !normalized.endsWith(".json")
+    || normalized.split("/").some((part) => part.toLowerCase() === ".git")) return null;
+  const absolute = resolve(root, normalized);
+  const rel = relative(root, absolute);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  let parent = root;
+  for (const component of normalized.split("/").slice(0, -1)) {
+    parent = join(parent, component);
+    if (physicalClosingWriterDirectory(parent, dependencies) === null) return null;
+  }
+  const lstat = dependencies.lstatSyncFn ?? lstatSync;
+  const initial = lstat(absolute);
+  if (!initial.isFile() || initial.isSymbolicLink() || initial.nlink !== 1
+    || initial.size < 1 || initial.size > CLOSING_WRITER_MAX_REQUEST_BYTES) return null;
+  if (comparableScriptPath((dependencies.realpathSyncFn ?? realpathSync)(absolute)) !== comparableScriptPath(absolute)) return null;
+  let fd;
+  try {
+    fd = (dependencies.openSyncFn ?? openSync)(absolute, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    const fstat = dependencies.fstatSyncFn ?? fstatSync;
+    const before = fstat(fd);
+    if (!before.isFile() || !closingWriterSnapshotEqual(initial, before)) return null;
+    const bytes = (dependencies.readFileSyncFn ?? readFileSync)(fd);
+    const after = fstat(fd);
+    const final = lstat(absolute);
+    if (!Buffer.isBuffer(bytes) || bytes.length !== before.size
+      || !closingWriterSnapshotEqual(before, after) || !closingWriterSnapshotEqual(after, final)) return null;
+    return parseStrictJson(bytes);
+  } finally {
+    if (fd !== undefined) (dependencies.closeSyncFn ?? closeSync)(fd);
+  }
+}
+
+/**
+ * Classifies one actual public terminal-writer invocation, never publication
+ * or native authorship authority. There is no taskId in the budget identity:
+ * the scope is the current physical repository, authenticated role and exact
+ * validated record task-to-target path. The real writer reopens its request
+ * and applies its own independent policy. The existing budget core alone
+ * grants one counted closing attempt, and still stops after its five slots.
+ */
+export function isDispatchRecordWriterClosingCommand(command, rootDir, agentType, dependencies = {}) {
+  try {
+    if (typeof agentType !== "string" || agentType === "" || isCriticAgentType(agentType)) return false;
+    const parsed = parseClosingWriterCommand(command);
+    if (parsed === null || !isAbsolute(parsed.scriptPath) || !isAbsolute(parsed.repoRoot)) return false;
+    const root = resolve(rootDir);
+    if (comparableScriptPath(root) !== comparableScriptPath(rootDir)
+      || comparableScriptPath(resolve(parsed.repoRoot)) !== comparableScriptPath(parsed.repoRoot)
+      || comparableScriptPath(parsed.repoRoot) !== comparableScriptPath(root)) return false;
+    const rootInfo = physicalClosingWriterDirectory(root, dependencies);
+    const selectedInfo = physicalClosingWriterDirectory(parsed.repoRoot, dependencies);
+    if (rootInfo === null || selectedInfo === null || rootInfo.dev !== selectedInfo.dev || rootInfo.ino !== selectedInfo.ino) return false;
+    const pluginRoot = resolveAgentPluginRoot(root, dependencies);
+    if (typeof pluginRoot !== "string" || !isAbsolute(pluginRoot)
+      || physicalClosingWriterDirectory(pluginRoot, dependencies) === null) return false;
+    const expectedScript = join(pluginRoot, "scripts", DISPATCH_RECORD_WRITER_SCRIPT);
+    if (comparableScriptPath(parsed.scriptPath) !== comparableScriptPath(expectedScript)
+      || comparableScriptPath(resolve(parsed.scriptPath)) !== comparableScriptPath(parsed.scriptPath)
+      || physicalClosingWriterDirectory(dirname(expectedScript), dependencies) === null) return false;
+    const scriptInfo = (dependencies.lstatSyncFn ?? lstatSync)(expectedScript);
+    if (!scriptInfo.isFile() || scriptInfo.isSymbolicLink()
+      || comparableScriptPath((dependencies.realpathSyncFn ?? realpathSync)(expectedScript)) !== comparableScriptPath(expectedScript)) return false;
+    const request = readClosingWriterRequest(root, parsed.requestPath, dependencies);
+    if (!request || typeof request !== "object" || Array.isArray(request)
+      || Object.keys(request).sort().join() !== ["record", "schema", "target"].join()
+      || request.schema !== "pipeline.dispatch-record-write-request.v1") return false;
+    const record = validateDispatchRecord(request.record);
+    const role = agentType.startsWith("pipeline-core:") ? agentType.slice("pipeline-core:".length) : agentType;
+    if (record.agentType !== role || !isTerminalOutcome(record.outcome)) return false;
+    const target = normalizeDispatchRecordPath(request.target, "closing writer target");
+    if (target !== `evidence/dispatch-record-${record.taskId}.json`
+      || physicalClosingWriterDirectory(join(root, "evidence"), dependencies) === null) return false;
+    // Exclusive public writer cannot update an existing terminal record.
+    try { (dependencies.lstatSyncFn ?? lstatSync)(join(root, target)); return false; }
+    catch (error) { if (error?.code !== "ENOENT") return false; }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isClosingAct(input, rootDir, identity, dependencies = {}) {
+  const agentType = identity.agentType;
   const toolName = String(input?.tool_name ?? "");
   if (WRITE_TOOLS.includes(toolName)) {
     const filePath = writeTargetPath(input?.tool_input, toolName);
     if (filePath === "") return false;
     const rel = (isAbsolute(filePath) ? relative(rootDir, filePath) : filePath).replaceAll("\\", "/");
-    return DISPATCH_RECORD_PATTERN.test(rel) || (isCriticAgentType(agentType) && CRITIC_NOTES_PATTERN.test(rel));
+    return DISPATCH_RECORD_PATTERN.test(rel) || (isCriticAgentType(agentType) && isOwnedCriticNotesTarget(input, rootDir, identity, dependencies));
   }
   if (toolName === "Bash") {
     const command = input?.tool_input?.command ?? input?.tool_input?.CommandLine;
     if (typeof command !== "string") return false;
     const trimmed = command.trim();
-    return isSingleGitClosingCommand(trimmed) || isCommitFlowProducerCommand(trimmed, resolveAgentPluginRoot(rootDir, dependencies));
+    return isSingleGitClosingCommand(trimmed) || isCommitFlowProducerCommand(trimmed, resolveAgentPluginRoot(rootDir, dependencies))
+      || isDispatchRecordWriterClosingCommand(trimmed, rootDir, agentType, dependencies);
   }
   return false;
 }
@@ -1160,7 +1411,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
   if (preliminaryBudget.decision === "invalid-input") {
     return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: preliminaryBudget.reason });
   }
-  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir, identity.agentType, dependencies)
+  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir, identity, dependencies)
     ? decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: true, grantedCalls })
     : preliminaryBudget;
   counter.count = budget.nextCount;
@@ -1170,8 +1421,12 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
     // CRITIC-CKPT-F2 (Rulings 157/159/161): behind the budget decision on purpose. A write after the allowance is already
     // answered by the budget's own exhaustion refusal (CRITIC-CKPT-T2 (d2)-(d4)); only a call the budget admits reaches
     // this line, and a Critic write to anything but its notes file is then refused with a typed code (CRITIC-CKPT-T3).
-    if (isCriticAgentType(identity.agentType) && writesOutsideCriticNotes(input, rootDir)) {
-      return criticWriteConfined({ agentId: identity.agentId, agentType: identity.agentType });
+    if (isCriticAgentType(identity.agentType) && WRITE_TOOLS.includes(String(input?.tool_name ?? ""))) {
+      if (writesOutsideCriticNotes(input, rootDir, identity, dependencies)) {
+        return criticWriteConfined({ agentId: identity.agentId, agentType: identity.agentType });
+      }
+      const prepared = prepareOwnedCriticNotesDirectory({ path, counter, identity, input, rootDir, dependencies });
+      if (!prepared.ok) return verdict(2, "DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: " + prepared.code + ". Return the report as text; do not retry with Bash or adopt another directory.\n");
     }
     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
     const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));
@@ -1553,4 +1808,265 @@ if (isDirectInvocation(import.meta.url)) {
     if (result.stdout) process.stdout.write(result.stdout, () => process.exit(result.exitCode));
     else process.exit(result.exitCode);
   });
+}
+
+// CRT035: ownership is private to the guard; descriptive evidence cannot mint it.
+const launchOwners = new WeakMap();
+let activeUnitLaunchOwner = null;
+
+function launchError(code) { const error = new Error(code); error.code = code; return error; }
+function launchFailure(code, status = "refused") { return { ok: false, status, code }; }
+function launchHash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+function launchCanonical(value) {
+  if (Array.isArray(value)) return `[${value.map(launchCanonical).join(",")}]`;
+  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${launchCanonical(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+function launchExact(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join(",") === [...keys].sort().join(",");
+}
+function launchPhysical(path, directory = false) {
+  if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path) throw launchError("DBLO-ROOT-BINDING");
+  let cursor = parse(path).root;
+  for (const name of path.slice(cursor.length).split(sep).filter(Boolean)) {
+    cursor = join(cursor, name);
+    const stat = lstatSync(cursor);
+    if (stat.isSymbolicLink() || (cursor !== path && !stat.isDirectory())) throw launchError("DBLO-ROOT-BINDING");
+  }
+  const stat = lstatSync(path);
+  if (directory ? !stat.isDirectory() : !stat.isFile()) throw launchError("DBLO-ROOT-BINDING");
+  return stat;
+}
+function launchIdentity(stat) {
+  return { dev: stat.dev, ino: stat.ino, mode: stat.mode, size: stat.size, nlink: stat.nlink, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs };
+}
+function launchDirectoryIdentity(stat) { return { dev: stat.dev, ino: stat.ino, mode: stat.mode }; }
+function launchSame(a, b) {
+  return a === null || b === null ? a === b : launchCanonical(a.identity) === launchCanonical(b.identity) && a.bytes.equals(b.bytes);
+}
+function launchRead(path, limit = 65536) {
+  let before;
+  try { before = launchPhysical(path); }
+  catch (error) { if (error?.code === "ENOENT") return null; throw error; }
+  if (before.nlink !== 1 || before.size > limit || before.size < 0) throw launchError("DBLO-SNAPSHOT-DRIFT");
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const opened = fstatSync(fd);
+    if (!opened.isFile() || launchCanonical(launchIdentity(before)) !== launchCanonical(launchIdentity(opened))) throw launchError("DBLO-SNAPSHOT-DRIFT");
+    const bytes = readFileSync(fd);
+    const after = launchPhysical(path);
+    if (bytes.length !== before.size || launchCanonical(launchIdentity(before)) !== launchCanonical(launchIdentity(after))) throw launchError("DBLO-SNAPSHOT-DRIFT");
+    return { bytes, identity: launchIdentity(after) };
+  } finally { closeSync(fd); }
+}
+function launchLockAbsent(owner) {
+  for (const path of [`${owner.paths.counter}.binding.lock`, `${owner.paths.counter}.binding.lock.recovery`, `${owner.paths.pending}.lock`]) {
+    try { lstatSync(path); throw launchError("DBLO-SNAPSHOT-BUSY"); }
+    catch (error) { if (error?.code !== "ENOENT") throw error; }
+  }
+}
+function launchSnapshot(owner) {
+  return {
+    counter: launchRead(owner.paths.counter), pending: launchRead(owner.paths.pending),
+    grant: launchRead(owner.paths.grant, 32768),
+    lock: launchRead(`${owner.paths.counter}.binding.lock`), meta: launchRead(owner.paths.meta, 16384),
+  };
+}
+function launchCurrent(owner, handle) {
+  return owner !== undefined && !owner.invalid && owner.active === handle && activeUnitLaunchOwner === owner;
+}
+
+/** Authenticated internal bridge. No serialized descriptor or supplied reader authorizes it. */
+export function readOwnedDispatchBudgetLaunchObservation(input = {}) {
+  if (!launchExact(input, ["rootDir", "hostDispatchContext"])) return launchFailure("DBLO-HANDLE-INVALID");
+  const { rootDir, hostDispatchContext } = input;
+  if (hostDispatchContext === null || hostDispatchContext === undefined) return launchFailure("DBLO-CURRENT-HOST-UNAVAILABLE", "unavailable");
+  const owner = launchOwners.get(hostDispatchContext);
+  if (!launchCurrent(owner, hostDispatchContext)) return launchFailure("DBLO-HANDLE-INVALID");
+  try {
+    launchPhysical(rootDir, true);
+    if (rootDir !== owner.rootDir || resolveGitCommonDir(rootDir) !== owner.commonDir
+      || launchCanonical(launchDirectoryIdentity(launchPhysical(rootDir, true))) !== launchCanonical(owner.rootIdentity)
+      || launchCanonical(launchDirectoryIdentity(launchPhysical(owner.commonDir, true))) !== launchCanonical(owner.commonIdentity)) {
+      return launchFailure("DBLO-ROOT-BINDING");
+    }
+    if (hostDispatchContext === owner.orchestrator) {
+      const evidence = { schema: "pipeline.dispatch-budget-launch-observation.v1", repositoryFingerprint: owner.repositoryFingerprint,
+        dispatchBindingSha256: owner.orchestratorBindingSha256, counterSha256: null, grantSha256: null,
+        maxTurns: null, baseCalls: null, count: null, effectiveWorkingCap: null, decision: "not-applicable" };
+      return { ok: true, value: { status: "not-applicable", code: "DBLO-HOST-ROUTE-NOT-APPLICABLE", evidenceSha256: launchHash(launchCanonical(evidence)) } };
+    }
+    launchLockAbsent(owner);
+    const first = launchSnapshot(owner);
+    if (owner.interleave !== null) {
+      const interleave = owner.interleave;
+      owner.interleave = null;
+      const returned = interleave(owner.paths);
+      if (returned !== null && (typeof returned === "object" || typeof returned === "function") && typeof returned.then === "function") throw launchError("DBLO-UNIT-LIFETIME");
+    }
+    const second = launchSnapshot(owner);
+    launchLockAbsent(owner);
+    if (!launchCurrent(owner, hostDispatchContext)) return launchFailure("DBLO-HANDLE-INVALID");
+    if (!Object.keys(first).every((key) => launchSame(first[key], second[key]))) return launchFailure("DBLO-SNAPSHOT-DRIFT");
+    if (second.counter === null) return launchFailure("DBLO-COUNTER-UNAVAILABLE", "unavailable");
+    if (second.pending !== null) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
+    if (!launchSame(second.meta, owner.metaSnapshot)) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
+    const parent = resolveParentDispatchToolUseId(owner.childInput, dispatchBudgetCallerIdentity(owner.childInput));
+    if (parent.status !== "prepared" || parent.toolUseId !== owner.toolUseId || parent.metaPath !== owner.paths.meta) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
+    const maxTurns = readAgentMaxTurns("pipeline-core:critic", owner.pluginRoot);
+    if (maxTurns !== owner.maxTurns) return launchFailure("DBLO-TIER-DRIFT");
+    let counter;
+    try { counter = JSON.parse(second.counter.bytes.toString("utf8")); } catch { return launchFailure("DBLO-COUNTER-INVALID"); }
+    const keys = ["schema", "agentId", "agentType", "maxTurns", "baseCalls", "workingCap", "count"];
+    if (!launchExact(counter, counter?.updatedAt === undefined ? keys : [...keys, "updatedAt"])
+      || counter.schema !== "pipeline.dispatch-budget-counter.v1"
+      || !Number.isSafeInteger(counter.count) || counter.count < 0 || counter.count >= Number.MAX_SAFE_INTEGER
+      || (counter.updatedAt !== undefined && (typeof counter.updatedAt !== "string" || !Number.isFinite(Date.parse(counter.updatedAt))))) return launchFailure("DBLO-COUNTER-INVALID");
+    if (counter.agentId !== owner.agentId || counter.agentType !== "pipeline-core:critic" || counter.maxTurns !== maxTurns
+      || counter.baseCalls !== owner.baseCalls || counter.workingCap !== Math.min(owner.baseCalls, dispatchWorkingCap(maxTurns))) return launchFailure("DBLO-COUNTER-BINDING");
+    let grantedCalls = 0;
+    let grantSha256 = null;
+    if (second.grant !== null) {
+      try {
+        const grant = JSON.parse(second.grant.bytes.toString("utf8"));
+        const valid = validateGrantRecord(grant, owner.agentId);
+        if (valid.ok) { grantedCalls = grant.totalExtra; grantSha256 = launchHash(second.grant.bytes); }
+      } catch { /* Invalid grants contribute zero; they never widen the base cap. */ }
+    }
+    const decision = decideDispatchBudgetCall({ maxTurns, baseCalls: owner.baseCalls, currentCount: counter.count, grantedCalls, isClosingAct: false });
+    if (decision.decision === "invalid-input") return launchFailure("DBLO-COUNTER-INVALID");
+    const stopped = !decision.allowed;
+    const evidence = { schema: "pipeline.dispatch-budget-launch-observation.v1", repositoryFingerprint: owner.repositoryFingerprint,
+      dispatchBindingSha256: owner.dispatchBindingSha256, counterSha256: launchHash(second.counter.bytes), grantSha256,
+      maxTurns, baseCalls: owner.baseCalls, count: counter.count,
+      effectiveWorkingCap: effectiveDispatchWorkingCap(owner.baseCalls, maxTurns, grantedCalls), decision: decision.decision };
+    return { ok: true, value: { status: stopped ? "stopped-budget" : "working", code: stopped ? "DISPATCH-BUDGET-EXHAUSTED" : "DBLO-WORKING", evidenceSha256: launchHash(launchCanonical(evidence)) } };
+  } catch (error) {
+    if (error?.code === "DBLO-UNIT-LIFETIME") throw error;
+    return launchFailure(typeof error?.code === "string" && error.code.startsWith("DBLO-") ? error.code : "DBLO-SNAPSHOT-DRIFT");
+  }
+}
+
+/** The current native host has no authenticated cross-process launch carrier. */
+export function withCurrentDispatchBudgetLaunchContext(callback) {
+  // Unit activation deliberately cannot enter this production namespace.
+  return launchFailure("DBLO-CURRENT-HOST-UNAVAILABLE", "unavailable");
+}
+
+function launchSync(callback, argument) {
+  if (typeof callback !== "function" || callback.constructor?.name === "AsyncFunction") throw launchError("DBLO-UNIT-LIFETIME");
+  const value = callback(argument);
+  if (value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function") throw launchError("DBLO-UNIT-LIFETIME");
+  return value;
+}
+function launchActivate(owner, handle, callback) {
+  if (owner.invalid) throw launchError("DBLO-HANDLE-INVALID");
+  if (owner.active !== null || activeUnitLaunchOwner !== null) throw launchError("DBLO-UNIT-LIFETIME");
+  owner.active = handle;
+  activeUnitLaunchOwner = owner;
+  try { return launchSync(callback, handle); }
+  finally { owner.active = null; activeUnitLaunchOwner = null; }
+}
+
+/** A unit-only owner: all authority premises come from genuine local producers. */
+export function createControlledDispatchBudgetLaunchOwner(input = {}) {
+  if (!launchExact(input, ["taskRoot", "pluginRoot", "baseCalls"]) || !Number.isSafeInteger(input.baseCalls) || input.baseCalls < 1) throw launchError("DBLO-UNIT-CONSTRUCTION");
+  const { taskRoot, pluginRoot, baseCalls } = input;
+  let rootDir, commonDir;
+  try {
+    launchPhysical(taskRoot, true);
+    launchPhysical(pluginRoot, true);
+    if (!taskRoot.split(sep).includes("scratch") || taskRoot.split(sep).includes(".git")) throw launchError("DBLO-UNIT-CONSTRUCTION");
+    const maxTurns = readAgentMaxTurns("pipeline-core:critic", pluginRoot);
+    const bound = bindDispatchBudget({ prompt: `- Tool budget: ${baseCalls} tool uses`, maxTurns, applicable: dispatchBudgetContractForRole("pipeline-core:critic", { pluginRoot }).applicable });
+    if (bound.status !== "prepared") throw launchError(bound.code);
+    rootDir = mkdtempSync(join(taskRoot, "dispatch-owner-"));
+    const git = (args) => execFileSync("git", args, { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    git(["init", "--quiet"]);
+    commonDir = resolveGitCommonDir(rootDir);
+    if (commonDir === null || commonDir !== join(rootDir, ".git")) throw launchError("DBLO-UNIT-CONSTRUCTION");
+    const governance = createGovernanceScopeController({ hostStateRoot: join(rootDir, ".unit-governance-host") });
+    const plan = governance.planDecision({ rootDir, decision: "enroll", by: "synthetic-dispatch-budget-unit" });
+    const enrolled = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    if (!enrolled.requiresEnforcement || !observeGovernanceScope({ rootDir }).requiresEnforcement) throw launchError("DBLO-UNIT-CONSTRUCTION");
+    const agentId = `unit-${randomUUID()}`;
+    const toolUseId = `unit-dispatch-${randomUUID()}`;
+    const transcript = join(rootDir, ".unit-dispatch", "session.jsonl");
+    const meta = join(rootDir, ".unit-dispatch", "session", "subagents", `agent-${agentId}.meta.json`);
+    mkdirSync(dirname(meta), { recursive: true, mode: 0o700 });
+    writeFileSync(meta, `${JSON.stringify({ agentType: "pipeline-core:critic", description: "controlled unit owner", toolUseId, spawnDepth: 1 })}\n`, { flag: "wx", mode: 0o600 });
+    const pending = persistPendingDispatchBudgetBindings({ commonDir, toolUseId, bindings: [{ agentType: "pipeline-core:critic", baseCalls, maxTurns, effectiveCap: bound.effectiveCap }] });
+    if (pending.status !== "prepared") throw launchError(pending.code);
+    const childInput = Object.freeze({ agent_id: agentId, agent_type: "pipeline-core:critic", transcript_path: transcript,
+      session_id: "controlled-unit-session", tool_name: "Read", tool_input: Object.freeze({ file_path: join(rootDir, "unit-public.txt") }) });
+    const produced = evaluateDispatchBudgetGuard(childInput, { rootDir, pluginRoot });
+    const paths = Object.freeze({ counter: counterPath(commonDir, agentId), pending: pending.path, grant: grantPath(counterPath(commonDir, agentId), agentId), meta });
+    const initial = launchRead(paths.counter);
+    if (produced.exitCode !== 0 || initial === null || JSON.parse(initial.bytes.toString("utf8")).count !== 1 || launchRead(paths.pending) !== null) throw launchError("DBLO-UNIT-CONSTRUCTION");
+    const owner = { rootDir, commonDir, pluginRoot, agentId, toolUseId, baseCalls, maxTurns, paths, childInput,
+      invalid: false, active: null, interleave: null, interleaveActive: false, metaSnapshot: launchRead(meta),
+      rootIdentity: launchDirectoryIdentity(launchPhysical(rootDir, true)), commonIdentity: launchDirectoryIdentity(launchPhysical(commonDir, true)) };
+    // Directory entries may change as genuine fixtures are published. Device/inode/mode stay bound.
+    owner.repositoryFingerprint = launchHash(launchCanonical({ root: rootDir, commonDir, rootIdentity: owner.rootIdentity, commonIdentity: owner.commonIdentity }));
+    owner.dispatchBindingSha256 = launchHash(launchCanonical({ agentId, toolUseId, baseCalls, maxTurns, effectiveCap: bound.effectiveCap, metaSha256: launchHash(owner.metaSnapshot.bytes) }));
+    const hostDispatchContext = Object.freeze(Object.create(null));
+    const orchestrator = Object.freeze(Object.create(null));
+    owner.orchestrator = orchestrator;
+    launchOwners.set(hostDispatchContext, owner);
+    launchOwners.set(orchestrator, owner);
+    const orchestratorInput = Object.freeze({ transcript_path: transcript, session_id: "controlled-unit-session", tool_name: "Read", tool_input: {} });
+    const actualOrchestrator = evaluateDispatchBudgetGuard(orchestratorInput, { rootDir, pluginRoot });
+    if (dispatchBudgetCallerIdentity(orchestratorInput).kind !== "orchestrator" || actualOrchestrator.exitCode !== 0) throw launchError("DBLO-UNIT-CONSTRUCTION");
+    owner.orchestratorBindingSha256 = launchHash(launchCanonical({ repositoryFingerprint: owner.repositoryFingerprint, identityKind: "orchestrator", agentIdPresent: false, agentTypePresent: false }));
+    launchLockAbsent(owner);
+    return Object.freeze({
+      rootDir, hostDispatchContext, paths,
+      advanceWorkingCalls(n) {
+        if (owner.invalid) throw launchError("DBLO-HANDLE-INVALID");
+        if (!Number.isSafeInteger(n) || n < 1) throw launchError("DBLO-UNIT-CONSTRUCTION");
+        const results = [];
+        for (let i = 0; i < n; i += 1) { const result = evaluateDispatchBudgetGuard(childInput, { rootDir, pluginRoot }); results.push(result); if (result.exitCode !== 0) break; }
+        return results;
+      },
+      grantWorkingCalls(request) {
+        if (owner.invalid) throw launchError("DBLO-HANDLE-INVALID");
+        if (!launchExact(request, ["extra", "reason", "grantedAt"])) throw launchError("DBLO-UNIT-CONSTRUCTION");
+        const acquired = acquireDispatchBudgetCounterLockWithWait(`${paths.counter}.binding.lock`);
+        if (acquired.status !== "acquired") throw launchError(acquired.code);
+        try {
+          const before = launchRead(paths.grant, 32768);
+          let record = null;
+          if (before !== null) { try { record = JSON.parse(before.bytes.toString("utf8")); } catch { throw launchError("grant-record-shape"); } }
+          const appended = appendGrant({ record, agentId, ...request });
+          if (!appended.ok) throw launchError(appended.code);
+          mkdirSync(dirname(paths.grant), { recursive: true, mode: 0o700 });
+          const temporary = `${paths.grant}.${randomUUID()}.tmp`;
+          try {
+            writeFileSync(temporary, `${JSON.stringify(appended.record, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+            if (!launchSame(before, launchRead(paths.grant, 32768))) throw launchError("DBLO-SNAPSHOT-DRIFT");
+            renameSync(temporary, paths.grant);
+            const retained = JSON.parse(launchRead(paths.grant, 32768).bytes.toString("utf8"));
+            if (launchCanonical(retained) !== launchCanonical(appended.record) || !validateGrantRecord(retained, agentId).ok) throw launchError("DBLO-SNAPSHOT-DRIFT");
+            return retained;
+          } finally { try { unlinkSync(temporary); } catch (error) { if (error?.code !== "ENOENT") throw error; } }
+        } finally { releaseDispatchBudgetCounterLock(acquired.lock); }
+      },
+      readObservation() { return readOwnedDispatchBudgetLaunchObservation({ rootDir, hostDispatchContext }); },
+      snapshot() { return launchSnapshot(owner); },
+      withLaunchContext(callback) { return launchActivate(owner, hostDispatchContext, callback); },
+      withOrchestratorContext(callback) { return launchActivate(owner, orchestrator, callback); },
+      withOwnedSnapshotInterleave(mutate, operation) {
+        if (owner.invalid) throw launchError("DBLO-HANDLE-INVALID");
+        if (owner.interleaveActive || typeof mutate !== "function" || mutate.constructor?.name === "AsyncFunction") throw launchError("DBLO-UNIT-LIFETIME");
+        owner.interleaveActive = true; owner.interleave = mutate;
+        try { return launchSync(operation); }
+        finally { owner.interleave = null; owner.interleaveActive = false; }
+      },
+      invalidate() { owner.invalid = true; },
+    });
+  } catch (error) {
+    if (error?.code?.startsWith("DBLO-") || error?.code?.startsWith("DBB-")) throw error;
+    throw launchError("DBLO-UNIT-CONSTRUCTION");
+  }
 }

@@ -29,7 +29,7 @@ import {
   snapshotPhysicalPluginRoot,
 } from "../lib/public-core-observation.mjs";
 import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
-import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { observeGovernanceScope, governanceScopeFailureDiagnostic, governanceScopeDiagnosticAction } from "../lib/governance-scope.mjs";
 import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedTopology } from "../lib/antigravity-topology-refresh-host.mjs";
 import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
@@ -56,8 +56,10 @@ import {
   INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER,
   resolveAntigravityRegistryInstalledRoot,
   resolveClaudeRegistryBinding,
+  readInstalledPluginAttestationSetup,
   resolveCodexRegistrySource,
   installedPluginAttestationSetupCommand,
+  writeClaudeRegistryInstalledPluginReceipt,
   verifyLocalDevelopmentInstalledPluginReceipt,
 } from "./installed-plugin-attestation-host.mjs";
 
@@ -1073,6 +1075,7 @@ export function observePipelineStartPreflight({
   // calls it once and carries the outcome as `modelRoleBootstrap`; a thenable result makes the return
   // value a Promise of the envelope. Without the seam the return value stays a plain object.
   runModelRoleBootstrapFn,
+  attestationReceiptDirectory = undefined,
 } = {}) {
   // Repository enrollment precedes distribution/onboarding/housekeeping work.
   // An installed runner plugin or unrelated AGENTS.md does not opt this root in.
@@ -1087,12 +1090,14 @@ export function observePipelineStartPreflight({
     && governanceScope.hintAllowed === (governanceScope.state === "inactive" && governanceScope.root !== null);
   if (!validScope || governanceScope.state !== "active") {
     const state = validScope ? governanceScope.state : "unverifiable-active";
+    const diagnostic = validScope ? governanceScopeFailureDiagnostic(governanceScope) : null;
     return {
       schema: SCHEMA, statusScope: "pipeline-governance-activation",
       status: state === "inactive" ? "pipeline-governance-inactive" : state === "declined" ? "pipeline-governance-declined" : "pipeline-governance-unverifiable",
       governanceScope: validScope ? governanceScope : null,
+      ...(diagnostic ? { cause: diagnostic.cause, topologyDiagnostic: diagnostic.topologyDiagnostic } : {}),
       pipelineWorkPerformed: false,
-      nextAction: state === "inactive" && governanceScope.hintAllowed
+      nextAction: diagnostic ? governanceScopeDiagnosticAction({ rootDir: resolve(cwd) }) : state === "inactive" && governanceScope.hintAllowed
         ? {
             kind: "command",
             executable: process.execPath,
@@ -1207,6 +1212,15 @@ export function observePipelineStartPreflight({
     || runner === "claude" && installedIdentity?.source === "local-development" && !claudeDirectDirectory
     || runner === "antigravity" && (registryInstalledPluginRoot === null || antigravityTopology?.loadedKind === "managed-copy")
   );
+  const claudeReceiptStoreOptions = runner === "claude" && attestationReceiptDirectory !== undefined
+    ? {
+        receiptDirectory: typeof attestationReceiptDirectory === "string"
+          && isAbsolute(attestationReceiptDirectory)
+          && resolve(attestationReceiptDirectory) === attestationReceiptDirectory
+          ? attestationReceiptDirectory
+          : null,
+      }
+    : {};
   const rawInstalledPluginAttestation = localInstalledCopy
     ? runner === "codex" && registrySourcePluginRoot === null
       ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-SOURCE-UNAVAILABLE"] }
@@ -1222,7 +1236,7 @@ export function observePipelineStartPreflight({
           ? { registryInstalledPluginRoot: runner === "claude" ? claudeRegistryBinding.installedPluginRoot : registryInstalledPluginRoot }
           : { registrySourcePluginRoot }),
         protectedPaths: INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[runner] ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
-      }, runner === "antigravity" ? { antigravityConfigRoot, antigravityWorkspaceRoot: cwd } : {})
+      }, runner === "antigravity" ? { antigravityConfigRoot, antigravityWorkspaceRoot: cwd } : claudeReceiptStoreOptions)
     : { schema: "pipeline.installed-plugin-attestation-bootstrap.v1", status: "not-required", reasonCodes: [] };
   const codexAttestationSource = rawInstalledPluginAttestation.status === "unavailable"
     && runner === "codex" && registrySourcePluginRoot !== null
@@ -1232,7 +1246,51 @@ export function observePipelineStartPreflight({
         plugin: { name: "pipeline-core", version },
       })
     : null;
-  const installedPluginAttestationBase = codexAttestationSource?.status === "unavailable"
+  const claudeInlineAttestation = (() => {
+    if (runner !== "claude" || !localInstalledCopy || claudeRegistryBinding === null
+      || rawInstalledPluginAttestation.status !== "unavailable") return null;
+    try {
+      const readPluginList = () => resolvedPluginList();
+      const readKnownMarketplaces = () => knownMarketplaces();
+      const registryReads = { readPluginList, readKnownMarketplaces, ...claudeReceiptStoreOptions };
+      const freshBinding = resolveClaudeRegistryBinding({
+        plugin: { name: "pipeline-core", version }, installedPluginRoot: pluginRoot,
+        ...registryReads,
+      });
+      if (freshBinding === null
+        || freshBinding.installedPluginRoot !== claudeRegistryBinding.installedPluginRoot
+        || freshBinding.installedPluginRoot !== pluginRoot
+        || freshBinding.marketplacePluginRoot !== claudeRegistryBinding.marketplacePluginRoot) return null;
+      const sourcePluginRoot = freshBinding.marketplacePluginRoot;
+      const hostInput = {
+        plugin: { name: "pipeline-core", version }, sourcePluginRoot,
+        installedPluginRoot: pluginRoot,
+        protectedPaths: INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER.claude ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
+      };
+      const written = writeClaudeRegistryInstalledPluginReceipt(hostInput, registryReads);
+      if (written?.schema !== "pipeline.installed-plugin-attestation-host-result.v1"
+        || written.status !== "written") return null;
+      const readback = readInstalledPluginAttestationSetup({
+        provider: "claude", version, sourcePluginRoot, installedPluginRoot: pluginRoot,
+      }, registryReads);
+      if (readback?.schema !== "pipeline.installed-plugin-attestation-host-result.v1"
+        || readback.status !== "verified") return null;
+      const verifyInput = {
+        provider: "claude", plugin: { name: "pipeline-core", version },
+        installedPluginRoot: pluginRoot,
+        registryInstalledPluginRoot: freshBinding.installedPluginRoot,
+        protectedPaths: hostInput.protectedPaths,
+      };
+      const verified = attestationReceiptDirectory === undefined
+        ? verifyLocalInstalledPluginReceiptFn(verifyInput)
+        : verifyLocalInstalledPluginReceiptFn(verifyInput, registryReads);
+      return verified?.schema === "pipeline.installed-plugin-attestation-verification.v1"
+        && verified.status === "verified" ? verified : null;
+    } catch {
+      return null;
+    }
+  })();
+  const installedPluginAttestationBase = claudeInlineAttestation ?? (codexAttestationSource?.status === "unavailable"
     ? {
         ...rawInstalledPluginAttestation,
         reasonCodes: [...new Set([
@@ -1240,7 +1298,7 @@ export function observePipelineStartPreflight({
           ...codexAttestationSource.reasonCodes,
         ])],
       }
-    : rawInstalledPluginAttestation;
+    : rawInstalledPluginAttestation);
   const antigravityAttestationSource = runner === "antigravity"
     && antigravityTopology?.status === "current"
     && typeof antigravityTopology.sourcePluginRoot === "string"

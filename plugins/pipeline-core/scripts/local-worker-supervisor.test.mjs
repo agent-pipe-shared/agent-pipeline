@@ -15,7 +15,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { homedir, uptime, devNull } from "node:os";
+import { uptime, devNull } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,15 +60,15 @@ function git(args, cwd) {
   }).trim();
 }
 
-function capacity(effective = 5) {
+function capacity() {
   return {
     configured: { concurrentTasks: 8, required: true },
     operator: { concurrentTasks: 8, required: true },
     certified: { concurrentTasks: 8, required: true },
     observed: { concurrentTasks: 8, required: true },
     pressure: { concurrentTasks: 8, required: false },
-    reserved: { elephant: 1, verify: 1, critic: 1 },
-    effective: { status: "available", concurrentTasks: effective, reasonCodes: [] },
+    reserved: { elephant: 0, verify: 0, critic: 0 },
+    effective: { status: "available", concurrentTasks: 8, reasonCodes: [] },
   };
 }
 
@@ -97,7 +97,7 @@ function worker(subjectSha256, leaseId, writePath, evidenceSha256, stateRoot, no
   };
 }
 
-function createPool(commit, stateRoot, workerRequests, effective = 5) {
+function createPool(commit, stateRoot, workerRequests) {
   const count = workerRequests.length;
   const now = Math.floor(uptime() * 1000);
   const allWorkers = [
@@ -116,7 +116,7 @@ function createPool(commit, stateRoot, workerRequests, effective = 5) {
     poolId: "pool-b1i",
     candidate: { repositorySha256: A, baseCommit: commit, candidateCommit: commit },
     queueRevision: 7,
-    capacity: capacity(effective),
+    capacity: capacity(),
     workers: allWorkers,
     admissionSet: admissions,
     cleanupOwner: { subjectSha256: A, ownerNonce: "owner-lease-a", evidenceSha256: C },
@@ -159,7 +159,7 @@ function createRequest(sourceRoot, stateRoot, commit, options = {}) {
       recoveryReserve: options.recoveryReserve ?? 1,
     },
     git: { executable: GIT, executableSha256: fileSha256(GIT) },
-    pool: createPool(commit, stateRoot, workers, options.effective ?? 5),
+    pool: createPool(commit, stateRoot, workers),
     runner: {
       kind: "fixture",
       executable: NODE,
@@ -179,10 +179,11 @@ function createRequest(sourceRoot, stateRoot, commit, options = {}) {
 }
 
 function fixture() {
-  // `/tmp` is intentionally untrusted for durable supervisor state. Verify
-  // candidates may themselves be rooted below `/tmp`, so use a short-lived
-  // private directory below the current user's trusted home instead.
-  const root = mkdtempSync(join(homedir(), ".pipeline-b1i-"));
+  // Keep disposable clones and state in repository Scratch. Production
+  // trusted-ancestor checks still apply to this private fixture directory.
+  const scratchRoot = fileURLToPath(new URL("../../../scratch/", import.meta.url));
+  mkdirSync(scratchRoot, { recursive: true, mode: 0o700 });
+  const root = mkdtempSync(join(scratchRoot, ".pipeline-b1i-"));
   try {
     const sourceRoot = join(root, "source");
     const stateBase = join(root, "state");
@@ -417,7 +418,8 @@ check("plans and runs two overlapping real child processes in separate no-hardli
 check("returns serial-fallback-required before creating a workspace when recovery reserve is exhausted", () => {
   const context = fixture();
   try {
-    const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { recoveryReserve: 4 });
+    // Two retained workers cannot fit after seven real recovery slots are reserved.
+    const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { recoveryReserve: 7 });
     const requestPath = writeRequest(context, request);
     const planned = plan(context, requestPath);
     assert.equal(planned.code, "LWS-SERIAL-FALLBACK-REQUIRED");

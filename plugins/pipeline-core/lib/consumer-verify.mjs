@@ -4,6 +4,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSy
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
+import { readProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
 
 export const CONSUMER_VERIFY_ADAPTER_PATH = "project/consumer-verify.mjs";
 // Installation location is supplied as an argv value, never embedded in project bytes.
@@ -20,14 +21,18 @@ function commandEntry(value, label) {
 
 export function readConsumerVerifyConfiguration(rootDir) {
   const artifact = resolveAuthorityArtifactPath("calibration", { rootDir });
+  const projectIdentity = readProjectCalibrationIdentity({ rootDir });
+  if (projectIdentity.status !== "resolved") throw new Error(`VEP-PROJECT-IDENTITY: ${projectIdentity.code}`);
   if (!artifact.exists) throw new Error("VEP-NO-CALIBRATION: no project calibration found.");
-  const calibration = JSON.parse(readFileSync(artifact.path, "utf8"));
-  const project = typeof calibration?.project === "string" && calibration.project.trim() ? calibration.project : "unspecified";
+  const calibrationBytes = readFileSync(artifact.path);
+  if (projectIdentity.source.path !== artifact.relPath || projectIdentity.source.sha256 !== createHash("sha256").update(calibrationBytes).digest("hex")) throw new Error("VEP-PROJECT-IDENTITY: PCI-SOURCE-DRIFT");
+  const calibration = JSON.parse(calibrationBytes.toString("utf8"));
+  const project = projectIdentity.project;
   const fullCommand = typeof calibration?.verify === "string" && calibration.verify.trim()
     && !calibration.verify.includes("the verify contract of this project is not configured") ? calibration.verify : null;
   if (fullCommand !== null && /verify-evidence-producer\.mjs|consumer-verify\.mjs|consumer-verify-check\.mjs/u.test(fullCommand)) throw new Error("VEP-IMPACT-CONFIG: recursive full command.");
   const impact = calibration?.verifyImpact;
-  if (impact === undefined) return Object.freeze({ project, fullCommand, baseline: [], areas: [] });
+  if (impact === undefined) return Object.freeze({ project, projectIdentity, fullCommand, baseline: [], areas: [] });
   if (!impact || typeof impact !== "object" || Array.isArray(impact) || impact.schema !== "pipeline.project-verify-impact.v1"
     || !Array.isArray(impact.baseline) || !Array.isArray(impact.areas)) throw new Error("VEP-IMPACT-CONFIG: invalid root.");
   const ids = new Set();
@@ -43,7 +48,7 @@ export function readConsumerVerifyConfiguration(rootDir) {
     if (ids.has(entry.id)) throw new Error(`VEP-IMPACT-CONFIG: duplicate command id ${entry.id}.`);
     ids.add(entry.id);
   }
-  return Object.freeze({ project, fullCommand, baseline: Object.freeze(baseline), areas: Object.freeze(areas) });
+  return Object.freeze({ project, projectIdentity, fullCommand, baseline: Object.freeze(baseline), areas: Object.freeze(areas) });
 }
 
 export function assertConsumerVerifyAdapter(rootDir) {

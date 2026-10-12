@@ -7,7 +7,17 @@ import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { resolveRepoScopedDirectory } from "./po-key-directory.mjs";
 
-const SECRET_BASENAME = /^(?:po-private\.pem|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|credentials|auth\.json|oauth_creds\.json|\.credentials\.json|application_default_credentials\.json|\.(?:npmrc|netrc)|\.env(?:\.(?!(?:example|sample|template)$).*)?|[^/\\]+\.(?:p12|pfx|key|pem))$/iu;
+/** One immutable credential declaration shared with passive shell readers. */
+export const PASSIVE_READ_CREDENTIAL_ROOTS = Object.freeze({
+  homeRelativePaths: Object.freeze([".ssh",".aws",".gnupg",".kube",".docker",".azure",".config/gcloud",".config/gh",".codex/auth.json",".claude/.credentials.json",".gemini/oauth_creds.json",".gemini/config/oauth_creds.json",".netrc",".git-credentials",".npmrc",".pypirc"]),
+  posixAbsolutePaths: Object.freeze(["/etc/shadow"]),
+  secretBasenameRegex: Object.freeze({ source: "^(?:po-private\\.pem|id_(?:rsa|dsa|ecdsa|ed25519)(?:\\.pub)?|credentials|auth\\.json|oauth_creds\\.json|\\.credentials\\.json|application_default_credentials\\.json|\\.(?:npmrc|netrc|git-credentials|pypirc)|\\.env(?:\\.(?!(?:example|sample|template)$).*)?|[^/\\\\]+\\.(?:p12|pfx|key|pem))$", flags: "iu" }),
+  recursiveInventoryGlobs: Object.freeze(["po-private.pem","id_*","credentials",".env*",".npmrc",".netrc",".git-credentials",".pypirc","*.pem","*.key","*.p12","*.pfx"]),
+  systemPseudoRoots: Object.freeze(["/proc","/sys","/dev","/run","/etc","/root","/private/etc","/private/var/run","/System"]),
+});
+// Keep the actual RegExp private: freezing a RegExp object does not seal its internal slots.
+const SECRET_BASENAME = new RegExp(PASSIVE_READ_CREDENTIAL_ROOTS.secretBasenameRegex.source,
+  PASSIVE_READ_CREDENTIAL_ROOTS.secretBasenameRegex.flags);
 
 function within(root, path, includeEqual = true) {
   const part = relative(root, path);
@@ -27,9 +37,9 @@ function rawCandidate(raw, root, home) {
 }
 
 function systemPseudoPath(path) {
-  const unixRoots = ["/proc", "/sys", "/dev", "/run", "/etc", "/root",
-    "/private/etc", "/private/var/run", "/System"];
-  if (process.platform !== "win32") return unixRoots.some((root) => within(root, path));
+  const unixRoots = PASSIVE_READ_CREDENTIAL_ROOTS.systemPseudoRoots;
+  if (process.platform !== "win32") return PASSIVE_READ_CREDENTIAL_ROOTS.posixAbsolutePaths
+    .some((root) => within(root, path)) || unixRoots.some((root) => within(root, path));
   const lower = path.toLowerCase();
   return /^(?:[a-z]:[\\/](?:windows|programdata|\$recycle\.bin)(?:[\\/]|$)|[\\/]{2}[.?][\\/])/u.test(lower);
 }
@@ -47,9 +57,7 @@ function userVisibleHostPath(path, homeDir) {
 // fallback keeps a fresh project diagnosable when rg is not on PATH.
 function safeRecursiveTree(start, protectedRoots, realpath, stat) {
   const inventory = spawnSync("rg", ["--files", "-0",
-    "-g", "po-private.pem", "-g", "id_*", "-g", "credentials", "-g", ".env*",
-    "-g", ".npmrc", "-g", ".netrc", "-g", "*.pem", "-g", "*.key",
-    "-g", "*.p12", "-g", "*.pfx"], {
+    ...PASSIVE_READ_CREDENTIAL_ROOTS.recursiveInventoryGlobs.flatMap((glob) => ["-g", glob])], {
     cwd: start, encoding: "buffer", timeout: 10000, maxBuffer: 32 * 1024 * 1024,
     env: { ...process.env, RIPGREP_CONFIG_PATH: "" },
   });
@@ -112,9 +120,10 @@ export function isAllowedPassiveReadTarget(raw, {
   let physical = lexical;
   try { physical = realpath(candidate); }
   catch (error) { if (error?.code !== "ENOENT") return false; }
-  const protectedRoots = [".ssh", ".aws", ".gnupg", ".kube", ".docker", ".azure",
-    ".config/gcloud", ".config/gh", ".codex/auth.json", ".claude/.credentials.json",
-    ".gemini/oauth_creds.json", ".gemini/config/oauth_creds.json"]
+  // Preserve the original twelve physical-root readbacks. The four appended
+  // credential filenames are already denied by the same shared basename rule;
+  // enrolling them again would introduce new realpath/error/alias behavior.
+  const protectedRoots = PASSIVE_READ_CREDENTIAL_ROOTS.homeRelativePaths.slice(0, 12)
     .map((path) => resolve(homeDir, path)).concat(credentialRoots.map((path) => resolve(path)));
   if (process.platform === "win32") {
     for (const variable of ["APPDATA", "LOCALAPPDATA"]) {
@@ -122,19 +131,41 @@ export function isAllowedPassiveReadTarget(raw, {
       if (typeof value === "string" && isAbsolute(value)) protectedRoots.push(resolve(value));
     }
   }
+  // Auxiliary configuration failure is not an empty credential inventory.
+  // Keep host/recursive expansion closed, but evaluate exact own files below.
   let machine;
   try { machine = machinePlaneRead(); }
-  catch { return false; }
-  if (machine.status !== "valid" && machine.status !== "absent") return false;
-  if (machine.status === "valid" && typeof machine.plane.poKeyDirectory === "string") {
+  catch { machine = null; }
+  const machineUnknown = (machine?.status !== "valid" && machine?.status !== "absent")
+    || (machine?.status === "valid" && machine.plane?.poKeyDirectory !== null
+      && typeof machine.plane?.poKeyDirectory !== "string");
+  if (machine?.status === "valid" && typeof machine.plane?.poKeyDirectory === "string") {
     protectedRoots.push(resolve(machine.plane.poKeyDirectory));
   }
   let repoKey;
   try { repoKey = repoKeyDirectory(rootDir); }
-  catch { return false; }
-  if (repoKey.status === "valid" && typeof repoKey.directory === "string") {
+  catch { repoKey = null; }
+  const repoKeyUnknown = (repoKey?.status !== "valid" && repoKey?.status !== "absent")
+    || (repoKey?.status === "valid" && typeof repoKey.directory !== "string");
+  if (repoKey?.status === "valid" && typeof repoKey.directory === "string") {
     protectedRoots.push(resolve(repoKey.directory));
-  } else if (repoKey.status !== "absent") return false;
+  }
+  const inProject = within(rootDir, lexical) && within(rootDir, physical);
+  if (machineUnknown || repoKeyUnknown) {
+    // No alias, private implementation directory, missing path, hard link,
+    // directory inventory, or outside root inherits this fallback. Existing
+    // credential/system/secret-name checks still apply to both identities.
+    const samePath = (a, b) => process.platform === "win32"
+      ? a.toLowerCase() === b.toLowerCase() : a === b;
+    let observed;
+    try {
+      if (!isAbsolute(rootDir) || !samePath(realpath(rootDir), resolve(rootDir))
+        || !inProject || !samePath(lexical, physical)) return false;
+      observed = stat(candidate);
+    } catch { return false; }
+    if (!observed.isFile() || observed.nlink !== 1
+      || relative(rootDir, lexical).split(/[\\/]/u).some((part) => part.startsWith("."))) return false;
+  }
   const identities = [lexical, physical];
   for (const identity of identities) {
     if (systemPseudoPath(identity)) return false;
@@ -154,10 +185,13 @@ export function isAllowedPassiveReadTarget(raw, {
   // operands and the repository key pointer always belong to the original project.
   // Reject ambiguous, missing, aliased, and credential-containing boundaries.
   const recursiveRoots = [];
-  if (recursive || directoryListing) {
+  if (!inProject && (recursive || directoryListing)) {
     for (const boundary of additionalRecursiveRoots) {
       if (typeof boundary !== "string" || !isAbsolute(boundary)
         || resolve(boundary) !== boundary || /[\0$`*?\[\]{}]/u.test(boundary)) return false;
+      // Unrelated auxiliary roots cannot deny this target. A relevant root
+      // still needs its exact physical identity and credential checks below.
+      if (!within(boundary, lexical)) continue;
       let observed;
       try {
         if (realpath(boundary) !== boundary) return false;
@@ -175,7 +209,6 @@ export function isAllowedPassiveReadTarget(raw, {
       recursiveRoots.push({ path: boundary, directory: observed.isDirectory() });
     }
   }
-  const inProject = within(rootDir, lexical) && within(rootDir, physical);
   const inAdditional = (recursive || directoryListing) && recursiveRoots.some(({ path, directory }) =>
     directory
       ? within(path, lexical) && within(path, physical)

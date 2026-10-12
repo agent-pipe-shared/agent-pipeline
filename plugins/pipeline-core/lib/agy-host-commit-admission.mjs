@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
+import { inspectSourceOwnedNativeConcurrentAuthority } from "./native-goldfish-host-state.mjs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 
+export const NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA="pipeline.native-goldfish-host-commit-baseline.v2";
 export const AGY_HOST_COMMIT_BASELINE_SCHEMA = "pipeline.agy-host-commit-baseline.v1";
 const OID = /^[a-f0-9]{40,64}$/u;
 const MAX_BASELINE_UNTRACKED = 64;
@@ -60,7 +62,7 @@ function untrackedDigests(root, untracked) {
 }
 
 /** Capture immediately before the Agy launch. No stage or commit occurs. */
-export function captureAgyHostCommitBaseline({ root, candidateCommit, resultPath } = {}) {
+function captureHostCommitBaseline({ root, candidateCommit, resultPath } = {}, concurrent = null) {
   const physical = physicalRoot(root);
   if (physical === null || !OID.test(candidateCommit ?? "") || !normalizedPath(resultPath)) return fail("AGY-HOST-BASELINE-INPUT");
   const head = git(physical, ["rev-parse", "--verify", "HEAD^{commit}"]);
@@ -70,13 +72,29 @@ export function captureAgyHostCommitBaseline({ root, candidateCommit, resultPath
   const tracked = paths(git(physical, ["diff", "--no-renames", "--name-only", "-z", "HEAD"]));
   const untracked = paths(git(physical, ["ls-files", "--others", "--exclude-standard", "-z"]));
   if (head === null || topLevel === null || conflicts === null || staged === null || tracked === null || untracked === null) return fail("AGY-HOST-BASELINE-GIT");
-  if (topLevel.trim() !== physical || head.trim() !== candidateCommit || conflicts.length !== 0 || staged.length !== 0 || tracked.length !== 0) return fail("AGY-HOST-BASELINE-DIRTY");
+  if (topLevel.trim() !== physical || head.trim() !== candidateCommit || conflicts.length !== 0 || staged.length !== 0 || tracked.some(path=>!concurrent?.foreignPaths.includes(path))) return fail("AGY-HOST-BASELINE-DIRTY");
   if (resultExists(physical, resultPath)) return fail("AGY-HOST-BASELINE-RESULT-COLLISION");
-  const files = untrackedDigests(physical, untracked);
+  const files = untrackedDigests(physical, untracked.filter(path=>!concurrent?.foreignPaths.includes(path)));
   if (files === null) return fail("AGY-HOST-BASELINE-UNSAFE");
   return { ok: true, code: "AGY-HOST-BASELINE-CAPTURED", baseline: { schema: AGY_HOST_COMMIT_BASELINE_SCHEMA, root: physical, candidateCommit, resultPath, untracked: files } };
 }
 
+export function captureAgyHostCommitBaseline(input={}){return captureHostCommitBaseline(input);}
+export function captureSourceOwnedNativeHostCommitBaseline(input={}){
+  const concurrent=inspectSourceOwnedNativeConcurrentAuthority(input.authority,{root:input.root});
+  if(concurrent.baseCommit!==input.candidateCommit||concurrent.parentCommit!==input.candidateCommit)return fail('NATIVE-HOST-BASELINE-HEAD');
+  const captured=captureHostCommitBaseline(input,concurrent);return captured.ok?{...captured,baseline:{...captured.baseline,schema:NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA,nativeRef:concurrent.reference}}:captured;
+}
+const nativeConcurrentAdmissions=new WeakMap();
+export function inspectSourceOwnedNativeConcurrentAdmission(admission){
+  const plan=nativeConcurrentAdmissions.get(admission);if(!plan)throw Error('NATIVE-HOST-ADMISSION-UNOWNED');return plan;
+}
+export function assessSourceOwnedNativeHostCommit(input={}){
+  const concurrent=inspectSourceOwnedNativeConcurrentAuthority(input.authority,{root:input.baseline?.root});
+  if(input.baseline?.schema!==NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA||Object.keys(input.baseline).sort().join(',')!=='candidateCommit,nativeRef,resultPath,root,schema,untracked'||concurrent.baseCommit!==input.baseline.candidateCommit||input.baseline.nativeRef!==concurrent.reference)return fail('NATIVE-HOST-BASELINE-BINDING');
+  const admission=assessHostCommit({...input,baseline:{...input.baseline,schema:AGY_HOST_COMMIT_BASELINE_SCHEMA,candidateCommit:concurrent.parentCommit}},concurrent);
+  if(admission.ok)nativeConcurrentAdmissions.set(admission,concurrent);return admission;
+}
 /** No-commit observations must not be published after an unobserved child-side commit. */
 export function observeAgyHostHead({ baseline } = {}) {
   if (baseline?.schema !== AGY_HOST_COMMIT_BASELINE_SCHEMA
@@ -92,7 +110,8 @@ export function observeAgyHostHead({ baseline } = {}) {
 }
 
 /** Admit only the exact child-claimed diff and consent-bound paths. */
-export function assessAgyHostCommit({ baseline, final, allowedPaths } = {}) {
+export function assessAgyHostCommit(input={}){return assessHostCommit(input);}
+function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=null) {
   if (baseline?.schema !== AGY_HOST_COMMIT_BASELINE_SCHEMA || physicalRoot(baseline.root) !== baseline.root
     || !OID.test(baseline.candidateCommit ?? "") || !normalizedPath(baseline.resultPath)
     || !Array.isArray(baseline.untracked) || !validBaselineUntracked(baseline.untracked) || !Array.isArray(final?.changedPaths)
@@ -110,7 +129,7 @@ export function assessAgyHostCommit({ baseline, final, allowedPaths } = {}) {
   const preserved = untrackedDigests(baseline.root, baseline.untracked.map((entry) => entry.path));
   if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), baseline.untracked.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
   const newUntracked = untracked.filter((path) => !baseline.untracked.some((entry) => entry.path === path) && path !== baseline.resultPath);
-  const actual = [...new Set([...tracked, ...newUntracked])].sort();
+  const actual = [...new Set([...tracked, ...newUntracked])].filter(path=>!concurrent?.foreignPaths.includes(path)).sort();
   if (!same(actual, final.changedPaths)) return fail("AGY-HOST-COMMIT-PATH-MISMATCH");
   if (actual.length === 0 || !actual.every((path) => allowedPaths.includes(path))) return fail("AGY-HOST-COMMIT-CONSENT-PATH");
   const admittedBlobs = [];

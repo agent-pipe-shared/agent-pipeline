@@ -150,9 +150,20 @@ export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR } 
         reason: "`modelOverride` present but missing a non-empty `rationale` — MP-05/MP-07 requires a stated rationale for a deviating model; treated as an unlabelled mismatch, not an honoured override",
       };
     }
+    // The legacy declaration is configured intent, never observed host authority.
+    // Require the record to describe that exact declaration rather than allowing
+    // an unrelated model/effort to ride on its rationale.
+    if (typeof override.model !== "string" || override.model.trim() === ""
+      || typeof override.effort !== "string" || override.effort.trim() === ""
+      || record.model !== override.model || record.effort !== override.effort) {
+      return {
+        classification: "model-override-malformed",
+        reason: "`modelOverride` model/effort must exactly equal the recorded declaration",
+      };
+    }
     return {
       classification: "model-override-declared",
-      reason: `explicit override declared: model \`${override.model ?? "(absent)"}\`, effort \`${override.effort ?? "(absent)"}\`, rationale: ${override.rationale}`,
+      reason: `explicit override declared: model \`${override.model}\`, effort \`${override.effort}\`, rationale: ${override.rationale}`,
     };
   }
   const resolved = resolveAgentModel(agentType, { agentsDir });

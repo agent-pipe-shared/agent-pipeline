@@ -190,9 +190,21 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
 // unchanged; every other slim V3 caller (an ordinary consumer project's
 // runtime initialization -- project-onboarding-v3.mjs) passes `false`
 // explicitly and gets the honest, unconfigured consumer placeholder instead.
-function slimRuntimeSeed(relative, { overlayCalibration = true } = {}) {
+function slimRuntimeSeed(relative, { overlayCalibration = true, rootDir, deps } = {}) {
   if (relative === ".claude/pipeline.yaml") return freshManifestBytes();
-  if (relative === ".claude/pipeline.json" && !overlayCalibration) return freshCalibrationBytes();
+  if (relative === ".claude/pipeline.json" && !overlayCalibration) {
+    // Ordinary consumer initialization retains the already selected neutral
+    // calibration, including intentional aliases and unowned fields.
+    const neutral = assertNoSymlink(rootDir, "project/pipeline.json", deps);
+    if (deps.existsSync(neutral)) {
+      const info = deps.lstatSync(neutral);
+      if (!info.isFile() || info.isSymbolicLink() || info.size > 1024 * 1024) throw new Error("neutral calibration is not a bounded regular file");
+      const bytes = deps.readFileSync(neutral);
+      if (!Buffer.isBuffer(bytes) || !Buffer.from(bytes.toString("utf8"), "utf8").equals(bytes)) throw new Error("neutral calibration is not UTF8");
+      return bytes.toString("utf8");
+    }
+    return freshCalibrationBytes({ rootDir, deps });
+  }
   if (relative === ".claude/settings.json" && !overlayCalibration) return freshSettingsJsonBytes();
   return SLIM_V3_RUNTIME_SEEDS[relative];
 }
@@ -372,11 +384,11 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
     if (!deps.existsSync(target)) {
       const seed = legacy
         ? resolveLegacyRuntimeSeed(relative)
-        : initializeSlimV3 ? slimRuntimeSeed(relative, { overlayCalibration })
+        : initializeSlimV3 ? slimRuntimeSeed(relative, { overlayCalibration, rootDir: root, deps })
           // Disabled native Codex targets are renderer inputs only. They are
           // neither required on disk nor published into a non-Codex project.
           : !enabledRunners.includes("codex") && relative.startsWith(".codex/")
-            ? slimRuntimeSeed(relative, { overlayCalibration })
+            ? slimRuntimeSeed(relative, { overlayCalibration, rootDir: root, deps })
           // A reserved Codex mount supplies `.codex` at runtime.  Missing
           // Claude compatibility projections are renderer baselines only in
           // this mode; they must not make a freshly project-seeded root

@@ -2,12 +2,14 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 
 import { dispatchFindings } from "./dispatch-policy.mjs";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 
 export const ROLE_DISPATCH_REQUEST_SCHEMA = "pipeline.role-dispatch-request.v1";
 export const ROLE_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.role-dispatch-preflight.v1";
@@ -296,7 +298,7 @@ function reportBatchEvent(onEvent, event) {
   }
 }
 
-export async function runRoleDispatchBatch({ root, resultRoot = root, packets, launch, onEvent } = {}) {
+export async function runRoleDispatchBatch({ root, resultRoot = root, packets, launch, onEvent, fallback } = {}) {
   const prepared = prepareRoleDispatchBatch({ root, resultRoot, packets });
   let reportingReady = onEvent === undefined || typeof onEvent === "function";
   for (const [index, preparation] of prepared.preparations.entries()) {
@@ -307,6 +309,28 @@ export async function runRoleDispatchBatch({ root, resultRoot = root, packets, l
     return { ...prepared, status: "rejected", code: "RDB-EVENT-SINK", launcherCalls: 0 };
   }
   if (prepared.status !== "prepared") return prepared;
+  if (launch === undefined && fallback !== undefined) {
+    if (!exactKeys(fallback, ["runner", "reasonCode", "launch"]) || typeof fallback.launch !== "function") {
+      return { ...prepared, status: "rejected", code: "RDB-FALLBACK-SHAPE", launcherCalls: 0 };
+    }
+    const results = [];
+    for (const preparation of prepared.preparations) {
+      const current = prepareCanonicalRoleFallback({ root, resultRoot, packet: preparation.packet,
+        runner: fallback.runner, reasonCode: fallback.reasonCode });
+      if (current.status !== "prepared") return { ...prepared, status: "rejected",
+        code: "RDB-FALLBACK-PREPARATION", results, failedPreparation: current, launcherCalls: results.length };
+      if (!reportBatchEvent(onEvent, batchEvent("START", results.length, preparation.packet, "starting", "RDB-FALLBACK-START"))) {
+        return { ...prepared, status: "rejected", code: "RDB-EVENT-SINK", results, launcherCalls: results.length };
+      }
+      const result = await runCanonicalRoleFallback({ root, resultRoot, packet: preparation.packet,
+        runner: fallback.runner, reasonCode: fallback.reasonCode, launch: fallback.launch });
+      results.push(result);
+      if (result.status !== "returned") return { ...prepared, status: "failed", code: "RDB-FALLBACK-FAILED",
+        results, launcherCalls: results.reduce((count, row) => count + row.launcherCalls, 0) };
+    }
+    return { ...prepared, status: "completed", code: "RDB-FALLBACK-RETURNED", results,
+      launcherCalls: results.length, evidenceStatus: "owning-role-intake-required" };
+  }
   if (typeof launch !== "function") {
     return { ...prepared, status: "rejected", code: "RDB-LAUNCHER", launcherCalls: 0 };
   }
@@ -347,4 +371,101 @@ export async function runRoleDispatchBatch({ root, resultRoot = root, packets, l
     results.push(await launch(structuredClone(current.packet)));
   }
   return { ...prepared, status: "completed", code: "RDB-COMPLETED", results, launcherCalls: prepared.preparations.length };
+}
+
+// Canonical method fallback is preparation, never model, course or host admission.
+const CANONICAL_FALLBACK_CARRIERS = Object.freeze({
+  critic: { path: "templates/prompts/critic-review.md", taskRoute: "duty.critic_normal", readOnly: true },
+  "consult-advisor": { path: "skills/advisor-consult/SKILL.md", taskRoute: "duty.advisory", readOnly: true },
+  "goldfish-implementor": { path: "templates/prompts/goldfish-task.md", taskRoute: "duty.implement", readOnly: false },
+  "goldfish-mechanic": { path: "templates/prompts/goldfish-task.md", taskRoute: "duty.mechanic", readOnly: false },
+  "goldfish-deep": { path: "templates/prompts/goldfish-task.md", taskRoute: "duty.deep", readOnly: false },
+});
+
+function canonicalFallbackCarrier(role) {
+  const name = typeof role === "string" ? role.replace(/^pipeline-core:/u, "") : "";
+  const definition = CANONICAL_FALLBACK_CARRIERS[name];
+  if (!definition) return null;
+  const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const path = resolve(pluginRoot, definition.path);
+  const stat = lstatSync(path);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1
+    || stat.size < 1 || stat.size > 128 * 1024 || realpathSync(path) !== path) {
+    throw new Error("RDF-CARRIER-PHYSICAL");
+  }
+  const bytes = readFileSync(path);
+  const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  return { ...definition, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length, text };
+}
+
+/**
+ * Default emission for a failed role route. The reason is diagnostic input,
+ * not proof that a native route ran. Existing course/consent/host admission
+ * remains required by the canonical carrier and its owning runtime.
+ */
+export function prepareCanonicalRoleFallback({ root, resultRoot = root, packet, runner, reasonCode } = {}) {
+  const fail = (code) => ({ schema: "pipeline.canonical-role-fallback.v1", status: "unavailable", code,
+    route: "fallback-self-dispatch", assurance: "method-preparation-only", modelCalls: 0, launcherCalls: 0 });
+  if (!["claude", "codex", "antigravity"].includes(runner)
+    || typeof reasonCode !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/u.test(reasonCode)) {
+    return fail("RDF-INPUT");
+  }
+  let source;
+  try { source = registeredFunctionalTaskRoutes(); } catch { return fail("RDF-ROUTE-SOURCE"); }
+  if (!source.ok) return fail("RDF-ROUTE-SOURCE");
+  const prepared = preflightRoleDispatch({ root, resultRoot, packet });
+  if (prepared.status !== "prepared") return { ...fail(prepared.code), preparation: prepared };
+  let carrier;
+  try { carrier = canonicalFallbackCarrier(prepared.packet.role); } catch { return fail("RDF-CARRIER-PHYSICAL"); }
+  if (!carrier) return fail("RDF-CARRIER-UNSUPPORTED");
+  const routes = source.taskRoutes.filter((route) => route.runner === runner && route.taskRoute === carrier.taskRoute);
+  if (routes.length !== 1) return fail("RDF-ROUTE-SOURCE");
+  return {
+    schema: "pipeline.canonical-role-fallback.v1", status: "prepared", code: "RDF-PREPARED",
+    route: "fallback-self-dispatch", runner, reasonCode, assurance: "method-preparation-only",
+    nativeProof: "unavailable", taskRoute: carrier.taskRoute, nativeRouteState: routes[0].state,
+    carrier: { path: carrier.path, sha256: carrier.sha256, size: carrier.size },
+    action: { kind: "runner-native-subagent", subagentType: prepared.packet.role,
+      freshContext: true, readOnly: carrier.readOnly, canonicalTemplate: carrier.text,
+      brief: prepared.packet.prompt,
+      carrierMode: runner === "antigravity" && carrier.taskRoute === "duty.critic_normal"
+        ? "canonical-reference-envelope" : "canonical-template-rendering",
+      requiredAdmission: "owning-role-course-and-host-gates" },
+    preparation: prepared, modelCalls: 0, launcherCalls: 0,
+  };
+}
+
+/**
+ * Uses the same explicit method launcher seam as runRoleDispatchBatch. Output
+ * is a launcher report, not an authenticated review receipt. In particular,
+ * exit zero must still pass the owning role's genuine result/course intake.
+ */
+export async function runCanonicalRoleFallback({ root, resultRoot = root, packet, runner, reasonCode, launch } = {}) {
+  const prepared = prepareCanonicalRoleFallback({ root, resultRoot, packet, runner, reasonCode });
+  if (prepared.status !== "prepared") return prepared;
+  if (typeof launch !== "function") return { ...prepared, status: "unavailable", code: "RDF-LAUNCHER" };
+  // Re-read physical inputs and carrier immediately before invoking the method.
+  const current = prepareCanonicalRoleFallback({ root, resultRoot, packet, runner, reasonCode });
+  if (current.status !== "prepared") return current;
+  if (current.carrier.sha256 !== prepared.carrier.sha256) {
+    return { ...current, status: "unavailable", code: "RDF-CARRIER-DRIFT" };
+  }
+  let output;
+  try { output = await launch(structuredClone(current.action), structuredClone(current.preparation.packet)); }
+  catch (error) {
+    return { ...current, status: "failed", code: "RDF-LAUNCH-ERROR", launcherCalls: 1,
+      output: { exitCode: null, stdout: "", stderr: String(error?.message ?? error) },
+      evidenceStatus: "owning-role-intake-required" };
+  }
+  if (!exactKeys(output, ["exitCode", "stdout", "stderr"]) || !Number.isInteger(output.exitCode)
+    || output.exitCode < 0 || output.exitCode > 255 || typeof output.stdout !== "string" || typeof output.stderr !== "string") {
+    return { ...current, status: "failed", code: "RDF-PRODUCER-OUTPUT-INVALID", launcherCalls: 1,
+      output: { exitCode: Number.isInteger(output?.exitCode) ? output.exitCode : null,
+        stdout: typeof output?.stdout === "string" ? output.stdout : "",
+        stderr: typeof output?.stderr === "string" ? output.stderr : "" },
+      evidenceStatus: "owning-role-intake-required" };
+  }
+  return { ...current, status: output.exitCode === 0 ? "returned" : "failed",
+    code: output.exitCode === 0 ? "RDF-RETURNED" : "RDF-PRODUCER-FAILED", launcherCalls: 1,
+    output: structuredClone(output), evidenceStatus: "owning-role-intake-required" };
 }

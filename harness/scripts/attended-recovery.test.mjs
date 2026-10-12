@@ -90,6 +90,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { composeWindowsHideNodeOptions } from "../../plugins/pipeline-core/lib/windows-hide-preload.mjs";
 
 const RESULT_SCHEMA = "pipeline.attended-recovery-result.v1";
 const PACKAGE_SCHEMA = "pipeline.attended-recovery-package.v1";
@@ -695,7 +696,10 @@ function plantGitStubs(fx, marker) {
     // that writes the marker from a preload script handed over through NODE_OPTIONS.
     copyFileSync(process.execPath, join(fx.repo, "git.exe"));
     const preload = join(fx.external, "git-stub-preload.cjs");
-    writeFileSync(preload, `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran");\nprocess.exit(3);\n`, "utf8");
+    // The real Node verifier helper inherits this preload too. Only the copied
+    // decoy executable may write the marker and exit.
+    const decoy = join(fx.repo, "git.exe").toLowerCase();
+    writeFileSync(preload, `if (process.execPath.toLowerCase() === ${JSON.stringify(decoy)}) {\nrequire("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran");\nprocess.exit(3);\n}\n`, "utf8");
     return `--require "${preload.replaceAll("\\", "/")}"`;
   }
   const stub = join(fx.repo, "git");
@@ -705,21 +709,53 @@ function plantGitStubs(fx, marker) {
 }
 
 test("RV-S7-T2: RV7-D2 a stub git executable at the repository root is never run and does not change the verifier result", async (t) => {
-  const { run } = await loadCli();
   const fx = buildFixture(t);
   const staged = stageCase(fx);
   const marker = join(fx.external, "git-stub-ran.marker");
   const nodeOptions = plantGitStubs(fx, marker); // after buildFixture: the fixture's own git calls must not meet the stub
-  const before = snapshot(fx.root);
   const savedNodeOptions = process.env.NODE_OPTIONS;
-  if (nodeOptions !== null) process.env.NODE_OPTIONS = nodeOptions;
-  let result;
-  try {
-    result = await drive(run, argvFor("verify", fx, staged));
-  } finally {
-    if (savedNodeOptions === undefined) delete process.env.NODE_OPTIONS;
-    else process.env.NODE_OPTIONS = savedNodeOptions;
-  }
+  const inheritedOptions = composeWindowsHideNodeOptions(savedNodeOptions);
+  const childEnv = {
+    ...process.env,
+    ...(inheritedOptions === undefined && nodeOptions === null ? {} : {
+      NODE_OPTIONS: [inheritedOptions, nodeOptions].filter(Boolean).join(" "),
+    }),
+  };
+  // Positive control: the real decoy must start, fail and write the marker.
+  const control = spawnSync(join(fx.repo, process.platform === "win32" ? "git.exe" : "git"), [], {
+    cwd: fx.repo,
+    env: childEnv,
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 30000,
+  });
+  assert.equal(control.error, undefined, "the decoy positive control must start");
+  assert.equal(control.status, 3, "the decoy positive control must exit 3");
+  assert.equal(existsSync(marker), true, "the decoy positive control must write the marker");
+  rmSync(marker);
+  const before = snapshot(fx.root);
+  // The CLI has no child-environment injection seam. Isolate only its real
+  // execution and beforeStep spy; keep all verdict assertions in this test.
+  const helper = [
+    'const { run } = await import(process.argv[1]);',
+    'const calls = [];',
+    'const result = await run(JSON.parse(process.argv[2]), { hooks: { beforeStep: (...args) => calls.push(args) } });',
+    'process.stdout.write(JSON.stringify({ result, calls }));',
+  ].join("\n");
+  const verified = spawnSync(process.execPath, ["--input-type=module", "-e", helper,
+    new URL("./attended-recovery.mjs", import.meta.url).href,
+    JSON.stringify(argvFor("verify", fx, staged))], {
+    cwd: fx.repo,
+    env: childEnv,
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 120000,
+  });
+  assert.equal(verified.error, undefined, "the real verifier helper must start");
+  assert.equal(verified.status, 0, `the real verifier helper must exit 0: ${verified.stderr}`);
+  const { result, calls } = JSON.parse(verified.stdout);
+  assert.deepEqual(calls, [], "verify-only: no journal step may start");
+  assert.equal(process.env.NODE_OPTIONS, savedNodeOptions, "parent NODE_OPTIONS must remain unchanged");
   assert.equal(existsSync(marker), false, "the stub git in the repository directory was executed: git must be resolved from PATH only");
   assertVerified(result);
   assertTargetsUntouched(fx, before);

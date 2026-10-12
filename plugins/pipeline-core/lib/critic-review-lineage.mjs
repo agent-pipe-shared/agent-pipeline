@@ -14,6 +14,11 @@ import {
   canonicalJson,
   sha256Canonical,
 } from "./review-economy.mjs";
+import {readCriticCourseAdmission,resolveRegisteredCriticCourseIdentity} from './critic-course-admission.mjs';
+import {readConsumedCriticCourseResult,readConsumedCourseClaimBinding,projectConsumedCriticFindings} from './critic-verify-lifecycle.mjs';
+import {execFileSync} from 'node:child_process';
+import {readConsumedCandidateResult} from '../scripts/critic-packet-preflight.mjs';
+import {readAcceptedCriticCriterion} from './critic-accepted-contract.mjs';
 
 export const CRITIC_REVIEW_LINEAGE_SCHEMA = "pipeline.critic-review-lineage.v1";
 export const RELEASE_CRITIC_REVIEW_SCOPE_SCHEMA = "pipeline.release-critic-review-scope.v1";
@@ -235,6 +240,7 @@ function compiledRequest(record) {
     },
     mode: record.request.mode,
     admissionCode: record.request.admissionCode,
+    ...(record.schema==='pipeline.critic-review-lineage.v2'?{courseBinding:record.courseBinding,consumedResult:record.consumedResult}:{}),
   };
 }
 
@@ -283,8 +289,9 @@ function verdictCode(record) {
 }
 
 function lineageCode(record) {
-  if (!exact(record, ROOT_KEYS)
-    || record.schema !== CRITIC_REVIEW_LINEAGE_SCHEMA
+  const v2=record?.schema==='pipeline.critic-review-lineage.v2';
+  if (!exact(record, v2?[...ROOT_KEYS,'courseBinding','consumedResult']:ROOT_KEYS)
+    || !(record.schema === CRITIC_REVIEW_LINEAGE_SCHEMA || v2)
     || !identifier(record.reviewId)
     || !(record.parentReviewId === null || identifier(record.parentReviewId))
     || candidateCode(record.candidate)
@@ -319,6 +326,7 @@ function lineageCode(record) {
     || !digest(record.recordSha256)) {
     return "CRL-SHAPE";
   }
+  if(v2){const bound=v2BindingCode(record);if(bound)return bound;}
   if (!same(record.diff.changedPaths, record.coverage.changedPaths)) return "CRL-COVERAGE-BINDING";
   const packagesInvalid = packageCode(record.packages, record.coverage);
   if (packagesInvalid) return packagesInvalid;
@@ -431,6 +439,7 @@ function transitionCode(parent, current) {
   }
   for (const finding of current.findings) {
     const prior = finding.priorFindingId === null ? null : parentById.get(finding.priorFindingId);
+    if(current.schema==='pipeline.critic-review-lineage.v2' && prior?.status!=='open' && same(finding,prior))continue;
     if (prior === null) {
       if (finding.status !== "open" || parentById.has(finding.id)) return "CRL-HISTORY-NEW-FINDING";
     } else if (!prior || prior.status !== "open" || finding.id !== prior.id) {
@@ -723,6 +732,9 @@ export function compileCriticReviewLineage(input) {
   if (!(parent === null || validateCriticReviewLineage(parent).ok)) throw new TypeError("CRL-PARENT");
   const admission = admitReviewAttempt(input.reviewAttempt);
   const courseGate = admission.courseGateRequired === true;
+  // Refused ordinary/delta attempts cannot be compiled into admitted new records.
+  // Existing historical validators and immutable records are left unchanged.
+  if (!admission.ok && !courseGate) throw new TypeError("CRL-REVIEW-REFUSED");
   const expected = expectedInvalidation(parent, input.reviewAttempt, admission);
   if (!exact(input.invalidation, ["kind", "reason", "evidenceSha256"])
     || input.invalidation.kind !== expected.kind
@@ -829,3 +841,60 @@ export function validateCriticLineagePacketAdmission(lineage, packet) {
   }
   return { ok: true, code: null, lineageSha256: lineage.recordSha256 };
 }
+
+const COURSE_BINDING_KEYS=['courseKey','originalFeatureId','originalManifestSha256','genesisCandidate','submissionSha256','envelopeSha256','criterionSha256','deltaRequestSha256','deterministicEvidenceSha256','courseSourceSha256','courseDecisionSha256'];
+function v2BindingCode(record){
+ const b=record.courseBinding,c=record.consumedResult;
+ if(!exact(b,COURSE_BINDING_KEYS)||!identifier(b.originalFeatureId)||!digest(b.courseKey)||!digest(b.originalManifestSha256)
+  ||!exact(b.genesisCandidate,['base','commit','tree'])||!Object.values(b.genesisCandidate).every(v=>OID.test(v??''))
+  ||!['submissionSha256','envelopeSha256','criterionSha256','deltaRequestSha256'].every(k=>b[k]===null||digest(b[k]))
+  ||!['deterministicEvidenceSha256','courseSourceSha256','courseDecisionSha256'].every(k=>digest(b[k])))return 'CRL-V2-COURSE-BINDING';
+ if(record.course.reviewRound>2 && (!digest(b.submissionSha256)||!digest(b.envelopeSha256)||!digest(b.criterionSha256)))return 'CRL-V2-EXCEPTION-BINDING';
+ if(record.course.reviewRound===1 ? b.deltaRequestSha256!==null : !digest(b.deltaRequestSha256))return 'CRL-V2-DELTA-BINDING';
+ if(record.verdict.status==='pending')return c===null?null:'CRL-V2-PENDING-CONSUMED';
+ if(!exact(c,['packetId','packetDigest','receiptSha256','resultSha256','verdictSha256','findingBindings'])||c.packetId!==record.request.packetId
+  ||!['packetDigest','receiptSha256','resultSha256','verdictSha256'].every(k=>digest(c[k]))
+  ||c.receiptSha256!==record.coverage.receiptSha256||c.resultSha256!==record.verdict.resultSha256
+  ||!Array.isArray(c.findingBindings)||c.findingBindings.length>256)return 'CRL-V2-CONSUMED-BINDING';
+ const ids=new Set();for(let index=0;index<c.findingBindings.length;index++){const row=c.findingBindings[index];if(!exact(row,['findingId','index','sha256'])||!identifier(row.findingId)||row.index!==index||!digest(row.sha256)||ids.has(row.findingId)||!record.findings.some(f=>f.id===row.findingId&&f.evidenceSha256===row.sha256))return 'CRL-V2-FINDING-BINDING';ids.add(row.findingId);}
+ if(record.verdict.status==='findings' && c.findingBindings.length===0)return 'CRL-V2-FINDINGS-EMPTY';
+ if(record.verdict.status==='no-findings' && c.findingBindings.length!==0)return 'CRL-V2-PASS-FINDINGS';
+ return null;
+}
+function bindingArtifact(record,featureId){const bytes=Buffer.from(canonicalJson(record)),sha256=sha256Canonical(record),path=`specs/${featureId}/evidence/critic-lineage-${sha256}.json`;return {path,sha256,bytes,registration:{class:'candidate-evidence',path,sha256,authority:false,mutability:'immutable',retention:'retain'}};}
+function unchangedCarry(root,parent,packet){
+ for(const path of parent.diff.changedPaths){if(packet.diffPaths.includes(path))continue;
+  const read=commit=>execFileSync('git',['-C',root,'ls-tree','-z',commit,'--',path],{encoding:'buffer',stdio:['ignore','pipe','ignore'],maxBuffer:1024*1024});
+  if(!read(parent.candidate.commit).equals(read(packet.candidate.commit)))throw Error('CRL-V2-CARRY-DRIFT');}
+}
+/** Terminal runtime compiler: consumed owner readback is mandatory, not caller lane/verdict. */
+export function compileRegisteredCriticReviewLineage(input){try{
+ if(!exact(input,['courseRequest','packetId','reviewId','parentReviewId','packages','coverage','correction','invalidation']))throw Error('CRL-V2-COMPILE-SHAPE');
+ const admission=readCriticCourseAdmission(input.courseRequest);if(admission.decision?.status!=='admitted')throw Error(admission.decision?.code??'CRL-V2-COURSE');
+ const resolved=resolveRegisteredCriticCourseIdentity(Object.fromEntries(['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'].map(k=>[k,input.courseRequest[k]])));if(!resolved.ok)throw Error(resolved.code);
+ const parent=resolved.value.registeredHistory.at(-1)?.record??null;if((parent?.reviewId??null)!==input.parentReviewId)throw Error('CRL-V2-PARENT');
+ const observedPacket=readConsumedCandidateResult({controlRoot:resolved.value.resolvedRepository.controlRoot,packetId:input.packetId}).packet;
+ const actual=readConsumedCriticCourseResult({resolvedRepository:resolved.value.resolvedRepository,packetId:input.packetId,expectedCandidate:{commit:admission.source.candidate.commit,tree:admission.source.candidate.tree},expectedRange:{base:admission.source.candidate.base,commit:admission.source.candidate.commit,diffSha256:observedPacket.diff.sha256},expectedRecord:null});
+ if(!actual.ok)return actual;const {packet,receipt,result}=actual.value;
+ if(packetCode(packet))throw Error('CRL-V2-PACKET');
+ const {decision,...sourceSubject}=admission,courseSourceSha256=sha256Canonical(sourceSubject),courseDecisionSha256=sha256Canonical(decision);
+ const observedClaim=readConsumedCourseClaimBinding({resolvedRepository:resolved.value.resolvedRepository,packetId:input.packetId,expectedCandidate:{commit:packet.candidate.commit,tree:packet.candidate.tree}});
+ if(!observedClaim.ok)return observedClaim;const claim=observedClaim.value;
+ if(claim.courseSourceSha256!==courseSourceSha256||claim.courseDecisionSha256!==courseDecisionSha256)throw Error('CRL-V2-CLAIM-DRIFT');
+ if(coverageCode(input.coverage)||!input.coverage.complete||input.coverage.receiptSha256!==actual.value.receiptSha256||!same(input.coverage.changedPaths,packet.diffPaths)||packageCode(input.packages,input.coverage))throw Error('CRL-V2-COVERAGE');
+ if(parent){unchangedCarry(input.courseRequest.repoRoot,parent,packet);if(!same(input.coverage.acceptanceIds,parent.coverage.acceptanceIds)||!same(input.coverage.integrationEdges,parent.coverage.integrationEdges))throw Error('CRL-V2-CARRY-COVERAGE');}
+ const projected=projectConsumedCriticFindings({packetId:packet.packetId,findings:result.verdict.findings});
+ const carried=(parent?.findings??[]).map(f=>f.status==='open'?{...f,priorFindingId:f.id,status:receipt.reviewPass?'fixed':'open'}:structuredClone(f));
+ const findings=[...carried,...projected].sort((a,b)=>a.id.localeCompare(b.id));if(new Set(findings.map(f=>f.id)).size!==findings.length)throw Error('CRL-V2-FINDING-ID');
+ const i=admission.courseIdentity,b=admission.budgets;
+ let criterionSha256=null;
+ if(admission.acceptance!==null){const observed=readAcceptedCriticCriterion({repoRoot:input.courseRequest.repoRoot,featureId:i.originalFeatureId,envelopePath:input.courseRequest.acceptedReference.path,criterionLocator:input.courseRequest.criterionLocator});if(!observed.ok)return observed;criterionSha256=sha256Canonical({acceptance:observed.acceptance,criterion:observed.criterion,source:observed.source,locator:observed.locator});}
+ const record={schema:'pipeline.critic-review-lineage.v2',reviewId:input.reviewId,parentReviewId:parent?.reviewId??null,candidate:{commit:packet.candidate.commit,tree:packet.candidate.tree},diff:{base:packet.candidate.base,sha256:packet.diff.sha256,changedPaths:[...packet.diffPaths]},references:{packetSha256:sha256Canonical(packet),requestSha256:packet.bindings.requestSha256,diffPathsSha256:packet.bindings.diffPathsSha256,governanceSha256:packet.bindings.governanceSha256},packages:structuredClone(input.packages),coverage:structuredClone(input.coverage),request:{packetId:packet.packetId,requestSha256:packet.bindings.requestSha256,compiledSha256:'0'.repeat(64),mode:decision.mode,admissionCode:decision.code},lane:{laneId:result.session.id,contextSha256:sha256Canonical(result.session),independent:true,evidenceSha256:actual.value.receiptSha256,freshFromReviewId:parent?.reviewId??null},verdict:{status:receipt.reviewPass?'no-findings':'findings',schemaValid:true,resultSha256:actual.value.resultSha256,failure:null},findings,correction:structuredClone(input.correction),invalidation:structuredClone(input.invalidation),course:{reviewRound:b.reviewRound,correctionCommitCount:b.correctionCommitCount,maxReviewRounds:4,maxCorrectionCommits:3,status:'admitted'},previousSha256:parent?.recordSha256??null,recordSha256:'0'.repeat(64),courseBinding:{courseKey:i.courseKey,originalFeatureId:i.originalFeatureId,originalManifestSha256:i.originalManifestSha256,genesisCandidate:i.genesisCandidate,submissionSha256:i.submissionSha256,envelopeSha256:i.envelopeSha256,criterionSha256:admission.acceptance?sha256Canonical(admission.acceptance):null,deltaRequestSha256:admission.deltaRequestSha256,deterministicEvidenceSha256:admission.deterministicEvidenceSha256,courseSourceSha256,courseDecisionSha256},consumedResult:{packetId:packet.packetId,packetDigest:sha256Canonical(packet),receiptSha256:actual.value.receiptSha256,resultSha256:actual.value.resultSha256,verdictSha256:sha256Canonical(result.verdict),findingBindings:projected.map((f,index)=>({findingId:f.id,index,sha256:f.evidenceSha256}))}};
+ // Owner packet/verdict digests use that owner's pretty JSON+LF encoding;
+ // artifact/result/lineage digests keep the established compact canonical form.
+ record.consumedResult.packetDigest=receipt.packetDigest;
+ record.courseBinding.criterionSha256=criterionSha256;
+ record.consumedResult.verdictSha256=receipt.verdictSha256;
+ record.request.compiledSha256=sha256Canonical(compiledRequest(record));record.recordSha256=sha256Canonical(recordCore(record));const checked=validateCriticReviewLineage(record);if(!checked.ok)throw Error(checked.code);if(parent){const invalid=transitionCode(parent,record);if(invalid)throw Error(invalid);}
+ return {ok:true,value:{record:Object.freeze(record),artifact:bindingArtifact(record,i.originalFeatureId)}};
+ }catch(error){return {ok:false,status:'refused',code:error.code??error.message??'CRL-V2-COMPILE'};}}

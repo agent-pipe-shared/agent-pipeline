@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Per-dispatch Critic disposition enforcement for dispatch-record v3. */
 import { createHash } from "node:crypto";
+import { historicalFreshReviewCaptureFacts, readHistoricalFreshReviewAdmission, historicalFreshReviewPacketBinding } from "../lib/historical-fresh-review-admission.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -313,10 +314,11 @@ function validateStampOnlyRange(root, integrationCommit, candidateCommit) {
 }
 
 /** Create a private, content-bound reference from the trusted local dispatch reader. */
-export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandidateCommit } = {}) {
+export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandidateCommit, baseCommit } = {}) {
   if (typeof root !== "string" || typeof taskId !== "string" || typeof reviewCandidateCommit !== "string"
     || !/^[a-f0-9]{40}$/u.test(reviewCandidateCommit)) throw new TypeError("local dispatch evidence input is invalid");
-  const scan = walkDispatchRecords(root);
+  const historical = historicalAdmission(root,{kind:"admitted-dispatch",taskId,baseCommit,candidateCommit:reviewCandidateCommit});
+  const scan = walkDispatchRecordsForReview(root,historical?.entries ?? []);
   if (scan.findings.length > 0) throw new Error("local dispatch evidence source is unreadable");
   const matches = scan.records.filter(({ record }) => record?.taskId === taskId);
   if (matches.length !== 1) throw new Error("local dispatch evidence requires one exact source record");
@@ -331,7 +333,7 @@ export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandida
     || !/^[a-f0-9]{40}$/u.test(record.candidateCommit ?? "")) {
     throw new Error("local dispatch evidence source is not a required authored delivery");
   }
-  const admission = evaluateReviewAdmission({ root, taskId, candidateCommit: reviewCandidateCommit });
+  const admission = evaluateReviewAdmission({ root, taskId, baseCommit, candidateCommit: reviewCandidateCommit });
   if (!admission.ok || admission.targetRecordCandidateCommit !== record.candidateCommit) {
     throw new Error("local dispatch evidence candidate is not admitted for this task");
   }
@@ -348,6 +350,10 @@ export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandida
 
 /** Admit a signed source import as its own review target without fabricating a dispatch row. */
 export function evaluateSignedQualityImportReviewAdmission({ root, anchor } = {}) {
+  const historical = historicalAdmission(root, {kind:"signed-quality-import",taskId:anchor?.taskId,baseCommit:anchor?.baseCommit,candidateCommit:anchor?.candidateCommit});
+  return evaluateSignedQualityImportReviewAdmissionCore({root,anchor}, historical?.entries ?? [], historical);
+}
+function evaluateSignedQualityImportReviewAdmissionCore({ root, anchor } = {}, historicalEntries = [], historical = null) {
   try {
     const anchorKeys = ["schema", "intentSha256", "integrationCommit", "baseCommit", "candidateCommit", "taskId"];
     if (typeof root !== "string" || !anchor || typeof anchor !== "object" || Array.isArray(anchor)
@@ -364,7 +370,9 @@ export function evaluateSignedQualityImportReviewAdmission({ root, anchor } = {}
       commitSha: anchor.integrationCommit, intentSha256: anchor.intentSha256 });
     if (!signed?.ok || signed.code !== "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED"
       || signed.intentSha256 !== anchor.intentSha256) signedImportFailure("signed-import-not-authorized");
-    const coverage = evaluateRepositoryCriticSkipCoverage({ root });
+    const coverage = historical !== null || historicalEntries.length > 0
+      ? evaluateReviewAdmissionCore({root,taskId:anchor.taskId,candidateCommit:anchor.candidateCommit},historicalEntries,anchor)
+      : evaluateRepositoryCriticSkipCoverage({ root });
     if (!coverage.ok) return { ok: false, code: "signed-import-ordinary-coverage-pending",
       authorityKind: "signed-quality-import", anchor, ordinaryCoverage: coverage,
       findings: coverage.readFindings };
@@ -382,6 +390,9 @@ export function evaluateSignedQualityImportReviewAdmission({ root, anchor } = {}
         skipRecordCount: coverage.skipRecordCount, legacyRecordCount: coverage.legacyRecordCount,
         administrativelyRetiredRecordCount: coverage.administrativelyRetiredRecordCount },
       targetRecordCount: 0,
+      historicalQualification: historical ? "unknown" : null,
+      historicalDebtCount: historical?.entries.length ?? 0,
+      ...(historical ? { historicalFreshReview: historicalFreshReviewPacketBinding({repository:root,currentTarget:{kind:"signed-quality-import",taskId:anchor.taskId,baseCommit:anchor.baseCommit,candidateCommit:anchor.candidateCommit}}) } : {}),
     };
   } catch (error) {
     return { ok: false, code: error?.code ?? "signed-import-invalid", details: error?.details ?? null,
@@ -450,6 +461,9 @@ function reconciledNoCommitFinding(record, entry) {
 }
 
 export function walkDispatchRecords(root) {
+  return walkDispatchRecordsForReview(root, []);
+}
+function walkDispatchRecordsForReview(root, historicalEntries) {
   const findings = [];
   const records = [];
   let entries;
@@ -459,6 +473,16 @@ export function walkDispatchRecords(root) {
   for (const name of names) {
     const path = `${EVIDENCE_DIR}/${name}`;
     try {
+      const historical = historicalEntries.find(entry => entry.path === path);
+      if (historical) {
+        const source = physicalRegularFile(root, path, path);
+        const info = lstatSync(resolve(root, path));
+        if (source.finding || info.nlink !== 1 || source.bytes.length !== historical.byteLength
+          || (info.mode & 0o777) !== historical.mode || digest(source.bytes) !== historical.sha256) {
+          findings.push(`${path}: historical fresh-review inventory drifted`);
+        }
+        continue; // zero authorship/review coverage; debt remains in the admission report
+      }
       const bytes = readFileSync(resolve(root, path));
       records.push({ path, bytes, sha256: createHash("sha256").update(bytes).digest("hex"), record: JSON.parse(bytes.toString("utf8")) });
     }
@@ -756,10 +780,19 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
  */
 export function evaluateReviewAdmission(options = {}) {
   const root = options.root ?? DEFAULT_ROOT;
+  const historical = historicalAdmission(root, { kind: "admitted-dispatch", taskId: options.taskId,
+    baseCommit: options.baseCommit, candidateCommit: options.candidateCommit });
+  const result = evaluateReviewAdmissionCore(options, historical?.entries ?? []);
+  return { ...result, historicalQualification: historical ? "unknown" : null,
+    historicalDebtCount: historical?.entries.length ?? 0,
+    ...(historical ? { historicalFreshReview: historicalFreshReviewPacketBinding({repository:root,currentTarget:{kind:"admitted-dispatch",taskId:options.taskId,baseCommit:options.baseCommit,candidateCommit:options.candidateCommit}}) } : {}) };
+}
+function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signedImportAnchor = null) {
+  const root = options.root ?? DEFAULT_ROOT;
   const taskId = options.taskId;
   const candidateCommit = options.candidateCommit;
   const readChangedPaths = options.readChangedPaths ?? ((record) => readCommitChangedPaths(root, record.commits));
-  const scan = walkDispatchRecords(root);
+  const scan = walkDispatchRecordsForReview(root, historicalEntries);
   const reconciliations = readLegacyDispatchReconcileIndex(root, options);
   const abandoned = readAbandonedV3RecoveryIndex(root, options);
   const addenda = readCriticDispositionAddenda(root);
@@ -856,11 +889,42 @@ export function evaluateReviewAdmission(options = {}) {
     findings.push(`${path}: requires exactly one Critic disposition`);
   }
   for (const [path, addendum] of addenda.entriesByPath) if (!usedAddenda.has(path)) findings.push(`${addendum.path}: orphan critic addendum has no applicable pending record`);
+  if (signedImportAnchor !== null) admittedCount = 1;
   if (admittedCount !== 1) findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}`);
   const ok = findings.length === 0 && admittedCount === 1;
   return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount,
     pendingRecordCount, pendingRecordPaths, administrativelyRetiredRecordCount, targetRecordCandidateCommit,
     admittedByDescendant, readFindings: findings };
+}
+
+
+function historicalAdmission(root, currentTarget) {
+  if (typeof root !== "string" || typeof currentTarget.baseCommit !== "string") return null;
+  const observed = readHistoricalFreshReviewAdmission({repository:root,currentTarget});
+  return observed.status === "authorized" ? observed : null;
+}
+/** Diagnostic source capture only: not a public review-admission grant. */
+export function observeHistoricalFreshReviewTargetAuthority({repository,inventoryHandle} = {}) {
+  try {
+    const facts=historicalFreshReviewCaptureFacts({repository,inventoryHandle});
+    const historical=facts.entries.filter(entry=>entry.historical);
+    let result;
+    if(facts.target.kind === "signed-quality-import") {
+      const intent=facts.target.taskId.replace(/^signed-import-/u, "");
+      const commits=readGit(repository,["rev-list","--reverse",`${facts.target.baseCommit}..${facts.target.candidateCommit}`]).split("\n").filter(Boolean);
+      const matches=commits.filter(commit=>{const trailer=parseIntegrationTrailerBlock(readGit(repository,["show","-s","--format=%B",commit]));return trailer.ok&&trailer.intentSha256===intent;});
+      if(matches.length!==1) return {targetValid:false,code:"HFR-IMPORT-ANCHOR-UNAVAILABLE"};
+      const anchor={schema:"pipeline.signed-quality-import-review-anchor.v1",intentSha256:intent,integrationCommit:matches[0],baseCommit:facts.target.baseCommit,candidateCommit:facts.target.candidateCommit,taskId:facts.target.taskId};
+      // The private helper verifies real signed integration/range before the view.
+      result=evaluateSignedQualityImportReviewAdmissionCore({root:repository,anchor},historical,{entries:historical});
+    } else {
+      const scan=walkDispatchRecordsForReview(repository,historical);
+      const targets=scan.records.filter(entry=>entry.record?.taskId===facts.target.taskId);
+      if(targets.length!==1 || !terminalAuthoredDelivery(targets[0].record))return {targetValid:false,code:"HFR-TARGET-NOT-AUTHORED-DELIVERY"};
+      result=evaluateReviewAdmissionCore({root:repository,taskId:facts.target.taskId,candidateCommit:facts.target.candidateCommit},historical);
+    }
+    return {targetValid:result.ok===true,code:result.ok?"HFR-TARGET-OBSERVED":"HFR-TARGET-BLOCKED",findings:result.readFindings??result.findings??[]};
+  } catch {return {targetValid:false,code:"HFR-TARGET-UNAVAILABLE"};}
 }
 
 function runCli() {
@@ -877,3 +941,6 @@ function runCli() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runCli();
+
+// Dedicated source-private METHOD binding; ordinary Critic/M2/M3 admission is unchanged.
+export { createLocalControlledMethodDispatchEvidenceBinding, inspectLocalControlledMethodDispatchEvidenceBinding } from "../lib/controlled-method-dispatch-observation.mjs";

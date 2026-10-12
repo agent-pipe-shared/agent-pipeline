@@ -7,6 +7,7 @@ import {SOURCE_NAMES,exactCourseObject,designAdvisorValueSha256,validateInitialA
 import {readAdvisorPhysicalBytes,observeAdvisorCandidate,verifyAdvisorRevisionProvenance} from './design-advisor-provenance.mjs';
 import {advisorReportSha256,advisorProposalSetSha256} from './codex-advisor-execution.mjs';
 import {createCodexAdvisorHostStore,verifyCodexAdvisorInitialExecution} from './codex-advisor-host-store.mjs';
+import {projectAdvisorBindingDiagnostic,createAdvisorBindingDiagnosticRecorder} from './codex-advisor-binding-diagnostic.mjs';
 import {designAdvisorRouteSlots,readExistingDesignAdvisorCourse} from './design-advisor-course-store.mjs';
 import {nativeInitialAdvisorNoChildRoute} from './native-initial-advisor-execution.mjs';
 import {resolvePoGateRepositoryTopology,derivePoGateRepositoryFingerprint} from './po-gate-authority.mjs';
@@ -19,6 +20,7 @@ import {resolveV3DutyRoute} from './critic-route-v3.mjs';
 export const DESIGN_WORKFLOW_PACKAGE_V2_SCHEMA='pipeline.design-workflow-package.v2';
 const SHA=/^[a-f0-9]{64}$/u,ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u,fail=code=>({ok:false,code});
 const sha=b=>createHash('sha256').update(b).digest('hex');
+function diagnosticFailure(code,value){const diagnostic=projectAdvisorBindingDiagnostic(value);return diagnostic?{...fail(code),diagnostic}:fail(code);}
 const same=(a,b)=>canonicalizeJson(a)===canonicalizeJson(b);
 const exact=exactCourseObject;
 const PREPARE=Symbol('prepare-readiness-advisor-observation');
@@ -38,7 +40,7 @@ export function verifyReadinessAdvisorObservationV2({repoRoot,observation,source
  try{
   if(!exact(observation,['schema','candidate','sources','featureId','authoringDispatchId','advisor','initialContext','receipt','report','failure'])||observation.schema!=='pipeline.readiness-advisor-observation.v2'||!same(observation.sources,sources)||observation.initialContext?.featureId!==observation.featureId||observation.initialContext?.authoringDispatchId!==observation.authoringDispatchId)return fail('DWP2-INLINE-OBSERVATION');
   const result=readDesignWorkflowPackageV2FromRepository({repoRoot,trustedAdvisorExecutablePath,requireCurrentCandidate,[PREPARE]:true,[INLINE]:detached(observation)});
-  return result.ok&&same(result.advisorObservation,observation)?result:fail(result.code??'DWP2-INLINE-OBSERVATION');
+  return result.ok&&same(result.advisorObservation,observation)?result:diagnosticFailure(result.code??'DWP2-INLINE-OBSERVATION',result.diagnostic);
  }catch{return fail('DWP2-INLINE-OBSERVATION');}
 }
 function ref(v){return exact(v,['path','sha256'])&&typeof v.path==='string'&&SHA.test(v.sha256);}
@@ -153,19 +155,19 @@ export function readDesignWorkflowPackageV2FromRepository(options={}){
   const verifyCourse=()=>readExistingDesignAdvisorCourse({gitCommonDir:topology.gitCommonDir,repoFingerprint,featureId:pkg.featureId,runner:'codex',courseId:a.courseBinding.courseId,initialContextSha256:initialCheck.contextSha256});
   const course=verifyCourse();if(course.status!=='reuse-terminal'||course.outcome!=='answered'||!same(course.terminalObservation?.courseBinding,a.courseBinding)||!same(course.terminalObservation?.hostReceipt,a.hostReceipt))return fail('DWP2-DURABLE-COURSE');
   const verifyHost=()=>verifyCodexAdvisorInitialExecution({repoRoot,initialContext:initial,dispatch:a.consultation.dispatch,profile:a.profile,route:a.route,courseBinding:a.courseBinding,hostReceipt:a.hostReceipt,receipt,report,...(trustedAdvisorExecutablePath?{trustedExecutablePath:trustedAdvisorExecutablePath}:{})});
-  const host=verifyHost();if(!host?.ok||typeof host?.then==='function')return fail(host?.code??'DWP2-INITIAL-HOST-UNVERIFIED');
+  const host=verifyHost();if(!host?.ok||typeof host?.then==='function')return diagnosticFailure(host?.code??'DWP2-INITIAL-HOST-UNVERIFIED',host?.diagnostic);
   if(!host.projection||host.projection.reportCanonicalSha256!==a.consultation.reportCanonicalSha256||host.projection.answerSha256!==a.consultation.answerSha256||host.projection.proposalSetSha256!==a.consultation.proposalSetSha256||host.projection.advisoryReceipt?.sha256!==a.receipt.sha256)return fail('DWP2-HOST-PROJECTION');
   const advisorObservation=readinessObservation(pkg,initial,receipt,report,null);
-  if(prepare){for(const file of [...packageFiles,contextFile,receiptFile,reportFile,...SOURCE_NAMES.map(n=>({path:pkg.sources[n].path,bytes:finalSourceBytes[n]}))])if(!readAdvisorPhysicalBytes(repoRoot,file.path,file.bytes.length||1).equals(file.bytes))return fail('DWP2-PHYSICAL-DRIFT');const again=verifyHost();if(!again?.ok||!same(again.projection,host.projection)||!same(verifyCourse(),course)||!same(observeAdvisorCandidate(repoRoot),beforeCandidate))return fail('DWP2-INITIAL-HOST-DRIFT');return {ok:true,advisorObservation};}
+  if(prepare){for(const file of [...packageFiles,contextFile,receiptFile,reportFile,...SOURCE_NAMES.map(n=>({path:pkg.sources[n].path,bytes:finalSourceBytes[n]}))])if(!readAdvisorPhysicalBytes(repoRoot,file.path,file.bytes.length||1).equals(file.bytes))return fail('DWP2-PHYSICAL-DRIFT');const again=verifyHost();if(!again?.ok||!same(again.projection,host.projection)||!same(verifyCourse(),course)||!same(observeAdvisorCandidate(repoRoot),beforeCandidate))return diagnosticFailure('DWP2-INITIAL-HOST-DRIFT',again?.diagnostic);return {ok:true,advisorObservation};}
   const readinessFile=jsonFile(repoRoot,{path:pkg.readiness.path,sha256:pkg.readiness.sha256},131072),readiness=readinessFile.value;
   const readyCheck=validateDesignReadinessReceipt(readiness);if(!readyCheck.ok)return readyCheck;
   if(readiness.outcome!=='ready-for-po-review'||readiness.findings.some(f=>f.severity==='blocking')||readiness.dispatchId!==pkg.readiness.dispatchId||[pkg.authoringDispatchId,a.consultation.dispatch.dispatchId,initial.authoringDispatchId].includes(readiness.dispatchId)||!same(readiness.candidate,pkg.candidate)||!same(readiness.sources,pkg.sources)||readiness.hostExecution.dutyReceiptSha256!==designReadinessReportSha256(readiness))return fail('DWP2-READINESS-BINDING');
   if(requireReadinessExecution){const checked=verifyReadinessExecution({repoRoot,hostExecution:readiness.hostExecution,readinessReceipt:readiness,candidate:pkg.candidate,sources:pkg.sources,sourceBytes:sourceEntries,advisorObservation,requireCurrentCandidate});if(!checked?.ok||typeof checked?.then==='function')return fail(checked?.code??'DWP2-READINESS-HOST-UNVERIFIED');}
   const original=[{path:packagePath,bytes:packageBytes},contextFile,receiptFile,reportFile,readinessFile,...SOURCE_NAMES.map(n=>({path:pkg.sources[n].path,bytes:finalSourceBytes[n]}))];
   for(const file of original)if(!readAdvisorPhysicalBytes(repoRoot,file.path,file.bytes.length||1).equals(file.bytes))return fail('DWP2-PHYSICAL-DRIFT');
-  const hostAgain=verifyHost();if(!hostAgain?.ok||typeof hostAgain?.then==='function'||!same(hostAgain.projection,host.projection))return fail('DWP2-INITIAL-HOST-DRIFT');
+  const hostAgain=verifyHost();if(!hostAgain?.ok||typeof hostAgain?.then==='function'||!same(hostAgain.projection,host.projection))return diagnosticFailure('DWP2-INITIAL-HOST-DRIFT',hostAgain?.diagnostic);
   if(!same(verifyCourse(),course))return fail('DWP2-DURABLE-COURSE-DRIFT');
   if(!same(observeAdvisorCandidate(repoRoot),beforeCandidate))return fail('DWP2-CANDIDATE-DRIFT');
   return {ok:true,code:'DWP2-INITIAL-FINAL-VERIFIED',schema:pkg.schema,workflowPackage:detached(pkg),packagePath,packageSha256:sha(packageBytes),candidate:detached(pkg.candidate),readinessDispatchId:readiness.dispatchId,advisorDispatchId:receipt.dispatch.dispatchId,approvalReview:{schema:'pipeline.design-workflow-approval-review.v2',featureId:pkg.featureId,candidate:detached(pkg.candidate),packageSha256:sha(packageBytes),sources:SOURCE_NAMES.map(name=>({name,...pkg.sources[name],content:finalSourceBytes[name].toString('utf8')})),initialConsultation:{initialContext:detached(initial),consultation:detached(a.consultation),report:detached(report),disposition:detached(a.disposition),revisions:detached(a.revisions)},readiness:detached(readiness),approvalStatus:'pending-po-approval',implementationAuthority:false},implementationAuthority:false};
- }catch(e){return fail(typeof e?.message==='string'&&e.message.startsWith('DWP2-')?e.message:'DWP2-PHYSICAL-OR-GIT');}
+ }catch(e){const code=typeof e?.message==='string'&&e.message.startsWith('DWP2-')?e.message:'DWP2-PHYSICAL-OR-GIT',diagnostics=createAdvisorBindingDiagnosticRecorder();diagnostics.record('source-provenance',e);return diagnosticFailure(code,diagnostics.snapshot());}
 }

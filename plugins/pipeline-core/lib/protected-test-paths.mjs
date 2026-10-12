@@ -64,6 +64,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
+import { scanShell } from "./git-cmd.mjs";
 import {
   LEGACY_GUARD_CONFIG,
   NEUTRAL_GUARD_CONFIG,
@@ -770,6 +771,56 @@ function opaqueLanguagePayloadRegions(payload) {
  *   against a rule set — not filtered, not deduplicated. `classification` appears only when a
  *   fail-closed fallback could not positively resolve the candidate as its write target.
  */
+// Only complete, quoted data fed to a plain cat receiver is inert here.
+// Use the shared shell scanner for body boundaries; all ambiguous receiver
+// syntax, missing terminators and commands after the terminator stay visible.
+function withoutInertCatHeredocBodies(command) {
+  const scan = scanShell(command);
+  if (scan.unterminated) return command;
+  let text = command;
+  for (const region of [...scan.regions].reverse()) {
+    if (region.kind !== "heredoc-body") continue;
+    const openerEnd = region.start - 1;
+    const openerStart = command.lastIndexOf("\n", openerEnd - 1) + 1;
+    const opener = command.slice(openerStart, openerEnd);
+    if (!/^\s*cat(?:\s+>{1,2}\s*[A-Za-z0-9_./-]+)?\s+<<-?\s*(?:'[A-Za-z_][A-Za-z0-9_]*'|"[A-Za-z_][A-Za-z0-9_]*")\s*$/u.test(opener)) continue;
+    text = text.slice(0, region.start) + text.slice(region.end);
+  }
+  return text;
+}
+
+
+// This parsed-argv observation classifies a check, never authorizes a patch write.
+// Unknown/global configuration, index/cached/output and stdin forms stay closed.
+export function readOnlyGitApplyCheckArguments(argv) {
+  if (!Array.isArray(argv) || argv.some(arg => typeof arg !== "string" || /[\0\r\n]/u.test(arg))) return null;
+  let index = 0, directory = null;
+  const seen = new Set();
+  while (index < argv.length && argv[index] !== "apply") {
+    const option = argv[index++];
+    if (seen.has(option)) return null;
+    seen.add(option);
+    if (option === "-C") {
+      const value = argv[index++];
+      if (!value || value.startsWith("-") || value.split(/[\\/]/u).includes("..")) return null;
+      directory = value;
+    } else if (!["--no-pager", "--literal-pathspecs"].includes(option)) return null;
+  }
+  if (argv[index++] !== "apply" || argv[index++] !== "--check") return null;
+  const modes = ["nowarn", "warn", "fix", "error", "error-all"];
+  if (argv[index] === "--whitespace") {
+    index += 1;
+    if (!modes.includes(argv[index++])) return null;
+  } else if (argv[index]?.startsWith("--whitespace=")) {
+    if (!modes.includes(argv[index++].slice("--whitespace=".length))) return null;
+  }
+  if (argv[index] === "--") index += 1;
+  const patches = argv.slice(index);
+  if (patches.length === 0 || patches.some(path => !path || path.startsWith("-")
+    || !/\.(?:diff|patch)$/iu.test(path) || path.split(/[\\/]/u).includes(".."))) return null;
+  return Object.freeze({directory,patches:Object.freeze(patches)});
+}
+
 export function extractShellWriteTargets({ command, root, toolName = "Bash", platform = process.platform } = {}) {
   if (typeof command !== "string" || command.trim() === "") return [];
 
@@ -807,13 +858,15 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       const verb = isGit ? (argv[verbIndex] ?? null) : null;
       const gitWrite = isGit && GIT_WRITE_VERBS.has(verb ?? "");
       if (!WRITE_EXECUTABLES.has(executable) && !inPlace && !gitWrite) continue;
+      // Match only the direct, closed stash readers; every other stash form stays a writer.
+      if (gitWrite && verb === "stash" && verbIndex === 0) {
+        const stashArgs = argv.slice(verbIndex + 1);
+        if ((stashArgs.length === 1 && stashArgs[0] === "list")
+          || (stashArgs[0] === "show" && (stashArgs.length === 1
+            || (stashArgs.length === 2 && /^[0-9]+$/u.test(stashArgs[1]))))) continue;
+      }
       if (gitWrite && verb === "apply") {
-        const postVerbArgv = argv.slice(verbIndex + 1);
-        const checked = postVerbArgv[0] === "--check"
-          ? (postVerbArgv[1] === "--" ? postVerbArgv.slice(2) : postVerbArgv.slice(1))
-          : null;
-        if (verbIndex === 0 && checked?.length > 0
-          && checked.every((arg) => !arg.startsWith("-") && /\.(?:diff|patch)$/iu.test(arg))) continue;
+        if (readOnlyGitApplyCheckArguments(argv) !== null) continue;
         // The patch file is an input, not the destination. A PreToolUse inspection of its
         // contents would race the subsequent command, so no path-only classification can
         // authorize this opaque mutation. Use the per-target Edit/Write/apply_patch tools.
@@ -860,6 +913,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
   // gated on the text also naming a write-capable executable or a `>` redirect. Deliberately
   // narrower than the gate-strength lane's unconditional name match, for the reason in this
   // module's header — a protected suite is meant to be run.
+  command = withoutInertCatHeredocBodies(command);
   const lowered = command.replace(/\\/gu, "/").toLowerCase();
   if (/\bgit(?:\.exe)?\b/u.test(lowered) && /\bapply\b/u.test(lowered)) {
     throw new Error("mutating git apply has unbound patch targets");

@@ -63,3 +63,14 @@ consuming project's full agent workflow.
 The Greenfield runs are too heterogeneous to establish a cross-runner cost
 ranking or a representative consumer-overhead estimate. Comparable
 multi-runner task telemetry is still needed before making those claims.
+
+
+## Proposed item and waiting measurements
+
+For item-owned EGM, record each outcome's dispatch, tested delivery, integration
+and closure times; distinguish active work from waiting for a colliding file,
+integration, review or human decision. Keep batch identity, correction rounds,
+targeted-check executions and requalification reasons with the actual candidate.
+These are proposed measurements, not collected results. Compare identical
+original criteria and outcomes before claiming fewer handoffs, shorter item
+closure or less waiting. No performance guarantee follows from the new policy.

@@ -123,25 +123,49 @@ There is no cross-runner cost or delivery-time estimate for this project.
 Treat the [measurement boundary](cost-and-measurement.md) as transparency
 guidance, not as a reason to widen concurrency or autonomy.
 
-1. Split independent, non-overlapping packages so they may run in parallel.
-2. Give each implementor a bounded goal, exact context paths, acceptance checks,
-   prohibitions, and stop conditions.
-3. Run the applicable targeted deterministic and security checks, then the
-   Critic preflight.
-   A candidate-bound Critic-mode [Verify evidence producer](#verify-a-consumer-project)
-   receipt or validated diagnostic may admit review; Full Verify is still pending.
-4. Run the independent Critic review; profile and risk determine its depth and route.
-5. After corrections and any required delta review, run Full Verify on the
-   reviewed candidate with its consumed Critic evidence. The final receipt
-   includes the configured security outcome for that exact candidate. Record
-   the outcome and close the feature only when its tracked work is complete.
+1. Predeclare a coherent review batch before dispatching its items. Give each
+   Goldfish one complete, independently verifiable acceptance criterion or
+   backlog outcome, with original criteria and disjoint file ownership.
+   Analysis, test cases, implementation, targeted checks and fixes stay in that
+   owner's context. Colliding or dependent items wait for their predecessor.
+2. The item owner may add regression tests. Existing acceptance examiners remain
+   intact; necessary changes must be visible, justified and independently
+   reviewed. Map assertions to original criteria and demonstrate a meaningful
+   RED caused by the product defect, rather than a broken fixture or setup.
+   Record actual commands, results and candidate bindings; the author cannot
+   award itself an acceptance PASS.
+3. Main integrates each tested delivery while preserving other owners' changes.
+   Do not routinely repeat the owner's targeted checks. After a manual merge
+   conflict, run the affected checks; drift or missing evidence requires
+   Goldfish requalification. The original owner ends after tested delivery and
+   integration. Freeze batch membership after integration and before review.
+4. Run one fresh independent, read-only Critic over the complete coherent batch.
+   The Critic checks code and tests against the original criteria. Do not review
+   each mini-item separately. A singleton batch needs a documented substantial
+   risk rationale. Targeted deterministic/security evidence admits review;
+   Full Verify may still be pending and must be disclosed honestly.
+5. If findings need correction, give one fresh Correction Goldfish the entire
+   batch. That same owner keeps context through every finding, fix and delta
+   review. The batch budget is one full Critic plus at most three delta Critics;
+   stop immediately on PASS and never restart the budget under a new batch ID.
+6. Run Full Verify once on the integrated, reviewed candidate with its consumed
+   Critic evidence. A failed check needs repair and the applicable affected
+   requalification; it cannot be called acceptance. Close only when tracked
+   work and the existing configured acceptance requirements are complete.
 
-Several independent, low-risk dispatches may share one predeclared, bounded
-collection block: retain each task's targeted checks, review the combined
-diff once, then run one Full Verify. Architecture, guardrail or security work
-does not gain this batching exception. Keep a coherent feature scope separate
-from the smaller, independently owned dispatch scopes; a shared checkout is
-not isolation for parallel writers.
+Keeping test preparation and implementation together avoids repeated handoffs
+and rediscovery. It also removes the independent test author's protection
+against shared blind spots: an author can misunderstand a criterion in both
+code and tests. Preserved acceptance examiners, original-criterion mappings,
+meaningful RED evidence and a fresh Critic reduce this risk. Passing tests alone
+do not prove acceptance, and mechanical enforcement cannot prove semantic
+completeness. See [parallel work](parallel-work.md) for scheduling boundaries.
+
+This contract targets Claude Code, Codex and Antigravity in user repositories
+on Windows, Linux and macOS. Native qualification remains specific to the
+installed runner and host; the methodology does not establish universal native
+enforcement. No speed, cost or quality improvement has been measured for this
+change. Existing whole-closure report-only decisions remain report-only.
 
 The human remains the decision owner for material scope changes, configured
 approvals, and remote or otherwise irreversible actions. Routine task ordering,

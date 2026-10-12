@@ -2,14 +2,18 @@
 // Guard module "command-catalogue" (layer 4), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { inspectSourceOwnedContinuityVerificationGuardContext, inspectSourceOwnedApprovedControllerCourse } from "../session-requester-bridge.mjs";
+import { readOwnedVerificationPhysicalFile, recheckOwnedVerificationPhysicalRefs, readOwnedVerificationRegistration } from "../owned-continuity-verification.mjs";
+import { inspectOwningVerificationControllerTaskSource } from "../../scripts/owning-verification-controller.mjs";
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
-import { APP_SERVER_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { APP_SERVER_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { exactRoot, simpleWords } from "./shell-grammar.mjs";
-import { resolveSanctionedScriptInvocation, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
 import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
 
 const DESIGN_COURSE_SOURCES = ["input", "prd", "spec", "design", "traceability"];
@@ -120,6 +124,7 @@ function sanctionedDesignCourseArgs(args, root) {
 }
 
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
@@ -193,6 +198,160 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   return script === APP_SERVER_SCRIPT
     && ["--recover", "--doctor"].includes(args[0])
     && args.length === 1;
+}
+
+
+// Exact local publication routes, deliberately NOT lifecycle/read-only exemptions.
+// The whole shell/READY/security policy and the CLI's source/content CAS still apply.
+export function resolveBoundArtifactPublicationInvocation(command, root, options = {}) {
+  const invocation = resolveSanctionedScriptInvocation(command, root, options);
+  if (invocation === null || typeof root !== "string" || !isAbsolute(root) || resolve(root) !== root) return null;
+  const transfer = fileURLToPath(new URL("../../scripts/bound-artifact-transfer.mjs", import.meta.url));
+  const comparison = fileURLToPath(new URL("../../scripts/greenfield-public-comparison.mjs", import.meta.url));
+  if (![transfer, comparison].includes(invocation.script)) return null;
+  const relativePath = value => typeof value === "string" && value.length > 0 && value.length <= 512
+    && !/[\\:\x00-\x1f\x7f]/u.test(value)
+    && value.split("/").every(part => /^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(part) && part !== "." && part !== "..");
+  function physical(path, { input = false, maxBytes = 0, singleLink = false } = {}) {
+    if (!relativePath(path)) return false;
+    let current = root;
+    const parts = path.split("/");
+    for (let index = 0; index < parts.length; index += 1) {
+      current = join(current, parts[index]);
+      let info;
+      try { info = lstatSync(current); }
+      catch (error) { return error.code === "ENOENT" && !input && index === parts.length - 1; }
+      if (info.isSymbolicLink() || realpathSync(current) !== current) return false;
+      if (index < parts.length - 1) { if (!info.isDirectory()) return false; }
+      else if (!input || !info.isFile() || info.size > maxBytes || (singleLink && info.nlink !== 1)) return false;
+    }
+    return input;
+  }
+  try {
+    const rootInfo = lstatSync(root), scriptInfo = lstatSync(invocation.script);
+    if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || realpathSync(root) !== root
+      || !scriptInfo.isFile() || scriptInfo.isSymbolicLink() || realpathSync(invocation.script) !== invocation.script) return null;
+    const args = invocation.args;
+    if (invocation.script === transfer) {
+      if ((options.platform ?? process.platform) !== "linux" || args.length !== 7 || args[0] !== "prepare"
+        || args[1] !== "--root" || args[2] !== root || args[3] !== "--manifest" || args[5] !== "--output"
+        || !/^scratch\/[A-Za-z0-9_./-]+\.json$/u.test(args[4])
+        || !/^scratch\/[A-Za-z0-9_-]{1,80}$/u.test(args[6])
+        || !physical(args[4], { input: true, maxBytes: 131072, singleLink: true }) || !physical(args[6])) return null;
+      return Object.freeze({ kind: "bound-artifact-transfer", outputPath: args[6] });
+    }
+    if (args.length !== 6 || args[0] !== "--input" || args[2] !== "--input-sha256" || args[4] !== "--output"
+      || !HEX.test(args[3] ?? "") || ![args[1], args[5]].every(path => relativePath(path)
+        && ["docs/", "evidence/", "public/"].some(prefix => path.startsWith(prefix)))
+      || !args[5].endsWith(".json") || !physical(args[1], { input: true, maxBytes: 65536 }) || !physical(args[5])) return null;
+    const bytes = readFileSync(join(root, args[1]));
+    if (bytes.length < 1 || bytes.length > 65536 || createHash("sha256").update(bytes).digest("hex") !== args[3]) return null;
+    return Object.freeze({ kind: "greenfield-public-comparison", outputPath: args[5] });
+  } catch { return null; }
+}
+
+
+// Initial Controller admission is a readonly synchronous guard observation.
+// It never creates a requester, approves a course, or replaces a READY receipt.
+const owningControllerAdmissions = new WeakMap();
+const controllerCanonical = value => Array.isArray(value)
+  ? '[' + value.map(controllerCanonical).join(',') + ']'
+  : value !== null && typeof value === 'object'
+    ? '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + controllerCanonical(value[key])).join(',') + '}'
+    : JSON.stringify(value);
+const controllerEqual = (a, b) => controllerCanonical(a) === controllerCanonical(b);
+function owningControllerEntry() {
+  return fileURLToPath(new URL('../../scripts/owning-verification-controller.mjs', import.meta.url));
+}
+export function isFixedOwningVerificationControllerCandidate(command, root) {
+  const words = simpleWords(command, root);
+  return words !== null && ['node', 'node.exe'].includes(basename(words[0] ?? '').toLowerCase())
+    && words.slice(1).includes(owningControllerEntry());
+}
+function observeOwningControllerCommand(command, root) {
+  if (typeof root !== 'string' || !isAbsolute(root) || resolve(root) !== root
+    || realpathSync(root) !== root || process.cwd() !== root) throw new Error('OSV-CONTROLLER-ROOT');
+  const entry = owningControllerEntry(), words = simpleWords(command, root);
+  const prefix = [realpathSync(process.execPath), ...process.execArgv, entry];
+  if (words === null || words.length !== prefix.length + 6
+    || prefix.some((value, index) => words[index] !== value)) throw new Error('OSV-CONTROLLER-ARGV');
+  const args = words.slice(prefix.length);
+  if (args[0] !== '--root' || args[1] !== root || args[2] !== '--suite'
+    || !/^[a-z0-9][a-z0-9._-]{0,119}$/u.test(args[3] ?? '') || args[4] !== '--task-source'
+    || typeof args[5] !== 'string' || !isAbsolute(args[5]) || resolve(args[5]) !== args[5]
+    || !args[5].startsWith(join(root, 'scratch') + sep) || realpathSync(args[5]) !== args[5]) throw new Error('OSV-CONTROLLER-SELECTORS');
+  // Both shared inspectors are real Source readers. Caller dependencies cannot replace them.
+  const approved = inspectSourceOwnedApprovedControllerCourse({ rootDir: root });
+  const approvedKeys = ['status', 'repository', 'course', 'selectedStateRef', 'approvalRefs', 'expectedStateSha256', 'expectedRevision', 'sessionCleanup'];
+  if (approved === null || typeof approved !== 'object' || Array.isArray(approved)
+    || Object.keys(approved).sort().join('\0') !== approvedKeys.sort().join('\0')
+    || approved.status !== 'current' || approved.sessionCleanup !== null
+    || approved.repository?.primaryRoot !== root || !Array.isArray(approved.approvalRefs)
+    || approved.selectedStateRef?.sha256 !== approved.expectedStateSha256) throw new Error('OSV-CONTROLLER-COURSE');
+  const registered = readOwnedVerificationRegistration(approved.repository, args[3]);
+  if (!controllerEqual(registered.candidate, approved.repository.candidate)) throw new Error('OSV-CONTROLLER-CANDIDATE');
+  try { lstatSync(registered.selectedSuite.file); throw new Error('OSV-CONTROLLER-TARGET-OCCUPIED'); }
+  catch (error) { if (error?.code !== 'ENOENT') throw error; }
+  const task = inspectOwningVerificationControllerTaskSource({ rootDir: root, suiteId: args[3], taskSource: args[5] });
+  if (task === null || typeof task !== 'object' || Array.isArray(task)
+    || Object.keys(task).sort().join('\0') !== ['kind', 'taskSourceRef', 'sourceClosure', 'registration'].sort().join('\0')
+    || !['task', 'check'].includes(task.kind) || task.taskSourceRef?.path !== args[5]
+    || !Array.isArray(task.sourceClosure) || !controllerEqual(task.registration, registered)) throw new Error('OSV-CONTROLLER-TASK');
+  const entryRef = readOwnedVerificationPhysicalFile(entry).ref;
+  const refs = [entryRef, approved.selectedStateRef, ...approved.approvalRefs,
+    registered.registration.physicalRef, task.taskSourceRef, ...task.sourceClosure];
+  recheckOwnedVerificationPhysicalRefs(refs);
+  const again = inspectSourceOwnedApprovedControllerCourse({ rootDir: root });
+  if (!controllerEqual(approved, again)) throw new Error('OSV-CONTROLLER-COURSE-DRIFT');
+  return { command, root, kind: task.kind, suiteId: args[3], approved, registered, refs };
+}
+export function acquireSourceOwnedOwningControllerCommandAdmission(command, root) {
+  try {
+    const value = observeOwningControllerCommand(command, root), handle = Object.freeze({});
+    owningControllerAdmissions.set(handle, value); return handle;
+  } catch { return null; }
+}
+export function isSourceOwnedOwningVerificationControllerCommand(command, root, options = {}) {
+  const handle = options.sourceOwnedOwningControllerCommandAdmissionHandle;
+  const original = handle && owningControllerAdmissions.get(handle);
+  if (!original || original.command !== command || original.root !== root) return false;
+  try { return controllerEqual(original, observeOwningControllerCommand(command, root)); }
+  catch { return false; }
+}
+export function releaseSourceOwnedOwningControllerCommandAdmission(handle) {
+  if (handle) owningControllerAdmissions.delete(handle);
+}
+
+// OSV authenticates a local guard-process brand, not a command filename or JSON.
+// It clears only the opaque-script classification; real readiness and every
+// unrelated policy remain mandatory. The requester owner alone issues/revokes it.
+export function isSourceOwnedContinuityVerificationCommand(command, root, options = {}) {
+  const handle = options.sourceOwnedVerificationGuardContextHandle;
+  if (handle === undefined) return false;
+  try {
+    const observed = inspectSourceOwnedContinuityVerificationGuardContext({ guardContextHandle: handle });
+    const keys = ["repository", "executable", "argv", "cwd", "command", "commandSha256", "bindingSha256", "candidateCommit", "candidateTree", "courseSha256", "suiteSha256"];
+    if (observed === null || typeof observed !== "object" || Array.isArray(observed)
+      || Object.keys(observed).sort().join("\0") !== keys.sort().join("\0")) return false;
+    const entry = fileURLToPath(new URL("../../scripts/owned-continuity-verification.mjs", import.meta.url));
+    // The captured guard and executor inherit the same real Node prefix.
+    // Preserve it exactly; a caller cannot select or erase inherited preloads.
+    const argv = [...process.execArgv, entry, "--consume-owned-verification", "--channel-fd", "4"];
+    const words = simpleWords(command, root);
+    return typeof root === "string" && isAbsolute(root) && resolve(root) === root
+      && observed.repository === root && observed.cwd === root && process.cwd() === root
+      && typeof command === "string" && command === observed.command
+      && typeof observed.executable === "string" && isAbsolute(observed.executable)
+      && Array.isArray(observed.argv) && observed.argv.length === argv.length
+      && argv.every((value, index) => observed.argv[index] === value)
+      && words !== null && words.length === argv.length + 1
+      && words[0] === observed.executable
+      && argv.every((value, index) => words[index + 1] === value)
+      && [observed.commandSha256, observed.bindingSha256, observed.courseSha256, observed.suiteSha256].every(value => /^[a-f0-9]{64}$/u.test(value ?? ""))
+      && [observed.candidateCommit, observed.candidateTree].every(value => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value ?? ""))
+      && observed.candidateCommit.length === observed.candidateTree.length
+      && createHash("sha256").update(command, "utf8").digest("hex") === observed.commandSha256;
+  } catch { return false; }
 }
 
 export function isSanctionedLifecycleCommand(command, root, options = {}) {

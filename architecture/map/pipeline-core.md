@@ -9,6 +9,18 @@ nonResponsibilities:
 ownedPaths:
   - plugins/pipeline-core/**
 publicContracts:
+  - plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+  - plugins/pipeline-core/lib/session-authority-registry.mjs
+  - plugins/pipeline-core/lib/afk-ledger.mjs
+  - plugins/pipeline-core/lib/afk-transaction-host.mjs
+  - plugins/pipeline-core/lib/codex-host-process-journal.mjs
+  - plugins/pipeline-core/lib/codex-host-process-supervisor.mjs
+  - plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs
+  - plugins/pipeline-core/lib/bound-artifact-transfer.mjs
+  - plugins/pipeline-core/lib/greenfield-public-comparison.mjs
+  - plugins/pipeline-core/scripts/bound-artifact-transfer.mjs
+  - plugins/pipeline-core/scripts/greenfield-public-comparison.mjs
+  - plugins/pipeline-core/lib/guard/shell-grammar.mjs
   - plugins/pipeline-core/lib/passive-read-policy.mjs
   - plugins/pipeline-core/lib/intake-material-reference.mjs
   - plugins/pipeline-core/lib/po-key-directory.mjs
@@ -121,12 +133,22 @@ publicContracts:
   - plugins/pipeline-core/lib/project-uninstall.mjs
   - plugins/pipeline-core/lib/runtime-projection-removal.mjs
   - plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+  - plugins/pipeline-core/lib/critic-generic-batch.mjs
+  - plugins/pipeline-core/lib/darwin-native-process-observer.mjs
+  - plugins/pipeline-core/lib/native-platform-process-observer.mjs
+  - plugins/pipeline-core/lib/native/darwin-requester-observer.c
+  - plugins/pipeline-core/lib/agy-item-delivery.mjs
+  - plugins/pipeline-core/lib/architecture-prospective-materialization.mjs
+  - plugins/pipeline-core/lib/architecture-design.mjs
+  - plugins/pipeline-core/lib/design-decision-bindings.mjs
 allowedDependencies:
   - schemas
 authorityEffects:
   - read-write-workspace
   - execute-node-scripts
 verificationEntryPoints:
+  - plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs
+  - plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
   - plugins/pipeline-core/lib/passive-read-policy.test.mjs
   - plugins/pipeline-core/lib/intake-material-reference.test.mjs
   - plugins/pipeline-core/scripts/bootstrap-trust-recovery.test.mjs
@@ -222,6 +244,16 @@ verificationEntryPoints:
   - plugins/pipeline-core/lib/project-uninstall-contract.test.mjs
   - plugins/pipeline-core/lib/project-uninstall.test.mjs
   - plugins/pipeline-core/lib/runtime-projection-removal.test.mjs
+  - plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+  - plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs
+  - plugins/pipeline-core/lib/native-platform-process-observer.test.mjs
+  - plugins/pipeline-core/lib/darwin-requester-integration.test.mjs
+  - plugins/pipeline-core/lib/agy-item-delivery.test.mjs
+  - plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs
+  - plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs
+  - plugins/pipeline-core/install-agy.inline-candidate.test.mjs
+  - plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs
+  - plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs
 adrReferences:
   - ADR-0062
   - ADR-0063
@@ -396,3 +428,52 @@ grant active or declined state. Older unreadable decisions without independent
 provenance require explicit recovery. Observation never writes a migration.
 Uninstall removes exact manifest-proved workspace elements and rechecks resume
 postconditions; edited hook or plugin metadata is an ownership conflict.
+
+## Explicit local artifact publication
+
+`scripts/bound-artifact-transfer.mjs` reads a bounded local manifest and exclusively
+publishes a new scratch bundle on supported Linux hosts. `scripts/greenfield-public-comparison.mjs`
+reads digest-bound public observations and exclusively publishes a descriptive JSON
+projection under docs/, evidence/ or public/. The shared DevPlan lane checks the
+actual output path, while whole command grammar, READY and existing write policies
+remain active. Neither route grants source approval, public fidelity, native
+custody, measurement authentication or comparative quality claims.
+
+## Shell grammar capability placement (RGGRAM)
+
+The existing layer1 `plugins/pipeline-core/lib/guard/shell-grammar.mjs` is the
+shared closed command/read classifier behind the command/write-path guardrails
+capability (`claude-hook-safety`). Its evidence placement does not create a new
+product hook or a maintenance-window exception. Existing guard-split and kernel
+closure tests retain source graph and never-liftable membership duties. Native
+hook enforcement and the historical unnamed RGGRAM fixture remain unqualified.
+
+## Source-owned session authority and controlled observations
+
+- `plugins/pipeline-core/lib/session-authority-domain-owner.mjs`: Owns bounded physical namespace reads and source-private transition handles. Original writer effects, terminal readback and authenticated live-reference refresh remain distinct operations. Its Model activation preflight is a refusal boundary for foreign or lost mutable ownership; it grants no admission or native authority.
+- `plugins/pipeline-core/lib/session-authority-registry.mjs`: Owns the common-first session boundary, physical producer/member/release records, source-owned transition execution and reference refresh. Retired-owner terminal APIs are separate from ordinary admission. A current physical inventory or controlled observation is not a human approval or a native runner certification.
+- `plugins/pipeline-core/lib/afk-ledger.mjs`: Owns ledger framing, physical generation reads, writer locks and the AFK authority producer/lifetime adapter. Projection lifetime and physical snapshot readback require the genuine source-owned admission handle.
+- `plugins/pipeline-core/lib/afk-transaction-host.mjs`: Owns AFK activation, entry and review host transactions and the source-owned projection effect/settlement route. These export pointers establish ownership only; pending runtime cause fixes and AFK qualification remain separate.
+- `plugins/pipeline-core/lib/codex-host-process-journal.mjs`: Owns managed Codex journal publication/readback, authority producer ports and same-process requester/invocation context observations. Physical process facts do not alone attest a provider or model.
+- `plugins/pipeline-core/lib/codex-host-process-supervisor.mjs`: Owns managed child launch/recovery and source-owned terminal-journal inspection. Journal and supervisor cooperate on genuine invocation/terminal handles; an exit status alone is not a release certificate.
+- `plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs`: Publishes a bounded private observation from a genuine METHOD dispatch handle and creates/inspects a same-process METHOD evidence binding. Its explicit assurance is controlled-source-method, with native and independent-Critic-PASS claims false; it cannot replace the independent review or installed-runner proof.
+
+These contracts belong to pipeline-core. The harness remains the owner of test
+orchestration and declarative Verify registration. This navigation update does
+not establish whole-workflow acceptance, AFK PASS or native PASS.
+
+## Item-owned delivery verification
+
+The item delivery and coherent generic Critic batch contracts retain candidate-bound
+verification, terminal evidence and independent review. New suites enroll with
+required per-case completion; metadata enrollment does not qualify native runner
+execution or accept the proposed quality-gate ADR.
+
+`architecture-prospective-materialization.mjs` and the existing architecture design
+and decision-binding contracts project prospective source decisions into the
+bounded design-to-implementation transition. Their production evidence belongs to
+the existing `v3-routed-duties` readiness capability. The prospective materialization
+and companion suites bind controlled Source execution and registry evidence;
+proposed decisions remain proposed, and original architecture-design case policy
+and assertions remain retained. This qualification supplies no real PO approval
+or native host attestation.

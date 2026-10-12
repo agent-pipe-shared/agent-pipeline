@@ -203,7 +203,7 @@
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\" --runner claude",
             "timeout": 3
           }
         ]

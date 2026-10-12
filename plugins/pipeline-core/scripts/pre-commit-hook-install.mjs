@@ -66,8 +66,9 @@
  *   install-marker.json`, and a decline marker at `.../decline-marker.json` — the identical
  *   shape `pre-push-hook-install.mjs` already uses for both.
  *
- * SCOPE (backlog item's own "Scope constraint the fix must honour"): only gate-strength- and
- * testpath-protected paths are checked. A staged change to any other path is unaffected —
+ * SCOPE: protected-path predicates remain unchanged. Repositories carrying the
+ * observation-document policy additionally classify their exact staged docs inventory.
+ * Other repositories and unrelated paths keep the existing admission behavior —
  * proven by a test, not by inspection (see this file's own test suite).
  *
  * FIRST-APPEARANCE EXEMPTION (PO decision, 2026-08-29, candidate (b) of the backlog item's
@@ -724,6 +725,20 @@ async function main() {
     return;
   }
 
+  // Observation documentation is classified against the exact staged inventory
+  // and staged policy. Working-tree edits cannot authorize a different index.
+  try {
+    const { checkStagedObservationDocumentation } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "staged-observation-doc-classification.mjs")).href);
+    const classification = checkStagedObservationDocumentation(projectRoot);
+    if (!classification.ok) {
+      block(["staged observation/document governance refused: " + classification.codes.join(", ")]);
+      return;
+    }
+  } catch {
+    block(["staged observation/document governance inspection is unavailable; the staged commit cannot be admitted."]);
+    return;
+  }
+
   let gateStrengthRuleFor;
   let loadProtectedTestPathRules;
   let protectedTestPathRuleFor;
@@ -791,6 +806,24 @@ async function main() {
       ...sanctionedLateVerifyRecoveryPaths(projectRoot, paths),
     ]);
   } catch { sanctionedVerifyPaths = new Set(); }
+
+  // P16: normal onboarding intentionally keeps lifecycle State private and
+  // untracked. Preserve the old tracked-State predicates above; this separate
+  // route reopens real current approval and the exact committed tier transition.
+  // No marker is authority, and unavailable proof grants no protected path.
+  if (paths.length >= 1 && paths.length <= VERIFY_CALIBRATION_PATHS.length
+    && paths.includes(VERIFY_CALIBRATION_PATHS[0])
+    && paths.every((path) => VERIFY_CALIBRATION_PATHS.includes(path))) {
+    try {
+      const { inspectCalibrationVerifyCommitTransition } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "calibration-verify-commit-transition.mjs")).href);
+      const observed = inspectCalibrationVerifyCommitTransition({ rootDir: projectRoot, stagedPaths: paths });
+      if (observed?.ok === true && observed.code === "CVCT-COMMIT-READY"
+        && Array.isArray(observed.paths) && observed.paths.length === paths.length
+        && observed.paths.every((path) => paths.includes(path))) {
+        for (const path of observed.paths) sanctionedVerifyPaths.add(path);
+      }
+    } catch { /* ordinary GS-10/GS-11 refusal remains */ }
+  }
 
   // A quality package is not a per-file exemption. The verifier only returns
   // true after rechecking the detached proof, unchanged committed trust policy,

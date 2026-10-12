@@ -26,6 +26,7 @@ import { basename } from "node:path";
 import * as toolchainModule from "./toolchain-preflight.mjs";
 // TR-J-T3 addition, on its own line: the R7-7e typed-repair case spawns a frozen copy of the plugin root.
 import { cpSync } from "node:fs";
+import { redactText } from "./capture-evidence.mjs";
 
 let passed = 0;
 function check(name, fn) { cases.push({ id: `TCP${String(cases.length + 1).padStart(3, "0")}`, name, run: async () => { await fn(); passed += 1; process.stdout.write(`PASS TCP${String(passed).padStart(2, "0")} ${name}\n`); } }); }
@@ -491,7 +492,7 @@ function r77StubGit(repo, version) {
 }
 function r77Run(script, args, repo, env) {
   const run = spawnSync(process.execPath, [script, ...args], { cwd: repo, env, encoding: "utf8", shell: false, timeout: 120000 });
-  return { status: run.status, text: `${run.stdout ?? ""}\n${run.stderr ?? ""}`.split(repo).join("<fixture>") };
+  return { status: run.status, text: redactText(`${run.stdout ?? ""}\n${run.stderr ?? ""}`, repo) };
 }
 function r77JsonObjects(text) {
   const objects = [];
@@ -575,10 +576,13 @@ check("R7-7c: bootstrap and prepare-for-signature produce the same report conten
     const bootstrap = r77EntryReport("bootstrap (pipeline-start-preflight)", r77Run(R77_SCRIPT("pipeline-start-preflight.mjs"), [], repo, env));
     const prepareRun = r77Run(R77_SCRIPT("guard-human-override.mjs"), ["prepare-for-signature", "--repo", repo, "--request-sha256", "0".repeat(64)], repo, env);
     const prepare = r77EntryReport("prepare-for-signature", prepareRun);
+    // Apply the same canonical evidence redaction to child and direct observations.
+    // Preserve the full findings and every argv token in their original order.
+    const canonicalFindings = (findings) => JSON.parse(redactText(JSON.stringify(findings), repo));
     const direct = await r77Report(repo);
     assert.ok(direct.findings.some((finding) => finding.status !== "ok"), "fixture precondition: a fresh clone carries a non-ok finding (git-hooks)");
-    assert.deepEqual(bootstrap.findings, direct.findings, "bootstrap must carry the same findings as the report");
-    assert.deepEqual(prepare.findings, direct.findings, "prepare-for-signature must carry the same findings as the report");
+    assert.deepEqual(canonicalFindings(bootstrap.findings), canonicalFindings(direct.findings), "bootstrap must carry the same findings as the report");
+    assert.deepEqual(canonicalFindings(prepare.findings), canonicalFindings(direct.findings), "prepare-for-signature must carry the same findings as the report");
     for (const key of ["signIntentCommand", "authorizeBySignatureCommand", "expiresAt"]) assert.equal(prepareRun.text.includes(key), false, `prepare-for-signature with a non-ok finding must hand over no ${key} (no command, no window)`);
   });
 });

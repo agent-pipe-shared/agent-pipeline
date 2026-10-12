@@ -33,9 +33,9 @@
 ## Verdict processing (Elephant)
 
 - [ ] Findings failing the evidence bar or skip rule rejected with a short note
-- [ ] EVERY blocker/major dispositioned: fix (fresh rework dispatch) / reject with justification / escalate to the PO
+- [ ] EVERY blocker/major dispositioned: fix in a fresh Correction Goldfish dispatch for the complete declared batch / reject with justification / escalate to the PO
 - [ ] Before re-dispatch: harness checklist first — briefing? context? tools/permissions? hooks? (G2/P1)
-- [ ] Rework = fresh local dispatch, fresh context, refined briefing; max 3 local cycles, and open the PO course gate only when a further correction would exceed that budget (>3)
-- [ ] Re-review after rework by a NEW fresh Critic where triggers still apply — never reuse a Critic context
+- [ ] Correction ownership: one fresh Correction Goldfish owns the complete declared batch through its fixes and targeted retests, for at most three correction-diff rounds after the initial full review; preserve the batch identity across rounds and restarts, with no budget reset by renaming or repartitioning. A further correction requires the applicable PO course gate.
+- [ ] Batch review: declare meaningful acceptance-criterion and evidence scope before implementation items begin, then freeze membership after Main integration and its tests. Dispatch one full Critic review for the integrated batch and a fresh Critic context for a correction-diff review only when its review trigger applies; never dispatch a Critic automatically per mini-item.
 - [ ] Gate decision recorded: trigger row, dispositions, cycle count; telemetry line for the Critic run
 - [ ] Shadow metrics, when available, bind this gate/cycle to exact candidate and tool/runner/schema versions; unavailable values are `unknown`, never zero, and do not change the verdict

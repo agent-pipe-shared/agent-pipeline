@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "shell-grammar" (layer 1), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
+import { readOnlyGitApplyCheckArguments } from "../protected-test-paths.mjs";
 import { homedir } from "node:os";
-import { realpathSync, statSync } from "node:fs";
+import { lstatSync, realpathSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { isAllowedPassiveReadTarget } from "../passive-read-policy.mjs";
+import { isAllowedPassiveReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
+// Expose the policy-owned binding; shell decisions continue through the same policy function.
+export { PASSIVE_READ_CREDENTIAL_ROOTS };
 import { isBoundedReadOnlyPipeline, isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "./constants.mjs";
 import { MAX_AND_CHAIN_SEGMENTS } from "./grammar-denials.mjs";
@@ -865,10 +869,11 @@ function qp4ReadTargetOperands(name, argv) {
       if (option === null) continue;
     }
     const patternFile = option === "f" || option === "file";
+    const optionFile = patternFile || (rg ? option === "ignore-file" : option === "exclude-from");
     if (patternFile || option === "e" || option === "regexp") explicitPattern = true;
     const value = consumesNext ? argv[index + 1] : attached;
     if (consumesNext) index += 1;
-    if (patternFile && typeof value === "string" && value !== "") fileValues.push(value);
+    if (optionFile && typeof value === "string" && value !== "") fileValues.push(value);
   }
   return [...(explicitPattern ? positionals : positionals.slice(1)), ...fileValues];
 }
@@ -885,6 +890,37 @@ export function qp4OperandResolvesOutsideRoot(parsed, root) {
   });
 }
 
+// Report-only entry: exact bundled source and one bounded public JSON input.
+// No stdin shell redirect, new lifecycle exception or general script lane.
+function isResourceHeadroomReadOnlyInvocation(args, root) {
+  try {
+    if (!Array.isArray(args) || args.length !== 3 || args[1] !== '--input'
+      || typeof args[0] !== 'string' || typeof args[2] !== 'string') return false;
+    const script = fileURLToPath(new URL('../../scripts/report-resource-headroom.mjs', import.meta.url));
+    if (resolve(root, args[0]) !== script || realpathSync(script) !== script) return false;
+    const scriptStat = lstatSync(script);
+    if (!scriptStat.isFile() || scriptStat.isSymbolicLink() || scriptStat.nlink !== 1) return false;
+    const input = args[2], parts = input.split('/');
+    if (input.length === 0 || input.length > 500 || !input.endsWith('.json')
+      || /[\\:\x00-\x1f\x7f]/u.test(input)
+      || parts.some(part => part === '' || part === '.' || part === '..')
+      || ['.git','.ssh','.aws','.codex','.agents','.claude','.pipeline'].includes(parts[0])) return false;
+    const physicalRoot = resolve(root), rootStat = lstatSync(physicalRoot);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink() || realpathSync(physicalRoot) !== physicalRoot) return false;
+    let current = physicalRoot;
+    for (let index = 0; index < parts.length; index += 1) {
+      current = join(current, parts[index]);
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink() || realpathSync(current) !== current) return false;
+      if (index < parts.length - 1) { if (!stat.isDirectory()) return false; }
+      else if (!stat.isFile() || stat.nlink !== 1 || stat.size > 65536) return false;
+    }
+    // The CLI independently rechecks identity and bytes before report emission.
+    // Neither this grammar nor an exit0 report certifies measurement freshness.
+    return true;
+  } catch { return false; }
+}
+
 export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
@@ -899,6 +935,7 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
     && (/^\\n[^%$`\\r\\n]+\\n$/u.test(args[0])
       || /^\n[^%$`\\\r\n\0-\x08\x0b\x0c\x0e-\x1f\x7f]+\n$/u.test(args[0]));
   if (["node", "node.exe"].includes(executable)) {
+    if (isResourceHeadroomReadOnlyInvocation(args, root)) return true;
     if (args.length === 2
       && args[0] === "--check"
       && !args[1].startsWith("-")
@@ -981,6 +1018,27 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
     return true;
   }
   if (executable !== "git") return false;
+  const applyCheck = readOnlyGitApplyCheckArguments(args);
+  if (applyCheck !== null) {
+    const directory = applyCheck.directory === null ? root : resolve(root, applyCheck.directory);
+    if (applyCheck.directory !== null) {
+      try {
+        const facts = lstatSync(directory);
+        if (!facts.isDirectory() || facts.isSymbolicLink()
+          || realpathSync(directory) !== directory
+          || !isApprovedSingleCommandReadArg(directory, root, extraRoots, true)) return false;
+      } catch { return false; }
+    }
+    return applyCheck.patches.every(path => {
+      const candidate = isAbsolute(path) ? path : resolve(directory, path);
+      try {
+        const facts = lstatSync(candidate);
+        return facts.isFile() && !facts.isSymbolicLink()
+          && realpathSync(candidate) === candidate
+          && isApprovedSingleCommandReadArg(candidate, root, extraRoots, true);
+      } catch { return false; }
+    });
+  }
   let index = 0;
   while (index < args.length && args[index].startsWith("-")) {
     if (args[index] === "-C") {
@@ -1008,12 +1066,15 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
   if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref", "describe"].includes(subcommand)) {
     return true;
   }
-  if (subcommand === "apply") {
-    const operands = subargs[0] === "--check"
-      ? (subargs[1] === "--" ? subargs.slice(2) : subargs.slice(1))
-      : [];
-    return operands.length > 0 && operands.every((arg) => !arg.startsWith("-") && /\.(?:diff|patch)$/iu.test(arg));
+  // Closed stash readers only: no options, output, extra refs or mutating verbs.
+  if (subcommand === "stash") {
+    if (subargs.length === 1 && subargs[0] === "list") return true;
+    return subargs[0] === "show" && (subargs.length === 1
+      || (subargs.length === 2 && /^[0-9]+$/u.test(subargs[1])));
   }
+  // Apply checks require the shared closed parser and physical input containment
+  // in isReadOnlySimpleWords; this context-free subcommand reader grants none.
+  if (subcommand === "apply") return false;
   if (subcommand === "tag") {
     return subargs.length === 0 || subargs.every((arg) =>
       arg === "-l" || arg === "--list" || arg.startsWith("--format="));
@@ -1102,11 +1163,13 @@ function commitMessageFileRemediation(command) {
   if (!/^\s*git\s+commit\b/u.test(command)) return null;
   if (!/(?:^|\s)-m(?:[\s"'=]|$)|(?:^|\s)--message\b/u.test(command)) return null;
   if (!/[\r\n]/u.test(command)) return null;
-  return "Remediation: pass each paragraph as a single-line -m argument and provenance as Git --trailer arguments. "
-    + "Run \"git add -- <paths>\" and then "
-    + "\"git commit -m '<type(scope): subject>' -m '<why>' --trailer 'AI-Assisted: true' "
-    + "--trailer 'Dispatch: <task> (<role>)' -- <paths>\" as separate tool calls, "
-    + "naming the same exact paths in both. Include Dispatch only when the repository requires it.";
+  return "Remediation: use separate stage and commit tool calls, naming the same exact paths in both. "
+    + "Run \"git add -- <paths>\" first. For marker-free literal content, use "
+    + "\"git commit -m 'docs: update guidance' -m 'Explain the change' --trailer 'AI-Assisted: true' -- <paths>\". "
+    + "Keep each -m argument on one line. Parentheses in a scoped subject or required Dispatch role, "
+    + "and other fail-closed shell markers, remain refused even when quoted. Preserve that exact content "
+    + "and required trailers in a message file, then use \"git commit -F <msgfile> -- <paths>\". "
+    + "Include Dispatch only when the repository requires it; never strip required provenance to fit the file-free form.";
 }
 
 /**

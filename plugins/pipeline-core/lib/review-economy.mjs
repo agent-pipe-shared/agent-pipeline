@@ -34,6 +34,12 @@ export const REVIEW_LIMITS = Object.freeze({
   productRetries: 1,
   environmentReroutes: 1,
 });
+// Historical lineage/projection records keep REVIEW_LIMITS unchanged. New
+// dispatch admission follows the PO's one-full plus at most three correction-DIFF cap.
+export const CRITIC_DISPATCH_LIMITS = Object.freeze({
+  criticRounds: 4,
+  correctionCommits: REVIEW_LIMITS.correctionCommits,
+});
 export const CRITIC_REVIEW_ECONOMY_PROJECTION_SCHEMA = "pipeline.critic-review-economy-projection.v1";
 export const CRITIC_REVIEW_FAILURE_CLASSES = Object.freeze([
   "no-result",
@@ -177,14 +183,18 @@ function validPathInvariantMap(map) {
 
 export function admitReviewAttempt(input) {
   if (!isObject(input)) return { ok: false, mode: null, code: "RE-REVIEW-SHAPE" };
-  if (!safeInteger(input.round) || input.round < 1 || input.round > REVIEW_LIMITS.criticRounds) {
+  if (!safeInteger(input.round) || input.round < 1 || input.round > CRITIC_DISPATCH_LIMITS.criticRounds) {
     return { ok: false, mode: null, code: "RE-CRITIC-ROUND-LIMIT", courseGateRequired: true };
   }
   if (!safeInteger(input.correctionCommits) || input.correctionCommits > REVIEW_LIMITS.correctionCommits) {
     return { ok: false, mode: null, code: "RE-CORRECTION-LIMIT", courseGateRequired: true };
   }
-  if (input.round === 1 || input.requestedMode !== "delta") {
-    return { ok: true, mode: "full", code: input.round === 1 ? "RE-FIRST-FULL" : "RE-REQUESTED-FULL", affectedInvariantIds: [] };
+  if (input.round === 1) {
+    if (input.requestedMode !== "full") return { ok: false, mode: null, code: "RE-FIRST-FULL-REQUIRED", affectedInvariantIds: [] };
+    return { ok: true, mode: "full", code: "RE-FIRST-FULL", affectedInvariantIds: [] };
+  }
+  if (input.requestedMode !== "delta") {
+    return { ok: false, mode: null, code: "RE-FOLLOWUP-DELTA-REQUIRED", affectedInvariantIds: [] };
   }
   const bindingsValid = SHA40.test(input.base ?? "") && SHA40.test(input.head ?? "") && SHA40.test(input.tree ?? "")
     && Array.isArray(input.changedPaths) && input.changedPaths.length > 0
@@ -199,15 +209,22 @@ export function admitReviewAttempt(input) {
     && input.coordinatorImpactConfirmed === true
     && input.trustBoundaryChanged === false
     && input.impactAmbiguous === false;
-  if (!bindingsValid) return { ok: true, mode: "full", code: "RE-DELTA-FALLBACK-BINDINGS", affectedInvariantIds: [] };
+  if (!bindingsValid) return { ok: false, mode: null, code: "RE-DELTA-BINDINGS-INVALID", affectedInvariantIds: [] };
   const unknown = input.changedPaths.filter((path) => !Object.hasOwn(input.pathInvariantMap, path));
-  if (unknown.length > 0) return { ok: true, mode: "full", code: "RE-DELTA-FALLBACK-UNKNOWN-PATH", affectedInvariantIds: [] };
+  if (unknown.length > 0) return { ok: false, mode: null, code: "RE-DELTA-UNKNOWN-PATH", affectedInvariantIds: [] };
   return {
     ok: true,
     mode: "delta",
     code: "RE-DELTA-ADMITTED",
     affectedInvariantIds: sortedUnique(input.changedPaths.flatMap((path) => input.pathInvariantMap[path])),
   };
+}
+
+/** Pure admission projection. Accepted criteria never extend the current cap. */
+export function admitAuthenticatedReviewAttempt({attempt,acceptedCriterion}) {
+  // Preserve the existing argument shape for retained callers. Historical
+  // criterion authentication remains evidence; it is not new launch authority.
+  return admitReviewAttempt(attempt);
 }
 
 const CRITIC_LINEAGE_ROOT_KEYS = Object.freeze([

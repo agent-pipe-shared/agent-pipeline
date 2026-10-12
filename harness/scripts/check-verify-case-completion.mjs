@@ -323,19 +323,34 @@ function hasRequiredProtocol(source, suitePath) {
   return closedCompletionRegistration(source, calls[0].index) !== null;
 }
 
-function hasVerifyCaseCompletionPolicy(element) {
+function parseVerifyCaseCompletionPolicy(element) {
   const masked = maskNonCode(element);
   const open = masked.indexOf("{");
-  if (open === -1) return false;
+  if (open === -1) return { present: false, policy: null };
   const close = matchingClose(element, open, "{", "}");
-  if (close === -1) return false;
+  if (close === -1) return { present: false, policy: null };
   let properties;
   try { properties = topLevelElements(element.slice(open + 1, close)); }
-  catch { return false; }
+  catch { return { present: false, policy: null }; }
   const matches = properties.filter((property) => /^\s*caseCompletion\s*:/u.test(maskNonCode(property)));
-  if (matches.length !== 1) return false;
-  const closed = /^\s*caseCompletion\s*:\s*\{\s*schema\s*:\s*"pipeline\.verify-case-completion-policy\.v1"\s*,\s*caseIds\s*:\s*(?:\[(?:\s*"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}"\s*,?)*\]|Array\.from\(\{\s*length\s*:\s*[1-9][0-9]*\s*\},\s*\(_,\s*index\)\s*=>\s*`[A-Za-z0-9._:-]+\$\{String\(index \+ 1\)\.padStart\([1-9][0-9]*,\s*"0"\)\}`\))\s*,\s*maxBytes\s*:\s*([1-9][0-9_]*)\s*\}\s*$/u.exec(matches[0]);
-  return closed !== null && Number(closed[1].replaceAll("_", "")) <= 1_048_576;
+  const invalid = { present: matches.length !== 0, policy: null };
+  if (matches.length !== 1) return invalid;
+  const closed = /^\s*caseCompletion\s*:\s*\{\s*schema\s*:\s*"pipeline\.verify-case-completion-policy\.v1"\s*,\s*caseIds\s*:\s*(\[(?:\s*"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}"(?:\s*,\s*"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")*\s*,?\s*)?\]|Array\.from\(\{\s*length\s*:\s*[1-9][0-9]*\s*\},\s*\(_,\s*index\)\s*=>\s*`[A-Za-z0-9._:-]+\$\{String\(index \+ 1\)\.padStart\([1-9][0-9]*,\s*"0"\)\}`\))\s*,\s*maxBytes\s*:\s*([1-9][0-9]*(?:_[0-9]+)*)\s*\}\s*$/u.exec(matches[0]);
+  if (closed === null) return invalid;
+  let caseIds;
+  if (closed[1].startsWith("[")) {
+    // No eval: only the already-closed literal/string or bounded generator
+    // grammar is decoded. Preserve the exact ordered IDs for digest binding.
+    caseIds = [...closed[1].matchAll(/"([A-Za-z0-9][A-Za-z0-9._:-]{0,127})"/gu)].map((match) => match[1]);
+  } else {
+    const generated = /^Array\.from\(\{\s*length\s*:\s*([1-9][0-9]*)\s*\},\s*\(_,\s*index\)\s*=>\s*`([A-Za-z0-9._:-]+)\$\{String\(index \+ 1\)\.padStart\(([1-9][0-9]*),\s*"0"\)\}`\)$/u.exec(closed[1]);
+    const length = Number(generated?.[1]), width = Number(generated?.[3]);
+    if (!Number.isSafeInteger(length) || length > 2048 || !Number.isSafeInteger(width) || width > 64
+      || generated[2].length + Math.max(width, String(length).length) > 64) return invalid;
+    caseIds = Array.from({ length }, (_, index) => `${generated[2]}${String(index + 1).padStart(width, "0")}`);
+  }
+  const policy = { schema: "pipeline.verify-case-completion-policy.v1", caseIds, maxBytes: Number(closed[2].replaceAll("_", "")) };
+  return validateVerifyCaseCompletionPolicy(policy) ? { present: true, policy } : invalid;
 }
 
 function parseVerifyRegistrations(source, findings) {
@@ -360,10 +375,13 @@ function parseVerifyRegistrations(source, findings) {
         findings.push(`VERIFY-PARSE ${arrayName} entry ${index} is outside the closed literal registration grammar`);
         continue;
       }
+      const completion = parseVerifyCaseCompletionPolicy(element);
+      if (completion.present && completion.policy === null) findings.push(`VERIFY-POLICY ${match[1]} has invalid or unsupported builtin completion policy`);
+      const completionFields = { caseCompletion: completion.policy !== null, caseCompletionPolicy: completion.policy, caseCompletionPresent: completion.present };
       if (kind === "join") {
         const segments = [...match[3].matchAll(/"(?:[^"\\]|\\.)*"/gu)].map((item) => JSON.parse(item[0]));
-        parsed.push({ name: match[1], path: posix.join(BASES[match[2]], ...segments), arrayName, caseCompletion: hasVerifyCaseCompletionPolicy(element) });
-      } else parsed.push({ name: match[1], path: match[2], arrayName, caseCompletion: hasVerifyCaseCompletionPolicy(element) });
+        parsed.push({ name: match[1], path: posix.join(BASES[match[2]], ...segments), arrayName, ...completionFields });
+      } else parsed.push({ name: match[1], path: match[2], arrayName, ...completionFields });
     }
     if (parsed.length !== elements.length) findings.push(`VERIFY-PARSE ${arrayName} declared ${elements.length} entries, parsed ${parsed.length}`);
     for (const entry of parsed) accept(entry);
@@ -556,13 +574,11 @@ export function checkVerifyCaseCompletion({
   const augmentationInputs = [...staticRegistrations, ...declarativeRegistrations].map((entry) => ({
     name: entry.name,
     file: entry.path,
-    ...(entry.arrayName === "DECLARATIVE_VERIFY_SUITES"
-      ? (entry.caseCompletion ? { caseCompletion: entry.caseCompletionPolicy } : {})
-      : (entry.caseCompletion ? { caseCompletion: true } : {})),
+    ...((entry.caseCompletion || entry.caseCompletionPresent) ? { caseCompletion: entry.caseCompletionPolicy } : {}),
   }));
   const augmentedRegistrations = loadAndApplyVerifyCaseCompletionAugmentations({ rootDir: root, candidate: candidateOid, suites: augmentationInputs });
   if (!augmentedRegistrations.ok) findings.push(`VERIFY-AUGMENTATION ${augmentedRegistrations.code} ${augmentedRegistrations.error}`);
-  const policyNames = new Set(augmentedRegistrations.ok ? augmentedRegistrations.suites.filter((entry) => entry.caseCompletion).map((entry) => entry.name) : []);
+  const policyNames = new Set(augmentedRegistrations.ok ? augmentedRegistrations.suites.filter((entry) => validateVerifyCaseCompletionPolicy(entry.caseCompletion)).map((entry) => entry.name) : []);
   const registrations = [...staticRegistrations, ...declarativeRegistrations]
     .map((entry) => ({ ...entry, caseCompletion: policyNames.has(entry.name) }))
     .filter((entry) => entry.path.endsWith(".test.mjs"));

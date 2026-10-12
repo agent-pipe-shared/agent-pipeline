@@ -17,7 +17,8 @@ import {
   validateInterruptionReceipt,
 } from "../lib/interruption-receipts.mjs";
 import { canonicalInvocationJson } from "../lib/invocation-reliability.mjs";
-import registry from "../../../policies/interruption-registry.v1.json" with { type: "json" };
+import { checkInterruptionPromotion } from "../lib/interruption-promotion.mjs";
+import registry from "../config/interruption-registry.v1.json" with { type: "json" };
 
 export const REPORT_RESULT_SCHEMA = "pipeline.interruption-report-result.v1";
 export const LOCAL_REPORT_SCHEMA = "pipeline.interruption-local-report.v1";
@@ -64,6 +65,7 @@ export function parseReportInterruptionsArgs(argv) {
   let format = "json";
   let help = false;
   let writeBaseline = false;
+  let promotionStatus = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -71,6 +73,8 @@ export function parseReportInterruptionsArgs(argv) {
       help = true;
     } else if (arg === "--write-baseline") {
       writeBaseline = true;
+    } else if (arg === "--promotion-status") {
+      promotionStatus = true;
     } else if (arg === "--root") {
       i++;
       if (i >= argv.length || argv[i].startsWith("--")) {
@@ -172,6 +176,7 @@ export function parseReportInterruptionsArgs(argv) {
       dispatchId,
       format,
       writeBaseline,
+      promotionStatus,
     },
   };
 }
@@ -509,12 +514,23 @@ export function main(argv = process.argv.slice(2), ports = productionPorts) {
     }
 
     if (parsed.help) {
-      process.stdout.write("Usage: report-interruptions.mjs --root ROOT [--from ISO] [--through ISO] [--feature ID] [--package ID] [--dispatch ID] [--format json|text] [--write-baseline]\n");
+      process.stdout.write("Usage: report-interruptions.mjs --root ROOT [--from ISO] [--through ISO] [--feature ID] [--package ID] [--dispatch ID] [--format json|text] [--write-baseline] [--promotion-status]\n");
       process.exitCode = 0;
       return 0;
     }
 
     const o = parsed.options;
+    if (o.promotionStatus) {
+      if (o.writeBaseline || o.from != null || o.through != null || o.feature != null || o.packageId != null || o.dispatchId != null || o.format !== "json") {
+        process.stderr.write(`${JSON.stringify({ schema: REPORT_RESULT_SCHEMA, status: "rejected", code: "APR-CLI-SHAPE" })}\n`);
+        process.exitCode = 2;
+        return 2;
+      }
+      const promotion = checkInterruptionPromotion({ root: o.root });
+      process.stdout.write(`${JSON.stringify({ schema: REPORT_RESULT_SCHEMA, promotion })}\n`);
+      process.exitCode = 0;
+      return 0;
+    }
     if (o.writeBaseline && (o.feature != null || o.packageId != null || o.dispatchId != null)) {
       process.stderr.write(`${JSON.stringify({ schema: REPORT_RESULT_SCHEMA, status: "rejected", code: "RI-BASELINE-SCOPED" })}\n`);
       process.exitCode = 2;

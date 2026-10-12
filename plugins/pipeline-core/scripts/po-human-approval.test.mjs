@@ -5292,7 +5292,6 @@ test("R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the 
     previous.nodefault = process.env.NoDefaultCurrentDirectoryInExePath;
     delete process.env.NoDefaultCurrentDirectoryInExePath;
     process.env.R76_MARKER = marker;
-    process.env.NODE_OPTIONS = `--require "${hook.replace(/\\/gu, "/")}"`;
     // Positive control: started by its explicit path, the planted decoy must leave its marker, or
     // this case could never fail (a vacuous pass is the failure mode of a decoy test).
     spawnSync(process.platform === "win32" ? planted : join(env.dirs.repoRoot, "openssl"), ["version"], { stdio: "pipe" });
@@ -5300,12 +5299,13 @@ test("R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the 
     rmSync(marker, { force: true });
     process.chdir(env.dirs.repoRoot);
     const outcome = r76Sign(env, null);
+    assert.equal(process.env.NODE_OPTIONS, previous.options, "the decoy fixture preserves inherited Node preload options");
     if (previous.nodefault === undefined) delete process.env.NoDefaultCurrentDirectoryInExePath; else process.env.NoDefaultCurrentDirectoryInExePath = previous.nodefault;
     process.chdir(startCwd);
     assert.equal(existsSync(marker), false, `a decoy openssl was started (sign-intent ${r76Describe(outcome)})`);
   } finally {
     process.chdir(startCwd);
-    for (const [name, value] of [["NODE_OPTIONS", previous.options], ["R76_MARKER", previous.marker]]) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
+    for (const [name, value] of [["R76_MARKER", previous.marker]]) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
     rmSync(aux, { recursive: true, force: true });
     r76Release(env);
   }

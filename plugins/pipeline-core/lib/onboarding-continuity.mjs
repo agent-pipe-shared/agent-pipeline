@@ -11,6 +11,8 @@
  */
 import {
   createHash,
+  createPublicKey,
+  sign,
   createHmac,
   randomBytes,
   randomUUID,
@@ -18,12 +20,21 @@ import {
 } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+import {inspectSourceOwnedControlledMethodDispatchHandle} from "./controlled-continuity-method-dispatch.mjs";
+import {executeSourceOwnedAfkHostTransaction,readSourceOwnedAfkProjectionSettlementSelector,readSourceOwnedAfkProjectionSettlement,isCurrentSourceOwnedAfkProjectionAttempt} from "./afk-transaction-host.mjs";
+import {parseAfkLedgerGeneration,createAfkLedgerAuthorityProducerPort} from "./afk-ledger.mjs";
+import {observeAfkGitAuthority} from "./afk-git-adapter.mjs";
+import * as continuityExerciseCustody from "./afk-isolated-repository-custody.mjs";
 import {
   chmodSync,
+  fchmodSync,
+  linkSync,
+  writeSync,
   closeSync,
   constants,
   existsSync,
   fstatSync,
+  ftruncateSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
@@ -74,6 +85,7 @@ import {
 } from "./project-authority.mjs";
 import {
   PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
+  PO_GATE_PRD_LANGUAGE_MARKER,
   PRD_ACKNOWLEDGEMENT_MARKER,
   PRD_LANGUAGE_MARKER,
   TECHNICAL_SPEC_MARKER,
@@ -88,6 +100,8 @@ import {
   inspectSessionOwnerRuntime,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
+  observeOwnedSessionDescriptorOwnerHandle,
+  observeOwnedSessionDescriptorClosureHandle,
 } from "./worktree-lifecycle.mjs";
 import {
   derivePlanLifecycle,
@@ -96,6 +110,34 @@ import {
 } from "./plan-spec-state-v2.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver,
+  inspectSourceOwnedCurrentAuthorityContext, inspectSourceOwnedRequesterInvocation, withSourceOwnedRetiredOwnerTerminalContext,
+  inspectSourceOwnedRetiredOwnerTerminalContext } from "./session-requester-bridge.mjs";
+import { withSessionAuthorityBoundary, advanceSessionAuthorityMember, reserveSessionAuthorityMember, releaseSessionAuthorityMember,
+  inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord,
+  inspectSourceOwnedSessionAuthorityStateRefresh, inspectSourceOwnedSessionAuthorityCompanionRefresh,
+  executeSourceOwnedControlledContinuityTicketProbe } from "./session-authority-registry.mjs";
+import { isOwnedStateAuthorityWriteHandle, observeStateAuthorityWrite,
+  observeStateAuthorityWriteTerminal, isOwnedStateAuthorityCompanionWriteHandle,
+  observeStateAuthorityCompanionWrite, observeStateAuthorityCompanionWriteTerminal,
+  getOwnedStateAuthorityCompanionContextHandle, readState as readSanctionedPlanState,
+  readAcceptedDeliveryContract as readSanctionedAcceptedContract,
+  statePath as statePathForMethod, run as runSanctionedCompanionState,
+  inspectOwnedContinuityStateWriterLock } from "../scripts/pipeline-state.mjs";
+import { AsyncLocalStorage } from "node:async_hooks";
+import {inspectSourceOwnedSessionAuthorityMember} from "./session-authority-registry.mjs";
+import {sameProcess as sameOwnedVerificationProcess} from "./codex-host-process-journal.mjs";
+import {inspectSourceOwnedContinuityVerificationRequesterFloor,
+  spawnSourceOwnedContinuityVerificationChild,inspectSourceOwnedContinuityVerificationExchange} from "./session-requester-bridge.mjs";
+import {OWNED_VERIFICATION_CODES,ownedVerificationFail,ownedVerificationExact,
+  ownedVerificationDigest,ownedVerificationFreeze,ownedVerificationSameProcess,readOwnedVerificationPhysicalFile,
+  recheckOwnedVerificationPhysicalRefs,readOwnedVerificationRegistration,collectOwnedVerificationSourceModules,
+  inspectSourceOwnedTaskVerificationPreparation} from "./owned-continuity-verification.mjs";
+import { createDesignReviewReceipt } from "./design-review-receipt.mjs";
+import { compileDecisionSummary } from "../scripts/architecture-baseline.mjs";
+import { validateFeaturePackage } from "./feature-package-topology.mjs";
+
 import { resolveRepoScopedDirectory } from "./po-key-directory.mjs";
 
 export const KICKOFF_PLAN_SCHEMA = "pipeline.codex-onboarding-kickoff-plan.v1";
@@ -3353,7 +3395,7 @@ export function recordClosedOnboardingSessionCleanupRelease({
  * Existing bindings are replayable but immutable. No other state field may
  * change, and admitted dispatch/decision/close state rejects a late binding.
  */
-export function bindOnboardingSessionCleanup({
+function bindOnboardingSessionCleanupInternal({
   rootDir,
   expectedStateSha256,
   expectedRevision,
@@ -3918,7 +3960,7 @@ export function releaseOrphanSessionCleanupBinding({
  * closure completed. Unknown or different handles never rotate through this
  * routine.
  */
-export function releaseOnboardingSessionCleanup({
+function releaseOnboardingSessionCleanupInternal({
   rootDir,
   expectedStateSha256,
   expectedRevision,
@@ -6788,6 +6830,10 @@ function buildIntakeDesignInputContent(checkpoint, chunks) {
     "## Captured material input (verbatim, in capture order)",
     "",
     renderIntakeMaterialInputSection(chunks),
+    "## Design questions and answers",
+    "",
+    renderIntakeDesignQuestionsSection(checkpoint.designQuestions),
+    "",
   ].join("\n");
 }
 
@@ -8796,4 +8842,3164 @@ function migrateOwnedRetirementIntake({rootDir,expectedSha256,capability}){
  // Legacy bytes remain retained in the archive and evidence store; only the exact owned current slot moves.
  if(readIntakeCheckpointRaw(capability.legacyPaths.checkpoint).sha256!==prior.sha256)fail('ER-INTAKE-MIGRATION-CAS','legacy intake changed before retirement');
  unlinkSync(capability.legacyPaths.checkpoint);fsyncDirectory(capability.legacyPaths.directory);
+}
+
+// Source-owned basic continuity authority. Controlled transitions requiring an
+// accepted plan, consumed review and audited close are separate prerequisites.
+const continuityAuthorityPorts = new WeakMap();
+const continuityAuthorityOperations = new WeakMap();
+const continuityAuthorityExecutions = new WeakMap();
+const continuityAuthorityTerminals = new WeakMap();
+
+function continuityAuthorityUnavailable(reason) {
+  return Object.freeze({status:'unavailable',code:'SDC-AUTHORITY-UNAVAILABLE',reason});
+}
+function continuityAuthorityEqual(a,b) { return canonicalJson(a) === canonicalJson(b); }
+function continuityAuthorityHandle(map, value) {
+  const handle = Object.freeze({}); map.set(handle,value); return handle;
+}
+function continuityAuthorityRepository(repository) {
+  const actual = inspectSignedDescriptorCustodyRepository(repository?.primaryRoot);
+  if (!continuityAuthorityEqual(actual,repository))
+    fail('SDC-ROOT','continuity authority repository changed');
+  return actual;
+}
+function continuityAuthorityFact(path, namespaceId, semantic) {
+  const before = lstatSync(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1
+      || before.size > 1048576 || (typeof process.getuid === 'function' && before.uid !== process.getuid()))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity source file unsafe');
+  const fd = openSync(path,constants.O_RDONLY | constants.O_NOFOLLOW);
+  let bytes;
+  try {
+    const opened = fstatSync(fd); bytes = readFileSync(fd);
+    if (opened.dev !== before.dev || opened.ino !== before.ino || opened.mode !== before.mode)
+      fail('SDC-AUTHORITY-CAS','continuity source replaced');
+  } finally { closeSync(fd); }
+  const after = lstatSync(path);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  if (before.dev !== after.dev || before.ino !== after.ino || before.mode !== after.mode
+      || bytes.length !== after.size || sha256 !== createHash('sha256').update(readFileSync(path)).digest('hex'))
+    fail('SDC-AUTHORITY-CAS','continuity source changed');
+  return Object.freeze({namespaceId,pathSha256:canonicalSha256(path),sha256,size:bytes.length,
+    identity:Object.freeze({dev:String(after.dev),ino:String(after.ino),mode:after.mode,nlink:1}),
+    semanticSha256:canonicalSha256(semantic)});
+}
+function continuityAuthorityPrivateRef(repository,path) {
+  const rel = relative(repository.commonDir,path).split(sep).join('/');
+  if (!rel.startsWith('agent-pipeline/') || rel.split('/').some(p=>!p || p==='.' || p==='..'))
+    fail('SDC-PRIVATE-PATH','continuity reference outside common directory');
+  const bytes = assertPrivateCleanupFile(path,'continuity authority source');
+  return Object.freeze({path:`.git/${rel}`,sha256:createHash('sha256').update(bytes).digest('hex'),size:bytes.length});
+}
+// Observe real absence without manufacturing storage or an owning lifetime.
+// An absence is accepted only below the currently validated physical common
+// directory; every existing ancestor and actual entry set is read twice.
+function continuityAuthorityObservePrivateNamespace(repository,directory) {
+  const common=repository.commonDir;
+  if(directory!==join(common,'agent-pipeline','onboarding')
+      ||realpathSync(common)!==common)
+    fail('SDC-PRIVATE-PATH','continuity private namespace topology changed');
+  const ancestry=[];
+  function observeDirectory(path,privateMode) {
+    const before=lstatSync(path);
+    if(!before.isDirectory()||before.isSymbolicLink()||realpathSync(path)!==path
+        ||(typeof process.getuid==='function'&&before.uid!==process.getuid())
+        ||(privateMode&&process.platform!=='win32'&&(before.mode&0o077)!==0))
+      fail('SDC-PRIVATE-PATH','continuity private namespace ancestor unsafe');
+    const identity=stat=>({dev:String(stat.dev),ino:String(stat.ino),mode:stat.mode,
+      nlink:stat.nlink,uid:stat.uid});
+    // Windows does not expose the POSIX directory-open flags. Keep physical
+    // lstat/realpath and repeated membership CAS there; native qualification is
+    // separate from this source-only portable read policy.
+    const fd=process.platform==='win32'?null:
+      openSync(path,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);
+    let names;
+    try {
+      if(fd!==null&&!continuityAuthorityEqual(identity(before),identity(fstatSync(fd))))
+        fail('SDC-AUTHORITY-CAS','continuity namespace ancestor replaced on open');
+      names=readdirSync(path).sort();
+      if(names.length>4096)
+        fail('SDC-AUTHORITY-UNAVAILABLE','continuity namespace ancestor entry bound');
+      if((fd!==null&&!continuityAuthorityEqual(identity(before),identity(fstatSync(fd))))
+          ||!continuityAuthorityEqual(identity(before),identity(lstatSync(path)))
+          ||realpathSync(path)!==path)
+        fail('SDC-AUTHORITY-CAS','continuity namespace ancestor changed during read');
+    }finally{if(fd!==null)closeSync(fd);}
+    ancestry.push(Object.freeze({pathSha256:canonicalSha256(path),identity:Object.freeze(identity(before)),
+      entrySetSha256:canonicalSha256(names),entryCount:names.length}));
+    return names;
+  }
+  let current=common,names=observeDirectory(common,false);
+  for(const component of ['agent-pipeline','onboarding']) {
+    const child=join(current,component);
+    let stat;
+    try{stat=lstatSync(child);}catch(error){
+      if(error?.code!=='ENOENT')
+        fail('SDC-AUTHORITY-UNAVAILABLE','continuity namespace ancestor cannot be observed');
+      if(names.includes(component))
+        fail('SDC-AUTHORITY-CAS','continuity namespace disappeared after parent read');
+      return Object.freeze({schema:'pipeline.continuity-private-namespace-observation.v1',
+        status:'absent',pathSha256:canonicalSha256(directory),missingPathSha256:canonicalSha256(child),
+        ancestry:Object.freeze(ancestry),entries:Object.freeze([])});
+    }
+    if(!names.includes(component)||!stat.isDirectory()||stat.isSymbolicLink())
+      fail('SDC-PRIVATE-PATH','continuity namespace ancestor is aliased or not a directory');
+    current=child;names=observeDirectory(current,true);
+  }
+  return Object.freeze({schema:'pipeline.continuity-private-namespace-observation.v1',
+    status:'present',pathSha256:canonicalSha256(directory),missingPathSha256:null,
+    ancestry:Object.freeze(ancestry),entries:Object.freeze(names)});
+}
+
+function continuityAuthoritySnapshot(repository) {
+  continuityAuthorityRepository(repository);
+  const observed = observeSessionCleanupState(repository.primaryRoot);
+  const stateLockPath = `${observed.path}.lock`;
+  const stateLockExists = existsSync(stateLockPath);
+  const stateLockWitness = continuityAuthorityCurrentStateWriterLock(repository, observed);
+  if (stateLockExists && !stateLockWitness) fail('SDC-LOCK-HELD','continuity State lock held');
+  if (!stateLockExists && stateLockWitness) fail('SDC-AUTHORITY-CAS','owned continuity State lock disappeared');
+  const stateNamespaceNames = readdirSync(dirname(observed.path));
+  if (stateNamespaceNames.some(name=>name.startsWith(basename(observed.path)+'.')
+      && !(stateLockWitness && name === basename(stateLockPath))))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity State namespace has unresolved temporary entries');
+  if (stateLockWitness && !continuityAuthoritySameStateWriterLock(repository, observed, stateLockWitness))
+    fail('SDC-AUTHORITY-CAS','owned continuity State lock physical image changed');
+  const paths = privateCleanupPaths(repository.primaryRoot);
+  const privateRel = relative(repository.commonDir,paths.directory);
+  if (!privateRel || privateRel.startsWith(`..${sep}`) || isAbsolute(privateRel))
+    fail('SDC-PRIVATE-PATH','continuity private namespace outside common directory');
+  const namespaceWitness=continuityAuthorityObservePrivateNamespace(repository,paths.directory);
+  const first = namespaceWitness.entries;
+  if (first.length > 4096) fail('SDC-AUTHORITY-UNAVAILABLE','continuity namespace entry bound');
+  const binding = readPrivateCleanupBinding(repository.primaryRoot);
+  const release = observePrivateCleanupReleaseReceipt(repository.primaryRoot);
+  if (!['absent','valid'].includes(release.status))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity release receipt unresolved');
+  if(first.length===0&&(binding.binding!==null||release.status!=='absent'
+      ||observed.sessionCleanup||observed.orphanBinding))
+    fail('SDC-AUTHORITY-HELD','empty continuity namespace retains declared cleanup authority');
+  const selected = [continuityAuthorityFact(observed.path,'selected-state',observed.state)];
+  const cleanup = [], released = [];
+  const allowed = new Set([basename(paths.binding),basename(paths.key),basename(paths.releaseReceipt)]);
+  for (const name of first) {
+    const ownJournal = /^continuity-authority-(execution|terminal)-[a-f0-9]{32}\.json$/.test(name);
+    const privatization = name.startsWith(SESSION_CLEANUP_PRIVATIZATION_AUDIT_BASENAME+'.')
+      || name.startsWith(SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_BASENAME+'.');
+    if (!allowed.has(name) && !ownJournal && !privatization) {
+      if (name.startsWith('session-cleanup-') || name.startsWith('continuity-authority-'))
+        fail('SDC-AUTHORITY-UNAVAILABLE','unknown continuity private namespace entry');
+      continue; // Other intake namespaces have their own owners.
+    }
+    const path = join(paths.directory,name);
+    const bytes = assertPrivateCleanupFile(path,'continuity namespace entry');
+    let semantic;
+    if (path === paths.key) semantic = {kind:'private-mac-key',sha256:createHash('sha256').update(bytes).digest('hex')};
+    else {
+      try { semantic = JSON.parse(bytes.toString('utf8')); }
+      catch { fail('SDC-AUTHORITY-UNAVAILABLE','continuity private entry malformed'); }
+      if (ownJournal && (semantic.schema !== 'pipeline.continuity-authority-observation.v1'
+          || !['execution','terminal'].includes(semantic.stage) || semantic.repositorySha256 !== canonicalSha256(repository)))
+        fail('SDC-AUTHORITY-CAS','continuity authority journal binding');
+    }
+    const namespaceId = path === paths.releaseReceipt || name.startsWith('continuity-authority-terminal-')
+      ? 'cleanup-release' : 'cleanup-binding';
+    (namespaceId === 'cleanup-release' ? released : cleanup).push(continuityAuthorityFact(path,namespaceId,semantic));
+  }
+  if (!continuityAuthorityEqual(namespaceWitness,
+      continuityAuthorityObservePrivateNamespace(repository,paths.directory)))
+    fail('SDC-AUTHORITY-CAS','continuity namespace changed during read');
+  if (stateLockWitness && !continuityAuthoritySameStateWriterLock(repository, observed, stateLockWitness))
+    fail('SDC-AUTHORITY-CAS','owned continuity State lock physical image changed');
+  const memberships = [['selected-state',dirname(observed.path),selected],
+    ['cleanup-binding',paths.directory,cleanup],['cleanup-release',paths.directory,released]]
+    .map(([namespaceId,root,facts])=>Object.freeze({namespaceId,rootSha256:canonicalSha256(root),
+      entrySetSha256:canonicalSha256(facts),entryCount:facts.length,sourceFacts:Object.freeze(facts)}));
+  return {observed,binding,release,paths,memberships,namespaceWitness,sourceFacts:memberships.flatMap(m=>m.sourceFacts)};
+}
+function continuityAuthorityCurrent(data,requesterHandle) {
+  const terminal=continuityRetiredOwnerScope.getStore();
+  if(terminal){
+    if(terminal.operation.data!==data||terminal.operation.requesterHandle!==requesterHandle)
+      fail('SDC-AUTHORITY-CAS','foreign continuity terminal requester');
+    return continuityReadRetiredOwner(terminal.operation);
+  }
+  const context = readSourceOwnedAuthorityContext({repository:data.repository});
+  if (context.status !== 'bound' || context.requesterHandle !== requesterHandle)
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity current requester unavailable');
+  const read = createSignedCleanupRequesterObserver({repository:data.repository,requesterHandle});
+  const actual = read({repository:data.repository});
+  if (actual.status !== 'bound') fail('SDC-AUTHORITY-UNAVAILABLE','continuity requester readback unavailable');
+  return actual.requester;
+}
+function continuityAuthorityOperation(data,handle) {
+  const operation = continuityAuthorityOperations.get(handle);
+  if (!operation || operation.data !== data) fail('SDC-AUTHORITY-CAS','unowned continuity operation');
+  return operation;
+}
+function continuityAuthorityJournal(operation,stage,value) {
+  const paths = privateCleanupPaths(operation.data.repository.primaryRoot);
+  const path = join(paths.directory,`continuity-authority-${stage}-${operation.id}.json`);
+  const body = {schema:'pipeline.continuity-authority-observation.v1',stage,
+    repositorySha256:canonicalSha256(operation.data.repository),bindingSha256:operation.bindingSha256,
+    association:operation.association,source:value};
+  const fd = openSync(path,constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,0o600);
+  try { writeFileSync(fd,canonicalJson(body)); fsyncSync(fd); } finally { closeSync(fd); }
+  const ref = continuityAuthorityPrivateRef(operation.data.repository,path);
+  operation.journalRefs.push(ref);
+  return ref;
+}
+function continuityAuthorityCheckJournals(operation) {
+  for (const expected of operation.journalRefs) {
+    const path = join(operation.data.repository.commonDir,expected.path.slice(5));
+    if (!continuityAuthorityEqual(expected,continuityAuthorityPrivateRef(operation.data.repository,path)))
+      fail('SDC-AUTHORITY-CAS','continuity immutable journal changed');
+  }
+}
+/** Empty private writer parent, prepared only by Registry initialization before baselines. */
+export function prepareOnboardingContinuityAuthorityParent(input) {
+  if (arguments.length !== 1 || !exactKeys(input, new Set(['repository'])))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity initializer parent input');
+  const repository = continuityAuthorityRepository(input.repository);
+  return withSessionAuthorityBoundary({repository}, () => {
+    const expected = join(repository.commonDir,'agent-pipeline','onboarding');
+    const before = privateCleanupPaths(repository.primaryRoot);
+    if (before.directory !== expected)
+      fail('SDC-PRIVATE-PATH','continuity initializer parent binding');
+    // The original physical/private resolver creates directories only: no key,
+    // binding, descriptor, runtime owner, selected State or authority journal.
+    const after = privateCleanupPaths(repository.primaryRoot,{create:true});
+    if (after.directory !== before.directory)
+      fail('SDC-PRIVATE-PATH','continuity initializer parent changed');
+    return Object.freeze({status:'prepared'});
+  });
+}
+
+export function createOnboardingContinuityAuthorityProducerPort({repository}) {
+  const actualRepository=continuityAuthorityRepository(repository);
+  const cacheKey=canonicalSha256(actualRepository);
+  const retained=continuityAuthorityPortCache.get(cacheKey);
+  if (retained) return retained;
+  if (continuityAuthorityPortCache.size>=4096)
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity source port lifetime bound');
+  const data = {repository:actualRepository,assurance:'physical-readback',
+    legacy:new Map(),operations:new Set()};
+  let port;
+  const methods = {
+    readAssurance:()=>data.assurance,
+    observeSharedStateWrite:(handle,context)=>continuityObserveSharedStateWrite(data,port,methods,handle,context),
+    verifySharedStateWrite:(handle,witness)=>continuityVerifySharedStateWrite(data,port,methods,handle,witness),
+    refreshSharedStateMemberRefs:(handle,witness,context)=>continuityRefreshSharedStateMemberRefs(data,port,handle,witness,context),
+    observeCompanionStateWrite:(handle,context)=>continuityObserveCompanionStateWrite(data,port,methods,handle,context),
+    verifyCompanionStateWrite:(handle,witness)=>continuityVerifyCompanionStateWrite(data,port,methods,handle,witness),
+    refreshCompanionStateMemberRefs:(handle,witness,context)=>continuityRefreshCompanionStateMemberRefs(data,port,handle,witness,context),
+    readBaseline:()=>{
+      const snapshot = continuityAuthoritySnapshot(data.repository);
+      continuityRefreshCompanionKnownOwnerAlias(data,snapshot);
+      const tuple = snapshot.observed.orphanBinding?.sessionCleanup ?? snapshot.observed.sessionCleanup;
+      const legacyOperations = [];
+      if (tuple !== null && tuple !== undefined) {
+        const key = continuitySharedStateLogicalLegacyKey(data,snapshot,tuple);
+        let handle = data.legacy.get(key);
+        if (!handle) {
+          handle = continuityAuthorityHandle(continuityAuthorityOperations,{data,legacy:true,
+            association:{state:'unbound',target:null},phase:'armed',bindingSha256:key,journalRefs:[]});
+          continuityAuthorityOperations.get(handle).operationHandle=handle;
+          data.legacy.set(key,handle);
+        }
+        legacyOperations.push(handle); // Unknown requester origin is held globally, never absent.
+      }
+      return {memberships:snapshot.memberships,legacyOperations};
+    },
+    reconcile:()=>continuityAuthoritySnapshot(data.repository).memberships,
+    observeOperation:handle=>{
+      const operation = continuityAuthorityOperation(data,handle);
+      continuityAuthorityCheckJournals(operation);
+      const snapshot = continuityAuthoritySnapshot(data.repository);
+      return {association:operation.association,kinds:['continuity'],phase:operation.phase,
+        bindingSha256:operation.bindingSha256,sourceFacts:snapshot.sourceFacts};
+    },
+    observeTerminal:handle=>{
+      const terminal = continuityAuthorityTerminals.get(handle);
+      if (!terminal || terminal.operation.data !== data)
+        fail('SDC-AUTHORITY-CAS','unowned continuity terminal');
+      continuityAuthorityCheckJournals(terminal.operation);
+      const snapshot = continuityAuthoritySnapshot(data.repository);
+      if (snapshot.observed.sessionCleanup !== null || snapshot.observed.orphanBinding
+          || !continuityAuthorityEqual(snapshot.memberships,terminal.memberships))
+        fail('SDC-AUTHORITY-HELD','continuity terminal readback changed');
+      return {terminal:'continuity-released',sourceFacts:snapshot.sourceFacts};
+    },
+    prepareOperation:({requesterHandle,entry,input})=>{
+      try {
+        if (entry !== 'bind' || !exactKeys(input,new Set(['expectedStateSha256','expectedRevision'])))
+          fail('SDC-AUTHORITY-UNAVAILABLE','unsupported continuity operation');
+        if (data.legacy.size>=4096) fail('SDC-AUTHORITY-UNAVAILABLE','continuity legacy lifetime bound');
+        const requester = continuityAuthorityCurrent(data,requesterHandle);
+        const snapshot = continuityAuthoritySnapshot(data.repository);
+        if (snapshot.observed.stateSha256 !== input.expectedStateSha256
+            || snapshot.observed.revision !== input.expectedRevision || snapshot.observed.sessionCleanup !== null
+            || snapshot.observed.orphanBinding)
+          fail('SDC-AUTHORITY-CAS','continuity bind preimage changed');
+        const target = {sessionId:requester.sessionId,descriptorSha256:requester.descriptorSha256,
+          ownerNonceSha256:requester.ownerNonceSha256};
+        const operation = {data,id:randomBytes(16).toString('hex'),requesterHandle,input:{...input},
+          association:{state:'bound',target},phase:'reserved',journalRefs:[],
+          bindingSha256:canonicalSha256({repository:data.repository,target,input,sourceFacts:snapshot.sourceFacts})};
+        const operationHandle = continuityAuthorityHandle(continuityAuthorityOperations,operation);
+        operation.operationHandle = operationHandle;
+        retainContinuityControlledOwnerInvocation(operation);
+        data.operations.add(operation);
+        data.assurance = requester.assurance;
+        return {status:'prepared',operationHandle,inputSha256:canonicalSha256(input),preimageRefs:[]};
+      } catch (error) { return continuityAuthorityUnavailable(error.code ?? 'continuity-prepare'); }
+    },
+    executeOperation:async request=>continuityAuthorityExecute(data,port,request),
+    executeAfkTransaction:request=>continuityExecuteAfkTransaction(data,port,request),
+    executeCompanionOperation:request=>continuityExecuteCompanionOperation(data,port,request),
+    finishOperation:async request=>continuityAuthorityFinish(data,port,request),
+    recoverOperation:({memberRef})=>{
+      try {
+        const operation = [...data.operations].find(value=>value.memberPath===memberRef?.path);
+        if (!operation || !operation.executionHandle)
+          fail('SDC-AUTHORITY-UNAVAILABLE','continuity current execution recovery required');
+        continuityAuthorityCurrent(data,operation.requesterHandle);
+        continuityAuthorityCheckJournals(operation);
+        const path = join(data.repository.commonDir,memberRef.path.slice(5));
+        if (!continuityAuthorityEqual(memberRef,continuityAuthorityPrivateRef(data.repository,path)))
+          fail('SDC-AUTHORITY-CAS','continuity recovery member ref changed');
+        const member = JSON.parse(assertPrivateCleanupFile(path,'continuity member'));
+        const observed = methods.observeOperation(operation.operationHandle);
+        if (member.producerId !== 'onboarding-continuity' || member.phase !== observed.phase
+            || member.bindingSha256 !== observed.bindingSha256
+            || !continuityAuthorityEqual(member.association,observed.association)
+            || !continuityAuthorityEqual(member.sourceFacts,observed.sourceFacts))
+          fail('SDC-AUTHORITY-CAS','continuity recovery owner binding changed');
+        return {status:'recovered',operationHandle:operation.operationHandle,executionHandle:operation.executionHandle};
+      } catch (error) { return continuityAuthorityUnavailable(error.code ?? 'continuity-recover'); }
+    },
+  };
+  port = Object.freeze(methods); continuityAuthorityPorts.set(port,data);
+  continuityAuthorityPortCache.set(cacheKey,port); return port;
+}
+export function isOwnedOnboardingContinuityAuthorityProducerPort(port,{repository}) {
+  const data = continuityAuthorityPorts.get(port);
+  return Boolean(data && continuityAuthorityEqual(data.repository,continuityAuthorityRepository(repository)));
+}
+
+function continuityAuthorityExecute(data,port,{operationHandle,memberHandle,expectedMemberRef}) {
+      try {
+        const operation = continuityAuthorityOperation(data,operationHandle);
+        if (operation.legacy || operation.phase !== 'reserved') fail('SDC-AUTHORITY-CAS','continuity operation phase');
+        continuityAuthorityCurrent(data,operation.requesterHandle);
+        return withSessionAuthorityBoundary({repository:data.repository},boundary=>{
+          const currentMember=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle,expectedMemberRef,operationHandle});
+          operation.expectedMemberRef=currentMember.memberRef;
+          operation.memberPath=currentMember.memberRef.path;
+          const tuple = {sessionId:operation.association.target.sessionId,
+            descriptorSha256:operation.association.target.descriptorSha256};
+          const ownerResult = continuityAuthorityWriterRun(operation,'bind',()=>bindOnboardingSessionCleanup({rootDir:data.repository.primaryRoot,
+            ...operation.input,sessionCleanup:tuple}));
+          const observed = observeSessionCleanupState(data.repository.primaryRoot);
+          if (!continuityAuthorityEqual(observed.sessionCleanup,tuple))
+            fail('SDC-AUTHORITY-CAS','continuity bind writer readback');
+          continuityAuthorityJournal(operation,'execution',{ownerResult,stateSha256:observed.stateSha256});
+          operation.phase = 'armed'; operation.memberHandle = memberHandle;
+          operation.memberPath = expectedMemberRef.path;
+          const executionHandle = continuityAuthorityHandle(continuityAuthorityExecutions,{operation,ownerResult});
+          operation.executionHandle = executionHandle;
+          continuityJoinActualBoundCleanupOwner(operation,executionHandle);
+          const armedMember=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle,expectedMemberRef,operationHandle});
+          operation.expectedMemberRef=armedMember.memberRef;
+          return {status:'executed',code:null,executionHandle,ownerResult,sourceRefs:[...operation.journalRefs]};
+        });
+      } catch (error) { return {status:'unavailable',code:error.code ?? 'SDC-AUTHORITY-UNAVAILABLE',executionHandle:null,ownerResult:null,sourceRefs:[]}; }
+}
+function continuityAuthorityFinish(data,port,{operationHandle,executionHandle,entry,input,expectedMemberRef}) {
+      try {
+        const operation = continuityAuthorityOperation(data,operationHandle);
+        if (continuityAuthorityExecutions.get(executionHandle)?.operation !== operation
+            || operation.executionHandle !== executionHandle || operation.phase !== 'armed'
+            || entry !== 'release' || !exactKeys(input,new Set(['expectedStateSha256','expectedRevision'])))
+          fail('SDC-AUTHORITY-CAS','continuity terminal origin or entry');
+        continuityAuthorityCurrent(data,operation.requesterHandle);
+        return withSessionAuthorityBoundary({repository:data.repository},boundary=>{
+          const currentMember=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,
+            expectedMemberRef,operationHandle});
+          operation.expectedMemberRef=currentMember.memberRef;
+          const tuple = {sessionId:operation.association.target.sessionId,
+            descriptorSha256:operation.association.target.descriptorSha256};
+          const ownerResult = continuityAuthorityWriterRun(operation,'release',()=>releaseOnboardingSessionCleanup({rootDir:data.repository.primaryRoot,...input,sessionCleanup:tuple}));
+          operation.terminalOwnerResult = ownerResult;
+          const snapshot = continuityAuthoritySnapshot(data.repository);
+          if (snapshot.observed.sessionCleanup !== null || snapshot.observed.orphanBinding)
+            fail('SDC-AUTHORITY-HELD','continuity writer retained binding');
+          continuityAuthorityJournal(operation,'terminal',{ownerResult,stateSha256:snapshot.observed.stateSha256});
+          operation.phase = 'terminal-observed';
+          const terminalHandle = continuityAuthorityHandle(continuityAuthorityTerminals,
+            {operation,memberships:continuityAuthoritySnapshot(data.repository).memberships});
+          const terminalMember=advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.memberHandle,
+            expectedMemberRef,operationHandle});
+          operation.expectedMemberRef=terminalMember.memberRef;
+          return {status:'observed',terminalHandle,sourceRefs:[...operation.journalRefs]};
+        });
+      } catch (error) { return continuityAuthorityUnavailable(error.code ?? 'continuity-finish'); }
+}
+// Existing synchronous writer entrypoints participate in the same owning
+// reservation/effect implementation as the async producer interface.
+const continuityAuthorityWriterContext = new AsyncLocalStorage();
+const continuityAuthorityDirectBindings = new Map();
+function continuityAuthorityWriterRun(operation,entry,callback) {
+  return continuityAuthorityWriterContext.run({operation,entry},callback);
+}
+function continuityAuthorityInternalWriter(request,entry) {
+  const active=continuityAuthorityWriterContext.getStore();
+  if(!active)return null;
+  const operation=active.operation;
+  if(active.entry!==entry||operation.legacy||!operation.operationHandle
+      ||continuityAuthorityOperations.get(operation.operationHandle)!==operation
+      ||resolve(request.rootDir)!==operation.data.repository.primaryRoot
+      ||!continuityAuthorityEqual(request.sessionCleanup,{sessionId:operation.association.target.sessionId,
+        descriptorSha256:operation.association.target.descriptorSha256}))
+    fail('SDC-AUTHORITY-CAS','continuity source writer context mismatch');
+  continuityAuthorityCurrent(operation.data,operation.requesterHandle);
+  return active;
+}
+function continuityAuthorityDirectKey(repository,tuple) {
+  return canonicalSha256({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir,tuple});
+}
+function continuityAuthorityReadMemberRef(repository,original) {
+  if(!original||typeof original.path!=='string'||!original.path.startsWith('.git/agent-pipeline/session-authority/members/onboarding-continuity/'))
+    fail('SDC-AUTHORITY-CAS','continuity member path');
+  return continuityAuthorityPrivateRef(repository,join(repository.commonDir,original.path.slice(5)));
+}
+export function bindOnboardingSessionCleanup(request={}) {
+  if(continuityAuthorityInternalWriter(request,'bind'))return bindOnboardingSessionCleanupInternal(request);
+  const repository=continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(request.rootDir));
+  const context=readSourceOwnedAuthorityContext({repository});
+  if(context.status!=='bound')fail('SDC-AUTHORITY-UNAVAILABLE','continuity current invocation required before binding');
+  const port=createOnboardingContinuityAuthorityProducerPort({repository}),data=continuityAuthorityPorts.get(port);
+  const requester=continuityAuthorityCurrent(data,context.requesterHandle);
+  const tuple={sessionId:requester.sessionId,descriptorSha256:requester.descriptorSha256};
+  if(!continuityAuthorityEqual(request.sessionCleanup,tuple))fail('SDC-AUTHORITY-CAS','continuity caller tuple is not current owner');
+  const prepared=port.prepareOperation({requesterHandle:context.requesterHandle,entry:'bind',
+    input:{expectedStateSha256:request.expectedStateSha256,expectedRevision:request.expectedRevision}});
+  if(prepared.status!=='prepared')fail(prepared.code,'continuity owner preparation refused');
+  const reserved=withSessionAuthorityBoundary({repository},boundary=>reserveSessionAuthorityMember({boundary,
+    producerPort:port,association:port.observeOperation(prepared.operationHandle).association,
+    operationHandle:prepared.operationHandle}));
+  const executed=continuityAuthorityExecute(data,port,{operationHandle:prepared.operationHandle,
+    memberHandle:reserved.memberHandle,expectedMemberRef:reserved.memberRef});
+  if(executed.status!=='executed')fail(executed.code,'continuity owning bind failed after reservation');
+  const ownedBinding={repository,port,data,prepared,reserved:{...reserved,
+    memberRef:continuityAuthorityOperations.get(prepared.operationHandle).expectedMemberRef},executed};
+  continuityAuthorityDirectBindings.set(continuityAuthorityDirectKey(repository,tuple),ownedBinding);
+  captureContinuityVerificationOwner(ownedBinding);
+  return executed.ownerResult;
+}
+export function releaseOnboardingSessionCleanup(request={}) {
+  if(continuityAuthorityInternalWriter(request,'release'))return releaseOnboardingSessionCleanupInternal(request);
+  const repository=continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(request.rootDir));
+  const owned=continuityAuthorityDirectBindings.get(continuityAuthorityDirectKey(repository,request.sessionCleanup));
+  if(!owned||!continuityAuthorityEqual(repository,owned.repository))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity owning execution recovery required before release');
+  const memberRef=continuityAuthorityReadMemberRef(repository,owned.reserved.memberRef);
+  const terminal=continuityAuthorityFinish(owned.data,owned.port,{operationHandle:owned.prepared.operationHandle,
+    executionHandle:owned.executed.executionHandle,entry:'release',
+    input:{expectedStateSha256:request.expectedStateSha256,expectedRevision:request.expectedRevision},expectedMemberRef:memberRef});
+  if(terminal.status!=='observed')fail(terminal.code,'continuity owning release failed');
+  const operation=continuityAuthorityOperations.get(owned.prepared.operationHandle);
+  withSessionAuthorityBoundary({repository},boundary=>releaseSessionAuthorityMember({boundary,producerPort:owned.port,
+    memberHandle:owned.reserved.memberHandle,expectedMemberRef:continuityAuthorityReadMemberRef(repository,memberRef),
+    terminalHandle:terminal.terminalHandle}));
+  continuityAuthorityDirectBindings.delete(continuityAuthorityDirectKey(repository,request.sessionCleanup));
+  return operation.terminalOwnerResult;
+}
+
+// Source-owned selected-State bookkeeping. No public constructor mints a witness.
+const continuitySharedStateWitnesses = new WeakMap();
+const continuityAuthorityPortCache = new Map();
+const continuitySharedStateEntries = new Set([
+  'state.reopen-design','state.seal-plan-approval','state.set-gate-estimate',
+  'state.revoke-plan','state.set-phase-no-calibration',
+]);
+
+function continuitySharedStateImage(fact) {
+  const {sha256,size,identity,semanticSha256} = fact;
+  return {sha256,size,identity,semanticSha256};
+}
+function continuitySharedStateSelected(snapshot,selectedPathSha256,image) {
+  const selected = snapshot.sourceFacts.filter(fact=>fact.pathSha256===selectedPathSha256);
+  if (selected.length!==1 || selected[0].namespaceId!=='selected-state'
+      || !continuityAuthorityEqual(continuitySharedStateImage(selected[0]),image))
+    fail('SDC-AUTHORITY-CAS','continuity selected-State source seal mismatch');
+}
+function continuitySharedStateCleanupIdentity(snapshot) {
+  const observed=snapshot.observed;
+  return {
+    root:observed.root,path:observed.path,neutral:observed.neutral,mode:observed.mode,
+    revision:observed.revision,activeFeatureId:observed.activeFeatureId,
+    sessionCleanup:observed.sessionCleanup ?? null,
+    orphanBinding:observed.orphanBinding ?? null,discardedEntry:observed.discardedEntry ?? null,
+    releaseProof:observed.releaseProof ?? null,releaseReceipt:observed.releaseReceipt ?? null,
+    released:observed.released ?? false,privateBinding:observed.privateBinding ?? null,
+    continuity:observed.state.continuity ?? null,
+    closedFeatures:observed.state.closedFeatures ?? null,
+    discardedFeatures:observed.state.discardedFeatures ?? null,
+    cleanupReleases:observed.state.cleanupReleases ?? null,
+    binding:snapshot.binding,release:snapshot.release,
+  };
+}
+function continuitySharedStateLogicalLegacyKey(data,snapshot,tuple) {
+  return canonicalSha256({repository:data.repository,tuple,
+    cleanupIdentity:continuitySharedStateCleanupIdentity(snapshot),
+    sourceFacts:snapshot.sourceFacts.filter(fact=>fact.namespaceId!=='selected-state')});
+}
+function continuitySharedStateLegacyDigest(methods,pathSha256) {
+  const observations=methods.readBaseline().legacyOperations.map(handle=>methods.observeOperation(handle))
+    .map(observed=>({...observed,sourceFacts:observed.sourceFacts.filter(fact=>fact.pathSha256!==pathSha256)}))
+    .map(canonicalJson).sort();
+  return canonicalSha256(observations);
+}
+function continuitySharedStateNonselected(before,after,pathSha256) {
+  if (before.length!==after.length) fail('SDC-AUTHORITY-CAS','continuity namespace closure changed');
+  for (const prior of before) {
+    const next=after.find(value=>value.namespaceId===prior.namespaceId);
+    if (!next || next.rootSha256!==prior.rootSha256 || next.entryCount!==prior.entryCount
+        || !continuityAuthorityEqual(prior.sourceFacts.filter(fact=>fact.pathSha256!==pathSha256),
+          next.sourceFacts.filter(fact=>fact.pathSha256!==pathSha256)))
+      fail('SDC-AUTHORITY-CAS','continuity nonselected namespace changed');
+    if (!prior.sourceFacts.some(fact=>fact.pathSha256===pathSha256)
+        && !continuityAuthorityEqual(prior,next))
+      fail('SDC-AUTHORITY-CAS','continuity unaffected namespace changed');
+  }
+}
+function continuitySharedStateRecord(data,ref) {
+  if (!continuityAuthorityEqual(ref,continuityAuthorityPrivateRef(data.repository,
+      join(data.repository.commonDir,ref.path.slice(5)))))
+    fail('SDC-AUTHORITY-CAS','continuity indexed record changed');
+  const raw=assertPrivateCleanupFile(join(data.repository.commonDir,ref.path.slice(5)),
+    'continuity indexed authority record');
+  if (raw.length!==ref.size || createHash('sha256').update(raw).digest('hex')!==ref.sha256)
+    fail('SDC-AUTHORITY-CAS','continuity indexed record bytes changed');
+  let record;
+  try { record=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw)); }
+  catch { fail('SDC-AUTHORITY-CAS','continuity indexed record malformed'); }
+  if (!continuityAuthorityEqual(ref,continuityAuthorityPrivateRef(data.repository,
+      join(data.repository.commonDir,ref.path.slice(5)))))
+    fail('SDC-AUTHORITY-CAS','continuity indexed record readback changed');
+  return record;
+}
+function continuitySharedStatePrivateOperation(data,methods,member,memberRef) {
+  const possible=[...new Set([...data.operations,...[...data.legacy.values()]
+    .map(handle=>continuityAuthorityOperations.get(handle))])];
+  const matches=possible.filter(operation=>{
+    if (!operation || operation.data!==data || operation.phase==='terminal-observed') return false;
+    const handle=operation.operationHandle;
+    if (!handle || continuityAuthorityOperations.get(handle)!==operation) return false;
+    const observed=methods.observeOperation(handle);
+    return continuityAuthorityEqual(observed,{association:member.association,kinds:member.kinds,
+      phase:member.phase,bindingSha256:member.bindingSha256,sourceFacts:member.sourceFacts});
+  });
+  if (matches.length!==1) fail('SDC-AUTHORITY-UNAVAILABLE','continuity live operation unavailable or ambiguous');
+  const operation=matches[0];
+  if (operation.expectedMemberRef && !continuityAuthorityEqual(operation.expectedMemberRef,memberRef))
+    fail('SDC-AUTHORITY-CAS','continuity private live member pin changed');
+  if (!operation.legacy && operation.memberPath!==memberRef.path
+      && !(operation.phase==='reserved' && operation.memberPath===undefined))
+    fail('SDC-AUTHORITY-CAS','continuity owning member path changed');
+  return operation;
+}
+function continuityObserveSharedStateWrite(data,port,methods,handle,context) {
+  if (!exactKeys(context,new Set(['boundary','producerRecord','memberRecords','releaseRecords']))
+      || !isOwnedStateAuthorityWriteHandle(handle,{repository:data.repository}))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity State witness requires actual source owner');
+  continuityAuthorityRepository(data.repository);
+  const plan=observeStateAuthorityWrite(handle);
+  if (!continuitySharedStateEntries.has(plan.entry)
+      || plan.repositorySha256!==canonicalSha256({primaryRoot:data.repository.primaryRoot,commonDir:data.repository.commonDir})
+      || !plan.affectedProducerIds.includes('onboarding-continuity'))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity State entry not admitted');
+  const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary:context.boundary,producerPort:port});
+  if (!continuityAuthorityEqual(producer.record,context.producerRecord))
+    fail('SDC-AUTHORITY-CAS','continuity producer record is not current');
+  const members=producer.record.members.map(index=>inspectSourceOwnedSessionAuthorityMemberRecord({
+    boundary:context.boundary,producerPort:port,memberRef:index.memberRef}));
+  if (!continuityAuthorityEqual(members.map(value=>value.record),context.memberRecords)
+      || !continuityAuthorityEqual(members.filter(value=>value.releaseRecord!==null)
+        .map(value=>value.releaseRecord),context.releaseRecords))
+    fail('SDC-AUTHORITY-CAS','continuity member or release records are not current');
+  const snapshot=continuityAuthoritySnapshot(data.repository);
+  continuitySharedStateSelected(snapshot,plan.selectedPathSha256,plan.preimage);
+  if (!snapshot.observed.neutral || snapshot.observed.mode!=='active'
+      || snapshot.observed.orphanBinding || snapshot.release.status!=='absent'
+      || members.some(value=>value.record.phase==='released'||value.record.phase==='terminal-observed'))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity historical authority requires owning lifecycle transition');
+  if (!continuityAuthorityEqual(snapshot.memberships,producer.record.baseline))
+    fail('SDC-AUTHORITY-CAS','continuity preexisting baseline drift');
+  // Populate only genuine source-created legacy handles, then identify each
+  // actual indexed live operation. No disk record becomes a new operation.
+  methods.readBaseline();
+  const live=members.map(member=>({memberRef:member.memberRef,record:structuredClone(member.record),
+    operation:continuitySharedStatePrivateOperation(data,methods,member.record,member.memberRef)}));
+  if (new Set(live.map(value=>value.operation)).size!==live.length)
+    fail('SDC-AUTHORITY-CAS','continuity duplicate live operation incidence');
+  const identity=continuitySharedStateCleanupIdentity(snapshot);
+  const legacyOperationsSha256=continuitySharedStateLegacyDigest(methods,plan.selectedPathSha256);
+  for (const item of live) {
+    item.operation.expectedMemberRef=structuredClone(item.memberRef);
+    item.operation.memberPath=item.memberRef.path;
+  }
+  const witness=Object.freeze({});
+  continuitySharedStateWitnesses.set(witness,{data,port,handle,boundary:context.boundary,
+    plan:structuredClone(plan),producer,live,identity,memberships:snapshot.memberships,
+    legacyOperationsSha256,stage:'prepared'});
+  return witness;
+}
+function continuityVerifySharedStateWrite(data,port,methods,handle,witness) {
+  const owned=continuitySharedStateWitnesses.get(witness);
+  if (!owned || owned.data!==data || owned.port!==port || owned.handle!==handle
+      || !['prepared','verified'].includes(owned.stage)
+      || !isOwnedStateAuthorityWriteHandle(handle,{repository:data.repository}))
+    fail('SDC-AUTHORITY-CAS','unowned continuity State witness');
+  continuityAuthorityRepository(data.repository);
+  const terminal=observeStateAuthorityWriteTerminal(handle);
+  if (terminal.entry!==owned.plan.entry || terminal.selectedPathSha256!==owned.plan.selectedPathSha256
+      || !continuityAuthorityEqual(terminal.preimage,owned.plan.preimage))
+    fail('SDC-AUTHORITY-CAS','continuity State terminal origin mismatch');
+  const snapshot=continuityAuthoritySnapshot(data.repository);
+  continuitySharedStateSelected(snapshot,owned.plan.selectedPathSha256,terminal.postimage);
+  continuitySharedStateNonselected(owned.memberships,snapshot.memberships,owned.plan.selectedPathSha256);
+  if (!continuityAuthorityEqual(continuitySharedStateCleanupIdentity(snapshot),owned.identity)
+      || !continuityAuthorityEqual(continuitySharedStateRecord(data,owned.producer.producerRef),owned.producer.record))
+    fail('SDC-AUTHORITY-CAS','continuity cleanup authority or producer identity changed');
+  const memberObservations=owned.live.map(item=>{
+    if (!continuityAuthorityEqual(item.operation.expectedMemberRef,item.memberRef)
+        || !continuityAuthorityEqual(continuitySharedStateRecord(data,item.memberRef),item.record))
+      fail('SDC-AUTHORITY-CAS','continuity live member identity changed');
+    const observed=methods.observeOperation(item.operation.operationHandle);
+    if (!continuityAuthorityEqual({association:observed.association,kinds:observed.kinds,
+        phase:observed.phase,bindingSha256:observed.bindingSha256},
+      {association:item.record.association,kinds:item.record.kinds,
+        phase:item.record.phase,bindingSha256:item.record.bindingSha256})
+        || !continuityAuthorityEqual(observed.sourceFacts.filter(fact=>fact.pathSha256!==owned.plan.selectedPathSha256),
+          item.record.sourceFacts.filter(fact=>fact.pathSha256!==owned.plan.selectedPathSha256)))
+      fail('SDC-AUTHORITY-CAS','continuity original live operation changed');
+    return {memberRef:item.memberRef,...observed};
+  });
+  const legacyOperationsSha256=continuitySharedStateLegacyDigest(methods,owned.plan.selectedPathSha256);
+  if (legacyOperationsSha256!==owned.legacyOperationsSha256)
+    fail('SDC-AUTHORITY-CAS','continuity legacy operation identity changed');
+  owned.postimage=structuredClone(terminal.postimage);owned.stage='verified';
+  return {memberships:snapshot.memberships,memberObservations,legacyOperationsSha256};
+}
+function continuityRefreshSharedStateMemberRefs(data,port,handle,witness,{boundary}={}) {
+  const owned=continuitySharedStateWitnesses.get(witness);
+  if (!owned || owned.data!==data || owned.port!==port || owned.handle!==handle
+      || owned.boundary!==boundary || owned.stage!=='verified')
+    fail('SDC-AUTHORITY-CAS','continuity State refresh witness unavailable');
+  owned.stage='refreshing';
+  const refreshed=inspectSourceOwnedSessionAuthorityStateRefresh({boundary,producerPort:port,
+    stateWriteHandle:handle,ownerWitness:witness});
+  const updates=refreshed.members.map(change=>{
+    const item=owned.live.find(value=>continuityAuthorityEqual(value.memberRef,change.previousMemberRef));
+    if (!item || item.record.memberId!==change.memberId || item.record.memberGeneration!==change.memberGeneration
+        || !continuityAuthorityEqual(item.operation.expectedMemberRef,item.memberRef))
+      fail('SDC-AUTHORITY-CAS','continuity refresh is not original live member');
+    const actual=inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:change.memberRef});
+    const {sourceFacts,revision,updatedAt,...identity}=actual.record;
+    const {sourceFacts:priorFacts,revision:priorRevision,updatedAt:priorUpdatedAt,...priorIdentity}=item.record;
+    if (actual.releaseRef!==null || actual.releaseRecord!==null
+        || !continuityAuthorityEqual(identity,priorIdentity) || revision!==priorRevision+1
+        || !continuityAuthorityEqual(sourceFacts.filter(fact=>fact.pathSha256!==owned.plan.selectedPathSha256),
+          priorFacts.filter(fact=>fact.pathSha256!==owned.plan.selectedPathSha256)))
+      fail('SDC-AUTHORITY-CAS','continuity refreshed authority identity changed');
+    const selected=sourceFacts.filter(fact=>fact.pathSha256===owned.plan.selectedPathSha256);
+    if (selected.length!==1 || selected[0].namespaceId!=='selected-state'
+        || !continuityAuthorityEqual(continuitySharedStateImage(selected[0]),owned.postimage))
+      fail('SDC-AUTHORITY-CAS','continuity refreshed selected State seal changed');
+    const directs=[...continuityAuthorityDirectBindings.values()].filter(direct=>
+      direct.data===data && direct.prepared.operationHandle===item.operation.operationHandle);
+    for (const direct of directs) {
+      if (!continuityAuthorityEqual(direct.reserved.memberRef,change.previousMemberRef))
+        fail('SDC-AUTHORITY-CAS','continuity direct reservation predecessor changed');
+    }
+    return {item,change,directs};
+  });
+  if (new Set(updates.map(value=>value.item)).size!==updates.length)
+    fail('SDC-AUTHORITY-CAS','continuity duplicate ref refresh');
+  for (const {item,change,directs} of updates) {
+    item.operation.expectedMemberRef=structuredClone(change.memberRef);
+    for (const direct of directs) {
+      direct.reserved={...direct.reserved,memberRef:structuredClone(change.memberRef)};
+    }
+  }
+  owned.stage='refreshed';
+}
+
+// The real bind writer has already created this tuple under its owning source
+// operation. Join that actual lifetime rather than inventing a second legacy
+// operation for the same newly written private binding.
+function continuityJoinActualBoundCleanupOwner(operation,executionHandle) {
+  const data=operation.data;
+  if (operation.legacy || operation.phase!=='armed'
+      || continuityAuthorityOperations.get(operation.operationHandle)!==operation
+      || continuityAuthorityExecutions.get(executionHandle)?.operation!==operation
+      || operation.executionHandle!==executionHandle)
+    fail('SDC-AUTHORITY-CAS','actual continuity bind execution required');
+  const requester=continuityAuthorityCurrent(data,operation.requesterHandle);
+  const target=operation.association.target;
+  if (operation.association.state!=='bound'
+      || !continuityAuthorityEqual(target,{sessionId:requester.sessionId,
+        descriptorSha256:requester.descriptorSha256,ownerNonceSha256:requester.ownerNonceSha256}))
+    fail('SDC-AUTHORITY-CAS','actual continuity bind requester changed');
+  continuityAuthorityCheckJournals(operation);
+  const snapshot=continuityAuthoritySnapshot(data.repository);
+  const tuple={sessionId:target.sessionId,descriptorSha256:target.descriptorSha256};
+  if (!continuityAuthorityEqual(snapshot.observed.sessionCleanup,tuple)
+      || !snapshot.observed.neutral || snapshot.observed.mode!=='active'
+      || snapshot.observed.orphanBinding || snapshot.release.status!=='absent')
+    fail('SDC-AUTHORITY-CAS','actual private continuity bind readback required');
+  const member=continuitySharedStateRecord(data,operation.expectedMemberRef);
+  if (operation.memberPath!==operation.expectedMemberRef.path
+      || member.producerId!=='onboarding-continuity'
+      || !['reserved','armed'].includes(member.phase)
+      || member.bindingSha256!==operation.bindingSha256
+      || !continuityAuthorityEqual(member.kinds,['continuity'])
+      || !continuityAuthorityEqual(member.association,operation.association))
+    fail('SDC-AUTHORITY-CAS','actual original continuity member required');
+  const key=continuitySharedStateLogicalLegacyKey(data,snapshot,tuple);
+  const prior=data.legacy.get(key);
+  if (prior && prior!==operation.operationHandle)
+    fail('SDC-AUTHORITY-CAS','existing continuity legacy lifetime differs');
+  if (!prior && data.legacy.size>=4096)
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity legacy lifetime bound');
+  data.legacy.set(key,operation.operationHandle);
+}
+
+// A companion request is routed only from the actual I03 constructor's owning
+// operation. A context object supplied by a caller never enters this WeakMap.
+const continuityCompanionContexts = new WeakMap();
+const continuityCompanionContextScope = new AsyncLocalStorage();
+const continuityAfkInvocationScope = new AsyncLocalStorage();
+const continuityAfkAdmissions = new WeakMap();
+const continuityAfkAdmissionByOperation = new WeakMap();
+const continuityAfkProjectionForState = new WeakMap();
+const continuityCompanionStateWriterLockWitnesses = new WeakMap();
+// Only the authentic synchronous member-ref refresh may populate this map.
+// The actual context key never leaves its owning Source and is cleared finally.
+const continuityCompanionRefRefreshObservations = new WeakMap();
+const CONTINUITY_COMPANION_ENTRIES = new Set([
+  'discard-feature','set-feature','continuity-init','submit-plan','present-plan',
+  'afk-project',
+  'approve-plan','materialize-architecture','continuity-result-bootstrap-plan',
+  'continuity-result-bootstrap-apply','continuity-result-rebind-plan',
+  'continuity-result-rebind-apply','continuity-result-close-plan','continuity-result-close-apply',
+  'close-feature',
+]);
+
+function continuityCompanionCurrent(value,{repository,entry},refreshObservation=null) {
+  if (!value || value.entry !== entry || !CONTINUITY_COMPANION_ENTRIES.has(entry)
+      || !continuityAuthorityEqual(value.operation.data.repository,repository)
+      || continuityCompanionContextScope.getStore() !== value.contextHandle)
+    fail('SDC-AUTHORITY-UNAVAILABLE','unowned continuity companion context');
+  const operation=continuityAuthorityOperation(value.operation.data,value.operation.operationHandle);
+  if (operation !== value.operation || operation.phase !== 'armed'
+      || continuityAuthorityExecutions.get(value.executionHandle)?.operation !== operation
+      || operation.executionHandle !== value.executionHandle
+      || !continuityAuthorityEqual(operation.expectedMemberRef,value.expectedMemberRef))
+    fail('SDC-AUTHORITY-CAS','continuity companion original owner changed');
+  continuityAuthorityCurrent(operation.data,operation.requesterHandle);
+  continuityAuthorityCheckJournals(operation);
+  let physicalMemberRef=value.expectedMemberRef;
+  if (refreshObservation !== null) {
+    const owned=continuityCompanionWitnesses.get(refreshObservation.witness);
+    const lockWitness=continuityCompanionStateWriterLockWitnesses.get(value.contextHandle);
+    if (continuityCompanionRefRefreshObservations.get(value.contextHandle)!==refreshObservation
+        || !owned || owned.stage!=='refreshing' || owned.value!==value
+        || owned.data!==operation.data || owned.data!==refreshObservation.data
+        || owned.port!==refreshObservation.port || owned.handle!==refreshObservation.handle
+        || owned.boundary!==refreshObservation.boundary || owned.contextHandle!==value.contextHandle
+        || refreshObservation.contextHandle!==value.contextHandle || refreshObservation.value!==value
+        || refreshObservation.operation!==operation || operation.companionExecuting!==true
+        || entry!=='approve-plan' || !lockWitness || lockWitness.contextHandle!==value.contextHandle
+        || lockWitness.boundary!==owned.boundary || !continuityAuthorityEqual(lockWitness.repository,repository)
+        || !continuityAuthorityEqual(refreshObservation.previousMemberRef,value.expectedMemberRef)
+        || !continuityAuthorityEqual(refreshObservation.previousMemberRef,operation.expectedMemberRef)
+        || refreshObservation.memberRef.path!==refreshObservation.previousMemberRef.path)
+      fail('SDC-AUTHORITY-CAS','unowned continuity member refresh observation');
+    physicalMemberRef=refreshObservation.memberRef;
+  }
+  const path=join(repository.commonDir,physicalMemberRef.path.slice(5));
+  if (!continuityAuthorityEqual(physicalMemberRef,continuityAuthorityPrivateRef(repository,path)))
+    fail('SDC-AUTHORITY-CAS','continuity companion original member changed');
+  const member=JSON.parse(assertPrivateCleanupFile(path,'continuity companion member'));
+  if (member.producerId !== 'onboarding-continuity' || member.phase !== operation.phase
+      || member.bindingSha256 !== operation.bindingSha256
+      || !continuityAuthorityEqual(member.association,operation.association))
+    fail('SDC-AUTHORITY-CAS','continuity companion member ownership changed');
+  return value;
+}
+
+export function readSourceOwnedOnboardingContinuityCompanionContext({repository,entry}) {
+  const handle=continuityCompanionContextScope.getStore();
+  if (!handle) return null;
+  continuityCompanionCurrent(continuityCompanionContexts.get(handle),{repository,entry});
+  return handle;
+}
+
+export function isOwnedOnboardingContinuityCompanionContextHandle(contextHandle,{repository,entry}) {
+  try {
+    continuityCompanionCurrent(continuityCompanionContexts.get(contextHandle),{repository,entry});
+    return true;
+  } catch { return false; }
+}
+
+function continuityAuthoritySameStateWriterLock(repository, observed, witness) {
+  const fact = inspectOwnedContinuityStateWriterLock({dir:repository.primaryRoot,lock:witness.lock});
+  return fact !== null && fact.path === `${observed.path}.lock`
+    && continuityAuthorityEqual(fact,witness.lockFact);
+}
+
+function continuityAuthorityCurrentStateWriterLock(repository, observed) {
+  const contextHandle = continuityCompanionContextScope.getStore();
+  const value = contextHandle && continuityCompanionContexts.get(contextHandle);
+  if (!value || value.entry !== 'approve-plan') return null;
+  continuityCompanionCurrent(value,{repository,entry:'approve-plan'},
+    continuityCompanionRefRefreshObservations.get(contextHandle)??null);
+  if (value.operation.companionExecuting !== true) return null;
+  const witness = continuityCompanionStateWriterLockWitnesses.get(contextHandle);
+  if (!witness || witness.contextHandle !== contextHandle || !continuityAuthorityEqual(witness.repository,repository)) return null;
+  if (!continuityAuthoritySameStateWriterLock(repository,observed,witness))
+    fail('SDC-AUTHORITY-CAS','owned continuity State lock physical image changed');
+  return witness;
+}
+
+export function bindOnboardingContinuityStateWriterLockWitness({repository,contextHandle,boundary,dir,lock}) {
+  const value = contextHandle && continuityCompanionContexts.get(contextHandle);
+  if (!value || value.entry !== 'approve-plan' || continuityCompanionContextScope.getStore() !== contextHandle
+      || value.operation.companionExecuting !== true || !boundary || typeof boundary !== 'object')
+    fail('SDC-AUTHORITY-UNAVAILABLE','owned approval State lock context required');
+  continuityCompanionCurrent(value,{repository,entry:'approve-plan'});
+  if (continuityCompanionStateWriterLockWitnesses.has(contextHandle))
+    fail('SDC-AUTHORITY-CAS','approval State lock witness already bound');
+  if (resolve(dir) !== repository.primaryRoot)
+    fail('SDC-AUTHORITY-CAS','approval State lock root changed');
+  const observed = observeSessionCleanupState(repository.primaryRoot);
+  const lockFact = inspectOwnedContinuityStateWriterLock({dir:repository.primaryRoot,lock});
+  if (!lockFact || lockFact.path !== `${observed.path}.lock`)
+    fail('SDC-AUTHORITY-CAS','actual approval State lock unavailable');
+  const witness = Object.freeze({contextHandle,repository:structuredClone(repository),boundary,lock,lockFact});
+  continuityCompanionStateWriterLockWitnesses.set(contextHandle,witness);
+  controlledContinuityApplyLockFault(witness);
+  return witness;
+}
+
+export function assertOnboardingContinuityStateWriterLockWitness(witness) {
+  const value=witness?.contextHandle&&continuityCompanionContexts.get(witness.contextHandle);
+  if(!witness||!value||value.entry!=='approve-plan'
+      ||continuityCompanionStateWriterLockWitnesses.get(witness.contextHandle)!==witness
+      ||continuityCompanionContextScope.getStore()!==witness.contextHandle
+      ||value.operation.companionExecuting!==true||!witness.boundary
+      ||!continuityAuthorityEqual(value.operation.data.repository,witness.repository))
+    fail('SDC-AUTHORITY-CAS','unowned approval State lock assertion');
+  continuityCompanionCurrent(value,{repository:witness.repository,entry:'approve-plan'});
+  // The existing observer checks the original lock image and unresolved siblings.
+  // It returns no authority or snapshot across this read-only assertion boundary.
+  continuityAuthoritySnapshot(witness.repository);
+}
+
+export function clearOnboardingContinuityStateWriterLockWitness(witness) {
+  if (!witness || continuityCompanionStateWriterLockWitnesses.get(witness.contextHandle) !== witness)
+    fail('SDC-AUTHORITY-CAS','unowned approval State lock witness cleanup');
+  continuityCompanionStateWriterLockWitnesses.delete(witness.contextHandle);
+}
+
+function continuityAfkCurrent(row) {
+  if (!row || row.closed || continuityAfkInvocationScope.getStore()!==row
+      || continuityAfkAdmissions.get(row.admissionHandle)!==row
+      || continuityAfkAdmissionByOperation.get(row.operation)!==row
+      || row.operation.data!==row.data || row.operation.operationHandle!==row.operationHandle
+      || row.operation.executionHandle!==row.executionHandle || row.operation.phase!=='armed'
+      || canonicalSha256(row.input)!==row.inputSha256
+      || continuityAuthorityExecutions.get(row.executionHandle)?.operation!==row.operation)
+    fail('SDC-AUTHORITY-CAS','AFK owning operation changed');
+  continuityAuthorityCurrent(row.data,row.operation.requesterHandle);
+  continuityAuthorityCheckJournals(row.operation);
+  const memberRef=row.stateMemberRef??row.expectedMemberRef;
+  if(!continuityAuthorityEqual(row.operation.expectedMemberRef,memberRef))
+    fail('SDC-AUTHORITY-CAS','AFK owning member reference changed');
+  const memberPath=join(row.data.repository.commonDir,memberRef.path.slice(5));
+  if(!continuityAuthorityEqual(memberRef,continuityAuthorityPrivateRef(row.data.repository,memberPath)))
+    fail('SDC-AUTHORITY-CAS','AFK owning member physical image changed');
+  const member=JSON.parse(assertPrivateCleanupFile(memberPath,'AFK owning member'));
+  const observed=row.port.observeOperation(row.operationHandle);
+  if(member.producerId!=='onboarding-continuity'||member.phase!=='armed'
+      ||member.bindingSha256!==observed.bindingSha256
+      ||!continuityAuthorityEqual(member.association,observed.association)
+      ||!continuityAuthorityEqual(member.kinds,observed.kinds)
+      ||!continuityAuthorityEqual(member.sourceFacts,observed.sourceFacts))
+    fail('SDC-AUTHORITY-CAS','AFK owning member record changed');
+  let currentState;
+  try {
+    continuityAuthoritySnapshot(row.data.repository);
+    const statePath=relative(row.data.repository.primaryRoot,statePathForMethod(row.data.repository.primaryRoot)).split(sep).join('/');
+    currentState=continuityCompanionEffectImage(row.data.repository,{scope:'repository',path:statePath,preimage:null,postimage:null});
+  } catch(error) {
+    row.stateDisposition=row.stateAttempted?'durability-unknown':'indeterminate';
+    throw error;
+  }
+  if(continuityAuthorityEqual(currentState,row.statePreimage)) row.stateDisposition='unchanged';
+  else if(row.statePostimage&&continuityAuthorityEqual(currentState,row.statePostimage)) row.stateDisposition='committed';
+  else {
+    row.stateDisposition=row.stateAttempted?'durability-unknown':'indeterminate';
+    fail('SDC-AUTHORITY-CAS','AFK selected State physical image changed');
+  }
+  return row;
+}
+
+export function readSourceOwnedOnboardingAfkAdmission({admissionHandle}) {
+  const row=continuityAfkAdmissions.get(admissionHandle);
+  continuityAfkCurrent(row);
+  return Object.freeze({repository:row.data.repository,kind:row.kind,activationId:row.activationId,
+    input:structuredClone(row.input),stateDisposition:row.stateDisposition});
+}
+
+export function readSourceOwnedOnboardingAfkProjectionForState({repository,entry}) {
+  const contextHandle=continuityCompanionContextScope.getStore();
+  const context=contextHandle&&continuityCompanionContexts.get(contextHandle);
+  if(!context||entry!=='afk-project'||context.entry!=='afk-project'
+      ||!continuityAuthorityEqual(context.operation.data.repository,repository)) return null;
+  continuityCompanionCurrent(context,{repository,entry});
+  const row=continuityAfkAdmissionByOperation.get(context.operation);
+  if(!row||row.phase!=='projecting'||row.projectionRead||row.projectionContextHandle&&row.projectionContextHandle!==contextHandle
+      ||continuityAfkProjectionForState.get(context.operation)!==row)
+    fail('SDC-AUTHORITY-CAS','AFK projection is not in its private settlement scope');
+  continuityAfkCurrent(row);
+  row.projectionRead=true; row.projectionContextHandle=contextHandle;
+  return Object.freeze(structuredClone(row.projection));
+}
+
+export function settleSourceOwnedOnboardingAfkProjection({admissionHandle}) {
+  const row=continuityAfkAdmissions.get(admissionHandle);
+  try {
+    continuityAfkCurrent(row);
+    if(row.phase!=='prepared'&&row.phase!=='host-settled')
+      fail('SDC-AUTHORITY-CAS','AFK projection settlement phase changed');
+    const selector=readSourceOwnedAfkProjectionSettlementSelector({admissionHandle});
+    if(!selector||!continuityAuthorityEqual(selector.repository,row.data.repository)
+        ||selector.activationId!==row.activationId||! /^[a-f0-9]{64}$/u.test(selector.ledgerHeadSha256??''))
+      fail('SDC-AUTHORITY-CAS','AFK actual ledger settlement selector unavailable');
+    const projection=readSourceOwnedAfkProjectionSettlement(selector);
+    if(!projection||!exactKeys(projection,new Set(['schema','activationId','status','ledgerSequence','ledgerHeadSha256','privateRefOid','updatedAt']))
+        ||projection.schema!=='pipeline.afk-projection.v1'||projection.activationId!==row.activationId
+        ||projection.ledgerHeadSha256!==selector.ledgerHeadSha256)
+      fail('SDC-AUTHORITY-CAS','AFK actual ledger projection unavailable');
+    row.projection=Object.freeze(structuredClone(projection)); row.phase='projecting'; row.projectionRead=false;
+    continuityAfkProjectionForState.set(row.operation,row);
+    row.stateAttempted=true;
+    const result=continuityExecuteCompanionOperation(row.data,row.port,{operationHandle:row.operationHandle,
+      executionHandle:row.executionHandle,expectedMemberRef:row.operation.expectedMemberRef,
+      expectedStateSha256:row.expectedStateSha256,entry:'afk-project',argv:['afk-project',
+        '--activation-id',row.activationId,'--ledger-head-sha256',selector.ledgerHeadSha256]});
+    if(result?.status==='completed'&&result.entry==='afk-project'&&result.exitCode===0
+        &&result.statePreimage?.sha256===row.expectedStateSha256&&result.statePostimage?.sha256
+        &&result.memberRef?.path) {
+      row.statePostimage=structuredClone(result.statePostimage);
+      row.stateMemberRef=structuredClone(result.memberRef);
+      row.stateDisposition='committed';
+    }
+    if(result?.status!=='completed') {
+      try { continuityAfkCurrent(row); } catch {}
+      return Object.freeze({status:'unavailable',code:['SDC-AUTHORITY-UNAVAILABLE','SDC-AUTHORITY-CAS','SDC-AUTHORITY-HELD','SDC-PRIVATE-PATH','SDC-LOCK-HELD'].includes(result?.code)?result.code:'SDC-AUTHORITY-HELD',
+        attempted:row.stateAttempted,stateDisposition:row.stateDisposition});
+    }
+    if(!row.projectionRead) fail('SDC-AUTHORITY-CAS','AFK State projection was not consumed');
+    return result;
+  } catch(error) {
+    return Object.freeze({status:'unavailable',code:['SDC-AUTHORITY-UNAVAILABLE','SDC-AUTHORITY-CAS','SDC-AUTHORITY-HELD','SDC-PRIVATE-PATH','SDC-LOCK-HELD'].includes(error?.code)?error.code:'SDC-AUTHORITY-CAS',
+      attempted:row?.stateAttempted===true,stateDisposition:row?.stateDisposition??'indeterminate'});
+  } finally {
+    if(row) {
+      continuityAfkProjectionForState.delete(row.operation);
+      row.projection=null; row.phase='settled';
+    }
+  }
+}
+
+function continuityExecuteAfkTransaction(data,port,request) {
+  let row,originalHostFailure=null;
+  try {
+    if(!exactKeys(request,new Set(['operationHandle','executionHandle','expectedMemberRef','expectedStateSha256','kind','activationId','input']))
+        ||!['activate','entry','review'].includes(request.kind)||! /^[a-f0-9]{32}$/u.test(request.activationId??'')
+        ||! /^[a-f0-9]{64}$/u.test(request.expectedStateSha256??'')||!request.expectedMemberRef
+        ||!request.input||typeof request.input!=='object'||Array.isArray(request.input))
+      fail('SDC-AUTHORITY-UNAVAILABLE','unsupported AFK owning transaction request');
+    const operation=continuityAuthorityOperation(data,request.operationHandle);
+    if(operation.legacy||operation.phase!=='armed'||operation.companionExecuting===true
+        ||operation.executionHandle!==request.executionHandle
+        ||continuityAuthorityExecutions.get(request.executionHandle)?.operation!==operation
+        ||!continuityAuthorityEqual(operation.expectedMemberRef,request.expectedMemberRef))
+      fail('SDC-AUTHORITY-CAS','AFK original owning execution changed');
+    const inputKeys={activate:new Set(['receipt','recordedAt']),entry:new Set(['request','proposal','recordedAt']),
+      review:new Set(['reviewInput'])}[request.kind];
+    if(!exactKeys(request.input,inputKeys)) fail('SDC-AUTHORITY-UNAVAILABLE','unsupported AFK transaction input');
+    const activationMismatch=(request.kind==='activate'&&request.input.receipt?.activationId!==request.activationId)
+      ||(request.kind==='entry'&&request.input.request?.activationId!==request.activationId)
+      ||(request.kind==='review'&&request.input.reviewInput?.activationId!==undefined
+        &&request.input.reviewInput.activationId!==request.activationId);
+    if(activationMismatch)
+      fail('SDC-AUTHORITY-CAS','AFK transaction activation binding changed');
+    const snapshot=continuityAuthoritySnapshot(data.repository);
+    if(snapshot.observed.stateSha256!==request.expectedStateSha256||snapshot.observed.sessionCleanup===null
+        ||snapshot.observed.orphanBinding)
+      fail('SDC-AUTHORITY-CAS','AFK selected State or owner binding changed');
+    continuityAuthorityCurrent(data,operation.requesterHandle);
+    continuityAuthorityCheckJournals(operation);
+    const memberPath=join(data.repository.commonDir,request.expectedMemberRef.path.slice(5));
+    if(!continuityAuthorityEqual(operation.expectedMemberRef,continuityAuthorityPrivateRef(data.repository,memberPath)))
+      fail('SDC-AUTHORITY-CAS','AFK owning member preimage changed');
+    const statePath=relative(data.repository.primaryRoot,statePathForMethod(data.repository.primaryRoot)).split(sep).join('/');
+    const statePreimage=continuityCompanionEffectImage(data.repository,{scope:'repository',path:statePath,preimage:null,postimage:null});
+    if(!statePreimage||statePreimage.sha256!==request.expectedStateSha256)
+      fail('SDC-AUTHORITY-CAS','AFK selected State physical preimage changed');
+    row={data,port,operation,operationHandle:request.operationHandle,executionHandle:request.executionHandle,
+      expectedMemberRef:structuredClone(request.expectedMemberRef),expectedStateSha256:request.expectedStateSha256,
+      statePreimage,
+      kind:request.kind,activationId:request.activationId,input:structuredClone(request.input),inputSha256:canonicalSha256(request.input),
+      phase:'prepared',attempted:false,hostInvoked:false,stateAttempted:false,stateDisposition:'unchanged',closed:false};
+    row.admissionHandle=Object.freeze({});
+    continuityAfkAdmissions.set(row.admissionHandle,row);
+    continuityAfkAdmissionByOperation.set(operation,row);
+    bindControlledAfkExerciseAdmission(row);
+    return continuityAfkInvocationScope.run(row,()=>{
+      try {
+        row.hostInvoked=true;
+        const result=executeSourceOwnedAfkHostTransaction({admissionHandle:row.admissionHandle});
+        if(result?.status==='unavailable'&&Object.isFrozen(result)
+            &&exactKeys(result,new Set(['status','code','attempted','hostEffects','stateDisposition']))
+            &&controlledAfkExerciseCodes.has(result.code)&&typeof result.attempted==='boolean'
+            &&['none','retained','unknown'].includes(result.hostEffects)
+            &&['unchanged','committed','durability-unknown','indeterminate'].includes(result.stateDisposition))
+          originalHostFailure=result;
+        continuityAfkCurrent(row);
+        if(result?.status==='completed'&&exactKeys(result,new Set(['status','kind','hostResult','statePreimage','statePostimage','memberRef','assurance']))
+            &&result.kind===row.kind&&result.statePreimage?.sha256===row.expectedStateSha256
+            &&result.statePostimage?.sha256&&result.memberRef?.path&&typeof result.assurance==='string'
+            &&result.hostResult&&typeof result.hostResult==='object') {
+          controlledAfkExerciseReplay(row,result);
+          return result;
+        }
+        if(result?.status==='unavailable'&&exactKeys(result,new Set(['status','code','attempted','hostEffects','stateDisposition']))
+            &&typeof result.code==='string'&&typeof result.attempted==='boolean'
+            &&['none','retained','unknown'].includes(result.hostEffects)
+            &&['unchanged','committed','durability-unknown','indeterminate'].includes(result.stateDisposition))
+          return result;
+        return Object.freeze({status:'unavailable',code:'SDC-AUTHORITY-HELD',attempted:true,
+          hostEffects:'unknown',stateDisposition:row.stateDisposition});
+      } catch(error) {
+        let observedHostEffects=row.hostInvoked?'unknown':'none';
+        let observedStateDisposition=row.stateDisposition;
+        if(originalHostFailure)try {
+          // Preserve only a Source-observed failed prefix, never admission or success.
+          if(row.closed||!row.hostInvoked||continuityRetiredOwnerScope.getStore()
+              ||continuityAfkInvocationScope.getStore()!==row
+              ||continuityAfkAdmissions.get(row.admissionHandle)!==row
+              ||continuityAfkAdmissionByOperation.get(operation)!==row
+              ||continuityAuthorityPorts.get(port)!==data||row.port!==port||row.data!==data
+              ||row.operation!==operation||continuityAuthorityOperations.get(request.operationHandle)!==operation
+              ||row.operationHandle!==request.operationHandle||operation.operationHandle!==request.operationHandle
+              ||row.executionHandle!==request.executionHandle||operation.executionHandle!==request.executionHandle
+              ||continuityAuthorityExecutions.get(request.executionHandle)?.operation!==operation
+              ||operation.data!==data||operation.legacy||operation.phase!=='armed'
+              ||row.kind!==request.kind||row.activationId!==request.activationId
+              ||row.inputSha256!==canonicalSha256(request.input)||row.inputSha256!==canonicalSha256(row.input)
+              ||!continuityAuthorityEqual(row.expectedMemberRef,request.expectedMemberRef)
+              ||!continuityAuthorityEqual(operation.expectedMemberRef,row.expectedMemberRef))
+            fail('SDC-AUTHORITY-CAS','AFK failed prefix ownership changed');
+          continuityAuthorityRepository(data.repository);
+          const requester=continuityAuthorityCurrent(data,operation.requesterHandle);
+          continuityAuthorityCheckJournals(operation);
+          const path=join(data.repository.commonDir,row.expectedMemberRef.path.slice(5));
+          if(!continuityAuthorityEqual(row.expectedMemberRef,continuityAuthorityPrivateRef(data.repository,path)))
+            fail('SDC-AUTHORITY-CAS','AFK failed prefix member changed');
+          continuityAuthorityRepository(data.repository);
+          continuityAuthorityCheckJournals(operation);
+          if(!continuityAuthorityEqual(requester,continuityAuthorityCurrent(data,operation.requesterHandle))
+              ||!continuityAuthorityEqual(row.expectedMemberRef,continuityAuthorityPrivateRef(data.repository,path)))
+            fail('SDC-AUTHORITY-CAS','AFK failed prefix readback changed');
+          observedHostEffects=originalHostFailure.hostEffects;
+          if(row.stateAttempted===true&&row.statePostimage===undefined&&row.stateMemberRef===undefined
+              &&['durability-unknown','indeterminate'].includes(originalHostFailure.stateDisposition))
+            observedStateDisposition=originalHostFailure.stateDisposition;
+        } catch { /* Unowned or unstable evidence retains the original unknown fallback. */ }
+        return Object.freeze({status:'unavailable',code:['SDC-AUTHORITY-UNAVAILABLE','SDC-AUTHORITY-CAS','SDC-AUTHORITY-HELD','SDC-PRIVATE-PATH','SDC-LOCK-HELD'].includes(error?.code)?error.code:'SDC-AUTHORITY-HELD',attempted:row.hostInvoked,
+          hostEffects:observedHostEffects,stateDisposition:observedStateDisposition});
+      } finally {
+        row.closed=true; continuityAfkAdmissionByOperation.delete(operation);
+      }
+    });
+  } catch(error) {
+    return Object.freeze({status:'unavailable',code:['SDC-AUTHORITY-UNAVAILABLE','SDC-AUTHORITY-CAS','SDC-AUTHORITY-HELD','SDC-PRIVATE-PATH','SDC-LOCK-HELD'].includes(error?.code)?error.code:'SDC-AUTHORITY-UNAVAILABLE',attempted:false,
+      hostEffects:'none',stateDisposition:'indeterminate'});
+  }
+}
+
+function continuityExecuteCompanionOperation(data,port,request) {
+  let attempted=false;
+  let activeOperation=null;
+  try {
+    if (!exactKeys(request,new Set(['operationHandle','executionHandle','expectedMemberRef','expectedStateSha256','entry','argv']))
+        || !CONTINUITY_COMPANION_ENTRIES.has(request.entry)
+        || !Array.isArray(request.argv) || request.argv.length<1 || request.argv.length>256
+        || request.argv[0]!==request.entry
+        || request.argv.some(value=>typeof value!=='string' || value.length<1 || value.length>4096 || /[\0\r\n]/u.test(value))
+        || !/^[a-f0-9]{64}$/u.test(request.expectedStateSha256??''))
+      fail('SDC-AUTHORITY-UNAVAILABLE','unsupported owning continuity companion request');
+    const operation=continuityAuthorityOperation(data,request.operationHandle);
+    activeOperation=operation;
+    if(request.entry==='afk-project') {
+      const admission=continuityAfkAdmissionByOperation.get(operation);
+      if(!admission||admission.phase!=='projecting'||continuityAfkProjectionForState.get(operation)!==admission)
+        fail('SDC-AUTHORITY-UNAVAILABLE','AFK projection requires the actual private settlement');
+    }
+    continuityCompanionMemberRefSettlements.delete(operation);
+    if (operation.legacy || operation.phase!=='armed' || operation.companionExecuting===true
+        || operation.executionHandle!==request.executionHandle
+        || continuityAuthorityExecutions.get(request.executionHandle)?.operation!==operation
+        || !continuityAuthorityEqual(operation.expectedMemberRef,request.expectedMemberRef))
+      fail('SDC-AUTHORITY-CAS','continuity companion original execution changed');
+    const requester=continuityAuthorityCurrent(data,operation.requesterHandle);
+    continuityAuthorityCheckJournals(operation);
+    const memberPath=join(data.repository.commonDir,operation.expectedMemberRef.path.slice(5));
+    if (!continuityAuthorityEqual(operation.expectedMemberRef,continuityAuthorityPrivateRef(data.repository,memberPath)))
+      fail('SDC-AUTHORITY-CAS','continuity companion physical member changed');
+    const member=JSON.parse(assertPrivateCleanupFile(memberPath,'continuity companion owning member'));
+    const observed=port.observeOperation(request.operationHandle);
+    if (member.producerId!=='onboarding-continuity' || member.phase!=='armed'
+        || member.bindingSha256!==observed.bindingSha256
+        || !continuityAuthorityEqual(member.association,observed.association)
+        || !continuityAuthorityEqual(member.kinds,observed.kinds)
+        || !continuityAuthorityEqual(member.sourceFacts,observed.sourceFacts))
+      fail('SDC-AUTHORITY-CAS','continuity companion member observation changed');
+    const effect={scope:'repository',path:relative(data.repository.primaryRoot,statePathForMethod(data.repository.primaryRoot)).split(sep).join('/'),
+      preimage:null,postimage:null};
+    const preimage=continuityCompanionEffectImage(data.repository,effect);
+    if (!preimage || preimage.sha256!==request.expectedStateSha256)
+      fail('SDC-AUTHORITY-CAS','continuity companion State preimage changed');
+    const argv=[...request.argv];
+    const argvSha256=canonicalSha256(argv);
+    // Existing capability ownership is the context origin. Caller arguments
+    // select an existing State entry; they never supply a context or verdict.
+    // The actual State parser, approval, Critic/Verify and terminal gates run.
+    operation.companionExecuting=true;
+    let exitCode;
+    try {
+      attempted=true;
+      exitCode=runOwnedContinuityCompanionState(operation,request.executionHandle,request.entry,argv,request.expectedStateSha256);
+    } finally { operation.companionExecuting=false; }
+    if (!Number.isInteger(exitCode) || (request.entry==='afk-project' && exitCode!==0))
+      fail('SDC-AUTHORITY-HELD','continuity companion actual command terminal unavailable');
+    const postimage=continuityCompanionEffectImage(data.repository,effect);
+    const settlement=continuityCompanionMemberRefSettlements.get(operation);
+    let currentMemberRef=operation.expectedMemberRef;
+    if (settlement) {
+      const context=continuityCompanionContexts.get(settlement.contextHandle);
+      const owner=continuityCompanionWitnesses.get(settlement.witness);
+      if (settlement.operation!==operation || settlement.operationHandle!==request.operationHandle
+          || settlement.executionHandle!==request.executionHandle || !settlement.boundary || !settlement.handle || !settlement.witness
+          || !owner || owner.data!==data || owner.port!==port || owner.handle!==settlement.handle
+          || owner.contextHandle!==settlement.contextHandle
+          || owner.value!==settlement.contextValue || owner.boundary!==settlement.boundary || owner.stage!=='refreshed'
+          || !continuityAuthorityEqual(settlement.previousMemberRef,request.expectedMemberRef)
+          || !context || context!==settlement.contextValue || context.operation!==operation
+          || context.executionHandle!==request.executionHandle || context.contextHandle!==settlement.contextHandle
+          || (!continuityAuthorityEqual(operation.expectedMemberRef,settlement.previousMemberRef)
+            && !continuityAuthorityEqual(operation.expectedMemberRef,settlement.memberRef))
+          || (!continuityAuthorityEqual(context.expectedMemberRef,settlement.previousMemberRef)
+            && !continuityAuthorityEqual(context.expectedMemberRef,settlement.memberRef)))
+        fail('SDC-AUTHORITY-CAS','continuity companion terminal settlement mismatch');
+      currentMemberRef=settlement.memberRef;
+    }
+    const currentMemberPath=join(data.repository.commonDir,currentMemberRef.path.slice(5));
+    if (!postimage || !continuityAuthorityEqual(currentMemberRef,continuityAuthorityPrivateRef(data.repository,currentMemberPath)))
+      fail('SDC-AUTHORITY-CAS','continuity companion terminal physical readback changed');
+    if (settlement) {
+      operation.expectedMemberRef=structuredClone(currentMemberRef);
+      settlement.contextValue.expectedMemberRef=structuredClone(currentMemberRef);
+      continuityCompanionMemberRefSettlements.delete(operation);
+    }
+    return Object.freeze({status:'completed',entry:request.entry,exitCode,argvSha256,
+      statePreimage:Object.freeze(preimage),statePostimage:Object.freeze(postimage),
+      memberRef:Object.freeze(structuredClone(currentMemberRef)),assurance:requester.assurance});
+  } catch (error) {
+    // Refusal can follow a real attempted write. Keep the lifetime held; never
+    // infer rollback, owner termination or release from a command result.
+    if (activeOperation) continuityCompanionMemberRefSettlements.delete(activeOperation);
+    return Object.freeze({status:'unavailable',code:error.code??'SDC-AUTHORITY-UNAVAILABLE',attempted,exitCode:null});
+  }
+}
+
+// Called only by the owning port's closed named operation, never exported as a
+// general callback factory. The original State run performs all real gates.
+function runOwnedContinuityCompanionState(operation,executionHandle,entry,argv,expectedStateSha256) {
+  if (!CONTINUITY_COMPANION_ENTRIES.has(entry) || !Array.isArray(argv)
+      || entry!==argv[0]
+      || argv.some(value=>typeof value!=='string'))
+    fail('SDC-AUTHORITY-UNAVAILABLE','unsupported owning continuity companion entry');
+  const contextHandle=Object.freeze({});
+  const value={contextHandle,operation,executionHandle,entry,expectedStateSha256,
+    expectedMemberRef:structuredClone(operation.expectedMemberRef)};
+  continuityCompanionContexts.set(contextHandle,value);
+  const execute=()=>continuityCompanionContextScope.run(contextHandle,()=>{
+    continuityCompanionCurrent(value,{repository:operation.data.repository,entry});
+    const exercise=controlledAfkExerciseCompanion(operation,executionHandle,entry,argv);
+    if(exercise)return exercise.result;
+    return runSanctionedCompanionState(argv,{dir:operation.data.repository.primaryRoot});
+  });
+  return entry==='close-feature'
+    ? runOwnedContinuityRetiredTerminal(operation,entry,execute) : execute();
+}
+
+const continuityCompanionWitnesses=new WeakMap();
+const continuityCompanionMemberRefSettlements=new WeakMap();
+function continuityCompanionPhysicalPath(repository,effect) {
+  if (!exactKeys(effect,new Set(['scope','path','preimage','postimage']))
+      || !['repository','common'].includes(effect.scope) || typeof effect.path!=='string'
+      || isAbsolute(effect.path) || effect.path.includes('\\')
+      || effect.path.split('/').some(part=>!part||part==='.'||part==='..')
+      || (effect.scope==='repository'&&effect.path.split('/')[0]==='.git'))
+    fail('SDC-PRIVATE-PATH','invalid continuity companion effect');
+  const root=effect.scope==='common'?repository.commonDir:repository.primaryRoot;
+  let cursor=root;
+  if (realpathSync(root)!==root) fail('SDC-ROOT','continuity companion root changed');
+  for (const part of effect.path.split('/')) {
+    cursor=join(cursor,part);
+    if (!existsSync(cursor)) continue;
+    const stat=lstatSync(cursor);
+    if (stat.isSymbolicLink()) fail('SDC-PRIVATE-PATH','continuity companion source alias');
+  }
+  return cursor;
+}
+function continuityCompanionEffectImage(repository,effect) {
+  const path=continuityCompanionPhysicalPath(repository,effect);
+  if (!existsSync(path)) return null;
+  const before=lstatSync(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink!==1
+      || before.size>16777216 || (typeof process.getuid==='function'&&before.uid!==process.getuid()))
+    fail('SDC-PRIVATE-PATH','unsafe continuity companion source');
+  const fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW);
+  let bytes;
+  try {
+    const opened=fstatSync(fd);
+    if (opened.dev!==before.dev || opened.ino!==before.ino || opened.mode!==before.mode || opened.nlink!==1)
+      fail('SDC-AUTHORITY-CAS','continuity companion opened source changed');
+    bytes=readFileSync(fd);
+  } finally { closeSync(fd); }
+  const after=lstatSync(path),rawSha=createHash('sha256').update(bytes).digest('hex');
+  if (after.dev!==before.dev || after.ino!==before.ino || after.mode!==before.mode
+      || after.nlink!==1 || bytes.length!==after.size
+      || rawSha!==createHash('sha256').update(readFileSync(path)).digest('hex'))
+    fail('SDC-AUTHORITY-CAS','continuity companion source raced');
+  let semanticSha256=rawSha;
+  try { const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes); semanticSha256=canonicalSha256(JSON.parse(text)); } catch {}
+  return {sha256:rawSha,size:bytes.length,identity:{dev:String(after.dev),ino:String(after.ino),mode:after.mode,nlink:1},semanticSha256};
+}
+function continuityCompanionFactMatched(fact,effects,imageKey) {
+  return effects.some(effect=>effect[imageKey]!==null
+    && continuityAuthorityEqual(continuitySharedStateImage(fact),effect[imageKey]));
+}
+function continuityCompanionLegacyDigest(methods,effects,imageKey) {
+  const observations=methods.readBaseline().legacyOperations.map(handle=>methods.observeOperation(handle))
+    .map(value=>({...value,sourceFacts:value.sourceFacts.filter(fact=>!continuityCompanionFactMatched(fact,effects,imageKey))}))
+    .map(canonicalJson).sort();
+  return canonicalSha256(observations);
+}
+function continuityCompanionConservedFacts(before,after,effects) {
+  if (!continuityAuthorityEqual(before.filter(fact=>!continuityCompanionFactMatched(fact,effects,'preimage')),
+      after.filter(fact=>!continuityCompanionFactMatched(fact,effects,'postimage'))))
+    fail('SDC-AUTHORITY-CAS','unscoped continuity companion effects');
+}
+function continuityCompanionAssertOriginalBinding(value,snapshot) {
+  const target=value.operation.association.target;
+  const tuple=snapshot.binding.binding?.sessionCleanup;
+  if (!snapshot.observed.neutral || !tuple
+      || !continuityAuthorityEqual(tuple,{sessionId:target.sessionId,descriptorSha256:target.descriptorSha256})
+      || snapshot.binding.binding.featureId!==value.originalBinding.featureId
+      || snapshot.binding.binding.schema!==value.originalBinding.schema
+      || snapshot.release.status!=='absent')
+    fail('SDC-AUTHORITY-CAS','original continuity private binding changed');
+}
+function continuityRefreshCompanionKnownOwnerAlias(data,snapshot) {
+  const contextHandle=continuityCompanionContextScope.getStore();
+  const value=continuityCompanionContexts.get(contextHandle);
+  if (!value || value.operation.data!==data || !value.companionWriteHandle) return;
+  continuityCompanionCurrent(value,{repository:data.repository,entry:value.entry});
+  const handle=value.companionWriteHandle;
+  if (!isOwnedStateAuthorityCompanionWriteHandle(handle,{repository:data.repository})
+      || getOwnedStateAuthorityCompanionContextHandle(handle)!==contextHandle)
+    fail('SDC-AUTHORITY-CAS','unowned continuity companion source seal');
+  const changed=value.companionPlan.effects.some(effect=>
+    !continuityAuthorityEqual(continuityCompanionEffectImage(data.repository,effect),effect.preimage));
+  if (!changed) return; // No physical effect: the actual original alias remains exact.
+  const terminal=observeStateAuthorityCompanionWriteTerminal(handle);
+  if (terminal.entry!==value.entry || !continuityCompanionResultValue(terminal.result)
+      || terminal.effects.length!==value.companionPlan.effects.length)
+    fail('SDC-AUTHORITY-CAS','continuity companion terminal mismatch');
+  terminal.effects.forEach((effect,index)=>{
+    const prior=value.companionPlan.effects[index];
+    if (effect.scope!==prior.scope || effect.path!==prior.path
+        || !continuityAuthorityEqual(effect.preimage,prior.preimage)
+        || !continuityAuthorityEqual(continuityCompanionEffectImage(data.repository,effect),effect.postimage))
+      fail('SDC-AUTHORITY-CAS','continuity companion terminal image mismatch');
+  });
+  continuityCompanionAssertOriginalBinding(value,snapshot);
+  continuityCompanionConservedFacts(value.originalSourceFacts,snapshot.sourceFacts,terminal.effects);
+  const tuple=snapshot.binding.binding.sessionCleanup;
+  const key=continuitySharedStateLogicalLegacyKey(data,snapshot,tuple);
+  const prior=data.legacy.get(key);
+  if (prior && prior!==value.operation.operationHandle)
+    fail('SDC-AUTHORITY-CAS','continuity companion legacy lifetime conflict');
+  if (!prior && data.legacy.size>=4096)
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity companion lifetime bound');
+  data.legacy.set(key,value.operation.operationHandle);
+}
+function continuityObserveCompanionStateWrite(data,port,methods,handle,context) {
+  if (!exactKeys(context,new Set(['boundary','producerRecord','memberRecords','releaseRecords']))
+      || !isOwnedStateAuthorityCompanionWriteHandle(handle,{repository:data.repository}))
+    fail('SDC-AUTHORITY-UNAVAILABLE','genuine continuity companion source required');
+  const plan=observeStateAuthorityCompanionWrite(handle);
+  const contextHandle=getOwnedStateAuthorityCompanionContextHandle(handle);
+  const value=continuityCompanionCurrent(continuityCompanionContexts.get(contextHandle),
+    {repository:data.repository,entry:plan.entry});
+  if (value.operation.data!==data || plan.repositorySha256!==canonicalSha256({primaryRoot:data.repository.primaryRoot,commonDir:data.repository.commonDir})
+      || !plan.affectedProducerIds.includes('onboarding-continuity')
+      || !Array.isArray(plan.effects) || !plan.effects.length || plan.effects.length>4096)
+    fail('SDC-AUTHORITY-CAS','continuity companion owner incidence mismatch');
+  // Revalidate the requested State image at the original Common boundary,
+  // after any attended approval prompt and before the actual sealed effect.
+  const requestedStateEffect={scope:'repository',path:relative(data.repository.primaryRoot,statePathForMethod(data.repository.primaryRoot)).split(sep).join('/'),
+    preimage:null,postimage:null};
+  const requestedStateImage=continuityCompanionEffectImage(data.repository,requestedStateEffect);
+  if (!requestedStateImage || requestedStateImage.sha256!==value.expectedStateSha256)
+    fail('SDC-AUTHORITY-CAS','continuity companion requested State preimage changed');
+  const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary:context.boundary,producerPort:port});
+  const members=producer.record.members.map(index=>inspectSourceOwnedSessionAuthorityMemberRecord({
+    boundary:context.boundary,producerPort:port,memberRef:index.memberRef}));
+  if (!continuityAuthorityEqual(producer.record,context.producerRecord)
+      || !continuityAuthorityEqual(members.map(item=>item.record),context.memberRecords)
+      || !continuityAuthorityEqual(members.filter(item=>item.releaseRecord!==null).map(item=>item.releaseRecord),context.releaseRecords)
+      || members.some(item=>item.record.phase==='terminal-observed'
+        || (item.record.phase==='released'&&item.record.sourceFacts.some(fact=>continuityCompanionFactMatched(fact,plan.effects,'preimage')))))
+    fail('SDC-AUTHORITY-CAS','continuity companion record authentication failed');
+  const snapshot=continuityAuthoritySnapshot(data.repository);
+  if (!continuityAuthorityEqual(snapshot.memberships,producer.record.baseline))
+    fail('SDC-AUTHORITY-CAS','continuity companion preexisting baseline drift');
+  plan.effects.forEach(effect=>{
+    if (effect.postimage!==null || !continuityAuthorityEqual(continuityCompanionEffectImage(data.repository,effect),effect.preimage))
+      fail('SDC-AUTHORITY-CAS','continuity companion preimage changed');
+  });
+  value.originalBinding=structuredClone(snapshot.binding.binding);
+  value.originalSourceFacts=structuredClone(snapshot.sourceFacts);
+  continuityCompanionAssertOriginalBinding(value,snapshot);
+  const historical=members.filter(item=>item.record.phase==='released').map(item=>({
+    memberRef:item.memberRef,record:structuredClone(item.record),releaseRef:item.releaseRef,
+    releaseRecord:structuredClone(item.releaseRecord)}));
+  const live=members.filter(item=>item.record.phase!=='released').map(item=>({memberRef:item.memberRef,record:structuredClone(item.record),
+    operation:continuitySharedStatePrivateOperation(data,methods,item.record,item.memberRef)}));
+  if (live.filter(item=>item.operation===value.operation).length!==1)
+    fail('SDC-AUTHORITY-CAS','continuity companion original member unavailable');
+  value.companionWriteHandle=handle;value.companionPlan=structuredClone(plan);
+  const witness=Object.freeze({});
+  continuityCompanionWitnesses.set(witness,{data,port,handle,contextHandle,value,boundary:context.boundary,
+    plan:structuredClone(plan),producer,live,historical,stage:'prepared',
+    legacyOperationsSha256:continuityCompanionLegacyDigest(methods,plan.effects,'preimage')});
+  return witness;
+}
+function continuityVerifyCompanionStateWrite(data,port,methods,handle,witness) {
+  const owned=continuityCompanionWitnesses.get(witness);
+  if (!owned || owned.data!==data || owned.port!==port || owned.handle!==handle
+      || !['prepared','verified'].includes(owned.stage)
+      || getOwnedStateAuthorityCompanionContextHandle(handle)!==owned.contextHandle)
+    fail('SDC-AUTHORITY-CAS','unowned continuity companion witness');
+  continuityCompanionCurrent(owned.value,{repository:data.repository,entry:owned.plan.entry});
+  const terminal=observeStateAuthorityCompanionWriteTerminal(handle);
+  const snapshot=continuityAuthoritySnapshot(data.repository);
+  continuityRefreshCompanionKnownOwnerAlias(data,snapshot);
+  continuityCompanionAssertOriginalBinding(owned.value,snapshot);
+  if (!continuityAuthorityEqual(continuitySharedStateRecord(data,owned.producer.producerRef),owned.producer.record))
+    fail('SDC-AUTHORITY-CAS','continuity companion producer changed');
+  for (const item of owned.historical) {
+    if (!item.releaseRef || !item.releaseRecord
+        || !continuityAuthorityEqual(continuitySharedStateRecord(data,item.memberRef),item.record)
+        || !continuityAuthorityEqual(continuitySharedStateRecord(data,item.releaseRef),item.releaseRecord))
+      fail('SDC-AUTHORITY-CAS','continuity companion historical release changed');
+  }
+  const memberObservations=owned.live.map(item=>{
+    if (!continuityAuthorityEqual(item.operation.expectedMemberRef,item.memberRef)
+        || !continuityAuthorityEqual(continuitySharedStateRecord(data,item.memberRef),item.record))
+      fail('SDC-AUTHORITY-CAS','continuity companion original member changed');
+    const observed=methods.observeOperation(item.operation.operationHandle);
+    if (!continuityAuthorityEqual({association:observed.association,kinds:observed.kinds,phase:observed.phase,bindingSha256:observed.bindingSha256},
+        {association:item.record.association,kinds:item.record.kinds,phase:item.record.phase,bindingSha256:item.record.bindingSha256}))
+      fail('SDC-AUTHORITY-CAS','continuity companion original operation changed');
+    continuityCompanionConservedFacts(item.record.sourceFacts,observed.sourceFacts,terminal.effects);
+    return {memberRef:item.memberRef,...observed};
+  });
+  const legacyOperationsSha256=continuityCompanionLegacyDigest(methods,terminal.effects,'postimage');
+  if (legacyOperationsSha256!==owned.legacyOperationsSha256)
+    fail('SDC-AUTHORITY-CAS','continuity companion legacy identity changed');
+  owned.terminal=structuredClone(terminal);owned.stage='verified';
+  return {memberships:snapshot.memberships,memberObservations,legacyOperationsSha256};
+}
+function continuityRefreshCompanionStateMemberRefs(data,port,handle,witness,{boundary}={}) {
+  const owned=continuityCompanionWitnesses.get(witness);
+  if (!owned || owned.data!==data || owned.port!==port || owned.handle!==handle
+      || owned.boundary!==boundary || owned.stage!=='verified')
+    fail('SDC-AUTHORITY-CAS','unowned continuity companion refresh');
+  owned.stage='refreshing';
+  const ticket=inspectSourceOwnedSessionAuthorityCompanionRefresh({boundary,producerPort:port,
+    companionWriteHandle:handle,ownerWitness:witness});
+  const updates=ticket.members.map(change=>{
+    const item=owned.live.find(row=>continuityAuthorityEqual(row.memberRef,change.previousMemberRef));
+    if (!item || item.record.memberId!==change.memberId || item.record.memberGeneration!==change.memberGeneration
+        || !continuityAuthorityEqual(item.operation.expectedMemberRef,item.memberRef))
+      fail('SDC-AUTHORITY-CAS','continuity companion refresh predecessor mismatch');
+    // The genuine refresh ticket binds the successor before owner reconciliation.
+    // Reopen that exact ticket ref without adopting any ref from current disk.
+    const matching=ticket.memberRecords.filter(record=>
+      continuityAuthorityEqual(record.memberRef,change.memberRef));
+    if (matching.length!==1)
+      fail('SDC-AUTHORITY-CAS','continuity companion refresh successor unavailable');
+    const actual=matching[0];
+    if (!continuityAuthorityEqual(actual.producerRef,ticket.producerRef)
+        || !continuityAuthorityEqual(actual.catalogueRef,ticket.catalogueRef)
+        || !continuityAuthorityEqual(continuitySharedStateRecord(data,change.memberRef),actual.record))
+      fail('SDC-AUTHORITY-CAS','continuity companion refresh successor changed');
+    const {sourceFacts,revision,updatedAt,...identity}=actual.record;
+    const {sourceFacts:priorFacts,revision:priorRevision,updatedAt:priorUpdatedAt,...priorIdentity}=item.record;
+    if (actual.releaseRef!==null || actual.releaseRecord!==null || revision!==priorRevision+1
+        || !continuityAuthorityEqual(identity,priorIdentity))
+      fail('SDC-AUTHORITY-CAS','continuity companion refreshed member identity mismatch');
+    continuityCompanionConservedFacts(priorFacts,sourceFacts,owned.terminal.effects);
+    const directs=[...continuityAuthorityDirectBindings.values()].filter(direct=>
+      direct.data===data&&direct.prepared.operationHandle===item.operation.operationHandle);
+    for (const direct of directs) {
+      if (!continuityAuthorityEqual(direct.reserved.memberRef,change.previousMemberRef))
+        fail('SDC-AUTHORITY-CAS','continuity companion direct predecessor mismatch');
+    }
+    return {item,change,directs,sourceFacts};
+  });
+  if (new Set(updates.map(value=>value.item)).size!==updates.length)
+    fail('SDC-AUTHORITY-CAS','duplicate continuity companion refresh');
+  // Registry has published these exact authenticated successors. Keep the
+  // original pins until normal settlement, but validate that publication
+  // during the current approval owner's genuine State-lock observation.
+  const ownUpdate=updates.find(update=>update.item.operation===owned.value.operation);
+  const observation=ownUpdate && owned.value.entry==='approve-plan' ? Object.freeze({
+    data,port,handle,witness,boundary,contextHandle:owned.contextHandle,value:owned.value,
+    operation:owned.value.operation,previousMemberRef:structuredClone(ownUpdate.change.previousMemberRef),
+    memberRef:structuredClone(ownUpdate.change.memberRef),
+  }) : null;
+  if (observation) {
+    if (continuityCompanionRefRefreshObservations.has(owned.contextHandle))
+      fail('SDC-AUTHORITY-CAS','continuity member refresh observation already active');
+    continuityCompanionRefRefreshObservations.set(owned.contextHandle,observation);
+  }
+  try {
+    for (const {item,sourceFacts} of updates) {
+      const observed=port.observeOperation(item.operation.operationHandle);
+      if (!continuityAuthorityEqual(observed.sourceFacts,sourceFacts))
+        fail('SDC-AUTHORITY-CAS','continuity companion refreshed physical facts mismatch');
+    }
+  } finally {
+    if (observation) continuityCompanionRefRefreshObservations.delete(owned.contextHandle);
+  }
+  for (const {item,change,directs} of updates) {
+    if (item.operation===owned.value.operation) {
+      const priorSettlement=continuityCompanionMemberRefSettlements.get(item.operation);
+      if (priorSettlement && !continuityAuthorityEqual(priorSettlement.memberRef,change.previousMemberRef))
+        fail('SDC-AUTHORITY-CAS','continuity companion refresh chain changed');
+      continuityCompanionMemberRefSettlements.set(item.operation,Object.freeze({
+        operation:item.operation,
+        operationHandle:item.operation.operationHandle,
+        executionHandle:owned.value.executionHandle,
+        contextHandle:owned.contextHandle,
+        contextValue:owned.value,
+        handle,
+        witness,
+        previousMemberRef:structuredClone(priorSettlement?.previousMemberRef??change.previousMemberRef),
+        memberRef:structuredClone(change.memberRef),
+        boundary:owned.boundary,
+      }));
+    }
+    item.operation.expectedMemberRef=structuredClone(change.memberRef);
+    for (const direct of directs) {
+      direct.reserved={...direct.reserved,memberRef:structuredClone(change.memberRef)};
+    }
+    if (item.operation===owned.value.operation) owned.value.expectedMemberRef=structuredClone(change.memberRef);
+  }
+  owned.stage='refreshed';
+}
+
+function continuityCompanionResultValue(value) {
+  if (Number.isInteger(value)) return true;
+  if (!value || typeof value!=="object" || Array.isArray(value)) return false;
+  try { return continuityAuthorityEqual(value,JSON.parse(canonicalJson(value))); } catch { return false; }
+}
+
+// Synthetic controlled-method preparation uses the real ordinary producers.
+// The returned observation is not authority: only this module retains its brand.
+const continuityMethodPreparations=new WeakMap();
+const continuityMethodPreparationRoots=new Map();
+const CONTINUITY_METHOD_ANCHOR='unit-descriptor-custody';
+
+function continuityMethodRoot(rootDir) {
+  const root=resolve(rootDir);
+  const st=lstatSync(root);
+  if (realpathSync(root)!==root || !st.isDirectory() || st.isSymbolicLink()
+      || (typeof process.getuid==='function'&&st.uid!==process.getuid()))
+    fail('SDC-ROOT','controlled continuity physical root required');
+  return inspectSignedDescriptorCustodyRepository(root);
+}
+function continuityMethodGit(repository,argv) {
+  const result=spawnSync('git',['-C',repository.primaryRoot,...argv],{env:{...process.env},shell:false,encoding:'utf8',timeout:15000,maxBuffer:1048576});
+  if (!isSuccessfulSpawn(result) || result.signal!==null)
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled continuity actual Git operation unavailable');
+  return String(result.stdout).trim();
+}
+function continuityMethodPhysicalSource(root,path) {
+  if (typeof path!=='string' || isAbsolute(path) || path.includes('\\')
+      || path.split('/').some(value=>!value||value==='.'||value==='..') || path.startsWith('.git/'))
+    fail('SDC-PRIVATE-PATH','unsafe controlled continuity public source path');
+  let physical=root;
+  for (const part of path.split('/')) {
+    physical=join(physical,part);
+    if (!existsSync(physical)) continue;
+    const st=lstatSync(physical);
+    if (st.isSymbolicLink() || (typeof process.getuid==='function'&&st.uid!==process.getuid()))
+      fail('SDC-PRIVATE-PATH','controlled continuity source owner or alias changed');
+  }
+  return physical;
+}
+function continuityMethodPublicRef(root,path) {
+  const physical=continuityMethodPhysicalSource(root,path),before=lstatSync(physical);
+  if (!before.isFile() || before.nlink!==1 || before.size>1048576)
+    fail('SDC-PRIVATE-PATH','controlled continuity source file unsafe');
+  const fd=openSync(physical,constants.O_RDONLY|constants.O_NOFOLLOW);let bytes;
+  try {const opened=fstatSync(fd);if(opened.dev!==before.dev||opened.ino!==before.ino||opened.mode!==before.mode||opened.nlink!==1)
+    fail('SDC-AUTHORITY-CAS','controlled source open identity changed');bytes=readFileSync(fd);}finally {closeSync(fd);}
+  const after=lstatSync(physical),sha256=createHash('sha256').update(bytes).digest('hex');
+  if (before.dev!==after.dev || before.ino!==after.ino || before.mode!==after.mode
+      || after.nlink!==1 || bytes.length!==after.size || sha256!==createHash('sha256').update(readFileSync(physical)).digest('hex'))
+    fail('SDC-AUTHORITY-CAS','controlled continuity source raced');
+  return {path,sha256,size:bytes.length};
+}
+function continuityMethodWriteSource(record,path,bytes,{replace=false}={}) {
+  const physical=continuityMethodPhysicalSource(record.repository.primaryRoot,path);
+  const prior=existsSync(physical)?continuityMethodPublicRef(record.repository.primaryRoot,path):null;
+  if (prior&&!replace) fail('SDC-AUTHORITY-CAS','controlled continuity source collision');
+  if (prior) record.preimages.push({ref:prior,bytes:readFileSync(physical)});
+  mkdirSync(dirname(physical),{recursive:true,mode:0o700});
+  continuityMethodPhysicalSource(record.repository.primaryRoot,path);
+  const before=prior?lstatSync(physical):null;
+  const fd=openSync(physical,constants.O_WRONLY|constants.O_NOFOLLOW
+    |(prior?0:constants.O_CREAT|constants.O_EXCL),0o600);
+  try {
+    const opened=fstatSync(fd);
+    if (opened.nlink!==1 || (before&&(opened.dev!==before.dev||opened.ino!==before.ino||opened.mode!==before.mode
+        || !continuityAuthorityEqual(continuityMethodPublicRef(record.repository.primaryRoot,path),prior))))
+      fail('SDC-AUTHORITY-CAS','controlled source replacement preimage changed');
+    if (prior) ftruncateSync(fd,0);
+    writeFileSync(fd,bytes);fsyncSync(fd);
+  }finally {closeSync(fd);}
+  const ref=continuityMethodPublicRef(record.repository.primaryRoot,path);
+  if (ref.sha256!==createHash('sha256').update(bytes).digest('hex'))
+    fail('SDC-AUTHORITY-CAS','controlled continuity source readback mismatch');
+  record.publicSources.push(ref);return ref;
+}
+function continuityMethodState(root) {
+  const observed=readSanctionedPlanState(root);
+  if (observed.status!=='ok') fail('SDC-AUTHORITY-UNAVAILABLE','controlled continuity State unavailable');
+  return observed.state;
+}
+function continuityMethodInvoke(record,argv) {
+  const logs=[],prior={log:console.log,error:console.error,warn:console.warn};
+  for (const channel of Object.keys(prior)) console[channel]=(...args)=>logs.push({channel,text:args.map(String).join(' ')});
+  let result;
+  try {result=runSanctionedCompanionState(argv,{dir:record.repository.primaryRoot});}
+  finally {Object.assign(console,prior);}
+  record.calls.push({argv:[...argv],result,logs});
+  if (result!==0) fail('SDC-AUTHORITY-UNAVAILABLE',`controlled continuity genuine ${argv[0]} prerequisite unavailable`);
+  return {result,logs};
+}
+function continuityMethodAssertBeforeAuthority(repository) {
+  if (existsSync(join(repository.commonDir,'agent-pipeline/session-authority/catalogue.json'))
+      || listActiveSessionDescriptors(repository.primaryRoot).length!==0
+      || !['unbound','design-unbound'].includes(readOnboardingSessionCleanupBinding({rootDir:repository.primaryRoot}).status)
+      || continuityMethodGit(repository,['status','--porcelain','--untracked-files=all'])!=='')
+    fail('SDC-AUTHORITY-HELD','controlled continuity preparation must precede every authority lifetime and pending public write');
+}
+function continuityMethodSigner(root,fixtureSigner) {
+  if (!exactKeys(fixtureSigner,new Set(['privateKey','publicKey','keyReference']))
+      || fixtureSigner.keyReference!==CONTINUITY_METHOD_ANCHOR
+      || typeof fixtureSigner.publicKey!=='string'
+      || fixtureSigner.privateKey?.type!=='private' || fixtureSigner.privateKey.asymmetricKeyType!=='ed25519'
+      || createPublicKey(fixtureSigner.privateKey).export({type:'spki',format:'pem'})!==fixtureSigner.publicKey)
+    fail('SDC-AUTHORITY-UNAVAILABLE','actual memory-only controlled fixture signer required');
+  const policy=readCriticalHumanProofPolicy(root);
+  const sha=createHash('sha256').update(fixtureSigner.publicKey).digest('hex');
+  if (!policy.ok || !policy.trustAnchors?.some(anchor=>anchor.keyReference===fixtureSigner.keyReference&&anchor.publicKeySha256===sha)
+      || readHumanApprovalMode(root).mode!=='signature')
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled signer does not match actual independent committed signature policy');
+  return fixtureSigner;
+}
+function continuityMethodArchitecture() {
+  return {schema:'pipeline.architecture-design.v1',repositoryKind:'greenfield',
+    disposition:{decision:'approved-scoped',scope:['specs/','architecture/','src/','tests/'],
+      rationale:'Controlled synthetic fixture with source-owned continuity; no material architecture decision.'},
+    modules:[{id:'unit',responsibility:'Own synthetic continuity fixture',nonResponsibilities:['No native/model authority'],
+      ownedPaths:['src/**','tests/**'],publicContracts:['src/index.mjs'],allowedDependencies:[],authorityEffects:[],
+      verificationEntryPoints:['tests/unit.test.mjs'],adrReferences:[]}],
+    implementationSurface:['src/index.mjs'],fitnessModel:{schema:'pipeline.fitness-model.v1',profileId:'synthetic-unit',revision:1,
+      allowedBoundaryCrossings:[],antiFragmentationPolicy:{decision:'bounded'}}};
+}
+
+
+// Prepared and committed before the immutable Repository/catalogue snapshot.
+// Source-generated stage inputs and actual journal execution remain separate.
+function continuityMethodPrepareVerifySuite(record) {
+  const path='tests/unit.test.mjs';
+  const bytes=Buffer.from("// Source-owned controlled-method checks. This file records no synthetic PASS.\nimport assert from 'node:assert/strict';\nimport {createHash} from 'node:crypto';\nimport {lstatSync, readFileSync, realpathSync} from 'node:fs';\nimport {spawnSync} from 'node:child_process';\nimport {fileURLToPath} from 'node:url';\n\nconst sha=b=>createHash('sha256').update(b).digest('hex');\nfunction file(path) {\n  const before=lstatSync(path);\n  assert(before.isFile()&&!before.isSymbolicLink()&&before.nlink===1);\n  assert.equal(realpathSync(path),path);\n  const bytes=readFileSync(path),after=lstatSync(path);\n  assert.equal(after.dev,before.dev);assert.equal(after.ino,before.ino);\n  assert.equal(after.mode,before.mode);assert.equal(after.nlink,1);\n  assert.equal(bytes.length,after.size);return bytes;\n}\nassert.equal(process.argv.length,4,'source producer supplies one physical stage and its digest');\nconst stageBytes=file(process.argv[2]);assert.equal(sha(stageBytes),process.argv[3]);\nconst s=JSON.parse(stageBytes);\nassert.deepEqual(Object.keys(s).sort(),['candidate','common','criticPacketId','featureId','modules','refs','root','stateFile','stateSha256'].sort());\nassert.deepEqual(Object.keys(s.modules).sort(),['lifecycle','recorder']);\nfor(const ref of Object.values(s.modules)) {\n  assert.deepEqual(Object.keys(ref).sort(),['sha256','url']);\n  const url=new URL(ref.url);assert.equal(url.protocol,'file:');\n  assert.equal(sha(file(fileURLToPath(url))),ref.sha256);\n}\nconst {registerTestCaseCompletion}=await import(s.modules.recorder.url);\nconst {readBoundConsumedCriticReceipt}=await import(s.modules.lifecycle.url);\nfunction git(args) {\n  const r=spawnSync('git',['-C',s.root,...args],{encoding:'utf8',shell:false,timeout:5000});\n  assert.equal(r.error,undefined);assert.equal(r.signal,null);assert.equal(r.status,0);\n  return r.stdout.trim();\n}\nregisterTestCaseCompletion({fd:3,maxBytes:16384,cases:[\n  {id:'ICV001',name:'actual immutable candidate',run(){assert.equal(git(['rev-parse','HEAD']),s.candidate.commit);assert.equal(git(['rev-parse','HEAD^{tree}']),s.candidate.tree);}},\n  {id:'ICV002',name:'physical selected State',run(){const bytes=file(s.stateFile);assert.equal(sha(bytes),s.stateSha256);assert.equal(JSON.parse(bytes).activeFeature.id,s.featureId);}},\n  {id:'ICV003',name:'actual public source bindings',run(){assert(s.refs.length>=2);for(const ref of s.refs){assert.deepEqual(Object.keys(ref).sort(),['path','sha256']);assert(!ref.path.startsWith('/')&&!ref.path.includes('\\\\')&&ref.path.split('/').every(x=>x&&x!=='.'&&x!=='..'));assert.equal(sha(file(s.root+'/'+ref.path)),ref.sha256);}}},\n  {id:'ICV004',name:'real consumed packet',run(){const v=readBoundConsumedCriticReceipt({gitCommonDir:s.common,criticPacketId:s.criticPacketId,candidate:s.candidate});assert.equal(v.packet.candidate.commit,s.candidate.commit);assert.equal(v.critic.candidate.tree,s.candidate.tree);}},\n]});\n");
+  const source=continuityMethodWriteSource(record,path,bytes);
+  record.verifySuite=Object.freeze({path,sha256:source.sha256,
+    caseCompletion:Object.freeze({schema:'pipeline.verify-case-completion-policy.v1',
+      caseIds:Object.freeze(['ICV001','ICV002','ICV003','ICV004']),maxBytes:16384})});
+}
+
+export function prepareControlledMethodContinuityArtifacts({rootDir,fixtureRoot,fixtureSigner}) {
+  const repository=continuityMethodRoot(rootDir);
+  continuityMethodAssertBeforeAuthority(repository);
+  if (continuityMethodPreparationRoots.has(repository.primaryRoot) || continuityMethodPreparationRoots.size>=4096)
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled continuity preparation lifetime already used or full');
+  const expectedRoot=join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/continuity-transitions');
+  if (resolve(fixtureRoot)!==expectedRoot || existsSync(expectedRoot))
+    fail('SDC-PRIVATE-PATH','exclusive controlled continuity preparation namespace required');
+  const state=continuityMethodState(repository.primaryRoot),intake=readOnboardingIntakeCheckpoint({rootDir:repository.primaryRoot,repositoryCapability:'local'});
+  const observed=observeSessionCleanupState(repository.primaryRoot);
+  if (intake.status!=='present' || !['generated','bound'].includes(intake.value.transactionState)
+      || !observed.neutral || observed.sessionCleanup!==null || observed.orphanBinding
+      || state.planApproved!==false || state.planApproval!==undefined
+      || state.activeFeature?.phase!=='design' || state.continuity?.featureId!==state.activeFeature?.id
+      || !/^[a-z][a-z0-9-]{0,63}$/.test(state.activeFeature.id))
+    fail('SDC-AUTHORITY-UNAVAILABLE','genuine neutral source-generated unapproved fixture required');
+  const signer=continuityMethodSigner(repository.primaryRoot,fixtureSigner);
+  const featureId=state.activeFeature.id,planPath=state.activeFeature.planPath,specPath=state.continuity.authority.spec.path;
+  const featureDir=dirname(planPath).split(sep).join('/');
+  if (featureDir!==`specs/${featureId}` || dirname(specPath).split(sep).join('/')!==featureDir)
+    fail('SDC-PRIVATE-PATH','controlled continuity feature package layout unsupported');
+  mkdirSync(expectedRoot,{mode:0o700});
+  let privateDirectory=repository.commonDir;
+  for (const part of relative(repository.commonDir,expectedRoot).split(sep)) {
+    privateDirectory=join(privateDirectory,part);const st=lstatSync(privateDirectory);
+    if (!st.isDirectory() || st.isSymbolicLink() || realpathSync(privateDirectory)!==privateDirectory
+        || (st.mode&0o077)!==0 || (typeof process.getuid==='function'&&st.uid!==process.getuid()))
+      fail('SDC-PRIVATE-PATH','controlled preparation private directory unsafe');
+  }
+  mkdirSync(join(expectedRoot,'empty-hooks'),{mode:0o700});
+  const handle=Object.freeze({}),record={handle,repository,fixtureRoot:expectedRoot,featureId,planPath,specPath,
+    initialState:structuredClone(state),initialObservation:structuredClone(observed),publicSources:[],preimages:[],calls:[],stage:'preparing'};
+  continuityMethodPreparations.set(handle,record);continuityMethodPreparationRoots.set(repository.primaryRoot,record);
+  const companionPaths=[`${featureDir}/design.md`,`${featureDir}/traceability.md`],reportPath=`${featureDir}/review/method-design-review.md`,
+    receiptPath=`${featureDir}/review/method-design-review-receipt.json`;
+  const specBytes=Buffer.from('# Controlled continuity fixture technical specification\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | The package must receive a PASS verdict from an independent Critic before acceptance. | Source-consumed controlled method review; no native/model acceptance claim. |\n');
+  continuityMethodWriteSource(record,specPath,specBytes,{replace:true});
+  const language=state.continuity.runtime.humanFacingLanguage;
+  const prdBytes=Buffer.from(`${PO_GATE_PRD_LANGUAGE_MARKER(language)}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${createHash('sha256').update(specBytes).digest('hex')} -->\n# Controlled continuity fixture PRD\nImplementation surface: \`src/index.mjs\`.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(continuityMethodArchitecture())}\n\`\`\`\n`);
+  continuityMethodWriteSource(record,planPath,prdBytes,{replace:true});
+  for (const [path,bytes] of [[companionPaths[0],'# Controlled synthetic design\nOne owned source lifecycle; no external authority.\n'],
+      [companionPaths[1],'| ID | Evidence |\n| --- | --- |\n| AC-1 | Actual consumed source review and owning Verify terminal. |\n'],
+      [reportPath,'# Controlled method design review\nSynthetic test material after actual source reads; no model/native reviewer attribution.\n'],
+      [`${featureDir}/acceptance.md`,'# Controlled fixture acceptance\nActual owning source lifecycle required.\n'],
+      [`${featureDir}/result.md`,'# Controlled fixture result\nSource-producer evidence remains required before close.\n'],
+      [`${featureDir}/owned-next-feature.md`,'# Controlled next-feature fixture\nOnly the genuine orphan-prefix transition.\n']])
+    continuityMethodWriteSource(record,path,Buffer.from(bytes),{replace:!path.includes('/review/')});
+  const source=path=>{const {size,...ref}=continuityMethodPublicRef(repository.primaryRoot,path);return ref;};
+  const design=createDesignReviewReceipt({featureId,previous:null,sources:{prd:source(planPath),spec:source(specPath),companions:companionPaths.map(source)},
+    reviewer:{runner:'codex',model:'controlled-method-synthetic'},report:source(reportPath),openFindingIds:[],reviewedAt:new Date().toISOString()});
+  if (!design.ok) fail(design.code,'controlled design receipt producer refused');
+  continuityMethodWriteSource(record,receiptPath,Buffer.from(design.bytes));
+  mkdirSync(join(repository.primaryRoot,'docs/adr'),{recursive:true,mode:0o700});
+  continuityMethodGit(repository,['add','--',featureDir]);
+  continuityMethodGit(repository,['-c','user.name=AUTH Unit','-c','user.email=auth@example.invalid','commit','-q','-m',"test(pipeline): prepare controlled continuity source inputs\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true"]);
+  const published=publishPoGateProfileReceipt({rootDir:repository.primaryRoot,
+    userYamlText:readFileSync(join(repository.primaryRoot,'pipeline.user.yaml')),
+    runtimeYamlText:readFileSync(join(repository.primaryRoot,'project/pipeline.yaml'))});
+  if (!published.ok) fail('SDC-AUTHORITY-UNAVAILABLE','actual controlled profile publication refused');
+  continuityMethodInvoke(record,['submit-plan','--by','controlled-method-author','--profile','feature']);
+  continuityMethodInvoke(record,['present-plan','--by','controlled-method-presenter','--review-receipt',receiptPath]);
+  const presented=continuityMethodState(repository.primaryRoot),requestPath=presented.planPresentation?.designApprovalRequestPath;
+  if (typeof requestPath!=='string' || !/^scratch\/design-approval-request-[a-f0-9]{64}\.json$/.test(requestPath))
+    fail('SDC-AUTHORITY-UNAVAILABLE','actual design request producer unavailable');
+  const request=JSON.parse(readFileSync(continuityMethodPhysicalSource(repository.primaryRoot,requestPath)));
+  const digest=request.approvalIntent?.sha256;
+  if (!/^[a-f0-9]{64}$/.test(digest)) fail('SDC-AUTHORITY-CAS','actual design request intent malformed');
+  const proof={schema:'pipeline.po-approval-proof.v1',intentSha256:digest,keyReference:signer.keyReference,
+    publicKey:signer.publicKey,signatureBase64:sign(null,Buffer.from(digest),signer.privateKey).toString('base64')};
+  continuityMethodWriteSource(record,requestPath.replace('request-','proof-'),Buffer.from(JSON.stringify(proof,null,2)+'\n'));
+  continuityMethodInvoke(record,['approve-plan','--by','controlled-method-po','--design-approval-request',requestPath]);
+  const approved=continuityMethodState(repository.primaryRoot),accepted=approved.planApproval?.acceptedContract;
+  if (approved.planApproved!==true || !accepted?.path || !/^[a-f0-9]{64}$/.test(accepted.sha256)
+      || continuityMethodPublicRef(repository.primaryRoot,accepted.path).sha256!==accepted.sha256)
+    fail('SDC-AUTHORITY-CAS','genuine retained accepted contract readback unavailable');
+  continuityMethodInvoke(record,['materialize-architecture']);
+  const compiled=compileDecisionSummary(repository.primaryRoot);
+  if (compiled.authorityStatus!=='source-validated') fail('SDC-AUTHORITY-UNAVAILABLE','actual architecture compiler unavailable');
+  const manifestPath=`${featureDir}/lifecycle.json`;
+  const artifact=(kind,path,authority,mutability,retention)=>({class:kind,path,
+    sha256:continuityMethodPublicRef(repository.primaryRoot,path).sha256,authority,mutability,retention});
+  const manifest={schema:'pipeline.feature-package.v1',feature:{id:featureId,rigor:2},state:'approved',
+    artifacts:[artifact('prd',planPath,true,'mutable','active'),artifact('spec',specPath,true,'mutable','active'),
+      artifact('acceptance',`${featureDir}/acceptance.md`,true,'mutable','active'),
+      artifact('result',`${featureDir}/result.md`,true,'mutable','active'),
+      artifact('candidate-evidence',accepted.path,false,'immutable','retain')],
+    candidate:structuredClone(request.approvalIntent.value.candidate),supersedes:null};
+  continuityMethodWriteSource(record,manifestPath,Buffer.from(JSON.stringify(manifest,null,2)+'\n'),{replace:true});
+  const checkedPackage=validateFeaturePackage(repository.primaryRoot,manifestPath);
+  if (!checkedPackage.ok) fail('SDC-AUTHORITY-UNAVAILABLE','actual controlled feature package validation refused');
+  // Commit the genuine registered package before the distinct suite source candidate.
+  const baselinePaths=[featureDir,'architecture','project/architecture-decisions.compiled.json'];
+  continuityMethodGit(repository,['add','--',...baselinePaths]);
+  continuityMethodGit(repository,['add','-f','--',accepted.path]);
+  continuityMethodGit(repository,['-c','user.name=AUTH Unit','-c','user.email=auth@example.invalid','commit','-q','-m',"test(pipeline): register controlled continuity package\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true"]);
+  // Bind only the existing calibration tiers the sanctioned transition writes.
+  const calibrationInputs=['project/pipeline.json','.claude/pipeline.json']
+    .filter(path=>existsSync(join(repository.primaryRoot,path))).map(path=>{
+      const ref=continuityMethodPublicRef(repository.primaryRoot,path);
+      const value=JSON.parse(readFileSync(continuityMethodPhysicalSource(repository.primaryRoot,path)));
+      if (!value || typeof value!=='object' || Array.isArray(value)
+          || !continuityAuthorityEqual(continuityMethodPublicRef(repository.primaryRoot,path),ref))
+        fail('SDC-AUTHORITY-CAS','controlled calibration preimage changed');
+      return {path,ref,value};
+    });
+  // Enter the existing baseline-only lifecycle without changing calibration.
+  continuityMethodInvoke(record,['set-phase','--phase','implementation']);
+  // The existing approval-verified carrier selects only genuine committed tiers.
+  continuityMethodInvoke(record,['configure-verify','--verify-command','node tests/unit.test.mjs']);
+  const calibrationOutputs=calibrationInputs.map(({path,value})=>{
+    const ref=continuityMethodPublicRef(repository.primaryRoot,path);
+    const actual=JSON.parse(readFileSync(continuityMethodPhysicalSource(repository.primaryRoot,path)));
+    if (!continuityAuthorityEqual(actual,{...value,verify:'node tests/unit.test.mjs'})
+        || !continuityAuthorityEqual(continuityMethodPublicRef(repository.primaryRoot,path),ref))
+      fail('SDC-AUTHORITY-CAS','controlled calibration output binding changed');
+    return ref;
+  });
+  const implementation=continuityMethodState(repository.primaryRoot);
+  if (derivePlanLifecycle(implementation).status!=='implementing')
+    fail('SDC-AUTHORITY-CAS','actual implementation phase producer unavailable');
+  // Calibration has its own narrow normal-hook commit, never a mixed delta.
+  continuityMethodGit(repository,['add','--',...calibrationOutputs.map(ref=>ref.path)]);
+  continuityMethodGit(repository,['-c','user.name=AUTH Unit','-c','user.email=auth@example.invalid','commit','-q','-m',"chore(pipeline): configure controlled continuity verification\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true"]);
+  for (const ref of calibrationOutputs) {
+    if (!continuityAuthorityEqual(continuityMethodPublicRef(repository.primaryRoot,ref.path),ref)
+        || continuityMethodGit(repository,['rev-parse','HEAD:'+ref.path])
+          !==continuityMethodGit(repository,['hash-object','--',ref.path]))
+      fail('SDC-AUTHORITY-CAS','controlled committed calibration readback changed');
+  }
+  // The suite candidate still has exactly this genuine baseline as its parent.
+  record.reviewBaseCommit=continuityMethodGit(repository,['rev-parse','HEAD']);
+  continuityMethodPrepareVerifySuite(record);
+  const paths=[featureDir,'architecture','project/architecture-decisions.compiled.json','tests/unit.test.mjs'];
+  continuityMethodGit(repository,['add','--',...paths]);
+  continuityMethodGit(repository,['add','-f','--',accepted.path]);
+  continuityMethodGit(repository,['-c','user.name=AUTH Unit','-c','user.email=auth@example.invalid','commit','-q','-m',"test(pipeline): record approved controlled continuity artifacts\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true"]);
+  for (const ref of calibrationOutputs) {
+    if (!continuityAuthorityEqual(continuityMethodPublicRef(repository.primaryRoot,ref.path),ref)
+        || continuityMethodGit(repository,['rev-parse','HEAD:'+ref.path])
+          !==continuityMethodGit(repository,['hash-object','--',ref.path]))
+      fail('SDC-AUTHORITY-CAS','controlled committed calibration readback changed');
+    record.publicSources.push(ref);
+  }
+  if (continuityMethodGit(repository,['status','--porcelain','--untracked-files=all'])!=='')
+    fail('SDC-AUTHORITY-CAS','controlled continuity setup left unbound public writes');
+  record.repository=continuityMethodRoot(repository.primaryRoot);
+  record.preparedState=structuredClone(continuityMethodState(repository.primaryRoot));
+  record.preparedObservation=structuredClone(observeSessionCleanupState(repository.primaryRoot));
+  record.publicSources=record.publicSources.filter(ref=>!ref.path.startsWith('scratch/'))
+    .map(ref=>continuityMethodPublicRef(repository.primaryRoot,ref.path));
+  for (const path of [accepted.path,'architecture/design-materialization.json','project/architecture-decisions.compiled.json',
+      'pipeline.user.yaml','project/pipeline.yaml','project/critical-human-proof.json'])
+    record.publicSources.push(continuityMethodPublicRef(repository.primaryRoot,path));
+  record.acceptedRef=structuredClone(accepted);record.nextFeaturePlan=`${featureDir}/owned-next-feature.md`;record.manifestPath=manifestPath;
+  record.stateRef=continuityMethodPublicRef(repository.primaryRoot,
+    relative(repository.primaryRoot,statePathForMethod(repository.primaryRoot)).split(sep).join('/'));
+  const provenance={schema:'pipeline.controlled-continuity-artifact-preparation.v1',repository:record.repository,featureId,
+    stateRef:record.stateRef,acceptedRef:record.acceptedRef,publicSources:record.publicSources,verifySuite:record.verifySuite,reviewBaseCommit:record.reviewBaseCommit,calls:record.calls,
+    assurance:'method-source-producers-synthetic-inputs',modelOrNativeAcceptance:false};
+  const provenancePath=join(expectedRoot,'artifact-preparation.json');
+  const fd=openSync(provenancePath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+  try {writeFileSync(fd,canonicalJson(provenance));fsyncSync(fd);}finally {closeSync(fd);}
+  record.provenanceRef=continuityAuthorityPrivateRef(record.repository,provenancePath);record.stage='prepared';
+  return {preparationHandle:handle,repository:structuredClone(record.repository),featureId,
+    stateRef:structuredClone(record.stateRef),provenanceRef:structuredClone(record.provenanceRef),
+    sourceRefs:record.publicSources.map(ref=>({...ref})),verifySuite:structuredClone(record.verifySuite),assurance:'method-source-producers-synthetic-inputs',nativeAcceptance:false};
+}
+
+function continuityMethodReadPreparation({repository,preparationHandle,checkInitialState=true}) {
+  const record=continuityMethodPreparations.get(preparationHandle);
+  if (!record || record.stage!=='prepared' || continuityMethodPreparationRoots.get(repository.primaryRoot)!==record
+      || !continuityAuthorityEqual(record.repository,continuityAuthorityRepository(repository)))
+    fail('SDC-AUTHORITY-UNAVAILABLE','genuine exact source-owned preparation required');
+  const path=join(repository.commonDir,record.provenanceRef.path.slice(5));
+  if (!continuityAuthorityEqual(continuityAuthorityPrivateRef(repository,path),record.provenanceRef)
+      || (checkInitialState&&!continuityAuthorityEqual(continuityMethodPublicRef(repository.primaryRoot,record.stateRef.path),record.stateRef)))
+    fail('SDC-AUTHORITY-CAS','controlled preparation source changed');
+  for (const ref of record.publicSources) {
+    if (!continuityAuthorityEqual(continuityMethodPublicRef(repository.primaryRoot,ref.path),ref))
+      fail('SDC-AUTHORITY-CAS','controlled preparation public source changed');
+  }
+  if (record.methodDispatchHandle) {
+    const method=inspectSourceOwnedControlledMethodDispatchHandle({methodDispatchHandle:record.methodDispatchHandle});
+    if (!continuityAuthorityEqual(method.repository,record.repository)) fail('SDC-METHOD-DISPATCH-CAS','METHOD preparation continuation changed');
+  }
+  return record;
+}
+
+// Private preparation ownership is the sole METHOD constructor entry.
+export function inspectControlledMethodContinuityDispatchPreparation(input) {
+  if (!exactKeys(input,new Set(['repository','preparationHandle'])))
+    fail('SDC-METHOD-DISPATCH-INPUT','closed private METHOD preparation input required');
+  const {repository,preparationHandle}=input;
+  const record=continuityMethodReadPreparation({repository,preparationHandle});
+  continuityMethodAssertBeforeAuthority(record.repository);
+  if (!record.verifySuite || record.methodDispatchHandle || !/^[a-f0-9]{40}$/.test(record.reviewBaseCommit??''))
+    fail('SDC-METHOD-DISPATCH-UNAVAILABLE','unconsumed genuine METHOD preparation required');
+  if (continuityMethodGit(repository,['rev-parse','HEAD^'])!==record.reviewBaseCommit)
+    fail('SDC-METHOD-DISPATCH-CAS','genuine suite source commit parent changed');
+  const accepted=readSanctionedAcceptedContract({dir:repository.primaryRoot,envelopePath:record.acceptedRef.path});
+  if (!accepted.ok || accepted.envelopeSha256!==record.acceptedRef.sha256
+      || accepted.authorityBasis!=='signature' || accepted.cryptographicallyAuthenticated!==true)
+    fail('SDC-METHOD-DISPATCH-UNAVAILABLE','actual accepted signature preparation unavailable');
+  return Object.freeze({repository:structuredClone(record.repository),featureId:record.featureId,
+    fixtureRoot:record.fixtureRoot,preparationRef:structuredClone(record.provenanceRef),
+    reviewBaseCommit:record.reviewBaseCommit,specRef:continuityMethodPublicRef(repository.primaryRoot,record.specPath),
+    manifestPath:record.manifestPath,acceptedRef:structuredClone(record.acceptedRef),verifySuite:structuredClone(record.verifySuite)});
+}
+
+// One pre-reservation diagnostic registration continuation, never held rebase.
+export function completeControlledMethodContinuityDispatchPreparation(input) {
+  if (!exactKeys(input,new Set(['preparationHandle','methodDispatchHandle'])))
+    fail('SDC-METHOD-DISPATCH-INPUT','closed private METHOD continuation input required');
+  const {preparationHandle,methodDispatchHandle}=input;
+  const record=continuityMethodPreparations.get(preparationHandle);
+  if (!record || record.stage!=='prepared' || record.methodDispatchHandle
+      || continuityMethodPreparationRoots.get(record.repository.primaryRoot)!==record)
+    fail('SDC-METHOD-DISPATCH-UNAVAILABLE','private unconsumed preparation required');
+  const observed=inspectSourceOwnedControlledMethodDispatchHandle({methodDispatchHandle});
+  if (!continuityAuthorityEqual(observed.previousRepository,record.repository)
+      || observed.featureId!==record.featureId || observed.reviewBaseCommit!==record.reviewBaseCommit
+      || !continuityAuthorityEqual(observed.preparationRef,record.provenanceRef)
+      || !continuityAuthorityEqual(observed.reviewCandidate,record.repository.candidate))
+    fail('SDC-METHOD-DISPATCH-CAS','METHOD continuation does not own original preparation');
+  continuityMethodAssertBeforeAuthority(observed.repository);
+  const originalManifest=record.publicSources.find(ref=>ref.path===record.manifestPath);
+  if (!originalManifest || !continuityAuthorityEqual(originalManifest,observed.manifestBefore)
+      || observed.manifestAfter.path!==record.manifestPath
+      || !continuityAuthorityEqual(continuityMethodPublicRef(record.repository.primaryRoot,record.stateRef.path),record.stateRef))
+    fail('SDC-METHOD-DISPATCH-CAS','pre-reservation METHOD state/manifest preimage changed');
+  for (const ref of record.publicSources.filter(ref=>ref.path!==record.manifestPath))
+    if (!continuityAuthorityEqual(continuityMethodPublicRef(record.repository.primaryRoot,ref.path),ref))
+      fail('SDC-METHOD-DISPATCH-CAS','unrelated preparation source changed');
+  const fresh=continuityMethodRoot(record.repository.primaryRoot);
+  if (!continuityAuthorityEqual(fresh,observed.repository))
+    fail('SDC-METHOD-DISPATCH-CAS','actual diagnostic registration repository changed');
+  record.repository=fresh;
+  record.publicSources=record.publicSources.map(ref=>ref.path===record.manifestPath?structuredClone(observed.manifestAfter):ref);
+  for (const ref of observed.evidenceRefs.filter(ref=>ref.path!==record.manifestPath))record.publicSources.push(structuredClone(ref));
+  record.methodDispatchHandle=methodDispatchHandle;
+  return Object.freeze({repository:structuredClone(record.repository),featureId:record.featureId,
+    methodDispatch:observed,assurance:'controlled-source-method',productionDispatchAuthority:false});
+}
+
+// Read-only inter-module bridge. This reads actual private source ownership; it
+// cannot construct an operation, grant a caller phase or recover a native actor.
+export function inspectControlledMethodContinuityCarrierContext({repository,operationHandle,executionHandle,memberRef}) {
+  const port=createOnboardingContinuityAuthorityProducerPort({repository}),data=continuityAuthorityPorts.get(port);
+  const operation=continuityAuthorityOperation(data,operationHandle);
+  if (operation.legacy || operation.phase!=='armed' || operation.executionHandle!==executionHandle
+      || continuityAuthorityExecutions.get(executionHandle)?.operation!==operation
+      || !continuityAuthorityEqual(operation.expectedMemberRef,memberRef))
+    fail('SDC-AUTHORITY-CAS','controlled carrier original owning operation changed');
+  const current=continuityAuthorityCurrent(data,operation.requesterHandle);
+  if (current.assurance!=='controlled-unit-method')
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled carrier cannot claim native requester authority');
+  continuityAuthorityCheckJournals(operation);
+  const memberPath=join(repository.commonDir,memberRef.path.slice(5));
+  if (!continuityAuthorityEqual(continuityAuthorityPrivateRef(repository,memberPath),memberRef))
+    fail('SDC-AUTHORITY-CAS','controlled carrier member source changed');
+  const member=JSON.parse(assertPrivateCleanupFile(memberPath,'controlled carrier member'));
+  const observed=port.observeOperation(operationHandle);
+  if (member.producerId!=='onboarding-continuity' || member.phase!=='armed'
+      || member.bindingSha256!==observed.bindingSha256 || !continuityAuthorityEqual(member.association,observed.association)
+      || !continuityAuthorityEqual(member.kinds,observed.kinds) || !continuityAuthorityEqual(member.sourceFacts,observed.sourceFacts))
+    fail('SDC-AUTHORITY-CAS','controlled carrier exact source member observation changed');
+  const preparation=continuityMethodPreparationRoots.get(repository.primaryRoot);
+  if (!preparation) fail('SDC-AUTHORITY-UNAVAILABLE','actual source-owned carrier preparation unavailable');
+  const record=continuityMethodReadPreparation({repository,preparationHandle:preparation.handle,checkInitialState:false});
+  const state=continuityMethodState(repository.primaryRoot);
+  const acceptedRef=state.planApproval?.acceptedContract;
+  if (state.activeFeature?.id!==record.featureId || state.activeFeature.planPath!==record.planPath
+      || state.planApproved!==true || derivePlanLifecycle(state).status!=='implementing'
+      || !acceptedRef?.path || !/^[a-f0-9]{64}$/.test(acceptedRef.sha256)
+      || continuityMethodPublicRef(repository.primaryRoot,acceptedRef.path).sha256!==acceptedRef.sha256)
+    fail('SDC-AUTHORITY-CAS','controlled carrier source-approved feature changed');
+  const accepted=readSanctionedAcceptedContract({dir:repository.primaryRoot,envelopePath:acceptedRef.path});
+  if (!accepted.ok || accepted.envelopeSha256!==acceptedRef.sha256
+      || accepted.authorityBasis!=='signature' || accepted.cryptographicallyAuthenticated!==true)
+    fail('SDC-AUTHORITY-UNAVAILABLE','actual controlled carrier accepted signature envelope unavailable');
+  const active=inspectSourceOwnedCurrentAuthorityContext({repository});
+  if (active.status!=='bound' || active.requesterHandle!==operation.requesterHandle
+      || active.assurance!=='controlled-unit-method' || !active.currentInvocationHandle
+      || !/^[a-f0-9]{64}$/.test(active.invocationBindingSha256))
+    fail('SDC-AUTHORITY-UNAVAILABLE','actual current carrier invocation unavailable');
+  return Object.freeze({repository:structuredClone(repository),featureId:record.featureId,planPath:record.planPath,specPath:record.specPath,
+    manifestPath:record.manifestPath,acceptedRef:structuredClone(acceptedRef),preparationRef:structuredClone(record.provenanceRef),
+    publicSources:record.publicSources.map(ref=>({...ref})),verifySuite:structuredClone(record.verifySuite),methodDispatch:record.methodDispatchHandle?inspectSourceOwnedControlledMethodDispatchHandle({methodDispatchHandle:record.methodDispatchHandle}):null,operation:observed,memberRef:structuredClone(memberRef),
+    currentRequester:structuredClone(current),invocationBindingSha256:active.invocationBindingSha256,assurance:'controlled-unit-method'});
+}
+
+// Only the original controlled local preparation retains an invocation. No
+// caller record or stale descriptor can create this private terminal join.
+const continuityRetainedOwnerInvocations = new WeakMap();
+const continuityRetiredOwnerScope = new AsyncLocalStorage();
+function retainContinuityControlledOwnerInvocation(operation) {
+  const observed=inspectSourceOwnedCurrentAuthorityContext({repository:operation.data.repository});
+  if(observed.status!=='bound'||observed.requesterHandle!==operation.requesterHandle)
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity original invocation unavailable');
+  if(observed.assurance!=='controlled-unit-method')return;
+  if(!observed.currentInvocationHandle||!observed.runtimePort
+      ||!continuityAuthorityEqual(operation.association.target,{
+        sessionId:observed.currentRequester.sessionId,
+        descriptorSha256:observed.currentRequester.descriptorSha256,
+        ownerNonceSha256:observed.currentRequester.ownerNonceSha256}))
+    fail('SDC-AUTHORITY-CAS','continuity local owner invocation changed');
+  const ownerHandle=observeOwnedSessionDescriptorOwnerHandle({repository:operation.data.repository,
+    target:operation.association.target});
+  continuityRetainedOwnerInvocations.set(operation,Object.freeze({
+    currentInvocationHandle:observed.currentInvocationHandle,runtimePort:observed.runtimePort,
+    ownerHandle,sourceRef:observed.sourceRef,invocationBindingSha256:observed.invocationBindingSha256,
+    currentRequester:observed.currentRequester}));
+}
+function continuityReadRetiredOwner(operation) {
+  const scope=continuityRetiredOwnerScope.getStore();
+  if(!scope||scope.operation!==operation
+      ||!['close-feature','release-owned-transition'].includes(scope.entry))
+    fail('SDC-AUTHORITY-UNAVAILABLE','continuity owning terminal scope required');
+  const retained=continuityRetainedOwnerInvocations.get(operation);
+  if(!retained)fail('SDC-AUTHORITY-UNAVAILABLE','continuity original local owner was not retained');
+  const observed=inspectSourceOwnedRetiredOwnerTerminalContext({repository:operation.data.repository});
+  if(observed.status!=='terminal-observed'||observed.requesterHandle!==operation.requesterHandle
+      ||observed.currentInvocationHandle!==retained.currentInvocationHandle
+      ||observed.runtimePort!==retained.runtimePort||observed.assurance!=='controlled-unit-method'
+      ||!continuityAuthorityEqual(observed.sourceRef,retained.sourceRef)
+      ||observed.invocationBindingSha256!==retained.invocationBindingSha256
+      ||!continuityAuthorityEqual(observed.currentRequester,retained.currentRequester)
+      ||!continuityAuthorityEqual(observed.closure.target,operation.association.target)
+      ||observed.closure.assurance!=='physical-owner-retirement')
+    fail('SDC-AUTHORITY-CAS','continuity retired original invocation changed');
+  return observed.currentRequester;
+}
+function runOwnedContinuityRetiredTerminal(operation,entry,callback) {
+  if(!['close-feature','release-owned-transition'].includes(entry)
+      ||typeof callback!=='function'||continuityRetiredOwnerScope.getStore()
+      ||continuityAuthorityOperations.get(operation.operationHandle)!==operation
+      ||operation.phase!=='armed'||operation.legacy)
+    fail('SDC-AUTHORITY-UNAVAILABLE','unsupported continuity owning terminal route');
+  const retained=continuityRetainedOwnerInvocations.get(operation);
+  if(!retained)fail('SDC-AUTHORITY-UNAVAILABLE','continuity original local invocation unavailable');
+  const repository=continuityAuthorityRepository(operation.data.repository);
+  if(observeOwnedSessionDescriptorOwnerHandle({repository,target:operation.association.target})!==retained.ownerHandle)
+    fail('SDC-AUTHORITY-CAS','continuity descriptor owning capability changed');
+  const closureHandle=observeOwnedSessionDescriptorClosureHandle({repository,
+    target:operation.association.target,ownerHandle:retained.ownerHandle});
+  return withSourceOwnedRetiredOwnerTerminalContext({repository,
+    currentInvocationHandle:retained.currentInvocationHandle,runtimePort:retained.runtimePort,
+    ownerHandle:retained.ownerHandle,closureHandle},()=>continuityRetiredOwnerScope.run({operation,entry},()=>{
+      continuityReadRetiredOwner(operation);continuityAuthorityCheckJournals(operation);
+      const result=callback();
+      if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous owning terminal callback');
+      continuityReadRetiredOwner(operation);continuityAuthorityCheckJournals(operation);return result;
+    }));
+}
+
+// Controlled method exercise only. The original production request is unchanged.
+const controlledAfkExercisePorts=new WeakMap();
+const controlledAfkExerciseScope=new AsyncLocalStorage();
+const controlledAfkExerciseIds=new Set(['replay-settled-admission','run-companion-without-own-context',
+  'interrupt-after-host-settled','interrupt-after-state-rename']);
+const controlledAfkExerciseCodes=new Set(['SDC-AUTHORITY-UNAVAILABLE','SDC-AUTHORITY-CAS',
+  'SDC-AUTHORITY-HELD','SDC-PRIVATE-PATH','SDC-LOCK-HELD']);
+function controlledAfkExerciseRefuse(error) {
+  fail(controlledAfkExerciseCodes.has(error?.code)?error.code:'SDC-AUTHORITY-UNAVAILABLE',
+    'controlled AFK exercise context unavailable');
+}
+function controlledAfkExerciseSourceContext() {
+  return ['onboarding-continuity.mjs','afk-transaction-host.mjs','afk-ledger.mjs',
+    'session-requester-bridge.mjs','../scripts/pipeline-state.mjs'].map(name=>{
+      const path=fileURLToPath(new URL(name,import.meta.url));
+      return continuityAuthorityFact(path,'controlled-afk-exercise-source',{pathSha256:canonicalSha256(path)});
+    });
+}
+function controlledAfkExerciseOrigin(value) {
+  const repository=continuityAuthorityRepository(value.repository);
+  const observed=inspectSourceOwnedRequesterInvocation({repository,
+    currentInvocationHandle:value.currentInvocationHandle,runtimePort:value.runtimePort});
+  const active=inspectSourceOwnedCurrentAuthorityContext({repository});
+  if(observed.status!=='bound'||active.status!=='bound'||observed.assurance!=='controlled-unit-method'
+      ||active.assurance!=='controlled-unit-method'||active.currentInvocationHandle!==value.currentInvocationHandle
+      ||active.runtimePort!==value.runtimePort||active.requesterHandle!==observed.requesterHandle
+      ||active.descriptorHandle!==observed.descriptorHandle
+      ||!continuityAuthorityEqual(active.sourceRef,observed.sourceRef)
+      ||active.invocationBindingSha256!==observed.invocationBindingSha256
+      ||!continuityAuthorityEqual(active.controllerIdentity,observed.controllerIdentity)
+      ||!continuityAuthorityEqual(active.currentRequester,observed.currentRequester))
+    fail('SDC-AUTHORITY-CAS','controlled AFK original invocation changed');
+  const ref=observed.sourceRef;
+  if(!ref||typeof ref.path!=='string'||!ref.path.startsWith('.git/agent-pipeline/'))
+    fail('SDC-PRIVATE-PATH','controlled AFK invocation source path');
+  const path=join(repository.commonDir,ref.path.slice(5));
+  if(!continuityAuthorityEqual(ref,continuityAuthorityPrivateRef(repository,path)))
+    fail('SDC-AUTHORITY-CAS','controlled AFK origin source ref changed');
+  const source=JSON.parse(assertPrivateCleanupFile(path,'controlled AFK origin'));
+  if(!exactKeys(source,new Set(['schema','repositorySha256','process','assurance','fixtureRoot','eventId']))
+      ||source.schema!=='pipeline.controlled-requester-invocation.v1'
+      ||source.repositorySha256!==canonicalSha256({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir})
+      ||source.assurance!=='controlled-unit-method'||source.fixtureRoot!==value.fixtureRoot
+      ||source.process?.pid!==process.pid||! /^[a-f0-9]{32}$/u.test(source.eventId??'')
+      ||canonicalSha256(source)!==observed.invocationBindingSha256
+      ||dirname(value.fixtureRoot)!==join(repository.commonDir,'agent-pipeline','controlled-method-fixtures')
+      ||realpathSync(value.fixtureRoot)!==value.fixtureRoot
+      ||!continuityAuthorityEqual(ref,continuityAuthorityPrivateRef(repository,path)))
+    fail('SDC-AUTHORITY-CAS','controlled AFK Source origin changed');
+  const directory=lstatSync(value.fixtureRoot);
+  if(!directory.isDirectory()||directory.isSymbolicLink()||(directory.mode&0o077)!==0
+      ||typeof process.getuid!=='function'||directory.uid!==process.getuid())
+    fail('SDC-PRIVATE-PATH','controlled AFK fixture directory custody');
+  if(value.origin&&(observed.requesterHandle!==value.origin.requesterHandle
+      ||observed.descriptorHandle!==value.origin.descriptorHandle
+      ||observed.invocationBindingSha256!==value.origin.invocationBindingSha256
+      ||!continuityAuthorityEqual(observed.sourceRef,value.origin.sourceRef)
+      ||!continuityAuthorityEqual(observed.controllerIdentity,value.origin.controllerIdentity)
+      ||!continuityAuthorityEqual(observed.currentRequester,value.origin.currentRequester)))
+    fail('SDC-AUTHORITY-CAS','controlled AFK retained requester changed');
+  const modules=controlledAfkExerciseSourceContext();
+  if(value.modules&&!continuityAuthorityEqual(modules,value.modules))
+    fail('SDC-AUTHORITY-CAS','controlled AFK exercise module context changed');
+  return {observed,modules};
+}
+function controlledAfkExerciseCurrent() {
+  const value=controlledAfkExerciseScope.getStore();
+  if(!value)return null;
+  if(value.closed||controlledAfkExercisePorts.get(value.port)!==value)
+    fail('SDC-AUTHORITY-CAS','controlled AFK exercise scope closed');
+  controlledAfkExerciseOrigin(value);
+  if(value.operation&&(continuityAuthorityOperations.get(value.operation.operationHandle)!==value.operation
+      ||continuityAuthorityExecutions.get(value.request.executionHandle)?.operation!==value.operation
+      ||value.operation.executionHandle!==value.request.executionHandle
+      ||value.operation.data!==value.data||value.operation.requesterHandle!==value.origin.requesterHandle
+      ||value.operation.legacy||value.operation.phase!=='armed'))
+    fail('SDC-AUTHORITY-CAS','controlled AFK original operation changed');
+  return value;
+}
+function controlledAfkExerciseDirectory(repository,path) {
+  let current=repository.commonDir;
+  const components=relative(current,path).split(sep);
+  if(components.some(part=>!part||part==='.'||part==='..')||isAbsolute(relative(current,path)))
+    fail('SDC-PRIVATE-PATH','controlled AFK readback directory outside common root');
+  for(const part of components){
+    current=join(current,part);let info;
+    try{info=lstatSync(current);}catch(error){
+      if(error?.code!=='ENOENT')throw error;
+      const parent=dirname(current),before=lstatSync(parent),names=readdirSync(parent).sort();
+      try{lstatSync(current);fail('SDC-AUTHORITY-CAS','controlled AFK absent directory appeared');}
+      catch(second){if(second?.code!=='ENOENT')throw second;}
+      const after=lstatSync(parent);
+      if(before.dev!==after.dev||before.ino!==after.ino||before.mode!==after.mode
+          ||!continuityAuthorityEqual(names,readdirSync(parent).sort()))
+        fail('SDC-AUTHORITY-CAS','controlled AFK absence parent changed');
+      return null;
+    }
+    if(!info.isDirectory()||info.isSymbolicLink()||(info.mode&0o077)!==0
+        ||typeof process.getuid!=='function'||info.uid!==process.getuid()||realpathSync(current)!==current)
+      fail('SDC-PRIVATE-PATH','controlled AFK readback directory custody');
+  }
+  const info=lstatSync(path),names=readdirSync(path).sort();
+  if(names.length>4096)fail('SDC-AUTHORITY-UNAVAILABLE','controlled AFK readback entry bound');
+  return {identity:{dev:String(info.dev),ino:String(info.ino),mode:info.mode,nlink:info.nlink},names};
+}
+// This is a private physical observation of an already authenticated interrupted
+// course. It never reconciles, creates a producer, or admits a writer.
+function controlledAfkPhysicalRequire(condition) {
+  if(!condition)fail('SDC-AUTHORITY-CAS','controlled AFK physical record unresolved');
+}
+function controlledAfkPhysicalClosed(value,keys) {
+  controlledAfkPhysicalRequire(exactKeys(value,new Set(keys)));
+  return value;
+}
+function controlledAfkPhysicalDigest(value) {
+  controlledAfkPhysicalRequire(typeof value==='string'&&/^[a-f0-9]{64}$/u.test(value));
+}
+function controlledAfkPhysicalGeneration(value) {
+  controlledAfkPhysicalRequire(Number.isSafeInteger(value)&&value>0);
+}
+function controlledAfkPhysicalId(value) {
+  controlledAfkPhysicalRequire(typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/u.test(value));
+}
+function controlledAfkPhysicalRef(value,path=null) {
+  controlledAfkPhysicalClosed(value,['path','sha256','size']);controlledAfkPhysicalDigest(value.sha256);
+  controlledAfkPhysicalRequire(typeof value.path==='string'&&value.path.startsWith('.git/agent-pipeline/')
+    &&!value.path.includes('\\')&&!value.path.split('/').some(part=>!part||part==='.'||part==='..')
+    &&Number.isSafeInteger(value.size)&&value.size>=0&&(path===null||value.path===`.git/${path}`));
+}
+function controlledAfkPhysicalTarget(value) {
+  controlledAfkPhysicalClosed(value,['sessionId','descriptorSha256','ownerNonceSha256']);
+  controlledAfkPhysicalId(value.sessionId);controlledAfkPhysicalDigest(value.descriptorSha256);
+  controlledAfkPhysicalDigest(value.ownerNonceSha256);
+}
+function controlledAfkPhysicalTime(value) {
+  controlledAfkPhysicalRequire(typeof value==='string'&&Number.isFinite(Date.parse(value))
+    &&new Date(value).toISOString()===value);
+}
+function controlledAfkPhysicalSourceFacts(values) {
+  const namespaces=['registered-activations','activation-generations','writer-recovery-locks'];
+  controlledAfkPhysicalRequire(Array.isArray(values)&&values.length<=4096);
+  let total=0;
+  for(const value of values){
+    controlledAfkPhysicalClosed(value,['namespaceId','pathSha256','sha256','size','identity','semanticSha256']);
+    controlledAfkPhysicalRequire(namespaces.includes(value.namespaceId));
+    for(const digest of [value.pathSha256,value.sha256,value.semanticSha256])controlledAfkPhysicalDigest(digest);
+    controlledAfkPhysicalClosed(value.identity,['dev','ino','mode','nlink']);
+    controlledAfkPhysicalRequire(typeof value.identity.dev==='string'&&/^\d+$/u.test(value.identity.dev)
+      &&typeof value.identity.ino==='string'&&/^\d+$/u.test(value.identity.ino)
+      &&Number.isSafeInteger(value.identity.mode)&&value.identity.nlink===1
+      &&Number.isSafeInteger(value.size)&&value.size>=0&&value.size<=1048576);
+    total+=value.size;
+  }
+  controlledAfkPhysicalRequire(total<=16777216);
+}
+function controlledAfkPhysicalRecord(repository,path,expectedRef,readset) {
+  const absolute=join(repository.commonDir,path),directory=dirname(absolute);
+  controlledAfkPhysicalRequire(path.startsWith('agent-pipeline/session-authority/')
+    &&!path.includes('\\')&&!path.split('/').some(part=>!part||part==='.'||part==='..'));
+  const topology=controlledAfkExerciseDirectory(repository,directory);
+  controlledAfkPhysicalRequire(topology!==null);
+  const initial=lstatSync(absolute);
+  controlledAfkPhysicalRequire(initial.isFile()&&!initial.isSymbolicLink()&&initial.nlink===1&&initial.size<=1048576);
+  const bytes=assertPrivateCleanupFile(absolute,'controlled AFK physical record');
+  const parsed=JSON.parse(bytes.toString('utf8'));
+  controlledAfkPhysicalRequire(bytes.length<=1048576&&bytes.toString('utf8')===canonicalJson(parsed));
+  const fact=continuityAuthorityFact(absolute,'controlled-afk-physical-record',parsed);
+  const ref=continuityAuthorityPrivateRef(repository,absolute);
+  controlledAfkPhysicalRequire(ref.sha256===sha256(bytes)&&ref.size===bytes.length
+    &&fact.sha256===ref.sha256&&fact.size===ref.size
+    &&(process.platform==='win32'||(fact.identity.mode&0o777)===0o600)
+    &&continuityAuthorityEqual(topology,controlledAfkExerciseDirectory(repository,directory)));
+  if(expectedRef!==null){controlledAfkPhysicalRef(expectedRef,path);controlledAfkPhysicalRequire(continuityAuthorityEqual(expectedRef,ref));}
+  controlledAfkPhysicalRequire(!readset.records.has(path));
+  readset.total+=bytes.length;controlledAfkPhysicalRequire(readset.total<=16777216);
+  readset.records.set(path,{path,parsed,fact,ref,directory,topology});
+  return {record:parsed,ref};
+}
+function controlledAfkPhysicalMember(record,repository,participant) {
+  controlledAfkPhysicalClosed(record,['schema','repositorySha256','producerId','memberId','memberGeneration','revision',
+    'association','kinds','bindingSha256','phase','sourceFacts','createdAt','updatedAt','releaseRef']);
+  controlledAfkPhysicalRequire(record.schema==='pipeline.session-authority-member.v1'
+    &&record.repositorySha256===canonicalSha256({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir})
+    &&record.producerId===participant.producerId);
+  controlledAfkPhysicalId(record.memberId);controlledAfkPhysicalGeneration(record.memberGeneration);
+  controlledAfkPhysicalGeneration(record.revision);controlledAfkPhysicalDigest(record.bindingSha256);
+  controlledAfkPhysicalClosed(record.association,['state','target']);
+  if(record.association.state==='bound')controlledAfkPhysicalTarget(record.association.target);
+  else controlledAfkPhysicalRequire(record.association.state==='unbound'&&record.association.target===null);
+  controlledAfkPhysicalRequire(continuityAuthorityEqual(record.kinds,['armed-capability'])
+    &&['reserved','armed','running','terminal-observed','released'].includes(record.phase));
+  controlledAfkPhysicalSourceFacts(record.sourceFacts);
+  controlledAfkPhysicalTime(record.createdAt);controlledAfkPhysicalTime(record.updatedAt);
+  if(record.phase==='released')controlledAfkPhysicalRef(record.releaseRef,
+    `agent-pipeline/session-authority/releases/afk-ledger/${record.memberId}.${record.memberGeneration}.json`);
+  else controlledAfkPhysicalRequire(record.releaseRef===null);
+}
+function controlledAfkPhysicalRelease(record,member,repository,participant) {
+  controlledAfkPhysicalClosed(record,['schema','repositorySha256','producerId','memberId','memberGeneration',
+    'memberPreimageSha256','bindingSha256','terminal','sourceFacts','createdAt']);
+  controlledAfkPhysicalRequire(record.schema==='pipeline.session-authority-release.v1'
+    &&record.repositorySha256===canonicalSha256({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir})
+    &&record.producerId===participant.producerId&&record.memberId===member.memberId
+    &&record.memberGeneration===member.memberGeneration&&record.bindingSha256===member.bindingSha256
+    &&['completed','cancelled','consumed','revoked','stopped','continuity-released'].includes(record.terminal));
+  controlledAfkPhysicalDigest(record.memberPreimageSha256);controlledAfkPhysicalSourceFacts(record.sourceFacts);
+  controlledAfkPhysicalRequire(record.sourceFacts.length>0);controlledAfkPhysicalTime(record.createdAt);
+}
+function controlledAfkRenamedPhysicalMembers(value,state) {
+  controlledAfkExerciseOrigin(value);
+  const marker=value.renamedStateObservation,anchor=value.ledgerObservationAnchor;
+  const operation=value.operation,row=value.admissionRow,repository=value.repository;
+  controlledAfkPhysicalRequire(value.exercise==='interrupt-after-state-rename'
+    &&value.reachedStage==='after-atomic-State-rename-before-directory-sync'
+    &&controlledAfkExercisePorts.get(value.port)===value&&!value.closed&&value.used
+    &&marker&&anchor&&value.before&&value.originalResult?.status==='unavailable'
+    &&marker.operation===operation&&marker.executionHandle===value.request.executionHandle
+    &&marker.row===row&&row?.closed===true&&row.phase==='settled'
+    &&continuityAfkAdmissions.get(row.admissionHandle)===row
+    &&continuityAfkAdmissionByOperation.get(operation)===undefined
+    &&continuityAuthorityOperations.get(value.request.operationHandle)===operation
+    &&continuityAuthorityExecutions.get(value.request.executionHandle)?.operation===operation
+    &&operation.data===value.data&&operation.requesterHandle===value.origin.requesterHandle
+    &&operation.executionHandle===value.request.executionHandle&&!operation.legacy&&operation.phase==='armed'
+    &&row.operation===operation&&row.data===value.data&&row.executionHandle===value.request.executionHandle
+    &&row.inputSha256===canonicalSha256(value.request.input)&&row.projectionRead===true
+    &&row.projectionContextHandle===marker.contextHandle
+    &&continuityAuthorityEqual(marker.memberRef,operation.expectedMemberRef)
+    &&continuityAuthorityEqual(marker.state,state));
+  const root='agent-pipeline/session-authority',readset={records:new Map(),total:0};
+  const common=lstatSync(repository.commonDir);
+  controlledAfkPhysicalRequire(common.isDirectory()&&!common.isSymbolicLink()
+    &&realpathSync(repository.commonDir)===repository.commonDir
+    &&typeof process.getuid==='function'&&common.uid===process.getuid());
+  const commonIdentity=stat=>({dev:String(stat.dev),ino:String(stat.ino),mode:stat.mode,nlink:stat.nlink,uid:stat.uid});
+  const directories=[join(repository.commonDir,'agent-pipeline'),
+    ...['','/producers','/members','/members/afk-ledger','/releases','/releases/afk-ledger']
+      .map(suffix=>join(repository.commonDir,`${root}${suffix}`))];
+  const topology=directories.map(path=>controlledAfkExerciseDirectory(repository,path));
+  controlledAfkPhysicalRequire(topology[0]!==null&&topology[1]!==null&&topology[2]!==null);
+  const catalogue=controlledAfkPhysicalRecord(repository,`${root}/catalogue.json`,null,readset).record;
+  controlledAfkPhysicalClosed(catalogue,['schema','repositorySha256','generation','participantSetSha256','participants','producers']);
+  const repositorySha256=canonicalSha256({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir});
+  controlledAfkPhysicalRequire(catalogue.schema==='pipeline.session-authority-catalogue.v1'
+    &&catalogue.repositorySha256===repositorySha256);
+  controlledAfkPhysicalGeneration(catalogue.generation);controlledAfkPhysicalDigest(catalogue.participantSetSha256);
+  const ids=['onboarding-continuity','human-guard-override','chat-gate','state-push-challenge',
+    'native-goldfish','managed-codex','agy-session-consent','agy-family-dispatch','model-family-host',
+    'afk-ledger','session-power','local-worker-supervisor'];
+  controlledAfkPhysicalRequire(Array.isArray(catalogue.participants)&&catalogue.participants.length===12
+    &&Array.isArray(catalogue.producers)&&catalogue.producers.length===12
+    &&canonicalSha256(catalogue.participants)===catalogue.participantSetSha256
+    &&catalogue.participantSetSha256===anchor.record.participantSetSha256);
+  for(let i=0;i<ids.length;i++){
+    const participant=catalogue.participants[i],index=catalogue.producers[i];
+    controlledAfkPhysicalClosed(participant,['producerId','kinds','sourcePaths','sourceSha256','namespaceIds']);
+    controlledAfkPhysicalClosed(index,['producerId','producerRef','producerGeneration']);
+    controlledAfkPhysicalRequire(participant.producerId===ids[i]&&index.producerId===ids[i]);
+    controlledAfkPhysicalDigest(participant.sourceSha256);controlledAfkPhysicalGeneration(index.producerGeneration);
+    controlledAfkPhysicalRef(index.producerRef,`${root}/producers/${ids[i]}.json`);
+  }
+  const participant=catalogue.participants[9],index=catalogue.producers[9];
+  const sourcePaths=['plugins/pipeline-core/lib/afk-ledger.mjs','plugins/pipeline-core/lib/afk-transaction-host.mjs',
+    'plugins/pipeline-core/lib/session-authority-domain-owner.mjs'];
+  controlledAfkPhysicalRequire(continuityAuthorityEqual(participant.kinds,['armed-capability'])
+    &&continuityAuthorityEqual(participant.namespaceIds,['registered-activations','activation-generations','writer-recovery-locks'])
+    &&continuityAuthorityEqual(participant.sourcePaths,sourcePaths));
+  const sources=sourcePaths.map(path=>{
+    const absolute=fileURLToPath(new URL(path.slice('plugins/pipeline-core/lib/'.length),import.meta.url));
+    const fact=continuityAuthorityFact(absolute,'controlled-afk-physical-source',{pathSha256:canonicalSha256(absolute)});
+    return {path,absolute,fact};
+  });
+  controlledAfkPhysicalRequire(participant.sourceSha256===canonicalSha256(sources.map(({path,fact})=>({path,sha256:fact.sha256})))
+    &&participant.sourceSha256===anchor.record.sourceSha256);
+  const producer=controlledAfkPhysicalRecord(repository,`${root}/producers/afk-ledger.json`,index.producerRef,readset).record;
+  controlledAfkPhysicalClosed(producer,['schema','repositorySha256','producerId','generation','participantSetSha256',
+    'sourceSha256','baseline','members','targetCertificates','lastTransitionSha256']);
+  controlledAfkPhysicalRequire(producer.schema==='pipeline.session-authority-producer.v1'
+    &&producer.repositorySha256===repositorySha256&&producer.producerId==='afk-ledger'
+    &&producer.generation===index.producerGeneration&&producer.generation>=anchor.record.generation
+    &&producer.participantSetSha256===catalogue.participantSetSha256&&producer.sourceSha256===participant.sourceSha256);
+  controlledAfkPhysicalGeneration(producer.generation);controlledAfkPhysicalDigest(producer.lastTransitionSha256);
+  controlledAfkPhysicalRequire(Array.isArray(producer.baseline)&&producer.baseline.length===3);
+  const namespaceIds=new Set();let entries=0;
+  for(const membership of producer.baseline){
+    controlledAfkPhysicalClosed(membership,['namespaceId','rootSha256','entrySetSha256','entryCount','sourceFacts']);
+    controlledAfkPhysicalRequire(participant.namespaceIds.includes(membership.namespaceId)&&!namespaceIds.has(membership.namespaceId));
+    namespaceIds.add(membership.namespaceId);controlledAfkPhysicalDigest(membership.rootSha256);
+    controlledAfkPhysicalDigest(membership.entrySetSha256);controlledAfkPhysicalSourceFacts(membership.sourceFacts);
+    controlledAfkPhysicalRequire(Number.isSafeInteger(membership.entryCount)&&membership.entryCount===membership.sourceFacts.length);
+    entries+=membership.entryCount;
+  }
+  controlledAfkPhysicalRequire(entries<=4096&&Array.isArray(producer.members)&&producer.members.length<=4096
+    &&Array.isArray(producer.targetCertificates)&&producer.targetCertificates.length<=4096);
+  const targets=new Set();
+  for(const certificate of producer.targetCertificates){
+    controlledAfkPhysicalClosed(certificate,['target','targetGeneration','certificateRef']);
+    controlledAfkPhysicalTarget(certificate.target);controlledAfkPhysicalGeneration(certificate.targetGeneration);
+    controlledAfkPhysicalRef(certificate.certificateRef,`${root}/targets/${certificate.target.sessionId}/afk-ledger.${certificate.targetGeneration}.json`);
+    const key=canonicalJson(certificate.target);controlledAfkPhysicalRequire(!targets.has(key));targets.add(key);
+  }
+  const memberNames=[],members=new Map(),refs=[];
+  for(const memberIndex of producer.members){
+    controlledAfkPhysicalClosed(memberIndex,['memberId','memberGeneration','memberRef']);
+    controlledAfkPhysicalId(memberIndex.memberId);controlledAfkPhysicalGeneration(memberIndex.memberGeneration);
+    const name=`${memberIndex.memberId}.${memberIndex.memberGeneration}.json`;
+    controlledAfkPhysicalRequire(!members.has(name));
+    const loaded=controlledAfkPhysicalRecord(repository,`${root}/members/afk-ledger/${name}`,memberIndex.memberRef,readset);
+    controlledAfkPhysicalMember(loaded.record,repository,participant);
+    controlledAfkPhysicalRequire(loaded.record.memberId===memberIndex.memberId
+      &&loaded.record.memberGeneration===memberIndex.memberGeneration);
+    memberNames.push(name);members.set(name,loaded);refs.push({...loaded.ref});
+  }
+  controlledAfkPhysicalRequire(continuityAuthorityEqual(topology[4]?.names??[],memberNames.sort()));
+  const releaseNames=topology[6]?.names??[],releasedNames=[];
+  for(const name of releaseNames){
+    const member=members.get(name);controlledAfkPhysicalRequire(member!==undefined);
+    const loaded=controlledAfkPhysicalRecord(repository,`${root}/releases/afk-ledger/${name}`,member.record.releaseRef,readset);
+    controlledAfkPhysicalRelease(loaded.record,member.record,repository,participant);
+    if(member.record.phase==='released')releasedNames.push(name);
+    else controlledAfkPhysicalRequire(member.record.phase==='terminal-observed'
+      &&loaded.record.memberPreimageSha256===member.ref.sha256);
+  }
+  controlledAfkPhysicalRequire(continuityAuthorityEqual(releasedNames.sort(),
+    [...members].filter(([,row])=>row.record.phase==='released').map(([name])=>name).sort()));
+  for(const observed of readset.records.values()){
+    const absolute=join(repository.commonDir,observed.path);
+    controlledAfkPhysicalRequire(continuityAuthorityEqual(observed.fact,
+      continuityAuthorityFact(absolute,'controlled-afk-physical-record',observed.parsed))
+      &&continuityAuthorityEqual(observed.ref,continuityAuthorityPrivateRef(repository,absolute))
+      &&continuityAuthorityEqual(observed.topology,controlledAfkExerciseDirectory(repository,observed.directory)));
+  }
+  for(let i=0;i<directories.length;i++)controlledAfkPhysicalRequire(
+    continuityAuthorityEqual(topology[i],controlledAfkExerciseDirectory(repository,directories[i])));
+  controlledAfkPhysicalRequire(continuityAuthorityEqual(commonIdentity(common),commonIdentity(lstatSync(repository.commonDir)))
+    &&realpathSync(repository.commonDir)===repository.commonDir);
+  for(const source of sources)controlledAfkPhysicalRequire(continuityAuthorityEqual(source.fact,
+    continuityAuthorityFact(source.absolute,'controlled-afk-physical-source',{pathSha256:canonicalSha256(source.absolute)})));
+  controlledAfkExerciseOrigin(value);
+  return refs;
+}
+function controlledAfkExerciseSnapshot(value) {
+  try {
+    controlledAfkExerciseOrigin(value);
+    const repository=value.repository,operation=value.operation,activationId=value.request.activationId;
+    const state=continuityCompanionEffectImage(repository,{scope:'repository',
+      path:relative(repository.primaryRoot,statePathForMethod(repository.primaryRoot)).split(sep).join('/'),preimage:null,postimage:null});
+    const owningMemberRef=continuityAuthorityPrivateRef(repository,join(repository.commonDir,operation.expectedMemberRef.path.slice(5)));
+    if(!continuityAuthorityEqual(owningMemberRef,operation.expectedMemberRef))
+      fail('SDC-AUTHORITY-CAS','controlled AFK owning member readback changed');
+    const directory=join(repository.commonDir,'agent-pipeline','afk',activationId,'generations');
+    const before=controlledAfkExerciseDirectory(repository,directory),generations=[];let totalBytes=0;
+    if(before)for(const name of before.names){
+      const match=/^([0-9]{16})-([a-f0-9]{64})\.afklog$/u.exec(name);
+      if(!match)fail('SDC-AUTHORITY-HELD','controlled AFK generation name unresolved');
+      const path=join(directory,name),ref=continuityAuthorityPrivateRef(repository,path);
+      const bytes=assertPrivateCleanupFile(path,'controlled AFK generation');
+      totalBytes+=bytes.length;
+      if(totalBytes>16777216||bytes.length>1048576||sha256(bytes)!==ref.sha256||bytes.length!==ref.size)
+        fail('SDC-AUTHORITY-CAS','controlled AFK generation bytes changed');
+      const parsed=parseAfkLedgerGeneration(bytes,activationId);
+      if(!parsed.ok||parsed.sequence!==Number(match[1])||parsed.headSha256!==match[2]
+          ||!continuityAuthorityEqual(ref,continuityAuthorityPrivateRef(repository,path)))
+        fail('SDC-AUTHORITY-CAS','controlled AFK generation readback changed');
+      generations.push({ref,parsed});
+    }
+    generations.sort((a,b)=>a.parsed.sequence-b.parsed.sequence);
+    for(let index=1;index<generations.length;index++){
+      const prior=generations[index-1].parsed,next=generations[index].parsed;
+      if(prior.sequence>=next.sequence||prior.frames.some((frame,i)=>frame.recordHash!==next.frames[i]?.recordHash))
+        fail('SDC-AUTHORITY-CAS','controlled AFK generation prefix changed');
+    }
+    if(!continuityAuthorityEqual(before,controlledAfkExerciseDirectory(repository,directory)))
+      fail('SDC-AUTHORITY-CAS','controlled AFK generation namespace changed');
+    const latest=generations.at(-1),ledger=latest?{activationId,sequence:latest.parsed.sequence,
+      headSha256:latest.parsed.headSha256,generationRefs:generations.map(row=>({...row.ref}))}:null;
+    const refName=`refs/agent-pipeline/afk/${activationId}`;
+    const ref=observeAfkGitAuthority(repository.primaryRoot,refName);
+    if(!ref.ok)fail('SDC-AUTHORITY-UNAVAILABLE','controlled AFK private ref unavailable');
+    const privateRef=ref.refOid===null?null:{ref:refName,objectFormat:ref.objectFormat,oid:ref.refOid};
+    const ledgerMemberRefs=value.renamedStateObservation!==null
+      ?controlledAfkRenamedPhysicalMembers(value,state)
+      :withSessionAuthorityBoundary({repository},boundary=>{
+      const producerPort=createAfkLedgerAuthorityProducerPort({repository});
+      const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort});
+      if(value.exercise==='interrupt-after-state-rename'&&value.ledgerObservationAnchor===null)
+        value.ledgerObservationAnchor=producer;
+      return producer.record.members.map(row=>{
+        const member=inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort,memberRef:row.memberRef});
+        return {...member.memberRef};
+      });
+    });
+    const again=observeAfkGitAuthority(repository.primaryRoot,refName);
+    const afterState=continuityCompanionEffectImage(repository,{scope:'repository',
+      path:relative(repository.primaryRoot,statePathForMethod(repository.primaryRoot)).split(sep).join('/'),preimage:null,postimage:null});
+    if(!again.ok||!continuityAuthorityEqual(ref,again)||!continuityAuthorityEqual(state,afterState)
+        ||!continuityAuthorityEqual(owningMemberRef,continuityAuthorityPrivateRef(repository,join(repository.commonDir,owningMemberRef.path.slice(5)))))
+      fail('SDC-AUTHORITY-CAS','controlled AFK final physical snapshot changed');
+    for(const row of generations) {
+      const path=join(repository.commonDir,row.ref.path.slice(5));
+      if(!continuityAuthorityEqual(row.ref,continuityAuthorityPrivateRef(repository,path))
+          ||sha256(assertPrivateCleanupFile(path,'controlled AFK final generation'))!==row.ref.sha256)
+        fail('SDC-AUTHORITY-CAS','controlled AFK final generation changed');
+    }
+    if(!continuityAuthorityEqual(before,controlledAfkExerciseDirectory(repository,directory)))
+      fail('SDC-AUTHORITY-CAS','controlled AFK final generation namespace changed');
+    controlledAfkExerciseOrigin(value);
+    return Object.freeze({state,ledger,privateRef,owningMemberRef,ledgerMemberRefs});
+  } catch(error) {value.snapshotError=controlledAfkExerciseCodes.has(error?.code)?error.code:'SDC-AUTHORITY-UNAVAILABLE';return null;}
+}
+function bindControlledAfkExerciseAdmission(row) {
+  const value=controlledAfkExerciseCurrent();if(!value)return;
+  if(value.admissionRow||row.operation!==value.operation||row.data!==value.data
+      ||row.executionHandle!==value.request.executionHandle||row.activationId!==value.request.activationId
+      ||row.kind!==value.request.kind||row.inputSha256!==canonicalSha256(value.request.input))
+    fail('SDC-AUTHORITY-CAS','controlled AFK admission ownership changed');
+  value.admissionRow=row;
+}
+function controlledAfkExerciseReplay(row,result) {
+  const value=controlledAfkExerciseCurrent();
+  if(!value||value.exercise!=='replay-settled-admission')return;
+  if(value.admissionRow!==row||row.closed||value.reachedStage!==null)
+    fail('SDC-AUTHORITY-CAS','controlled AFK replay ownership changed');
+  value.reachedStage='after-first-host-settlement';value.before=controlledAfkExerciseSnapshot(value);
+  value.exerciseResult=executeSourceOwnedAfkHostTransaction({admissionHandle:row.admissionHandle});
+  value.after=controlledAfkExerciseSnapshot(value);
+}
+function controlledAfkExerciseCompanion(operation,executionHandle,entry,argv) {
+  const value=controlledAfkExerciseCurrent();
+  if(!value||value.exercise!=='run-companion-without-own-context'||entry!=='afk-project')return null;
+  const row=value.admissionRow,contextHandle=continuityCompanionContextScope.getStore();
+  const context=contextHandle&&continuityCompanionContexts.get(contextHandle);
+  if(!row||row.closed||row.operation!==operation||row.executionHandle!==executionHandle
+      ||continuityAfkInvocationScope.getStore()!==row||row.phase!=='projecting'
+      ||continuityAfkProjectionForState.get(operation)!==row
+      ||!context||context.operation!==operation||context.executionHandle!==executionHandle
+      ||context.entry!==entry||value.reachedStage!==null)
+    fail('SDC-AUTHORITY-CAS','controlled AFK companion ownership changed');
+  value.reachedStage='inside-fixed-companion-without-context';
+  return {result:continuityCompanionContextScope.exit(()=>runSanctionedCompanionState(argv,{dir:operation.data.repository.primaryRoot}))};
+}
+export function observeSourceOwnedControlledMethodAfkHostCheckpoint(input) {
+  const value=controlledAfkExerciseCurrent();
+  if(!value||value.exercise!=='interrupt-after-host-settled')return;
+  if(!exactKeys(input,new Set(['admissionHandle']))||value.admissionRow?.admissionHandle!==input.admissionHandle
+      ||continuityAfkInvocationScope.getStore()!==value.admissionRow
+      ||!isCurrentSourceOwnedAfkProjectionAttempt({admissionHandle:input.admissionHandle,
+        repository:value.repository,activationId:value.request.activationId})||value.reachedStage!==null)
+    fail('SDC-AUTHORITY-CAS','controlled AFK host checkpoint ownership changed');
+  value.reachedStage='after-host-observation-before-projection';
+  fail('SDC-AUTHORITY-HELD','controlled method interruption after actual host settlement');
+}
+export function observeSourceOwnedControlledMethodAfkStateRename(input) {
+  const value=controlledAfkExerciseCurrent();
+  if(!value||value.exercise!=='interrupt-after-state-rename')return;
+  const row=value.admissionRow,contextHandle=continuityCompanionContextScope.getStore();
+  const context=contextHandle&&continuityCompanionContexts.get(contextHandle);
+  if(!exactKeys(input,new Set(['rootDir','target','lock','bytes']))||!row||row.closed
+      ||continuityAfkInvocationScope.getStore()!==row||row.phase!=='projecting'||!row.projectionRead
+      ||row.projectionContextHandle!==contextHandle||!context||context.operation!==value.operation
+      ||context.executionHandle!==value.request.executionHandle||context.entry!=='afk-project'
+      ||input.rootDir!==value.repository.primaryRoot||input.target!==statePathForMethod(input.rootDir)
+      ||!Buffer.isBuffer(input.bytes)||!inspectOwnedContinuityStateWriterLock({dir:input.rootDir,lock:input.lock})
+      ||value.reachedStage!==null)
+    fail('SDC-AUTHORITY-CAS','controlled AFK renamed State ownership changed');
+  const effect={scope:'repository',path:relative(input.rootDir,input.target).split(sep).join('/'),preimage:null,postimage:null};
+  const image=continuityCompanionEffectImage(value.repository,effect);
+  if(!image||image.sha256!==sha256(input.bytes)||image.size!==input.bytes.length
+      ||!continuityAuthorityEqual(image,continuityCompanionEffectImage(value.repository,effect)))
+    fail('SDC-AUTHORITY-CAS','controlled AFK actual renamed State bytes changed');
+  value.renamedStateObservation=Object.freeze({state:image,operation:value.operation,
+    executionHandle:value.request.executionHandle,row,contextHandle,memberRef:structuredClone(value.operation.expectedMemberRef)});
+  value.reachedStage='after-atomic-State-rename-before-directory-sync';
+  fail('SDC-AUTHORITY-HELD','controlled method interruption after actual State rename');
+}
+export function createSourceOwnedControlledMethodAfkExercisePort(input,runtimePort) {
+  try {
+    if(!exactKeys(input,new Set(['repository','currentInvocationHandle','fixtureRoot']))
+        ||typeof input.fixtureRoot!=='string'||controlledAfkExerciseScope.getStore())
+      fail('SDC-AUTHORITY-UNAVAILABLE','unsupported controlled AFK exercise factory');
+    const value={repository:continuityAuthorityRepository(input.repository),
+      currentInvocationHandle:input.currentInvocationHandle,fixtureRoot:input.fixtureRoot,runtimePort,
+      used:false,closed:false,request:null,operation:null,data:null,admissionRow:null,reachedStage:null,
+      before:null,after:null,originalResult:null,exerciseResult:null,snapshotError:null,
+      ledgerObservationAnchor:null,renamedStateObservation:null};
+    const origin=controlledAfkExerciseOrigin(value);value.origin=origin.observed;value.modules=origin.modules;
+    const port=Object.freeze({execute(args){
+      try {
+        if(controlledAfkExercisePorts.get(port)!==value||value.used||value.closed)
+          fail('SDC-AUTHORITY-UNAVAILABLE','controlled AFK exercise port already used');
+        value.used=true;
+        if(!exactKeys(args,new Set(['request','exercise']))||!controlledAfkExerciseIds.has(args.exercise)
+            ||!exactKeys(args.request,new Set(['operationHandle','executionHandle','expectedMemberRef','expectedStateSha256','kind','activationId','input'])))
+          fail('SDC-AUTHORITY-UNAVAILABLE','unsupported controlled AFK exercise request');
+        controlledAfkExerciseOrigin(value);
+        const producerPort=createOnboardingContinuityAuthorityProducerPort({repository:value.repository});
+        const data=continuityAuthorityPorts.get(producerPort),operation=continuityAuthorityOperation(data,args.request.operationHandle);
+        if(operation.legacy||operation.phase!=='armed'||operation.companionExecuting
+            ||operation.requesterHandle!==value.origin.requesterHandle
+            ||operation.executionHandle!==args.request.executionHandle
+            ||continuityAuthorityExecutions.get(args.request.executionHandle)?.operation!==operation
+            ||!continuityAuthorityEqual(operation.expectedMemberRef,args.request.expectedMemberRef)
+            ||! /^[a-f0-9]{64}$/u.test(args.request.expectedStateSha256??'')
+            ||! /^[a-f0-9]{32}$/u.test(args.request.activationId??'')
+            ||!['activate','entry','review'].includes(args.request.kind))
+          fail('SDC-AUTHORITY-CAS','controlled AFK actual owning request changed');
+        const physical=continuityAuthoritySnapshot(value.repository);
+        if(physical.observed.stateSha256!==args.request.expectedStateSha256||!physical.observed.sessionCleanup||physical.observed.orphanBinding)
+          fail('SDC-AUTHORITY-CAS','controlled AFK State preimage changed');
+        continuityAuthorityCurrent(data,operation.requesterHandle);continuityAuthorityCheckJournals(operation);
+        value.operation=operation;value.data=data;value.request=args.request;value.exercise=args.exercise;
+        if(value.exercise!=='replay-settled-admission')value.before=controlledAfkExerciseSnapshot(value);
+        const result=controlledAfkExerciseScope.run(value,()=>producerPort.executeAfkTransaction(args.request));
+        value.originalResult=result;
+        if(value.exercise!=='replay-settled-admission'){value.exerciseResult=result;value.after=controlledAfkExerciseSnapshot(value);}
+      } catch(error) {controlledAfkExerciseRefuse(error);}
+      finally {value.closed=true;controlledAfkExercisePorts.delete(port);}
+      const privateScopeClosed=controlledAfkExerciseScope.getStore()!==value
+        &&(!value.admissionRow||value.admissionRow.closed===true);
+      return Object.freeze({schema:'pipeline.afk-method-exercise-observation.v1',exerciseId:value.exercise,
+        originalInvocationBindingSha256:value.origin.invocationBindingSha256,
+        operationBindingSha256:value.operation.bindingSha256,sourceContextSha256:canonicalSha256(value.modules),
+        reachedStage:value.reachedStage,before:value.before,after:value.after,
+        originalResult:value.originalResult,exerciseResult:value.exerciseResult,privateScopeClosed});
+    }});
+    value.port=port;controlledAfkExercisePorts.set(port,value);return port;
+  } catch(error) {controlledAfkExerciseRefuse(error);}
+}
+
+// Fixed controlled-method controls. Production requests and authority gates are unchanged.
+const controlledContinuityExercisePorts=new WeakMap();
+const controlledContinuityExerciseOwners=new WeakMap();
+const controlledContinuityExerciseProbes=new WeakMap();
+const controlledContinuityReferenceWrites=new WeakMap();
+const controlledContinuityExerciseScope=new AsyncLocalStorage();
+const controlledContinuityLockCases=new Set(['APLOCK003','APLOCK004','APLOCK005','APLOCK006','APLOCK007','APLOCK008']);
+const controlledContinuityTicketCases=new Set(['AFTICKET001','AFTICKET002','AFTICKET003','AFTICKET004']);
+const controlledContinuityRequestKeys=new Set(['operationHandle','executionHandle','expectedMemberRef','expectedStateSha256','entry','argv']);
+function controlledContinuityModules() {
+  return ['onboarding-continuity.mjs','session-authority-registry.mjs','session-requester-bridge.mjs',
+    '../scripts/pipeline-state.mjs','afk-isolated-repository-custody.mjs'].map(name=>{
+      const path=fileURLToPath(new URL(name,import.meta.url));
+      return continuityAuthorityFact(path,'controlled-continuity-exercise-source',{pathSha256:canonicalSha256(path)});
+    });
+}
+function controlledContinuityCurrent(value) {
+  if(!value||value.closed||controlledContinuityExercisePorts.get(value.port)!==value
+      ||controlledContinuityExerciseScope.getStore()!==value
+      ||continuityAuthorityPorts.get(value.producerPort)!==value.data
+      ||continuityAuthorityOperations.get(value.request.operationHandle)!==value.operation
+      ||continuityAuthorityExecutions.get(value.request.executionHandle)?.operation!==value.operation
+      ||value.operation.data!==value.data||value.operation.executionHandle!==value.request.executionHandle
+      ||value.operation.requesterHandle!==value.origin.requesterHandle||value.operation.legacy
+      ||value.operation.phase!=='armed')
+    fail('SDC-AUTHORITY-CAS','controlled continuity private lifetime changed');
+  controlledAfkExerciseOrigin(value);
+  if(!continuityAuthorityEqual(value.controlModules,controlledContinuityModules()))
+    fail('SDC-AUTHORITY-CAS','controlled continuity source context changed');
+  return value;
+}
+export function inspectSourceOwnedControlledContinuityExerciseCustodyClaim(input) {
+  if(!exactKeys(input,new Set(['exerciseOwnerHandle','repository'])))return null;
+  const value=input.exerciseOwnerHandle&&controlledContinuityExerciseOwners.get(input.exerciseOwnerHandle);
+  if(!value||value.ownerHandle!==input.exerciseOwnerHandle||value.closed
+      ||controlledContinuityExerciseScope.getStore()!==value
+      ||!['claiming','settling'].includes(value.custodyPhase)
+      ||input.repository?.primaryRoot!==value.repository.primaryRoot
+      ||input.repository?.commonDir!==value.repository.commonDir)return null;
+  controlledContinuityCurrent(value);
+  return Object.freeze({repository:Object.freeze({...value.repository}),exerciseId:value.caseId,
+    phase:value.custodyPhase,custodyRefSha256:value.custody.custodySourceRef.receiptSha256,
+    sourceContextSha256:canonicalSha256(value.controlModules),
+    invocationBindingSha256:value.origin.invocationBindingSha256,
+    operationBindingSha256:value.operation.bindingSha256});
+}
+function controlledContinuityImage(value,path) {
+  const repository=value.repository;
+  const rel=relative(repository.primaryRoot,path);
+  if(isAbsolute(rel)||rel.split(sep).some(part=>part==='..'||part==='.')||!rel)
+    fail('SDC-PRIVATE-PATH','controlled continuity image outside root');
+  let cursor=repository.primaryRoot;
+  for(const part of rel.split(sep)){
+    cursor=join(cursor,part);
+    try{if(lstatSync(cursor).isSymbolicLink())fail('SDC-PRIVATE-PATH','controlled continuity image alias');}
+    catch(error){if(error?.code==='ENOENT')return null;throw error;}
+  }
+  const before=lstatSync(path);
+  const identity=stat=>({dev:String(stat.dev),ino:String(stat.ino),mode:stat.mode,nlink:stat.nlink});
+  const safe=stat=>{if(!stat.isFile()||stat.isSymbolicLink()||stat.uid!==process.getuid()
+      ||stat.size>1048576)fail('SDC-PRIVATE-PATH','controlled continuity image unsafe');};
+  safe(before);const fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW);
+  let bytes;
+  try{
+    const opened=fstatSync(fd);safe(opened);bytes=readFileSync(fd);
+    if(!continuityAuthorityEqual(identity(before),identity(opened)))
+      fail('SDC-AUTHORITY-CAS','controlled continuity image replaced');
+  }finally{closeSync(fd);}
+  const after=lstatSync(path);safe(after);
+  if(!continuityAuthorityEqual(identity(before),identity(after))||bytes.length!==after.size
+      ||sha256(bytes)!==sha256(readFileSync(path)))
+    fail('SDC-AUTHORITY-CAS','controlled continuity image raced');
+  return {path:rel.split(sep).join('/'),sha256:sha256(bytes),size:bytes.length,identity:identity(after)};
+}
+function controlledContinuityImages(value) {
+  if(!value.targetPath)return null;
+  return {target:controlledContinuityImage(value,value.targetPath),
+    auxiliary:value.auxiliaryPath?controlledContinuityImage(value,value.auxiliaryPath):null};
+}
+function controlledContinuityOpenCaptured(value,path,image) {
+  if(!image||!continuityAuthorityEqual(controlledContinuityImage(value,path),image))
+    fail('SDC-AUTHORITY-CAS','controlled continuity captured image changed');
+  const fd=openSync(path,constants.O_RDWR|constants.O_NOFOLLOW),stat=fstatSync(fd);
+  if(String(stat.dev)!==image.identity.dev||String(stat.ino)!==image.identity.ino
+      ||stat.mode!==image.identity.mode||stat.nlink!==image.identity.nlink
+      ||stat.uid!==process.getuid()||sha256(readFileSync(fd))!==image.sha256){
+    closeSync(fd);fail('SDC-AUTHORITY-CAS','controlled continuity captured inode changed');
+  }
+  return fd;
+}
+function controlledContinuityApplyLockFault(witness) {
+  const value=controlledContinuityExerciseScope.getStore();
+  if(!value||!controlledContinuityLockCases.has(value.caseId))return;
+  controlledContinuityCurrent(value);
+  const context=continuityCompanionContexts.get(witness.contextHandle);
+  if(value.stage!==null||!value.claimed||!context||context.operation!==value.operation
+      ||context.executionHandle!==value.request.executionHandle||context.entry!=='approve-plan'
+      ||continuityCompanionContextScope.getStore()!==witness.contextHandle
+      ||continuityCompanionStateWriterLockWitnesses.get(witness.contextHandle)!==witness
+      ||value.operation.companionExecuting!==true
+      ||!continuityAuthorityEqual(witness.repository,value.repository)
+      ||!continuityAuthorityEqual(inspectOwnedContinuityStateWriterLock({dir:value.repository.primaryRoot,
+        lock:witness.lock}),witness.lockFact))
+    fail('SDC-AUTHORITY-CAS','controlled approval witness capture changed');
+  value.targetPath=witness.lockFact.path;
+  if(value.targetPath!==statePathForMethod(value.repository.primaryRoot)+'.lock')
+    fail('SDC-AUTHORITY-CAS','controlled approval lock target changed');
+  value.auxiliaryPath=value.caseId==='APLOCK008'
+    ?statePathForMethod(value.repository.primaryRoot)+'.tmp.controlled-APLOCK008'
+    :['APLOCK003','APLOCK005'].includes(value.caseId)?value.targetPath+'.controlled-'+value.caseId:null;
+  value.before=controlledContinuityImages(value);
+  if(value.before.auxiliary!==null)fail('SDC-AUTHORITY-CAS','controlled approval fault sibling occupied');
+  const image=value.before.target,bytes=readFileSync(value.targetPath);
+  if(image?.sha256!==witness.lockFact.bytesSha256||image.size!==witness.lockFact.size
+      ||sha256(bytes)!==image.sha256||image.identity.nlink!==1)
+    fail('SDC-AUTHORITY-CAS','controlled approval original lock bytes changed');
+  value.stage='after-source-lock-witness-capture';
+  if(value.caseId==='APLOCK003'){
+    const fd=openSync(value.auxiliaryPath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+    try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}
+    if(!continuityAuthorityEqual(controlledContinuityImage(value,value.targetPath),image))
+      fail('SDC-AUTHORITY-CAS','controlled approval replacement predecessor raced');
+    const replacement=controlledContinuityImage(value,value.auxiliaryPath);
+    if(replacement.sha256!==image.sha256||replacement.identity.nlink!==1
+        ||replacement.identity.ino===image.identity.ino)
+      fail('SDC-AUTHORITY-CAS','controlled approval replacement not distinct');
+    renameSync(value.auxiliaryPath,value.targetPath);
+  }else if(value.caseId==='APLOCK005'){
+    linkSync(value.targetPath,value.auxiliaryPath);
+    const target=controlledContinuityImage(value,value.targetPath),alias=controlledContinuityImage(value,value.auxiliaryPath);
+    if(target.identity.nlink!==2||alias.identity.nlink!==2||target.identity.ino!==image.identity.ino
+        ||alias.identity.ino!==image.identity.ino||target.identity.dev!==alias.identity.dev
+        ||target.sha256!==image.sha256||alias.sha256!==image.sha256)
+      fail('SDC-AUTHORITY-CAS','controlled approval hardlink capture changed');
+  }else if(value.caseId==='APLOCK008'){
+    const fd=openSync(value.auxiliaryPath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+    try{writeFileSync(fd,Buffer.from('controlled unresolved State temporary\n'));fsyncSync(fd);}finally{closeSync(fd);}
+  }else{
+    const fd=controlledContinuityOpenCaptured(value,value.targetPath,image);
+    try{
+      if(value.caseId==='APLOCK004')fchmodSync(fd,0o620);
+      else{
+        const record=JSON.parse(bytes.toString('utf8'));
+        if(value.caseId==='APLOCK006'){
+          if(typeof record.ownerNonce!=='string'||record.ownerNonce.length===0)
+            fail('SDC-AUTHORITY-CAS','controlled approval original nonce absent');
+          record.ownerNonce=(record.ownerNonce[0]==='0'?'1':'0')+record.ownerNonce.slice(1);
+        }else record.controlledUnknownField=true;
+        const output=Buffer.from(JSON.stringify(record)+'\n');
+        ftruncateSync(fd,0);
+        let offset=0;
+        while(offset<output.length){
+          const written=writeSync(fd,output,offset,output.length-offset,offset);
+          if(written<1)fail('SDC-AUTHORITY-UNAVAILABLE','controlled approval fault write incomplete');
+          offset+=written;
+        }
+      }
+      fsyncSync(fd);
+    }finally{closeSync(fd);}
+  }
+  const dirFd=openSync(dirname(value.targetPath),constants.O_RDONLY);
+  try{fsyncSync(dirFd);}finally{closeSync(dirFd);}
+  value.afterFault=controlledContinuityImages(value);
+}
+// Authenticate the genuine publication phase without reopening the obsolete
+// predecessor through the ordinary State context getter. No ref is adopted.
+function controlledContinuityAuthenticateRefresh(value,owned,stage,witness) {
+  const beforeRefresh=stage==='after-live-companion-tickets-before-owner-refresh';
+  if(!['after-live-companion-tickets-before-owner-refresh','after-owner-refresh-before-final-inventory'].includes(stage)
+      ||!owned||continuityCompanionWitnesses.get(witness)!==owned
+      ||owned.stage!==(beforeRefresh?'verified':'refreshed')
+      ||owned.value!==continuityCompanionContexts.get(owned.contextHandle)
+      ||owned.contextHandle!==continuityCompanionContextScope.getStore()
+      ||owned.value.operation!==value.operation||owned.value.executionHandle!==value.request.executionHandle
+      ||owned.data!==value.data||owned.port!==value.producerPort||!owned.terminal
+      ||value.operation.companionExecuting!==true)
+    fail('SDC-AUTHORITY-CAS','controlled companion private refresh phase changed');
+  const ticket=inspectSourceOwnedSessionAuthorityCompanionRefresh({boundary:owned.boundary,
+    producerPort:owned.port,companionWriteHandle:owned.handle,ownerWitness:witness});
+  const changed=new Set();
+  for(const change of ticket.members){
+    const matches=owned.live.filter(item=>continuityAuthorityEqual(item.memberRef,change.previousMemberRef));
+    if(matches.length!==1||changed.has(matches[0]))
+      fail('SDC-AUTHORITY-CAS','controlled companion refresh predecessor changed');
+    const item=matches[0],records=ticket.memberRecords.filter(record=>continuityAuthorityEqual(record.memberRef,change.memberRef));
+    if(records.length!==1||change.memberId!==item.record.memberId||change.memberGeneration!==item.record.memberGeneration
+        ||!continuityAuthorityEqual(item.operation.expectedMemberRef,beforeRefresh?item.memberRef:change.memberRef))
+      fail('SDC-AUTHORITY-CAS','controlled companion private member pin changed');
+    const actual=records[0];
+    if(!continuityAuthorityEqual(actual.producerRef,ticket.producerRef)
+        ||!continuityAuthorityEqual(actual.catalogueRef,ticket.catalogueRef)
+        ||!continuityAuthorityEqual(continuitySharedStateRecord(owned.data,change.memberRef),actual.record)
+        ||actual.releaseRef!==null||actual.releaseRecord!==null)
+      fail('SDC-AUTHORITY-CAS','controlled companion physical successor changed');
+    const {sourceFacts,revision,updatedAt,...identity}=actual.record;
+    const {sourceFacts:priorFacts,revision:priorRevision,updatedAt:priorUpdatedAt,...priorIdentity}=item.record;
+    if(revision!==priorRevision+1||!continuityAuthorityEqual(identity,priorIdentity)
+        ||(item.operation===value.operation&&!continuityAuthorityEqual(owned.value.expectedMemberRef,
+          beforeRefresh?item.memberRef:change.memberRef)))
+      fail('SDC-AUTHORITY-CAS','controlled companion successor identity changed');
+    continuityCompanionConservedFacts(priorFacts,sourceFacts,owned.terminal.effects);
+    changed.add(item);
+  }
+  for(const item of owned.live)if(!changed.has(item)
+      &&(!continuityAuthorityEqual(item.operation.expectedMemberRef,item.memberRef)
+        ||!continuityAuthorityEqual(continuitySharedStateRecord(owned.data,item.memberRef),item.record)))
+    fail('SDC-AUTHORITY-CAS','controlled companion unchanged member changed');
+  for(const item of owned.historical)if(!item.releaseRef||!item.releaseRecord
+      ||!continuityAuthorityEqual(continuitySharedStateRecord(owned.data,item.memberRef),item.record)
+      ||!continuityAuthorityEqual(continuitySharedStateRecord(owned.data,item.releaseRef),item.releaseRecord))
+    fail('SDC-AUTHORITY-CAS','controlled companion historical release changed');
+}
+export function inspectSourceOwnedControlledContinuityTicketProbe(input) {
+  if(!exactKeys(input,new Set(['probeHandle','boundary','companionWriteHandle','ownerWitness','repository','stage'])))return null;
+  const probe=input.probeHandle&&controlledContinuityExerciseProbes.get(input.probeHandle);
+  if(!probe||probe.closed||probe.boundary!==input.boundary||probe.handle!==input.companionWriteHandle
+      ||probe.witness!==input.ownerWitness||probe.stage!==input.stage
+      ||!continuityAuthorityEqual(probe.value.repository,input.repository))return null;
+  const value=controlledContinuityCurrent(probe.value),owned=continuityCompanionWitnesses.get(probe.witness);
+  if(!value.claimed||value.stage!==probe.stage||!owned||owned.value.operation!==value.operation
+      ||owned.data!==value.data||owned.port!==value.producerPort||owned.handle!==probe.handle
+      ||owned.boundary!==probe.boundary||owned.contextHandle!==continuityCompanionContextScope.getStore()
+      ||owned.value.executionHandle!==value.request.executionHandle
+      ||value.operation.companionExecuting!==true)
+    fail('SDC-AUTHORITY-CAS','controlled companion probe ownership changed');
+  controlledContinuityAuthenticateRefresh(value,owned,probe.stage,probe.witness);
+  return Object.freeze({caseId:value.caseId,producerPort:value.producerPort,
+    referenceWriteHandle:value.referenceWriteHandle??null,
+    successorReservationOperationHandle:value.successorReservationOperationHandle??null,
+    operationBindingSha256:value.operation.bindingSha256,association:value.operation.association});
+}
+export function observeSourceOwnedControlledContinuityCompanionCheckpoint(input) {
+  const value=controlledContinuityExerciseScope.getStore();
+  if(!value||controlledContinuityLockCases.has(value.caseId))return;
+  if(!exactKeys(input,new Set(['boundary','companionWriteHandle','ownerWitness','stage'])))
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled companion checkpoint closed shape');
+  const required=value.caseId==='AFTICKET003'?'after-owner-refresh-before-final-inventory'
+    :'after-live-companion-tickets-before-owner-refresh';
+  if(input.stage!==required)return;
+  controlledContinuityCurrent(value);
+  const owned=continuityCompanionWitnesses.get(input.ownerWitness);
+  if(value.stage!==null||!value.claimed||!owned||owned.data!==value.data||owned.port!==value.producerPort
+      ||owned.value.operation!==value.operation||owned.handle!==input.companionWriteHandle
+      ||owned.boundary!==input.boundary||owned.value.executionHandle!==value.request.executionHandle
+      ||owned.contextHandle!==continuityCompanionContextScope.getStore()
+      ||value.operation.companionExecuting!==true
+      ||(input.stage==='after-live-companion-tickets-before-owner-refresh'&&owned.stage!=='verified')
+      ||(input.stage==='after-owner-refresh-before-final-inventory'&&owned.stage!=='refreshed'))
+    fail('SDC-AUTHORITY-CAS','controlled companion actual checkpoint changed');
+  controlledContinuityAuthenticateRefresh(value,owned,input.stage,input.ownerWitness);
+  value.stage=input.stage;
+  if(value.caseId==='capture-companion-reference'){
+    value.capturedWriteHandle=owned.handle;return;
+  }
+  const probeHandle=Object.freeze({}),probe={value,handle:owned.handle,witness:input.ownerWitness,
+    boundary:input.boundary,stage:input.stage,closed:false};
+  controlledContinuityExerciseProbes.set(probeHandle,probe);
+  try{
+    const observed=executeSourceOwnedControlledContinuityTicketProbe({probeHandle});
+    value.before=observed.before;value.afterFault=observed.afterFault;
+    value.probeResult=observed.probeResult;
+    if(observed.targetRef)value.targetPath=join(value.repository.commonDir,observed.targetRef.path.slice(5));
+  }finally{probe.closed=true;controlledContinuityExerciseProbes.delete(probeHandle);}
+}
+function controlledContinuityAdmission(value,request) {
+  if(!exactKeys(request,controlledContinuityRequestKeys)||request.entry!=='approve-plan'
+      ||!Array.isArray(request.argv)||request.argv[0]!=='approve-plan'||request.argv.length>128
+      ||request.argv.some(arg=>typeof arg!=='string'||arg.length>8192)
+      ||! /^[a-f0-9]{64}$/u.test(request.expectedStateSha256??''))
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled approval request closed shape');
+  controlledAfkExerciseOrigin(value);
+  if(!continuityAuthorityEqual(value.controlModules,controlledContinuityModules()))
+    fail('SDC-AUTHORITY-CAS','controlled approval module custody changed');
+  const operation=continuityAuthorityOperation(value.data,request.operationHandle);
+  if(operation.legacy||operation.phase!=='armed'||operation.companionExecuting
+      ||operation.requesterHandle!==value.origin.requesterHandle||operation.executionHandle!==request.executionHandle
+      ||continuityAuthorityExecutions.get(request.executionHandle)?.operation!==operation
+      ||!continuityAuthorityEqual(operation.expectedMemberRef,request.expectedMemberRef))
+    fail('SDC-AUTHORITY-CAS','controlled approval original operation changed');
+  continuityAuthorityCurrent(value.data,operation.requesterHandle);continuityAuthorityCheckJournals(operation);
+  const state=continuityAuthoritySnapshot(value.repository);
+  if(state.observed.stateSha256!==request.expectedStateSha256||!state.observed.sessionCleanup||state.observed.orphanBinding)
+    fail('SDC-AUTHORITY-CAS','controlled approval actual State preimage changed');
+  const member=continuityAuthorityPrivateRef(value.repository,join(value.repository.commonDir,request.expectedMemberRef.path.slice(5)));
+  if(!continuityAuthorityEqual(member,request.expectedMemberRef))
+    fail('SDC-AUTHORITY-CAS','controlled approval actual member changed');
+  value.request=request;value.operation=operation;
+}
+function controlledContinuityClaim(value) {
+  value.ownerHandle=Object.freeze({});controlledContinuityExerciseOwners.set(value.ownerHandle,value);
+  value.custodyPhase='claiming';
+  const claimed=continuityExerciseCustody.claimSourceOwnedDisposableAfkRepositoryExercise({
+    repositoryCustodyHandle:value.repositoryCustodyHandle,exerciseOwnerHandle:value.ownerHandle});
+  if(claimed?.status!=='claimed'||claimed.lifecycle!=='exercise-claimed'
+      ||claimed.exerciseId!==value.caseId||claimed.invocationBindingSha256!==value.origin.invocationBindingSha256
+      ||claimed.operationBindingSha256!==value.operation.bindingSha256
+      ||claimed.custodySourceRef?.receiptSha256!==value.custody.custodySourceRef.receiptSha256
+      ||claimed.repository?.primaryRoot!==value.repository.primaryRoot
+      ||claimed.repository?.commonDir!==value.repository.commonDir)
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled approval custody claim unavailable');
+  value.claimed=true;value.custodyPhase='executing';
+}
+function controlledContinuitySettle(value) {
+  value.privateScopeClosed=false;
+  try{
+    if(value.claimed){
+      value.custodyPhase='settling';
+      const settled=continuityExerciseCustody.settleSourceOwnedDisposableAfkRepositoryExercise({
+        repositoryCustodyHandle:value.repositoryCustodyHandle,exerciseOwnerHandle:value.ownerHandle});
+      const keys=settled&&Object.keys(settled).sort();
+      const held=continuityAuthorityEqual(keys,['lifecycle','status'])&&settled.status==='held'&&settled.lifecycle==='held';
+      const completed=settled?.status==='settled'&&settled.lifecycle==='completed-with-evidence'
+        &&settled.exerciseId===value.caseId&&settled.invocationBindingSha256===value.origin.invocationBindingSha256
+        &&settled.operationBindingSha256===value.operation.bindingSha256
+        &&settled.custodySourceRef?.receiptSha256===value.custody.custodySourceRef.receiptSha256;
+      value.privateScopeClosed=held||completed;
+    }
+  }catch{value.privateScopeClosed=false;}
+  finally{
+    value.custodyPhase='closed';value.closed=true;
+    if(value.ownerHandle)controlledContinuityExerciseOwners.delete(value.ownerHandle);
+    controlledContinuityExercisePorts.delete(value.port);
+  }
+}
+function controlledContinuityExecute(value,args,kind) {
+  if(controlledContinuityExercisePorts.get(value.port)!==value||value.used||value.closed
+      ||controlledContinuityExerciseScope.getStore())
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled continuity port already used');
+  value.used=true;
+  const keys=kind==='lock'?new Set(['request','caseId']):kind==='capture'?new Set(['request'])
+    :new Set(['request','caseId','referenceOperationHandle','successorReservationOperationHandle']);
+  if(!exactKeys(args,keys)||(kind==='lock'&&!controlledContinuityLockCases.has(args.caseId))
+      ||(kind==='ticket'&&!controlledContinuityTicketCases.has(args.caseId)))
+    fail('SDC-AUTHORITY-UNAVAILABLE','controlled continuity exercise closed shape');
+  controlledContinuityAdmission(value,args.request);
+  value.caseId=kind==='capture'?'capture-companion-reference':args.caseId;
+  if(kind==='ticket'){
+    if(value.caseId!=='AFTICKET002'&&args.referenceOperationHandle!==null
+        ||value.caseId!=='AFTICKET003'&&args.successorReservationOperationHandle!==null)
+      fail('SDC-AUTHORITY-UNAVAILABLE','controlled companion unused selector');
+    if(value.caseId==='AFTICKET002'){
+      const reference=controlledContinuityReferenceWrites.get(args.referenceOperationHandle);
+      if(!reference||reference.operation.operationHandle!==args.referenceOperationHandle
+          ||continuityAuthorityOperations.get(args.referenceOperationHandle)!==reference.operation
+          ||reference.operation.data!==reference.data||reference.operation===value.operation
+          ||reference.repository.primaryRoot===value.repository.primaryRoot
+          ||reference.repository.commonDir===value.repository.commonDir
+          ||reference.sourceContextSha256!==canonicalSha256(value.controlModules))
+        fail('SDC-AUTHORITY-CAS','controlled companion actual prior reference unavailable');
+      value.referenceWriteHandle=reference.handle;
+    }
+    if(value.caseId==='AFTICKET003'){
+      const successor=continuityAuthorityOperation(value.data,args.successorReservationOperationHandle);
+      if(successor===value.operation||successor.legacy||successor.phase!=='reserved'
+          ||successor.requesterHandle!==value.origin.requesterHandle||successor.executionHandle)
+        fail('SDC-AUTHORITY-CAS','controlled companion actual pre-bind preparation unavailable');
+      value.successorReservationOperationHandle=args.successorReservationOperationHandle;
+    }
+  }
+  return controlledContinuityExerciseScope.run(value,()=>{
+    try{
+      controlledContinuityClaim(value);
+      value.originalResult=value.producerPort.executeCompanionOperation(args.request);
+      if(value.originalResult&&typeof value.originalResult.then==='function')
+        fail('SDC-AUTHORITY-UNAVAILABLE','controlled companion asynchronous original result');
+      if(value.targetPath)value.after=controlledContinuityImages(value);
+      if(kind==='capture'&&value.capturedWriteHandle&&value.originalResult?.status==='completed'
+          &&value.originalResult.exitCode===0){
+        controlledContinuityReferenceWrites.set(args.request.operationHandle,{operation:value.operation,data:value.data,
+          handle:value.capturedWriteHandle,repository:{...value.repository},sourceContextSha256:canonicalSha256(value.controlModules)});
+        value.referenceCaptured=true;
+      }
+    }finally{controlledContinuitySettle(value);}
+    if(kind==='capture')return Object.freeze({originalResult:value.originalResult,captured:value.referenceCaptured===true});
+    return Object.freeze({schema:'pipeline.continuity-method-control-observation.v1',caseId:value.caseId,
+      stage:value.stage,invocationBindingSha256:value.origin.invocationBindingSha256,
+      operationBindingSha256:value.operation.bindingSha256,custodySourceSha256:value.custody.custodySourceRef.receiptSha256,
+      sourceContextSha256:canonicalSha256(value.controlModules),before:value.before,afterFault:value.afterFault,
+      after:value.after,originalResult:value.originalResult,probeResult:value.probeResult,privateScopeClosed:value.privateScopeClosed});
+  });
+}
+export function createSourceOwnedControlledContinuityExercisePort(input,runtimePort) {
+  try{
+    if(!exactKeys(input,new Set(['producerPort','currentInvocationHandle','fixtureRoot','repositoryCustodyHandle']))
+        ||controlledContinuityExerciseScope.getStore()||typeof input.fixtureRoot!=='string')
+      fail('SDC-AUTHORITY-UNAVAILABLE','controlled continuity factory closed shape');
+    const data=continuityAuthorityPorts.get(input.producerPort);
+    if(!data)fail('SDC-AUTHORITY-UNAVAILABLE','controlled continuity genuine port required');
+    const custody=continuityExerciseCustody.inspectSourceOwnedDisposableAfkRepository({repositoryCustodyHandle:input.repositoryCustodyHandle});
+    const repository=continuityAuthorityRepository(data.repository);
+    if(custody?.status!=='owned'||!['created','inspected'].includes(custody.lifecycle)
+        ||custody.repository?.primaryRoot!==repository.primaryRoot||custody.repository?.commonDir!==repository.commonDir
+        ||! /^[a-f0-9]{64}$/u.test(custody.custodySourceRef?.receiptSha256??''))
+      fail('SDC-AUTHORITY-UNAVAILABLE','controlled continuity Source-created root custody required');
+    const value={data,producerPort:input.producerPort,repository,custody,
+      repositoryCustodyHandle:input.repositoryCustodyHandle,currentInvocationHandle:input.currentInvocationHandle,
+      fixtureRoot:input.fixtureRoot,runtimePort,used:false,closed:false,claimed:false,caseId:null,stage:null,
+      request:null,operation:null,ownerHandle:null,custodyPhase:null,targetPath:null,auxiliaryPath:null,
+      before:null,afterFault:null,after:null,originalResult:null,probeResult:null,privateScopeClosed:false};
+    const origin=controlledAfkExerciseOrigin(value);value.origin=origin.observed;value.modules=origin.modules;
+    value.controlModules=controlledContinuityModules();
+    const port=Object.freeze({
+      executeApprovalLockCase:args=>controlledContinuityExecute(value,args,'lock'),
+      captureCompanionReference:args=>controlledContinuityExecute(value,args,'capture'),
+      executeCompanionTicketCase:args=>controlledContinuityExecute(value,args,'ticket'),
+    });
+    value.port=port;controlledContinuityExercisePorts.set(port,value);return port;
+  }catch(error){controlledAfkExerciseRefuse(error);}
+}
+
+// Source-owned production verification custody. Bind only captures; it adds no bind prerequisite.
+const continuityVerificationOwners=new WeakMap();
+const continuityVerificationCaptured=new WeakMap();
+const continuityVerificationAssociations=new WeakMap();
+const continuityVerificationAttempts=new WeakMap();
+const continuityVerificationPortStates=new WeakMap();
+const CONTINUITY_VERIFICATION_TTL=120000;
+function continuityVerificationUnavailable(code){return Object.freeze({status:'unavailable',code});}
+function continuityVerificationCode(error,fallback='OSV-OWNER-UNAVAILABLE'){
+  return OWNED_VERIFICATION_CODES.includes(error?.code)?error.code:fallback;
+}
+function captureContinuityVerificationOwner(owned){
+  // Inert custody only: no ready/approved/suite predicate can regress the original bind.
+  continuityVerificationCaptured.set(owned.prepared.operationHandle,owned);
+}
+function continuityVerificationFloorEqual(a,b){
+  if(!ownedVerificationSameProcess(a?.controllerIdentity,b?.controllerIdentity))return false;
+  const strip=value=>Object.fromEntries(Object.entries(value).filter(([key])=>key!=='controllerIdentity'));
+  return continuityAuthorityEqual(strip(a),strip(b));
+}
+function continuityVerificationInvocationProcess(actual,original){
+  if(process.platform==='win32')return actual?.platform==='win32'&&original?.pid===actual.pid
+    &&original.startIdentitySha256===ownedVerificationDigest({start:actual.start,bootIdentity:actual.bootIdentity});
+  return actual&&!['Z','X'].includes(actual.state)&&original?.pid===actual.pid
+    &&original.startIdentitySha256===ownedVerificationDigest({start:actual.start,bootSha256:actual.bootSha256});
+}
+function continuityVerificationOwnerRead(owned,runtimePort){
+  const {repository,port,data,prepared,executed}=owned;
+  if(continuityAuthorityPorts.get(port)!==data||data.repository!==repository&& !continuityAuthorityEqual(data.repository,repository))
+    ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  const operation=continuityAuthorityOperation(data,prepared.operationHandle);
+  if(operation.legacy||operation.phase!=='armed'||operation.companionExecuting
+    ||operation.executionHandle!==executed.executionHandle||continuityAuthorityExecutions.get(executed.executionHandle)?.operation!==operation
+    ||continuityVerificationCaptured.get(prepared.operationHandle)!==owned)ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  const active=inspectSourceOwnedCurrentAuthorityContext({repository});
+  if(active.status!=='bound'||active.runtimePort!==runtimePort||active.requesterHandle!==operation.requesterHandle
+    ||!active.currentInvocationHandle||active.assurance==='controlled-unit-method')ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  const requester=continuityAuthorityCurrent(data,operation.requesterHandle);
+  if(requester.assurance==='controlled-unit-method'||!continuityAuthorityEqual(operation.association.target,
+    {sessionId:requester.sessionId,descriptorSha256:requester.descriptorSha256,ownerNonceSha256:requester.ownerNonceSha256}))ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  continuityAuthorityCheckJournals(operation);
+  const snapshot=continuityAuthoritySnapshot(repository),state=snapshot.observed.state,lifecycle=derivePlanLifecycle(state);
+  if(!snapshot.observed.neutral||snapshot.observed.mode!=='active'||snapshot.observed.orphanBinding||snapshot.release.status!=='absent'
+    ||!continuityAuthorityEqual(snapshot.observed.sessionCleanup,{sessionId:requester.sessionId,descriptorSha256:requester.descriptorSha256})
+    ||!lifecycle.ok||lifecycle.approvalCurrent!==true||!['approved','implementing'].includes(lifecycle.status)||state.planApproved!==true)
+    ownedVerificationFail('OSV-COURSE-UNAVAILABLE');
+  const approvalRefs=[readOwnedVerificationPhysicalFile(resolve(repository.primaryRoot,state.activeFeature.planPath),{root:repository.primaryRoot}).ref];
+  const acceptedRef=state.planApproval?.acceptedContract;
+  // Use the existing accepted-policy reader; no additional signature or METHOD requirement.
+  if(acceptedRef){const accepted=readSanctionedAcceptedContract({dir:repository.primaryRoot,envelopePath:acceptedRef.path});
+    if(!accepted.ok||accepted.envelopeSha256!==acceptedRef.sha256)ownedVerificationFail('OSV-COURSE-UNAVAILABLE');
+    approvalRefs.push(readOwnedVerificationPhysicalFile(resolve(repository.primaryRoot,acceptedRef.path),{root:repository.primaryRoot}).ref);}
+  const member=withSessionAuthorityBoundary({repository},boundary=>inspectSourceOwnedSessionAuthorityMember({boundary,
+    producerPort:port,memberHandle:operation.memberHandle,operationHandle:prepared.operationHandle,expectedMemberRef:operation.expectedMemberRef}));
+  const requesterFloor=inspectSourceOwnedContinuityVerificationRequesterFloor({repository,requesterHandle:operation.requesterHandle,
+    currentInvocationHandle:active.currentInvocationHandle,runtimePort});
+  if(!continuityAuthorityEqual(requesterFloor.repository,repository)||!continuityAuthorityEqual(requesterFloor.currentRequester,active.currentRequester)
+    ||requesterFloor.invocationBindingSha256!==active.invocationBindingSha256
+    ||!continuityVerificationInvocationProcess(requesterFloor.controllerIdentity,active.controllerIdentity))ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  return {repository,operation,active,requester,requesterFloor,member,snapshot,approvalRefs,
+    selectedStateRef:readOwnedVerificationPhysicalFile(snapshot.observed.path,{root:repository.primaryRoot}).ref,
+    course:{featureId:state.activeFeature.id,planPath:state.activeFeature.planPath,lifecycle:lifecycle.status,
+      approvalSha256:ownedVerificationDigest({approval:state.planApproval,submission:state.planSubmission,revocation:state.planRevocation??null,
+        lifecycle,continuity:state.continuity,approvalRefs})}};
+}
+export function acquireSourceOwnedContinuityVerificationOwner(input){
+  if(!ownedVerificationExact(input,['runtimePort']))return continuityVerificationUnavailable('OSV-OWNER-UNAVAILABLE');
+  let found=null;for(const owned of continuityAuthorityDirectBindings.values()){
+    try{const current=continuityVerificationOwnerRead(owned,input.runtimePort);if(found)return continuityVerificationUnavailable('OSV-OWNER-UNAVAILABLE');found={owned,current};}catch{}
+  }
+  if(!found)return continuityVerificationUnavailable('OSV-OWNER-UNAVAILABLE');
+  const ownerHandle=Object.freeze({});continuityVerificationOwners.set(ownerHandle,{owned:found.owned,runtimePort:input.runtimePort});
+  return Object.freeze({status:'acquired',ownerHandle});
+}
+export function inspectSourceOwnedContinuityVerificationOwner(input){
+  if(!ownedVerificationExact(input,['ownerHandle','runtimePort']))return continuityVerificationUnavailable('OSV-OWNER-UNAVAILABLE');
+  try{const row=continuityVerificationOwners.get(input.ownerHandle);if(!row||row.runtimePort!==input.runtimePort)ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+    const c=continuityVerificationOwnerRead(row.owned,input.runtimePort);
+    return Object.freeze({status:'current',repository:c.repository,course:ownedVerificationFreeze(c.course),
+      issuer:Object.freeze({producerPort:row.owned.port,operationHandle:c.operation.operationHandle,executionHandle:c.operation.executionHandle,
+        memberHandle:c.operation.memberHandle,expectedMemberRef:structuredClone(c.operation.expectedMemberRef)})});
+  }catch(error){return continuityVerificationUnavailable(continuityVerificationCode(error));}
+}
+export function registerSourceOwnedCourseVerificationAssociation(input){
+  if(!ownedVerificationExact(input,['ownerHandle','runtimePort','taskPreparationHandle']))ownedVerificationFail('OSV-ASSOCIATION-UNAVAILABLE');
+  const owner=continuityVerificationOwners.get(input.ownerHandle);if(!owner||owner.runtimePort!==input.runtimePort)ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  const current=continuityVerificationOwnerRead(owner.owned,input.runtimePort);
+  const event=inspectSourceOwnedTaskVerificationPreparation(input);
+  if(!continuityAuthorityEqual(event.course,current.course))ownedVerificationFail('OSV-INPUT-DRIFT');
+  let associations=continuityVerificationAssociations.get(current.operation);if(!associations){associations=new Map();continuityVerificationAssociations.set(current.operation,associations);}
+  const suiteId=event.registered.selectedSuite.name;if(associations.has(suiteId)||associations.size>=128)ownedVerificationFail('OSV-ASSOCIATION-UNAVAILABLE');
+  const association={ownerHandle:input.ownerHandle,runtimePort:input.runtimePort,event,course:current.course,operation:current.operation,
+    stateRef:current.selectedStateRef,requesterFloor:current.requesterFloor};
+  association.sha256=ownedVerificationDigest({event,course:current.course,member:current.member,requesterFloor:current.requesterFloor});
+  associations.set(suiteId,association);
+  return Object.freeze({status:'registered',suiteId,associationSha256:association.sha256});
+}
+function continuityVerificationAssociationRead(owned,runtimePort,suiteId){
+  const current=continuityVerificationOwnerRead(owned,runtimePort),association=continuityVerificationAssociations.get(current.operation)?.get(suiteId);
+  if(!association||association.runtimePort!==runtimePort||association.operation!==current.operation)ownedVerificationFail('OSV-ASSOCIATION-UNAVAILABLE');
+  const registered=readOwnedVerificationRegistration(current.repository,suiteId);
+  if(!continuityAuthorityEqual(registered,association.event.registered)||!continuityAuthorityEqual(current.course,association.course)
+    ||!continuityAuthorityEqual(current.selectedStateRef,association.stateRef)
+    ||!continuityVerificationFloorEqual(current.requesterFloor,association.requesterFloor))ownedVerificationFail('OSV-INPUT-DRIFT');
+  recheckOwnedVerificationPhysicalRefs(association.event.closure);
+  return {current,association,registered};
+}
+function continuityVerificationBinding(owned,runtimePort,suiteId){
+  const {current:c,association:a,registered:r}=continuityVerificationAssociationRead(owned,runtimePort,suiteId);
+  const moduleRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+  const executable=readOwnedVerificationPhysicalFile(realpathSync(process.execPath),{maxBytes:256*1024*1024}).ref;
+  const fixed=(path,args)=>({module:readOwnedVerificationPhysicalFile(path).ref,executable,
+    argv:[...process.execArgv,path,...args],cwd:c.repository.primaryRoot});
+  const executor=fixed(join(moduleRoot,'scripts','owned-continuity-verification.mjs'),['--consume-owned-verification','--channel-fd','4']);
+  const guard=fixed(join(moduleRoot,'hooks','guard-lifecycle-ready.mjs'),['--runner','codex','--consume-owned-verification-guard','--channel-fd','4']);
+  const quote=s=>"'"+String(s).replaceAll("'",process.platform==='win32'?"''":"'\\''")+"'";
+  const command=(process.platform==='win32'?'& ':'')+[executable.path,...executor.argv].map(quote).join(' ');
+  const sourceClosure=[...a.event.closure];
+  // Bind the issuer and authentic channel/executor Source as well as the suite's own static closure.
+  const moduleSources=collectOwnedVerificationSourceModules({primaryRoot:resolve(moduleRoot,'..','..')},[fileURLToPath(import.meta.url),join(moduleRoot,'lib','owned-continuity-verification.mjs'),
+    join(moduleRoot,'lib','session-requester-bridge.mjs'),join(moduleRoot,'lib','codex-host-process-journal.mjs'),
+    join(moduleRoot,'lib','session-authority-registry.mjs'),join(moduleRoot,'scripts','pipeline-state.mjs'),
+    join(moduleRoot,'scripts','verify-journal.mjs'),guard.module.path,executor.module.path]);
+  for(const ref of moduleSources)if(!sourceClosure.some(item=>item.path===ref.path))sourceClosure.push(ref);
+  sourceClosure.sort((x,y)=>x.path.localeCompare(y.path));
+  const course={...c.course,taskRegistrationSha256:a.event.taskRegistrationSha256};
+  const binding={schema:'pipeline.owned-continuity-verification.binding.v1',repository:c.repository,candidate:r.candidate,
+    requester:structuredClone(c.active.currentRequester),invocation:{sourceRef:c.active.sourceRef,invocationBindingSha256:c.active.invocationBindingSha256,
+      controllerIdentity:c.requesterFloor.controllerIdentity,assurance:c.active.assurance},requesterFloor:c.requesterFloor,
+    course,courseSha256:ownedVerificationDigest(course),selectedStateRef:c.selectedStateRef,approvalRefs:c.approvalRefs,
+    member:c.member,registration:r.registration,associationSha256:a.sha256,suiteSha256:ownedVerificationDigest({suite:r.selectedSuite,closure:a.event.closure,candidateBlobs:a.event.candidateBlobs}),
+    selectedSuite:r.selectedSuite,sourceClosure,guard,executor,command,commandSha256:sha256(command),
+    journalInputs:{gitCommonDir:c.repository.commonDir,repoRoot:c.repository.primaryRoot,candidate:r.candidate,suites:[r.selectedSuite],
+      policyInputs:{courseSha256:ownedVerificationDigest(course),associationSha256:a.sha256,closureSha256:ownedVerificationDigest(sourceClosure),
+        registrationSha256:r.registration.physicalRef.sha256,attemptNonce:randomBytes(32).toString('hex')}}};
+  return ownedVerificationFreeze(binding);
+}
+export function createSourceOwnedContinuityVerificationPort(input,runtimePort){
+  if(!ownedVerificationExact(input,['producerPort','operationHandle','executionHandle','memberHandle','expectedMemberRef']))ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  const owned=continuityVerificationCaptured.get(input.operationHandle);if(!owned||owned.port!==input.producerPort)ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  const current=continuityVerificationOwnerRead(owned,runtimePort);
+  if(current.operation.executionHandle!==input.executionHandle||current.operation.memberHandle!==input.memberHandle
+    ||!continuityAuthorityEqual(current.operation.expectedMemberRef,input.expectedMemberRef))ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  const port=Object.freeze({async execute(request){
+    if(!ownedVerificationExact(request,['suiteId'])||typeof request.suiteId!=='string')return continuityVerificationUnavailable('OSV-ASSOCIATION-UNAVAILABLE');
+    const state=continuityVerificationPortStates.get(port);if(state.used)return continuityVerificationUnavailable('OSV-REPLAY');state.used=true;
+    let handle;try{const binding=continuityVerificationBinding(owned,runtimePort,request.suiteId);handle=Object.freeze({});
+      continuityVerificationAttempts.set(handle,{owned,runtimePort,suiteId:request.suiteId,binding,bindingSha256:ownedVerificationDigest(binding),
+        deadline:performance.now()+CONTINUITY_VERIFICATION_TTL,state:'pending',claimedChallenge:null,executorChallenge:null,result:null});
+      // All physical Registry callbacks have returned before this real asynchronous child course.
+      const result=await spawnSourceOwnedContinuityVerificationChild({verificationAttemptHandle:handle},runtimePort);
+      const attempt=continuityVerificationAttempts.get(handle);
+      if(attempt.state==='expired'||(!['succeeded','failed'].includes(attempt.state)&&performance.now()>=attempt.deadline)){
+        attempt.state='expired';return continuityVerificationUnavailable('OSV-EXPIRED');}
+      if(!['succeeded','failed'].includes(attempt.state)){
+        attempt.state='failed';return continuityVerificationUnavailable('OSV-TERMINAL-UNAVAILABLE');}
+      return attempt.result??result;
+    }catch(error){if(handle){const attempt=continuityVerificationAttempts.get(handle);
+      if(attempt&&(attempt.state==='expired'||(!['succeeded','failed'].includes(attempt.state)&&performance.now()>=attempt.deadline))){
+        attempt.state='expired';return continuityVerificationUnavailable('OSV-EXPIRED');}
+      if(attempt&&!['succeeded','failed','expired'].includes(attempt.state))attempt.state='failed';}
+      return continuityVerificationUnavailable(continuityVerificationCode(error,'OSV-VERIFY-FAILED'));}
+  }});continuityVerificationPortStates.set(port,{used:false});return port;
+}
+function continuityVerificationAttemptRead(input){
+  if(!ownedVerificationExact(input,['verificationAttemptHandle','runtimePort']))ownedVerificationFail('OSV-OWNER-UNAVAILABLE');
+  const a=continuityVerificationAttempts.get(input.verificationAttemptHandle);
+  if(!a||a.runtimePort!==input.runtimePort||!['pending','claimed','running'].includes(a.state))ownedVerificationFail('OSV-REPLAY');
+  if(performance.now()>=a.deadline){a.state='expired';ownedVerificationFail('OSV-EXPIRED');}
+  const {current,registered}=continuityVerificationAssociationRead(a.owned,a.runtimePort,a.suiteId);
+  if(!continuityAuthorityEqual(current.member,a.binding.member)||!continuityAuthorityEqual(current.selectedStateRef,a.binding.selectedStateRef)
+    ||!continuityVerificationFloorEqual(current.requesterFloor,a.binding.requesterFloor)||!continuityAuthorityEqual(registered.candidate,a.binding.candidate))ownedVerificationFail('OSV-INPUT-DRIFT');
+  recheckOwnedVerificationPhysicalRefs([...a.binding.sourceClosure,a.binding.selectedStateRef,...a.binding.approvalRefs,a.binding.registration.physicalRef,
+    a.binding.executor.executable,a.binding.requesterFloor.program.executable,a.binding.requesterFloor.program.module]);return a;
+}
+export function inspectSourceOwnedContinuityVerificationAttempt(input){
+  try{const a=continuityVerificationAttemptRead(input);return Object.freeze({status:'current',state:a.state,bindingSha256:a.bindingSha256,
+    binding:a.binding,deadlineRemainingMs:Math.max(1,Math.floor(a.deadline-performance.now()))});}
+  catch(error){const a=continuityVerificationAttempts.get(input?.verificationAttemptHandle);
+    if(a&&a.runtimePort===input?.runtimePort&&['pending','claimed','running'].includes(a.state))a.state='failed';
+    return continuityVerificationUnavailable(continuityVerificationCode(error));}
+}
+function continuityVerificationExchange(input,phase){
+  const handleKey=phase==='guard-challenge'?'guardExchangeHandle':phase==='executor-challenge'?'executorExchangeHandle':'terminalExchangeHandle';
+  if(!ownedVerificationExact(input,['verificationAttemptHandle','runtimePort',handleKey]))ownedVerificationFail('OSV-EXCHANGE-UNAVAILABLE');
+  const a=continuityVerificationAttemptRead({verificationAttemptHandle:input.verificationAttemptHandle,runtimePort:input.runtimePort});
+  const e=inspectSourceOwnedContinuityVerificationExchange({exchangeHandle:input[handleKey]});
+  const failedTerminal=phase==='terminal'&&e.terminal?.journal===null;
+  const kind=failedTerminal?e.kind:(phase==='guard-challenge'?'guard':'executor');
+  if(!['guard','executor'].includes(kind))ownedVerificationFail('OSV-EXCHANGE-UNAVAILABLE');
+  const selected=kind==='guard'?a.binding.guard:a.binding.executor;
+  if(e.verificationAttemptHandle!==input.verificationAttemptHandle||e.runtimePort!==input.runtimePort||e.phase!==phase
+    ||e.kind!==kind||e.bindingSha256!==a.bindingSha256
+    ||!SHA256_RE.test(e.challengeSha256??'')||!ownedVerificationSameProcess(a.binding.invocation.controllerIdentity,e.controllerIdentity)
+    ||!continuityAuthorityEqual(e.executable,selected.executable)||!continuityAuthorityEqual(e.argv,selected.argv)
+    ||e.cwd!==selected.cwd||e.commandSha256!==a.binding.commandSha256)ownedVerificationFail('OSV-EXCHANGE-UNAVAILABLE');
+  return {a,e};
+}
+export function claimSourceOwnedContinuityVerificationAttempt(input){
+  try{const {a,e}=continuityVerificationExchange(input,'guard-challenge');if(a.state!=='pending')ownedVerificationFail('OSV-REPLAY');
+    a.state='claimed';a.claimedChallenge=e.challengeSha256;return Object.freeze({status:'claimed',bindingSha256:a.bindingSha256});
+  }catch(error){const a=continuityVerificationAttempts.get(input?.verificationAttemptHandle);
+    if(a&&a.runtimePort===input?.runtimePort&&a.state==='pending')a.state='failed';
+    return continuityVerificationUnavailable(continuityVerificationCode(error,'OSV-EXCHANGE-UNAVAILABLE'));}
+}
+export function startSourceOwnedContinuityVerificationAttempt(input){
+  try{const {a,e}=continuityVerificationExchange(input,'executor-challenge');if(a.state!=='claimed'||e.challengeSha256===a.claimedChallenge)ownedVerificationFail('OSV-REPLAY');
+    a.state='running';a.executorChallenge=e.challengeSha256;return Object.freeze({status:'running',bindingSha256:a.bindingSha256});
+  }catch(error){const a=continuityVerificationAttempts.get(input?.verificationAttemptHandle);
+    if(a&&a.runtimePort===input?.runtimePort&&a.state==='claimed')a.state='failed';
+    return continuityVerificationUnavailable(continuityVerificationCode(error,'OSV-EXCHANGE-UNAVAILABLE'));}
+}
+export function completeSourceOwnedContinuityVerificationAttempt(input){
+  let a;try{const observed=continuityVerificationExchange(input,'terminal');a=observed.a;const e=observed.e;
+    if(e.terminal?.journal===null){
+      if(!['pending','claimed','running'].includes(a.state))ownedVerificationFail('OSV-REPLAY');
+      a.state='failed';a.result=Object.freeze({status:'failed',code:'OSV-VERIFY-FAILED',terminal:structuredClone(e.terminal)});return a.result;
+    }
+    if(a.state!=='running'||e.challengeSha256!==a.executorChallenge||!e.terminal)ownedVerificationFail('OSV-TERMINAL-UNAVAILABLE');
+    const terminal=e.terminal;
+    const journal=terminal.journal;
+    const ok=terminal.outerClose?.closeObserved===true&&terminal.outerClose?.code===0
+      &&terminal.outerClose?.signal===null&&terminal.outerClose?.errorCode===null
+      &&continuityAuthorityEqual(terminal.outerClose.childIdentity,e.childIdentity)
+      &&journal?.terminal?.status==='passed'&&journal?.steps?.length===1
+      &&journal.dispatchedSuiteCount===1&&journal.steps[0].exitCode===0&&journal.steps[0].reused===false
+      &&continuityAuthorityEqual(journal.candidate??journal.manifest?.candidate,a.binding.candidate);
+    a.state=ok?'succeeded':'failed';a.result=Object.freeze({status:a.state,code:ok?null:'OSV-VERIFY-FAILED',terminal:structuredClone(terminal)});return a.result;
+  }catch(error){a??=continuityVerificationAttempts.get(input?.verificationAttemptHandle);if(a&&a.runtimePort===input?.runtimePort&&!['succeeded','failed','expired'].includes(a.state))a.state='failed';
+    return continuityVerificationUnavailable(continuityVerificationCode(error,'OSV-TERMINAL-UNAVAILABLE'));}
 }

@@ -34,6 +34,7 @@ import {
 } from "../lib/native-hook-failure-memory.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
+import { classifyGhCommand } from "../lib/gh-cmd.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -370,7 +371,7 @@ const hookSessionId = nativeHookSessionId(input);
 const guardNames = toolName === "Bash"
   ? [
     ...( /\bgit(?:\.exe)?\b/iu.test(command) ? ["guard-git.mjs"] : []),
-    ...(commandIsGitPush(command) ? ["guard-push.mjs"] : []),
+    ...((commandIsGitPush(command) || classifyGhCommand(command).kind === "refused") ? ["guard-push.mjs"] : []),
     // The lifecycle tool validates its own typed arguments and plan digest.  Do
     // not make a bootstrap command depend on a second heavyweight hook process:
     // on Codex's nested sandbox that process can exhaust the hook's outer budget.
@@ -540,6 +541,9 @@ if (denials.length > 0) {
   }
   if (consumed.status === "non-liftable-recovery-required") {
     deny([consumed.cause, ...(consumed.recoveryGuidance ?? []), consumed.coDenialSummary, consumed.nextAction.reason].filter(Boolean).join("\n"));
+  }
+  if (consumed.status === "replan" && consumed.code === "HGO-INPUT-MISMATCH" && consumed.inputMismatch) {
+    deny(`${denials.map((entry) => entry.reason).join("\n")}\nHGO-INPUT-MISMATCH: differing digest inputs: toolInputSha256\n${JSON.stringify(consumed.inputMismatch)}`);
   }
   let overrideGuidance = "";
   if (consumed.status === "absent" || consumed.status === "replan") {

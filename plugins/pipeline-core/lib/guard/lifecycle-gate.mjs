@@ -13,10 +13,14 @@ import { blocked, externalRestartOnly } from "./denial-route.mjs";
 import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
 import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, minimumRigorObservation } from "./entry-gates.mjs";
 import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
-import { isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+import { isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice } from "./rebase-lane.mjs";
 
 export function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
+  if (toolName === "Bash" && isSanctionedGovernanceScopeDiagnosticInvocation(
+    input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,
+  )) return verdict(0);
   // The exact resume-hint readback is passive and is itself needed to diagnose
   // which non-ready lifecycle status applies. Admit it by shape before asking
   // readiness, otherwise an earlier repository/runtime observation can make
@@ -40,6 +44,17 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
     return verdict(0);
   }
 
+  // Revalidate the live brand at the readiness boundary. It is not a READY
+  // receipt: the actual reader below and all ordinary refusal branches stay intact.
+  const ownsVerificationContext = dependencies.sourceOwnedVerificationGuardContextHandle !== undefined;
+  if (ownsVerificationContext && (toolName !== "Bash"
+    || !isSourceOwnedContinuityVerificationCommand(input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies))) {
+    return verdict(2, "OSV-GUARD-CONTEXT-INVALID: owning verification context changed before readiness.\n");
+  }
+  const ownsControllerAdmission = dependencies.sourceOwnedOwningControllerCommandAdmissionHandle !== undefined;
+  if (ownsControllerAdmission && (toolName !== "Bash" || !isSourceOwnedOwningVerificationControllerCommand(
+    input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,
+  ))) return verdict(2, "OSV-CONTROLLER-INVOCATION-INVALID: fixed Controller inputs changed before readiness.\n");
   let receipt;
   try {
     receipt = (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
@@ -334,5 +349,11 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
     );
     if (rigorVerdict !== null) return rigorVerdict;
   }
+  if (ownsVerificationContext && !isSourceOwnedContinuityVerificationCommand(
+    input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,
+  )) return verdict(2, "OSV-GUARD-CONTEXT-INVALID: owning verification context changed before final admission.\n");
+  if (ownsControllerAdmission && !isSourceOwnedOwningVerificationControllerCommand(
+    input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,
+  )) return verdict(2, "OSV-CONTROLLER-INVOCATION-INVALID: fixed Controller inputs changed before final admission.\n");
   return verdict(0);
 }

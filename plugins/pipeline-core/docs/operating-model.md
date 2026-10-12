@@ -84,7 +84,7 @@ is normative for the distinction.
 | --- | --- | --- |
 | Human decision role (`PO`) | Intent, priority, scope decisions, plan approval where required, acceptance and exceptions. | Rubber-stamping agent claims or acting as an implementation relay. |
 | Elephant | Triage, specification, decomposition, dispatch, finding disposition, continuity and close. | Quiet policy decisions or ordinary production implementation. |
-| Goldfish | One bounded, independently briefed task and its evidence. | Chat-history inheritance, open-ended scope expansion or weakening its own examiner. |
+| Goldfish | One independently verifiable outcome from analysis and test-case preparation through implementation, targeted checks and fixes; a Correction Goldfish owns one coherent reviewed batch. | Chat-history inheritance, open-ended scope expansion or weakening existing acceptance examiners. |
 | Critic | Independent, read-only assessment of a finished candidate and its evidence. | Implementation, access to implementor reasoning, or an unsupported finding. |
 
 “EGM” means the Elephants & Goldfish model: durable written context is more
@@ -167,6 +167,16 @@ Critic run is required only if the risk flag is set. This exception is scoped
 exclusively to this definition — it is not extended by local judgment;
 anything outside these criteria still requires a Goldfish dispatch.
 
+### 3.4 Administrative role work and local commits
+
+Backlog registration and planning Markdown are ordinary Elephant role work,
+independent of stage-0 implementation size limits. Use the exact administrative
+content binding and two-step open-registration precheck in GIT-03/GIT-09/GIT-10.
+Local commits do not require PO decisions. This grants no production-code
+authorship exception, design approval, push approval or protected-signature
+waiver; each remains at its existing boundary. Official ledger projections
+follow the real item commit, never a fabricated future commit OID.
+
 ## 4. The lifecycle
 
 The maintained visual version is in [PIPELINE_FLOW](../PIPELINE_FLOW.md). The
@@ -235,9 +245,51 @@ normative shape is:
    **Rollback.** Before the readback, abort the action. After publication,
    never force-push or automatically reverse it: a compensating remote action
    needs new explicit PO authority that names that action, remote and ref.
-5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
-   prohibitions, stop conditions and route metadata. Independent tasks may run
-   in parallel when their files and state do not conflict.
+5. **Dispatch.** Give one Goldfish ownership of one independently verifiable
+   outcome through analysis, test-case preparation, implementation, targeted
+   checks and fixes. Keep the same live owner while that outcome is active; a
+   large outcome may be divided only into vertical sub-outcomes that can each
+   be verified independently. Do not dispatch test authorship and implementation
+   as separate default phases. The six-field briefing names the outcome, exact
+   write/read scopes, original criteria, targeted checks, prohibitions, stop
+   conditions and route metadata.
+
+   The Elephant reserves write scopes before dispatch. Work with overlapping
+   paths waits until the earlier owner has finished and integrated; a worktree
+   does not authorize planned same-file concurrency. Non-overlapping outcomes
+   may use the available worker slots, with starts paced to keep integration
+   and review queues moving. There is no fixed 3–5 worker ceiling. Never run
+   concurrent commits through a shared Git index. If a change exhausts its
+   resource budget, checkpoint or block that same outcome with its owner,
+   attempt history and recovery pointer; do not silently create horizontal
+   analysis, test or fix dispatches.
+
+   Before the first item dispatch, the Elephant predeclares a meaningful
+   delivery batch and its review unit. As outcomes finish, the Elephant
+   integrates each recorded change into Main and resolves incidental
+   conflicts. Freeze the batch’s actual members and integrated scope only after
+   integration and before its Critic review; item completion does not trigger
+   an automatic Critic. The owner’s targeted evidence remains valid when its
+   source and relevant dependencies are unchanged. The Elephant may rerun only
+   the affected targeted checks when it manually resolves an integration
+   conflict. If evidence is missing or invalid, or relevant dependencies drift
+   outside that conflict-resolution act, assign the check or requalification
+   to the appropriate Goldfish: the same item owner before integration, or a
+   correction/requalification owner after integration. The Elephant does not
+   run ordinary targeted tests itself. A singleton batch is for a substantial
+   independent delivery or an urgent isolated-risk reason, not an automatic
+   consequence of each item finishing. This method is intended to apply across
+   Claude Code, Codex and Antigravity, across supported platforms and consumer
+   repositories; each source/runtime combination still needs qualification
+   before enforcement is claimed.
+
+   The original item owner ends after targeted-green delivery and integration.
+   If the full Critic finds corrections, assign one fresh Correction Goldfish
+   to the whole coherent batch. That owner carries the findings through test
+   cases, fixes, targeted checks and subsequent correction-diff findings in
+   the same context until genuine PASS or the three-review correction limit.
+   Do not create one correction dispatch per item; keep the original batch,
+   members and review lineage fixed.
 
    The Elephant SHALL treat an absent early progress message as neutral, not as
    a worker failure. Before interrupting a dispatched worker, it SHALL allow a
@@ -250,6 +302,33 @@ normative shape is:
    checks and packet preflight. A candidate-bound Critic-mode Verify receipt
    or a validated diagnostic may admit review while full release-mode Verify
    remains explicitly pending; neither is a full qualification.
+
+   **Owned task verification (ADR-0087).** For an approved owning task whose
+   unique suite registration is already committed and whose selected task file
+   is still absent, the Coordinator internally invokes the installed plugin's
+   fixed scripts/owning-verification-controller.mjs using the inherited Node
+   executable and Node arguments, from the canonical repository root:
+   --root <canonical-root> --suite <registered-suite-id> --task-source <canonical-absolute-task-content-path>.
+   The contained physical task-content file has exactly
+   {schema:"pipeline.owning-verification-task-source.v1",suiteId,files:[{path,source}]}.
+   These selectors are content, never approval or requester authority. The fixed
+   entry authenticates the real approved course through the Source-owned
+   requester constructor, binds cleanup, and authors, completes registration
+   custody and executes once within the same held runtime and unchanged HEAD.
+   Untracked contained Scratch files retain their full physical closure and an
+   honest null candidate blob reference. The Coordinator records the actual
+   result and preserves typed refusals; it does not advance HEAD, suppress
+   hooks, manufacture readiness or rerun an unrelated session-reuse action.
+   This is an internal task action, not an additional PO terminal command or
+   signature. It supplies focused task evidence; Full Verify remains required.
+
+   The approved Controller check channel uses the same six selectors and a
+   contained task-content record with exactly schema
+   pipeline.owning-verification-controller-check.v1, suiteId, caseId and variant.
+   It invokes only the fixed installed independent controls module within the
+   genuine held runtime. The closed case/variant selects one original control
+   per course; each actual receipt records that variant without inferring
+   sibling PASS. It cannot select a module, export, requester, callback or origin.
 7. **Critic, then Full Verify.** Have a fresh Critic review the substantive
    delta after those boundary checks. High-risk, architecture, guardrail and
    security changes receive the required stronger review path. Findings need
@@ -272,13 +351,15 @@ normative shape is:
    per dispatch. The block size is a bound the Elephant states before
    dispatching (e.g. "this sweep's N items"), so a regression cannot ride
    along unreviewed indefinitely. This does not change a single package's
-   correction-review rule: QG-13 defaults to one initial round plus one fresh
-   re-review, then self-verification. An explicit actual-PASS delivery criterion
-   permits further fresh reviews of only each immediate correction diff,
-   including fixes and direct regressions, within existing budgets. Preserve
-   the original coverage and continuous review lineage; never reopen unchanged
-   cleared areas or turn self-verification into PASS
-   (`guardrails/quality-gates.md` QG-13).
+   correction-review rule: each finished work batch permits one full
+   independent Critic review and up to three correction-diff reviews, stopping
+   earlier on genuine PASS. Four Critic calls total is the maximum; there is no
+   full-review rerun. Preserve original coverage and continuous exact-candidate
+   lineage; each correction review starts at the immediately preceding
+   reviewed candidate and covers only its correction diff and direct
+   regressions. Renaming or splitting the same batch does not reset its budget.
+   Historical receipts remain readable but do not expand this course. The
+   documentation Reader retains its separate two-plus-one budget.
 8. **Close.** Synchronize handover and history, preserve evidence, perform the
    required retro and run close extensions. A feature lifecycle is closed only
    after its tracked work is actually complete.
@@ -369,16 +450,19 @@ first hunts for defects, then reports only findings it can support. “No
 findings” is valid. The Elephant decides whether each finding is fixed,
 accepted with a reason, or escalated; it must not silently discard one.
 
-QG-13 defaults to one initial Critic round plus one fresh re-review, then
-self-verification. When the delivery contract explicitly requires actual
-independent PASS, further reviews may examine only the immediately previous
-reviewed commit through the new correction candidate, its fixes and direct
-regressions. The coordinator must verify retained source coverage and the
-continuous receipt/finding-disposition lineage before a latest diff PASS can
-satisfy that contract. Unchanged cleared areas are not reopened; a diff receipt
-never claims a new whole-artifact review. Self-verification never supplies
-PASS, and execution/cost/course budgets still apply
-(`guardrails/quality-gates.md` QG-13).
+The selected PO direction prospectively limits each meaningful work batch to
+one full independent Critic review and up to three correction-diff reviews,
+stopping earlier on genuine PASS. Four Critic calls total is the maximum; no
+full-review rerun is permitted. Renaming or splitting the same batch does not
+reset its history. Each correction review starts at the immediately previous
+reviewed candidate and examines only its fixes and direct regressions. The
+coordinator retains genuine source coverage and continuous receipt/finding-
+disposition lineage. Unchanged cleared areas are not reopened; a diff receipt
+never claims a new whole-artifact review, and self-verification never supplies
+PASS. Execution/cost/course budgets still apply. This document records selected
+method; source/runtime admission and durable batch accounting remain to be
+qualified before universal enforcement is claimed. The documentation Reader
+retains its separate two-plus-one budget.
 
 If a duty is unavailable, a precondition drifts, evidence is stale, a stop
 condition fires or the same attempt repeatedly fails, stop the affected work.
@@ -575,7 +659,7 @@ bounded triage content; it is not briefing context for a Goldfish or Critic.
 - **EGM:** Elephants & Goldfish model; durable documents over conversational
   memory.
 - **Evidence:** a machine or receipt-bound record of an observed check/result.
-- **Goldfish:** fresh-context executor for one bounded dispatch.
+- **Goldfish:** fresh-context owner of one independently verifiable outcome; a fresh Correction Goldfish may own one coherent reviewed batch.
 - **Elephant:** long-lived orchestrator for the project lifecycle.
 - **Implementation complete:** the Goldfish/Elephant-visible DoD and verify
   checks passed; independent (Critic) review, manual/browser checks, and PO
@@ -686,7 +770,7 @@ diese Unterscheidung normativ.
 | --- | --- | --- |
 | Menschliche Entscheidungsrolle (`PO`) | Absicht, Priorität, Scope-Entscheidungen, nötige Planfreigabe, Abnahme und Ausnahmen. | Agentenbehauptungen abzunicken oder als Implementierungs-Relay zu dienen. |
 | Elephant | Triage, Spezifikation, Zerlegung, Dispatch, Befunddisposition, Kontinuität und Close. | Stille Policy-Entscheidungen oder normale Produktionsimplementierung. |
-| Goldfish | Eine klar begrenzte, unabhängig gebriefte Aufgabe samt Evidenz. | Chat-Historie zu erben, Scope offen auszuweiten oder den eigenen Prüfer zu schwächen. |
+| Goldfish | Ein unabhängig prüfbares Outcome von Analyse und Testfallvorbereitung über Implementierung bis zu gezielten Checks und Korrekturen; ein Correction-Goldfish besitzt ein kohärentes geprüftes Batch. | Chat-Historie zu erben, Scope offen auszuweiten oder bestehende Akzeptanzprüfer zu schwächen. |
 | Critic | Unabhängige Read-only-Bewertung eines fertigen Kandidaten und seiner Evidenz. | Implementierung, Zugriff auf Implementierungsbegründungen oder unbelegte Befunde. |
 
 „EGM“ bedeutet Elephants-&-Goldfish-Modell: dauerhafte schriftliche Kontexte
@@ -798,15 +882,91 @@ Die normative Form lautet:
    der Veröffentlichung niemals force-pushen oder automatisch zurückbauen:
    Eine gegensteuernde Remote-Aktion benötigt neue ausdrückliche PO-Autorität,
    die Aktion, Remote und Ref benennt.
-5. **Dispatch.** Einem Goldfish genau ein Outcome, Kontextpfade, DoD-Checks,
-   Verbote, Stop-Bedingungen und Route-Metadaten geben. Unabhängige Aufgaben
-   dürfen parallel laufen, wenn Dateien und Zustand nicht kollidieren.
-6. **Verify.** Den einen konfigurierten Verify-Befehl ausführen. Das Ergebnis
-   ist maschinelle Evidenz mit Befehl und Resultat, nicht „sieht gut aus“.
-7. **Critic.** Den Delta erst nach grüner deterministischer Kette prüfen.
-   High-Risk-, Architektur-, Guardrail- und Security-Änderungen erhalten den
-   vorgeschriebenen stärkeren Reviewpfad. Jeder Befund braucht Evidenz und
-   Disposition.
+5. **Dispatch.** Ein Goldfish erhält die Verantwortung für genau ein
+   unabhängig prüfbares Outcome von Analyse und Testfallvorbereitung über
+   Implementierung bis zu gezielten Checks und Korrekturen. Derselbe aktive
+   Owner bleibt zuständig; ein großes Outcome wird nur in vertikale,
+   eigenständig prüfbare Teil-Outcomes geteilt. Testautorenschaft und
+   Implementierung sind keine getrennten Standardphasen. Das Briefing nennt
+   Outcome, Schreib-/Lesebereiche, ursprüngliche Kriterien, Checks, Verbote,
+   Stop-Bedingungen und Route-Metadaten.
+
+   Der Elephant reserviert Schreibbereiche vor dem Dispatch. Überlappende
+   Pfade warten, bis der vorige Owner fertig integriert ist; ein Worktree
+   erlaubt keine geplante gleichzeitige Arbeit an derselben Datei. Nicht
+   überlappende Outcomes nutzen verfügbare Worker-Slots, wobei Starts zur
+   Integrations- und Review-Warteschlange passen. Es gibt keine feste Obergrenze
+   von 3–5 Workern. Gleichzeitige Commits über denselben Git-Index sind
+   unzulässig. Ist das Ressourcenbudget ausgeschöpft, wird dasselbe Outcome mit
+   Owner, Versuchshistorie und Wiederaufnahmepunkt gesichert oder blockiert;
+   horizontale Analyse-, Test- oder Fix-Dispatches entstehen dadurch nicht.
+
+   Vor dem ersten Item-Dispatch legt der Elephant ein sinnvolles Liefer-Batch
+   und dessen Review-Einheit fest. Nach jeder Lieferung integriert der Elephant
+   den aufgezeichneten Stand in Main und löst beiläufige Konflikte. Die
+   tatsächlichen Mitglieder und der integrierte Umfang werden erst nach der
+   Integration und vor dem Critic eingefroren; ein fertiges Item löst keinen
+   automatischen Critic aus. Gezielte Evidenz bleibt gültig, wenn Quelle und
+   relevante Abhängigkeiten unverändert sind. Der Elephant darf nur die
+   betroffenen gezielten Checks erneut ausführen, wenn er selbst einen
+   Integrationskonflikt auflöst. Fehlende oder ungültige Evidenz sowie
+   relevante Abweichungen von Abhängigkeiten außerhalb dieser Konfliktauflösung
+   gehen zum passenden Goldfish für Prüfung oder Requalifizierung: vor der
+   Integration an denselben Item-Owner, danach an einen Correction- oder
+   Requalifizierungs-Owner. Der Elephant führt keine gewöhnlichen gezielten
+   Tests selbst aus. Diese Regel gilt als Ziel für Claude Code, Codex und
+   Antigravity, unterstützte Plattformen und konsumierende Repositories; jede
+   Quelle/Runtime-Kombination muss vor einer Aussage zur Durchsetzung noch
+   qualifiziert werden. Ein Singleton-Batch gilt für eine erhebliche
+   eigenständige Lieferung oder ein dringendes isoliertes Risiko, nicht
+   automatisch für jedes fertige Item.
+
+   Der ursprüngliche Item-Owner endet nach targeted-green-Lieferung und
+   Integration. Meldet der vollständige Critic Korrekturen, erhält ein frischer
+   Correction-Goldfish das gesamte kohärente Batch. Dieser Owner führt Befunde
+   im selben Kontext durch Testfälle, Fixes, gezielte Checks und weitere
+   Korrektur-Diff-Befunde bis zum echten PASS oder zur Grenze von drei
+   Korrekturprüfungen. Es gibt keinen eigenen Korrektur-Dispatch pro Item;
+   ursprüngliches Batch, Mitglieder und Review-Linie bleiben unverändert.
+6. **Critic-Grenze prüfen.** Die anwendbaren gezielten deterministischen Checks und den Packet-Preflight ausführen. Ein kandidatgebundener Critic-Mode-Verify-Receipt oder ein validierter Diagnostic kann die Review zulassen, während der Full-Release-Verify ausdrücklich noch aussteht; beides ist keine vollständige Qualifikation.
+
+   **Eigene Task-Verifikation (ADR-0087).** Für einen freigegebenen Owning-Task
+   mit bereits eindeutig committed Suite-Registrierung und noch fehlender
+   ausgewählter Task-Datei ruft der Coordinator intern den festen installierten
+   Plugin-Einstieg scripts/owning-verification-controller.mjs auf. Er übernimmt
+   Node, Node-Argumente und Umgebung unverändert und arbeitet vom kanonischen
+   Repository-Root mit --root <canonical-root> --suite <registered-suite-id> --task-source <canonical-absolute-task-content-path>.
+   Die physische Task-Inhaltsdatei im Repository enthält genau
+   {schema:"pipeline.owning-verification-task-source.v1",suiteId,files:[{path,source}]}.
+   Selektoren sind Inhalt, keine Freigabe oder Requester-Autorität. Der feste
+   Einstieg authentifiziert den echten freigegebenen Course, bindet Cleanup und
+   führt Authoring, Abschluss der Registrierungscustody und die einmalige
+   Ausführung innerhalb derselben gehaltenen Runtime bei unverändertem HEAD aus.
+   Nicht versionierte enthaltene Scratch-Dateien behalten ihre vollständige
+   physische Closure und einen ehrlichen null-Blob-Bezug. Verweigerungen bleiben
+   wirksam; kein automatischer Commit, Hook-Bypass oder Start bei Session-Reuse.
+   Das ist eine interne Task-Aktion, kein zusätzlicher PO-Terminalschritt oder
+   Signaturgang. Die fokussierte Evidenz ersetzt Full Verify nicht.
+
+   Der freigegebene Controller-Testkanal nutzt dieselben sechs Selektoren und
+   einen enthaltenen Inhaltsdatensatz mit genau dem Schema
+   pipeline.owning-verification-controller-check.v1, suiteId, caseId und variant.
+   Nur das feste installierte unabhängige Kontrollmodul läuft innerhalb der
+   echten gehaltenen Runtime. Pro Course wird genau eine Originalkontrolle mit
+   festem Variantenselektor beobachtet; Geschwistervarianten erhalten dadurch
+   kein PASS. Modul, Export, Requester, Callback und Herkunft sind nicht wählbar.
+
+7. **Critic, dann Full Verify.** Den integrierten Batch nach grüner
+   deterministischer Kette durch einen frischen unabhängigen Critic prüfen
+   lassen. High-Risk-, Architektur-, Guardrail- und Security-Änderungen erhalten
+   den vorgeschriebenen stärkeren Reviewpfad. Jeder Befund braucht Evidenz und
+   Disposition. Pro Batch gibt es eine vollständige unabhängige Prüfung und
+   höchstens drei Prüfungen des jeweiligen Korrektur-Diffs; bei echtem PASS
+   endet der Kurs, insgesamt also höchstens vier Calls. Kein Full-Rerun und
+   keine Budgetrücksetzung durch Umbenennung oder Aufteilung. Danach den
+   konfigurierten Full Verify auf dem geprüften integrierten Batch ausführen
+   und an das verbrauchte Critic-Paket binden. Das maschinelle Ergebnis belegt
+   Befehl und Resultat, nicht ‚sieht gut aus‘.
 8. **Close.** Handover und Historie synchronisieren, Evidenz bewahren, die
    nötige Retro durchführen und Close-Erweiterungen ausführen. Ein Feature
    endet erst, wenn seine verfolgte Arbeit wirklich abgeschlossen ist.
@@ -914,17 +1074,21 @@ sucht er nach Fehlern, dann meldet er nur belegbare Befunde. „Keine Befunde“
 ist gültig. Der Elephant entscheidet, ob jeder Befund behoben, mit Begründung
 akzeptiert oder eskaliert wird; er darf keinen still verwerfen.
 
-QG-13 sieht standardmäßig eine erste Critic-Runde und eine frische
-Nachprüfung vor, danach Selbstverifikation. Verlangt der Delivery-Vertrag
-ausdrücklich einen tatsächlichen unabhängigen PASS, dürfen weitere Reviews nur
-den unmittelbar zuvor geprüften Commit bis zum neuen Korrekturkandidaten,
-seine Fixes und direkte Regressionen betrachten. Der Koordinator muss die
-erhaltene Quellenabdeckung und die lückenlose Receipt-/Befund-Dispositionslinie
-prüfen, bevor ein PASS für den neuesten Diff diesen Vertrag erfüllen kann.
-Unveränderte bereits geklärte Bereiche werden nicht erneut geöffnet; ein
-Diff-Receipt behauptet nie eine neue Gesamtartefakt-Prüfung. Selbstverifikation
-liefert niemals PASS; Ausführungs-, Kosten- und Kursbudgets gelten weiter
-(`guardrails/quality-gates.md` QG-13).
+Die ausgewählte PO-Richtung begrenzt jedes sinnvolle Arbeitspaket künftig auf
+eine vollständige unabhängige Critic-Prüfung und bis zu drei Prüfungen des
+Korrektur-Diffs; bei echtem PASS endet der Kurs. Insgesamt sind höchstens vier
+Critic-Aufrufe und kein vollständiger Prüfungs-Neustart erlaubt. Umbenennen
+oder Aufteilen desselben Pakets setzt die Historie nicht zurück. Jede
+Korrekturprüfung beginnt beim unmittelbar zuvor geprüften Kandidaten und
+betrachtet nur Fixes und direkte Regressionen. Der Koordinator erhält die echte
+Quellenabdeckung und lückenlose Receipt-/Befund-Dispositionslinie. Geklärte
+unveränderte Bereiche werden nicht erneut geöffnet; ein Diff-Receipt behauptet
+keine neue Gesamtprüfung, und Selbstverifikation liefert niemals PASS.
+Ausführungs-, Kosten- und Kursbudgets gelten weiter. Dieses Dokument hält die
+gewählte Methode fest; Source-/Runtime-Zulassung und dauerhafte Batch-Zuordnung
+müssen noch qualifiziert werden, bevor universelle Durchsetzung behauptet
+wird. Für den Dokumentations-Reader gilt weiterhin sein eigener
+Zwei-plus-eins-Rahmen.
 
 Ist eine Duty nicht verfügbar, driftet eine Vorbedingung, ist Evidenz veraltet,
 tritt eine Stop-Bedingung auf oder scheitert derselbe Versuch wiederholt, wird
@@ -1067,7 +1231,7 @@ Push; Veröffentlichung und Readback sind getrennte, autorisierte Übergänge.
 - **Duty:** Geroutete Arbeitseinheit, etwa Implementierung oder Readiness.
 - **EGM:** Elephants-&-Goldfish-Modell; dauerhafte Dokumente statt Gesprächsmemory.
 - **Evidence:** Maschinen- oder Receipt-gebundener Nachweis eines beobachteten Ergebnisses.
-- **Goldfish:** Ausführer mit frischem Kontext für einen begrenzten Dispatch.
+- **Goldfish:** Outcome-Owner mit frischem Kontext; ein frischer Correction-Goldfish kann ein kohärentes geprüftes Batch übernehmen.
 - **Elephant:** Langlebiger Orchestrator des Projekt-Lifecycles.
 - **Phase:** Lifecycle-Zustand wie Design oder Execution.
 - **Profile:** Prozessform `mini`, `feature` oder `epic`.

@@ -4,7 +4,7 @@ import {createHash,randomBytes} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {constants,closeSync,fchmodSync,fstatSync,fsyncSync,ftruncateSync,lstatSync,mkdirSync,openSync,readSync,realpathSync,renameSync,unlinkSync,writeSync} from 'node:fs';
-import {dirname,join,parse,resolve,sep} from 'node:path';
+import {dirname,isAbsolute,join,parse,resolve,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {discoverRepository} from './worktree-lifecycle.mjs';
 import {hasCodexGitControlMount} from './codex-host-layout.mjs';
@@ -22,6 +22,26 @@ export const GOVERNANCE_ENROLLMENT_SCHEMA='pipeline.governance-enrollment.v1';
 export const GOVERNANCE_DECISION_PLAN_SCHEMA='pipeline.governance-decision-plan.v1';
 const MAX=262144;
 const CONTROLLERS=new WeakSet();
+// Non-authoritative in-process diagnostics do not widen the scope schema or enrollment authority.
+const FAILURE_DIAGNOSTICS=new WeakMap();
+export function governanceScopeFailureDiagnostic(observation){return FAILURE_DIAGNOSTICS.get(observation)??null;}
+function boundedGitFailureCause(error){
+  // runGit is the existing producer of this fixed exit/detail shape; never project unknown exception text.
+  const match=error?.code==='WT-GIT-FAILED'&&/^git [^\r\n]+ failed \((-?\d+)\)(?:: ([\s\S]*))?$/u.exec(error.message??'');
+  const exit=match?Number(match[1]):null;
+  let firstLine=match?(match[2]??'').split(/[\r\n]/u)[0]:'Git topology probe unavailable';
+  firstLine=firstLine.replace(/\u001b\[[0-?]*[ -/]*[@-~]/gu,'').replace(/[\u0000-\u001f\u007f]/gu,'');
+  // Quoted absolute paths may contain spaces; redact them before unquoted path tokens.
+  firstLine=firstLine.replace(/'(?:[A-Za-z]:[\\/]|\\\\|\/)[^']*'/gu,"'[path]'")
+    .replace(/"(?:[A-Za-z]:[\\/]|\\\\|\/)[^"]*"/gu,'"[path]"')
+    .replace(/(?:[A-Za-z]:[\\/]|\\\\|\/|~[\\/]|(?:\.ssh|\.aws|\.gnupg|\.codex|\.claude)[\\/])[^\s'"<>]*/gu,'[path]');
+  return freeze({gitExitCode:Number.isSafeInteger(exit)?exit:null,stderrFirstLine:firstLine.slice(0,500)});
+}
+function observeFailure(observation,error){
+  if(error?.code==='GS-GIT-UNAVAILABLE'&&error.cause&&error.topologyDiagnostic)
+    FAILURE_DIAGNOSTICS.set(observation,freeze({cause:error.cause,topologyDiagnostic:error.topologyDiagnostic}));
+  return observation;
+}
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const freeze=v=>{if(v&&typeof v==='object'){for(const x of Object.values(v))freeze(x);Object.freeze(v);}return v;};
 const exact=(v,keys)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&[Object.prototype,null].includes(Object.getPrototypeOf(v))&&Object.keys(v).sort().join('|')===[...keys].sort().join('|');
@@ -58,16 +78,26 @@ function readOptional(path,budget,max=MAX){
     return {text,sha256:digest(bytes),identity:identity(st),mode:st.mode&0o777,bytes:count};
   }finally{closeSync(fd);}
 }
-function physicalContext(rootDir){
+// Controlled read-only observation dependency; mutation/controller operations never receive it.
+function readOnlyTopologyOptions(value){
+  if(value===undefined)return undefined;
+  if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype
+    ||Object.keys(value).some(k=>!['spawn','env','timeout','maxBuffer'].includes(k)))fail('GS-TOPOLOGY-OPTIONS');
+  if(value.spawn!==undefined&&typeof value.spawn!=='function'||value.env!==undefined&&(value.env===null||typeof value.env!=='object'||Array.isArray(value.env))
+    ||value.timeout!==undefined&&(!Number.isSafeInteger(value.timeout)||value.timeout<1)
+    ||value.maxBuffer!==undefined&&(!Number.isSafeInteger(value.maxBuffer)||value.maxBuffer<1))fail('GS-TOPOLOGY-OPTIONS');
+  return {...value};
+}
+function physicalContext(rootDir,topologyOptions){
   if(typeof rootDir!=='string'||rootDir.length===0||/[\x00-\x1f]/.test(rootDir))fail('GS-ROOT');
   const start=resolve(rootDir);physical(start,{directory:true});
   // Discover through the canonical physical Git topology. No Git init occurs.
   let repository=null,root=start,common=null,hostControlIdentity=null;
-  try{repository=discoverRepository(start);}catch(gitError){
+  try{repository=discoverRepository(start,topologyOptions);}catch(gitError){
     // A failed Git topology probe is not evidence of a non-Git project.
     // Refuse a standalone host-store write when Git control exists nearby.
     let ancestor=start,ancestorDepth=0;
-    const unavailable=(reason,errno=null)=>{throw Object.assign(new Error('GS-GIT-UNAVAILABLE'),{code:'GS-GIT-UNAVAILABLE',ownedGitTopology:true,topologyDiagnostic:{reason,errno:typeof errno==='string'?errno:null,gitCode:typeof gitError.code==='string'?gitError.code:null,gitReportsNotRepository:/not a git repository/.test(gitError.message??''),boundary:ancestor===start?'selected-root':ancestor===parse(ancestor).root?'filesystem-root':'ancestor',ancestorDepth}});};
+    const unavailable=(reason,errno=null)=>{throw Object.assign(new Error('GS-GIT-UNAVAILABLE'),{code:'GS-GIT-UNAVAILABLE',ownedGitTopology:true,cause:boundedGitFailureCause(gitError),topologyDiagnostic:{reason,errno:typeof errno==='string'?errno:null,gitCode:typeof gitError.code==='string'?gitError.code:null,gitReportsNotRepository:/not a git repository/.test(gitError.message??''),boundary:ancestor===start?'selected-root':ancestor===parse(ancestor).root?'filesystem-root':'ancestor',ancestorDepth}});};
     while(true){let control;try{control=lstatSync(join(ancestor,'.git'));}catch(e){if(e.code!=='ENOENT')unavailable('control-stat-unavailable',e.code);}if(control){
       // This exact native host layout has no local Git authority. Never write
       // its control mount or classify an arbitrary broken Git tree as absent.
@@ -253,29 +283,29 @@ export function createGovernanceScopeController({hostStateRoot=join(homedir(),'.
     if(proofError)throw proofError;
     return null;
   }
-  function observe({rootDir}={}){
+  function observe({rootDir,topologyOptions}={}){
     let ctx=null;
-    try{ctx=physicalContext(rootDir);const first=inspect(ctx);const secondCtx=physicalContext(rootDir),second=inspect(secondCtx);if(JSON.stringify(first)!==JSON.stringify(second))fail('GS-OBSERVATION-DRIFT');return verifiedObservation(ctx,first);}catch(e){
+    try{topologyOptions=readOnlyTopologyOptions(topologyOptions);ctx=physicalContext(rootDir,topologyOptions);const first=inspect(ctx);const secondCtx=physicalContext(rootDir,topologyOptions),second=inspect(secondCtx);if(JSON.stringify(first)!==JSON.stringify(second))fail('GS-OBSERVATION-DRIFT');return verifiedObservation(ctx,first);}catch(e){
       // Observation through a lexical root alias must not disarm an enrolled
       // physical repository. Resolve only for read-only authority observation;
       // decision planning still rejects the alias and performs no mutation.
       if(ctx===null&&e.code==='GS-ALIAS')try{
-        const canonical=realpathSync(resolve(rootDir));ctx=physicalContext(canonical);
-        const first=inspect(ctx),secondCtx=physicalContext(canonical),second=inspect(secondCtx);
+        const canonical=realpathSync(resolve(rootDir));ctx=physicalContext(canonical,topologyOptions);
+        const first=inspect(ctx),secondCtx=physicalContext(canonical,topologyOptions),second=inspect(secondCtx);
         if(JSON.stringify(first)!==JSON.stringify(second))fail('GS-OBSERVATION-DRIFT');
         const state=['active','unverifiable-active'].includes(first.state)?'unverifiable-active':first.state;
         return freeze({...verifiedObservation(ctx,first,state,['GS-ALIAS']),hintAllowed:false});
       }catch(canonicalError){e=canonicalError;}
       if(e.ownedGitTopology===true||e.code==='GS-CONFIG-UNAVAILABLE')try{
         const retained=retainedEnrollment(ctx?.root??rootDir);
-        if(retained)return observation(retained.ctx,retained.result,retained.result.state==='declined'?'declined':'unverifiable-active',[e.code]);
-      }catch(proofError){if(proofError.code==='GS-POSITIVE-PROOF'&&proofError.scopedClaimObserved===true)return observation(proofError.proofContext,null,'unverifiable-active',['GS-POSITIVE-PROOF']);}
+        if(retained)return observeFailure(observation(retained.ctx,retained.result,retained.result.state==='declined'?'declined':'unverifiable-active',[e.code]),e);
+      }catch(proofError){if(proofError.code==='GS-POSITIVE-PROOF'&&proofError.scopedClaimObserved===true)return observeFailure(observation(proofError.proofContext,null,'unverifiable-active',['GS-POSITIVE-PROOF']),e);}
       // Dedicated record failure is an owned active-claim failure. Bare path /
       // unrelated-marker failure alone cannot activate foreign projects.
       const dedicated=['GS-CONFIG-RECORD','GS-FOREIGN-CONFIG-KEY','GS-CONFIG-DUPLICATE','GS-RECORD','GS-RECORD-BINDING','GS-PRIVATE-MODE','GS-LEGACY-ACTIVE-PROJECTION'].includes(e.code);
       let legacyActive=false;
       if(ctx&&!dedicated)try{const legacy=legacyObservation(ctx,{used:0});legacyActive=['active','unverifiable-active'].includes(legacy.state);}catch{}
-      return freeze({...observation(ctx,null,dedicated||legacyActive?'unverifiable-active':'inactive',[typeof e.code==='string'&&/^GS-/.test(e.code)?e.code:'GS-UNAVAILABLE']),hintAllowed:false});
+      return observeFailure(freeze({...observation(ctx,null,dedicated||legacyActive?'unverifiable-active':'inactive',[typeof e.code==='string'&&/^GS-/.test(e.code)?e.code:'GS-UNAVAILABLE']),hintAllowed:false}),e);
     }
   }
   function planDecision({rootDir,decision,by}={}){
@@ -393,6 +423,19 @@ export function createGovernanceScopeController({hostStateRoot=join(homedir(),'.
 }
 function privatePath(path,directory){const st=physical(path,{directory});if(process.platform==='win32'){if(assessWindowsPrivatePath(path).status!=='secure')fail('GS-PRIVATE-MODE');}else if((st.mode&0o777)!==(directory?0o700:0o600))fail('GS-PRIVATE-MODE');}
 function syncDirectory(path){let fd;try{fd=openSync(path,constants.O_RDONLY);fsyncSync(fd);}catch(e){if(process.platform!=='win32'||!['EPERM','EINVAL','EISDIR','EACCES','ENOTSUP'].includes(e.code))throw e;}finally{if(fd!==undefined)closeSync(fd);}}
+const GOVERNANCE_DIAGNOSTIC_SCRIPT=fileURLToPath(new URL('../scripts/governance-scope-diagnose.mjs',import.meta.url));
+// This action is a physical read-only command description, never an authority token.
+export function governanceScopeDiagnosticAction({rootDir}={},options={}){
+  const {executable=process.execPath,scriptPath=GOVERNANCE_DIAGNOSTIC_SCRIPT,realpathSyncFn=realpathSync,lstatSyncFn=lstatSync}=options;
+  try{
+    const canonical=(path,directory)=>{
+      if(typeof path!=='string'||!isAbsolute(path)||resolve(path)!==path||/[\x00-\x1f\x7f]/u.test(path))return false;
+      const st=lstatSyncFn(path);return !st.isSymbolicLink()&&(directory?st.isDirectory():st.isFile())&&realpathSyncFn(path)===path;
+    };
+    if(scriptPath!==GOVERNANCE_DIAGNOSTIC_SCRIPT||executable!==process.execPath||!canonical(rootDir,true)||!canonical(scriptPath,false)||!canonical(executable,false))return null;
+    return freeze({schema:'pipeline.governance-scope-diagnostic-action.v1',kind:'command',root:rootDir,executable,argv:[scriptPath,'--root',rootDir],mutation:false,requiresConfirmation:false,executionBoundary:'host',expected:{schema:'pipeline.governance-scope-diagnosis.v1'}});
+  }catch{return null;}
+}
 const defaultController=createGovernanceScopeController();
 export const observeGovernanceScope=options=>defaultController.observe(options);
 export const planGovernanceScopeDecision=options=>defaultController.planDecision(options);

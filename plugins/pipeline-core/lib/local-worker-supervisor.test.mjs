@@ -42,8 +42,8 @@ function capacity() {
     certified: { concurrentTasks: 8, required: true },
     observed: { concurrentTasks: 8, required: true },
     pressure: { concurrentTasks: 8, required: false },
-    reserved: { elephant: 1, verify: 1, critic: 1 },
-    effective: { status: "available", concurrentTasks: 5, reasonCodes: [] },
+    reserved: { elephant: 0, verify: 0, critic: 0 },
+    effective: { status: "available", concurrentTasks: 8, reasonCodes: [] },
   };
 }
 

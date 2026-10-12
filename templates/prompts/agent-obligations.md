@@ -171,12 +171,15 @@ deliberately carries no static copy of that; a second copy is the drift.
     be terminal rather than `in-progress`, and its `report.changedFiles` must
     cover the paths the commit touches. Never borrow an ID whose own scope
     excludes the work — that is the failure this pair exists to make visible.
-  - `Dispatch: stage-0 (elephant)` — the orchestrator committing directly under
-    the stage-0 fast path (operating-model §3.3): small, disclosed,
-    judgment-light work with no dispatch behind it and therefore no record to
-    bind. Stage-0 work is legitimate; the trailer exists so it stops being
-    indistinguishable from unattributed work. It is the only form an Elephant
-    committing directly uses; there is no separate design-phase form.
+  - `Dispatch: stage-0 (elephant)` — the single direct-Elephant trailer.
+    Design-phase authoring uses this form under EL-16 and Alfred Spec §21.5;
+    it does not grant production implementation authority. Implementation
+    self-execution still requires every fast-path criterion in operating-model
+    §3.3, including at most 2 files and roughly 25 diff lines. The trailer
+    does not establish those criteria or waive path, phase, signature or
+    protected-source gates. There is no separate design-phase trailer form.
+    Use the current sanctioned source-binding and document-integration actions;
+    an unavailable authorship verdict is not permission to bypass a gate.
   A commit with neither of these forms is unbound to any evidence, and the
   `dispatch-authorship-verify` tool shipped with this plugin
   (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the

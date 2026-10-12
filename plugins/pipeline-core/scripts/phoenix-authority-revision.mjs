@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Proof-gated wrapper around the existing continuity authority revision writer. */
 import { run as approve } from "./phoenix-authority-approval.mjs";
-import { run as pipelineState } from "../../../harness/scripts/pipeline-state.mjs";
+import { run as pipelineState } from "./pipeline-state.mjs";
 
 function parse(argv) {
   const [command, ...rest] = argv; const values = { command };

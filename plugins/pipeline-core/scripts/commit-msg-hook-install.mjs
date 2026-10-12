@@ -188,6 +188,8 @@ async function main() {
     block([\`GIT-03-UNREADABLE-MESSAGE-FILE: the commit-message file could not be read (\${error?.name ?? "Error"}); policy evaluation cannot continue.\`]);
     return;
   }
+  let inspectAdministrativeCommit;
+  let hasAdministrativeDispatch;
   let finishedCommitMessageFindings;
   let markerPolicyMode;
   let parseIntegrationTrailerBlock;
@@ -197,6 +199,7 @@ async function main() {
   let LEGACY_GUARD_CONFIG;
   let evaluateStagedDevPlanPaths;
   try {
+    ({ inspectAdministrativeCommit, hasAdministrativeDispatch } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "administrative-commit-policy.mjs")).href));
     ({ finishedCommitMessageFindings, markerPolicyMode, parseIntegrationTrailerBlock } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "commit-message-policy.mjs")).href));
     ({ verifyQualityPackageIntegrationPreCommit } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "signed-quality-package.mjs")).href));
     ({ resolveProjectAuthorityPaths, NEUTRAL_GUARD_CONFIG, LEGACY_GUARD_CONFIG } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "project-authority.mjs")).href));
@@ -337,6 +340,7 @@ async function main() {
       requireMarker: mode !== "off",
       requireDispatch: mode !== "off",
       integrationAdmission,
+      administrativeAdmission: hasAdministrativeDispatch(message) ? inspectAdministrativeCommit({repoRoot:root,message}) : null,
     });
     if (!result || !Array.isArray(result.findings)) throw new TypeError("policy returned an invalid verdict");
   } catch (error) {

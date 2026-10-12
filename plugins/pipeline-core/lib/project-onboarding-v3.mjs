@@ -9,13 +9,14 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
+import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { inspectArchitectureDesign, parseArchitectureDesign } from "./architecture-design.mjs";
 import {
   accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
   linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
 } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -347,7 +348,7 @@ function deps(overrides = {}) {
     linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
     spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer,
     initializePoGateProfileReceipt, publishPoGateProfileReceipt,
-    homedir, readMachinePlane: () => readMachinePlane({ homedirFn: overrides.homedir ?? homedir }), environment: process.env,
+    homedir, tmpdir, readMachinePlane: () => readMachinePlane({ homedirFn: overrides.homedir ?? homedir }), environment: process.env,
     ...overrides,
   };
 }
@@ -356,7 +357,10 @@ function safeRoot(rootDir, fs) {
   const requested = resolve(rootDir);
   const info = fs.lstatSync(requested);
   if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("root must be a real directory, not a symbolic link");
-  return fs.realpathSync(requested);
+  const root = fs.realpathSync(requested);
+  const osTempRoot = fs.realpathSync(resolve(fs.tmpdir()));
+  if (root === osTempRoot) throw new Error("root must not be the operating system temporary directory");
+  return root;
 }
 function safePath(root, relative, fs) {
   if (!SAFE_RELATIVE.test(relative)) throw new Error(`unsafe project-relative path: ${relative}`);
@@ -468,7 +472,7 @@ export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), p
     if (!validatePipelineUserV3(intent).ok) throw new Error("canonical V3 source is invalid");
     // This path holds an explicit PO profile selection, so the seeded gate
     // chapter is the one that profile asks for.
-    const baselines = freshBaselines(intent, { profile, fs });
+    const baselines = freshBaselines(intent, { rootDir: root, profile, fs });
     // Same three portable targets the primary onboarding flow writes for the
     // seeded blocking `push` gate, PLUS the matching proof policy
     // (CRITICAL_HUMAN_PROOF_POLICY_PATH) -- this route seeds the identical
@@ -499,7 +503,7 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), 
   if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "invalid-plan", root: plan.root, diagnostics: [diagnostic("$.planSha256", "plan_digest_mismatch", "the supplied plan digest is not current", "run the read-only partial-authority plan again")] };
   const root = plan.root; const created = []; const createdDirectories = [];
   try {
-    const intent = freshIntent(runner, fs); const baselines = freshBaselines(intent, { fs });
+    const intent = freshIntent(runner, fs); const baselines = freshBaselines(intent, { rootDir: root, fs });
     const bytes = new Map([[SOURCE, renderYaml(intent)], [".claude/pipeline.yaml", baselines[".claude/pipeline.yaml"].bytes], [NEUTRAL_MANIFEST, baselines[NEUTRAL_MANIFEST].bytes], [CRITICAL_HUMAN_PROOF_POLICY_PATH, baselines[CRITICAL_HUMAN_PROOF_POLICY_PATH].bytes]]);
     for (const target of plan.targets) {
       const path = safePath(root, target.path, fs);
@@ -1154,7 +1158,7 @@ export function freshManifestBytes(profile = null) {
 // The honest consumer-project calibration for `.claude/pipeline.json`, byte-
 // identical to what freshBaselines() below seeds for a non-host-managed fresh
 // project. This is exported so runner-profile-migration-v3.mjs's slim V3
-// runtime initialization can seed the SAME honest placeholder for an ORDINARY
+// runtime initialization can seed the SAME factual root identity for an ORDINARY
 // consumer project's runtime targets -- as opposed to
 // SLIM_V3_RUNTIME_SEEDS[".claude/pipeline.json"] there, which is the private
 // overlay's own calibration and is correct only for a private overlay
@@ -1162,8 +1166,18 @@ export function freshManifestBytes(profile = null) {
 // ran before its runtime-initialization step (the ordinary greenfield order)
 // would have its `.claude/pipeline.json` seeded from the overlay literal the
 // moment runtime initialization finds it still absent.
-export function freshCalibrationBytes() {
-  return `${JSON.stringify({ project: "new-project", verify: null, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: "local-only", worktree: "optional", stakes: "standard", constraints: ["Configure project-specific verification before release."] }, null, 2)}\n`;
+function freshCalibrationValue(rootDir, fs, hostManaged = false) {
+  const identity = buildRootProjectCalibrationIdentity({ rootDir, deps: fs ?? {} });
+  return {
+    project: identity.project,
+    projectIdentity: { schema: identity.schema, kind: identity.status === "resolved" ? identity.kind : "unavailable", rootSha256: identity.rootSha256 },
+    verify: null, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch",
+    repositoryMode: hostManaged ? "host-managed" : "local-only", worktree: "optional", stakes: "standard",
+    constraints: [hostManaged ? "Codex owns .git and .codex; configure project verification before release." : "Configure project-specific verification before release."],
+  };
+}
+export function freshCalibrationBytes({ rootDir, deps: overrides = {} } = {}) {
+  return `${JSON.stringify(freshCalibrationValue(rootDir, overrides), null, 2)}\n`;
 }
 // Materializes `project/critical-human-proof.json` at onboarding time,
 // unconditionally of `gates.push_approval` (ADR-0056) -- that setting is
@@ -1444,7 +1458,7 @@ export function runnerPermissionCarryforwardAction(plan, root) {
     ["ready", "no-op"],
   );
 }
-function freshBaselines(intent, { hostManaged = false, profile = null, fs = null } = {}) {
+function freshBaselines(intent, { rootDir, hostManaged = false, profile = null, fs = null } = {}) {
   const baselines = {
     ".claude/settings.json": { status: "present", bytes: freshSettingsJsonBytes() },
     // The seeded verify command FAILS until a human configures it. The previous
@@ -1457,7 +1471,7 @@ function freshBaselines(intent, { hostManaged = false, profile = null, fs = null
     // exactly what to replace and where. `node` is used rather than a shell
     // builtin because the runtime executing this command is guaranteed present
     // on every host the Pipeline runs on, on Windows as well.
-    ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify({ project: "new-project", verify: null, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: hostManaged ? "host-managed" : "local-only", worktree: "optional", stakes: "standard", constraints: [hostManaged ? "Codex owns .git and .codex; configure project verification before release." : "Configure project-specific verification before release."] }, null, 2)}\n` },
+    ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify(freshCalibrationValue(rootDir, fs, hostManaged), null, 2)}\n` },
     ".claude/pipeline.yaml": { status: "present", bytes: freshManifestBytes(profile) },
     ".codex/config.toml": { status: "present", bytes: "" },
     ".codex/agents/implementor.toml": { status: "present", bytes: codexCustomAgentSeed("implementor") },
@@ -4312,7 +4326,7 @@ function manifestRepairResult({
 }
 
 function currentRuntimeBaselines(root, intent, fs) {
-  const baselines = freshBaselines(intent, { fs });
+  const baselines = freshBaselines(intent, { rootDir: root, fs });
   for (const relative of runtimePaths()) {
     const target = safePath(root, relative, fs);
     if (!fs.existsSync(target)) continue;
@@ -5525,7 +5539,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   if (!git.ok) return { schema: PLAN_SCHEMA, status: "unsupported", root: inspected.root, diagnostics: [diagnostic("$.git", "git_initial_branch_unsupported", git.reason, "install Git 2.28 or newer before activation")], targets: [], requiresExplicitActivation: true };
   const intent = freshIntent(runner, fs); const validation = validatePipelineUserV3(intent);
   if (!validation.ok) return { schema: PLAN_SCHEMA, status: "invalid-authority", root: inspected.root, diagnostics: validation.errors, targets: [], requiresExplicitActivation: true };
-  const baselines = freshBaselines(intent, { hostManaged, fs });
+  const baselines = freshBaselines(intent, { rootDir: inspected.root, hostManaged, fs });
   const manifest = validateManifest(parseYaml(baselines[NEUTRAL_MANIFEST].bytes), { rootDir: inspected.root });
   if (manifest.status !== "ok") return { schema: PLAN_SCHEMA, status: "invalid-projection", root: inspected.root, diagnostics: manifest.errors, targets: [], requiresExplicitActivation: true };
   // Only when the project has none. The apply below is create-only (`flag: "wx"`,
@@ -6778,7 +6792,9 @@ function collectInitialAnswersAction(observed, fs) {
     // An unavailable private checkpoint never authorizes a guessed answer.
   }
   const authorInputs = observed.authorIdentityAction?.inputs ?? [];
-  const trustSetup = observed.trustAnchorGuidanceAction?.applyAction?.argv?.[0] === ONBOARDING_INIT_DRIVER
+  const trustSetupArgv = observed.trustAnchorGuidanceAction?.applyAction?.argv;
+  const trustSetup = trustSetupArgv?.[0] === ONBOARDING_INIT_DRIVER
+    && ["--trust-anchor-mode", "--trust-anchor-directory", "--trust-anchor-human-name", "--trust-anchor-existing-key"].every(flag => trustSetupArgv.includes(flag))
     ? observed.trustAnchorGuidanceAction
     : null;
   const inputs = [
@@ -6840,14 +6856,23 @@ function withPendingAsksSurfacedOnNextAction(observed, fs) {
   const initialAnswersAction = collectInitialAnswersAction(observed, fs);
   const trustSetupBundled = initialAnswersAction !== null
     && observed.trustAnchorGuidanceAction?.applyAction?.argv?.[0] === ONBOARDING_INIT_DRIVER;
+  const publicAnchorPlan = observed.trustAnchorGuidanceAction?.kind === "command"
+    && observed.trustAnchorGuidanceAction.argv?.[1] === "plan-existing-trust-anchor"
+    ? observed.trustAnchorGuidanceAction : null;
   const pendingAsks = [
     initialAnswersAction ?? observed.authorIdentityAction,
     initialAnswersAction === null ? observed.pushApprovalSetupAction : null,
-    trustSetupBundled ? null : observed.trustAnchorGuidanceAction,
+    trustSetupBundled || publicAnchorPlan !== null ? null : observed.trustAnchorGuidanceAction,
     observed.projectIgnoreGapAction,
   ].filter(Boolean);
-  if (pendingAsks.length === 0 || observed.nextAction == null) return observed;
-  return { ...observed, nextAction: { ...observed.nextAction, pendingAsks } };
+  if (observed.nextAction == null) return observed;
+  // Keep the current genuine primary question. Once answered, the ordinary
+  // inspector exposes this read-only plan ahead of the next command. Other
+  // unresolved questions still stop the generic driver before any mutation.
+  const nextAction = initialAnswersAction === null && publicAnchorPlan !== null
+    && observed.nextAction.kind === "command" ? publicAnchorPlan : observed.nextAction;
+  if (pendingAsks.length === 0 && nextAction === observed.nextAction) return observed;
+  return { ...observed, nextAction: { ...nextAction, ...(pendingAsks.length ? { pendingAsks } : {}) } };
 }
 
 // PO decision 2026-08-19 (backlog: 2026-08-18-po-key-trust-anchor-onboarding.md,
@@ -6855,11 +6880,11 @@ function withPendingAsksSurfacedOnNextAction(observed, fs) {
 // (a signing key already exists somewhere on this machine) still leaves EVERY
 // subsequent project on it with no propagated trust anchor -- nothing before
 // this read the machine plane's already-known authority and offered to carry
-// its public digest into a new project. Read-only, additive, never writes
-// project/critical-human-proof.json itself: GS-2 (guard-gate-strength.mjs) is
-// a deliberate, unliftable protection ("an agent that can weaken its own gate
-// has no gate"); this only proposes the pre-composed snippet and command a
-// human (or the existing signed HGO Edit ceremony) runs themselves. Must not
+// Observation stays read-only and never directly writes the protected policy.
+// A recorded authority lacking its first repository anchor now selects the
+// fixed Source-owned public-only planner. Its private plan/CAS writer lives
+// in onboarding-init.mjs; no generic Edit/Write exemption or human file-edit
+// ceremony is inferred. Unknown/first-key setup retains its separate route. Must not
 // be read as touching PO-KEYDIR-01(A)'s repo-scoped-by-default directory
 // decision (backlog: 2026-08-10-po-key-directory-default-should-be-repo-
 // scoped-not-machine-wide.md) -- this is about the ANCHOR artifact, not
@@ -6936,24 +6961,13 @@ function repositoryAlreadyHasTrustAnchor(root, fs, publicKeySha256) {
 // shape consistently with every other one in this file (all require
 // minBytes >= 1); the actual deliverable is the guidance text's snippet.
 const TRUST_ANCHOR_ACK_MAX_BYTES = 16;
-function proposeTrustAnchorMaterializationAction(anchor) {
-  const snippet = JSON.stringify([{ keyReference: anchor.keyReference, publicKeySha256: anchor.publicKeySha256 }], null, 2);
-  return {
-    kind: "collect-input",
-    input: {
-      name: "trustAnchorMaterializationAcknowledged",
-      encoding: "utf8",
-      trim: true,
-      minBytes: 1,
-      maxBytes: TRUST_ANCHOR_ACK_MAX_BYTES,
-      singleLine: true,
-      rejectNul: true,
-    },
-    mutation: false,
-    requiresConfirmation: false,
-    guidance: `this machine already has a signing key (${anchor.humanName ?? "a recorded PO"} at ${anchor.directory}), but this repository's ${CRITICAL_HUMAN_PROOF_POLICY_PATH} has no matching trust anchor yet -- propose this ready-to-use "trustAnchors" entry to the PO rather than making them rediscover the file's shape: ${snippet}. The PO themselves (or the existing signed HGO Edit ceremony, human-guard-override.mjs -- guard-gate-strength.mjs forbids any agent write to this file directly) adds this entry to ${CRITICAL_HUMAN_PROOF_POLICY_PATH}'s "trustAnchors" array (creating the file with schema "${CRITICAL_HUMAN_PROOF_POLICY_V3}" if it does not exist yet) and commits it. This is informational only, never mutating -- reply with a short acknowledgment ("done" or "skip") once the PO has seen it, whether or not they acted on it now.`,
-    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
-  };
+function proposeTrustAnchorMaterializationAction(root, runner) {
+  // Planning derives real authority and policy facts in the fixed Source owner.
+  // No directory, key bytes or done/skip answer is exposed as a caller selector.
+  return commandAction(
+    [ONBOARDING_SCRIPT, "plan-existing-trust-anchor", "--root", root, "--runner", runner],
+    false, false, "pipeline.existing-public-trust-anchor-materialization.v1", ["planned", "not-required"],
+  );
 }
 
 // NVA-V6-ANCHORREPORT (backlog: 2026-08-28-a-dead-key-directory-pointer-is-
@@ -7112,12 +7126,14 @@ function proposeTrustAnchorAbsentGuidanceAction(root, runner) {
 // `unresolvedMachinePushApprovalSetup(fs)` is already false by the time any
 // of those branches below is reached and its later call is a no-op for them,
 // byte-for-byte preserving "broken-pointer"/"malformed-policy"/"found"'s
-// existing behaviour (including "found", still routed through
-// `proposeTrustAnchorMaterializationAction()` exactly as before, still
-// gated on push-approval-setup being resolved).
+// absence/fault classifications. The found authority's unresolved first
+// anchor now routes to the fixed public-only planner after actual initial
+// answers, rather than requiring a done/skip acknowledgment.
 function withPendingTrustAnchorGuidanceAsk(observed, fs) {
   if (observed.repository?.mode !== "local") return observed;
   if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  const answered = initialAnswersReceipt(observed.root, fs);
+  if (answered?.pushApprovalPreference === "chat" && activePushApprovalMode(observed.root, fs) === "chat") return observed;
   const pointer = observeLocalTrustAnchorPointer(fs);
   if (pointer.status === "no-plane" || pointer.status === "no-directory") {
     return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorAbsentGuidanceAction(observed.root, observed.runner) };
@@ -7131,7 +7147,7 @@ function withPendingTrustAnchorGuidanceAsk(observed, fs) {
   }
   if (pointer.anchor === null) return observed;
   if (repositoryAlreadyHasTrustAnchor(observed.root, fs, pointer.anchor.publicKeySha256)) return observed;
-  return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorMaterializationAction(pointer.anchor) };
+  return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorMaterializationAction(observed.root, observed.runner) };
 }
 
 // Sibling of `withPendingAuthorIdentityAsk()` above -- same gating shape,

@@ -13,17 +13,26 @@ import { execFileSync } from "node:child_process";
 import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 
+import { resolveGovernedItemQueue, prepareGovernedItemQueue, executeGovernedItemDeliveryChecks, readNativeReservedItemScopes, observeGovernedItemIntegrationReadiness } from "./native-goldfish-host-state.mjs";
+import { bindAgyItemDeliveryChecks, inspectAgyItemMainIntegration, inspectAgyItemMainIntegrationValue } from "./agy-item-delivery.mjs";
+import { parseDispatchSlice } from "./dispatch-policy.mjs";
+import { scopesOverlap } from "./slice-queue.mjs";
 import { invokeAgy } from "./antigravity-execution-host.mjs";
 import { AGY_FINAL_RETURN_JSON_SCHEMA, validateAgyFinalReturn, validateAgyFamilyReturnBinding } from "./agy-final-return.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
 import { bindStoredModelRoleDispatch } from "./model-role-host-session.mjs";
 import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, preflightRoleDispatch } from "./role-dispatch-preflight.mjs";
 import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
-import { recheckAgyFamilyConsentBinding, AGY_FAMILY_BINDING_SCHEMA } from "./agy-session-authority.mjs";
+import { recheckAgyFamilyConsentBinding, AGY_FAMILY_BINDING_SCHEMA, releaseSourceOwnedAgyConsentAdmission, loadStoredConsent, validateConsentRecord } from "./agy-session-authority.mjs";
 import { observeModelFamilyActivation } from "./model-family-runtime-host.mjs";
 import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
 import { createModelFamilyInvocationEntry } from "./model-family-invocation.mjs";
 import { createModelFamilyExecutionHost, validateInvocationReadback, digest as familyDigest } from "./model-family-execution.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { inspectSourceOwnedCurrentAuthorityContext, inspectSourceOwnedRequesterInvocation } from "./session-requester-bridge.mjs";
+import { withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, recoverSessionAuthorityMember } from "./session-authority-registry.mjs";
+import { createAgyAuthorityJournalOwner, inspectAgyAuthorityRepository, readAgyAuthorityInventory, withAgyAuthorityStoreTransaction } from "./agy-host-observed-store.mjs";
+import { AGY_HOST_OBSERVED_RECEIPT_SCHEMA, AGY_FAMILY_HOST_OBSERVED_RECEIPT_SCHEMA } from "./agy-host-observed-receipt.mjs";
 
 export const AGY_SESSION_DISPATCH_SCHEMA = "pipeline.agy-session-dispatch-receipt.v1";
 export const AGY_SESSION_CONSENT_SCHEMA = "pipeline.agy-session-consent.v1";
@@ -48,6 +57,163 @@ const nativeContexts = new WeakMap();
 const heldFamilyReturns = new WeakMap();
 const admittedFamilyExecutions = new WeakMap();
 const verifiedFamilyReturns = new WeakMap();
+const dispatchProducerPorts = new WeakMap();
+const itemDeliveryContexts = new WeakMap();
+
+function authorityFailure(code) { throw Object.assign(new Error(code), { code }); }
+function dispatchLegacy(entry) {
+  if (entry.namespaceId !== "agy-host-observed" || ![AGY_HOST_OBSERVED_RECEIPT_SCHEMA, AGY_FAMILY_HOST_OBSERVED_RECEIPT_SCHEMA].includes(entry.value?.schema)
+    || entry.name !== `${entry.value.dispatchId}.json` || !SHA256.test(entry.value.recordSha256 ?? "")) authorityFailure("AGY-DISPATCH-UNKNOWN-SOURCE");
+  // Retained receipt bytes are evidence, not a currently armed invocation.
+  return null;
+}
+export function createAgyFamilyDispatchAuthorityProducerPort({ repository }) {
+  const repo = inspectAgyAuthorityRepository(repository);
+  const owner = createAgyAuthorityJournalOwner({ repository: repo, namespaceIds: ["agy-host-observed", "registered-opaque-context-lifetimes"],
+    journalNamespace: "registered-opaque-context-lifetimes", producerId: "agy-family-dispatch", kinds: ["dispatch", "armed-capability"], classifyLegacy: dispatchLegacy });
+  dispatchProducerPorts.set(owner.port, { repository: repo, owner }); return owner.port;
+}
+export function isOwnedAgyFamilyDispatchAuthorityProducerPort(port, { repository } = {}) {
+  const owned = dispatchProducerPorts.get(port); if (!owned) return false;
+  try { const actual=inspectAgyAuthorityRepository(repository); return owned.repository.primaryRoot===actual.primaryRoot&&owned.repository.commonDir===actual.commonDir; } catch { return false; }
+}
+function observeDispatchRequester(repository, explicit = null) {
+  const observed = explicit?.currentInvocationHandle && explicit?.runtimePort
+    ? { ...inspectSourceOwnedRequesterInvocation({ repository, currentInvocationHandle: explicit.currentInvocationHandle, runtimePort: explicit.runtimePort }), currentInvocationHandle: explicit.currentInvocationHandle, runtimePort: explicit.runtimePort }
+    : inspectSourceOwnedCurrentAuthorityContext({ repository });
+  if (observed?.status !== "bound" || !observed.currentInvocationHandle || !observed.runtimePort) authorityFailure("AGY-SESSION-NATIVE-CARRIER-UNAVAILABLE");
+  return observed;
+}
+function beginDispatchLifetime({ root, sessionId, descriptorSha256, packet, purpose, currentInvocationHandle, runtimePort, itemBriefing }) {
+  const repository = inspectSignedDescriptorCustodyRepository(root), producerPort = createAgyFamilyDispatchAuthorityProducerPort({ repository });
+  const { owner } = dispatchProducerPorts.get(producerPort);
+  return withSessionAuthorityBoundary({ repository }, boundary => {
+    const requester = observeDispatchRequester(repository, { currentInvocationHandle, runtimePort });
+    const target = requester.currentRequester;
+    if (target.sessionId !== sessionId || target.descriptorSha256 !== descriptorSha256
+      || packet?.candidate?.commit !== repository.candidate.commit || packet?.candidate?.tree !== repository.candidate.tree) authorityFailure("AGY-SESSION-REQUESTER-CAS");
+    let itemDelivery = null;
+    if (IMPLEMENTATION_ROLES.has(packet.role)) {
+      if(itemBriefing){const prepared=prepareGovernedItemQueue({root,itemDelivery:itemBriefing,candidate:repository.candidate,writeScope:packet.requiredPaths});if(prepared.status==='refused')authorityFailure(prepared.code);}
+      const governed=resolveGovernedItemQueue({root});
+      if(governed.status==='refused')authorityFailure(governed.code);
+      if(governed.status==='required') {
+        const named=parseDispatchSlice(packet.prompt),item=governed.normalized.slices.find(row=>row.id===named.sliceId);
+        if(!item||item.state!=='ready'||!itemBriefing||itemBriefing.itemId!==item.delivery.itemId||itemBriefing.sliceId!==item.id)authorityFailure('AGY-ITEM-NOT-READY');
+        if(item.dependsOn.length){const readiness=observeGovernedItemIntegrationReadiness({root});if(readiness.status!=='observed'||item.dependsOn.some(id=>!readiness.integrated.includes(id)))authorityFailure('AGY-ITEM-INTEGRATION-DEPENDENCY-HELD');}
+        if(item.delivery.baseCommit!==repository.candidate.commit)authorityFailure('AGY-ITEM-BASE-MISMATCH');
+        itemDelivery={itemId:item.delivery.itemId,sliceId:item.id,queuePath:governed.path,queueSha256:governed.sha256,writeScope:[...item.writeScope]};
+        const criterionSha256=familyDigest(itemBriefing.criterionLocator);
+        const {reservations}=readNativeReservedItemScopes({repository,boundary});
+        for(const row of reservations) {
+          if(row.criterionSha256===criterionSha256)authorityFailure('AGY-ITEM-CRITERION-OWNER-COLLISION');
+          if(row.itemId===itemDelivery.itemId)authorityFailure('AGY-ITEM-OWNER-COLLISION');
+          if(scopesOverlap(row.writeScope,itemDelivery.writeScope))authorityFailure('AGY-ITEM-SCOPE-COLLISION');
+        }
+        const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
+        const latest=new Map();for(const row of agy.entries.filter(entry=>entry.value?.basis?.itemDelivery)){const prior=latest.get(row.value.operationId);if(!prior||(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);}
+        const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort});
+        const released=new Set(producer.record.members.map(member=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort,memberRef:member.memberRef}).record).filter(member=>member.phase==='released').map(member=>member.bindingSha256));
+        for(const row of [...latest.values()].filter(entry=>!released.has(entry.value.bindingSha256))) {
+          const previous=row.value.basis.itemDelivery;
+          if(row.value.basis.itemBriefing?.criterionLocator&&familyDigest(row.value.basis.itemBriefing.criterionLocator)===criterionSha256)authorityFailure('AGY-ITEM-CRITERION-OWNER-COLLISION');
+          if(previous.itemId===itemDelivery.itemId)authorityFailure('AGY-ITEM-OWNER-COLLISION');
+          if(scopesOverlap(previous.writeScope,itemDelivery.writeScope))authorityFailure('AGY-ITEM-SCOPE-COLLISION');
+        }
+      }
+    }
+    const association = { state: "bound", target: { sessionId, descriptorSha256, ownerNonceSha256: target.ownerNonceSha256 } };
+    const operationHandle = owner.create({ purpose, association, packetSha256: familyDigest(packet), candidate:repository.candidate, itemDelivery, itemBriefing:itemBriefing??null, controllerIdentity: requester.controllerIdentity,
+      sourceRef: requester.sourceRef, invocationBindingSha256: requester.invocationBindingSha256, assurance: requester.assurance });
+    const reservation = reserveSessionAuthorityMember({ boundary, producerPort, association, operationHandle });
+    return withAgyAuthorityStoreTransaction({ repository, boundary, producerPort }, () => {
+      owner.advance({ operationHandle, boundary, producerPort, phase: "armed" });
+      const refs = advanceSessionAuthorityMember({ boundary, producerPort, memberHandle: reservation.memberHandle, expectedMemberRef: reservation.memberRef, operationHandle });
+      return { repository, producerPort, owner, operationHandle, memberHandle: reservation.memberHandle, memberRef: refs.memberRef,
+        requester, itemDelivery, itemBriefing, currentInvocationHandle: requester.currentInvocationHandle, runtimePort: requester.runtimePort, retainedOwnerContext: true };
+    });
+  });
+}
+function recheckDispatchLifetime(lifetime) {
+  const repository=inspectSignedDescriptorCustodyRepository(lifetime.repository.primaryRoot);
+  if(repository.primaryRoot!==lifetime.repository.primaryRoot||repository.commonDir!==lifetime.repository.commonDir)authorityFailure('AGY-SESSION-REPOSITORY-CAS');
+  lifetime.repository=repository;
+  const actual = observeDispatchRequester(lifetime.repository, lifetime);
+  if (actual.requesterHandle !== lifetime.requester.requesterHandle || actual.descriptorHandle !== lifetime.requester.descriptorHandle
+    || actual.invocationBindingSha256 !== lifetime.requester.invocationBindingSha256
+    || familyDigest(actual.controllerIdentity) !== familyDigest(lifetime.requester.controllerIdentity)
+    || familyDigest(actual.sourceRef) !== familyDigest(lifetime.requester.sourceRef) || actual.assurance !== lifetime.requester.assurance) authorityFailure("AGY-SESSION-REQUESTER-CAS");
+  return actual;
+}
+function advanceDispatchLifetime(lifetime, phase, terminal = null, terminalEvidence = null) {
+  recheckDispatchLifetime(lifetime);
+  return withSessionAuthorityBoundary({ repository: lifetime.repository }, boundary => {
+    recheckDispatchLifetime(lifetime);
+    return withAgyAuthorityStoreTransaction({ repository: lifetime.repository, boundary, producerPort: lifetime.producerPort }, () => {
+      const terminalHandle = lifetime.owner.advance({ operationHandle: lifetime.operationHandle, boundary, producerPort: lifetime.producerPort, phase, terminal, terminalEvidence });
+      const observed=lifetime.owner.port.observeOperation(lifetime.operationHandle);
+      const updater=phase==='running'&&lifetime.phase==='running'?refreshSourceOwnedDispatchAuthorityMember:advanceSessionAuthorityMember;
+      const refs = updater({ boundary, producerPort: lifetime.producerPort, memberHandle: lifetime.memberHandle, expectedMemberRef: lifetime.memberRef, operationHandle: lifetime.operationHandle });
+      lifetime.phase=observed.phase;
+      lifetime.memberRef = refs.memberRef; return terminalHandle;
+    });
+  });
+}
+/** One synchronous evidence-store publication, not a native dispatch result or
+ * native-context terminal witness. Its member covers the actual write/readback. */
+export function withSourceOwnedAgyHostObservedPublication({ root, commonDir, receipt }, publish) {
+  const repository = inspectSignedDescriptorCustodyRepository(root);
+  if (repository.commonDir !== commonDir || typeof publish !== "function") authorityFailure("AGY-HOST-STORE-ROOT");
+  const producerPort = createAgyFamilyDispatchAuthorityProducerPort({ repository }), { owner } = dispatchProducerPorts.get(producerPort);
+  return withSessionAuthorityBoundary({ repository }, boundary => {
+    const requester = inspectSourceOwnedCurrentAuthorityContext({ repository });
+    if (requester?.status !== "bound" || requester.currentRequester.sessionId !== receipt.sessionId || requester.currentRequester.descriptorSha256 !== receipt.descriptorSha256) authorityFailure("AGY-HOST-STORE-REQUESTER-UNAVAILABLE");
+    const association = { state: "bound", target: { sessionId: receipt.sessionId, descriptorSha256: receipt.descriptorSha256, ownerNonceSha256: requester.currentRequester.ownerNonceSha256 } };
+    const operationHandle = owner.create({ purpose: "host-observed-publication", association, receiptSha256: familyDigest(receipt), sourceRef: requester.sourceRef,
+      invocationBindingSha256: requester.invocationBindingSha256, controllerIdentity: requester.controllerIdentity, assurance: requester.assurance });
+    const reservation = reserveSessionAuthorityMember({ boundary, producerPort, association, operationHandle });
+    return withAgyAuthorityStoreTransaction({ repository, boundary, producerPort }, () => {
+      const result = publish();
+      if (result && typeof result.then === "function") authorityFailure("AGY-HOST-STORE-ASYNC");
+      if (!result?.ok) return result; // Interrupted or failed writes retain reservation.
+      const stored = readAgyAuthorityInventory({ repository, namespaceIds: ["agy-host-observed"] }).entries.find(e => e.name === `${receipt.dispatchId}.json`);
+      if (!stored || stored.fact.sha256 !== result.sha256 || familyDigest(stored.value) !== familyDigest(receipt)) authorityFailure("AGY-HOST-STORE-CAS");
+      const terminalHandle = owner.advance({ operationHandle, boundary, producerPort, phase: "terminal-observed", terminal: "completed", sourcePaths: [{ namespaceId: "agy-host-observed", pathSha256: stored.fact.pathSha256 }] });
+      const refs = advanceSessionAuthorityMember({ boundary, producerPort, memberHandle: reservation.memberHandle, expectedMemberRef: reservation.memberRef, operationHandle });
+      const released = releaseSessionAuthorityMember({ boundary, producerPort, memberHandle: reservation.memberHandle, expectedMemberRef: refs.memberRef, terminalHandle });
+      return { ...result, authorityReleaseRef: released.releaseRef, assurance: requester.assurance };
+    });
+  });
+}
+/** Observation only. This cannot mint a native requester or hide an armed
+ * model owner. Unsupported host carriers remain unavailable before admission. */
+export function inspectSourceOwnedAgyRequesterContext({ repository, context }) {
+  const held = nativeContexts.get(context);
+  if (!held || !held.authorityLifetime || inspectAgyAuthorityRepository(repository).primaryRoot !== held.authorityLifetime.repository.primaryRoot || repository.commonDir !== held.authorityLifetime.repository.commonDir) return { status: "unavailable", code: "AGY-SESSION-CONTEXT-UNAVAILABLE" };
+  try { return { ...recheckDispatchLifetime(held.authorityLifetime), retainedOwnerContext: held.authorityLifetime.retainedOwnerContext }; }
+  catch { return { status: "unavailable", code: "AGY-SESSION-CONTEXT-UNAVAILABLE" }; }
+}
+
+/** Shared scheduling readback. Only actual released Source members with a
+ * completed journal and reverified Main delivery can satisfy a dependency. */
+export function readAgyIntegratedItemDelivery({repository,boundary,governed}={}) {
+  const producerPort=createAgyFamilyDispatchAuthorityProducerPort({repository});
+  const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort});
+  const inventory=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
+  const latest=new Map();for(const row of inventory.entries.filter(row=>row.value?.basis?.itemDelivery)){const prior=latest.get(row.value.operationId);if(!prior||(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);}
+  const integrated=[];
+  for(const member of producer.record.members){
+    const observed=inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort,memberRef:member.memberRef});
+    if(observed.record.phase!=='released'||observed.releaseRecord?.terminal!=='completed')continue;
+    const row=[...latest.values()].find(row=>row.value.bindingSha256===observed.record.bindingSha256);
+    if(!row?.value.basis.itemDelivery||row.value.phase!=='terminal-observed'||row.value.terminal!=='completed'||!row.value.terminalEvidence?.integration)continue;
+    const original=row.value.basis.itemDelivery,item=governed?.normalized?.slices.find(item=>item.id===original.sliceId);
+    if(!item||item.delivery.itemId!==original.itemId||item.delivery.baseCommit!==row.value.basis.candidate.commit||familyDigest(item.writeScope)!==familyDigest(original.writeScope))continue;
+    const proof=inspectAgyItemMainIntegrationValue({root:repository.primaryRoot,value:row.value.terminalEvidence.integration.delivery});
+    integrated.push({sliceId:original.sliceId,itemId:original.itemId,bindingSha256:row.value.bindingSha256,releaseRef:observed.releaseRef,mainCommit:proof.mainCommit});
+  }
+  return {status:'observed',code:'AGY-ITEM-INTEGRATION-READBACK',integratedSliceIds:integrated.map(item=>item.sliceId),integrated};
+}
 
 export function readAgyFamilyVerifiedReturn(handle) {
   const held = verifiedFamilyReturns.get(handle);
@@ -76,6 +242,7 @@ export async function prepareAgyFamilyVerifiedReturn({ context, ports, observedA
     family: checked.value.family };
   const handle = Object.freeze(Object.create(null)), value = { witness, result: published, final };
   verifiedFamilyReturns.set(handle, { context, value: structuredClone(value) });
+  held.returnHandles.add(handle);
   return { ok: true, handle, ...structuredClone(value) };
 }
 
@@ -88,7 +255,7 @@ export async function recheckAgyFamilyVerifiedReturn(handle) {
     invocationId: context.receipt.invocationId, requestedModel: context.receipt.selectedModelId, requestedEffort: context.receipt.effort,
     role: context.packet.role, scope: context.scope, requiredPaths: context.packet.requiredPaths, fallbackPolicy: context.fallbackPolicy,
     nowEpochMs: w.observedAtMs });
-  return consent.ok ? { ...readAgyFamilyVerifiedReturn(handle), source: { root: context.root, packetSha256: familyDigest(context.packet) } } : consent;
+  return consent.ok ? { ...readAgyFamilyVerifiedReturn(handle), source: { root: context.root, packetSha256: familyDigest(context.packet), itemDelivery: context.authorityLifetime.itemDelivery !== null } } : consent;
 }
 
 /** Trusted source ports resolve original invocation provenance, independently
@@ -153,30 +320,156 @@ export function readAgyFamilyNativeContext(context) {
     : { ok: false, code: "AGY-SESSION-FAMILY-CONTEXT-REQUIRED" };
 }
 
+/** Terminal release joins the original source-owned model disposition. A
+ * verified return alone leaves the opaque owner context held. */
+export async function closeSourceOwnedAgyFamilyVerifiedReturn(handle) {
+  const returned = verifiedFamilyReturns.get(handle), context = returned?.context, held = nativeContexts.get(context);
+  if (!returned || !held || !admittedFamilyExecutions.has(context) || !held.consumed) return { ok: false, code: "AGY-FAMILY-RETURN-CONTEXT-REQUIRED" };
+  const lifetime = held.authorityLifetime;
+  if (typeof held.entry.disposeModelFamilyInvocation !== "function") return { ok: false, code: "AGY-SESSION-OWNER-CONTEXT-HELD", status: "held" };
+  try {
+    recheckDispatchLifetime(lifetime);
+    const readback = verifyAgySessionResultReadback({ resultRoot: held.root, resultPath: held.resultPath, receipt: returned.value.result,
+      dispatchId: held.packet.dispatchId, candidate: held.packet.candidate, sessionId: held.sessionId,
+      requestedModel: held.receipt.selectedModelId, expectedFinal: returned.value.final, familyWitness: returned.value.witness });
+    if (!readback.ok) return { ok: false, code: "AGY-SESSION-TERMINAL-RESULT-DRIFT", status: "held" };
+    if(lifetime.itemDelivery){
+      const checks=executeGovernedItemDeliveryChecks({root:held.root,itemDelivery:lifetime.itemBriefing,candidate:lifetime.repository.candidate});
+      if(checks.status!=='observed'||checks.evidence.verdict!=='passed')return {ok:false,status:'held',code:checks.code};
+      const delivery=bindAgyItemDeliveryChecks({root:held.root,itemDelivery:lifetime.itemBriefing,candidate:lifetime.repository.candidate,checkHandle:checks.handle,baseCommit:held.packet.candidate.commit,writeScope:lifetime.itemDelivery.writeScope,changedPaths:returned.value.final.changedPaths});
+      lifetime.deliveryHandle=delivery.handle;
+      lifetime.deliveryValue=delivery.value;
+    }
+    const disposed = await held.entry.disposeModelFamilyInvocation({ invocation: held.selected });
+    if (!disposed?.ok || disposed.status !== "closed" || disposed.code !== "MODEL-FAMILY-INVOCATION-CLOSED"
+      || disposed.receiptSha256 !== held.receipt.receiptSha256 || !["physical-readback", "controlled-unit-method"].includes(disposed.assurance)
+      || !Array.isArray(disposed.sourceRefs) || !disposed.sourceRefs.length || disposed.sourceRefs.length > 64
+      || disposed.sourceRefs.some(f => !SHA256.test(f?.sha256 ?? "") || !SHA256.test(f?.pathSha256 ?? "") || !SHA256.test(f?.semanticSha256 ?? "")
+        || typeof f.namespaceId !== "string" || !Number.isSafeInteger(f.size) || f.size < 0 || f.identity?.nlink !== 1)) return { ok: false, code: "AGY-SESSION-OWNER-CONTEXT-HELD", status: "held" };
+    const consentClosed = releaseSourceOwnedAgyConsentAdmission({ authority: held.consentAuthority, handle: held.consentHandle });
+    if (!consentClosed.ok) return { ...consentClosed, status: "held" };
+    // Every source-owned reader/binder of these Agy contexts now refuses. No
+    // caller-provided terminal boolean or WeakMap absence initiated disposal.
+    for (const returnHandle of held.returnHandles) verifiedFamilyReturns.delete(returnHandle);
+    held.returnHandles.clear();
+    heldFamilyReturns.delete(context); admittedFamilyExecutions.delete(context); nativeContexts.delete(context);
+    lifetime.retainedOwnerContext = false;
+    const terminalEvidence={ modelReceiptSha256: disposed.receiptSha256,
+      modelTerminalSourceRefs: disposed.sourceRefs, verifiedResultSha256: returned.value.result.sha256, consentReleaseRef: consentClosed.releaseRef,
+      ownerContextState: "source-invalidated" };
+    // Product delivery remains owned after host contexts end. Neither a final
+    // report nor context disposal proves targeted checks or Main integration.
+    if(lifetime.itemDelivery){
+      advanceDispatchLifetime(lifetime,'running',null,{schema:'pipeline.agy-item-delivery-checkpoint.v1',...terminalEvidence,delivery:lifetime.deliveryValue});
+      const deliveryContext=Object.freeze({});itemDeliveryContexts.set(deliveryContext,{lifetime,terminalEvidence});
+      return {ok:true,status:'delivered',code:'AGY-ITEM-RESERVATION-HELD',memberRef:lifetime.memberRef,deliveryContext,delivery:structuredClone(lifetime.deliveryValue)};
+    }
+    const terminalHandle = advanceDispatchLifetime(lifetime, "terminal-observed", "completed", terminalEvidence);
+    return withSessionAuthorityBoundary({ repository: lifetime.repository }, boundary => {
+      const released = releaseSessionAuthorityMember({ boundary, producerPort: lifetime.producerPort, memberHandle: lifetime.memberHandle, expectedMemberRef: lifetime.memberRef, terminalHandle });
+      return { ok: true, status: "closed", code: "AGY-SESSION-SOURCE-OWNED-CONTEXT-CLOSED", releaseRef: released.releaseRef,
+        assurance: lifetime.requester.assurance === "controlled-unit-method" || disposed.assurance === "controlled-unit-method" ? "controlled-unit-method" : "physical-readback",
+        modelTerminalSourceRefs: structuredClone(disposed.sourceRefs) };
+    });
+  } catch (error) { return { ok: false, status: "held", code: error?.code ?? "AGY-SESSION-OWNER-CONTEXT-HELD" }; }
+}
+
+/** The original Source reservation is released only after actual Main readback.
+ * Raw delivered/PASS objects cannot select a retained reservation. */
+export function integrateSourceOwnedAgyItemDelivery({deliveryContext}={}) {
+  const held=itemDeliveryContexts.get(deliveryContext);if(!held)return {ok:false,status:'held',code:'AGY-ITEM-DELIVERY-CONTEXT-REQUIRED'};
+  try {
+    const {lifetime,terminalEvidence}=held;
+    recheckDispatchLifetime(lifetime);
+    const integration=inspectAgyItemMainIntegration({root:lifetime.repository.primaryRoot,handle:lifetime.deliveryHandle});
+    const terminalHandle=advanceDispatchLifetime(lifetime,'terminal-observed','completed',{...terminalEvidence,integration});
+    const result=withSessionAuthorityBoundary({repository:lifetime.repository},boundary=>releaseSessionAuthorityMember({boundary,producerPort:lifetime.producerPort,memberHandle:lifetime.memberHandle,expectedMemberRef:lifetime.memberRef,terminalHandle}));
+    itemDeliveryContexts.delete(deliveryContext);
+    return {ok:true,status:'integrated',code:'AGY-ITEM-MAIN-INTEGRATED',releaseRef:result.releaseRef,integration};
+  }catch(error){return {ok:false,status:'held',code:error.code??'AGY-ITEM-INTEGRATION-UNAVAILABLE'};}
+}
+
+/** Recover only a real current journal/member pair for the same authenticated
+ * original owner. A JSON receipt or an old member revision cannot release it. */
+export function recoverSourceOwnedAgyItemDelivery({root,memberRef}={}) {
+  try {
+    const repository=inspectSignedDescriptorCustodyRepository(root),producerPort=createAgyFamilyDispatchAuthorityProducerPort({repository}),{owner}=dispatchProducerPorts.get(producerPort);
+    return withSessionAuthorityBoundary({repository},boundary=>{
+      const requester=observeDispatchRequester(repository);
+      const member=inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort,memberRef});
+      const journal=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']}).entries
+        .filter(row=>row.value?.bindingSha256===member.record.bindingSha256).sort((a,b)=>(b.value.revision??0)-(a.value.revision??0))[0];
+      const basis=journal?.value.basis,evidence=journal?.value.terminalEvidence;
+      if(!['running','terminal-observed'].includes(member.record.phase)||journal?.value.phase!==member.record.phase||!basis.itemDelivery||evidence?.ownerContextState!=='source-invalidated'
+        ||familyDigest(basis.association.target)!==familyDigest({sessionId:requester.currentRequester.sessionId,descriptorSha256:requester.currentRequester.descriptorSha256,ownerNonceSha256:requester.currentRequester.ownerNonceSha256})
+        ||basis.invocationBindingSha256!==requester.invocationBindingSha256||familyDigest(basis.sourceRef)!==familyDigest(requester.sourceRef)
+        ||familyDigest(basis.controllerIdentity)!==familyDigest(requester.controllerIdentity))authorityFailure('AGY-ITEM-RECOVERY-OWNER-CAS');
+      const operationHandle=owner.restore(member.record.bindingSha256);
+      const recovered=recoverSessionAuthorityMember({boundary,producerPort,operationHandle,expectedMemberRef:member.memberRef});
+      const integration=inspectAgyItemMainIntegrationValue({root,value:evidence.delivery??evidence.integration?.delivery});
+      return withAgyAuthorityStoreTransaction({repository,boundary,producerPort},()=>{
+        const terminalHandle=member.record.phase==='terminal-observed'?owner.restoreTerminal(operationHandle):owner.advance({operationHandle,boundary,producerPort,phase:'terminal-observed',terminal:'completed',terminalEvidence:{...evidence,integration}});
+        if(member.record.phase==='terminal-observed'&&journal.value.terminal!=='completed')authorityFailure('AGY-ITEM-RECOVERY-TERMINAL-CAS');
+        const refs=member.record.phase==='terminal-observed'?{memberRef:recovered.memberRef}:advanceSessionAuthorityMember({boundary,producerPort,memberHandle:recovered.memberHandle,expectedMemberRef:recovered.memberRef,operationHandle});
+        const released=releaseSessionAuthorityMember({boundary,producerPort,memberHandle:recovered.memberHandle,expectedMemberRef:refs.memberRef,terminalHandle});
+        return {ok:true,status:'integrated',code:'AGY-ITEM-MAIN-INTEGRATED',releaseRef:released.releaseRef,integration};
+      });
+    });
+  }catch(error){return {ok:false,status:'held',code:error.code??'AGY-ITEM-RECOVERY-UNAVAILABLE'};}
+}
+
+/** Cancellation observes genuine invocation disposal and the absence of product
+ * residue. A stop request or process error alone leaves the reservation held. */
+export async function cancelSourceOwnedAgyItemDispatch({context}={}) {
+  const held=nativeContexts.get(context),lifetime=held?.authorityLifetime;
+  if(!held||!lifetime?.itemDelivery||typeof held.entry.disposeModelFamilyInvocation!=='function')return {ok:false,status:'held',code:'AGY-ITEM-CANCELLATION-UNAVAILABLE'};
+  try {
+    recheckDispatchLifetime(lifetime);
+    const root=held.root,args=['-C',root];
+    const options={encoding:'utf8',shell:false,timeout:10000,maxBuffer:1024*1024,env:{...process.env,GIT_DIR:undefined,GIT_WORK_TREE:undefined,GIT_COMMON_DIR:undefined,GIT_INDEX_FILE:undefined}};
+    const diff=execFileSync('git',[...args,'diff','--name-only','-z',held.packet.candidate.commit,lifetime.repository.candidate.commit,'--',...lifetime.itemDelivery.writeScope],options);
+    const residue=execFileSync('git',[...args,'status','--porcelain=v1','-z','--untracked-files=all','--',...lifetime.itemDelivery.writeScope],options);
+    if(diff.length||residue.length)return {ok:false,status:'held',code:'AGY-ITEM-CANCELLATION-PRODUCT-RESIDUE'};
+    const disposed=await held.entry.disposeModelFamilyInvocation({invocation:held.selected});
+    if(!disposed?.ok||disposed.status!=='closed'||disposed.code!=='MODEL-FAMILY-INVOCATION-CLOSED'||disposed.receiptSha256!==held.receipt.receiptSha256
+      ||!['physical-readback','controlled-unit-method'].includes(disposed.assurance)||!Array.isArray(disposed.sourceRefs)||!disposed.sourceRefs.length
+      ||disposed.sourceRefs.some(ref=>!SHA256.test(ref.sha256??'')||!SHA256.test(ref.pathSha256??'')||!SHA256.test(ref.semanticSha256??'')||ref.identity?.nlink!==1))return {ok:false,status:'held',code:'AGY-ITEM-CANCELLATION-UNAVAILABLE'};
+    const consent=releaseSourceOwnedAgyConsentAdmission({authority:held.consentAuthority,handle:held.consentHandle});if(!consent.ok)return {...consent,status:'held'};
+    if(execFileSync('git',[...args,'diff','--name-only','-z',held.packet.candidate.commit,'HEAD','--',...lifetime.itemDelivery.writeScope],options).length
+      ||execFileSync('git',[...args,'status','--porcelain=v1','-z','--untracked-files=all','--',...lifetime.itemDelivery.writeScope],options).length)return {ok:false,status:'held',code:'AGY-ITEM-CANCELLATION-PRODUCT-RESIDUE'};
+    for(const handle of held.returnHandles)verifiedFamilyReturns.delete(handle);
+    heldFamilyReturns.delete(context);admittedFamilyExecutions.delete(context);nativeContexts.delete(context);lifetime.retainedOwnerContext=false;
+    const terminalHandle=advanceDispatchLifetime(lifetime,'terminal-observed','cancelled',{modelReceiptSha256:disposed.receiptSha256,modelTerminalSourceRefs:disposed.sourceRefs,consentReleaseRef:consent.releaseRef,ownerContextState:'source-invalidated',productResidue:'absent'});
+    const released=withSessionAuthorityBoundary({repository:lifetime.repository},boundary=>releaseSessionAuthorityMember({boundary,producerPort:lifetime.producerPort,memberHandle:lifetime.memberHandle,expectedMemberRef:lifetime.memberRef,terminalHandle}));
+    return {ok:true,status:'cancelled',code:'AGY-ITEM-CANCELLED',releaseRef:released.releaseRef};
+  }catch(error){return {ok:false,status:'held',code:error.code??'AGY-ITEM-CANCELLATION-UNAVAILABLE'};}
+}
+
 /** Preparation constructs the S5 entry here; a caller-shaped entry cannot
  * substitute opaque selections or launch methods. All ports are host seams. */
 export async function prepareAgyFamilyNativeDispatch({ root, packet, sessionId, descriptorSha256, resultPath,
-  consentAuthority, runtimeHost = createModelFamilyRuntimeHost({ cwd: root }), routeSource,
-  scope, fallbackPolicy, nowEpochMs = Date.now() } = {}) {
+  consentAuthority, runtimeHost, routeSource,
+  scope, fallbackPolicy, currentInvocationHandle, runtimePort, itemDelivery, nowEpochMs = Date.now() } = {}) {
   try {
     if (!IMPLEMENTATION_ROLES.has(packet?.role)) return { ok: false, code: "AGY-SESSION-ROLE-FORBIDDEN" };
+    const authorityLifetime = beginDispatchLifetime({ root, sessionId, descriptorSha256, packet, purpose: "family-dispatch", currentInvocationHandle, runtimePort, itemBriefing:itemDelivery });
     const taskRoute = packet.role.endsWith("mechanic") ? "duty.mechanic" : "duty.implement";
-    const entry = createModelFamilyInvocationEntry({ runtimeHost, ...(routeSource ? { routeSource } : {}) });
+    const entry = createModelFamilyInvocationEntry({ runtimeHost: runtimeHost ?? createModelFamilyRuntimeHost({ cwd: root }), ...(routeSource ? { routeSource } : {}) });
     const selected = await entry.prepareCurrentModelFamilyInvocation({ kind: "dispatch", runner: "antigravity", taskRoute, invocationId: packet.dispatchId });
     if (!selected.ok) return selected;
     const receipt = selected.value.receipt;
     if (receipt.sessionId !== sessionId || receipt.candidateCommit !== packet.candidate?.commit || receipt.candidateTree !== packet.candidate?.tree) return { ok: false, code: "AGY-CONSENT-CANDIDATE-MISMATCH" };
     if (typeof consentAuthority?.admit !== "function" || typeof consentAuthority?.bind !== "function") return { ok: false, code: "AGY-CONSENT-HOST-INVALID" };
-    const admitted = await consentAuthority.admit({ root, sessionId, descriptorSha256, nowEpochMs }); if (!admitted.ok) return admitted;
+    const admitted = await consentAuthority.admit({ root, sessionId, descriptorSha256, currentInvocationHandle: authorityLifetime.currentInvocationHandle, runtimePort: authorityLifetime.runtimePort, nowEpochMs }); if (!admitted.ok) return admitted;
     const request = { invocationId: packet.dispatchId, requestedModel: receipt.selectedModelId, requestedEffort: receipt.effort, role: packet.role, scope, requiredPaths: packet.requiredPaths, fallbackPolicy, nowEpochMs };
     const bound = await consentAuthority.bind(admitted.handle, request); if (!bound.ok) return bound;
     const checked = await recheckAgyFamilyConsentBinding({ authority: consentAuthority, handle: admitted.handle, root, sessionId, candidate: packet.candidate, consent: bound.projection, ...request });
     if (!checked.ok || checked.invocation.receiptSha256 !== receipt.receiptSha256) return checked.ok ? { ok: false, code: "AGY-CONSENT-INVOCATION-MISMATCH" } : checked;
     const context = Object.freeze(Object.create(null));
     nativeContexts.set(context, { entry, selected: selected.value.handle, receipt, consentAuthority, consentHandle: admitted.handle, consent: checked.projection,
-      root, sessionId, descriptorSha256, resultPath, packet: structuredClone(packet), scope: structuredClone(scope), fallbackPolicy: structuredClone(fallbackPolicy), consumed: false });
-    return { ok: true, context, receipt: structuredClone(receipt), consent: checked.projection };
-  } catch { return { ok: false, code: "AGY-SESSION-FAMILY-PREPARATION-UNAVAILABLE" }; }
+      root, sessionId, descriptorSha256, resultPath, packet: structuredClone(packet), scope: structuredClone(scope), fallbackPolicy: structuredClone(fallbackPolicy), consumed: false, authorityLifetime, returnHandles: new Set() });
+    return { ok: true, context, receipt: structuredClone(receipt), consent: checked.projection, assurance: authorityLifetime.requester.assurance };
+  } catch (error) { return { ok: false, code: error.code ?? "AGY-SESSION-FAMILY-PREPARATION-UNAVAILABLE", launcherCalls: 0, modelCalls: 0 }; }
 }
 
 /** Internal next-slice seam: public receipts cannot resolve native result
@@ -395,12 +688,14 @@ export async function dispatchAgySession({
         packet: prepared.packet, sessionId: session.id, descriptorSha256: held.descriptorSha256, requestedModel, effort,
         scope, fallbackPolicy, inputSha256, timeoutMs, consent: checked.projection };
       const r = held.receipt, bindingPacket = Object.fromEntries(["runner", "sessionId", "invocationId", "candidateCommit", "candidateTree", "taskRoute", "role", "effort", "selectedModelId", "authoritySha256", "discoverySha256", "packetBindingSha256"].map(k => [k, r[k]]));
+      try { advanceDispatchLifetime(held.authorityLifetime, "running"); } catch (error) { return rejected(error.code ?? "AGY-SESSION-AUTHORITY-UNAVAILABLE", "authorityLifetime"); }
       const bound = await held.entry.bindModelFamilyInvocation({ invocation: held.selected, packet: bindingPacket, nativeRequest });
       if (!bound.ok) return rejected(bound.code, "nativeRequest");
       const finalConsent = await recheckAgyFamilyConsentBinding({ authority: familyConsentAuthority, handle: familyConsentHandle, root,
         sessionId: session.id, candidate: packet.candidate, consent, invocationId: familyInvocationId, requestedModel,
         requestedEffort: effort, role: packet.role, scope, requiredPaths: packet.requiredPaths, fallbackPolicy, nowEpochMs });
       if (!finalConsent.ok) return rejected(finalConsent.code, "familyConsent");
+      try { recheckDispatchLifetime(held.authorityLifetime); } catch (error) { return rejected(error.code ?? "AGY-SESSION-AUTHORITY-UNAVAILABLE", "authorityLifetime"); }
       held.consumed = true;
       const launched = await held.entry.launchModelFamilyInvocation({ binding: bound.value });
       heldFamilyReturns.set(familyNativeContext, { invocation: r, consent: checked.projection, nativeRequest, nativeResult: launched, observedAtMs: nowEpochMs });
@@ -460,6 +755,16 @@ export async function dispatchAgySession({
     ...prepared.packet,
     prompt: `${prepared.packet.prompt}\n- **Host-bound Final Return:** Emit the --json-schema object with schema pipeline.agy-final-return.v1, dispatchId ${packet.dispatchId}, candidateCommit ${prepared.candidate.commit}, outcome, report and changedPaths. This is a claim for host validation, not permission to commit.\n`,
   } : prepared.packet;
+  // The legacy verifier callback is not a requester capability. Join the real
+  // private channel and reserve before invoking the native process boundary.
+  let authorityLifetime;
+  try {
+    const stored = loadStoredConsent(root, session.id, consent.descriptorSha256 ?? consent.subject?.session?.descriptorSha256);
+    const checked = validateConsentRecord(stored.record, { root, repository: stored.descriptor.repo, session: { id: session.id, descriptorSha256: stored.descriptor.descriptorSha256 }, nowEpochMs });
+    if (!checked.ok || stored.revoked || stored.record.decisionId !== consent.decisionId || stored.record.subjectSha256 !== consent.subjectSha256) return rejected("AGY-CONSENT-RECORD-CHANGED", "consent");
+    authorityLifetime = beginDispatchLifetime({ root, sessionId: session.id, descriptorSha256: stored.descriptor.descriptorSha256, packet: prepared.packet, purpose: "legacy-dispatch" });
+    advanceDispatchLifetime(authorityLifetime, "running");
+  } catch (error) { return rejected(error.code ?? "AGY-SESSION-NATIVE-CARRIER-UNAVAILABLE", "authorityLifetime"); }
   const invoked = await invokeAgy({ root, resultRoot, packet: executionPacket, agyPath, model: requestedModel, effort, timeoutMs, env, signal, streamJson, jsonSchema: requireStructuredFinal ? AGY_FINAL_RETURN_JSON_SCHEMA : null });
   const validatedFinal = invoked.ok === true && requireStructuredFinal
     ? validateAgyFinalReturn(invoked.payload, { dispatchId: packet.dispatchId, candidateCommit: prepared.candidate.commit }) : null;

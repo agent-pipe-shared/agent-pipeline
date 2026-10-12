@@ -367,7 +367,7 @@ Die Pipeline unterscheidet zwei Config-Ebenen: **Orchestrator-/Advisor-Routing j
 |---------------------|-------------------------------------|------------------------------|-----------------|
 | `worktypes.<profile>.{design_phase,execution_phase}` | Elephant (Orchestrator), geroutet je Session-Profil & Phase | opus (Profil `design`, beide Phasen) / opus→sonnet (Profil `feature`: opus Design-Phase, sonnet Ausführungsphase, revidiert 2026-07-10) / sonnet (Profil `mini`, beide Phasen) | high — vollständige Profil-/Phasen-Matrix s. `pipeline.user.yaml` → `worktypes` (revidiert 2026-07-10, vormals high–max) |
 | `models.implement`  | Goldfish (Implementor)             | sonnet                       | medium          |
-| `models.mechanic`   | Goldfish (Mechanic)                | sonnet                       | low             |
+| `models.mechanic`   | Goldfish (Mechanic)                | haiku                        | medium          |
 | `models.deep`       | Goldfish (Deep, MP-27)             | sonnet                       | xhigh           |
 | `models.review`     | Critic                             | sonnet                       | max             |
 | `worktypes.<profile>.advisor` | optionaler Second-Opinion-Advisor, je Session-Profil | `off` (Profil `design`) / opus (Profile `feature`/`mini`, feste Paarung — `feature`-Advisor 2026-07-10 von `off` auf `opus` geändert) | — |
@@ -396,7 +396,7 @@ Alle Werte sind in `pipeline.user.yaml` überschreibbar — das Preset „Pro" f
 ### MP-27 — Goldfish 3-Stufen-Effort-Matrix
 
 - **Gebot:** Goldfish-Dispatches laufen auf einem von drei eigenen Subagenten, je mit fest zugeordnetem Effort (Frontmatter, nicht Prosa):
-  - **`goldfish-mechanic`** — Effort **`low`**: mechanische, gleichförmige, reine Plan-Ausführung ohne In-Task-Designentscheidungen, voll spezifiziertes Briefing.
+  - **`goldfish-mechanic`** — Effort **`medium`**: mechanische, gleichförmige, reine Plan-Ausführung ohne In-Task-Designentscheidungen, voll spezifiziertes Briefing.
   - **`goldfish-implementor`** — Effort **`medium`** — Standard für klar gebriefte Implementierungsaufgaben.
   - **`goldfish-deep`** — Effort **`xhigh`**: Test-Suite-/Verify-Autorenschaft, Guardrail-/Hook-/Kanon-Code, Aufgaben mit echtem In-Task-Design-Spielraum, Klasse-hoch-Arbeit.
   Planung/Design und Analyse-Synthese bleiben unverändert auf Design-Tier-Ebene mit `xhigh`+ (MP-01/MP-22/MP-23 unangetastet).
@@ -450,20 +450,21 @@ Alle Werte sind in `pipeline.user.yaml` überschreibbar — das Preset „Pro" f
 
 ### MP-06 — Deeskalation innerhalb der Matrix
 
-- **Gebot:** Deeskalation heißt niedrigerer Effort, nie ein niedrigeres Schreib-Tier/Modell. Für mechanische Goldfish-Aufgaben bleibt `goldfish-mechanic` (Effort `low`, MP-27) das Ziel. MP-25 erlaubt eine getrennte reine Lese-/Fetch-/Extraktionsklasse; Critic- und Design-Tier-Untergrenzen werden nie unterschritten.
+- **Gebot:** Deeskalation heißt niedrigerer Effort, nie ein niedrigeres Schreib-Tier/Modell. Für mechanische Goldfish-Aufgaben bleibt `goldfish-mechanic` (Haiku, Effort `medium`, MP-27) das Ziel. MP-25 erlaubt eine getrennte reine Lese-/Fetch-/Extraktionsklasse; Critic- und Design-Tier-Untergrenzen werden nie unterschritten.
 - **Warum:** Effort ist der übliche Sparhebel für Schreibarbeit. Achtung: Die Effort-Skala ist PRO MODELL kalibriert — „high" auf einem kleineren Modell ≠ „high" auf einem größeren; Effort-Level nicht modellübergreifend vergleichen.
 - **Prüfweise:** Telemetrie; Frontmatter-Defaults im Plugin.
 
-### MP-07 — Critic-Staffelung: Review-Tier Standard, Eskalation bei Kritikalität
+### MP-07 — Critic-Staffelung: Review-Tier standardmäßig; EIN gebündelter Design-Tier-Critic nur für kritische Architektur und Security
 
-- **Gebot:** Critic-Reviews laufen standardmäßig auf dem Review-Tier-Modell / Effort `max`. **Eskalation auf ein höheres Tier (Design-Tier-Modell) ist PFLICHT**, wenn der Prüfgegenstand eines der folgenden berührt:
-  - **Architektur:** ADR-pflichtige Entscheidungen, Kernverträge, Operating-Model-Änderungen;
-  - **Guardrails:** Hooks (insb. git-guard), Permissions/Settings, Permission-Modi, Workflow-Vorbedingungen;
-  - **Security:** Secrets/Credentials, Auth, Netz-Exposition, History-Rewrites — sowie alles, was reale Geräte oder Produktivsysteme steuern kann.
-  Zusätzlich DARF der Orchestrator nach Judgment eskalieren (z. B. ungewöhnlich großer Blast-Radius). Deeskalation unter das Review-Tier-Modell ist verboten (MP-03).
-- **Warum:** Der Critic-Input ist klein (Spec + Diff + Guardrails, nie Chat-Verlauf), daher dominiert Modellqualität über Inputkosten. Bei kritischen Reviews ist ein übersehener Befund um Größenordnungen teurer als die Tier-Differenz.
-- **Prüfweise:** Critic-Briefing-Template enthält „Kritikalität → Modell" als bedingten Teil des Pflichtfelds „Dispatch-Metadaten" (kanonische Briefing-Feldliste: `docs/operating-model.md`, *Der Lifecycle* — Schritt 5, Dispatch; `roles/goldfish.md` GF-01); Telemetrie-Zeile weist das Critic-Modell aus. EIN Critic-Agent + Invocation-Parameter `model` (`plugins/pipeline-core/agents/critic.md`) — kein Fork für den kritischen Fall; die Eskalation setzt der Orchestrator pro Dispatch.
-- **Ergänzung (MP-27):** Mit sinkendem Goldfish-Implementierungs-Effort (MP-27) STEIGT die Bedeutung dieses Review-Gates, statt sich zu verringern — die Trigger-Kriterien und Modellwahl oben bleiben dabei UNVERÄNDERT (Kritikalität entscheidet weiterhin über Architektur/Guardrails/Security, nicht der Goldfish-Effort).
+- **Gebot:** Critic-Reviews laufen standardmäßig auf dem Review-Tier-Modell / Effort `max`.
+  1. Für tatsächlich kritische Architektur- oder Security-Änderungen ist das Design-Tier verpflichtend; nur diese Fälle eskalieren. Eine Guardrail-Änderung allein eskaliert nicht automatisch.
+  2. Für jeden zusammengehörigen Batch gibt es EINEN gesamten Critic, nie einen Critic je Slice; das gilt für jedes Tier.
+  3. Höchstens ein Folge-Critic desselben Batches prüft ausschließlich das Delta seit dem geprüften Kandidaten. Damit gilt ein gesamter Review plus höchstens ein Delta-Review, ohne zusätzliche Runden. Er nennt diesen Bereich als einzige Suchfläche und bleibt auf dem Review-Tier, außer das Delta ist selbst neu kritische Architektur oder Security.
+  4. Alle anderen Critics bleiben auf dem Review-Tier. Deeskalation darunter ist verboten (MP-03).
+  5. Ein großer Blast-Radius ist ein Grund, den Batch zu erweitern oder zu verschieben, nicht für zusätzliche Design-Tier-Runden je Slice.
+- **Warum:** Der kleine Critic-Input bindet Spec, Diff und Guardrails. Die kritische Prüfung wird in einem gebündelten Durchgang und ausschließlich Delta-Folgeprüfungen konzentriert.
+- **Prüfweise:** Das kanonische Briefing nennt Kritikalität, Batch und bei Folgeprüfung den exakten Delta-Bereich. EIN Critic-Agent bleibt erhalten; der Invocation-Parameter `model` setzt das Tier pro Dispatch. Die Telemetrie hält das tatsächliche Modell fest.
+- **Ergänzung (MP-27):** Geringerer Implementierungs-Effort ändert weder die Batch-Grenze noch die Kritikalitätsregel und erzeugt keine zusätzlichen Review-Runden.
 
 ### MP-22 — Minimum-tier principle: phase-scoped (design vs. execution)
 

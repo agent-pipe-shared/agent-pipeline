@@ -10,9 +10,9 @@ import { writeLocalDevelopmentInstalledPluginReceipt } from "./scripts/installed
 import { homedir } from "node:os";
 import { createAntigravityRefreshHost, resolveAntigravityCliPath } from "./lib/antigravity-topology-refresh-host.mjs";
 import { observeAntigravityPluginTopology } from "./lib/antigravity-plugin-topology.mjs";
-import { observeRunnerPublicCoreIdentity } from "./lib/public-core-observation.mjs";
+import { observeRunnerPublicCoreIdentity, snapshotPhysicalPluginRoot } from "./lib/public-core-observation.mjs";
 import { installAgyFromCentralSnapshot as installAgyFromCentralSnapshotDefault } from "./lib/agy-central-refresh.mjs";
-import { spawnSync } from "node:child_process";
+import { execFileSync as nodeExecFileSync, spawnSync } from "node:child_process";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const LOCAL_MARKETPLACE = join(process.env.HOME || process.env.USERPROFILE, "agent-pipeline-local-marketplace");
@@ -206,7 +206,7 @@ export function refreshAntigravityInstallation(options, dependencies = {}) {
   const receiptSourceRoot = options.attestationSourceRoot ?? options.approvedSourceRoot;
   if (receiptSourceRoot !== options.approvedSourceRoot) {
     const checked = verifyAntigravityInstallerSource({ configRoot: options.configRoot, workspaceRoot: options.workspaceRoot, sourcePluginRoot: options.approvedSourceRoot, attestationSourceRoot: receiptSourceRoot, scope: options.scope }, dependencies);
-    if (checked.status === "rejected") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: checked.reason, completed: [] };
+    if (checked.status === "rejected") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: checked.reason, ...(checked.reasonCodes ? { reasonCodes: checked.reasonCodes } : {}), completed: [] };
   }
   const receiptWriter = dependencies.writeInstalledReceipt ?? writeLocalDevelopmentInstalledPluginReceipt;
   const host = createAntigravityRefreshHost({ ...options, ...dependencies, writeInstalledReceipt: input => receiptWriter({ ...input, sourcePluginRoot: receiptSourceRoot }) });
@@ -215,14 +215,77 @@ export function refreshAntigravityInstallation(options, dependencies = {}) {
   return host.apply(plan);
 }
 
+/** Discover provenance locally; a worktree path is a locator, never authority. */
+export function resolveAntigravityInstallerAttestationSource({ sourcePluginRoot, discoveryPluginRoot = sourcePluginRoot }, {
+  execFileSync = nodeExecFileSync,
+  observeSource = observeRunnerPublicCoreIdentity,
+  snapshotSource = snapshotPhysicalPluginRoot,
+} = {}) {
+  let selected;
+  try { selected = snapshotSource(sourcePluginRoot); }
+  catch (error) {
+    return { status: "rejected", reason: "ATR-SOURCE-PHYSICAL-UNAVAILABLE", reasonCodes: [error.code ?? "SNT-A2-INTERNAL-ERROR"] };
+  }
+  const roots = [discoveryPluginRoot];
+  let discoveryUnavailable = false;
+  try {
+    const output = execFileSync("git", ["worktree", "list", "--porcelain", "-z"], {
+      cwd: dirname(dirname(discoveryPluginRoot)), shell: false, encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"], timeout: 20000, maxBuffer: 1048576,
+    });
+    if (typeof output !== "string" || !output.endsWith("\0")) throw new Error("Invalid worktree discovery");
+    for (const field of output.split("\0")) {
+      if (field.startsWith("worktree ")) roots.push(join(field.slice(9), "plugins", "pipeline-core"));
+    }
+  } catch { discoveryUnavailable = true; }
+  const reasonCodes = [];
+  for (const root of new Set(roots)) {
+    // The existing observer independently checks canonical physical roots,
+    // named branch, origin, clean plugin subtree and complete matching bytes.
+    const observed = observeSource("antigravity", { sourcePluginRoot: root, installedPluginRoot: sourcePluginRoot });
+    if (observed?.status !== "ready") {
+      reasonCodes.push(...(observed?.reasonCodes ?? ["SNT-A2-INTERNAL-ERROR"]));
+      continue;
+    }
+    try {
+      const candidate = snapshotSource(root);
+      const current = snapshotSource(sourcePluginRoot);
+      const sameTree = (left, right) => left.contentSha256 === right.contentSha256
+        && left.files.length === right.files.length
+        && left.files.every((file, index) => file.path === right.files[index].path && file.identity.mode === right.files[index].identity.mode)
+        && left.directoryIdentities.length === right.directoryIdentities.length
+        && left.directoryIdentities.every((directory, index) => directory.path === right.directoryIdentities[index].path && directory.identity.mode === right.directoryIdentities[index].identity.mode);
+      if (!sameTree(selected, current)) return { status: "rejected", reason: "ATR-SOURCE-PHYSICAL-UNAVAILABLE", reasonCodes: ["SNT-A2-PLUGIN-CHANGED"] };
+      if (!sameTree(candidate, current)) {
+        reasonCodes.push("ATR-SOURCE-CANDIDATE-MODE-MISMATCH");
+        continue;
+      }
+      // Re-observe after the mode comparison; discovery cannot upgrade a stale
+      // or changed Git/physical binding to the existing local-development tier.
+      const final = observeSource("antigravity", { sourcePluginRoot: root, installedPluginRoot: sourcePluginRoot });
+      if (final?.status === "ready" && JSON.stringify(final) === JSON.stringify(observed)) {
+        return { status: "attestable-source", attestationSourceRoot: root, candidate: final.candidate };
+      }
+      reasonCodes.push(...(final?.reasonCodes ?? ["SNT-A2-PLUGIN-CHANGED"]));
+    } catch (error) { reasonCodes.push(error.code ?? "SNT-A2-INTERNAL-ERROR"); }
+  }
+  if (discoveryUnavailable) reasonCodes.push("ATR-SOURCE-CANDIDATE-DISCOVERY-UNAVAILABLE");
+  return { status: "rejected", reason: "ATR-SOURCE-CANDIDATE-UNAVAILABLE", reasonCodes: [...new Set(reasonCodes)] };
+}
+
 /** Check that any copy which may execute can receive a source-bound receipt. */
 export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, sourcePluginRoot, scope, attestationSourceRoot = sourcePluginRoot }, {
   observeTopology = observeAntigravityPluginTopology,
   observeSource = observeRunnerPublicCoreIdentity,
 } = {}) {
   const topology = observeTopology({ configRoot, workspaceRoot, approvedSourceRoot: sourcePluginRoot });
-  if (topology.source.status !== "observed" || topology.managed.status === "unavailable") {
+  if (topology.source.status !== "observed") {
+    try { snapshotPhysicalPluginRoot(sourcePluginRoot); }
+    catch (error) { return { status: "rejected", reason: "ATR-SOURCE-PHYSICAL-UNAVAILABLE", reasonCodes: [error.code ?? "SNT-A2-INTERNAL-ERROR"] }; }
     return { status: "rejected", reason: "ATR-SOURCE-UNVERIFIABLE" };
+  }
+  if (topology.managed.status === "unavailable") {
+    return { status: "rejected", reason: "ATR-MANAGED-UNVERIFIABLE" };
   }
   if (scope === "workspace" && topology.managed.candidates.length === 0 && attestationSourceRoot === sourcePluginRoot) return { status: "direct-root" };
   // A selected gitless marketplace copy must match the approved clean Git source.
@@ -231,7 +294,7 @@ export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, so
   const source = observeSource("antigravity", { sourcePluginRoot: attestationSourceRoot, installedPluginRoot: sourcePluginRoot });
   return source?.status === "ready"
     ? { status: "attestable-source" }
-    : { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE" };
+    : { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE", reasonCodes: source?.reasonCodes ?? ["SNT-A2-INTERNAL-ERROR"] };
 }
 
 /** Choice 3: publish the per-user central agy snapshot and refresh the global agy copy from it. Injectable for tests. */
@@ -283,8 +346,10 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
     const configRoot = join(homedir(), ".gemini");
     Promise.resolve()
       .then(() => {
+        const sourceCheck = resolveAntigravityInstallerAttestationSource({ sourcePluginRoot: selectedSource.pluginRoot, discoveryPluginRoot: SCRIPT_DIR });
+        if (sourceCheck.status === "rejected") throw new Error(`${sourceCheck.reason}: ${sourceCheck.reasonCodes.join(", ")}`);
         if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
-        return runCentralSnapshotInstall({ sourcePluginRoot: selectedSource.pluginRoot, attestationSourceRoot: selectedSource.pluginRoot, configRoot, workspaceRoot: process.cwd(), runCli: centralSnapshotRunCli(configRoot) });
+        return runCentralSnapshotInstall({ sourcePluginRoot: selectedSource.pluginRoot, attestationSourceRoot: sourceCheck.attestationSourceRoot, configRoot, workspaceRoot: process.cwd(), runCli: centralSnapshotRunCli(configRoot) });
       })
       .then((result) => {
         console.log(JSON.stringify(result));
@@ -312,11 +377,9 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
     let targetFile;
     if (answer.trim() === "1") {
       const agentsDir = join(process.cwd(), ".agents");
-      if (!existsSync(agentsDir)) mkdirSync(agentsDir, { recursive: true });
       targetFile = join(agentsDir, "plugins.json");
     } else if (answer.trim() === "2") {
       const globalDir = join(process.env.HOME || process.env.USERPROFILE, ".gemini", "config");
-      if (!existsSync(globalDir)) mkdirSync(globalDir, { recursive: true });
       targetFile = join(globalDir, "plugins.json");
     } else {
       console.log("Invalid selection. Exiting.");
@@ -325,11 +388,13 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
     }
 
     try {
+      const binding = resolveAntigravityInstallerAttestationSource({ sourcePluginRoot: corePluginPath, discoveryPluginRoot: SCRIPT_DIR });
+      if (binding.status === "rejected") throw new Error(`${binding.reason}: ${binding.reasonCodes.join(", ")}`);
       const configRoot = join(homedir(), ".gemini");
       if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
-      const attestationSourceRoot = useMarketplace ? SCRIPT_DIR : corePluginPath;
+      const attestationSourceRoot = binding.attestationSourceRoot;
       const sourceCheck = verifyAntigravityInstallerSource({ configRoot, workspaceRoot: process.cwd(), sourcePluginRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace" });
-      if (sourceCheck.status === "rejected") throw new Error(`${sourceCheck.reason}: run this installer from an approved clean Git source checkout`);
+      if (sourceCheck.status === "rejected") throw new Error(`${sourceCheck.reason}${sourceCheck.reasonCodes ? `: ${sourceCheck.reasonCodes.join(", ")}` : ""}`);
       const result = refreshAntigravityInstallation({ configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() });
       console.log(JSON.stringify(result));
       if (result.status !== "refreshed") throw new Error(result.reason ?? "ATR-REFRESH-UNAVAILABLE");

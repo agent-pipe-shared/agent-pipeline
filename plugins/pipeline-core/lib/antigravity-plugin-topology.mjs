@@ -15,7 +15,8 @@ export function supportsAntigravityPluginCliVersion(version){
   if(!match)return false;
   const [major,minor,patch]=match.slice(1).map(Number);
   if(![major,minor,patch].every(Number.isSafeInteger))return false;
-  return major>1||(major===1&&(minor>2||(minor===2&&patch>=12)));
+  // Only physically observed lifecycle versions are admitted; future releases remain unavailable.
+  return major===1&&minor===2&&(patch===12||patch===13);
 }
 const valueHash=v=>hash(canonicalizeJson(v));
 const freeze=v=>{if(v&&typeof v==='object'){for(const x of Object.values(v))freeze(x);Object.freeze(v);}return v;};

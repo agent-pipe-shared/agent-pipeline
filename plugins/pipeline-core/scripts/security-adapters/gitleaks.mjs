@@ -468,7 +468,7 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     parsed = JSON.parse(raw);
   } catch (err) {
     cleanupTmp(tmpDir);
-    return { status: "ERROR", classification: "scanner_error", findings: [], raw, reason: `unparseable gitleaks report JSON: ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw, reason: "unparseable gitleaks report JSON (GITLEAKS-REPORT-JSON-INVALID)" };
   }
 
   if (!Array.isArray(parsed)) {
@@ -510,9 +510,16 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     const fingerprint = canonicalContentFingerprint(f);
     if (fingerprint !== null) {
       const nearMissLine = findNearMissLine(contentAuthority.linesByLocation, fingerprint);
-      if (nearMissLine !== null) {
-        const repairCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs --path ${fingerprint.path} --rule ${fingerprint.rule} --column ${fingerprint.column} --old-line ${nearMissLine}`;
-        base.msg = `${base.msg} [possibly-stale .gitleaksignore suppression: an entry exists for ${fingerprint.path}:${fingerprint.rule} column ${fingerprint.column} recorded at line ${nearMissLine}, but this finding is now at line ${fingerprint.line} -- likely the suppression just needs its line updated, not a new secret. Repair: ${repairCmd}]`;
+      // A moved-line hint requires the same reviewed value, not just a location.
+      // The ordinary exact-match suppression predicate remains unchanged.
+      if (nearMissLine !== null && contentAuthority.entries.has(authorityKey({ ...f, StartLine: nearMissLine }))) {
+        // Shell-safe public selectors; the reviewed value is never an argv operand.
+        const quote = value => "'" + String(value).replace(/'/gu, "'\\''") + "'";
+        const selectors = `--path ${quote(fingerprint.path)} --rule ${quote(fingerprint.rule)} --column ${fingerprint.column} --old-line ${nearMissLine}`;
+        const repairCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs ${selectors}`;
+        const recomputeCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs --recompute ${selectors}`;
+        const recomputedEntry = gitleaksContentAuthorityLine(f);
+        base.msg = `${base.msg} [possibly-stale .gitleaksignore suppression: an entry exists for ${fingerprint.path}:${fingerprint.rule} column ${fingerprint.column} recorded at line ${nearMissLine}, but this finding is now at line ${fingerprint.line} -- likely the suppression just needs its line updated, not a new secret. Recomputed entry (diagnostic only, not reviewed authorization): ${recomputedEntry}. Recompute without writing: ${recomputeCmd}. Explicit repair after review: ${repairCmd}]`;
       }
     }
     return base;

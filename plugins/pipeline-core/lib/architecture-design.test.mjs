@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parseArchitectureDesign, architectureDesignTargets, materializeArchitectureDesign, publishArchitectureDesignTargets } from "./architecture-design.mjs";
+import { makeAggregateFixture as actualAuthorityFixture } from "./architecture-prospective-materialization.fixture.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { generateAdoptionProposal } from "../scripts/architecture-adoption.mjs";
 import { loadConceptFile } from "../scripts/module-inventory.mjs";
@@ -132,10 +133,10 @@ test("brownfield proposal is read-only, reports unknown inventory, and materiali
 });
 
 function transactionFixture(run) {
-  const root = mkdtempSync(join(tmpdir(), "architecture-transaction-"));
+  const root = actualAuthorityFixture({stage: "approved-unmaterialized"}).dir;
   try {
     mkdirSync(join(root, "architecture/map"), { recursive: true });
-    mkdirSync(join(root, "project"));
+    mkdirSync(join(root, "project"), { recursive: true });
     for (const target of initialGreenfieldMapTargets("fresh")) writeFileSync(join(root, target.path), target.bytes);
     const lock = { ok: true, path: join(root, "project/pipeline-state.json.lock"), token: "architecture-test", ownerNonce: "transaction-test" };
     writeFileSync(lock.path, JSON.stringify({ schema: "pipeline.continuity-lock.v0", token: lock.token, ownerNonce: lock.ownerNonce, acquiredAtMs: 1 }));
@@ -247,7 +248,10 @@ function hf9Put(root, relative, text) {
 }
 
 function hf9Fixture(stage, { block = false, scaffold = "none", receipt = false, staleContinuity = false } = {}) {
-  const root = mkdtempSync(join(stage, "fx-"));
+  // Real source writers establish neutral manifest/state selection; the five
+  // original branch-test stubs below remain unchanged and are never DAB proof.
+  const root = actualAuthorityFixture({stage: "presented"}).dir;
+  for (const target of initialGreenfieldMapTargets("fresh")) unlinkSync(join(root, target.path));
   const prd = block ? `# Design\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(hf9Design())}\n\`\`\`\n` : HF9_PRD_NO_BLOCK;
   hf9Put(root, HF9_PLAN, prd);
   hf9Put(root, HF9_SPEC, HF9_SPEC_TEXT);

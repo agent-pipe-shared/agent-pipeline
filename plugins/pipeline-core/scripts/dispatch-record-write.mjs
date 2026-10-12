@@ -1,18 +1,23 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { inspectSourceOwnedNativeConfiguredRoute } from "../lib/native-goldfish-host-state.mjs";
 import { randomBytes, createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeSync } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
+import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
 import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
 import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
-import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation } from "../lib/native-goldfish-host-observation.mjs";
+import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation, readNativeGoldfishHostObservation } from "../lib/native-goldfish-host-observation.mjs";
+
+import { readNativeCodexPending, readNativeGoldfishPending } from "../lib/native-goldfish-host-state.mjs";
+import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+import { CRITIC_REQUIRED_SCHEMA } from "../lib/critic-skip-decision.mjs";
 
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const REQUEST_SCHEMA = "pipeline.dispatch-record-write-request.v1";
@@ -173,6 +178,10 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
   { hostObservedAgy = false, hostObservedNativeGoldfish = false } = {}) {
   const record = validateDispatchRecord(inputRecord);
   const modelCheck = compareRecordedModel(record);
+  if (record.schema === DISPATCH_RECORD_SCHEMA && !isTerminalOutcome(record.outcome)) {
+    if (hostObservedAgy || hostObservedNativeGoldfish) fail("attempt-host-route", "terminal host route cannot publish an opening");
+    return publishOpening(root, targetPath, record, modelCheck, dependencies);
+  }
   const agyUndelivered = record.schema === "pipeline.dispatch-record.v4"
     && record.runner === "antigravity"
     && record.outcomeClassification.kind === "completed-undelivered";
@@ -207,8 +216,13 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
     const checked = inspectAgyHostObservedLocalReadback({ root, taskId: record.taskId,
       record, recordBytes: agyAuthoredRecordBytes(record) });
     if (!checked.ok) fail("record-host-observation", `Agy host observation is not independently readable: ${checked.code}`);
-  } else if (!hostObservedNativeGoldfish && !agyUndelivered && !agyInterrupted && modelCheck.classification !== "model-matches") {
-    fail("record-model", `record model/effort is not bound to agentType without caller authority: ${modelCheck.reason}`);
+  } else if (!hostObservedNativeGoldfish && !agyUndelivered && !agyInterrupted
+    && modelCheck.classification !== "model-matches"
+    && !(record.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
+      && modelCheck.classification === "model-override-declared")) {
+    // v3 already admits a closed, rationale-bearing declared override. It is
+    // legacy model intent only; every v4 host/native predicate above remains.
+    fail("record-model", `record model/effort is not bound to agentType or an exact v3 declared override: ${modelCheck.reason}`);
   }
   const targetRelative = normalizeDispatchRecordPath(targetPath, "target path");
   const expected = `evidence/dispatch-record-${record.taskId}.json`;
@@ -235,6 +249,179 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
     };
   }
   return receipt;
+}
+
+// Attempts are observations of configured intent, never execution or authorship authority.
+function openingRecord(record) {
+  const checked = validateDispatchRecord(record);
+  if (checked.schema !== DISPATCH_RECORD_SCHEMA || isTerminalOutcome(checked.outcome)
+    || checked.commits.length !== 0 || checked.resultSha256 !== null || checked.report !== null
+    || checked.log.length !== 0 || (checked.orchestratorAddedFiles?.length ?? 0) !== 0
+    || checked.outcomeClassification.kind !== "authored-commit") fail("attempt-opening", "opening cannot claim result, work, checkpoints or delivery");
+  return checked;
+}
+function attemptPath(taskId) { return `evidence/dispatch-attempt-${taskId}.json`; }
+function jsonBytes(value) { return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8"); }
+function stable(value) {
+  if (Array.isArray(value)) return value.map(stable);
+  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])]));
+  return value;
+}
+
+/** Exclusive intent checkpoint. Neither a checkpoint nor its note authorizes work or claims host execution. */
+export function writeDispatchAttemptCheckpoint({ repoRoot, taskId, openingSha256, checkpoint }) {
+  const root = physicalRoot(repoRoot);
+  const target = attemptPath(taskId);
+  const original = readPhysicalRequest(root, target, {});
+  if (createHash("sha256").update(original).digest("hex") !== openingSha256) fail("attempt-checkpoint-binding", "opening digest changed");
+  const envelope = decodeJson(original);
+  exactKeys(envelope, ["schema", "opening"], "attempt");
+  if (envelope.schema !== "pipeline.dispatch-attempt.v1") fail("attempt-schema", "wrong attempt schema");
+  const opening = openingRecord(envelope.opening);
+  if (opening.taskId !== taskId) fail("attempt-checkpoint-binding", "foreign opening");
+  // Reuse the durable record's bounded note/privacy and log-entry validation.
+  const validated = validateDispatchRecord({ ...opening, log: [checkpoint] }).log[0];
+  if (!["checkpoint", "blocked", "failed", "recovery-required"].includes(validated.phase)) fail("attempt-checkpoint-phase", "checkpoint phase is not an intent journal event");
+  const bytes = jsonBytes({ schema: "pipeline.dispatch-attempt-checkpoint.v1", taskId,
+    openingPath: target, openingSha256, checkpoint: validated, assurance: "caller-reported-intent-only" });
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const checkpointPath = `evidence/dispatch-attempt-checkpoint-${taskId}-${digest}.json`;
+  return { target: checkpointPath, sha256: publishExclusiveBytes(root, checkpointPath, taskId, bytes, {}, "attempt-checkpoint") };
+}
+function publishOpening(root, targetPath, record, modelCheck, dependencies) {
+  openingRecord(record);
+  if (modelCheck.classification !== "model-matches") fail("record-model", "opening requires configured model/effort binding; it does not observe a host model");
+  const normalized = normalizeDispatchRecordPath(targetPath, "opening target");
+  if (![attemptPath(record.taskId), `evidence/dispatch-record-${record.taskId}.json`].includes(normalized)) fail("target-path", "opening target does not match task");
+  const target = attemptPath(record.taskId);
+  const bytes = jsonBytes({ schema: "pipeline.dispatch-attempt.v1", opening: record });
+  const digest = publishExclusiveBytes(root, target, record.taskId, bytes, dependencies, "dispatch-attempt");
+  return { schema: "pipeline.dispatch-attempt-write-receipt.v1", target, sha256: digest,
+    bytes: bytes.length, taskId: record.taskId, candidateCommit: record.candidateCommit, assurance: "configured-intent-only" };
+}
+
+/** Reopen actual private native pending state; caller fields only select its real invocation. */
+export function inspectNativeGoldfishDispatchAttempt(input) { return nativeDispatchAttempt(input, false); }
+export function bindNativeGoldfishDispatchAttempt(input) { return nativeDispatchAttempt(input, true); }
+function nativeDispatchAttempt({ repoRoot, runner, input, expectedPendingSha256 }, publish) {
+  const root = physicalRoot(repoRoot);
+  const commonDir = resolveGitCommonDir(root);
+  const pending = runner === "codex" && input?.hook_event_name === "SubagentStop"
+    ? readNativeCodexPending({ commonDir, input })
+    : runner === "claude" && input?.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)
+      ? readNativeGoldfishPending({ commonDir, runner, sessionId: input.session_id, correlationId: input.tool_use_id }) : null;
+  if (!pending?.ok || pending.state.root !== root || pending.state.commonDir !== commonDir
+    || pending.state.runner !== runner || pending.state.binding.runner !== runner) fail("attempt-admission", "actual native pending invocation is unavailable or foreign");
+  const state = pending.state;
+  if (expectedPendingSha256 !== undefined && expectedPendingSha256 !== pending.sha256) fail("attempt-admission-drift", "pending invocation changed after precommit observation");
+  const binding = state.binding;
+  const target = attemptPath(binding.dispatchId);
+  const expected = openingRecord({ schema: DISPATCH_RECORD_SCHEMA, runner, taskId: binding.dispatchId,
+    agentType: binding.agentType, model: binding.model, effort: binding.effort, rulesetSha: binding.rulesetSha,
+    dispatcher: "Elephant", candidateCommit: binding.candidateCommit, resultSha256: null,
+    outcome: "in-progress", commits: [], log: [], report: null,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    ...(binding.criticDecision.schema === CRITIC_REQUIRED_SCHEMA ? { criticRequired: binding.criticDecision } : { criticSkip: binding.criticDecision }) });
+  const present = existsSync(resolve(root,target));
+  const configured=runner==="codex"?inspectSourceOwnedNativeConfiguredRoute({root,pendingSha256:pending.sha256}):null;
+  if(configured&&(configured.model!==expected.model||configured.effort!==expected.effort||configured.role!==state.binding.role||configured.candidateCommit!==expected.candidateCommit))fail("record-model","native configured route differs from original opening");
+  if (!present && publish) {
+    if(configured){const envelope={schema:"pipeline.dispatch-attempt.v1",opening:expected};publishExclusiveBytes(root,target,binding.dispatchId,jsonBytes(envelope),{},"dispatch-attempt");}
+    else publishOpening(root,target,expected,compareRecordedModel(expected),{});
+  }
+  if (!configured&&compareRecordedModel(expected).classification !== "model-matches") fail("record-model", "native opening model configuration mismatch");
+  const bytes = !present && !publish ? jsonBytes({ schema: "pipeline.dispatch-attempt.v1", opening: expected }) : readPhysicalRequest(root,target,{});
+  const envelope = decodeJson(bytes);
+  exactKeys(envelope,["schema","opening"],"attempt");
+  if (envelope.schema !== "pipeline.dispatch-attempt.v1") fail("attempt-schema","wrong attempt schema");
+  const actual = openingRecord(envelope.opening);
+  // Alternate pending spelling is still intent-only; all other configured fields must match.
+  if (JSON.stringify(stable({ ...actual, outcome: "in-progress" })) !== JSON.stringify(stable(expected))) fail("attempt-binding","opening differs from actual admitted native briefing");
+  const association = { schema: "pipeline.dispatch-attempt-admission.v1", taskId: binding.dispatchId,
+    runner, openingPath: target, openingSha256: createHash("sha256").update(bytes).digest("hex"),
+    pendingSha256: pending.sha256,
+    invocationSha256: createHash("sha256").update(JSON.stringify([runner,state.sessionId,state.toolUseId,state.agentId])).digest("hex"),
+    candidateCommit: binding.candidateCommit, candidateTree: binding.candidateTree,
+    operation: "native-goldfish-host-commit", allowedPaths: [...binding.allowedPaths] };
+  const associationPath = `evidence/dispatch-attempt-admission-${binding.dispatchId}.json`;
+  const associationBytes = jsonBytes(association);
+  if (!publish) return { status: "observed-not-published", pendingSha256: pending.sha256, openingPresent: present };
+  const digest = publishExclusiveBytes(root,associationPath,binding.dispatchId,associationBytes,{},"attempt-admission");
+  return { target: associationPath, sha256: digest, openingPath: target, openingSha256: association.openingSha256 };
+}
+
+/** Only a freshly reopened genuine terminal proof can create this separate association. */
+export function writeNativeGoldfishAttemptTerminalAssociation({ repoRoot, record, attempt }) {
+  const root = physicalRoot(repoRoot);
+  const checked = validateDispatchRecord(record);
+  const recordBytes = nativeAuthoredRecordBytes(checked);
+  const proof = inspectNativeGoldfishHostObservation({ root, taskId: checked.taskId, record: checked, recordBytes });
+  if (!proof.ok || !isTerminalOutcome(checked.outcome)) fail("attempt-terminal-proof","genuine native terminal proof unavailable");
+  const expectedPath = `evidence/dispatch-attempt-admission-${checked.taskId}.json`;
+  if (attempt?.target !== expectedPath) fail("attempt-terminal-binding","foreign attempt selector");
+  const bytes = readPhysicalRequest(root,expectedPath,{});
+  const admission = decodeJson(bytes);
+  if (createHash("sha256").update(bytes).digest("hex") !== attempt.sha256
+    || admission.schema !== "pipeline.dispatch-attempt-admission.v1" || admission.taskId !== checked.taskId
+    || admission.runner !== checked.runner) fail("attempt-terminal-binding","admission association changed");
+  // Public admission digests are selectors, not authority. Reopen the original
+  // private invocation and its real prelaunch -> authored-commit lineage.
+  const admissionKeys = ["schema", "taskId", "runner", "openingPath", "openingSha256",
+    "pendingSha256", "invocationSha256", "candidateCommit", "candidateTree", "operation", "allowedPaths"];
+  if (JSON.stringify(Object.keys(admission).sort()) !== JSON.stringify(admissionKeys.sort())
+    || admission.openingPath !== attemptPath(checked.taskId)
+    || admission.operation !== "native-goldfish-host-commit") fail("attempt-terminal-binding","admission shape or operation changed");
+  const commonDir = resolveGitCommonDir(root);
+  const observed = readNativeGoldfishHostObservation({ commonDir, taskId: checked.taskId,
+    candidateCommit: checked.candidateCommit, record: checked, recordBytes });
+  if (!observed.ok || observed.sha256 !== proof.receiptSha256) fail("attempt-terminal-binding","private terminal observation changed");
+  const receipt = observed.receipt;
+  const pending = checked.runner === "codex"
+    ? readNativeCodexPending({ commonDir, input: { hook_event_name: "SubagentStop",
+      session_id: receipt.sessionId, agent_id: receipt.agentId } })
+    : readNativeGoldfishPending({ commonDir, runner: checked.runner,
+      sessionId: receipt.sessionId, correlationId: receipt.toolUseId });
+  if (!pending.ok) fail("attempt-terminal-binding","original private pending invocation unavailable");
+  const state = pending.state;
+  const binding = state.binding;
+  const same = (left, right) => JSON.stringify(stable(left)) === JSON.stringify(stable(right));
+  const invocationSha256 = createHash("sha256")
+    .update(JSON.stringify([state.runner,state.sessionId,state.toolUseId,state.agentId])).digest("hex");
+  if (state.root !== root || state.commonDir !== commonDir || state.runner !== checked.runner
+    || state.sessionId !== receipt.sessionId || state.toolUseId !== receipt.toolUseId
+    || state.agentId !== receipt.agentId || binding.runner !== checked.runner
+    || binding.dispatchId !== checked.taskId || binding.role !== receipt.role
+    || binding.model !== receipt.model || binding.effort !== receipt.effort
+    || binding.rulesetSha !== receipt.rulesetSha || binding.candidateCommit !== receipt.candidateCommit
+    || binding.candidateTree !== receipt.candidateTree || (receipt.schema!=="pipeline.native-goldfish-host-observation.v3"&&receipt.parent !== binding.candidateCommit)
+    || receipt.commit !== checked.candidateCommit || receipt.commit === binding.candidateCommit
+    || pending.sha256 !== admission.pendingSha256 || invocationSha256 !== admission.invocationSha256
+    || admission.candidateCommit !== binding.candidateCommit || admission.candidateTree !== binding.candidateTree
+    || !same(admission.allowedPaths,binding.allowedPaths)
+    || !same([...binding.allowedPaths].sort(),receipt.allowedPaths)) fail("attempt-terminal-binding","original admission lineage changed");
+  const opening = readPhysicalRequest(root,admission.openingPath,{});
+  if (createHash("sha256").update(opening).digest("hex") !== admission.openingSha256) fail("attempt-terminal-binding","opening changed");
+  let original;
+  try {
+    const envelope = decodeJson(opening);
+    exactKeys(envelope,["schema","opening"],"attempt");
+    if (envelope.schema !== "pipeline.dispatch-attempt.v1") throw new Error("attempt schema");
+    original = openingRecord(envelope.opening);
+  } catch { fail("attempt-terminal-binding","original opening invalid"); }
+  const expected = { schema: DISPATCH_RECORD_SCHEMA, runner: state.runner, taskId: binding.dispatchId,
+    agentType: binding.agentType, model: binding.model, effort: binding.effort, rulesetSha: binding.rulesetSha,
+    dispatcher: "Elephant", candidateCommit: binding.candidateCommit, resultSha256: null,
+    outcome: "in-progress", commits: [], log: [], report: null,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    ...(binding.criticDecision.schema === CRITIC_REQUIRED_SCHEMA ? { criticRequired: binding.criticDecision } : { criticSkip: binding.criticDecision }) };
+  if (!same({ ...original, outcome: "in-progress" },expected)) fail("attempt-terminal-binding","opening differs from original private admission");
+  const terminalPath = `evidence/dispatch-record-${checked.taskId}.json`;
+  if (!readPhysicalRequest(root,terminalPath,{}).equals(recordBytes)) fail("attempt-terminal-binding","published terminal differs");
+  const value = { schema: "pipeline.dispatch-attempt-terminal.v1", taskId: checked.taskId,
+    admissionPath: expectedPath, admissionSha256: attempt.sha256, openingSha256: admission.openingSha256,
+    terminalPath, terminalSha256: createHash("sha256").update(recordBytes).digest("hex"), candidateCommit: checked.candidateCommit };
+  const target = `evidence/dispatch-attempt-terminal-${checked.taskId}.json`;
+  return { target, sha256: publishExclusiveBytes(root,target,checked.taskId,jsonBytes(value),{},"attempt-terminal") };
 }
 
 function publishExclusiveBytes(root, targetRelative, taskId, bytes, dependencies, label) {
@@ -312,3 +499,6 @@ if (isDirectInvocation(import.meta.url)) {
   try { process.stdout.write(`${JSON.stringify(writeDispatchRecord(parseArgs(process.argv.slice(2))))}\n`); }
   catch (error) { process.stderr.write(`DISPATCH-RECORD-WRITE-FAILED: ${error.code ?? "error"}: ${error.message}\n`); process.exitCode = 2; }
 }
+
+// Source-private METHOD observation; never admitted by public/native record writers.
+export { writeSourceOwnedControlledMethodDispatchObservation } from "../lib/controlled-method-dispatch-observation.mjs";

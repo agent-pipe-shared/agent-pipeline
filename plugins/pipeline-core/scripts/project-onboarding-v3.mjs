@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { planExistingPublicTrustAnchorMaterialization, applyExistingPublicTrustAnchorMaterialization, EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA } from "./onboarding-init.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
 import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
@@ -237,6 +238,8 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   { name: "plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "plan-reinstall", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "apply-reinstall", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "plan-existing-trust-anchor", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "materialize-existing-trust-anchor", flat: true, mutates: true, automatedArgvShape: null },
   { name: "plan-partial-authority", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "apply-partial-authority", flat: true, mutates: true, automatedArgvShape: null },
   { name: "plan-source-recovery", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
@@ -495,6 +498,14 @@ function parse(args) {
     if(Object.keys(output).some(key=>!allowed.has(key)))return {error:"Git creation command has unexpected flags"};
     const names=args.slice(1).filter(arg=>arg.startsWith("--"));if(new Set(names).size!==names.length)return {error:"Git creation command has duplicate flags"};
     if(output.command==="apply-enrollment-git-creation"&&(!output.activate||!output.requestCreateGit||!output.planSha256))return {error:"Git creation requires --request-create-git --plan-sha256 --activate"};
+  }
+  if (["plan-existing-trust-anchor", "materialize-existing-trust-anchor"].includes(output.command)) {
+    const mutation = output.command === "materialize-existing-trust-anchor";
+    const allowed = new Set(["command", "activate", "intent", "root", "runner", ...(mutation ? ["planSha256"] : [])]);
+    const names = args.slice(1).filter(arg => arg.startsWith("--"));
+    if (Object.keys(output).some(key => !allowed.has(key)) || new Set(names).size !== names.length
+      || names.includes("--intent") || (!mutation && output.activate)
+      || (mutation && (!output.activate || !output.planSha256))) return { error: "existing public anchor command has an invalid closed argv shape" };
   }
   if (output.activate && !APPLY_SHAPED_COMMANDS.has(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
@@ -855,6 +866,14 @@ export function main(args = process.argv.slice(2), {
         output=applyEnrollmentGitCreation({plan:planned.plan,planSha256:options.planSha256,requestCreateGit:options.requestCreateGit,activate:options.activate});
       }
     }
+    else if (options.command === "plan-existing-trust-anchor") output = planExistingPublicTrustAnchorMaterialization({ rootDir: options.root, runner: options.runner });
+    else if (options.command === "materialize-existing-trust-anchor") {
+      const planned = planExistingPublicTrustAnchorMaterialization({ rootDir: options.root, runner: options.runner });
+      output = planned.status !== "planned" ? planned
+        : planned.planSha256 !== options.planSha256
+          ? { schema: EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA, status: "refused", ok: false, code: "TRUST-ANCHOR-PLAN-DRIFT", stateDisposition: "unchanged", nextAction: null }
+          : applyExistingPublicTrustAnchorMaterialization(planned);
+    }
     else if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent, runner: options.runner });
     else if (options.command === "plan-reinstall") output = planProjectOnboardingReinstall({ rootDir: options.root, deps });
     else if (options.command === "apply-reinstall") output = applyProjectOnboardingReinstall({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
@@ -1051,6 +1070,7 @@ export function main(args = process.argv.slice(2), {
     };
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
+  if (output.schema === EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA) return output.ok === true ? 0 : 1;
   if(output.schema===ENROLLMENT_GIT_CREATION_SCHEMA)return ["planned","created","retained","refused"].includes(output.status)?0:1;
   // Wave 4 step 4 (NVA-W4-COORD-2): intake-generate-plan is `{ schema, root,
   // ..., planSha256, targets }` shaped, no `status` field -- same

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const { devPlanShellRefusalHit } = await import(new URL('./devplan-shell-lane.mjs', import.meta.url));
 const { isExactObservedOnboardingNextAction, isSanctionedLifecycleCommand } = await import(new URL('./command-catalogue.mjs', import.meta.url));
-const { registerTestCaseCompletion } = await import(new URL('../test-case-completion.mjs', import.meta.url));
+import { registerTestCaseCompletion } from '../test-case-completion.mjs';
 const repository = fileURLToPath(new URL('../../../../', import.meta.url));
 // No fixture is materialized; these paths only anchor injected observations.
 const root = join(repository, 'scratch/.devplan-shell-lane-recovery-fixture');

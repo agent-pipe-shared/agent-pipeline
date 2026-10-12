@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
- * design-approval-route.e2e.test.mjs -- RED end-to-end contract for the ADR-0085 route (row 2, test-only).
+ * design-approval-route.e2e.test.mjs -- current canonical DAB fixture successor (test-only).
+ * Original a4d6 route/retirement history remains immutable in the source proposal.
+ * Current feature approval retains the original v8 projection in a physical
+ * accepted envelope and publishes the closed v9 State reference. This test
+ * supplies genuine owner capabilities; platform support is never fabricated.
+ * Native Windows execution requires the Source-owned requester/Registry/domain
+ * backend and the coherent selected State writer; no skip is a passing course.
  *
  * Run: node --test plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
  *
@@ -8,7 +14,7 @@
  * Ruling 77 in specs/sprint-alfred-epic/plans/0.7-execution-order.md, API contract
  * specs/sprint-alfred-epic/plans/adr-0085-u1-u3-api-contract.md (sections 4-5).
  *
- * Every case is expected RED today, each for a "route missing" reason:
+ * Historical a4d6 expectations below are retained as provenance, not current verdicts:
  *   route 1  present-plan has no --review-receipt flag (accepts only --by and --design-workflow-package).
  *   route 2  same first failure; everything after it is unreachable until present-plan works.
  *   route 3  same; the boundary is additionally gated on planApproval.schema === v8 so it cannot pass vacuously.
@@ -59,11 +65,78 @@
  * Never import harness/scripts/pipeline-state.test.mjs (it runs the whole suite on import; TP-5).
  */
 import assert from "node:assert/strict";
-import { after, test } from "node:test";
+import { after } from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+// Original14 Source callbacks; synthetic METHOD fixtures, no native/Human grant.
+const originalDesignCases = [
+  {
+    "id": "DABC001",
+    "name": "compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State"
+  },
+  {
+    "id": "DABR001",
+    "name": "route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command"
+  },
+  {
+    "id": "DABR002",
+    "name": "route 2: one design proof, approve-plan, and the closed v9 accepted-contract record"
+  },
+  {
+    "id": "DABR003",
+    "name": "route 3: the boundary library admits the current approved v9 accepted-contract record"
+  },
+  {
+    "id": "DABR004",
+    "name": "route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve"
+  },
+  {
+    "id": "DABV001",
+    "name": "decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt"
+  },
+  {
+    "id": "DABX001",
+    "name": "retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED"
+  },
+  {
+    "id": "DABX002",
+    "name": "retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan)"
+  },
+  {
+    "id": "DABX003",
+    "name": "retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)"
+  },
+  {
+    "id": "DABX004",
+    "name": "retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)"
+  },
+  {
+    "id": "DABX005",
+    "name": "retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)"
+  },
+  {
+    "id": "DABX006",
+    "name": "retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)"
+  },
+  {
+    "id": "DABX007",
+    "name": "retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)"
+  },
+  {
+    "id": "DABX008",
+    "name": "retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)"
+  }
+];
+const designCompletionCases = [];
+function test(name, run) {
+  const declared = originalDesignCases.find(row => row.name === name);
+  assert.ok(declared, "original design case must be declared");
+  designCompletionCases.push({ ...declared, run });
+}
+
 import { spawnSync } from "node:child_process";
-import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
+import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { userInfo } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -83,6 +156,8 @@ const V7_FIELDS = ["designAdvisorAdmissionSha256", "designWorkflowPackagePath", 
 const V8_KEYS = ["schema", "approvedBy", "approvedAt", "submissionSha256", "profileSha256", "poGateAuthority",
   "priorInvalidationSha256", "designApprovalBinding", "designApproval"];
 const V8_REQUIRED = V8_KEYS.filter((key) => key !== "priorInvalidationSha256");
+const V9_KEYS = [...V8_KEYS, "acceptedContract"];
+const V9_REQUIRED = [...V8_REQUIRED, "acceptedContract"];
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const loadLib = (name) => import(pathToFileURL(join(PLUGIN_ROOT, "lib", name)).href);
@@ -91,8 +166,35 @@ async function tryLoadLib(name) {
 }
 
 const DIRS = [];
+const FIXTURE_GIT_ENVIRONMENTS = new Map();
 function tmp(prefix) {
-  const dir = mkdtempSync(join(tmpdir(), `design-route-${prefix}-`));
+  // Source-owned test storage: never place authority below a writable /tmp
+  // ancestor or depend on the Verify runner's repository working directory.
+  const base = userInfo().homedir;
+  assert.equal(realpathSync(base), base, "fixture home must be canonical");
+  const home = lstatSync(base);
+  assert.ok(home.isDirectory() && !home.isSymbolicLink());
+  if (process.platform !== "win32") assert.equal(home.uid, process.getuid());
+  let cursor = base;
+  while (true) {
+    const entry = lstatSync(cursor);
+    assert.ok(entry.isDirectory() && !entry.isSymbolicLink());
+    assert.equal(realpathSync(cursor), cursor);
+    if (process.platform !== "win32") assert.equal(entry.mode & 0o022, 0);
+    assert.equal(existsSync(join(cursor, ".git")), false, "fixture must be outside Git discovery");
+    const next = dirname(cursor);
+    if (next === cursor) break;
+    cursor = next;
+  }
+  const dir = mkdtempSync(join(base, `design-route-${prefix}-`));
+  const created = lstatSync(dir);
+  assert.ok(created.isDirectory() && !created.isSymbolicLink());
+  if (process.platform !== "win32") {
+    assert.equal(created.uid, process.getuid());
+    assert.equal(created.mode & 0o077, 0);
+  }
+  // buildSubmittedFeature retains the genuine Windows DACL hardening before
+  // writing any fixture inputs or initializing Git or producer authority.
   DIRS.push(dir);
   return dir;
 }
@@ -101,7 +203,7 @@ after(() => {
 });
 
 function git(dir, ...args) {
-  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8", env: FIXTURE_GIT_ENVIRONMENTS.get(dir), timeout: 120_000 });
   if (result.status !== 0) throw new Error(`fixture git ${args.join(" ")} failed: ${result.stderr}`);
   return result.stdout;
 }
@@ -109,13 +211,175 @@ function writeFileIn(dir, rel, text) {
   mkdirSync(join(dir, ...rel.split("/").slice(0, -1)), { recursive: true });
   writeFileSync(join(dir, ...rel.split("/")), text);
 }
+let stateModule;
 function readState(dir) {
-  return JSON.parse(readFileSync(join(dir, ".claude", "pipeline-state.json"), "utf8"));
+  return JSON.parse(readFileSync(stateModule.statePath(dir), "utf8"));
 }
 function cli(fx, args) {
   fx.ledger.push(args[0]);
   const result = spawnSync(process.execPath, [CLI, ...args], { cwd: fx.dir, encoding: "utf8", env: fx.env, timeout: 120_000 });
   return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "", error: result.error };
+}
+// These handles are issued by the real Source owners. The fixture never
+// promotes a serialized METHOD assurance, PID, session identity or approval.
+const ROUTE_PARTICIPANTS = ["onboarding-continuity", "human-guard-override", "chat-gate",
+  "state-push-challenge", "native-goldfish", "managed-codex", "agy-session-consent",
+  "agy-family-dispatch", "model-family-host", "afk-ledger", "session-power", "local-worker-supervisor"];
+function readRouteMember(fx) {
+  const owner = fx.routeOwner;
+  assert.ok(owner.memberPath.startsWith(".git/agent-pipeline/session-authority/members/onboarding-continuity/"));
+  const path = join(owner.repository.commonDir, owner.memberPath.slice(5));
+  const before = lstatSync(path);
+  assert.ok(before.isFile() && !before.isSymbolicLink() && before.nlink === 1);
+  if (process.platform !== "win32") {
+    assert.equal(before.uid, process.getuid());
+    assert.equal(before.mode & 0o077, 0);
+  } else {
+    // The genuine Windows requester/domain backend remains a prerequisite;
+    // this observation cannot mint or replace its private capabilities.
+    assert.equal(owner.windows.assessWindowsPrivatePath(path).status, "secure");
+  }
+  const bytes = readFileSync(path), after = lstatSync(path);
+  for (const key of ["dev", "ino", "mode", "nlink", "size", "mtimeMs", "ctimeMs"])
+    assert.equal(after[key], before[key], `fixture member physical ${key} conserved`);
+  assert.equal(bytes.length, before.size);
+  const value = JSON.parse(bytes);
+  assert.equal(value.producerId, "onboarding-continuity");
+  assert.equal(value.phase, "armed");
+  return { value, ref: { path: owner.memberPath, sha256: sha256(bytes), size: bytes.length } };
+}
+async function bindRouteOwner(fx) {
+  const lifecycle = await loadLib("worktree-lifecycle.mjs");
+  const bridge = await loadLib("session-requester-bridge.mjs");
+  const observers = await loadLib("session-authority-observers.mjs");
+  const registry = await loadLib("session-authority-registry.mjs");
+  const continuity = await loadLib("onboarding-continuity.mjs");
+  const windows = await loadLib("windows-private-state.mjs");
+  const repository = lifecycle.inspectSignedDescriptorCustodyRepository(fx.dir);
+  // No platform skip or CallerJSON native-positive fallback. An unavailable
+  // native producer remains a real prerequisite failure before presentation.
+  const runtime = bridge.createControlledMethodRuntimeFixture({ repository,
+    fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/design-approval-route"),
+    sessionId: "design-approval-route-fixture" });
+  const ports = observers.createSessionAuthorityParticipantPorts({ repository });
+  assert.deepEqual(ports.map(row => row.producerId), ROUTE_PARTICIPANTS);
+  assert.equal(registry.initializeSessionAuthorityRegistry({ repository }, ports).status, "initialized");
+  const port = ports.find(row => row.producerId === "onboarding-continuity").port;
+  assert.equal(typeof port.executeCompanionOperation, "function");
+  const owner = { repository, runtime, port, windows };
+  await runtime.run(async () => {
+    const observed = continuity.observeSessionCleanupState(fx.dir);
+    const prepared = port.prepareOperation({ requesterHandle: runtime.requesterHandle, entry: "bind",
+      input: { expectedStateSha256: observed.stateSha256, expectedRevision: observed.revision } });
+    assert.equal(prepared.status, "prepared");
+    const operation = port.observeOperation(prepared.operationHandle);
+    const reserved = registry.withSessionAuthorityBoundary({ repository }, boundary =>
+      registry.reserveSessionAuthorityMember({ boundary, producerPort: port,
+        association: operation.association, operationHandle: prepared.operationHandle }));
+    const executed = await port.executeOperation({ operationHandle: prepared.operationHandle,
+      memberHandle: reserved.memberHandle, expectedMemberRef: reserved.memberRef });
+    assert.equal(executed.status, "executed");
+    Object.assign(owner, { operationHandle: prepared.operationHandle,
+      executionHandle: executed.executionHandle, memberPath: reserved.memberRef.path });
+  });
+  fx.routeOwner = owner;
+  readRouteMember(fx);
+}
+async function ownedCli(fx, args) {
+  assert.ok(["present-plan", "approve-plan"].includes(args[0]));
+  fx.ledger.push(args[0]);
+  const owner = fx.routeOwner, member = readRouteMember(fx);
+  const request = { operationHandle: owner.operationHandle, executionHandle: owner.executionHandle,
+    expectedMemberRef: member.ref, expectedStateSha256: sha256(readFileSync(stateModule.statePath(fx.dir))),
+    entry: args[0], argv: [...args] };
+  const stdout = [], stderr = [], saved = { log: console.log, error: console.error, warn: console.warn };
+  console.log = (...values) => stdout.push(values.map(String).join(" "));
+  console.error = console.warn = (...values) => stderr.push(values.map(String).join(" "));
+  let result;
+  try { result = await owner.runtime.run(() => owner.port.executeCompanionOperation(request)); }
+  finally { Object.assign(console, saved); }
+  assert.equal(result.status, "completed", `actual owned command prerequisite: ${JSON.stringify(result)}`);
+  assert.deepEqual(result.memberRef, readRouteMember(fx).ref);
+  assert.equal(result.statePostimage.sha256, sha256(readFileSync(stateModule.statePath(fx.dir))));
+  return { status: result.exitCode, stdout: stdout.join("\n"), stderr: stderr.join("\n"), error: undefined };
+}
+function physicalRouteArtifact(fx, path) {
+  assert.ok(typeof path === "string" && !path.includes("\\") && !path.startsWith("/")
+    && path.split("/").every(part => part && part !== "." && part !== ".."));
+  let target = realpathSync(fx.dir);
+  for (const part of path.split("/")) {
+    target = join(target, part);
+    assert.equal(lstatSync(target).isSymbolicLink(), false);
+    assert.equal(realpathSync(target), target);
+    if (process.platform === "win32")
+      assert.equal(fx.routeOwner.windows.assessWindowsPrivatePath(target).status, "secure");
+  }
+  const before = lstatSync(target);
+  assert.ok(before.isFile() && before.nlink === 1 && before.size <= 1048576);
+  const bytes = readFileSync(target), after = lstatSync(target);
+  const fact = info => ({ dev: String(info.dev), ino: String(info.ino), mode: info.mode,
+    nlink: info.nlink, size: info.size, mtimeMs: info.mtimeMs, ctimeMs: info.ctimeMs });
+  assert.deepEqual(fact(after), fact(before));
+  assert.equal(bytes.length, before.size);
+  return { path, bytes, sha256: sha256(bytes), identity: fact(before) };
+}
+async function registerActualRouteAcceptedContract(out) {
+  const { fx } = out, state = readState(fx.dir), ref = state.planApproval?.acceptedContract;
+  assert.equal(state.planApproval?.schema, "pipeline.plan-approval.v9");
+  assert.equal(state.planApproved, true);
+  assert.deepEqual(Object.keys(ref).sort(), ["path", "schema", "sha256"]);
+  assert.equal(ref.schema, "pipeline.accepted-delivery-contract-reference.v1");
+  assert.match(ref.sha256, /^[a-f0-9]{64}$/u);
+  assert.equal(ref.path, `specs/e2e/evidence/accepted-delivery-contract-${ref.sha256}.json`);
+  const beforeState = readFileSync(stateModule.statePath(fx.dir)), beforeMember = readRouteMember(fx);
+  const beforeCandidate = git(fx.dir, "rev-parse", "HEAD", "HEAD^{tree}");
+  const physical = physicalRouteArtifact(fx, ref.path), envelope = JSON.parse(physical.bytes);
+  assert.equal(physical.sha256, ref.sha256);
+  const { canonical } = await loadLib("po-approval-proof.mjs");
+  assert.equal(physical.bytes.toString("utf8"), canonical(envelope));
+  assert.deepEqual(Object.keys(envelope).sort(), ["approval", "featureId", "manifestPath", "policyBinding",
+    "repositoryFingerprint", "request", "schema", "submission"]);
+  assert.equal(envelope.schema, "pipeline.accepted-delivery-contract-evidence.v1");
+  assert.equal(envelope.featureId, FEATURE_ID);
+  assert.equal(envelope.manifestPath, "specs/e2e/lifecycle.json");
+  assert.deepEqual(envelope.request, out.request);
+  const projection = { ...state.planApproval, schema: "pipeline.plan-approval.v8" };
+  delete projection.acceptedContract;
+  assert.deepEqual(envelope.approval, projection);
+  const sourcePaths = [PLAN_PATH, SPEC_PATH, "specs/e2e/acceptance.md", "specs/e2e/result.md"];
+  const sources = sourcePaths.map(path => physicalRouteArtifact(fx, path));
+  const request = physicalRouteArtifact(fx, relative(fx.dir, out.requestAbs).split(sep).join("/"));
+  const artifact = (kind, source, authority, mutability, retention) =>
+    ({ class: kind, path: source.path, sha256: source.sha256, authority, mutability, retention });
+  const packageValue = { schema: "pipeline.feature-package.v1", feature: { id: FEATURE_ID, rigor: 2 }, state: "approved",
+    artifacts: [artifact("prd", sources[0], true, "mutable", "active"), artifact("spec", sources[1], true, "mutable", "active"),
+      artifact("acceptance", sources[2], true, "mutable", "active"), artifact("result", sources[3], true, "mutable", "active"),
+      artifact("candidate-evidence", physical, false, "immutable", "retain")],
+    candidate: structuredClone(out.request.approvalIntent.value.candidate), supersedes: null };
+  const target = join(fx.dir, envelope.manifestPath), bytes = Buffer.from(`${JSON.stringify(packageValue, null, 2)}\n`);
+  assert.equal(existsSync(target), false, "exclusive synthetic canonical registration input");
+  const fd = openSync(target, "wx", 0o600);
+  try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
+  assert.deepEqual(physicalRouteArtifact(fx, envelope.manifestPath).bytes, bytes);
+  const topology = await loadLib("feature-package-topology.mjs");
+  const validated = topology.validateFeaturePackage(fx.dir, envelope.manifestPath);
+  assert.equal(validated.ok, true, JSON.stringify(validated.findings));
+  const resolved = topology.resolveCanonicalArtifactIdentity(fx.dir, ref.path);
+  assert.equal(resolved.status, "resolved");
+  assert.deepEqual({ featureId: resolved.identity.featureId, manifest: resolved.identity.manifest,
+    path: resolved.identity.path, sha256: resolved.identity.sha256, class: resolved.identity.class,
+    authority: resolved.identity.authority, mutability: resolved.identity.mutability, retention: resolved.identity.retention },
+    { featureId: FEATURE_ID, manifest: envelope.manifestPath, path: ref.path, sha256: ref.sha256,
+      class: "candidate-evidence", authority: false, mutability: "immutable", retention: "retain" });
+  assert.deepEqual(readFileSync(stateModule.statePath(fx.dir)), beforeState);
+  assert.deepEqual(readRouteMember(fx), beforeMember);
+  assert.equal(git(fx.dir, "rev-parse", "HEAD", "HEAD^{tree}"), beforeCandidate);
+  for (const source of [physical, request, ...sources])
+    assert.deepEqual(physicalRouteArtifact(fx, source.path), source);
+  out.acceptedEnvelope = envelope;
+  out.acceptedPhysical = physical;
+  out.accepted = stateModule.readAcceptedDeliveryContract({ dir: fx.dir, envelopePath: ref.path });
+  assert.equal(out.accepted.ok, true, JSON.stringify(out.accepted));
 }
 function collectStrings(value, out = new Set(), depth = 0) {
   if (depth > 6 || value === null || value === undefined) return out;
@@ -140,12 +404,23 @@ function continuityRequest(authority) {
 
 /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
 async function buildSubmittedFeature(prefix) {
+  stateModule ??= await import(pathToFileURL(CLI).href);
+  const governance = await loadLib("governance-scope.mjs");
   const poGate = await loadLib("po-gate-authority.mjs");
   const windows = await loadLib("windows-private-state.mjs");
   const receiptLib = await loadLib("design-review-receipt.mjs");
   const dir = tmp(prefix);
   const home = tmp(`${prefix}-home`);
-  const env = { ...process.env, CLAUDE_PROJECT_DIR: dir, HOME: home, USERPROFILE: home };
+  if (process.platform === "win32") {
+    assert.equal(windows.hardenWindowsPrivateDirectory(dir).status, "secure");
+    assert.equal(windows.hardenWindowsPrivateDirectory(home).status, "secure");
+  }
+  const globalConfig = join(home, "empty-gitconfig"), template = join(home, "empty-template");
+  writeFileSync(globalConfig, "", { flag: "wx", mode: 0o600 });
+  mkdirSync(template, { mode: 0o700 });
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: dir, HOME: home, USERPROFILE: home,
+    GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1", GIT_TEMPLATE_DIR: template };
+  FIXTURE_GIT_ENVIRONMENTS.set(dir, env);
   const fx = { dir, home, env, ledger: [] };
 
   git(dir, "init", "-q");
@@ -156,12 +431,21 @@ async function buildSubmittedFeature(prefix) {
   writeFileIn(dir, "project/pipeline.json", `${JSON.stringify({ schema: "pipeline.project.v1", verify: "echo ok" })}\n`);
   git(dir, "add", "--", "README.md");
   git(dir, "commit", "-q", "-m", "init");
+  writeFileIn(dir, ".gitignore", "scratch/\nproject/pipeline-state.json\n.claude/pipeline-state.json\n");
+  writeFileIn(dir, ".claude/pipeline.json", readFileSync(join(dir, "project/pipeline.json"), "utf8"));
+  git(dir, "add", "--", ".gitignore", "project/pipeline.json", ".claude/pipeline.json");
+  git(dir, "commit", "-q", "-m", "fixture: committed consumer configuration");
+  const controller = governance.createGovernanceScopeController();
+  const enrollment = controller.planDecision({ rootDir: dir, decision: "enroll", by: "Design route fixture" });
+  assert.equal(controller.applyDecision(enrollment, { activate: true, planSha256: enrollment.planSha256 }).state, "active");
 
   // PO-gate authority, mirrored from seedSubprocessPoGateAuthority (harness/scripts/pipeline-state.test.mjs:874-914).
   writeFileIn(dir, "pipeline.user.yaml", "schema: pipeline.user.v1\nlanguage:\n  human_facing: de\n  agent_facing: en\n");
   git(dir, "add", "--", "pipeline.user.yaml");
   git(dir, "commit", "-q", "-m", "fixture: add pipeline policy source", "--", "pipeline.user.yaml");
   writeFileIn(dir, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: de\n");
+  // Initialize the actual neutral authority tier before State/owner capture.
+  writeFileIn(dir, "project/pipeline.yaml", readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"));
 
   const specBytes = Buffer.from("# Test Spec\n", "utf8");
   const specSha256 = sha256(specBytes);
@@ -171,6 +455,8 @@ async function buildSubmittedFeature(prefix) {
   writeFileIn(dir, COMPANION_PATHS[0], "# Design\n");
   writeFileIn(dir, COMPANION_PATHS[1], "| ID | Evidence |\n| --- | --- |\n");
   writeFileIn(dir, REPORT_PATH, "# Design review 1\nVerdict: pass.\n");
+  writeFileIn(dir, "specs/e2e/acceptance.md", "# Controlled route acceptance\n");
+  writeFileIn(dir, "specs/e2e/result.md", "# Controlled route result\n");
 
   const gitCommonDir = join(dir, ".git");
   const receipt = poGate.createPoGateProfileReceipt({
@@ -181,12 +467,12 @@ async function buildSubmittedFeature(prefix) {
     updatedAt: FIXED_AT,
   });
   const receiptFile = poGate.poGateProfileReceiptPath(gitCommonDir);
-  mkdirSync(join(gitCommonDir, "agent-pipeline", "po-gate"), { recursive: true });
+  mkdirSync(join(gitCommonDir, "agent-pipeline", "po-gate"), { recursive: true, mode: 0o700 });
   if (process.platform === "win32") {
     let cursor = gitCommonDir;
     for (const part of dirname(poGate.PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH).split(/[\\/]/u).filter(Boolean)) {
       cursor = join(cursor, part);
-      windows.hardenWindowsPrivateDirectory(cursor);
+      assert.equal(windows.hardenWindowsPrivateDirectory(cursor).status, "secure");
     }
   }
   writeFileSync(receiptFile, poGate.serializePoGateProfileReceipt(receipt));
@@ -216,7 +502,7 @@ async function buildSubmittedFeature(prefix) {
     trustAnchors: [{ keyReference: fx.signer.keyReference, publicKeySha256: sha256(publicKeyPem) }],
   }, null, 2)}\n`);
 
-  git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, "project/critical-human-proof.json");
+  git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, "project/critical-human-proof.json", "specs/e2e/acceptance.md", "specs/e2e/result.md");
   git(dir, "commit", "-q", "-m", "fixture: finished design sources and review receipt");
 
   const featureSet = cli(fx, ["set-feature", "--id", FEATURE_ID, "--plan-path", PLAN_PATH]);
@@ -226,7 +512,7 @@ async function buildSubmittedFeature(prefix) {
     humanFacing: "de", planPath: PLAN_PATH, planSha256: sha256(readFileSync(join(dir, PLAN_PATH))),
     specPath: SPEC_PATH, specSha256: sha256(readFileSync(join(dir, SPEC_PATH))),
   }), null, 2)}\n`);
-  const initialized = cli(fx, ["continuity-init", "--expected-revision", "absent", "--request-file", requestRel, "--lock-token", "token-00000001"]);
+  const initialized = cli(fx, ["continuity-init", "--expected-revision", "absent", "--request-file", requestRel, "--lock-token", randomBytes(24).toString("hex")]);
   if (initialized.status !== 0) throw new Error(`fixture continuity-init failed: ${initialized.stderr}`);
   const submitted = cli(fx, ["submit-plan", "--by", "coordinator", "--profile", "feature"]);
   if (submitted.status !== 0) throw new Error(`fixture submit-plan --profile feature failed: ${submitted.stderr}`);
@@ -240,8 +526,9 @@ async function runRoute() {
   const out = { steps: [] };
   out.fx = await buildSubmittedFeature("route");
   const { fx } = out;
+  await bindRouteOwner(fx);
   out.dispatchBefore = readState(fx.dir).continuity?.queueHead?.dispatch ?? null;
-  out.present = cli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
+  out.present = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
   if (out.present.status !== 0) return out;
   const signLines = out.present.stdout.split(/\r?\n/u).filter((line) => /sign-intent/u.test(line));
   out.signLines = signLines;
@@ -259,7 +546,8 @@ async function runRoute() {
   out.proofAbs = join(dirname(out.requestAbs), basename(out.requestAbs).replace("request", "proof"));
   writeFileSync(out.proofAbs, `${JSON.stringify(proof, null, 2)}\n`);
   const requestRel = relative(realpathSync(fx.dir), realpathSync(out.requestAbs)).split(sep).join("/");
-  out.approve = cli(fx, ["approve-plan", "--by", "po-test", "--design-approval-request", requestRel]);
+  out.approve = await ownedCli(fx, ["approve-plan", "--by", "po-test", "--design-approval-request", requestRel]);
+  if (out.approve.status === 0) await registerActualRouteAcceptedContract(out);
   out.stateAfter = readState(fx.dir);
   return out;
 }
@@ -283,7 +571,7 @@ test("route 1: present-plan --review-receipt accepts finished sources and hands 
   }
 });
 
-test("route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record", async (t) => {
+test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {
   const run = await routeRun();
   t.diagnostic(`present-plan exit ${run.present.status}; stderr: ${run.present.stderr.trim()}`);
   assert.equal(run.present.status, 0, `present-plan --review-receipt must exit 0 first; stderr: ${run.present.stderr}`);
@@ -293,9 +581,9 @@ test("route 2: sign, approve-plan --design-approval-request, and a pipeline.plan
   const state = run.stateAfter;
   assert.equal(state.planApproved, true);
   const record = state.planApproval;
-  assert.equal(record.schema, "pipeline.plan-approval.v8");
-  for (const key of V8_REQUIRED) assert.ok(key in record, `v8 record has ${key}`);
-  for (const key of Object.keys(record)) assert.ok(V8_KEYS.includes(key), `v8 record has no key outside the closed set: ${key}`);
+  assert.equal(record.schema, "pipeline.plan-approval.v9");
+  for (const key of V9_REQUIRED) assert.ok(key in record, `v9 record has ${key}`);
+  for (const key of Object.keys(record)) assert.ok(V9_KEYS.includes(key), `v9 record has no key outside the closed set: ${key}`);
   for (const key of V7_FIELDS) assert.equal(key in record, false, `v8 record drops ${key}`);
   assert.notEqual(record.designApprovalBinding, null);
   assert.equal(record.designApproval.schema, "pipeline.design-approval.v1");
@@ -305,14 +593,29 @@ test("route 2: sign, approve-plan --design-approval-request, and a pipeline.plan
   const { canonical } = await loadLib("po-approval-proof.mjs");
   assert.equal(record.designApproval.bindingSha256, sha256(canonical(record.designApprovalBinding)));
   assert.equal(record.designApproval.bindingSha256, run.request.bindingSha256);
+  assert.equal(record.designApproval.proofSha256, sha256(canonical(record.designApproval.proof)));
+  assert.deepEqual(Object.keys(record.acceptedContract).sort(), ["path", "schema", "sha256"]);
+  assert.equal(record.acceptedContract.schema, "pipeline.accepted-delivery-contract-reference.v1");
+  assert.equal(record.acceptedContract.sha256, run.acceptedPhysical.sha256);
+  assert.equal(record.acceptedContract.path, run.acceptedPhysical.path);
+  assert.equal(run.accepted.envelopeSha256, record.acceptedContract.sha256);
+  assert.equal(run.accepted.authorityBasis, "signature");
+  assert.equal(run.accepted.cryptographicallyAuthenticated, true);
+  assert.equal(run.accepted.bindingSha256, run.request.bindingSha256);
+  assert.equal(run.accepted.intentSha256, run.request.approvalIntent.sha256);
+  assert.deepEqual(run.accepted.candidate, run.request.approvalIntent.value.candidate);
+  assert.deepEqual(run.acceptedEnvelope.request, run.request);
 });
 
-test("route 3: the boundary library admits the approved v8 record", async (t) => {
+test("route 3: the boundary library admits the current approved v9 accepted-contract record", async (t) => {
   const run = await routeRun();
   assert.equal(run.present.status, 0, `present-plan --review-receipt must exit 0 first; stderr: ${run.present.stderr}`);
   assert.equal(run.approve?.status, 0, `approve-plan must exit 0 first; stderr: ${run.approve?.stderr}`);
   const state = run.stateAfter;
-  assert.equal(state.planApproval?.schema, "pipeline.plan-approval.v8", "an unapproved state must not read ok:true here");
+  assert.equal(state.planApproval?.schema, "pipeline.plan-approval.v9", "an unapproved state must not read ok:true here");
+  const accepted = stateModule.readAcceptedDeliveryContract({ dir: run.fx.dir, envelopePath: state.planApproval.acceptedContract.path });
+  assert.equal(accepted.ok, true, JSON.stringify(accepted));
+  assert.equal(accepted.envelopeSha256, state.planApproval.acceptedContract.sha256);
   const loaded = await tryLoadLib("guard-devplan-policy.mjs");
   assert.ok(loaded.ok, `guard-devplan-policy.mjs imports: ${loaded.error?.message}`);
   assert.equal(typeof loaded.mod.designAdvisoryAdmission, "function");
@@ -331,10 +634,27 @@ test("route 4: zero continuity-cas -- queueHead.dispatch stays unregistered acro
   assert.equal(run.fx.ledger.includes("continuity-cas"), false, "the route never needs the continuity-cas verb");
 });
 
+test("compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State", async () => {
+  const run = await routeRun();
+  assert.equal(run.approve?.status, 0);
+  const { validCurrentPlanApproval } = await loadLib("plan-spec-state-v2.mjs");
+  const { createAcceptedDeliveryContractEnvelope } = await loadLib("critic-accepted-contract.mjs");
+  const original = run.acceptedEnvelope.approval;
+  assert.equal(original.schema, "pipeline.plan-approval.v8");
+  assert.equal(validCurrentPlanApproval(original), true, "retained v8 structural API compatibility only");
+  for (const key of V8_REQUIRED) assert.ok(key in original);
+  for (const key of Object.keys(original)) assert.ok(V8_KEYS.includes(key));
+  const made = createAcceptedDeliveryContractEnvelope(Object.fromEntries(Object.entries(run.acceptedEnvelope).filter(([key]) => key !== "schema")));
+  assert.equal(made.ok, true);
+  assert.equal(made.sha256, run.stateAfter.planApproval.acceptedContract.sha256);
+  assert.equal(readState(run.fx.dir).planApproval.schema, "pipeline.plan-approval.v9");
+  assert.equal("acceptedContract" in original, false, "no current-State or authority adoption from the v8 projection");
+});
+
 test("decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt", async (t) => {
   const fx = await buildSubmittedFeature("decision-v");
   const { sha256CanonicalJson } = await loadLib("plan-spec-state-v2.mjs");
-  const statePath = join(fx.dir, ".claude", "pipeline-state.json");
+  const statePath = stateModule.statePath(fx.dir);
   const state = readState(fx.dir);
   const packageSha256 = "d".repeat(64);
   state.planPresentation = {
@@ -405,3 +725,9 @@ test("retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
     assert.ok(strings.has(code), `the table holds ${code}`);
   }
 });
+
+// Every original callback registers exactly once with the official FD3 protocol.
+assert.equal(designCompletionCases.length, originalDesignCases.length);
+const sortedDesignCases = designCompletionCases.sort((a, b) => a.id.localeCompare(b.id));
+assert.deepEqual(sortedDesignCases.map(({id,name}) => ({id,name})), originalDesignCases);
+registerTestCaseCompletion({ cases: sortedDesignCases, fd: 3, maxBytes: 16384 });

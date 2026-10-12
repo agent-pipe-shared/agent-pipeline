@@ -1,36 +1,65 @@
-# Epic/feature design course
+# Epic/feature design approval
 
 Load this before the first `submit-plan` for an `epic` or `feature`. The
-Coordinator owns the sequence; routine package preparation is agent work.
+Coordinator owns the sequence; routine preparation is agent work. ADR-0085
+governs the receipt-based flow: one independent design review, at most one delta
+follow-up, and one final PO decision. Do not assemble a design-workflow package
+or register an authoring dispatch as an approval input.
 
-1. Commit the material input, PRD, Spec, design and traceability sources as a
-   coherent candidate. Run deterministic path, hash, reference and configured
-   Verify checks before spending a model review. Check only explicit,
-   machine-checkable domain rules; do not invent arithmetic from prose.
-2. Dispatch the one initial Advisor course against that committed candidate
-   **before asking the PO to approve a plan**. Use the runner's registered host
-   route and export consent. Record its answer and disposition. If the host
-   cannot deliver an Advisor, use the typed unavailable course and preserve
-   its evidence for the final PO exception; never wait indefinitely or claim
-   an Advisor answer.
-3. Apply material Advisor findings to the source set, commit the revision, and
-   run deterministic checks again. The agent then calls `submit-plan`; this
-   mechanical submission requires no human signature or plan-submission
-   permission. If the current course is terminal for the same question, reuse
-   its bounded receipt rather than dispatching a second Advisor.
-4. Run independent design readiness on the current candidate and source
-   hashes. Correct blocking findings, rerun the checks affected by changed
-   inputs, and bind final readiness to all current sources. Do not treat a
-   prior readiness receipt as current after a material source change.
-5. Assemble the v2 design-workflow package and call `present-plan`. The
-   package validator checks Advisor/exception and readiness provenance before
-   creating the **single final PO plan-approval request**. Only that final
-   decision can open implementation.
+Normal architecture/design choices use Chat tiles with concrete options,
+tradeoffs and a recommendation. Preserve the PO's actual selections, affected
+contracts and digest-bound decision lineage in this same fixed design submission.
+The configured final design approval covers those selected decisions together
+with the design; when a signature is required, obtain one bundled design
+signature. No separate normal ADR terminal, activation or adoption signature is
+added. After genuine aggregate approval, the sanctioned source consumer verifies
+the binding and materializes the approved records internally. Chat selections
+alone do not grant implementation authority or let an agent self-approve records.
+Exceptional recovery and higher-layer exceptions retain their applicable checks.
 
-The current `pipeline-state inspect` awaiting-approval action asks for a
-complete package path; it does not execute the Advisor or readiness host
-routes. Follow the steps above before filling that path. The legacy v1
-onboarding test uses an earlier signing order and is not evidence for this
-v2 happy path. A fresh v2 runner test must assert zero PO signatures before
-the final presentation, one final proof, and implementation admission only
-after that proof.
+Advisor capability preflight is model-free for these profiles. Consultation is
+on demand for one concrete question, reason and digest-bound evidence, under
+the existing Advisor-consult contract. Bootstrap, resume, Compact, a configured
+route or export consent does not by itself trigger consultation. There is no
+mandatory initial Advisor course or exception rationale when no consultation
+was needed; capability evidence is not an Advisor answer.
+
+1. Complete the material input, PRD, Spec and bound companions in draft. Finish
+   relevant document corrections before binding the final source hashes.
+   Run deterministic checks for paths, hashes, references and configured
+   verification. Check explicit machine-checkable rules; do not invent
+   arithmetic from prose. Preserve the separately adopted Reader-review course
+   and evidence; it is not the independent technical design review.
+2. Obtain one independent review of the final design sources. Resolve its
+   findings; if sources change, use at most one delta follow-up and bind the
+   final receipt to the current sources. Do not add a separate readiness child
+   that repeats the content review. Preserve the report and canonical review
+   receipt, including the receipt chain when a delta is used.
+3. Use the sanctioned source-binding and document-integration routes. Keep
+   PRD/Spec markers current and commit the finalized sources, bound companions,
+   review reports and receipts. Before presentation every bound path must be
+   a tracked, unmodified regular file. If bound or submitted sources require
+   material edits, use the current inspector's sanctioned draft recovery;
+   never edit authority markers manually or invent a rebind command.
+4. Establish an exact current submission with `submit-plan` when needed. This
+   is mechanical agent work, not another PO permission. Inspect the resulting
+   state. For `epic`/`feature`, use `present-plan --by <presenter>
+   --review-receipt <repo-relative-json-path>`, repeating `--review-receipt`
+   once only when the current review chain includes the delta follow-up.
+   Supply one or two distinct tracked receipts in chain order. The retired
+   `--design-workflow-package` flag is rejected with `DWP-PRESENT-RETIRED`;
+   it is not a recovery route.
+5. The lifecycle writer checks the current source/receipt binding mechanically:
+   PRD/Spec hashes and technical marker, register/traceability consistency,
+   tracked unchanged paths, receipt/report provenance and committed candidate.
+   Resolve typed inconsistencies through the returned sanctioned actions; this
+   check does not judge content or replace the independent review. Present the
+   final design, then follow the inspector's exact action for the configured
+   single PO approval ceremony. Only that final recorded decision opens
+   implementation. No separate package or Advisor-exception approval is added.
+
+`pipeline-state inspect` is the current action authority. Its receipt request
+does not dispatch reviewers or waive ordinary authoring/provenance obligations.
+The approval binding must be rebuilt after material source or review drift;
+an older receipt or approval request is not current evidence. Keep historical
+approval evidence intact and use typed migration hints for retired machinery.

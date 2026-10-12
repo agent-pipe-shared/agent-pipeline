@@ -15,13 +15,38 @@ and the living decision summary.
 
 - **No ADR for every implementation detail:** Routine code edits, localized refactors,
   internal helper changes, and test updates do not trigger an architectural decision.
-- **Agent never approves its own decision or exception:** Agents propose ADRs and
-  evidence; approval, adoption, and waivers are PO-performed via the existing
-  signature-or-chat ceremony duality (`gates.push_approval`).
+- **Agent never approves its own decision or exception:** Agents propose choices
+  and evidence. The PO selects normal architecture/design choices through chat
+  tiles; the agent includes those selections in the common design package.
+  Efficacy follows the required approval of that exact aggregate package, not an
+  agent-written status or a separate ADR approval ceremony.
 - **Prose is not a control:** Architectural decisions exist as versioned machine-readable
   records (`pipeline.architecture-decision.v1` or `.v2`) with bound SHA-256 digests.
   V1 is used for project/global scope. V2 names exact OKF module IDs; its module
   mapping is not effective authority merely because the record says `accepted`.
+  Where design approval is required, its records and source digests must be bound
+  to the approved common design package.
+
+## Normal Design Decision Flow
+
+1. **Propose:** Present concise chat tiles with the material choice, concrete
+   options, tradeoffs and a recommendation. Routine implementation fixes do not
+   need new PO choices. Draft records remain proposed while approval is pending.
+2. **Select:** Preserve the PO's actual chat selection and its scope. Include the
+   selected option, affected contracts and digest-bound decision records in the
+   common design package; do not reopen a selected direction as an adoption question.
+3. **Approve the aggregate:** Use the existing configured design approval mode
+   for the exact fixed package. When a design signature is required, obtain one
+   signature over the complete design package, including its selected decisions.
+   There is no separate normal ADR terminal, signature or adoption ceremony.
+4. **Materialize:** After the required aggregate approval is verified, the
+   sanctioned source consumer materializes the approved records and their lineage.
+   Chat direction alone does not prove an approved design or implementation
+   authority where that proof is required. The agent never self-approves records.
+
+Exceptional recovery, HGO overrides and inherited scoped exceptions keep their
+own applicable authority checks. They are not extra steps in the normal design
+happy path and must not be introduced for each ordinary architectural choice.
 
 ---
 
@@ -51,9 +76,9 @@ When an architectural decision is required, draft a concise ADR in `docs/adr/`:
 - Companion sidecar JSON: `docs/adr/XXXX-<slug>.json` adhering to
   `pipeline.architecture-decision.v1` for project/global scope, or `.v2` for
   an explicit module scope. A v2 record must name sorted, unique module IDs
-  present in the physical OKF map. Its mapping stays advisory until the
-  separately approved, verifiable activation contract is present; do not treat
-  `status: "accepted"` as that approval.
+  present in the physical OKF map. Bind its selected scope and digests to the
+  common design approval where required; do not treat `status: "accepted"`
+  as that proof or request a separate normal activation signature.
 - Compute the SHA-256 digest of the markdown content and record it in `digest`.
 - Include standard ADR sections: Title, Status, Date, Context, Decision, Consequences, and Affected Contracts.
 
@@ -74,7 +99,9 @@ Resolve effective architecture decisions through authority layering:
 
 ### 4. Propose Explicit Human Waiver for Needed Deviation
 When a project requires a deliberate deviation from an inherited decision or rule:
-- Propose an explicit human waiver record with `status: "waived"`.
+- Propose an explicit scoped waiver with intended approved status `waived`.
+  Keep it as a proposal until its applicable aggregate or exceptional authority
+  is verified; do not publish an effective waiver merely by setting that status.
 - Populate `exception`:
   ```json
   {
@@ -85,13 +112,19 @@ When a project requires a deliberate deviation from an inherited decision or rul
   }
   ```
 - A waiver leaves the original authority intact.
-- PO executes the waiver approval via signature-or-chat.
+- Include an ordinary design-scoped waiver choice in the common design package
+  for the same aggregate approval. A genuine exceptional recovery or higher-layer
+  exception still requires its applicable authority; a PO chat tile alone cannot
+  override an unfulfilled mandatory source or an owning higher authority.
 
 ### 5. Supersede Rather than Rewrite
 Architecture decisions are immutable history. When reversing or replacing a decision:
 - Never overwrite or rewrite the previous ADR file.
-- Mark the previous decision `status: "superseded"`.
-- Create a new ADR with `status: "accepted"` and set `supersedes: "<previous-id>"`.
+- Draft the replacement with `status: "proposed"` and `supersedes: "<previous-id>"`.
+- Include the replacement and its historical lineage in the common design
+  package. Only after its required aggregate approval may the sanctioned
+  consumer materialize the replacement as `accepted` and the former record as
+  `superseded`; the agent must not grant those statuses by itself.
 - Preserve the complete lineage and historical context.
 
 ### 6. Update Living Summary and References

@@ -8,8 +8,8 @@
  *   slice-queue.mjs <verb> [<id> [<dep>]] --queue <path> [flags]
  *   verbs: validate | next | add | defer | hold | depend | pause | reap | finish | report
  *
- * `--queue` is explicit (absolute, or relative to the working directory): the default
- * location is an open PO question, so none is hard-coded. Stdout is ONE JSON document;
+ * `--queue` is explicit outside an approved course. Within a governed approved
+ * course it resolves to the active feature directory, matching authenticated admission. Stdout is ONE JSON document;
  * the exit code is typed: 0 ok, 2 usage (SQ-USAGE), 3 invalid queue or refused
  * mutation (the library's SQ-* codes), 4 queue/slice not found (SQ-NOT-FOUND), 5 I/O or
  * ledger failure (SQ-IO / FANOUT-*).
@@ -29,9 +29,13 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, statSync, lstatSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness } from "../lib/native-goldfish-host-state.mjs";
+import { nativeManagedCurrentOwner } from "../lib/native-managed-authority-support.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, FANOUT_FINISH_HOWS, FanoutLedgerError, liveSlices, readEvents } from "../lib/fanout-ledger.mjs";
 import { COMMIT_MODES, loadSliceQueue, LOAD_CLASSES, readyAndLive, SLICE_QUEUE_SCHEMA, SLICE_TIERS, validateSliceQueue } from "../lib/slice-queue.mjs";
@@ -103,7 +107,7 @@ export function parseArguments(argv) {
     else flags[name] = value;
   }
   if (positional.length !== spec.positional) throw usage(`${verb}: expected ${spec.positional} positional argument(s), got ${positional.length}`);
-  if (verb !== "pause" && flags.queue === undefined) throw usage(`${verb}: --queue <path> is required`);
+  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:process.cwd()});if(governed.status==='required')flags.queue=resolve(process.cwd(),governed.path);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
   return { verb, positional, flags };
 }
 
@@ -121,12 +125,14 @@ function requireText(flags, name, verb) {
 
 // ------------------------------------------------------------------ queue file
 
+const queuePreimages=new Map();
 function loadRaw(path, { allowAbsent = false } = {}) {
   const loaded = loadSliceQueue(path, { platform: process.platform });
   if (loaded.status === "absent") {
-    if (allowAbsent) return null;
+    if (allowAbsent){queuePreimages.set(resolve(path),null);return null;}
     throw new CliError("SQ-NOT-FOUND", EXIT.NOT_FOUND, "slice queue file does not exist", { path: displayPath(path) });
   }
+  queuePreimages.set(resolve(path),createHash("sha256").update(readFileSync(path)).digest("hex"));
   return loaded;
 }
 const displayPath = (path) => path;
@@ -136,7 +142,20 @@ function invalidQueue(loaded) {
 }
 
 /** Temp file + rename in the same directory. A failure removes the temp file. */
-export function writeQueueAtomic(path, queue) {
+export function writeQueueAtomic(path,queue) {
+  if(queue.schema!=='pipeline.slice-queue.v2')return writeQueueAtomicBytes(path,queue);
+  const governed=resolveGovernedItemQueue({root:process.cwd()});
+  if(governed.status!=='required'||resolve(process.cwd(),governed.path)!==resolve(path))throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
+  const repository=inspectSignedDescriptorCustodyRepository(process.cwd());
+  return withSessionAuthorityBoundary({repository},()=>{
+    if(nativeManagedCurrentOwner(repository).association.state!=='bound')throw new CliError('SQ-ITEM-OWNER-REQUIRED',EXIT.INVALID,'An actual Source requester is required.');
+    const expected=queuePreimages.get(resolve(path)),info=lstatSync(path);
+    if(expected===undefined||info.isSymbolicLink()||!info.isFile()||realpathSync(path)!==resolve(path)||createHash('sha256').update(readFileSync(path)).digest('hex')!==expected)throw new CliError('SQ-ITEM-QUEUE-CAS',EXIT.INVALID,'The item queue changed since its read.');
+    for(const old of governed.queue.slices){const next=queue.slices.find(row=>row.id===old.id);if(!next||JSON.stringify(next.delivery)!==JSON.stringify(old.delivery)||JSON.stringify(next.writeScope)!==JSON.stringify(old.writeScope))throw new CliError('SQ-ITEM-BINDING-AMENDMENT-REQUIRED',EXIT.INVALID,'Original item binding and scope require the approved continuation.');}
+    return writeQueueAtomicBytes(path,queue);
+  });
+}
+function writeQueueAtomicBytes(path, queue) {
   const directory = dirname(path);
   mkdirSync(directory, { recursive: true });
   const temp = join(directory, `.${basename(path)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
@@ -230,7 +249,9 @@ function deriveStatus(flags, loaded) {
   const live = target === null
     ? []
     : ledgerCall(() => liveSlices({ ...target, evidenceDir, sliceIds, now, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) }));
-  const status = readyAndLive({ queue: loaded.raw, records, live, now }, { platform: process.platform, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) });
+  let integrationReadiness;
+  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:process.cwd()});if(observed.status!=='observed')throw new CliError(observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,'Source integration readiness is unavailable.');integrationReadiness=observed.handle;}
+  const status = readyAndLive({ queue: loaded.raw, records, live, now, integrationReadiness }, { platform: process.platform, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) });
   return { status, target, now };
 }
 

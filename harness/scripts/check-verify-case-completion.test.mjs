@@ -908,6 +908,11 @@ check("VCR31", "strict declarative monotone extension passes the full exact prio
 
 check("VCR32", "static boolean case-presence markers cannot authorize a monotone policy extension", () => {
   const f = fixture();
+  const verifyPath = "harness/scripts/verify.mjs";
+  const verifySource = readFileSync(join(f.root, verifyPath), "utf8");
+  const booleanSource = verifySource.replace('caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["case-one"], maxBytes: 4096 }', "caseCompletion: true");
+  assert.notEqual(booleanSource, verifySource, "the negative fixture must actually carry a boolean instead of an exact policy");
+  write(f.root, verifyPath, booleanSource);
   const previous = declarativePolicy();
   const next = { ...previous, caseIds: ["case-one", "case-two"] };
   write(f.root, AUGMENTATION_FILE, JSON.stringify({ schema: "pipeline.verify-case-completion-augmentations.v1", augmentations: [

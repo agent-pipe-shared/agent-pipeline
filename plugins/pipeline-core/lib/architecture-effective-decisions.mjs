@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { loadMapBundle } from "../scripts/module-inventory.mjs";
+import { readEffectiveDesignArchitectureAuthority } from "./design-decision-bindings.mjs";
 
 const SCHEMA = "pipeline.architecture-effective-decisions.v1";
 const OID = /^[a-f0-9]{64}$/u;
@@ -69,7 +70,7 @@ export function loadPhysicalArchitectureMap(rootDir) {
   } catch { return null; }
 }
 
-export function inspectEffectiveArchitectureDecisions({ rootDir, area, now = new Date().toISOString() } = {}) {
+function inspectStructuralArchitectureDecisions({ rootDir, area, now = new Date().toISOString() } = {}) {
   if (typeof rootDir !== "string" || !isAbsolute(rootDir) || !AREA.test(area ?? "")
     || typeof now !== "string" || !Number.isFinite(Date.parse(now))) {
     return { schema: SCHEMA, status: "blocked", code: "ARCH-DECISION-INPUT-INVALID", area: area ?? null,
@@ -138,9 +139,9 @@ export function inspectEffectiveArchitectureDecisions({ rootDir, area, now = new
       // unscoped decision into authority. An approved schema revision is needed.
       findings.push(finding("module-applicability-unresolved", path));
     }
-    // Accepted v2 module sidecars are effective for their explicitly named
-    // modules once their digest and every module ID have passed the physical
-    // map checks below. A sidecar never widens that scope to another module.
+    // Accepted v2 module sidecars are structural candidates only for their
+    // explicitly named modules after digest and physical map checks. The
+    // production projection separately requires genuine aggregate authority.
     // Waivers still require separately verified authority and stay inactive.
     if (record.exception && record.status !== "waived") {
       findings.push(finding("exception-status-invalid", path));
@@ -198,6 +199,38 @@ export function inspectEffectiveArchitectureDecisions({ rootDir, area, now = new
   projectionSha256: status === "blocked" ? null : digest(JSON.stringify(subject)) };
 }
 
+/** Authoring-only structural view. This never establishes adoption authority. */
+export function inspectArchitectureDecisionAuthoringSources(input = {}) {
+  return { ...inspectStructuralArchitectureDecisions(input), purpose: "structural-authoring-only" };
+}
+
+/** Production planning authority requires the exact original aggregate proof. */
+export function inspectEffectiveArchitectureDecisions(input = {}) {
+  const structural = inspectStructuralArchitectureDecisions(input);
+  if (structural.status === "blocked") return structural;
+  const authority = readEffectiveDesignArchitectureAuthority({ rootDir: resolve(input.rootDir) });
+  const findings = [...structural.findings];
+  if (!authority.ok) {
+    findings.push(finding("aggregate-design-authority-unverified", "project/aggregate-design-architecture-references"));
+    return { ...structural, status: "blocked", code: "ARCH-DECISION-EFFECTIVE-UNRESOLVED",
+      decisions: [], findings, projectionSha256: null };
+  }
+  const approved = new Map(authority.decisions.map(record => [record.id, record]));
+  const decisions = structural.decisions.filter(record => {
+    const verified = approved.get(record.id);
+    const matches = verified && verified.digest === record.digest && verified.path === record.path
+      && verified.scope === record.scope
+      && JSON.stringify(verified.moduleIds) === JSON.stringify(record.moduleIds ?? []);
+    if (!matches) findings.push(finding("decision-adoption-unverified", record.path));
+    return matches;
+  });
+  findings.sort((left,right) => left.path?.localeCompare(right.path ?? "") || left.code.localeCompare(right.code));
+  const status = findings.length ? "advisory" : "ready";
+  const subject = { schema: SCHEMA, status, area: structural.area, decisions, activeExceptions: [], findings };
+  return { ...subject, code: status === "ready" ? "ARCH-DECISION-EFFECTIVE-READY" : "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
+    projectionSha256: digest(JSON.stringify(subject)) };
+}
+
 export function compareEffectiveArchitectureDecisions(left, right) {
   const validProjection = (value) => {
     if (value === null || typeof value !== "object" || Array.isArray(value)
@@ -220,3 +253,6 @@ export function compareEffectiveArchitectureDecisions(left, right) {
       : "ARCH-DECISION-PARITY-MATCH", projectionSha256: left.projectionSha256 }
     : { ok: false, code: "ARCH-DECISION-PARITY-DIVERGENCE" };
 }
+
+/** Reuse the closed physical sidecar syntax; this grants no adoption authority. */
+export const validateArchitectureDecisionSidecar = validDecision;

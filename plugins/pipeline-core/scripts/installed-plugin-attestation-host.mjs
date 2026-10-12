@@ -21,8 +21,8 @@ import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedT
 export const HOST_RESULT_SCHEMA = "pipeline.installed-plugin-attestation-host-result.v1";
 export const INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY = Object.freeze({
   executionBoundary: "host",
-  invocation: "user-copy-only",
-  codexToolCallPermitted: false,
+  invocation: "agent-tool-call",
+  codexToolCallPermitted: true,
 });
 const RECEIPT_SCHEMA = "pipeline.installed-plugin-attestation.v1";
 const REQUEST_SCHEMA = "pipeline.installed-plugin-attestation-authority-request.v1";

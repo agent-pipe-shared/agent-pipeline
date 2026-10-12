@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "../../plugins/pipeline-core/lib/yaml-lite.mjs";
+import { checkObservationDocumentation } from "../../plugins/pipeline-core/lib/observation-doc-classification.mjs";
 
 export const POLICY_PATH = "governance/observation-doc-governance.json";
 const FORM_PATH = ".github/ISSUE_TEMPLATE/observation.yml";
@@ -28,13 +29,6 @@ const REQUIRED_ARTIFACTS = Object.freeze([
   SKILL_PATH,
   PIPELINE_START_PATH,
   CLOSE_BLOCK_PATH,
-]);
-const AUDIENCES = Object.freeze(["public-user", "maintainer", "machine"]);
-const DOCUMENT_LIFECYCLES = Object.freeze([
-  "maintained",
-  "normative-record",
-  "compatibility-redirect",
-  "review-candidate",
 ]);
 const AREA_OPTIONS = Object.freeze([
   "advisory", "afk", "bootstrap", "docs", "guardrails", "lifecycle", "review",
@@ -92,88 +86,6 @@ export function discoverDocumentation(root) {
   if (!existsSync(docsRoot)) return { paths: [], findings: ["OG-DOCS-MISSING docs"] };
   visit(docsRoot);
   return { paths: paths.sort(), findings };
-}
-
-function requireExactPolicy(policy, findings) {
-  if (!exactKeys(policy, ["schema", "canonicalIssue", "lifecycle", "backlog", "privateOverlay", "documentation"])) {
-    findings.push("OG-POLICY-SCHEMA root keys are not exact");
-    return;
-  }
-  if (policy.schema !== "pipeline.observation-doc-governance.v1") findings.push("OG-POLICY-SCHEMA unsupported schema");
-
-  const issue = policy.canonicalIssue;
-  if (!exactKeys(issue, ["scope", "branchIndependent", "initialFormLabels", "controlledAreaLabelAllowed", "securityRoute"])
-      || issue.scope !== "repository-global"
-      || issue.branchIndependent !== true
-      || !exactArray(issue.initialFormLabels, ["kind:observation", "triage:needs-review"])
-      || issue.controlledAreaLabelAllowed !== true
-      || issue.securityRoute !== "private-vulnerability-reporting") {
-    findings.push("OG-ISSUE-AUTHORITY canonical Issue contract drifted");
-  }
-
-  const lifecycle = policy.lifecycle;
-  const expectedTransitions = {
-    observation: ["triage"],
-    triage: ["confirmed"],
-    confirmed: ["known-error", "backlog-link"],
-    "known-error": ["backlog-link"],
-    "backlog-link": [],
-  };
-  if (!exactKeys(lifecycle, ["states", "transitions"])
-      || !exactArray(lifecycle?.states, Object.keys(expectedTransitions))
-      || !exactKeys(lifecycle?.transitions, Object.keys(expectedTransitions))
-      || Object.entries(expectedTransitions).some(([state, targets]) => !exactArray(lifecycle?.transitions?.[state], targets))) {
-    findings.push("OG-LIFECYCLE observation lifecycle drifted");
-  }
-
-  const backlog = policy.backlog;
-  if (!exactKeys(backlog, ["promotion", "requiresStablePublicBranch", "reciprocalLinksRequired", "automaticPromotion"])
-      || backlog.promotion !== "explicit-after-triage"
-      || backlog.requiresStablePublicBranch !== true
-      || backlog.reciprocalLinksRequired !== true
-      || backlog.automaticPromotion !== false) {
-    findings.push("OG-BACKLOG backlog promotion contract drifted");
-  }
-
-  const overlay = policy.privateOverlay;
-  if (!exactKeys(overlay, ["allowedContent", "mayReplacePublicIssue", "mayDuplicatePublicObservation"])
-      || !exactArray(overlay.allowedContent, ["private-deltas", "public-issue-links", "public-backlog-links"])
-      || overlay.mayReplacePublicIssue !== false
-      || overlay.mayDuplicatePublicObservation !== false) {
-    findings.push("OG-OVERLAY private overlay contract drifted");
-  }
-}
-
-function checkInventory(policy, docsPaths, findings) {
-  const documentation = policy?.documentation;
-  if (!exactKeys(documentation, ["audiences", "lifecycles", "inventory"])
-      || !exactArray(documentation?.audiences, AUDIENCES)
-      || !exactArray(documentation?.lifecycles, DOCUMENT_LIFECYCLES)) {
-    findings.push("OG-DOC-AXES documentation audience/lifecycle axes drifted");
-    return;
-  }
-  if (!Array.isArray(documentation.inventory)) {
-    findings.push("OG-DOC-INVENTORY inventory must be an array");
-    return;
-  }
-  const paths = [];
-  for (const [index, entry] of documentation.inventory.entries()) {
-    if (!exactKeys(entry, ["audience", "lifecycle", "paths"])
-        || !AUDIENCES.includes(entry.audience)
-        || !DOCUMENT_LIFECYCLES.includes(entry.lifecycle)
-        || !Array.isArray(entry.paths)
-        || entry.paths.some((path) => typeof path !== "string" || !path.startsWith("docs/"))) {
-      findings.push(`OG-DOC-INVENTORY invalid entry ${index}`);
-      continue;
-    }
-    if (!exactArray(entry.paths, [...entry.paths].sort())) findings.push(`OG-DOC-ORDER inventory group ${index} paths must be sorted`);
-    paths.push(...entry.paths);
-  }
-  if (new Set(paths).size !== paths.length) findings.push("OG-DOC-DUPLICATE inventory paths must be unique");
-  const inventory = new Set(paths);
-  const discovered = new Set(docsPaths);
-  for (const path of docsPaths) if (!inventory.has(path)) findings.push(`OG-DOC-UNCLASSIFIED ${path}`);
-  for (const path of paths) if (!discovered.has(path)) findings.push(`OG-DOC-INVENTORY-STALE ${path}`);
 }
 
 function checkForm(form, chooser, findings) {
@@ -261,8 +173,7 @@ export function checkObservationGovernance(rootInput, options = {}) {
     ? { paths: [...options.docsPaths].sort(), findings: [] }
     : discoverDocumentation(root);
   findings.push(...discovered.findings);
-  requireExactPolicy(policy, findings);
-  checkInventory(policy, discovered.paths, findings);
+  findings.push(...checkObservationDocumentation(policy, discovered.paths).findings);
   checkForm(form, chooser, findings);
   const texts = Object.fromEntries([GOVERNANCE_DOC_PATH, ADR_PATH, ADR_INDEX_PATH, BACKLOG_PATH, SKILL_PATH, PIPELINE_START_PATH, CLOSE_BLOCK_PATH]
     .map((path) => [path, readFileSync(join(root, path), "utf8")]));

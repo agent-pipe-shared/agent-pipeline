@@ -68,10 +68,7 @@ flowchart TD
     R -->|no| G
     G -->|yes, approved| X[Execution preflight and dispatch]
     G -->|no, valid fast path| X
-    X --> TA{Separate test-author task needed?}
-    TA -->|yes| TT[Test-author task and test contract]
-    TA -->|no| IM[Goldfish implements one bounded package]
-    TT --> IM
+    X --> IM[One Goldfish owns analysis, tests, code and targeted fixes for one outcome]
     IM --> CM[Coordinator integrates and commits; clean candidate]
     CM --> V[Configured verify creates machine evidence]
     V -->|red| RC[Classify and recover]
@@ -165,10 +162,7 @@ a *new* reviewer checks it again. Neither an optional readiness decision nor a
 ```mermaid
 flowchart LR
     SP[Approved current Spec] --> PF[Preflight: route, authority, capacity, scope]
-    PF --> TD{Does the task change the test contract?}
-    TD -->|yes| T[Separate test-author]
-    TD -->|no| G[Goldfish implementor]
-    T --> G
+    PF --> G[One Goldfish: complete outcome, tests, code and targeted fixes]
     G --> CM[Coordinator commits a clean candidate]
     CM --> VE[One configured verify command]
     VE -->|green evidence| CR[Fresh read-only Critic]
@@ -185,12 +179,22 @@ flowchart LR
 | Guardrails | Installed runner integration and project configuration. | Configured command and write-path safeguards may refuse unsafe actions before delivery proceeds. | Claude and Antigravity have the documented hook integration; this does not claim those hooks on Codex. |
 | Codex host bridge | Codex host and plugin integration. | The bridge applies only the command and write-path policy its host exposes. | Host lifecycle evidence remains required; no host-independent enforcement or model identity is implied. |
 | Preflight | Elephant and deterministic checks. | Current PRD/Spec, profile/phase route, capacity, scope, and authority bindings still match. | A mismatch defers or opens a course decision; it never becomes an informal dispatch. |
-| Test author — optional | A separately briefed test-author duty. | Use it when the test or gate contract itself must change. | The implementor does not weaken or rewrite the tests that judge its own implementation. Its output is separately reviewable. |
-| Implement | Goldfish. | One fresh-context, self-contained implementation package. Independent packages may run in parallel when files and data do not overlap. | A six-field briefing supplies goal, context, Definition of Done, prohibitions, stop conditions, and dispatch metadata. |
+| Tests within the item | Item Goldfish. | Prepare test cases and add regression tests in the same context as the implementation. | Preserve existing acceptance examiners; expose and justify necessary changes for independent review. Map assertions to original criteria and show product-caused RED evidence. |
+| Implement | Item Goldfish. | Own one complete, independently verifiable acceptance criterion or backlog outcome through targeted checks and fixes. | Elephant schedules disjoint files; colliding items wait. Original owners end after tested delivery and integration. |
 | Candidate commit | Coordinator or authorized host, after validating the returned package. | Integrate the bounded result and create a clean committed candidate before candidate-bound Verify. | Record the actual commit and tree; a Child's proposed commit or a dirty checkout is not a substitute. |
 | Verify — mandatory | Coordinator invokes the configured evidence producer on the committed candidate. | For release, the producer runs the one configured project command; documented boundary-aware modes run the fixed baseline plus registered changed-area commands. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
-| Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | The Critic receives references to candidate, Spec, guardrails, and evidence — not implementation chat or rationale. | It runs after deterministic checks. Findings need evidence, a rule/criterion, and a consequence. A correction gets a fresh delta re-gate. Goldfish delivery stays review-pending until independent Critic evidence exists. |
+| Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | Review code and tests against original criteria once per coherent batch declared before dispatch and frozen after integration. | One full Critic plus at most three delta Critics, stop on PASS; no budget reset. One fresh Correction Goldfish retains the entire correction context. Singleton batches need a substantial risk rationale. |
 | Final Verify — mandatory for release | Coordinator runs the configured full evidence producer after the substantive Critic review. | The release-mode receipt binds the reviewed candidate and consumed Critic packet; corrections return through review. | The exact committed candidate needs a passing final receipt before close or promotion. |
+
+
+One item owner keeps analysis, test preparation, code and targeted fixes together
+to reduce handoffs. The trust tradeoff is a shared blind spot in code and tests.
+Preserved examiners and independent Critic judgment against the original criteria
+remain essential; tests alone are not acceptance. Main preserves deliveries and
+does not routinely repeat targeted checks. A manual merge conflict requires the
+affected checks; drift or missing evidence requires Goldfish requalification.
+Full Verify then qualifies the integrated reviewed candidate once. This applies
+to every risk tier. Whole-closure report-only decisions remain report-only.
 
 Each project uses the one full `verify` command named by its own calibration.
 For non-release boundaries, the evidence producer may run its fixed baseline
@@ -246,7 +250,7 @@ follows the close boundary under its own evidence and approval rules.
 |---|---|---|---|
 | Deterministic gate is red with a known product cause | Goldfish, then Elephant. | One automatic product retry at the same cause (two total attempts). | A passing retry returns to the deterministic gate/normal review. A second failure opens a human course decision. |
 | Trusted environment fault before product work | Elephant. | One narrow, fresh environment failover with frozen authority and no delegation. | On success resume bounded work; on another fault or an unproven cause, stop for a course decision. |
-| Critic finding needs semantic correction | Elephant dispatches a fresh correction. | One fresh re-review after the initial blocking result. | A passing re-review returns to close. If it still reports a blocking finding, the Elephant self-verifies the next correction directly; no third Critic round. |
+| Critic finding needs semantic correction | One fresh Correction Goldfish owns the batch. | Same owner through all findings, fixes and delta reviews; one full plus at most three delta Critics. | Stop on PASS. Exhausted budgets use the existing stop/course path; no renamed batch or direct self-acceptance resets the limit. |
 | Spec, scope, evidence, or authority drift | Elephant and human as needed. | Re-plan or re-approve; never carry stale approval into a changed contract. | Return to triage, Spec, readiness, or approval — whichever became stale. |
 | Unknown cause, repeated signature, exhausted budget, or conflict | Human decision-maker. | Continue with a new direction, defer, or stop. | No unbounded retry loop and no success claim without required evidence. |
 

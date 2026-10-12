@@ -122,7 +122,7 @@ export function createModelFamilyInvocationEntry({ runtimeHost = createModelFami
     }
     const handle = Object.freeze(Object.create(null));
     invocationHandles.set(handle, { store, invocation: prepared.value, receipt,
-      discoveryRequest: immutableSnapshot(discoveryRequest), input: Object.freeze({ ...input }) });
+      discoveryRequest: immutableSnapshot(discoveryRequest), input: Object.freeze({ ...input }), bindings:new Set() });
     return { ok: true, code: prepared.code ?? "MODEL-FAMILY-INVOCATION-READY", status: "ready",
       value: Object.freeze({ handle, receipt: immutableSnapshot(receipt) }) };
   }
@@ -158,6 +158,7 @@ export function createModelFamilyInvocationEntry({ runtimeHost = createModelFami
       nativeRequestCapability = admission.value;
     }
     const binding = Object.freeze(Object.create(null));
+    held.bindings.add(binding);
     bindingHandles.set(binding, { store: held.store, invocation: held.invocation,
       prelaunchToken: checked.value, receipt, discoveryRequest: held.discoveryRequest,
       packet: Object.freeze({ ...packet }), nativeRequestCapability });
@@ -218,8 +219,16 @@ export function createModelFamilyInvocationEntry({ runtimeHost = createModelFami
       : fail(read.code ?? "MODEL-FAMILY-RECEIPT-UNAVAILABLE");
   }
 
+  function disposeModelFamilyInvocation({invocation}={}) {
+    const held=invocationHandles.get(invocation);
+    if(!held||held.closed||typeof held.store.disposeInvocation!=='function')return fail('MODEL-FAMILY-OWNER-CONTEXT-HELD',false,'held');
+    let result;try{result=held.store.disposeInvocation({invocation:held.invocation});}catch{return fail('MODEL-FAMILY-OWNER-CONTEXT-HELD',false,'held');}
+    if(!result||Object.keys(result).sort().join('\0')!==['ok','status','code','receiptSha256','assurance','sourceRefs'].sort().join('\0')||result.ok!==true||result.status!=='closed'||result.code!=='MODEL-FAMILY-INVOCATION-CLOSED'||result.receiptSha256!==held.receipt.receiptSha256||!['controlled-unit-method','physical-readback'].includes(result.assurance)||!Array.isArray(result.sourceRefs)||!result.sourceRefs.length)return fail('MODEL-FAMILY-OWNER-CONTEXT-HELD',false,'held');
+    held.closed=true;for(const binding of held.bindings)bindingHandles.delete(binding);held.bindings.clear();invocationHandles.delete(invocation);
+    return immutableSnapshot(result);
+  }
   return Object.freeze({ observeActivation, prepareModelFamilyInvocation, prepareCurrentModelFamilyInvocation, bindModelFamilyInvocation,
-    launchModelFamilyInvocation, readHeld });
+    launchModelFamilyInvocation, disposeModelFamilyInvocation, readHeld });
 }
 
 const defaultEntry = createModelFamilyInvocationEntry();

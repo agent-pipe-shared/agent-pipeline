@@ -9,7 +9,7 @@ import { commitAdmittedAgyReturn } from "../lib/agy-host-commit-execution.mjs";
 import { agyAgentTypeForRole, draftAgyAuthoredRecordAfterCommit } from "../lib/agy-final-return.mjs";
 import { agyAuthoredRecordBytes, draftAgyHostObservedReceipt } from "../lib/agy-host-observed-receipt.mjs";
 import { persistAgyHostObservedReceipt } from "../lib/agy-host-observed-store.mjs";
-import { verifyAgySessionResultReadback, recheckAgyFamilyVerifiedReturn } from "../lib/agy-session-dispatch.mjs";
+import { verifyAgySessionResultReadback, recheckAgyFamilyVerifiedReturn, closeSourceOwnedAgyFamilyVerifiedReturn, integrateSourceOwnedAgyItemDelivery } from "../lib/agy-session-dispatch.mjs";
 import { digest, loadStoredConsent, validateConsentRecord, validateDispatchBinding } from "../lib/agy-session-authority.mjs";
 import { writeHostObservedAgyDispatchRecord } from "./dispatch-record-write.mjs";
 import { withAgyFamilyLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
@@ -85,6 +85,14 @@ export async function finalizeAgyFamilyHostObservedReturn({ sealed, launched } =
       operation: () => writeHostObservedAgyDispatchRecord({ repoRoot: sealed.root,
         target: `evidence/dispatch-record-${witness.dispatchId}.json`, record: draft.record }) });
     if (!published?.target) return recovery("AGY-FAMILY-FINALIZE-RECORD-PUBLICATION", committed.commit);
+    const delivery=checked.source.itemDelivery?await closeSourceOwnedAgyFamilyVerifiedReturn(launched.familyReturnHandle):{ok:true,status:'authored-commit-recorded'};
+    if(!delivery.ok)return recovery(delivery.code,committed.commit);
+    if(delivery.status==='delivered'){
+      const integration=integrateSourceOwnedAgyItemDelivery({deliveryContext:delivery.deliveryContext});
+      if(!integration.ok)return {...recovery(integration.code,committed.commit),delivery:delivery.delivery,memberRef:delivery.memberRef};
+      return {status:'item-main-integrated',code:integration.code,recoveryCommit:null,delivery:delivery.delivery,releaseRef:integration.releaseRef,
+        record:{target:published.target,sha256:published.sha256,commit:committed.commit,authorship:'host-observed-local'}};
+    }
     return { status: "authored-commit-recorded", code: "AGY-AUTHORED-RECORD-VERIFIED", recoveryCommit: null,
       record: { target: published.target, sha256: published.sha256, commit: committed.commit, authorship: "host-observed-local" } };
   } catch (error) { return recovery(`AGY-FAMILY-FINALIZE-POSTCOMMIT-${typeof error?.code === "string" ? error.code : "EXCEPTION"}`, committed.commit); }

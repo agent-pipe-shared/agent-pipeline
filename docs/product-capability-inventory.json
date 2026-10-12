@@ -47,7 +47,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow|TodoWrite:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:advisor:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
-        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\"",
@@ -100,12 +100,16 @@
         "plugins/pipeline-core/hooks/guard-testpath.mjs",
         "plugins/pipeline-core/hooks/guard-worktree-isolation.mjs",
         "plugins/pipeline-core/hooks/hooks.json",
-        "plugins/pipeline-core/hooks/native-goldfish-host.mjs"
+        "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
+        "plugins/pipeline-core/lib/guard/shell-grammar.mjs"
       ],
       "testEvidence": [
+        "harness/scripts/shell-grammar-capability-placement.test.mjs",
         "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
         "plugins/pipeline-core/hooks/guard-git.test.mjs",
         "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+        "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+        "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
         "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs"
       ],
       "targets": [
@@ -131,7 +135,7 @@
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent:node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent|update_plan:node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
-        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\" --runner codex",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStop::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
@@ -177,7 +181,10 @@
         "plugins/pipeline-core/hooks/codex-slicing-hint.mjs",
         "plugins/pipeline-core/hooks/guard-dispatch.mjs",
         "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
-        "plugins/pipeline-core/hooks/native-slicing.mjs"
+        "plugins/pipeline-core/hooks/native-slicing.mjs",
+        "plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+        "plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+        "plugins/pipeline-core/lib/native/darwin-requester-observer.c"
       ],
       "testEvidence": [
         "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
@@ -235,6 +242,7 @@
         "verify-phase:harness/scripts/verify.mjs:architecture-design-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-effective-decisions-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-entry-readiness-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-entry-required-source-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-fitness-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-inherited-sources-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-map-scaffold-tests",
@@ -400,6 +408,7 @@
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-write-tests",
+        "verify-phase:harness/scripts/verify.mjs:doc-reader-course-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:doc-reader-terminal-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:elephant-agy-implementation-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:elephant-implementation-dispatch-tests",
@@ -412,6 +421,7 @@
         "verify-phase:harness/scripts/verify.mjs:evidence-view-renderer-tests",
         "verify-phase:harness/scripts/verify.mjs:execution-lane-credential-tests",
         "verify-phase:harness/scripts/verify.mjs:execution-plane-launch-tests",
+        "verify-phase:harness/scripts/verify.mjs:existing-public-anchor-tests",
         "verify-phase:harness/scripts/verify.mjs:external-command-offer-tests",
         "verify-phase:harness/scripts/verify.mjs:external-push-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:fanout-governor-tests",
@@ -428,6 +438,7 @@
         "verify-phase:harness/scripts/verify.mjs:generate-vendored-canon-tests",
         "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
         "verify-phase:harness/scripts/verify.mjs:git-hook-runtime-snapshot-fast-verify-tests",
+        "verify-phase:harness/scripts/verify.mjs:git-stash-readonly-tests",
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
@@ -595,6 +606,7 @@
         "verify-phase:harness/scripts/verify.mjs:osv-scanner-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
         "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
+        "verify-phase:harness/scripts/verify.mjs:passive-read-credential-follow-tests",
         "verify-phase:harness/scripts/verify.mjs:passive-read-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
@@ -631,6 +643,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-user-v3-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-authority-staging-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:plan-reopen-current-action-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-retirement-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-legacy-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-tests",
@@ -669,6 +682,7 @@
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-foreign-residue-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-foreign-residue-unit-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-temp-root-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-answers-file-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-argv-closure-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-flap-tests",
@@ -705,6 +719,7 @@
         "verify-phase:harness/scripts/verify.mjs:push-prepare-tests",
         "verify-phase:harness/scripts/verify.mjs:push-release-flow-docs-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:r7-3-bound-paths-tests",
+        "verify-phase:harness/scripts/verify.mjs:read-option-operands-tests",
         "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-bridge-approval-tests",
@@ -782,11 +797,13 @@
         "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-start-runner-identity-tests",
         "verify-phase:harness/scripts/verify.mjs:settings-allowlist-merge-tests",
         "verify-phase:harness/scripts/verify.mjs:setup-check-tests",
         "verify-phase:harness/scripts/verify.mjs:setup-tests",
         "verify-phase:harness/scripts/verify.mjs:shared-pool-bounds-tests",
         "verify-phase:harness/scripts/verify.mjs:shared-pool-occupancy-tests",
+        "verify-phase:harness/scripts/verify.mjs:shell-grammar-capability-placement-tests",
         "verify-phase:harness/scripts/verify.mjs:signing-ceremony-tests",
         "verify-phase:harness/scripts/verify.mjs:slice-queue-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:slice-queue-tests",
@@ -851,7 +868,18 @@
         "verify-phase:harness/scripts/verify.mjs:worktree-process-start-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-target-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
-        "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests"
+        "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-generic-batch-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-case-completion-augmentation-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:darwin-native-process-observer-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-platform-process-observer-tests",
+        "verify-phase:harness/scripts/verify.mjs:darwin-requester-integration-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-item-delivery-tests",
+        "verify-phase:harness/scripts/verify.mjs:installed-bootstrap-import-closure-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-authority-revision-installed-package-tests",
+        "verify-phase:harness/scripts/verify.mjs:install-agy-inline-candidate-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-prospective-materialization-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-prospective-companion-tests"
       ],
       "runners": [
         "antigravity",
@@ -889,15 +917,20 @@
         "plugins/pipeline-core/lib/consumer-verify.mjs",
         "plugins/pipeline-core/lib/verify-selection.mjs",
         "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
-        "plugins/pipeline-core/scripts/verify-evidence-producer.mjs"
+        "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+        "plugins/pipeline-core/lib/critic-generic-batch.mjs"
       ],
       "testEvidence": [
         "harness/scripts/check-doc-contracts.test.mjs",
         "harness/scripts/self-verify-selection.test.mjs",
         "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+        "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
         "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
         "plugins/pipeline-core/lib/consumer-baseline-verify.test.mjs",
         "plugins/pipeline-core/lib/finding-lifecycle.test.mjs",
+        "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+        "plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+        "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
         "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
         "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
         "plugins/pipeline-core/lib/provenance-envelope.test.mjs",
@@ -918,7 +951,18 @@
         "plugins/pipeline-core/lib/threat-model.test.mjs",
         "plugins/pipeline-core/lib/verify-selection.test.mjs",
         "plugins/pipeline-core/scripts/sbom-discovery.test.mjs",
-        "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs"
+        "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+        "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+        "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
+        "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+        "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+        "plugins/pipeline-core/lib/darwin-requester-integration.test.mjs",
+        "plugins/pipeline-core/lib/agy-item-delivery.test.mjs",
+        "plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs",
+        "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+        "plugins/pipeline-core/install-agy.inline-candidate.test.mjs",
+        "plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs",
+        "plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs"
       ],
       "targets": [
         {
@@ -1173,6 +1217,7 @@
         "verify-phase:harness/scripts/verify.mjs:install-agy-tests",
         "verify-phase:harness/scripts/verify.mjs:install-snapshot-progress-tests",
         "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-inline-action-tests",
         "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-tests"
       ],
       "runners": [
@@ -1723,7 +1768,11 @@
         "plugins/pipeline-core/scripts/codex-design-readiness-host.mjs",
         "plugins/pipeline-core/scripts/codex-readiness-app-server-child.mjs",
         "plugins/pipeline-core/scripts/codex-readiness-app-server.mjs",
-        "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs"
+        "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs",
+        "plugins/pipeline-core/lib/agy-item-delivery.mjs",
+        "plugins/pipeline-core/lib/architecture-prospective-materialization.mjs",
+        "plugins/pipeline-core/lib/architecture-design.mjs",
+        "plugins/pipeline-core/lib/design-decision-bindings.mjs"
       ],
       "testEvidence": [
         "plugins/pipeline-core/lib/design-readiness-host-evidence.test.mjs",
@@ -2048,7 +2097,9 @@
         "local repository checkout"
       ],
       "productionEvidence": [
+        "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
         "plugins/pipeline-core/scripts/audit-bundle.mjs",
+        "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
         "plugins/pipeline-core/scripts/capture-evidence.mjs",
         "plugins/pipeline-core/scripts/evidence-viewer.mjs",
         "plugins/pipeline-core/scripts/governance-export.mjs",
@@ -2349,7 +2400,9 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-push-anchor-tests",
         "verify-phase:harness/scripts/verify.mjs:quality-package-windows-path-tests",
         "verify-phase:harness/scripts/verify.mjs:signed-quality-package-scratch-tests",
-        "verify-phase:harness/scripts/verify.mjs:signed-quality-package-tests"
+        "verify-phase:harness/scripts/verify.mjs:signed-quality-package-single-link-tests",
+        "verify-phase:harness/scripts/verify.mjs:signed-quality-package-tests",
+        "verify-phase:harness/scripts/verify.mjs:signing-disclosure-sweep-tests"
       ],
       "runners": [
         "host-only"
@@ -2386,6 +2439,7 @@
         "plugins/pipeline-core/scripts/po-human-approval.mjs"
       ],
       "testEvidence": [
+        "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
         "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
       ],
       "targets": [
@@ -2407,6 +2461,7 @@
       "surfaceIds": [
         "verify-phase:harness/scripts/verify.mjs:attended-recovery-tests",
         "verify-phase:harness/scripts/verify.mjs:devplan-shell-lane-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:devplan-shell-sanctioned-recovery-tests",
         "verify-phase:harness/scripts/verify.mjs:legacy-owner-custody-archive-tests",
         "verify-phase:harness/scripts/verify.mjs:legacy-owner-custody-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-refusal-registry-tests",
@@ -2483,6 +2538,7 @@
         "verify-phase:harness/scripts/verify.mjs:runtime-handover-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:runtime-handover-projection-win-path-tests",
         "verify-phase:harness/scripts/verify.mjs:runtime-handover-writer-tests",
+        "verify-phase:harness/scripts/verify.mjs:scratch-package-staging-tests",
         "verify-phase:harness/scripts/verify.mjs:scratch-retention-tests",
         "verify-phase:harness/scripts/verify.mjs:scratch-sweep-tests"
       ],
@@ -2700,7 +2756,9 @@
         "local transcripts for usage-ledger"
       ],
       "productionEvidence": [
+        "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
         "plugins/pipeline-core/lib/multi-cli-benchmark.mjs",
+        "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
         "plugins/pipeline-core/scripts/nova-a8-benchmark-runner.mjs",
         "plugins/pipeline-core/scripts/usage-ledger.mjs"
       ],

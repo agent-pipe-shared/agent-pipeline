@@ -16,6 +16,7 @@ const V5_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v5";
 const V6_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v6";
 const V7_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v7";
 export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v8";
+export const RETAINED_APPROVAL_SCHEMA = "pipeline.plan-approval.v9";
 // Schema-identifier collision, resolved additively and deliberately NOT merged:
 // "pipeline.plan-approval.v3" denotes two disjoint historical record shapes.
 //   - PREVIOUS_CURRENT_APPROVAL_SCHEMA (above): the submission-bound approval
@@ -407,8 +408,13 @@ export function validPlanSubmission(value) {
 }
 
 export function validCurrentPlanApproval(value) {
-  return hasExactKeys(value, CURRENT_APPROVAL_KEYS)
-    && value.schema === CURRENT_APPROVAL_SCHEMA
+  return ((hasExactKeys(value, CURRENT_APPROVAL_KEYS) && value.schema === CURRENT_APPROVAL_SCHEMA)
+      || (hasExactKeys(value, [...CURRENT_APPROVAL_KEYS, "acceptedContract"]) && value.schema === RETAINED_APPROVAL_SCHEMA
+        && hasExactKeys(value.acceptedContract, ["schema", "path", "sha256"])
+        && value.acceptedContract.schema === "pipeline.accepted-delivery-contract-reference.v1"
+        && SHA256.test(value.acceptedContract.sha256)
+        && /^specs\/[A-Za-z0-9_-]+\/evidence\/accepted-delivery-contract-[a-f0-9]{64}\.json$/u.test(value.acceptedContract.path)
+        && value.acceptedContract.path.endsWith("accepted-delivery-contract-" + value.acceptedContract.sha256 + ".json")))
     && isNonBlankString(value.approvedBy)
     && isCanonicalIso(value.approvedAt)
     && SHA256.test(value.submissionSha256)
@@ -557,7 +563,7 @@ function currentApproval(state, submission, observation) {
     const authority = approval.poGateAuthority;
     const invalidation = state.planInvalidation;
     const requiredSeal = invalidation === undefined ? null : sha256CanonicalJson(invalidation);
-    const advisorBindingMatchesProfile = approval.schema === CURRENT_APPROVAL_SCHEMA
+    const advisorBindingMatchesProfile = (approval.schema === CURRENT_APPROVAL_SCHEMA || approval.schema === RETAINED_APPROVAL_SCHEMA)
       ? (submission.profile === "mini"
         ? approval.designApproval === null
         : validDesignApproval(approval.designApproval))
@@ -575,7 +581,7 @@ function currentApproval(state, submission, observation) {
           ? approval.designAdvisorAdmissionSha256 === null
           : SHA256.test(approval.designAdvisorAdmissionSha256 ?? ""))
         : true;
-    const sealed = (approval.schema === CURRENT_APPROVAL_SCHEMA || approval.schema === V7_CURRENT_APPROVAL_SCHEMA
+    const sealed = (approval.schema === CURRENT_APPROVAL_SCHEMA || approval.schema === RETAINED_APPROVAL_SCHEMA || approval.schema === V7_CURRENT_APPROVAL_SCHEMA
       || approval.schema === V6_CURRENT_APPROVAL_SCHEMA || approval.schema === V5_CURRENT_APPROVAL_SCHEMA
       || approval.schema === PREVIOUS_CURRENT_APPROVAL_SCHEMA)
       ? approval.priorInvalidationSha256 === requiredSeal
@@ -668,7 +674,10 @@ export function derivePlanLifecycle(state, observation = {}) {
   const observedDrift = validPlanSubmission(state.planSubmission)
     && !submissionMatchesObservation(state.planSubmission, observation);
   const invalidated = validPlanSubmission(state.planSubmission)
+    && state.planSubmission.featureId === state.activeFeature.id
+    && state.planSubmission.planPath === state.activeFeature.planPath
     && validPlanInvalidation(state.planInvalidation)
+    && state.planInvalidation.featureId === state.activeFeature.id
     && state.planInvalidation.invalidatedSubmissionSha256 === sha256CanonicalJson(state.planSubmission);
   let status;
   if (submission === null && approval === null) status = "draft";
@@ -715,7 +724,7 @@ export function derivePlanLifecycle(state, observation = {}) {
         : "PLAN-LIFECYCLE-CURRENT",
     status,
     phase: state.activeFeature.phase,
-    nextAction: observedDrift ? "reopen-design" : null,
+    nextAction: observedDrift && !invalidated ? "reopen-design" : null,
     submissionCurrent: submission !== null,
     approvalCurrent: approval !== null,
     submissionSha256: submission === null ? null : sha256CanonicalJson(submission),

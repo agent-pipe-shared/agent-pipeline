@@ -689,7 +689,9 @@ export function startSessionDescriptor(startPath, options = {}) {
     ownerNonceSha256: ownerDigest(ownerNonce),
     ownerRuntime: localProcessOwnerRuntime(options.ownerPid ?? process.pid, options),
   };
+  assertOwnedDescriptorLifetimeCapacity();
   writeAtomic(path, canonicalJson(descriptor));
+  retainSourceCreatedDescriptorOwner(repo, path, descriptor);
   return {
     repo,
     path,
@@ -982,9 +984,19 @@ export function retireSessionDescriptor(startPath, fields, options = {}) {
   if (existsSync(cleanupManifestPath(loaded.repo, fields.sessionId))) {
     fail("WT-SESSION-ACTIVE", "session descriptor cannot retire while cleanup manifest is active");
   }
-  unlinkSync(loaded.path);
-  fsyncDirectory(dirname(loaded.path));
-  return { sessionId: loaded.sessionId, descriptorSha256: loaded.descriptorSha256 };
+  const releaseOwnedLock = existsSync(cleanupReceiptPath(loaded.repo, loaded.sessionId))
+    ? acquireManifestLock(loaded.repo, loaded.sessionId, loaded.ownerNonce, { noReclamation: true })
+    : null;
+  try {
+    const current = loadSessionDescriptor(startPath, loaded.sessionId, { ...options, expectedDescriptorSha256: loaded.descriptorSha256 });
+    if (current.ownerNonce !== loaded.ownerNonce || existsSync(cleanupManifestPath(loaded.repo, loaded.sessionId)))
+      fail("WT-SESSION-ACTIVE", "session descriptor retirement source changed");
+    const ownedClosure = releaseOwnedLock ? prepareOwnedDescriptorClosure(current) : null;
+    unlinkSync(current.path);
+    fsyncDirectory(dirname(current.path));
+    publishOwnedDescriptorClosure(current, ownedClosure);
+    return { sessionId: current.sessionId, descriptorSha256: current.descriptorSha256 };
+  } finally { if (releaseOwnedLock) releaseOwnedLock(); }
 }
 
 export const ORPHAN_ARCHIVE_AUDIT_SCHEMA = "pipeline.session-orphan-archive-audit.v1";
@@ -1335,9 +1347,10 @@ function validateVerifyRunLock(resource, { requireClosed = false } = {}) {
   return lock;
 }
 
-function acquireManifestLock(repo, sessionId, nonce) {
+function acquireManifestLock(repo, sessionId, nonce, { noReclamation = false } = {}) {
   const manifestPath = cleanupManifestPath(repo, sessionId);
   const lockPath = `${manifestPath}.lock`;
+  if (noReclamation && existsSync(lockPath)) fail("SDC-LOCK-HELD", "preexisting manifest lock cannot be reclaimed by custody");
   const expectedOwner = ownerDigest(nonce);
   const lockParent = dirname(lockPath);
   let existingLockAncestor = lockParent;
@@ -1347,6 +1360,7 @@ function acquireManifestLock(repo, sessionId, nonce) {
   if (realpathSync(lockParent) !== resolve(lockParent)) fail("WT-LOCAL-SYMLINK", "cleanup lock directory crosses a symlink");
   if (process.platform === "win32") assureWindowsLocalDirectories(existingLockAncestorBeforeCreate, lockParent, "WT-MANIFEST-LOCK");
   if (existsSync(lockPath)) {
+    if (noReclamation) fail("SDC-LOCK-HELD", "custody never reclaims a preexisting lock");
     const stat = lstatSync(lockPath);
     const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
     const windowsInsecure = process.platform === "win32" && assessWindowsPrivatePath(lockPath).status !== "secure";
@@ -1378,7 +1392,13 @@ function acquireManifestLock(repo, sessionId, nonce) {
     closeSync(fd);
   }
   fsyncDirectory(dirname(lockPath));
+  const custodyLockIdentity = noReclamation ? lstatSync(lockPath) : null;
   return () => {
+    if (custodyLockIdentity) {
+      assertPrivateRegularFile(lockPath, "SDC-LOCK-HELD", "custody manifest lock");
+      const observed = lstatSync(lockPath);
+      if (observed.dev !== custodyLockIdentity.dev || observed.ino !== custodyLockIdentity.ino || observed.mode !== custodyLockIdentity.mode || observed.nlink !== custodyLockIdentity.nlink) fail("SDC-LOCK-HELD", "custody lock identity changed");
+    }
     if (!existsSync(lockPath) || rawSha256(readFileSync(lockPath)) !== rawSha256(bytes)) {
       fail("WT-MANIFEST-LOCK", "cleanup writer lock ownership changed");
     }
@@ -1783,11 +1803,13 @@ export function cleanupSession(startPath, fields, options = {}) {
   const repo = discoverRepository(startPath, options);
   const releaseLock = acquireManifestLock(repo, fields.sessionId, fields.ownerNonce);
   try {
+  const ownedCleanupPreimage = observeOwnedSessionCleanupPreimage(repo, fields);
   if (options.allowAbsent === true && !existsSync(cleanupManifestPath(repo, fields.sessionId))) {
     const receipt = sanitizedCleanupReceipt(fields.sessionId, [], "complete", options.now);
     const receiptPath = cleanupReceiptPath(repo, fields.sessionId);
     if (existsSync(receiptPath)) fail("WT-SESSION-CLOSED", "a completed cleanup receipt already closes this session ID");
     writeAtomic(receiptPath, canonicalJson(receipt));
+    recordOwnedSessionCleanupCompletion(repo, fields, receiptPath, ownedCleanupPreimage);
     return { ok: true, receipt, receiptPath };
   }
   const loaded = loadManifest(repo, fields.sessionId, fields.ownerNonce);
@@ -1864,6 +1886,7 @@ export function cleanupSession(startPath, fields, options = {}) {
   writeAtomic(receiptPath, canonicalJson(receipt));
   unlinkSync(loaded.path);
   fsyncDirectory(dirname(loaded.path));
+  recordOwnedSessionCleanupCompletion(repo, fields, receiptPath, ownedCleanupPreimage);
   return { ok: true, receipt, receiptPath };
   } finally {
     releaseLock();
@@ -2014,4 +2037,286 @@ export function migrateBranchWorktree(startPath, sourcePath, branchOrRef, option
     failWorktreeRecord(repo, { ...record, status: "migrating" }, error, options.now);
     throw error;
   }
+}
+
+
+/** Read-only descriptor custody observation; raw bytes/nonces stay internal. */
+export function inspectSignedDescriptorCustodyInputs(startPath, sessionId, { archivedDescriptorSha256 = null } = {}) {
+  const repo = discoverRepository(startPath);
+  ensureSafeId(sessionId, "session ID");
+  const path = sessionDescriptorPath(repo, sessionId);
+  let source = path;
+  if (!existsSync(path) && archivedDescriptorSha256 !== null) {
+    if (!SHA256.test(archivedDescriptorSha256)) fail("SDC-SHAPE", "invalid archive digest");
+    source = join(localRoot(repo.commonDir), "session-descriptors", "signed-custody", "archived", `${sessionId}.${archivedDescriptorSha256}.json`);
+  }
+  assertNoSymlinkComponents(repo.commonDir, source);
+  assertPrivateRegularFile(source, "SDC-PRIVATE-PATH", "custody descriptor");
+  const bytes = readFileSync(source);
+  if (bytes.length > 256 * 1024) fail("SDC-SHAPE", "descriptor exceeds bounded custody input");
+  const value = JSON.parse(bytes);
+  if (!validSessionDescriptor(value, repo, sessionId)) fail("SDC-DESCRIPTOR-UNAVAILABLE", "invalid descriptor binding");
+  const target = file => {
+    assertNoSymlinkComponents(repo.commonDir, file);
+    assertPrivateRegularFile(file, "SDC-PRIVATE-PATH", "custody input");
+    const before = lstatSync(file), raw = readFileSync(file), after = lstatSync(file);
+    if (before.dev !== after.dev || before.ino !== after.ino || before.mode !== after.mode || before.nlink !== after.nlink || rawSha256(raw) !== rawSha256(readFileSync(file))) fail("SDC-DESCRIPTOR-CAS", "custody observation changed");
+    return { raw, target: { path: `.git/${relative(repo.commonDir, file).split(sep).join("/")}`, schema: JSON.parse(raw).schema, sha256: rawSha256(raw), size: raw.length,
+      identity: { dev: String(after.dev), ino: String(after.ino), mode: after.mode, nlink: after.nlink } } };
+  };
+  const descriptor = target(source);
+  if (rawSha256(descriptor.raw) !== rawSha256(bytes)) fail("SDC-DESCRIPTOR-CAS", "descriptor changed between validation and capture");
+  // Archive readback preserves the original signed active path, not an alternate target.
+  descriptor.target.path = `.git/${relative(repo.commonDir, path).split(sep).join("/")}`;
+  const manifestPath = cleanupManifestPath(repo, sessionId);
+  let manifest = { state: "absent", path: `.git/${relative(repo.commonDir, manifestPath).split(sep).join("/")}` };
+  if (existsSync(manifestPath)) {
+    const checked = loadManifest(repo, sessionId, value.ownerNonce);
+    if (!Number.isSafeInteger(checked.manifest.revision) || checked.manifest.revision < 0) fail("SDC-MANIFEST-UNAVAILABLE", "invalid manifest revision");
+    const observed = target(manifestPath);
+    manifest = { state: "present", target: observed.target, revision: checked.manifest.revision };
+  }
+  const lockPath = `${manifestPath}.lock`;
+  assertNoSymlinkComponents(repo.commonDir, lockPath);
+  const manifestLock = existsSync(lockPath)
+    ? { status: "held", path: `.git/${relative(repo.commonDir, lockPath).split(sep).join("/")}`, sha256: null }
+    : { status: "absent", path: `.git/${relative(repo.commonDir, lockPath).split(sep).join("/")}` };
+  return { repository: { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir,
+    candidate: { commit: gitText(repo.primaryRoot, ["rev-parse", "HEAD"]), tree: gitText(repo.primaryRoot, ["rev-parse", "HEAD^{tree}"]) } },
+    sessionId, ownerNonce: value.ownerNonce, descriptor: descriptor.target, bytes: descriptor.raw, manifest, manifestLock,
+    activePath: path, activePresent: existsSync(path), ownerRuntime: value.ownerRuntime ?? null };
+}
+
+export function inspectSignedDescriptorCustodyRepository(startPath) {
+  const repo = discoverRepository(startPath);
+  return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir,
+    candidate: { commit: gitText(repo.primaryRoot, ["rev-parse", "HEAD"]), tree: gitText(repo.primaryRoot, ["rev-parse", "HEAD^{tree}"]) } };
+}
+
+/** The exact registration lock namespace, with preexisting locks never reclaimed. */
+export function withSignedDescriptorCustodyManifestLock(startPath, sessionId, operation, { archivedDescriptorSha256 = null } = {}) {
+  const loaded = inspectSignedDescriptorCustodyInputs(startPath, sessionId, { archivedDescriptorSha256 });
+  const release = acquireManifestLock(discoverRepository(startPath), sessionId, loaded.ownerNonce, { noReclamation: true });
+  try { return operation(); } finally { release(); }
+}
+
+// A physical archive is not a current invocation credential. Only an actual
+// owner retirement in this module creates a current-process closure brand.
+const ownedDescriptorClosures = new Map();
+const OWNED_DESCRIPTOR_CLOSURE_SCHEMA = 'pipeline.owned-descriptor-closure.v1';
+function ownedClosureKey(repository,target) {
+  return rawSha256(Buffer.from(JSON.stringify({primaryRoot:repository.primaryRoot,
+    commonDir:repository.commonDir,sessionId:target.sessionId,descriptorSha256:target.descriptorSha256,
+    ownerNonceSha256:target.ownerNonceSha256})));
+}
+function ownedClosureRead(repo,path) {
+  assertNoSymlinkComponents(repo.commonDir,path);
+  assertPrivateRegularFile(path,'WT-OWNED-CLOSURE','owned descriptor closure source');
+  const before=lstatSync(path),bytes=readFileSync(path),after=lstatSync(path);
+  if(before.dev!==after.dev||before.ino!==after.ino||before.mode!==after.mode
+      ||before.nlink!==after.nlink||bytes.length!==after.size
+      ||rawSha256(bytes)!==rawSha256(readFileSync(path)))
+    fail('WT-OWNED-CLOSURE-CAS','owned closure source changed');
+  return {bytes,ref:{path:`.git/${relative(repo.commonDir,path).split(sep).join('/')}`,
+    sha256:rawSha256(bytes),size:bytes.length}};
+}
+function ownedClosureReceipt(repo,sessionId) {
+  const path=cleanupReceiptPath(repo,sessionId);
+  if(!existsSync(path))return null;
+  const read=ownedClosureRead(repo,path),value=JSON.parse(read.bytes.toString('utf8'));
+  if(!value||typeof value!=='object'||Array.isArray(value)
+      ||JSON.stringify(Object.keys(value).sort())!==JSON.stringify(['schema','sessionSha256','status','counts','outcomes','completedAt'].sort())
+      ||value.schema!==CLEANUP_RECEIPT_SCHEMA||value.sessionSha256!==rawSha256(Buffer.from(sessionId))
+      ||value.status!=='complete'||typeof value.completedAt!=='string'||Number.isNaN(Date.parse(value.completedAt)))
+    fail('WT-OWNED-CLOSURE','owner cleanup receipt is not complete');
+  return {...read,value,path};
+}
+function prepareOwnedDescriptorClosure(loaded) {
+  const receipt=ownedClosureReceipt(loaded.repo,loaded.sessionId);
+  if(receipt===null)return null; // Preserve legacy retirement; it cannot mint an owned closure.
+  const witnessRepository=inspectSignedDescriptorCustodyRepository(loaded.repo.primaryRoot);
+  const witnessTarget={sessionId:loaded.sessionId,descriptorSha256:loaded.descriptorSha256,ownerNonceSha256:ownerDigest(loaded.ownerNonce)};
+  const owner=sourceCreatedDescriptorOwners.get(ownedClosureKey(witnessRepository,witnessTarget));
+  const witness=ownedSessionCleanupWitnesses.get(ownedClosureKey(witnessRepository,witnessTarget));
+  if(!owner||!witness)return null; // Ordinary legacy retirement preserves its original API; no closure brand.
+  if(JSON.stringify(witness.repository)!==JSON.stringify(witnessRepository)
+      ||witness.descriptorRef.sha256!==loaded.descriptorSha256
+      ||JSON.stringify(witness.closureRef)!==JSON.stringify(receipt.ref))
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE','actual owning cleanup completion witness unavailable');
+  const original=ownedClosureRead(loaded.repo,loaded.path);
+  if(original.ref.sha256!==loaded.descriptorSha256)
+    fail('WT-OWNED-CLOSURE-CAS','owner descriptor changed before archival');
+  const descriptor=JSON.parse(original.bytes.toString('utf8'));
+  if(!validSessionDescriptor(descriptor,loaded.repo,loaded.sessionId)||descriptor.ownerNonce!==loaded.ownerNonce)
+    fail('WT-OWNED-CLOSURE','owner descriptor provenance changed');
+  const repository=inspectSignedDescriptorCustodyRepository(loaded.repo.primaryRoot);
+  const target={sessionId:loaded.sessionId,descriptorSha256:loaded.descriptorSha256,
+    ownerNonceSha256:ownerDigest(loaded.ownerNonce)};
+  const directory=join(localRoot(loaded.repo.commonDir),'session-descriptors','owned-retirement');
+  const stem=`${target.sessionId}.${target.descriptorSha256}`;
+  const archivePath=join(directory,`${stem}.descriptor.json`),proofPath=join(directory,`${stem}.proof.json`);
+  // Exclusive publication never overwrites interrupted or historical archives.
+  publishExclusiveFile(archivePath,original.bytes);
+  const archive=ownedClosureRead(loaded.repo,archivePath);
+  const proof={schema:OWNED_DESCRIPTOR_CLOSURE_SCHEMA,repository,target,
+    descriptorRef:original.ref,archiveRef:archive.ref,closureRef:receipt.ref,
+    closureCompletedAt:receipt.value.completedAt};
+  publishExclusiveFile(proofPath,Buffer.from(JSON.stringify(proof,null,2)+'\n'));
+  const proofRead=ownedClosureRead(loaded.repo,proofPath);
+  const current=ownedClosureRead(loaded.repo,loaded.path);
+  const currentReceipt=ownedClosureRead(loaded.repo,receipt.path);
+  if(current.ref.sha256!==original.ref.sha256||currentReceipt.ref.sha256!==receipt.ref.sha256
+      ||JSON.stringify(inspectSignedDescriptorCustodyRepository(loaded.repo.primaryRoot))!==JSON.stringify(repository)
+      ||existsSync(cleanupManifestPath(loaded.repo,loaded.sessionId)))
+    fail('WT-OWNED-CLOSURE-CAS','owner retirement preimage changed after archival');
+  return {repo:loaded.repo,repository,target,descriptorRef:original.ref,archivePath,archiveRef:archive.ref,
+    proofPath,proofRef:proofRead.ref,closurePath:receipt.path,closureRef:receipt.ref};
+}
+function publishOwnedDescriptorClosure(loaded,prepared) {
+  if(prepared===null)return;
+  if(existsSync(loaded.path)||inspectSessionClosure(loaded.repo.primaryRoot,loaded.sessionId).status!=='closed')
+    fail('WT-OWNED-CLOSURE-CAS','owner retirement did not reach completed physical closure');
+  ownedDescriptorClosures.set(ownedClosureKey(prepared.repository,prepared.target),prepared);
+}
+export function inspectOwnedSessionDescriptorClosure({repository,target}) {
+  try {
+    if(!target||JSON.stringify(Object.keys(target).sort())!==JSON.stringify(['sessionId','descriptorSha256','ownerNonceSha256'].sort()))
+      fail('WT-OWNED-CLOSURE','invalid closure target');
+    ensureSafeId(target.sessionId,'session ID');
+    if(!SHA256.test(target.descriptorSha256)||!SHA256.test(target.ownerNonceSha256))
+      fail('WT-OWNED-CLOSURE','invalid closure target digest');
+    const actual=inspectSignedDescriptorCustodyRepository(repository.primaryRoot);
+    if(JSON.stringify(actual)!==JSON.stringify(repository))fail('WT-OWNED-CLOSURE-CAS','closure candidate changed');
+    const prepared=ownedDescriptorClosures.get(ownedClosureKey(actual,target));
+    if(!prepared||JSON.stringify(prepared.repository)!==JSON.stringify(actual))
+      fail('WT-OWNED-CLOSURE','no source-owned retirement brand');
+    const archive=ownedClosureRead(prepared.repo,prepared.archivePath);
+    const proof=ownedClosureRead(prepared.repo,prepared.proofPath);
+    const receipt=ownedClosureReceipt(prepared.repo,target.sessionId);
+    if(!receipt||JSON.stringify(archive.ref)!==JSON.stringify(prepared.archiveRef)
+        ||JSON.stringify(proof.ref)!==JSON.stringify(prepared.proofRef)
+        ||JSON.stringify(receipt.ref)!==JSON.stringify(prepared.closureRef)
+        ||existsSync(sessionDescriptorPath(prepared.repo,target.sessionId))
+        ||existsSync(cleanupManifestPath(prepared.repo,target.sessionId)))
+      fail('WT-OWNED-CLOSURE-CAS','owner closure physical prefix changed');
+    const descriptor=JSON.parse(archive.bytes.toString('utf8'));
+    if(!validSessionDescriptor(descriptor,prepared.repo,target.sessionId)
+        ||rawSha256(archive.bytes)!==target.descriptorSha256
+        ||ownerDigest(descriptor.ownerNonce)!==target.ownerNonceSha256)
+      fail('WT-OWNED-CLOSURE-CAS','owner closure archive binding changed');
+    return Object.freeze({status:'closed',target:Object.freeze({...target}),
+      descriptorRef:Object.freeze({...prepared.descriptorRef}),archiveRef:Object.freeze({...prepared.archiveRef}),
+      proofRef:Object.freeze({...prepared.proofRef}),closureRef:Object.freeze({...prepared.closureRef}),
+      repository:Object.freeze({...actual,candidate:Object.freeze({...actual.candidate})}),assurance:'physical-owner-retirement'});
+  } catch(error) { return Object.freeze({status:'unavailable',code:error.code??'WT-OWNED-CLOSURE',reason:'owned-retirement-readback-unavailable'}); }
+}
+export function withOwnedSessionDescriptorClosureLock({repository,target},callback) {
+  if(typeof callback!=='function'||inspectOwnedSessionDescriptorClosure({repository,target}).status!=='closed')
+    fail('WT-OWNED-CLOSURE','unavailable source-owned closure');
+  const prepared=ownedDescriptorClosures.get(ownedClosureKey(repository,target));
+  const descriptor=JSON.parse(ownedClosureRead(prepared.repo,prepared.archivePath).bytes.toString('utf8'));
+  const release=acquireManifestLock(prepared.repo,target.sessionId,descriptor.ownerNonce,{noReclamation:true});
+  try {
+    if(inspectOwnedSessionDescriptorClosure({repository,target}).status!=='closed')
+      fail('WT-OWNED-CLOSURE-CAS','owned closure changed under manifest lock');
+    const result=callback();
+    if(result&&typeof result.then==='function')fail('WT-OWNED-CLOSURE','asynchronous closure lock callback');
+    return result;
+  } finally { release(); }
+}
+
+// Read-only preimage and private completion witness around the unchanged owner
+// cleanup writer. Historical or caller-authored receipt JSON cannot create it.
+const ownedSessionCleanupWitnesses = new Map();
+function observeOwnedSessionCleanupPreimage(repo,fields) {
+  try {
+    const loaded=loadSessionDescriptor(repo.primaryRoot,fields.sessionId);
+    if(loaded.ownerNonce!==fields.ownerNonce)return null;
+    const target={sessionId:loaded.sessionId,descriptorSha256:loaded.descriptorSha256,ownerNonceSha256:ownerDigest(loaded.ownerNonce)};
+    const owner=sourceCreatedDescriptorOwners.get(ownedClosureKey(repo,target));
+    if(!owner||owner.ownerNonce!==loaded.ownerNonce
+        ||JSON.stringify(owner.ownerRuntime)!==JSON.stringify(localProcessOwnerRuntime()))return null;
+    const original=ownedClosureRead(repo,loaded.path);
+    return {repository:inspectSignedDescriptorCustodyRepository(repo.primaryRoot),
+      target:{sessionId:fields.sessionId,descriptorSha256:loaded.descriptorSha256,
+        ownerNonceSha256:ownerDigest(loaded.ownerNonce)},descriptorRef:original.ref};
+  } catch { return null; }
+}
+function recordOwnedSessionCleanupCompletion(repo,fields,receiptPath,preimage) {
+  if(preimage===null)return; // No current original descriptor, no closure authority.
+  try {
+    const loaded=loadSessionDescriptor(repo.primaryRoot,fields.sessionId,{expectedDescriptorSha256:preimage.target.descriptorSha256});
+    const receipt=ownedClosureReceipt(repo,fields.sessionId);
+    const repository=inspectSignedDescriptorCustodyRepository(repo.primaryRoot);
+    if(loaded.ownerNonce!==fields.ownerNonce||!receipt||receipt.path!==receiptPath
+        ||existsSync(cleanupManifestPath(repo,fields.sessionId))
+        ||JSON.stringify(repository)!==JSON.stringify(preimage.repository))return;
+    ownedSessionCleanupWitnesses.set(ownedClosureKey(repository,preimage.target),
+      {repository,target:preimage.target,descriptorRef:preimage.descriptorRef,closureRef:receipt.ref});
+  } catch { /* Cleanup result is preserved; retirement will refuse missing provenance. */ }
+}
+
+// These capabilities exist only after this module's actual creation and
+// cleanup/retirement effects. Neither archived JSON nor a caller's tuple mints
+// an owning handle. There is deliberately no cross-process reconstruction.
+const sourceCreatedDescriptorOwners = new Map();
+const sourceCreatedDescriptorOwnerHandles = new WeakMap();
+const sourceCreatedDescriptorClosureHandles = new WeakMap();
+const OWNED_DESCRIPTOR_LIFETIME_LIMIT = 4096;
+
+function assertOwnedDescriptorLifetimeCapacity() {
+  if (sourceCreatedDescriptorOwners.size >= OWNED_DESCRIPTOR_LIFETIME_LIMIT)
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE', 'source-owned descriptor lifetime bound');
+}
+
+function retainSourceCreatedDescriptorOwner(repo, path, descriptor) {
+  const bytes = readFileSync(path);
+  const target = Object.freeze({sessionId:descriptor.sessionId,
+    descriptorSha256:rawSha256(bytes),ownerNonceSha256:ownerDigest(descriptor.ownerNonce)});
+  const key = ownedClosureKey(repo,target);
+  if (sourceCreatedDescriptorOwners.has(key))
+    fail('WT-OWNED-CLOSURE-CAS', 'source-created owner already retained');
+  const handle = Object.freeze({});
+  const value = {handle,target,primaryRoot:repo.primaryRoot,commonDir:repo.commonDir,
+    ownerNonce:descriptor.ownerNonce,ownerRuntime:descriptor.ownerRuntime,closureHandle:null};
+  sourceCreatedDescriptorOwnerHandles.set(handle,value);
+  sourceCreatedDescriptorOwners.set(key,value);
+}
+
+export function observeOwnedSessionDescriptorOwnerHandle({repository,target}) {
+  const actual = inspectSignedDescriptorCustodyRepository(repository?.primaryRoot);
+  if (JSON.stringify(actual) !== JSON.stringify(repository))
+    fail('WT-OWNED-CLOSURE-CAS', 'owner candidate changed');
+  const owner = sourceCreatedDescriptorOwners.get(ownedClosureKey(actual,target));
+  if (!owner || JSON.stringify(owner.target) !== JSON.stringify(target)
+      || JSON.stringify(owner.ownerRuntime) !== JSON.stringify(localProcessOwnerRuntime()))
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE', 'actual source-created owner capability unavailable');
+  return owner.handle;
+}
+
+export function observeOwnedSessionDescriptorClosureHandle({repository,target,ownerHandle}) {
+  const owner = sourceCreatedDescriptorOwnerHandles.get(ownerHandle);
+  if (!owner || JSON.stringify(owner.target) !== JSON.stringify(target)
+      || owner.primaryRoot !== repository?.primaryRoot || owner.commonDir !== repository?.commonDir)
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE', 'actual source-created owner capability required');
+  const observed = inspectOwnedSessionDescriptorClosure({repository,target});
+  if (observed.status !== 'closed')
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE', 'actual owning cleanup and retirement required');
+  if (!owner.closureHandle) {
+    const handle = Object.freeze({});
+    sourceCreatedDescriptorClosureHandles.set(handle,{owner,repository:structuredClone(repository),target:structuredClone(target)});
+    owner.closureHandle=handle;
+  }
+  return owner.closureHandle;
+}
+
+export function inspectOwnedSessionDescriptorClosureHandle(closureHandle,{repository,target}) {
+  const value=sourceCreatedDescriptorClosureHandles.get(closureHandle);
+  if (!value || JSON.stringify(value.repository)!==JSON.stringify(repository)
+      || JSON.stringify(value.target)!==JSON.stringify(target))
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE','unowned descriptor closure handle');
+  const observed=inspectOwnedSessionDescriptorClosure({repository,target});
+  if (observed.status!=='closed')
+    fail('WT-OWNED-CLOSURE-CAS','owning descriptor closure changed');
+  return observed;
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
 
 /**
  * Candidate-bound Critic packet lifecycle.
@@ -31,9 +32,11 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest } from "../lib/manifest.mjs";
+import { revalidateHistoricalFreshReviewPacketBinding } from "../lib/historical-fresh-review-admission.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { deriveCriticExportView, validateCriticExportAuthorization } from "../lib/critic-export-policy.mjs";
 import {
@@ -103,7 +106,14 @@ export function normalizePacketPath(value, label = "path") {
 function git(root, args, { allowNonzero = false, timeout = 5000, input = undefined } = {}) {
   const result = spawnSync("git", ["-C", root, ...args], {
     encoding: "utf8",
-    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    // Packet Git is local candidate transport: repository config remains active,
+    // while host system/global and inherited command-scope config are excluded.
+    env: {
+      LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "",
+      GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_COUNT: "0",
+      GIT_TERMINAL_PROMPT: "0",
+    },
     maxBuffer: 32 * 1024 * 1024,
     shell: false,
     timeout,
@@ -330,6 +340,14 @@ function validatePacketShape(packet) {
 }
 
 function normalizeCoordinatorOnly(value, candidate) {
+  if (isObject(value) && Object.hasOwn(value,"historicalFreshReview")) {
+    const {historicalFreshReview,...ordinary}=value;
+    const normalized=normalizeCoordinatorOnly(ordinary,candidate);
+    if(historicalFreshReview?.target?.baseCommit!==candidate.base
+      || historicalFreshReview?.target?.candidateCommit!==candidate.commit
+      || !revalidateHistoricalFreshReviewPacketBinding(historicalFreshReview)) fail("CPP-HISTORICAL-ADMISSION","Historical fresh-review binding is unavailable or drifted.");
+    return Object.freeze({...normalized,historicalFreshReview:Object.freeze({...historicalFreshReview})});
+  }
   if (exactKeys(value, ["signedQualityImportAnchor"])) {
     const anchor = value.signedQualityImportAnchor;
     if (!exactKeys(anchor, ["schema", "intentSha256", "integrationCommit", "baseCommit", "candidateCommit", "taskId"])
@@ -427,6 +445,8 @@ function advanceState(packetDir, packet, expected, next, body, now) {
   return successor;
 }
 function revalidateCandidate(packet) {
+  if(packet.coordinatorOnly?.historicalFreshReview!==undefined
+    && !revalidateHistoricalFreshReviewPacketBinding(packet.coordinatorOnly.historicalFreshReview)) fail("CPP-HISTORICAL-ADMISSION","Historical fresh-review source or authority drifted.");
   const checkout = packet.checkout.realPath;
   const observed = observeCheckout(checkout, packet.candidate.commit, packet.candidate.tree, packet.checkout.creatorNonce);
   if (JSON.stringify(observed) !== JSON.stringify(packet.checkout)) fail("CPP-CHECKOUT", "Checkout identity drift.");
@@ -487,17 +507,20 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const signedImportAnchor = options.signedQualityImportAnchor === undefined
       ? undefined : normalizeCoordinatorOnly({ signedQualityImportAnchor: options.signedQualityImportAnchor }, { base, commit: candidate }).signedQualityImportAnchor;
     const reviewAdmission = signedImportAnchor === undefined
-      ? evaluateReviewAdmission({ root: repoRoot, taskId: options.taskId, candidateCommit: candidate })
+      ? evaluateReviewAdmission({ root: repoRoot, taskId: options.taskId, baseCommit: base, candidateCommit: candidate })
       : evaluateSignedQualityImportReviewAdmissionFn({ root: repoRoot, anchor: signedImportAnchor });
     if (!reviewAdmission.ok) fail("CPP-REVIEW-ADMISSION", `Critic review admission is blocked: ${(reviewAdmission.readFindings ?? reviewAdmission.findings ?? []).join("; ")}`);
     if (signedImportAnchor !== undefined && reviewAdmission.code !== "signed-quality-import-review-admitted") fail("CPP-REVIEW-ADMISSION", "Signed import review admission did not return its distinct success code.");
     if (signedImportAnchor !== undefined && options.taskId !== signedImportAnchor.taskId) fail("CPP-COORDINATOR-BINDING", "Packet task identity does not match the signed import intent.");
     const localDispatchEvidence = signedImportAnchor === undefined
-      ? createLocalDispatchEvidenceBindingFn({ root: repoRoot, taskId: options.taskId, reviewCandidateCommit: candidate })
+      ? createLocalDispatchEvidenceBindingFn({ root: repoRoot, taskId: options.taskId, baseCommit: base, reviewCandidateCommit: candidate })
       : undefined;
-    const coordinatorOnly = signedImportAnchor === undefined
+    let coordinatorOnly = signedImportAnchor === undefined
       ? normalizeCoordinatorOnly({ localDispatchEvidence }, { base, commit: candidate })
       : normalizeCoordinatorOnly({ signedQualityImportAnchor: signedImportAnchor }, { base, commit: candidate });
+    if(reviewAdmission.historicalFreshReview !== undefined) {
+      coordinatorOnly=normalizeCoordinatorOnly({...coordinatorOnly,historicalFreshReview:reviewAdmission.historicalFreshReview},{base,commit:candidate});
+    }
     const baseType = gitText(repoRoot, ["cat-file", "-t", base]);
     if (gitText(repoRoot, ["cat-file", "-t", candidate]) !== "commit") fail("CPP-REF", "Candidate ref is not a commit.");
     if (baseType === "commit") {
@@ -723,7 +746,7 @@ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now
   return { ok: true, code: "CPP-CONSUMED", replay: false, packet, record };
 }
 
-export function readConsumedCandidateReceipt({ controlRoot, packetId }) {
+function readConsumedCandidateSnapshot({ controlRoot, packetId }) {
   const { packetDir, packet } = packetContext(controlRoot, packetId);
   const state = currentState(packetDir, packet);
   if (state.phase !== "consumed") fail("CPP-CONSUMED", "Packet is not consumed.");
@@ -740,9 +763,42 @@ export function readConsumedCandidateReceipt({ controlRoot, packetId }) {
       receiptRecord.body, receiptRecord.timestamp)) !== canonicalJson(state)) {
     fail("CPP-RECEIPT-DRIFT", "Consumed Critic receipt differs from its durable journal state.");
   }
+  return { packetDir, packet, state, receiptRecord };
+}
+export function readConsumedCandidateReceipt({ controlRoot, packetId }) {
+  const { packet, receiptRecord } = readConsumedCandidateSnapshot({ controlRoot, packetId });
   const receipt = receiptRecord?.body ?? receiptRecord;
   return Object.freeze({ packet, receipt });
 }
+
+/** Read the exact durable result preceding a consumed receipt; no verdict authority. */
+export function readConsumedCandidateResult({ controlRoot, packetId }) {
+  const initial = readConsumedCandidateSnapshot({ controlRoot, packetId });
+  const { packetDir, packet, state, receiptRecord } = initial;
+  const resultRecord = readJson(join(packetDir, "result.json"), "CPP-RESULT");
+  if (!exactKeys(resultRecord, ["schema", "packetId", "packetDigest", "revision", "priorStateDigest", "timestamp", "phase", "body"])
+    || resultRecord.schema !== RECORD_SCHEMA || resultRecord.phase !== "result-recorded"
+    || resultRecord.packetId !== packet.packetId || resultRecord.packetDigest !== sha256(canonicalJson(packet))
+    || !Number.isSafeInteger(resultRecord.revision) || resultRecord.revision < 1
+    || resultRecord.revision !== receiptRecord.revision - 1 || !SHA256.test(resultRecord.priorStateDigest ?? "")
+    || typeof resultRecord.timestamp !== "string" || !Number.isFinite(Date.parse(resultRecord.timestamp))
+    || !isObject(resultRecord.body)) fail("CPP-RESULT-DRIFT", "Consumed Critic result record is invalid.");
+  const predecessor = recordBody(packet, resultRecord.revision, resultRecord.priorStateDigest,
+    resultRecord.phase, resultRecord.body, resultRecord.timestamp);
+  if (sha256(canonicalJson(predecessor)) !== receiptRecord.priorStateDigest) {
+    fail("CPP-RESULT-DRIFT", "Consumed Critic result differs from its journal predecessor.");
+  }
+  const current = readConsumedCandidateSnapshot({ controlRoot, packetId });
+  const resultReadback = readJson(join(packetDir, "result.json"), "CPP-RESULT");
+  if (canonicalJson(current.packet) !== canonicalJson(packet)
+    || canonicalJson(current.state) !== canonicalJson(state)
+    || canonicalJson(current.receiptRecord) !== canonicalJson(receiptRecord)
+    || canonicalJson(resultReadback) !== canonicalJson(resultRecord)) {
+    fail("CPP-RESULT-DRIFT", "Consumed Critic snapshot changed during readback.");
+  }
+  return Object.freeze({ packet, receipt: receiptRecord.body, result: resultRecord.body });
+}
+
 
 export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapability }, { now = new Date() } = {}) {
   const { packetDir, packet } = packetContext(controlRoot, packetId);
@@ -768,3 +824,99 @@ export function blockCandidatePacket({ controlRoot, packetId, code, detail = nul
 }
 
 export const __test = Object.freeze({ bindingsFor, observeCheckout, candidateInventory });
+
+/** Read the immutable prelaunch admission only after genuine journal consumption. */
+export function readConsumedSessionAdmission({ controlRoot, packetId }) {
+  const consumed = readConsumedCandidateResult({ controlRoot, packetId });
+  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  const admissionPath = join(packetDir, "session-admission.json");
+  if (!existsSync(admissionPath) || packet.request.sessionBinding === undefined) {
+    fail("CPP-CONSUMED-ADMISSION-UNAVAILABLE", "Consumed session admission is unavailable.");
+  }
+  const admission = readJson(admissionPath, "CPP-SESSION-ADMISSION");
+  if (!Object.hasOwn(admission ?? {}, "courseSourceSha256") || !Object.hasOwn(admission ?? {}, "courseDecisionSha256")) {
+    fail("CPP-CONSUMED-ADMISSION-UNAVAILABLE", "Historical admission has no course digest slots.");
+  }
+  const claim = readJson(join(packetDir, "claim.json"), "CPP-CLAIM-READ");
+  const resultRecord = readJson(join(packetDir, "result.json"), "CPP-RESULT");
+  const preparedState = recordBody(packet, 1, null, "prepared", { code: "CPP-PREPARED" }, packet.createdAt);
+  if (!exactKeys(claim, ["schema", "packetId", "packetDigest", "revision", "priorStateDigest", "timestamp", "phase", "body"])
+    || claim.schema !== RECORD_SCHEMA || claim.packetId !== packetId || claim.phase !== "claimed" || claim.revision !== 2
+    || claim.packetDigest !== sha256(canonicalJson(packet)) || claim.priorStateDigest !== sha256(canonicalJson(preparedState))
+    || typeof claim.timestamp !== "string" || !Number.isFinite(Date.parse(claim.timestamp))
+    || !(exactKeys(claim.body, ["adapter", "claimantNonce"]) || exactKeys(claim.body, ["adapter", "claimantNonce", "criticReviewLineageSha256"]))
+    || claim.body.adapter !== packet.route.adapter || !SHA256.test(claim.body.claimantNonce ?? "")
+    || (Object.hasOwn(claim.body, "criticReviewLineageSha256") && !SHA256.test(claim.body.criticReviewLineageSha256 ?? ""))
+    || resultRecord.revision !== 3
+    || resultRecord.priorStateDigest !== sha256(canonicalJson(recordBody(packet, 2, claim.priorStateDigest, "claimed", claim.body, claim.timestamp)))
+    || canonicalJson(resultRecord.body) !== canonicalJson(consumed.result)) fail("CPP-CLAIM-READ", "Consumed journal claim binding differs.");
+  const binding = packet.request.sessionBinding;
+  if (!exactKeys(admission, ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256", "createdAt"])
+    || admission.schema !== SESSION_ADMISSION_SCHEMA || admission.packetId !== packetId
+    || admission.packetDigest !== sha256(canonicalJson(packet))
+    || admission.claimSha256 !== sha256(canonicalJson(claim))
+    || admission.sessionId !== binding.sessionId
+    || admission.preflightSha256 !== binding.preflightSha256
+    || admission.preflightSha256 !== packet.route.projectionDigest
+    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256)
+    || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
+    fail("CPP-SESSION-ADMISSION", "Consumed session admission is drifted.");
+  }
+  const readback = readConsumedCandidateResult({ controlRoot, packetId });
+  if (canonicalJson(readback) !== canonicalJson(consumed)
+    || canonicalJson(readJson(admissionPath, "CPP-SESSION-ADMISSION")) !== canonicalJson(admission)
+    || canonicalJson(readJson(join(packetDir, "claim.json"), "CPP-CLAIM-READ")) !== canonicalJson(claim)
+    || canonicalJson(readJson(join(packetDir, "result.json"), "CPP-RESULT")) !== canonicalJson(resultRecord)) {
+    fail("CPP-SESSION-ADMISSION", "Consumed admission changed during readback.");
+  }
+  return Object.freeze({ packet, receipt: consumed.receipt, result: consumed.result, admission });
+}
+
+/** Observe the real owner and canonical packet root before genuine claim. */
+export function claimCriticPacketWithLaunchContext(input, options) {
+  if (options === undefined || exactKeys(options, [])
+    || (exactKeys(options, ["hostDispatchContext"]) && options.hostDispatchContext === undefined)) {
+    throw new CriticPacketError("DBLO-CURRENT-HOST-UNAVAILABLE", "Launch observation refused.");
+  }
+  if (!exactKeys(options, ["hostDispatchContext"])) {
+    throw new CriticPacketError("DBLO-HANDLE-INVALID", "Launch observation refused.");
+  }
+  const required = ["rootDir", "controlRoot", "packetId", "adapter", "claimantNonce"];
+  if (!(exactKeys(input, required) || exactKeys(input, [...required, "lineage"]))) {
+    throw new CriticPacketError("DBLO-HANDLE-INVALID", "Launch observation refused.");
+  }
+  const observe = () => {
+    const observed = readDispatchBudgetLaunchObservation({ rootDir: input.rootDir,
+      hostDispatchContext: options.hostDispatchContext });
+    if (!observed.ok) throw new CriticPacketError(observed.code, "Launch observation refused.");
+    if (observed.value.status !== "working" && observed.value.status !== "not-applicable") {
+      throw new CriticPacketError(observed.value.code, "Launch observation refused.");
+    }
+  };
+  observe();
+  let common, requiredControl;
+  try {
+    const root = realpathSync(input.rootDir);
+    common = realpathSync(resolve(root, gitText(root, ["rev-parse", "--git-common-dir"])));
+    requiredControl = join(common, "agent-pipeline", "critic-packets");
+    if (typeof input.controlRoot !== "string" || resolve(input.controlRoot) !== requiredControl) {
+      throw new CriticPacketError("DBLO-ROOT-BINDING", "Launch observation refused.");
+    }
+  } catch (error) {
+    if (error instanceof CriticPacketError && error.code === "DBLO-ROOT-BINDING") throw error;
+    throw new CriticPacketError("DBLO-ROOT-BINDING", "Launch observation refused.");
+  }
+  // Retain the original physical, private and symlink policy without writes.
+  assertNoSymlinkPath(requiredControl, common, "control root");
+  if (assertRealPrivateDir(requiredControl, "control root") !== requiredControl) {
+    throw new CriticPacketError("DBLO-ROOT-BINDING", "Launch observation refused.");
+  }
+  observe();
+  return claimCandidatePacket({ controlRoot: input.controlRoot, packetId: input.packetId,
+    adapter: input.adapter, claimantNonce: input.claimantNonce,
+    ...(Object.hasOwn(input, "lineage") ? { lineage: input.lineage } : {}),
+  });
+}
+
+// Generic accounting retains the existing packet owner and genuine lifecycle readers.
+export { registerGenericCriticBatch, appendGenericCriticBatchCorrection, readGenericCriticBatchAdmission, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission } from "../lib/critic-generic-batch.mjs";

@@ -1,0 +1,10 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-item-owned-egm-retained-quality-gates",
+  "title": "Item-owned EGM and retained independent quality gates",
+  "status": "proposed",
+  "digest": "385f657e2e33f7c71a8b4f5179e87184557b0e862445a647184de2a9e047e71f",
+  "scope": "global",
+  "supersedes": "0005-quality-gates-dod",
+  "date": "2026-10-11"
+}

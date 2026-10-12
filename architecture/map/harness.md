@@ -22,9 +22,11 @@ authorityEffects:
   - execute-verify-suites
   - read-workspace-test-tree
 verificationEntryPoints:
+  - harness/scripts/shell-grammar-capability-placement.test.mjs
   - harness/scripts/check-verify-suite-registration.mjs
   - harness/scripts/check-verify-suite-append.mjs
   - harness/scripts/doc-reader-terminal-binding.test.mjs
+  - harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs
 adrReferences:
   - ADR-0063
 ---
@@ -70,3 +72,17 @@ and assigned once to deterministic-verification. Existing rows, policies and
 coverage remain intact. Declarative consumption already occurs through the shared
 closed loader; no builtin Verify mutation, exemption or new runner duty is needed.
 Prepared graph receipts do not establish actual Source or whole Verify acceptance.
+
+## RGGRAM placement fixture
+
+The four-case `shell-grammar-capability-placement-tests` registration checks
+concrete capability evidence, existing source-map ownership and actual product
+surface discovery. It adds no grammar admission or kernel exemption and does
+not claim to identify or repair the historical unnamed fixture.
+
+## Item-owned delivery suite enrollment
+
+New item-delivery suites append to the declarative registry and assign each Verify
+surface once to deterministic-verification. Existing suite policies can grow only
+through exact previous-policy digest-bound monotone augmentations. Earlier
+registrations, qualifications and deferred legacy migration reasons remain intact.

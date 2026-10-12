@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 
 export const SCHEMA_RIGOR_DERIVATION = "pipeline.rigor-derivation.v1";
-export const DEFAULT_DERIVATION_REVISION = "b1-r1";
+export const DEFAULT_DERIVATION_REVISION = "b1-r2-bindings";
 
 export const PROFILES = Object.freeze(["mini", "feature", "epic"]);
 export const PROFILE_RANKS = Object.freeze({
@@ -35,8 +35,55 @@ export const KNOWN_DIMENSIONS = Object.freeze([
   "contractDeltas",
   "reversibility",
   "diffStats",
-  "selectedProfile"
+  "selectedProfile",
+  "protectedIdentity",
+  "architectureProfile",
+  "fitnessOutcomes",
+  "interruptionLineage"
 ]);
+
+const BINDING_DIMENSIONS = new Set(["protectedIdentity", "architectureProfile", "fitnessOutcomes", "interruptionLineage"]);
+const SHA256 = /^[a-f0-9]{64}$/u;
+const BINDING_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const exactBinding = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+  && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+
+/** New B1 inputs are observations, never authority grants or calibrated scores. */
+function normalizeBinding(dimension, value) {
+  if (dimension === "protectedIdentity") {
+    if (!exactBinding(value, ["baselineRevision", "baselineDigest", "mergedDigest"])
+      || !Number.isSafeInteger(value.baselineRevision) || value.baselineRevision < 1
+      || !SHA256.test(value.baselineDigest) || !SHA256.test(value.mergedDigest)) return null;
+    return { baselineRevision: value.baselineRevision, baselineDigest: value.baselineDigest, mergedDigest: value.mergedDigest };
+  }
+  if (dimension === "architectureProfile") {
+    if (!exactBinding(value, ["id", "source", "sha256"]) || typeof value.id !== "string" || !BINDING_ID.test(value.id)
+      || typeof value.source !== "string" || value.source.length > 512
+      || !value.source.split("/").every(part => /^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(part) && part !== "." && part !== "..")
+      || !SHA256.test(value.sha256)) return null;
+    return { id: value.id, source: value.source, sha256: value.sha256 };
+  }
+  if (dimension === "fitnessOutcomes") {
+    if (!exactBinding(value, ["sourceSha256", "outcomes"]) || !SHA256.test(value.sourceSha256)
+      || !Array.isArray(value.outcomes) || value.outcomes.length < 1 || value.outcomes.length > 128) return null;
+    const outcomes = [];
+    const ids = new Set();
+    for (const row of value.outcomes) {
+      if (!exactBinding(row, ["classId", "propertyId", "outcome"]) || !Number.isSafeInteger(row.classId) || row.classId < 1
+        || typeof row.propertyId !== "string" || !BINDING_ID.test(row.propertyId) || !["pass", "finding", "unavailable", "unsupported", "unknown", "excepted"].includes(row.outcome)
+        || ids.has(row.classId)) return null;
+      ids.add(row.classId);
+      outcomes.push({ classId: row.classId, propertyId: row.propertyId, outcome: row.outcome });
+    }
+    outcomes.sort((a, b) => a.classId - b.classId);
+    return { sourceSha256: value.sourceSha256, outcomes };
+  }
+  if (!exactBinding(value, ["featureId", "snapshotSha256", "lineageCount", "receiptCount"])
+    || typeof value.featureId !== "string" || !BINDING_ID.test(value.featureId) || !SHA256.test(value.snapshotSha256)
+    || !Number.isSafeInteger(value.lineageCount) || value.lineageCount < 0
+    || !Number.isSafeInteger(value.receiptCount) || value.receiptCount < value.lineageCount) return null;
+  return { featureId: value.featureId, snapshotSha256: value.snapshotSha256, lineageCount: value.lineageCount, receiptCount: value.receiptCount };
+}
 
 /**
  * Known protected baseline patterns (A3 / TP paths).
@@ -126,6 +173,22 @@ export function normalizeInputs(rawInputs = {}) {
 
   for (const dim of KNOWN_DIMENSIONS) {
     const rawDim = src[dim];
+
+    if (BINDING_DIMENSIONS.has(dim)) {
+      // Only the accepted observation envelope is supported for new dimensions.
+      // Naked values and malformed available observations never become clean inputs.
+      const wrapped = exactBinding(rawDim, ["value", "status", "sourceContract"])
+        && typeof rawDim.sourceContract === "string" && rawDim.sourceContract.trim().length > 0
+        && rawDim.sourceContract.length <= 512;
+      const suppliedStatus = wrapped && ["available", "unavailable", "unknown"].includes(rawDim.status) ? rawDim.status : "unknown";
+      const value = suppliedStatus === "available" ? normalizeBinding(dim, rawDim.value) : null;
+      normalized[dim] = {
+        value,
+        status: suppliedStatus === "available" && value === null ? "unknown" : suppliedStatus,
+        sourceContract: wrapped ? rawDim.sourceContract : "unspecified",
+      };
+      continue;
+    }
 
     let value = null;
     let status = "unavailable";
@@ -246,7 +309,7 @@ export function deriveMinimumRigor(inputs, policy = null) {
   const normalized = normalizeInputs(inputs);
   const inputDigest = computeInputDigest(normalized);
 
-  const derivationRevision = policy?.derivationRevision || DEFAULT_DERIVATION_REVISION;
+  const derivationRevision = policy?.derivationRevision ? `${policy.derivationRevision}+bindings-v2` : DEFAULT_DERIVATION_REVISION;
   const maxChangedFiles = policy?.diffThresholds?.maxChangedFiles ?? 5;
   const maxChangedLines = policy?.diffThresholds?.maxChangedLines ?? 150;
 
@@ -270,6 +333,18 @@ export function deriveMinimumRigor(inputs, policy = null) {
     }
     for (const ev of extraEvidence) {
       requiredEvidenceSet.add(ev);
+    }
+  }
+
+  // The existing policy's wildcard unknown/unavailable rule applies to these
+  // accepted dimensions too. Known counts and findings are digest-bound, not
+  // assigned a new uncalibrated numerical weight or a new promotion authority.
+  for (const dimension of BINDING_DIMENSIONS) {
+    const observation = normalized[dimension];
+    const incompleteFitness = dimension === "fitnessOutcomes" && observation.value?.outcomes
+      .some(row => ["unknown", "unavailable", "unsupported"].includes(row.outcome));
+    if (observation.status !== "available" || incompleteFitness) {
+      escalate("feature", `UNAVAILABLE_OR_UNKNOWN_INPUT:${dimension}`, `Accepted ${dimension} observation is ${incompleteFitness ? "incomplete" : observation.status}`);
     }
   }
 
@@ -506,8 +581,50 @@ export function inferInputsFromRepo(root, { execFileSyncFn = execFileSync } = {}
       value: null,
       status: "unknown",
       sourceContract: "requires-po-bound-plan"
-    }
+    },
+    // The working-tree adapter does not possess D2/D3/C1 authority observations.
+    // Their sanctioned owners must supply exact bound observations at lifecycle
+    // boundaries. Missing collection/profile/identity is not an empty baseline.
+    protectedIdentity: { value: null, status: "unavailable", sourceContract: "pipeline.protected-baseline.v1" },
+    architectureProfile: { value: null, status: "unavailable", sourceContract: "pipeline.architecture-profile.v1" },
+    fitnessOutcomes: { value: null, status: "unavailable", sourceContract: "pipeline.fitness-evidence.v1" },
+    interruptionLineage: { value: null, status: "unavailable", sourceContract: "pipeline.interruption-store-snapshot.v1" }
   };
+}
+
+/**
+ * Pure owner-facing report-only lifecycle projection. The caller is a sanctioned
+ * State/Verify writer, not a guard-read side effect. Returned bytes neither grant
+ * reauthorization nor approve a profile. Durable publication remains that
+ * writer's CAS/journal duty. Previous evidence must already be owner-validated.
+ */
+export function deriveLifecycleRigorObservation({ boundary, featureId, candidate, inputs, previous = null, policy = null } = {}) {
+  if (!["plan-submission", "pre-close"].includes(boundary) || typeof featureId !== "string" || !BINDING_ID.test(featureId)
+    || !exactBinding(candidate, ["commit", "tree"]) || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.commit)
+    || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.tree) || candidate.commit.length !== candidate.tree.length) {
+    throw new TypeError("RIGOR-LIFECYCLE-BINDING");
+  }
+  if (previous !== null && (!exactBinding(previous, ["featureId", "minProfile", "inputDigest"])
+    || previous.featureId !== featureId || !PROFILES.includes(previous.minProfile) || !SHA256.test(previous.inputDigest))) {
+    throw new TypeError("RIGOR-LIFECYCLE-PREVIOUS");
+  }
+  const derivation = deriveMinimumRigor(inputs, policy);
+  const retainedProfile = previous && PROFILE_RANKS[previous.minProfile] > PROFILE_RANKS[derivation.minProfile]
+    ? previous.minProfile : derivation.minProfile;
+  const normalized = normalizeInputs(inputs);
+  const selected = normalized.selectedProfile.status === "available" && PROFILES.includes(normalized.selectedProfile.value)
+    ? normalized.selectedProfile.value : null;
+  const disagreement = selected === null ? null : {
+    selected, derived: retainedProfile, agrees: PROFILE_RANKS[selected] >= PROFILE_RANKS[retainedProfile],
+  };
+  return Object.freeze({
+    schema: "pipeline.rigor-lifecycle-observation.v1", mode: "report-only", boundary, featureId,
+    candidate: Object.freeze({ ...candidate }), derivation, retainedProfile,
+    previousInputDigest: previous?.inputDigest ?? null, disagreement,
+    reauthorization: selected === null ? "selected-profile-unavailable" : PROFILE_RANKS[selected] < PROFILE_RANKS[retainedProfile]
+      ? "existing-profile-reauthorization-required-before-enforcing-promotion" : "not-required-by-floor",
+    promotionAuthority: "unavailable-no-threshold-promotion-granted",
+  });
 }
 
 export function parseArgs(argv) {

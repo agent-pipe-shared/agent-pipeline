@@ -23,6 +23,7 @@ import {
   renameSync, rmSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { observeNativeWindowsProcess } from "./windows-native-process-observer.mjs";
 
 export const VERIFY_RUN_RECORD_SCHEMA = "pipeline.verify-run-record.v1";
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -39,6 +40,13 @@ export function verifyRunDirectory(gitCommonDir, runId) {
 }
 
 export function defaultProcessStartIdentity(pid) {
+  if (process.platform === "win32") {
+    const observed = observeNativeWindowsProcess({ pid });
+    if (observed.status === "present") return observed.process.start;
+    const error = new Error("VERIFY-RUN-RECORD-PROCESS-UNAVAILABLE");
+    error.code = "VERIFY-RUN-RECORD-PROCESS-UNAVAILABLE";
+    throw error;
+  }
   if (process.platform !== "linux") return `pid-${pid}`;
   try { return readFileSync(`/proc/${pid}/stat`, "utf8").trim().split(" ")[21] || `pid-${pid}`; }
   catch { return `pid-${pid}`; }
@@ -47,6 +55,15 @@ export function defaultProcessStartIdentity(pid) {
 // Alive unless the PID is provably gone or now belongs to a different process.
 export function defaultProcessAlive(pid, processStartId) {
   if (!Number.isSafeInteger(pid) || pid < 1) return false;
+  if (process.platform === "win32") {
+    const observed = observeNativeWindowsProcess({ pid });
+    if (observed.status === "absent") return false;
+    // Missing native evidence and legacy PID-only records cannot prove staleness.
+    if (observed.status !== "present" || typeof processStartId !== "string"
+      || !/^[1-9][0-9]{0,18}$/u.test(processStartId)
+      || BigInt(processStartId) > 3155378975999999999n) return true;
+    return observed.process.start === processStartId;
+  }
   try { process.kill(pid, 0); } catch (error) { return error?.code !== "ESRCH"; }
   return defaultProcessStartIdentity(pid) === processStartId;
 }

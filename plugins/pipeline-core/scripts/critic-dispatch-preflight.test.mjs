@@ -6,7 +6,9 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import test from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+const completionCases = [];
+function test(name, run) { completionCases.push({id: "CDPF" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
 
 import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, enumerateEvidenceArtifacts, preflightCriticDispatch, parseCriticDispatchPreflightArgs } from "./critic-dispatch-preflight.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -18,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 
 function verifyValue(commit, tree, exitCode = 0) {
@@ -79,6 +82,8 @@ function registeredFourRoundFixture(roundCount = 4) {
   const manifest = (artifacts) => ({ schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", artifacts });
   writeFileSync(join(fx.root, specPath), "# Course feature\nround one\n");
   writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest([]))}\n`);
+  const courseBase = commit(fx.root, "course genesis manifest");
+  writeFileSync(join(fx.root, specPath), "# Course feature\nround one source\n");
   const commits = [commit(fx.root, "course round one candidate")];
   for (let round = 2; round <= roundCount; round += 1) {
     writeFileSync(join(fx.root, specPath), `# Course feature\nround ${round}\n`);
@@ -87,7 +92,7 @@ function registeredFourRoundFixture(roundCount = 4) {
   const lineage = [];
   const invariantMap = { [specPath]: ["INV-1"] };
   for (let index = 0; index < commits.length; index += 1) {
-    const base = index === 0 ? fx.candidate : commits[index - 1];
+    const base = index === 0 ? courseBase : commits[index - 1];
     const candidate = commits[index];
     const diffSha256 = sha256(`course-diff-${index}`);
     const packet = {
@@ -133,70 +138,105 @@ function registeredFourRoundFixture(roundCount = 4) {
   return { ...fx, specPath, priorPath: artifacts.at(-1).path, reviewedCommit: commits.at(-1), fifth };
 }
 
-test("a fifth feature-package review is refused before packet-ready from retained Git lineage", () => {
+test("retained four-round history remains readable but cannot authorize dispatch without consumed journals", () => {
   const fx = registeredFourRoundFixture();
   try {
-    const proposed = input(fx, {
-      base: fx.reviewedCommit,
-      candidate: fx.fifth,
-      specPath: fx.specPath,
-      evidencePaths: ["evidence/verify-course.json"],
-      priorCriticEvidencePath: fx.priorPath,
-    });
-    assert.throws(() => preflightCriticDispatch(proposed), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-GATE");
-    assert.throws(() => preflightCriticDispatch({ ...proposed, priorCriticEvidencePath: null }), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-PARENT");
-    assert.throws(() => preflightCriticDispatch({ ...proposed, base: fx.candidate }), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-SOURCE");
-    assert.throws(() => preflightCriticDispatch({ ...proposed, base: null,
-      reviewScope: { kind: "current-artifacts", paths: [fx.specPath] } }),
-    (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-SCOPE");
-  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+    const result = preflightCriticDispatch(input(fx, { base: fx.reviewedCommit, candidate: fx.fifth, specPath: fx.specPath, evidencePaths: ["evidence/verify-course.json"], priorCriticEvidencePath: fx.priorPath }));
+    assert.equal(result.status, "unavailable", JSON.stringify(result));
+    assert.equal(result.code, "CVL-COURSE-JOURNAL-UNAVAILABLE");
+    assert.equal(result.dispatch.packetCreated, false);
+    assert.equal(result.dispatch.childCreated, false);
+  } finally { rmSync(fx.root, {recursive: true, force: true}); }
 });
 
-test("an exact evidence-only registration does not consume the fourth review's correction budget", () => {
+test("a fourth retained review cannot gain admission from finding prose alone", () => {
   const fx = registeredFourRoundFixture(3);
   try {
-    const result = preflightCriticDispatch(input(fx, {
-      base: fx.reviewedCommit,
-      candidate: fx.fifth,
-      specPath: fx.specPath,
-      evidencePaths: ["evidence/verify-course.json"],
-      priorCriticEvidencePath: fx.priorPath,
-    }));
-    assert.equal(result.status, "packet-ready");
-    assert.equal(result.coordinatorOnly.courseAdmission.round, 4);
-    assert.equal(result.coordinatorOnly.courseAdmission.correctionCommits, 3);
-  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+    const result = preflightCriticDispatch(input(fx, { base: fx.reviewedCommit, candidate: fx.fifth, specPath: fx.specPath, evidencePaths: ["evidence/verify-course.json"], priorCriticEvidencePath: fx.priorPath }));
+    assert.equal(result.status, "unavailable", JSON.stringify(result));
+    assert.equal(result.code, "CVL-COURSE-JOURNAL-UNAVAILABLE");
+    assert.equal(result.dispatch.spawnAuthorized, false);
+  } finally { rmSync(fx.root, {recursive: true, force: true}); }
 });
 
-test("a first versioned feature-package review remains admissible without a fabricated parent", () => {
+for (const declared of [false, true, "unit-drift", "singleton", "wrong-main", "foreign-spec", "empty-range"]) test(`feature genesis ${declared === true ? "admits a fixed integrated review unit" : `refuses ${declared || "missing review-unit"}`}`, () => {
   const fx = fixture();
   try {
-    mkdirSync(join(fx.root, "specs", "fresh-feature"), { recursive: true });
-    writeFileSync(join(fx.root, "specs", "fresh-feature", "spec.md"), "# Fresh feature\n");
-    writeFileSync(join(fx.root, "specs", "fresh-feature", "lifecycle.json"), `${JSON.stringify({
-      schema: "pipeline.feature-package.v1", feature: { id: "fresh-feature", rigor: 2 }, state: "approved", artifacts: [],
-    })}\n`);
+    rmSync(join(fx.root, "evidence"), {recursive: true, force: true});
+    const featureId = "fresh-feature";
+    const directory = join(fx.root, "specs", featureId);
+    const specPath = `specs/${featureId}/spec.md`;
+    const reviewSpecPath = declared === "foreign-spec" ? `specs/${featureId}/other-spec.md` : specPath;
+    const manifestPath = `specs/${featureId}/lifecycle.json`;
+    const diagnosticPath = `specs/${featureId}/evidence/diagnostic.json`;
+    const logPath = `specs/${featureId}/evidence/targeted.log`;
+    mkdirSync(join(directory, "evidence"), { recursive: true });
+    const manifest = {schema: "pipeline.feature-package.v1", feature: {id: featureId, rigor: 2}, state: "approved", artifacts: []};
+    writeFileSync(join(fx.root, manifestPath), JSON.stringify(manifest));
+    writeFileSync(join(fx.root, specPath), "# Fresh feature\nAC-1: behavior boundary\n");
+    manifest.artifacts.push({class: "spec", path: specPath, sha256: sha256(readFileSync(join(fx.root, specPath))), authority: true, mutability: "mutable", retention: "active"});
+    if (declared) {
+      const path = `specs/${featureId}/design/critic-review-unit.json`;
+      mkdirSync(join(directory, "design"), {recursive: true});
+      const logicalWorkIds = declared === "singleton" ? ["work-one"] : ["work-one", "work-two"];
+      const unit = {schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior boundary", specPath, logicalWorkIds, criterionIds: ["AC-1"], deliveryBoundary: {mainRef: declared === "wrong-main" ? "refs/heads/foreign-main" : git(fx.root, ["symbolic-ref", "HEAD"])}, singletonRationale: null};
+      writeFileSync(join(fx.root, path), JSON.stringify(unit));
+      manifest.artifacts.push({class: "design", path, sha256: sha256(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain"});
+    }
+    writeFileSync(join(fx.root, manifestPath), JSON.stringify(manifest));
+    if (declared === "foreign-spec") writeFileSync(join(fx.root, reviewSpecPath), "# Different source scope\n");
+    const base = commit(fx.root, "feature genesis manifest");
+    if (declared === "unit-drift") {
+      const path = join(directory, "design", "critic-review-unit.json");
+      const unit = JSON.parse(readFileSync(path));
+      unit.purpose = "New scope after declaring genesis";
+      writeFileSync(path, JSON.stringify(unit));
+    }
+    writeFileSync(join(fx.root, specPath), "# Fresh feature\nchanged\n");
     const candidate = commit(fx.root, "fresh feature candidate");
-    const tree = git(fx.root, ["rev-parse", `${candidate}^{tree}`]);
-    writeFileSync(join(fx.root, "evidence", "verify-fresh.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
-    const result = preflightCriticDispatch(input(fx, {
-      base: fx.candidate, candidate,
-      specPath: "specs/fresh-feature/spec.md",
-      evidencePaths: ["evidence/verify-fresh.json"],
-      priorCriticEvidencePath: null,
-    }));
-    assert.equal(result.status, "packet-ready");
-    assert.equal(result.coordinatorOnly.courseAdmission.featureId, "fresh-feature");
+    mkdirSync(join(fx.root, "evidence"));
+    const diagnostic = produceCriticDiagnostic({root: fx.root, candidate, specPath: reviewSpecPath, guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/fresh-targeted.log"});
+    writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, "evidence/fresh-targeted.log")));
+    diagnostic.targeted.log.path = logPath;
+    rmSync(join(fx.root, "evidence"), {recursive: true, force: true});
+    writeFileSync(join(fx.root, diagnosticPath), JSON.stringify(diagnostic));
+    for (const path of [diagnosticPath, logPath]) manifest.artifacts.push({class: "candidate-evidence", path, sha256: sha256(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain"});
+    writeFileSync(join(fx.root, manifestPath), JSON.stringify(manifest));
+    const registrationCommit = commit(fx.root, "register candidate-bound diagnostics");
+    const request = input(fx, { base: declared === "empty-range" ? candidate : base, candidate, specPath: reviewSpecPath, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: {featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null} });
+    if (declared === "empty-range") {
+      assert.throws(() => preflightCriticDispatch(request), error => error instanceof CriticDispatchPreflightError && error.code === "CDP-RANGE");
+      return;
+    }
+    if (declared === "foreign-spec") {
+      assert.throws(() => preflightCriticDispatch(request), error => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-CONTEXT");
+      return;
+    }
+    const result = preflightCriticDispatch(request);
+    if (!declared) {
+      assert.equal(result.status, "refused", JSON.stringify(result));
+      assert.equal(result.code, "CCA-REVIEW-UNIT-REQUIRED");
+      assert.equal(result.dispatch.packetCreated, false);
+      return;
+    }
+    if (typeof declared === "string") {
+      assert.equal(result.status, "refused", JSON.stringify(result));
+      assert.equal(result.code, {"unit-drift": "CGB-REVIEW-UNIT-BINDING", singleton: "CGB-SINGLETON-RATIONALE", "wrong-main": "CGB-MAIN-INTEGRATION", "foreign-spec": "CDP-COURSE-CONTEXT", "empty-range": "CCA-GENESIS-RANGE"}[declared]);
+      assert.equal(result.dispatch.packetCreated, false);
+      return;
+    }
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
+    assert.equal(result.coordinatorOnly.courseAdmission.featureId, featureId);
     assert.equal(result.coordinatorOnly.courseAdmission.round, 1);
-    assert.match(result.coordinatorOnly.courseAdmission.sourceSha256, /^[a-f0-9]{64}$/u);
-    assert.match(result.coordinatorOnly.courseAdmission.decisionSha256, /^[a-f0-9]{64}$/u);
-  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+    assert.equal(result.coordinatorOnly.courseAdmission.correctionCommits, 0);
+    assert.equal(result.dispatch.childCreated, false);
+  } finally { rmSync(fx.root, {recursive: true, force: true}); }
 });
 
 test("read-only dispatch preflight binds candidate, candidate-tree governance, and separate evidence", () => {
   const fx = fixture();
   const result = preflightCriticDispatch(input(fx));
-  assert.equal(result.status, "packet-ready");
+  assert.equal(result.status, "packet-ready", JSON.stringify(result));
   assert.equal(result.candidate.commit, fx.candidate);
   assert.equal(result.candidate.tree, fx.tree);
   assert.equal(result.spec.path, "specs/spec.md");
@@ -257,7 +297,7 @@ test("opt-in requirement map is candidate-bound, evaluated, and passed to the Cr
   const fx = fixture();
   const traced = traceabilityCandidate(fx);
   const result = preflightCriticDispatch(input(fx, { base: fx.candidate, candidate: traced.candidate }));
-  assert.equal(result.status, "packet-ready");
+  assert.equal(result.status, "packet-ready", JSON.stringify(result));
   assert.equal(result.requirementTraceability.mode, "declared");
   assert.deepEqual(result.requirementTraceability.criteria.map(({ id, status }) => ({ id, status })), [
     { id: "AC-KEYBOARD", status: "present" },
@@ -387,7 +427,7 @@ test("first Critic admits actual failed targeted diagnostics with full Verify no
     writeFileSync(evidencePath, JSON.stringify(value));
     const call = () => preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/diagnostics.json"] }));
     const result = call();
-    assert.equal(result.status, "packet-ready");
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
     assert.equal(result.evidence[0].diagnostic.fullVerify, "not-run");
     assert.equal(result.evidence[0].diagnostic.targeted.status, "failed");
     for (const mutate of [v => { v.candidate.tree = "f".repeat(40); }, v => { v.spec.sha256 = "f".repeat(64); }, v => { v.targeted.log.sha256 = "f".repeat(64); }, v => { v.guardrails = []; }]) {
@@ -454,7 +494,7 @@ test("a repository with exactly one commit resolves the root commit as an ordina
       guardrailPaths: [],
       evidencePaths: ["evidence/verify.json"],
     });
-    assert.equal(result.status, "packet-ready");
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
     assert.equal(result.base.commit, null, "a root commit's base has no commit -- only the empty tree");
     assert.equal(result.base.tree, fx.base);
     assert.equal(result.candidate.commit, fx.candidate);
@@ -708,7 +748,7 @@ test("actual evidence and prior-evidence failures retain their owning stages and
   }
   const seen = [];
   const result = preflightCriticDispatch(input(fx, { priorCriticEvidencePath: "evidence/malformed.json" }), (source) => { seen.push(source); });
-  assert.equal(result.status, "packet-ready"); assert.deepEqual(seen, [expectedSource(fx)]);
+  assert.equal(result.status, "packet-ready", JSON.stringify(result)); assert.deepEqual(seen, [expectedSource(fx)]);
 });
 
 test("an actual missing candidate manifest is observed before governance or spec reads", (t) => {
@@ -752,7 +792,7 @@ test("a successful Git exit remains admissible when a contained host adds an EPE
     return result;
   }]], () => {
     const result = preflightCriticDispatch(input(fx));
-    assert.equal(result.status, "packet-ready");
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
   });
   assert.ok(injected > 1);
 });
@@ -772,7 +812,7 @@ test("a successful EPERM Git observation remains admissible for the empty-tree r
     return result;
   }]], () => {
     const result = preflightCriticDispatch(input(fx));
-    assert.equal(result.status, "packet-ready");
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
   });
   assert.equal(emptyTreeInjected, true);
 });
@@ -792,7 +832,7 @@ test("a successful EPERM Git observation remains admissible for a byte candidate
       base: null,
       reviewScope: { kind: "current-artifacts", paths: ["specs/spec.md"] },
     }));
-    assert.equal(result.status, "packet-ready");
+    assert.equal(result.status, "packet-ready", JSON.stringify(result));
   });
   assert.equal(byteReadInjected, true);
 });
@@ -874,3 +914,60 @@ test("callback capture adds no Git operations and candidate never follows later 
   });
   assert.equal(moved, true); assert.deepEqual(seen, [expectedSource(fx)]);
 });
+
+function prepareIndexedFeature(root, featureId, logicalWorkIds, taskId) {
+  const prefix = `specs/${featureId}`;
+  const specPath = `${prefix}/spec.md`, manifestPath = `${prefix}/lifecycle.json`, unitPath = `${prefix}/design/critic-review-unit.json`;
+  mkdirSync(join(root, prefix, "design"), {recursive:true});
+  mkdirSync(join(root, prefix, "evidence"), {recursive:true});
+  writeFileSync(join(root, specPath), "# Complete behavior\nAC-1: deliver complete behavior\n");
+  const unit = {schema:"pipeline.critic-review-unit.v1", kind:"feature-section", purpose:"Deliver one complete behavior", specPath, logicalWorkIds, criterionIds:["AC-1"], deliveryBoundary:{mainRef:git(root,["symbolic-ref","HEAD"])}, singletonRationale:null};
+  writeFileSync(join(root,unitPath),JSON.stringify(unit));
+  const manifest = {schema:"pipeline.feature-package.v1",feature:{id:featureId,rigor:2},state:"approved",artifacts:[{class:"spec",path:specPath,sha256:sha256(readFileSync(join(root,specPath))),authority:true,mutability:"mutable",retention:"active"},{class:"design",path:unitPath,sha256:sha256(readFileSync(join(root,unitPath))),authority:false,mutability:"immutable",retention:"retain"}]};
+  writeFileSync(join(root,manifestPath),JSON.stringify(manifest));
+  const base = commit(root,"declare feature review unit");
+  writeFileSync(join(root,specPath),"# Complete behavior\nAC-1: deliver complete behavior\nImplemented behavior.\n");
+  manifest.artifacts[0].sha256=sha256(readFileSync(join(root,specPath)));
+  writeFileSync(join(root,manifestPath),JSON.stringify(manifest));
+  const candidate=commit(root,"integrate feature behavior");
+  const record={schema:"pipeline.dispatch-record.v3",taskId,agentType:"default",model:"gpt-5.6-luna",effort:"medium",rulesetSha:"b7797309cf6abe175fd52b0a8749d82b43714ea0",dispatcher:"elephant",outcome:"completed",commits:[candidate],candidateCommit:candidate,resultSha256:"a".repeat(64),log:[],report:{text:"done",changedFiles:[specPath]},criticRequired:{schema:"pipeline.critic-required-decision.v1",trigger:{schema:"pipeline.critic-trigger-input.v1",rigorLevel:2,riskClass:"high",riskFlag:true,diff:{mechanical:false,architecture:false,guardrails:true,security:false}},appliedRow:"T1"}};
+  writeFileSync(join(root,`evidence/dispatch-record-${taskId}.json`),JSON.stringify(record));
+  const logPath=`${prefix}/evidence/targeted.log`,diagnosticPath=`${prefix}/evidence/diagnostic.json`,capturedPath=`evidence/${featureId}-targeted.log`;
+  const diagnostic=produceCriticDiagnostic({root,candidate,specPath,guardrailPaths:[".claude/pipeline.yaml","governance/guidelines/review.md","governance/policies/checklist.md"],command:[process.execPath,"-e","process.exit(0)"],logPath:capturedPath});
+  writeFileSync(join(root,logPath),readFileSync(join(root,capturedPath)));
+  diagnostic.targeted.log.path=logPath;
+  writeFileSync(join(root,diagnosticPath),JSON.stringify(diagnostic));
+  for(const path of [logPath,diagnosticPath])manifest.artifacts.push({class:"candidate-evidence",path,sha256:sha256(readFileSync(join(root,path))),authority:false,mutability:"immutable",retention:"retain"});
+  writeFileSync(join(root,manifestPath),JSON.stringify(manifest));
+  const registrationCommit=commit(root,"register captured feature diagnostics");
+  return {root,base,candidate,specPath,guardrailPaths:[],evidencePaths:[diagnosticPath],priorCriticEvidencePath:null,courseContext:{featureId,registrationCommit,acceptedReference:null,criterionLocator:null,deltaRequestPath:null}};
+}
+
+test("a new feature ID cannot reset logical work after an actual feature packet claim; unrelated work remains admissible", () => {
+  const fx=fixture();
+  try {
+    rmSync(join(fx.root,"evidence"),{recursive:true,force:true});
+    mkdirSync(join(fx.root,"evidence"));
+    writeFileSync(join(fx.root,".gitignore"),"/evidence/\n");
+    const manifestPath=join(fx.root,".claude","pipeline.yaml");
+    writeFileSync(manifestPath,"schema: pipeline.manifest.v0\n"+readFileSync(manifestPath,"utf8"));
+    commit(fx.root,"ignore private diagnostic input");
+    const first=prepareIndexedFeature(fx.root,"original-feature",["scope-one","scope-two"],"feature-original-task");
+    const firstRequest={preflightInput:first,taskId:"feature-original-task",projectId:"pipeline",sessionId:"feature-original-review",packetId:"7".repeat(32),route:{routeId:"session-critic",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",modelTier:"higher-capability",effortTier:"xhigh"}};
+    const admitted=admitSessionCriticReview(firstRequest);
+    assert.equal(admitted.status,"admitted");
+    assert.equal(admitSessionCriticReview(firstRequest).status,"already-admitted");
+    assert.throws(() => admitSessionCriticReview({...firstRequest,sessionId:"new-feature-review-session",packetId:"8".repeat(32)}),error=>error.code==="CGB-BUDGET");
+    const renamed=prepareIndexedFeature(fx.root,"renamed-without-supersedes",["scope-one","scope-two"],"feature-renamed-task");
+    const denied=preflightCriticDispatch(renamed);
+    assert.equal(denied.status,"refused",JSON.stringify(denied));
+    assert.equal(denied.code,"CGB-CONFLICT");
+    assert.equal(denied.dispatch.packetCreated,false);
+    const mixed=prepareIndexedFeature(fx.root,"mixed-renamed-scope",["scope-one","new-scope"],"feature-mixed-task");
+    assert.equal(preflightCriticDispatch(mixed).code,"CGB-CONFLICT");
+    const unrelated=prepareIndexedFeature(fx.root,"unrelated-feature",["other-one","other-two"],"feature-unrelated-task");
+    assert.equal(preflightCriticDispatch(unrelated).status,"packet-ready");
+  } finally {rmSync(fx.root,{recursive:true,force:true});}
+});
+
+registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});

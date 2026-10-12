@@ -21,22 +21,26 @@
  */
 import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { constants as fsConstants, fstatSync, fsyncSync, chmodSync, closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, posix as posixPath, resolve, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isatty as nodeIsatty } from "node:tty";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
-import { decodeTypedLine } from "../lib/chat-gate-ceremony.mjs";
+import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-gate-ceremony.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
-import { describeHumanGuardOverrideSelection } from "../lib/human-guard-override.mjs";
+import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatureRequest } from "../lib/human-guard-override.mjs";
 import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
 import { PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA, validatePortableAgyAuthorshipRequest } from "../lib/portable-agy-authorship-export.mjs";
-import { PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA, validatePortableCriticExportRequest } from "../lib/portable-critic-export.mjs";
-import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { DESIGN_APPROVAL_REQUEST_SCHEMA, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
+import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { parseStrictJson } from "../lib/governance-event.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir, resolveRepoScopedDirectory } from "../lib/po-key-directory.mjs";
@@ -138,9 +142,9 @@ function checkPortableAgyAuthorshipRequestOnHost({ repository, requestPath, task
 }
 
 function describePortableCriticExportRequest(record, intentSha256) {
-  if (record?.schema !== PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA
+  if (record?.schema !== portableCriticExportProvider?.PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA
     || record.intentSha256 !== intentSha256
-    || !validatePortableCriticExportRequest(record, {
+    || !portableCriticExportProvider.validatePortableCriticExportRequest(record, {
       planSha256: record.approvalIntent?.value?.planSha256,
       specSha256: record.approvalIntent?.value?.specSha256,
     })) return null;
@@ -293,6 +297,170 @@ function describeDesignWorkflowApprovalRequest(record, intentSha256, repository)
       "this approves only the package-bound design-to-implementation plan decision; it does not approve push, release or publication",
     ],
   };
+}
+
+// CLAUDE-P2: source-owned public observations; never a caller authority flag.
+const DESIGN_SIGNING_MAX_BYTES = 1024 * 1024;
+function designSigningHash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+function readDesignSigningFile(repository, path, { optional = false, request = false, maxBytes = DESIGN_SIGNING_MAX_BYTES } = {}) {
+  const root = realpathSync(resolve(repository));
+  if (typeof path !== "string" || path.length === 0 || path.length > 240 || path.includes("\\") || path.includes("\0")
+    || isAbsolute(path) || /^[A-Za-z]:/u.test(path) || path.split("/").some(part => part === "" || part === "." || part === "..")) throw Error("DAB-SIGN-PATH-UNSAFE");
+  const inspect = () => {
+    let cursor = root;
+    for (const part of path.split("/")) {
+      cursor = join(cursor, part);
+      const metadata = lstatSync(cursor);
+      if (metadata.isSymbolicLink() || realpathSync(cursor) !== cursor
+        || (cursor !== join(root, path) && !metadata.isDirectory())) throw Error("DAB-SIGN-PATH-UNSAFE");
+    }
+    const metadata = lstatSync(cursor);
+    if (!metadata.isFile() || metadata.size > maxBytes || (request && (metadata.nlink !== 1 || metadata.size === 0))) throw Error("DAB-SIGN-FILE-UNSAFE");
+    return { target: cursor, metadata };
+  };
+  let initial;
+  try { initial = inspect(); }
+  catch (error) { if (optional && error?.code === "ENOENT") return null; throw error; }
+  const fd = openSync(initial.target, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+  try {
+    const opened = fstatSync(fd);
+    if (!opened.isFile() || opened.dev !== initial.metadata.dev || opened.ino !== initial.metadata.ino || opened.size > maxBytes) throw Error("DAB-SIGN-FILE-DRIFT");
+    const bytes = readFileSync(fd), final = inspect().metadata;
+    if (bytes.length !== opened.size || final.dev !== opened.dev || final.ino !== opened.ino || final.size !== opened.size
+      || final.mode !== opened.mode || final.nlink !== opened.nlink) throw Error("DAB-SIGN-FILE-DRIFT");
+    return { bytes, sha256: designSigningHash(bytes) };
+  } finally { closeSync(fd); }
+}
+function designSigningGit(repository, argv) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const result = spawnSync("git", ["-C", repository, ...argv], { env, shell: false, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000, maxBuffer: DESIGN_SIGNING_MAX_BYTES });
+  if (result.error || result.signal || result.status !== 0) throw Error("DAB-SIGN-GIT-UNAVAILABLE");
+  return result.stdout;
+}
+function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
+  try {
+    if (!own(record, ["schema", "binding", "bindingSha256", "approvalIntent"]) || record.schema !== DESIGN_APPROVAL_REQUEST_SCHEMA
+      || !SHA.test(intentSha256 ?? "") || record.approvalIntent?.sha256 !== intentSha256 || !validateDesignApprovalBinding(record.binding).ok) return null;
+    const root = realpathSync(resolve(repository)), requestPath = `scratch/design-approval-request-${record.bindingSha256}.json`;
+    const facts = new Map(), observe = (path, options) => {
+      const file = readDesignSigningFile(root, path, options);
+      facts.set(path, file?.sha256 ?? null); return file;
+    };
+    const requestFile = observe(requestPath, { request: true });
+    const physicalRequest = parseStrictJson(requestFile.bytes);
+    if (canonicalProofJson(physicalRequest) !== canonicalProofJson(record)) return null;
+    const receipts = record.binding.reviewReceipts.map(ref => {
+      const file = observe(ref.path);
+      if (file.sha256 !== ref.sha256) throw Error("DAB-SIGN-RECEIPT-DRIFT");
+      const summary = summarizeDesignReviewReceipt({ path: ref.path, bytes: file.bytes });
+      if (!summary.ok || summary.summary.featureId !== record.binding.featureId) throw Error("DAB-SIGN-RECEIPT-INVALID");
+      const report = observe(summary.summary.report.path);
+      if (report.sha256 !== summary.summary.report.sha256) throw Error("DAB-SIGN-REPORT-DRIFT");
+      return { path: ref.path, bytes: file.bytes, summary: summary.summary };
+    });
+    const source = ref => ({ path: ref.path, sha256: observe(ref.path).sha256 });
+    const currentSources = { prd: source(record.binding.sources.prd), spec: source(record.binding.sources.spec),
+      companions: receipts.at(-1).summary.sources.companions.map(ref => ({ path: ref.path, sha256: observe(ref.path, { optional: true })?.sha256 ?? null })) };
+    const checked = verifyDesignApprovalRequest({ request: physicalRequest, featureId: record.binding.featureId,
+      receipts: receipts.map(({ path, bytes }) => ({ path, bytes })), currentSources });
+    if (!checked.ok || checked.intentSha256 !== intentSha256) return null;
+    for (const [path, sha256] of facts) {
+      if (path === requestPath) continue;
+      if (sha256 === null) {
+        if (designSigningGit(root, ["ls-tree", "HEAD", "--", path]).trim() !== "") return null;
+      } else {
+        designSigningGit(root, ["ls-files", "--error-unmatch", "--", path]);
+        if (designSigningGit(root, ["status", "--porcelain", "--", path]).length !== 0) return null;
+      }
+    }
+    const candidate = { commit: designSigningGit(root, ["rev-parse", "HEAD"]).trim(), tree: designSigningGit(root, ["rev-parse", "HEAD^{tree}"]).trim() };
+    if (canonicalProofJson(candidate) !== canonicalProofJson(checked.candidate)) return null;
+    observe("pipeline.user.yaml", { optional: true });
+    observe("project/critical-human-proof.json", { optional: true, maxBytes: 32768 });
+    const mode = readHumanApprovalMode(root), policy = readCriticalHumanProofPolicy(root);
+    if (!policy.ok) return null;
+    const policySnapshot = { requiredKinds: [...policy.requiredKinds].sort(), waivers: [...policy.waivers].sort(), trustAnchor: policy.trustAnchor, trustAnchors: policy.trustAnchors };
+    // Re-read every exact public byte after all observations, including committed mode lookup.
+    for (const [path, sha256] of facts) if ((readDesignSigningFile(root, path, { optional: sha256 === null, request: path === requestPath })?.sha256 ?? null) !== sha256) return null;
+    const finalCandidate = { commit: designSigningGit(root, ["rev-parse", "HEAD"]).trim(), tree: designSigningGit(root, ["rev-parse", "HEAD^{tree}"]).trim() };
+    if (canonicalProofJson(finalCandidate) !== canonicalProofJson(candidate)) return null;
+    const snapshotSha256 = designSigningHash(canonicalProofJson({ root, candidate, mode, policy: policySnapshot, files: [...facts].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) }));
+    return { snapshotSha256, requestPath, description: { resolved: true, lines: [
+      "action: approve the exact reviewed design-to-implementation plan decision",
+      `feature: ${record.binding.featureId}`,
+      `candidate commit: ${candidate.commit}`,
+      `candidate tree: ${candidate.tree}`,
+      `design binding sha256: ${checked.bindingSha256}`,
+      ...receipts.map(({ summary }) => `review report: ${summary.report.path} (sha256: ${summary.report.sha256})`),
+      `selected approval mode: ${mode.mode} (${mode.source})`,
+      `public trust posture: ${policy.trustAnchors === null ? "legacy singular anchor" : "v3 anchor set"}`,
+      "complete bounded design binding follows (current sources and actual receipt/report bytes validated):",
+      JSON.stringify(physicalRequest.binding, null, 2),
+      "this signs only the exact design decision digest; approve-plan must independently consume it. It is not push, release, publication or a guard override.",
+    ] } };
+  } catch { return null; }
+}
+/** Read-only, source-proven purpose; no configured observer/authorization seam. */
+export function describeDesignApprovalSigningRequest(record, intentSha256, repository) {
+  return observeDesignApprovalSigningRequest(record, intentSha256, repository)?.description ?? null;
+}
+
+const SIGNING_REVIEW_MAX_BYTES = 16 * 1024 * 1024;
+function publishSigningReviewMaterial(repository, requestPath, requestSha256, intentSha256, record) {
+  const relativeRequest = repoScratchRelativePath(repository, requestPath);
+  if (relativeRequest === null || !SHA.test(requestSha256 ?? "") || !SHA.test(intentSha256 ?? "")) fail("PO-SIGN-REVIEW-REQUEST-CUSTODY");
+  const request = readDesignSigningFile(repository, relativeRequest, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES });
+  if (request.sha256 !== requestSha256) fail("PO-SIGN-REVIEW-REQUEST-DRIFT");
+  if (record?.resolved !== true || !Array.isArray(record.lines) || !record.lines.every(line => typeof line === "string")) fail("PO-SIGN-REVIEW-DESCRIPTION");
+  const value = { schema: "pipeline.po-signing-review-material.v1", intentSha256,
+    request: { path: relativeRequest, sha256: requestSha256, record: JSON.parse(request.bytes.toString("utf8")) }, fullDisclosureLines: record.lines,
+    ...(record.fullReviewMaterial === undefined ? {} : {fullReviewMaterial: record.fullReviewMaterial}) };
+  const bytes = Buffer.from(canonicalJson(value) + "\n", "utf8");
+  if (bytes.length > SIGNING_REVIEW_MAX_BYTES) fail("PO-SIGN-REVIEW-BOUND");
+  const sha256 = designSigningHash(bytes);
+  const path = join(dirname(requestPath), `review-${intentSha256}-${sha256}.json`);
+  const relativePath = repoScratchRelativePath(repository, path);
+  if (relativePath === null || relativePath.length > 240 || realpathSync(dirname(path)) !== dirname(path)) fail("PO-SIGN-REVIEW-PATH");
+  assertUnlinkedRegularFileOrAbsent(path, "signing review material must be a single-link regular artifact beside its actual request");
+  if (!existsSync(path)) {
+    const fd = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | (fsConstants.O_NOFOLLOW ?? 0), 0o600);
+    try {
+      const opened = fstatSync(fd);
+      if (!opened.isFile() || opened.nlink !== 1) fail("PO-SIGN-REVIEW-CUSTODY");
+      writeFileSync(fd, bytes); fsyncSync(fd);
+      const after = fstatSync(fd), named = lstatSync(path);
+      for (const key of ["dev", "ino", "mode", "uid", "gid", "nlink"]) if (after[key] !== opened[key] || named[key] !== opened[key]) fail("PO-SIGN-REVIEW-CUSTODY");
+      if (after.size !== bytes.length || named.size !== bytes.length) fail("PO-SIGN-REVIEW-READBACK");
+    } finally { closeSync(fd); }
+  }
+  const actual = readDesignSigningFile(repository, relativePath, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES });
+  if (actual.sha256 !== sha256 || !actual.bytes.equals(bytes)) fail("PO-SIGN-REVIEW-COLLISION");
+  if (readDesignSigningFile(repository, relativeRequest, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES }).sha256 !== requestSha256) fail("PO-SIGN-REVIEW-REQUEST-DRIFT");
+  return { path: relativePath, sha256, bytes: bytes.length };
+}
+function signingDisplayLine(value) {
+  const flat = value.replace(/\p{C}/gu, " ").replace(/\s+/gu, " ").trim();
+  return flat.length <= 240 ? flat : flat.slice(0, 237) + "...";
+}
+export function compactSigningDisclosure({ intentSha256, record, materialArtifact = null }) {
+  if (!SHA.test(intentSha256 ?? "")) fail("PO-SIGN-DISCLOSURE-DIGEST");
+  const source = record?.resolved === true && Array.isArray(record.lines)
+    ? record.lines.filter(line => typeof line === "string" && !/[\r\n]/u.test(line))
+    : ["purpose unavailable: this signs only the exact digest; no recorded authorization purpose is resolved."];
+  const facts = source.slice(0, 15).map(signingDisplayLine);
+  if (materialArtifact !== null && (typeof materialArtifact.path !== "string" || materialArtifact.path.length > 240 || /\p{C}/u.test(materialArtifact.path) || !SHA.test(materialArtifact.sha256 ?? ""))) fail("PO-SIGN-DISCLOSURE-MATERIAL");
+  return [
+    `intent sha256: ${intentSha256}`, ...facts,
+    ...(materialArtifact === null ? [] : ["full review material: " + JSON.stringify(materialArtifact.path), "full review material sha256: " + materialArtifact.sha256]),
+    ...(source.length > facts.length || (record?.lines?.length ?? 0) > source.length ? [materialArtifact === null ? "additional review details omitted: full review material is unavailable" : "additional validated review material is retained at the bound artifact"] : []),
+    "this approval covers exactly this digest; changed scope, expiry, reason or candidate requires another approval.",
+  ];
+}
+export function formatHumanApprovalCliResult(result, { humanFacing = process.stdout.isTTY === true } = {}) {
+  if (humanFacing && result?.ok === true && ["PO-HUMAN-SIGN-INTENT-READY", "PO-HUMAN-PROOF-READY", "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"].includes(result.code)) {
+    return JSON.stringify({ ok: true, code: result.code, proofPath: result.paths?.proof ?? null }) + "\n";
+  }
+  return JSON.stringify(result, null, 2) + "\n";
 }
 
 function checkPortableCriticExportRequestOnHost({ repository, requestPath, packetId, intentSha256 }) {
@@ -804,7 +972,7 @@ function suggestSubcommand(input, candidates) {
  * disclosure lines (see `releasePreflightConfirmationLines`) -- no
  * governance-fork-disposition-style verification bypass concern either.
  */
-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight"]);
+const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion"]);
 const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
 const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
@@ -1117,7 +1285,19 @@ function probeSigningToolchain(dependencies) {
   }
   if (resolved.error || resolved.status !== 0) return [noEd25519(`the openssl found on the PATH failed its version call: ${exitDetail(resolved)}`)];
   const findings = [okFinding("signing-toolchain")];
-  let directory = null;
+  let directory = null; let parent = null; let parentIdentity = null; let directoryIdentity = null;
+  const directorySnapshot = (value) => {
+    try {
+      const info=lstatSync(value);
+      if(!info.isDirectory() || info.isSymbolicLink() || realpathSync(value)!==value) return null;
+      return {dev:info.dev,ino:info.ino,mode:info.mode,uid:info.uid,gid:info.gid};
+    } catch { return null; }
+  };
+  const sameDirectory = (value, expected) => expected!==null && JSON.stringify(directorySnapshot(value))===JSON.stringify(expected);
+  // Parent membership timestamps may change when this operation creates its own child.
+  // Device/inode/mode/owner stay bound; every repository check remains live.
+  const workspaceCurrent = () => sameDirectory(parent,parentIdentity) && sameDirectory(directory,directoryIdentity)
+    && outsideEveryRepository(parent) && outsideEveryRepository(directory);
   try {
     let files;
     // R7-6-F3 (PO decision AE): a LOCAL I/O failure while preparing the throwaway material (the directory
@@ -1125,25 +1305,45 @@ function probeSigningToolchain(dependencies) {
     // OpenSSL on the PATH. Only this inner block maps to probe-environment-unavailable; every spawn
     // below stays outside it, so a spawn that fails or throws is still the ed25519 class.
     try {
-      const base = (dependencies.tmpdirFn ?? tmpdir)();
+      const preferred = (dependencies.tmpdirFn ?? tmpdir)();
+      // Bounded fallback: only the already validated real home, never an arbitrary new root.
+      // This chooses the base before material I/O; a later I/O/toolchain failure is not retried.
+      const base = outsideEveryRepository(preferred) ? realpathSync(preferred) : cwd;
       if (!outsideEveryRepository(base)) return [environmentUnavailable("no throwaway directory outside every repository was available for the round trip")];
+      parent=base; parentIdentity=directorySnapshot(parent);
+      if(parentIdentity===null) throw Object.assign(new Error("probe base is not a directory"),{code:"ENOTDIR"});
       directory = mkdtempSync(join(base, "pipeline-sign-probe-"));
+      directoryIdentity=directorySnapshot(directory);
+      if(directoryIdentity===null) throw Object.assign(new Error("probe directory unavailable"),{code:"PROBE-CUSTODY"});
+      chmodSync(directory,0o700);
+      const hardened=directorySnapshot(directory);
+      if(hardened===null || hardened.dev!==directoryIdentity.dev || hardened.ino!==directoryIdentity.ino
+        || hardened.uid!==directoryIdentity.uid || hardened.gid!==directoryIdentity.gid
+        || (process.platform!=="win32" && (hardened.mode&0o777)!==0o700)) throw Object.assign(new Error("probe directory custody changed"),{code:"PROBE-CUSTODY"});
+      directoryIdentity=hardened;
+      if(!workspaceCurrent()) return [environmentUnavailable("probe directory custody changed before material creation")];
       const { privateKey, publicKey } = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
       files = { privateKey: join(directory, "probe-private.pem"), publicKey: join(directory, "probe-public.pem"), payload: join(directory, "probe-payload.txt"), signature: join(directory, "probe-signature.bin") };
+      if(!workspaceCurrent()) return [environmentUnavailable("probe directory custody changed before material writes")];
       writeFileSync(files.privateKey, privateKey, { mode: 0o600 });
       writeFileSync(files.publicKey, publicKey);
       writeFileSync(files.payload, PROBE_PAYLOAD);
     } catch (error) {
       return [environmentUnavailable(`the throwaway material for the round trip could not be prepared (${error?.code ?? "error"})`)];
     }
+    if(!workspaceCurrent()) return [environmentUnavailable("probe directory custody changed before the sign step")];
     const signed = spawnOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", files.privateKey, "-in", files.payload, "-out", files.signature], options, dependencies);
     if (signed?.error || signed?.status !== 0) return [noEd25519(`the Ed25519 round trip failed at the sign step: ${exitDetail(signed)}`)];
+    if(!workspaceCurrent()) return [environmentUnavailable("probe directory custody changed before the verify step")];
     const verified = spawnOpenssl(["pkeyutl", "-verify", "-rawin", "-pubin", "-inkey", files.publicKey, "-in", files.payload, "-sigfile", files.signature], options, dependencies);
     if (verified?.error || verified?.status !== 0) return [noEd25519(`the Ed25519 round trip failed at the verify step: ${exitDetail(verified)}`)];
   } catch (error) {
     return [noEd25519(`the Ed25519 round trip could not be prepared (${error?.code ?? "error"})`)];
   } finally {
-    if (directory !== null) rmSync(directory, { recursive: true, force: true });
+    if (directory !== null) {
+      if(!sameDirectory(directory,directoryIdentity) || !sameDirectory(parent,parentIdentity)) return [environmentUnavailable("probe workspace identity changed; foreign entry preserved")];
+      rmSync(directory, { recursive: true, force: true });
+    }
   }
   return [...findings, okFinding("signing-toolchain")];
 }
@@ -1512,6 +1712,12 @@ function resolveSubjectPreimage({ args, repository, candidate }) {
   let preimage;
   try { preimage = JSON.parse(bytes.toString("utf8")); }
   catch { fail("critical approval request is invalid: --subject must be valid JSON"); }
+  if (args.kind === "interruption-promotion") {
+    preimage = validInterruptionPromotionSubject(preimage)
+      ? preimage
+      : interruptionPromotionSubjectFromBaseline(preimage, bytes);
+    if (!preimage) fail("critical approval request is invalid: --subject must be the eligible interruption baseline or its exact promotion subject");
+  }
   let computed;
   try { computed = criticalActionSubjectSha256({ kind: args.kind, candidate, subject: preimage }); }
   catch { fail("critical approval request is invalid: --subject could not be hashed for this --kind"); }
@@ -1536,6 +1742,9 @@ function resolveSubjectPreimage({ args, repository, candidate }) {
 function criticalApprovalRequest({ args, repository, featureId, dependencies }) {
   const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
   const subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
+  if (args.kind === "interruption-promotion" && subjectPreimage === null) {
+    fail("critical approval request is invalid: interruption-promotion requires the current baseline through --subject");
+  }
   const invalid = criticalRequestFieldError(args);
   if (invalid) fail(invalid);
   const request = createCriticalActionApprovalRequest({
@@ -1572,6 +1781,71 @@ function releasePreflightConfirmationLines(kind, subjectPreimage) {
   return [
     ...decoded,
     "this consents that a release attempt for the candidate above may be prepared and taken to the independently operated final gates; it is not a release, not a publication authorization, and not a pass of any of those gates.",
+  ];
+}
+
+function validInterruptionPromotionSubject(value) {
+  const own = (object, keys) => object !== null && typeof object === "object" && !Array.isArray(object)
+    && Object.keys(object).length === keys.length && keys.every((key) => Object.hasOwn(object, key));
+  const sha = (entry) => typeof entry === "string" && /^[a-f0-9]{64}$/u.test(entry);
+  const windowPart = (entry) => own(entry, ["value", "status"])
+    && entry.status === "measured" && typeof entry.value === "string"
+    && Number.isFinite(Date.parse(entry.value)) && new Date(entry.value).toISOString() === entry.value;
+  return own(value, ["baselineSha256", "registrySha256", "window", "coverage", "scope", "limitations"])
+    && sha(value.baselineSha256) && sha(value.registrySha256)
+    && own(value.window, ["start", "end"]) && windowPart(value.window.start) && windowPart(value.window.end)
+    && Date.parse(value.window.start.value) <= Date.parse(value.window.end.value)
+    && own(value.coverage, ["receipts", "followup"])
+    && value.coverage.receipts === "measured" && value.coverage.followup === "measured"
+    && own(value.scope, ["featureId", "packageId", "dispatchId"])
+    && Object.values(value.scope).every((entry) => entry === null)
+    && Array.isArray(value.limitations) && value.limitations.every((entry) => typeof entry === "string");
+}
+
+function interruptionPromotionSubjectFromBaseline(value, baselineBytes) {
+  const own = (object, keys) => object !== null && typeof object === "object" && !Array.isArray(object)
+    && Object.keys(object).length === keys.length && keys.every((key) => Object.hasOwn(object, key));
+  const sha = (entry) => typeof entry === "string" && /^[a-f0-9]{64}$/u.test(entry);
+  const validTime = (entry) => typeof entry === "string" && Number.isFinite(Date.parse(entry))
+    && new Date(entry).toISOString() === entry;
+  if (!own(value, ["requestedWindow", "window", "coverage", "registrySha256", "scope", "limitations", "generatedAt"])
+    || !sha(value.registrySha256) || !validTime(value.generatedAt)
+    || !own(value.window, ["start", "end"])
+    || !own(value.window.start, ["value", "status"]) || !own(value.window.end, ["value", "status"])
+    || !new Set(["measured", "unknown"]).has(value.window.start.status)
+    || !new Set(["measured", "unknown"]).has(value.window.end.status)
+    || (value.window.start.value !== null && !validTime(value.window.start.value))
+    || (value.window.end.value !== null && !validTime(value.window.end.value))
+    || (value.requestedWindow !== null && (!own(value.requestedWindow, ["start", "end"])
+      || !own(value.requestedWindow.start, ["value", "status"]) || !own(value.requestedWindow.end, ["value", "status"])))
+    || value.coverage === null || typeof value.coverage !== "object" || Array.isArray(value.coverage)
+    || !own(value.scope, ["featureId", "packageId", "dispatchId"])
+    || Object.values(value.scope).some((entry) => entry !== null && (typeof entry !== "string" || entry.trim() === ""))
+    || !Array.isArray(value.limitations) || value.limitations.some((entry) => typeof entry !== "string")) return null;
+  const subject = {
+    baselineSha256: createHash("sha256").update(baselineBytes).digest("hex"),
+    registrySha256: value.registrySha256,
+    window: structuredClone(value.window),
+    coverage: structuredClone(value.coverage),
+    scope: structuredClone(value.scope),
+    limitations: structuredClone(value.limitations),
+  };
+  return validInterruptionPromotionSubject(subject) ? subject : null;
+}
+
+function interruptionPromotionConfirmationLines(kind, subjectPreimage) {
+  if (kind !== "interruption-promotion") return [];
+  if (subjectPreimage === null || typeof subjectPreimage !== "object" || Array.isArray(subjectPreimage)) {
+    return ["promotion subject: unavailable; refuse approval"];
+  }
+  return [
+    `baseline sha256: ${subjectPreimage.baselineSha256}`,
+    `registry sha256: ${subjectPreimage.registrySha256}`,
+    `measurement window: ${JSON.stringify(subjectPreimage.window)}`,
+    `coverage: ${JSON.stringify(subjectPreimage.coverage)}`,
+    `scope: ${JSON.stringify(subjectPreimage.scope)}`,
+    `limitations: ${JSON.stringify(subjectPreimage.limitations)}`,
+    "this signs only the displayed measured baseline subject; changing the baseline bytes invalidates this approval.",
   ];
 }
 
@@ -1744,7 +2018,8 @@ function isAttendedTerminal(dependencies = {}) {
  * material read into this process, and the temporary intent/signature files are
  * removed on every path.
  */
-function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }) {
+function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies, beforePrivateKey, beforePublish }) {
+  beforePrivateKey?.();
   // TR-S1 (Ruling 78), defence in depth: the gate ran earlier in the verb, but a typed confirmation or a
   // passphrase decision can sit between that check and this spawn, so the armor is checked once more
   // immediately before the intent file is written and OpenSSL receives the key path.
@@ -1782,6 +2057,7 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
       fail('local PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
     }
     const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(io.read(artifacts.signature)).toString("base64") };
+    beforePublish?.();
     io.write(artifacts.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
     // SETUP-1: recorded on EVERY approval, independent of whether the project's trust
     // policy restricts which key may sign -- "not restricted" must never become "not
@@ -1795,6 +2071,37 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
   } finally { rmSync(artifacts.signature, { force: true }); }
 }
 
+let portableCriticExportProvider=null;
+let historicalFreshReviewProvider=null;
+
+function loadCriticSigningProvider(args) {
+  if(args.command!=="sign-intent" || !text(args.request) || !args.request.startsWith("scratch/")) return null;
+  let schema;
+  try {
+    const repository=realpathSync(resolve(args.repoRoot));
+    if(repository!==resolve(args.repoRoot)) return null;
+    const request=readDesignSigningFile(repository,args.request,{request:true,maxBytes:SIGNING_REVIEW_MAX_BYTES});
+    schema=JSON.parse(request.bytes.toString("utf8"))?.schema;
+  } catch { return null; }
+  // This physical public-request lookup selects an import only. The original
+  // signing body independently rereads and validates every request and authority.
+  if(schema==="pipeline.portable-critic-export-request.v1") {
+    return import("../lib/portable-critic-export.mjs").then(provider=>{
+      if(provider.PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA!==schema
+        || typeof provider.validatePortableCriticExportRequest!=="function") fail("PO-CRITIC-SIGN-PROVIDER-UNAVAILABLE");
+      portableCriticExportProvider=provider;
+    });
+  }
+  if(schema==="pipeline.historical-fresh-review-request.v1") {
+    return import("../lib/historical-fresh-review-admission.mjs").then(provider=>{
+      if(provider.HISTORICAL_FRESH_REVIEW_REQUEST_SCHEMA!==schema
+        || typeof provider.describeHistoricalFreshReviewApprovalRequest!=="function") fail("PO-CRITIC-SIGN-PROVIDER-UNAVAILABLE");
+      historicalFreshReviewProvider=provider;
+    });
+  }
+  return null;
+}
+
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
   // R7-6-T11: not a ceremony command, so it never reaches parseHumanArgs (no --repo-root, no signing).
   if (argv[0] === SET_PO_KEY_DIRECTORY_COMMAND) return runSetPoKeyDirectory(argv, dependencies);
@@ -1803,7 +2110,11 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   // async fork inspection this synchronous entry point cannot perform, and they
   // were rejected here (as unknown commands) before they existed.
   if (FORK_DISPOSITION_COMMANDS.has(args.command)) fail("fork-disposition commands run through runForkDispositionApproval");
-  return executeHumanApproval(args, dependencies);
+  const provider=loadCriticSigningProvider(args);
+  // Only Critic requests are async, and loading finishes before the synchronous
+  // Source-owned ceremony starts; its real terminal/release protocol is unchanged.
+  return provider===null ? executeHumanApproval(args, dependencies)
+    : provider.then(()=>executeHumanApproval(args, dependencies));
 }
 
 /**
@@ -1819,7 +2130,39 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
  * away). This split adds neither: every caller outside this module still enters
  * through `runHumanApproval` and its parser.
  */
+const poCeremonyOperations = new WeakMap();
+export function isOwnedPoHumanApprovalCeremonyOperation(handle,{repository}={}) {
+  const data=handle&&poCeremonyOperations.get(handle);
+  if(!data)return false;
+  try{return canonicalProofJson(data.repository)===canonicalProofJson(repository)
+    &&canonicalProofJson(inspectSignedDescriptorCustodyRepository(data.repository.primaryRoot))===canonicalProofJson(repository);}catch{return false;}
+}
+export function observePoHumanApprovalCeremonyOperation(handle) {
+  const data=handle&&poCeremonyOperations.get(handle);
+  if(!data||!isOwnedPoHumanApprovalCeremonyOperation(handle,{repository:data.repository}))fail("PO ceremony operation unavailable");
+  return Object.freeze({entry:"po-human-approval",inputSha256:data.inputSha256});
+}
+export function executeOwnedPoHumanApprovalCeremonyOperation(handle) {
+  const data=handle&&poCeremonyOperations.get(handle);
+  if(!data||data.executed||!isOwnedPoHumanApprovalCeremonyOperation(handle,{repository:data.repository}))fail("PO ceremony operation unavailable or replayed");
+  data.executed=true;
+  return executeHumanApprovalCore(data.args,data.dependencies);
+}
 function executeHumanApproval(args, dependencies = {}) {
+  // Preparations/readbacks create no human ceremony; -all delegates to its
+  // original individually parsed children, preserving one signing body.
+  if(!new Set(["setup","approve","approve-critical","authorize-critical","sign-intent"]).has(args.command)) {
+    return executeHumanApprovalCore(args,dependencies);
+  }
+  const repository=inspectSignedDescriptorCustodyRepository(resolve(args.repoRoot));
+  const handle=Object.freeze({});
+  poCeremonyOperations.set(handle,{repository,args,dependencies,executed:false,
+    inputSha256:createHash("sha256").update(canonicalProofJson({repository,command:args.command,args})).digest("hex")});
+  try{return runOwnedPoHumanApprovalCeremony({repository,sourceOperationHandle:handle});}
+  finally{poCeremonyOperations.delete(handle);}
+}
+
+function executeHumanApprovalCore(args, dependencies = {}) {
   if (args.command.endsWith("-all")) {
     const action = args.command.slice(0, -4);
     const results = ["cyb-4", "cyb-5"].map((featureId) => runHumanApproval([
@@ -2044,6 +2387,7 @@ function executeHumanApproval(args, dependencies = {}) {
       `feature id: ${featureId}`,
       `approval intent sha256: ${intentSha256}`,
       ...releasePreflightConfirmationLines(request.action.kind, subjectPreimage),
+      ...interruptionPromotionConfirmationLines(request.action.kind, subjectPreimage),
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
     ], dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
@@ -2078,8 +2422,11 @@ function executeHumanApproval(args, dependencies = {}) {
     // Everything below (disclosure, confirmation, signing) is unchanged and driven by
     // the SAME `intentSha256` local either way -- `--request` only changes where that
     // value comes from and, further below, adds a second write target for the result.
-    let scratchProofPath = null; let scratchSignerPath = null; let scratchRequestRecord = null;
-    let portableRequestPath = null;
+    const progress = dependencies.stderrWriteFn ?? (value => process.stderr.write(value));
+    progress("Preparing signing request...\n");
+    assertSigningReadyBeforePrompt({ repository, inspection: keyInspection, legacy: args.legacy === true, keys: paths, dependencies });
+    let scratchProofPath = null; let scratchSignerPath = null; let scratchRequestRecord = null; let scratchRequestSha256 = null;
+    let portableRequestPath = null; let designSigningObservation = null;
     if (text(args.request)) {
       const requestPath = resolve(repository, args.request);
       // NVA-SWEEP-F2f-REWORK (Critic finding 1): canonicalize both the repository root
@@ -2097,10 +2444,19 @@ function executeHumanApproval(args, dependencies = {}) {
       if (scratchRel === null) fail("--request must be a path inside this repository's own scratch/ directory");
       portableRequestPath = canonicalRequestPath;
       let raw;
-      try { raw = read(canonicalRequestPath, "utf8"); } catch { fail("--request could not be read"); }
+      const designRequestName = /^scratch\/design-approval-request-[a-f0-9]{64}\.json$/u.test(scratchRel);
+      try { raw = designRequestName ? readDesignSigningFile(canonicalRepository, scratchRel, { request: true }).bytes.toString("utf8") : read(canonicalRequestPath, "utf8"); } catch { fail("--request could not be read"); }
       let record;
       try { record = JSON.parse(raw); } catch { fail("--request must contain valid JSON"); }
-      if (record?.schema === DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA) {
+      if (record?.schema === DESIGN_APPROVAL_REQUEST_SCHEMA || designRequestName) {
+        designSigningObservation = observeDesignApprovalSigningRequest(record, record?.approvalIntent?.sha256, repository);
+        if (designSigningObservation === null || requestPath !== canonicalRequestPath || resolve(canonicalRepository, designSigningObservation.requestPath) !== canonicalRequestPath) fail("DAB-SIGN-REQUEST-INVALID: the design approval request does not bind its actual current sources, receipts, candidate and exact intent");
+        args.intentSha256 = record.approvalIntent.sha256;
+      } else if (record?.schema === SIGNED_QUALITY_PACKAGE_SCHEMA) {
+        if (requestPath !== canonicalRequestPath || !physicalQualityPackageFile(canonicalRequestPath, canonicalRepository, 16 * 1024 * 1024)) fail("QUALITY-PACKAGE-SIGN-REQUEST-CUSTODY: the package request must be an actual canonical single-link in-repository file");
+        if (!SHA.test(record.intentSha256 ?? "")) fail("QUALITY-PACKAGE-SIGN-REQUEST-DIGEST: the package request must carry its exact intent digest");
+        args.intentSha256 = record.intentSha256;
+      } else if (record?.schema === DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA) {
         // The canonical closed DWP request has four keys; its digest belongs
         // to approvalIntent. Never add a top-level alias or fall through to a
         // generic digest when the nested transport is malformed. The unchanged
@@ -2118,7 +2474,7 @@ function executeHumanApproval(args, dependencies = {}) {
         if (!SHA.test(record?.intentSha256 ?? "")) fail("--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)");
         args.intentSha256 = record.intentSha256;
       }
-      scratchRequestRecord = record;
+      scratchRequestRecord = record; scratchRequestSha256 = designSigningHash(Buffer.from(raw, "utf8"));
       scratchProofPath = scratchSiblingPath(canonicalRequestPath, "proof");
       scratchSignerPath = scratchSiblingPath(canonicalRequestPath, "signer");
       if (scratchProofPath === null || scratchSignerPath === null) {
@@ -2126,6 +2482,10 @@ function executeHumanApproval(args, dependencies = {}) {
       }
     }
     const intentSha256 = args.intentSha256;
+    const revalidateDesignSigning = designSigningObservation === null ? undefined : () => {
+      const current = observeDesignApprovalSigningRequest(scratchRequestRecord, intentSha256, repository);
+      if (current === null || current.snapshotSha256 !== designSigningObservation.snapshotSha256) fail("DAB-SIGN-REQUEST-DRIFT: request, source, receipt, candidate, mode or public policy changed during signing");
+    };
     // The human is not asked to authorize a bare digest (ADR-0061 Decision 4): the
     // request recorded behind it is resolved and its own recorded reason, scope and
     // expiry are shown. Everything displayed is READ from that record and bounded by
@@ -2144,42 +2504,54 @@ function executeHumanApproval(args, dependencies = {}) {
     // never-fabricate contract, so trying a second one after the first fails closed
     // only WIDENS what can be disclosed, never what gets signed; when both fail closed
     // the honest fallback below is unchanged.
+    // Validate the actual signing prerequisites before any disclosure resolver work.
+    // Request validation and the attended-terminal precondition remain unchanged.
     const describeGmw = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
     const describeHgo = dependencies.describeHgoIntentRecord ?? describeHumanGuardOverrideSelection;
-    const bootstrapAcknowledgement = describeBootstrapAcknowledgementRequest(scratchRequestRecord, intentSha256);
-    const portableAgyAuthorship = describePortableAgyAuthorshipRequest(scratchRequestRecord, intentSha256);
-    const portableCriticExport = describePortableCriticExportRequest(scratchRequestRecord, intentSha256);
-    const designWorkflowApproval = describeDesignWorkflowApprovalRequest(scratchRequestRecord, intentSha256, repository);
-    const inheritedSources = describeArchitectureInheritedSourcesRequest(scratchRequestRecord, intentSha256, repository);
-    const modelFamilyApproval = scratchRequestRecord?.schema === MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA
-      ? describeModelFamilyApprovalRequest(scratchRequestRecord, { rootDir: repository }) : null;
-    const adoptionApproval = describeAdoptionApprovalRequest(scratchRequestRecord, intentSha256);
-    // A scratch request which claims the bootstrap-acknowledgement schema is
-    // never a generic, opaque `sign-intent` request. In particular, do not
-    // fall through to the generic GMW/HGO disclosure route when its action
-    // and digest disagree: that would display one action while signing another
-    // digest. Other request schemas retain the established resolver below.
-    if (scratchRequestRecord?.schema === BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA && bootstrapAcknowledgement === null) {
-      fail("the bootstrap acknowledgement request does not bind its exact action and intent digest");
+    let record = null, portableAgyAuthorship = null, portableCriticExport = null;
+    const requestSchema = scratchRequestRecord?.schema;
+    let invalidRequest = null;
+    switch (requestSchema) {
+      case "pipeline.human-guard-override-signature-digest.v1":
+        record = describeHumanGuardOverrideSignatureRequest(scratchRequestRecord, {rootDir: repository, pluginRoot: PLUGIN_ROOT, scriptPath: SCRIPT});
+        invalidRequest = "HGO-SIGN-REQUEST-INVALID: the exact original indexed request, plan, selection and intent must validate before signing"; break;
+      case SIGNED_QUALITY_PACKAGE_SCHEMA:
+        record = describeSignedQualityPackageIntent(scratchRequestRecord, intentSha256);
+        invalidRequest = "QUALITY-PACKAGE-SIGN-REQUEST-INVALID: exact package digest, changed paths and bounded disclosure must validate before signing"; break;
+      case DESIGN_APPROVAL_REQUEST_SCHEMA:
+        record = designSigningObservation?.description ?? null;
+        invalidRequest = "DAB-SIGN-REQUEST-INVALID: the actual design request does not bind its current intent"; break;
+      case BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA:
+        record = describeBootstrapAcknowledgementRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the bootstrap acknowledgement request does not bind its exact action and intent digest"; break;
+      case PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA:
+        record = portableAgyAuthorship = describePortableAgyAuthorshipRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the portable Agy authorship request does not bind its exact subject and intent digest"; break;
+      case "pipeline.portable-critic-export-request.v1":
+        record = portableCriticExport = describePortableCriticExportRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the portable Critic export request does not bind its exact subject and intent digest"; break;
+      case "pipeline.organization-architecture-config-request.v1":
+        record = describeArchitectureInheritedSourcesRequest(scratchRequestRecord, intentSha256, repository);
+        invalidRequest = "the inherited architecture-source request does not bind its exact registry and intent digest"; break;
+      case MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA:
+        record = describeModelFamilyApprovalRequest(scratchRequestRecord, { rootDir: repository });
+        invalidRequest = "the model-family request does not bind the current candidate, exact v1 predecessor, complete mapping, and adapter-contract bytes"; break;
+      case ADOPTION_APPROVAL_REQUEST_SCHEMA:
+        record = describeAdoptionApprovalRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the adoption approval request does not bind its exact subject and intent digest"; break;
+      case "pipeline.historical-fresh-review-request.v1":
+        record = historicalFreshReviewProvider?.describeHistoricalFreshReviewApprovalRequest(scratchRequestRecord, intentSha256, repository) ?? null;
+        invalidRequest = "historical fresh-review request does not bind the actual immutable inventory, exact current target and preparation-only purpose"; break;
+      case DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA:
+        fail("PO-HUMAN-REQUEST-RETIRED: use the current source-owned design approval request"); break;
+      default:
+        if (scratchRequestRecord !== null) record = { resolved: false, code: "PO-HUMAN-REQUEST-UNSUPPORTED", lines: [] };
+        else {
+          record = describeGmw({ rootDir: repository, intentSha256 });
+          if (!record.resolved) record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });
+        }
     }
-    if (scratchRequestRecord?.schema === PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA && portableAgyAuthorship === null) {
-      fail("the portable Agy authorship request does not bind its exact subject and intent digest");
-    }
-    if (scratchRequestRecord?.schema === PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA && portableCriticExport === null) {
-      fail("the portable Critic export request does not bind its exact subject and intent digest");
-    }
-    if (scratchRequestRecord?.schema === DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA && designWorkflowApproval === null) {
-      fail("the design-workflow approval request does not bind a current, complete package and its exact sources");
-    }
-    if (scratchRequestRecord?.schema === MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA && modelFamilyApproval === null) {
-      fail("the model-family request does not bind the current candidate, exact v1 predecessor, complete mapping, and adapter-contract bytes");
-    }
-    if (scratchRequestRecord?.schema === "pipeline.organization-architecture-config-request.v1" && inheritedSources === null) {
-      fail("the inherited architecture-source request does not bind its exact registry and intent digest");
-    }
-    if (scratchRequestRecord?.schema === ADOPTION_APPROVAL_REQUEST_SCHEMA && adoptionApproval === null) {
-      fail("the adoption approval request does not bind its exact subject and intent digest");
-    }
+    if (invalidRequest !== null && (record === null || record.resolved !== true)) fail(invalidRequest);
     if (portableAgyAuthorship !== null) {
       const checkPortable = dependencies.checkPortableAgyAuthorshipRequest
         ?? checkPortableAgyAuthorshipRequestOnHost;
@@ -2197,23 +2569,23 @@ function executeHumanApproval(args, dependencies = {}) {
         fail("the portable Critic export request is not bound to a current consumed private Critic review");
       }
     }
-    let record = bootstrapAcknowledgement ?? portableAgyAuthorship ?? portableCriticExport ?? designWorkflowApproval ?? inheritedSources ?? modelFamilyApproval ?? adoptionApproval
-      ?? describeGmw({ rootDir: repository, intentSha256 });
-    if (!record.resolved) {
-      record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });
-    }
-    // R7-6-F (Spec 22.6): sign-intent's own run of the readiness probe, after request validation, the
-    // "run setup" check and the attended-terminal precondition, and BEFORE the first prompt and before
-    // any process receives a key path. A failure ends here with the typed result and its repair.
-    assertSigningReadyBeforePrompt({ repository, inspection: keyInspection, legacy: args.legacy === true, keys: paths, dependencies });
-    const disclosureLines = [
-      `intent sha256: ${intentSha256}`,
-      ...(record.resolved ? record.lines : [
-        `no recorded request resolves for this digest in this repository (${record.code}): this command has no description of that action and will not invent one.`,
-        "it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.",
-      ]),
-      "this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.",
-    ];
+    const materialArtifact = scratchRequestRecord !== null && record.resolved === true
+      ? publishSigningReviewMaterial(repository, portableRequestPath, scratchRequestSha256, intentSha256, record)
+      : record.materialArtifact ?? null;
+    const revalidateSigningDisclosure = () => {
+      revalidateDesignSigning?.();
+      if (requestSchema === "pipeline.human-guard-override-signature-digest.v1") {
+        const current = describeHumanGuardOverrideSignatureRequest(scratchRequestRecord, {rootDir: repository, pluginRoot: PLUGIN_ROOT, scriptPath: SCRIPT});
+        if (current === null || canonicalJson(current.requestBinding) !== canonicalJson(record.requestBinding)
+          || canonicalJson(current.materialArtifact) !== canonicalJson(record.materialArtifact)) fail("HGO-SIGN-REQUEST-DRIFT: the original indexed binding or physical plan changed during signing");
+      }
+      if (scratchRequestRecord !== null && record.resolved === true) {
+        const requestRelative = repoScratchRelativePath(repository, portableRequestPath);
+        if (readDesignSigningFile(repository, requestRelative, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES }).sha256 !== scratchRequestSha256
+          || readDesignSigningFile(repository, materialArtifact.path, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES }).sha256 !== materialArtifact.sha256) fail("PO-SIGN-REVIEW-DRIFT");
+      }
+    };
+    const disclosureLines = compactSigningDisclosure({ intentSha256, record, materialArtifact });
     // NVA-SIGNONCE-1: one human decision, not two. When the private key about to
     // sign is passphrase-protected, entering that passphrase at the OpenSSL
     // prompt below IS the deliberate human act, so the typed confirmation this
@@ -2223,6 +2595,7 @@ function executeHumanApproval(args, dependencies = {}) {
     // key with no passphrase this stays byte-for-byte what it was before: the
     // confirmation remains the only human gate in that case, and removing it too
     // would leave none.
+    revalidateSigningDisclosure();
     if (isPrivateKeyPassphraseProtected(paths.privateKey, dependencies)) {
       printDisclosureOnly(disclosureLines, humanFacingLanguage);
     } else {
@@ -2239,7 +2612,8 @@ function executeHumanApproval(args, dependencies = {}) {
       proof: artifactPath(directory, `proof-${intentSha256}.json`),
       signer: artifactPath(directory, `signer-${intentSha256}.json`),
     };
-    const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: manual, io: { write, read }, dependencies });
+    const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: manual, io: { write, read }, dependencies, beforePrivateKey: revalidateSigningDisclosure, beforePublish: revalidateSigningDisclosure });
+    revalidateSigningDisclosure();
     // NVA-SWEEP-F2: this is the "write the proof" half -- the durable proof written to
     // the external `--directory` above is UNCHANGED (still the artifact every other
     // verifier reads), and this is an ADDITIONAL mirror into the same repo-root
@@ -2484,7 +2858,7 @@ export async function runForkDispositionApproval(argv = process.argv.slice(2), d
 if (isDirectInvocation(import.meta.url)) {
   const argv = process.argv.slice(2);
   try {
-    const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : runHumanApproval(argv);
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : await runHumanApproval(argv);
+    process.stdout.write(formatHumanApprovalCliResult(result));
   } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
 }

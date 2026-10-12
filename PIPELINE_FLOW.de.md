@@ -66,10 +66,7 @@ flowchart TD
     R -->|nein| G
     G -->|ja, freigegeben| X[Execution-Preflight und Dispatch]
     G -->|nein, gültiger Schnellweg| X
-    X --> TA{Separate Test-Autorenaufgabe nötig?}
-    TA -->|ja| TT[Test-Autor und Testvertrag]
-    TA -->|nein| IM[Goldfish implementiert ein begrenztes Paket]
-    TT --> IM
+    X --> IM[Ein Goldfish: Analyse, Tests, Code und gezielte Korrekturen je Ergebnis]
     IM --> CM[Koordinator integriert und committet; sauberer Kandidat]
     CM --> V[Konfiguriertes Verify liefert Maschinen-Nachweis]
     V -->|rot| RC[Ursache einordnen und recovern]
@@ -152,10 +149,7 @@ Evidenz](docs/audit-and-evidence.md) erklärt Paketinhalt und Nicht-Claims.
 ```mermaid
 flowchart LR
     SP[Freigegebene aktuelle Spec] --> PF[Preflight: Route, Authority, Kapazität, Scope]
-    PF --> TD{Ändert die Aufgabe den Testvertrag?}
-    TD -->|ja| T[Separater Test-Autor]
-    TD -->|nein| G[Goldfish implementiert]
-    T --> G
+    PF --> G[Ein Goldfish: vollständiges Ergebnis, Tests, Code und gezielte Korrekturen]
     G --> CM[Koordinator committet sauberen Kandidaten]
     CM --> VE[Ein konfigurierter Verify-Befehl]
     VE -->|grüner Nachweis| CR[Frischer lesender Critic]
@@ -172,12 +166,23 @@ flowchart LR
 | Guardrails | Installierte Runner-Integration und Projektkonfiguration. | Konfigurierte Command- und Write-Path-Schutzmaßnahmen können unsichere Aktionen verweigern. | Claude und Antigravity haben die dokumentierte Hook-Integration; daraus folgen keine solchen Hooks auf Codex. |
 | Codex-Host-Bridge | Codex-Host und Plugin-Integration. | Die Bridge wendet nur die Command- und Write-Path-Policy an, die ihr Host anbietet. | Host-Lifecycle-Evidenz bleibt erforderlich; weder hostunabhängiges Enforcement noch Modellidentität werden behauptet. |
 | Preflight | Elephant und deterministische Checks. | Aktuelles PRD/Spec, Profil-/Phasenroute, Kapazität, Scope und Authority-Bindungen passen weiterhin zusammen. | Ein Mismatch vertagt oder öffnet eine Kursentscheidung; er wird nie zum informellen Dispatch. |
-| Test-Autor — optional | Eine separat gebriefte Test-Autoren-Duty. | Nutze sie, wenn sich Test- oder Gate-Vertrag selbst ändern muss. | Der Implementierende schwächt oder schreibt die Tests nicht um, die seine Umsetzung bewerten. Sein Ergebnis ist separat prüfbar. |
-| Implementieren | Goldfish. | Ein frisches, eigenständiges Implementierungspaket. Unabhängige Pakete dürfen parallel laufen, wenn Dateien und Daten nicht überlappen. | Ein Sechs-Felder-Briefing liefert Ziel, Kontext, Definition of Done, Verbote, Stopp-Bedingungen und Dispatch-Metadaten. |
+| Tests im Item | Item-Goldfish. | Testfälle und neue Regressionstests entstehen im selben Kontext wie der Code. | Bestehende Akzeptanzprüfer erhalten; notwendige Änderungen sichtbar begründen und unabhängig prüfen lassen. Assertions auf ursprüngliche Kriterien abbilden; RED durch den Produktfehler belegen. |
+| Implementieren | Item-Goldfish. | Ein vollständiges, unabhängig prüfbares Akzeptanzkriterium oder Backlog-Ergebnis bis zu gezielten Checks und Korrekturen verantworten. | Elephant plant getrennte Dateien; kollidierende Items warten. Original-Owner enden nach getesteter Lieferung und Integration. |
 | Kandidaten-Commit | Koordinator oder autorisierter Host nach Prüfung der Rückgabe. | Begrenztes Ergebnis integrieren und vor kandidatengebundenem Verify einen sauberen Commit-Kandidaten schaffen. | Tatsächlichen Commit und Tree festhalten; ein vorgeschlagener Child-Commit oder schmutziger Checkout ersetzt sie nicht. |
 | Verify — Pflicht | Der Koordinator ruft den konfigurierten Evidence-Producer für den committeten Kandidaten auf. | Für Releases fährt der Producer den einen konfigurierten Projektbefehl; dokumentierte grenzbewusste Modi fahren die feste Baseline plus registrierte Befehle für geänderte Bereiche. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
-| Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Der Critic bekommt Verweise auf Kandidat, Spec, Guardrails und Nachweis — nicht den Implementierungschat oder dessen Begründung. | Er läuft nach deterministischen Checks. Befunde brauchen Nachweis, Regel/Kriterium und Konsequenz. Eine Korrektur erhält ein frisches Delta-Re-Gate. Die Goldfish-Lieferung bleibt ohne unabhängigen Critic-Nachweis als Review-ausstehend markiert. |
+| Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Code und Tests gegen ursprüngliche Kriterien prüfen: ein kohärenter Batch, vor Dispatch festgelegt und nach Integration eingefroren. | Ein Voll-Critic plus höchstens drei Delta-Critics; bei PASS sofort stoppen, Budget nie neu starten. Ein frischer Korrektur-Goldfish behält den gesamten Korrekturkontext. Ein Einzel-Item-Batch braucht eine erhebliche Risikobegründung. |
 | Finales Verify — Pflicht für Releases | Der Koordinator führt nach dem substanziellen Critic-Review den vollständigen Evidence-Producer aus. | Der Release-Receipt bindet den reviewten Kandidaten und das konsumierte Critic-Paket; Korrekturen gehen erneut durch das Review. | Vor Close oder Promotion braucht der exakte Commit einen grünen finalen Receipt. |
+
+
+Ein Item-Owner behält Analyse, Testvorbereitung, Code und gezielte Korrekturen,
+um Übergaben zu reduzieren. Dabei kann derselbe Irrtum Code und Tests prägen.
+Erhaltene Akzeptanzprüfer und unabhängiges Critic-Urteil gegen ursprüngliche
+Kriterien bleiben nötig; Tests allein sind keine Abnahme. Main erhält alle
+Lieferungen und wiederholt gezielte Checks nicht routinemäßig. Nach manuellem
+Merge-Konflikt laufen betroffene Checks; Drift oder fehlende Evidenz verlangt
+Goldfish-Requalifikation. Full Verify qualifiziert anschließend einmal den
+integrierten, reviewten Kandidaten. Das gilt für jede Risikostufe. Bestehende
+Report-only-Entscheidungen für Whole Closure bleiben Report-only.
 
 Jedes Projekt verwendet den einen vollständigen `verify`-Befehl seiner eigenen
 Kalibrierung. Für Nicht-Release-Grenzen darf der Evidence-Producer seine feste
@@ -222,7 +227,7 @@ Close-Grenze unter eigenen Nachweis- und Freigaberegeln.
 |---|---|---|---|
 | Deterministisches Gate ist rot mit bekannter Produktursache | Goldfish, dann Elephant. | Ein automatischer Produkt-Retry für dieselbe Ursache (insgesamt zwei Versuche). | Ein bestandener Retry kehrt zum deterministischen Gate/normalen Review zurück. Der zweite Fehlschlag öffnet eine menschliche Kursentscheidung. |
 | Vertrauenswürdiger Umgebungsfehler vor Produktarbeit | Elephant. | Ein enger frischer Umgebungs-Failover mit eingefrorener Authority und ohne Delegation. | Bei Erfolg begrenzte Arbeit fortsetzen; bei weiterem Fehler oder unbewiesener Ursache für Kursentscheidung stoppen. |
-| Critic-Befund braucht semantische Korrektur | Elephant dispatcht eine frische Korrektur. | Eine frische Nachprüfung nach dem ersten blockierenden Ergebnis. | Eine bestandene Nachprüfung führt zu Close zurück. Bleibt ein blockierender Befund, prüft der Elephant die nächste Korrektur selbst; keine dritte Critic-Runde. |
+| Critic-Befund braucht semantische Korrektur | Ein frischer Korrektur-Goldfish verantwortet den Batch. | Derselbe Owner für alle Befunde, Fixes und Delta-Reviews; ein Voll-Critic plus höchstens drei Delta-Critics. | Bei PASS stoppen. Nach Budgetende gilt der bestehende Stopp-/Kurspfad; Umbenennung oder Selbstabnahme setzt das Budget nicht zurück. |
 | Spec-, Scope-, Nachweis- oder Authority-Drift | Elephant und nötigenfalls Mensch. | Neu planen oder freigeben; alte Freigabe nie in einen veränderten Vertrag tragen. | Zur Triage, Spec, Readiness oder Freigabe zurück — je nachdem, was veraltet ist. |
 | Unbekannte Ursache, wiederholte Signatur, erschöpftes Budget oder Konflikt | Menschlicher Entscheider. | Mit neuer Richtung fortsetzen, verschieben oder stoppen. | Keine endlose Retry-Schleife und kein Erfolg ohne erforderliche Nachweise. |
 

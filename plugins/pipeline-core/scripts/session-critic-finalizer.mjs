@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
 /** Durable, runner-neutral acceptance boundary for the ordinary fresh-session Critic. */
 
 import { randomBytes } from "node:crypto";
-import { chmodSync, lstatSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
+import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -12,6 +14,7 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { reserveFeatureCriticReviewUnitOwnership } from "../lib/critic-generic-batch.mjs";
 import {
   GOVERNANCE_REVIEW_SOURCE_SCHEMA,
   buildGovernanceReviewAction,
@@ -23,6 +26,7 @@ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import {
+  registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
   SESSION_PACKET_BINDING_SCHEMA,
   canonicalJson,
   claimCandidatePacket,
@@ -40,12 +44,18 @@ export const SESSION_CRITIC_ADMISSION_RESULT_SCHEMA = "pipeline.session-critic-p
 export const SESSION_CRITIC_RECEIPT_SCHEMA = "pipeline.session-critic-receipt.v1";
 export const SESSION_CRITIC_FINALIZE_RESULT_SCHEMA = "pipeline.session-critic-finalization.v1";
 export const SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA = "pipeline.session-critic-finalization-request.v1";
+export const SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA = "pipeline.session-critic-finalization-request.v2";
+export const SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA = "pipeline.session-critic-finalization-request.v3";
 export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finalization-error.v1";
 export const SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
+export const GENERIC_BATCH_REGISTRATION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-registration-request.v2";
+export const GENERIC_BATCH_CORRECTION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-correction-request.v2";
 export const SESSION_CRITIC_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
 const CLI_HELP = [
   "Usage: session-critic-finalizer.mjs admit --root <repository-root> --request <repo-relative request.json>",
   "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json>",
+  "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
+  "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
   "       session-critic-finalizer.mjs --help",
   "",
   "Admit and claim before the fresh Critic starts; finalize only the same preclaimed packet after return.",
@@ -158,13 +168,51 @@ function readBoundedJson(root, path, code) {
     fail(code);
   }
 }
+function readPhysicalRequest(root, value) {
+  if (!isPhysicalScratchTarget(value, { rootDir: root }) || !value.endsWith(".json")) fail("SCF-REQUEST-FILE");
+  const target = repoPath(root, value, "SCF-REQUEST-FILE");
+  const before = lstatSync(target);
+  const same = stat => before.dev === stat.dev && before.ino === stat.ino && before.mode === stat.mode
+    && before.nlink === stat.nlink && before.size === stat.size && before.mtimeMs === stat.mtimeMs && before.ctimeMs === stat.ctimeMs;
+  if (before.nlink !== 1) fail("SCF-REQUEST-FILE");
+  const fd = openSync(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    if (!same(fstatSync(fd))) fail("SCF-REQUEST-FILE");
+    const bytes = readFileSync(fd);
+    if (!same(fstatSync(fd)) || !same(lstatSync(target)) || !isPhysicalScratchTarget(value, { rootDir: root })) fail("SCF-REQUEST-FILE");
+    return JSON.parse(bytes.toString("utf8"));
+  } finally { closeSync(fd); }
+}
+function genericBatchFor(options, preflight) {
+  const feature = preflight.coordinatorOnly.courseAdmission !== null && preflight.coordinatorOnly.courseAdmission !== undefined;
+  if (feature) { if (options.genericBatchRef !== undefined) fail("SCF-GENERIC-BATCH-FEATURE"); return null; }
+  const reference = options.genericBatchRef;
+  if (!exact(reference, ["batchId", "registrationSha256", "memberSha256"])
+    || !PACKET_ID.test(reference.batchId) || !SHA256.test(reference.registrationSha256) || !SHA256.test(reference.memberSha256)) fail("SCF-GENERIC-BATCH-REQUIRED");
+  return { batchRef: { batchId: reference.batchId, registrationSha256: reference.registrationSha256 }, memberSha256: reference.memberSha256 };
+}
+function genericCourseFor(reservation) {
+  return { courseSourceSha256: reservation.sourceSha256, courseDecisionSha256: reservation.decisionSha256 };
+}
+function featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256) {
+  const course=preflight.coordinatorOnly.courseAdmission;
+  const context=options.preflightInput.courseContext??{featureId:course.featureId,registrationCommit:preflight.candidate.commit,
+    acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
+  const courseInput={repoRoot:root,featureId:context.featureId,baseCommit:candidateFor(preflight).base,candidateCommit:preflight.candidate.commit,
+    registrationCommit:context.registrationCommit,requestedMode:context.deltaRequestPath===null?"full":"delta",
+    acceptedReference:context.acceptedReference,criterionLocator:context.criterionLocator,deltaRequestPath:context.deltaRequestPath};
+  return reserveFeatureCriticReviewUnitOwnership({repoRoot:root,controlRoot,packetId,preflightSha256,courseInput,
+    sourceSha256:course.sourceSha256,decisionSha256:course.decisionSha256});
+}
 function validateCliRequest(value) {
+  const version3 = value?.schema === SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA;
+  const version2 = value?.schema === SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA;
   const hasSignedImportAnchor = record(value) && Object.hasOwn(value, "signedQualityImportAnchor");
-  if (!exact(value, hasSignedImportAnchor ? [...REQUEST_KEYS, "signedQualityImportAnchor"] : REQUEST_KEYS) || value.schema !== SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA
+  if (!exact(value, hasSignedImportAnchor ? [...REQUEST_KEYS, "signedQualityImportAnchor"] : REQUEST_KEYS) || ![SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA, SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA, SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA].includes(value.schema)
     || !isSafeTaskId(value.taskId) || !SAFE_ID.test(value.projectId ?? "")
     || !SAFE_ID.test(value.sessionId ?? "") || !PACKET_ID.test(value.packetId ?? "")
     || !["T0", "T1", "T2", "T3"].includes(value.trigger)
-    || !exact(value.route, ROUTE_KEYS) || !exact(value.review, REVIEW_KEYS)
+    || !exact(value.route, ROUTE_KEYS) || !exact(value.review, version2 ? [...REVIEW_KEYS, "courseContext"] : version3 ? [...REVIEW_KEYS, "genericBatchRef"] : REVIEW_KEYS)
     || typeof value.review.base !== "string" || typeof value.review.candidate !== "string"
     || typeof value.review.specPath !== "string" || !Array.isArray(value.review.guardrailPaths)
     || !Array.isArray(value.review.evidencePaths)
@@ -173,6 +221,9 @@ function validateCliRequest(value) {
     || !(value.event === null || (exact(value.event, EVENT_KEYS)
       && typeof value.event.eventOutPath === "string"
       && (typeof value.event.featureId === "string" || value.event.featureId === null)))) fail("SCF-REQUEST");
+  if (version2 && value.review.courseContext !== null && !exact(value.review.courseContext, ["featureId", "registrationCommit", "acceptedReference", "criterionLocator", "deltaRequestPath"])) fail("SCF-REQUEST");
+  if (version3 && (!exact(value.review.genericBatchRef, ["batchId", "registrationSha256", "memberSha256"])
+    || !PACKET_ID.test(value.review.genericBatchRef.batchId) || !SHA256.test(value.review.genericBatchRef.registrationSha256) || !SHA256.test(value.review.genericBatchRef.memberSha256))) fail("SCF-REQUEST");
   if (hasSignedImportAnchor) {
     const anchor = value.signedQualityImportAnchor;
     if (!exact(anchor, ["schema", "intentSha256", "integrationCommit"])
@@ -267,7 +318,17 @@ export function admitSessionCriticReview(options, deps = {}) {
   const modelRole = selectedSessionCriticModelRole(root, options.trigger ?? "T1", options.route, deps);
   const route = routeFor(modelRole === null ? options.route
     : { ...options.route, modelTier: modelRole.modelId }, preflightSha256);
+  const genericBatch = genericBatchFor(options, preflight);
   const controlRoot = controlRootFor(root);
+  if (existsSync(join(controlRoot, packetId))) {
+    const retained = genericBatch === null ? featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256)
+      : readReservedGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
+    const current = inspectClaimedSessionAdmission({ controlRoot, packetId }, deps.packetDependencies);
+    const course = genericCourseFor(retained.reservation);
+    if (current.admission.courseSourceSha256 !== course.courseSourceSha256 || current.admission.courseDecisionSha256 !== course.courseDecisionSha256) fail("SCF-PRELAUNCH-BINDING");
+    return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "already-admitted", packetId,
+      packetDigest: current.admission.packetDigest, admissionSha256: sha256(canonicalJson(current.admission)), replay: true });
+  }
   const prepared = (deps.prepareCandidatePacketFn ?? prepareCandidatePacket)({
     repoRoot: root,
     controlRoot,
@@ -297,8 +358,11 @@ export function admitSessionCriticReview(options, deps = {}) {
     controlRoot, packetId, adapter: prepared.packet.route.adapter,
     claimantNonce: (deps.randomBytesFn ?? randomBytes)(32).toString("hex"),
   }, deps.packetDependencies);
+  const genericReservation = genericBatch === null ? null : reserveGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
+  if(genericBatch===null)featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256);
+  const course = genericReservation === null ? courseDigestsFor(preflight) : genericCourseFor(genericReservation.reservation);
   const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({
-    controlRoot, packetId, preflightSha256, ...courseDigestsFor(preflight),
+    controlRoot, packetId, preflightSha256, ...course,
   }, deps.packetDependencies);
   return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA,
     status: "admitted", packetId, packetDigest: prepared.packetDigest,
@@ -350,6 +414,16 @@ function receiptFor(result) {
     findingCount: result.verdict.findings.length,
     reviewPass: result.verdict.pass,
   });
+}
+
+/** Pure validation only; this does not consume a packet or authorize review. */
+export function validateSessionCriticResult(result, packet) {
+  return validateResult(result, packet);
+}
+
+/** Pure receipt projection only; durable consumed readback remains required. */
+export function sessionCriticReceiptForResult(result) {
+  return receiptFor(result);
 }
 
 export function validateSessionCriticReceipt(receipt) {
@@ -415,7 +489,10 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     return a < b ? -1 : a > b ? 1 : 0;
   });
   const actualReferences = packet.references.map(({ kind, path }) => ({ kind, path }));
-  const expectedCourse = courseDigestsFor(preflight);
+  const genericBatch = genericBatchFor(options, preflight);
+  const genericReservation = genericBatch === null ? null : readReservedGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
+  if(genericBatch===null)featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256);
+  const expectedCourse = genericReservation === null ? courseDigestsFor(preflight) : genericCourseFor(genericReservation.reservation);
   if (admitted.admission.preflightSha256 !== preflightSha256
     || admitted.admission.courseSourceSha256 !== expectedCourse.courseSourceSha256
     || admitted.admission.courseDecisionSha256 !== expectedCourse.courseDecisionSha256
@@ -482,9 +559,18 @@ export function finalizeSessionCriticReview(options, deps = {}) {
 /** Closed CLI adapter. The request and verdict stay as bounded local files. */
 export function runSessionCriticFinalizerCli(argv, deps = {}) {
   try {
-    if (!Array.isArray(argv) || argv.length !== 5 || !["admit", "finalize"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+    if (!Array.isArray(argv) || argv.length !== 5 || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
     const root = realpathSync(resolve(argv[2]));
-    const request = validateCliRequest(readBoundedJson(root, argv[4], "SCF-REQUEST-FILE"));
+    const raw = readPhysicalRequest(root, argv[4]);
+    if (argv[0] === "register-batch") {
+      if (!exact(raw, ["schema", "declaration"]) || raw.schema !== GENERIC_BATCH_REGISTRATION_REQUEST_SCHEMA) fail("SCF-REVIEW-UNIT-REQUEST");
+      return Object.freeze({ exitCode: 0, output: registerGenericCriticBatch({ repoRoot: root, controlRoot: controlRootFor(root), declaration: raw.declaration }) });
+    }
+    if (argv[0] === "append-correction") {
+      if (!exact(raw, ["schema", "batchRef", "parent", "correction"]) || raw.schema !== GENERIC_BATCH_CORRECTION_REQUEST_SCHEMA) fail("SCF-REVIEW-UNIT-REQUEST");
+      return Object.freeze({ exitCode: 0, output: appendGenericCriticBatchCorrection({ repoRoot: root, controlRoot: controlRootFor(root), batchRef: raw.batchRef, parent: raw.parent, correction: raw.correction }) });
+    }
+    const request = validateCliRequest(raw);
     const common = {
       preflightInput: {
         root,
@@ -494,7 +580,9 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
         guardrailPaths: request.review.guardrailPaths,
         evidencePaths: request.review.evidencePaths,
         priorCriticEvidencePath: request.review.priorCriticEvidencePath,
+        ...(request.schema === SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA ? { courseContext: request.review.courseContext } : {}),
       },
+      ...(request.schema === SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA ? { genericBatchRef: request.review.genericBatchRef } : {}),
       taskId: request.taskId,
       projectId: request.projectId,
       sessionId: request.sessionId,
@@ -519,7 +607,7 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
       output: Object.freeze({
         schema: SESSION_CRITIC_CLI_ERROR_SCHEMA,
         status: "rejected",
-        code: error instanceof SessionCriticFinalizerError ? error.code : "SCF-INTERNAL",
+        code: error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError" ? error.code : "SCF-INTERNAL",
       }),
     });
   }
@@ -536,4 +624,26 @@ if (isDirectInvocation(import.meta.url)) {
     process.stdout.write(`${JSON.stringify(result.output)}\n`);
     process.exitCode = result.exitCode;
   }
+}
+
+/** Source-owned fresh checks around genuine terminal journal operations. */
+export function finalizeSessionCriticReviewWithLaunchContext(input, options) {
+  if (options === undefined || exact(options, [])
+    || (exact(options, ["hostDispatchContext"]) && options.hostDispatchContext === undefined)) {
+    throw new SessionCriticFinalizerError("DBLO-CURRENT-HOST-UNAVAILABLE");
+  }
+  if (!exact(options, ["hostDispatchContext"])) throw new SessionCriticFinalizerError("DBLO-HANDLE-INVALID");
+  const observe = () => {
+    const observed = readDispatchBudgetLaunchObservation({ rootDir: input?.preflightInput?.root,
+      hostDispatchContext: options.hostDispatchContext });
+    if (!observed.ok) throw new SessionCriticFinalizerError(observed.code);
+    if (observed.value.status !== "working" && observed.value.status !== "not-applicable") {
+      throw new SessionCriticFinalizerError(observed.value.code);
+    }
+  };
+  observe();
+  return finalizeSessionCriticReview(input, {
+    recordCandidateResultFn: (request) => { observe(); return recordCandidateResult(request); },
+    consumeCandidatePacketFn: (request) => { observe(); return consumeCandidatePacket(request); },
+  });
 }

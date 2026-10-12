@@ -265,7 +265,8 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   const root = resolve(rootDir);
   const adoption = (deps.resolveAdoptionState ?? resolveAdoptionState)(root, now);
   const design = (deps.inspectArchitectureDesign ?? inspectArchitectureDesign)(root, taskScope);
-  const disposition = design.ok && ["materialization-required", "materialized"].includes(design.status)
+  const disposition = design.ok && design.materializationKind !== "prospective-adr-only"
+    && ["materialization-required", "materialized"].includes(design.status)
     ? { ok: true, disposition: design.disposition, scope: design.scope, authority: design.authority }
     : (deps.checkPlanningAdoptionDisposition ?? checkPlanningAdoptionDisposition)(root, taskScope, now);
   const map = loadMapBundle(root);
@@ -370,6 +371,19 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     return readinessFailure("ARCHITECTURE-PLAN-SURFACE-MISSING", "the active PO-bound plan has no valid declared implementation surface", artifacts, disposition);
   }
   artifacts.decisionApplicability = inspectPlanningDecisionApplicability(root, surface, now, deps);
+
+  // Explicit adoption deferral keeps decision findings observable. Enforced
+  // entry, including approved designs with pending physical surfaces, must
+  // propagate a blocked dependent decision before claiming readiness.
+  if (disposition.disposition !== "deferred" && artifacts.decisionApplicability.status === "blocked") {
+    return readinessFailure("ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED",
+      "a required architecture decision for the declared implementation surface is unresolved or blocked",
+      artifacts, disposition, null, {
+        kind: "repair-required",
+        code: "ARCHITECTURE-DECISION-APPLICABILITY-REPAIR",
+        guidance: "Resolve the blocked area's decision findings through its owning authority, restore any required authenticated inherited source, and re-run architecture entry readiness. Preserve the original decision/source evidence; do not substitute a map, adoption approval, or fitness PASS for it.",
+      });
+  }
 
   // Greenfield design may be materialized before the implementation owner writes
   // its declared contracts and tests. The approved design authorizes entry, but

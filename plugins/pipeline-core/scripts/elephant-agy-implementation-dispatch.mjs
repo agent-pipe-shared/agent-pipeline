@@ -150,6 +150,8 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
   if (!input) return empty("AGY-ELEPHANT-REQUEST-PHYSICAL");
   let packet;
   try { packet = JSON.parse(input.bytes.toString("utf8")); } catch { return empty("AGY-ELEPHANT-REQUEST-JSON"); }
+  const itemDelivery=packet?.itemDelivery;
+  if(itemDelivery!==undefined){const {itemDelivery:_metadata,...rolePacket}=packet;packet=rolePacket;}
   if (packet?.schema !== ELEPHANT_AGY_IMPLEMENTATION_REQUEST_SCHEMA || packet.transport !== "antigravity" || !IMPLEMENTATION_ROLES.has(packet.role)) return empty("AGY-ELEPHANT-ROLE-FORBIDDEN");
   if (packet.resultDestination?.kind !== "return" || Object.keys(packet.resultDestination).length !== 1) return empty("AGY-ELEPHANT-RESULT-DESTINATION");
   const activation = observeAgyFamilyDispatchActivation(input.root);
@@ -166,7 +168,7 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
     const scope = stored.record.subject.scope, fallbackPolicy = stored.record.subject.fallbackPolicy;
     const prepared = await prepareAgyFamilyNativeDispatch({ root: input.root, packet: preflight.packet, sessionId, descriptorSha256, resultPath,
       consentAuthority: dependencies.familyConsentAuthority, runtimeHost: dependencies.familyRuntimeHost,
-      routeSource: dependencies.familyRouteSource, scope, fallbackPolicy, nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
+      routeSource: dependencies.familyRouteSource, scope, fallbackPolicy, itemDelivery, nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
     if (!prepared.ok) return empty(prepared.code, "unavailable");
     const r = prepared.receipt, route = { runner: "antigravity", provider: "google", requestedModel: r.selectedModelId, effort: r.effort,
       routePolicySha256: digest({ invocationSha256: r.receiptSha256, consentRecordSha256: prepared.consent.consentRecordSha256, candidate: preflight.candidate, packet: preflight.packet, resultPath }) };

@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalJson } from "../../plugins/pipeline-core/scripts/release-preflight.mjs";
-import { TERMINAL_READER_SCHEMA, parseTerminalReaderRecord, verifyTerminalReaderCourse } from "./doc-reader-terminal-binding.mjs";
+import { TERMINAL_READER_SCHEMA, TERMINAL_READER_SCHEMA_V2, parseTerminalReaderRecord, verifyTerminalReaderCourse } from "./doc-reader-terminal-binding.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
@@ -267,7 +267,7 @@ export function checkReaderBinding({ root = DEFAULT_ROOT, candidate, featureId }
     const resolvedRoot = resolve(root);
     candidateCommit = gitCommit(resolvedRoot, candidate);
     const stored = readUtf8Json(resolvedRoot, candidateCommit, recordPath(safeFeatureId), MAX_RECORD_BYTES, "reader binding record");
-    if (stored.value.schema === TERMINAL_READER_SCHEMA) {
+    if ([TERMINAL_READER_SCHEMA, TERMINAL_READER_SCHEMA_V2].includes(stored.value.schema)) {
       let terminalRecord;
       try { terminalRecord = parseTerminalReaderRecord(stored.bytes); }
       catch { throw new ReaderBindingError("binding", "terminal Reader: invalid or duplicate-key record JSON"); }

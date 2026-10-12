@@ -1,3 +1,7 @@
+
+import {fileURLToPath as authorityFileURLToPath} from 'node:url';
+import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest} from './session-authority-domain-owner.mjs';
+import {inspectOwnedSessionPowerController,readOwnedSessionPowerEndpointSource,registerSessionPowerAuthorityRepository,beginOwnedSessionPowerEndpointClose} from './session-power-owned-lifecycle.mjs';
 // SPDX-License-Identifier: SUL-1.0
 
 /**
@@ -10,8 +14,9 @@
  * action.  In particular this module never sends a signal to a recorded PID.
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { closeSync, existsSync, lstatSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { constants, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
+import { userInfo } from "node:os";
 
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository, loadSessionDescriptor } from "./worktree-lifecycle.mjs";
@@ -306,6 +311,87 @@ export function stopSessionPowerRecord(record, { now = new Date(), endpointProof
 
 function hash(value) { return createHash("sha256").update(value).digest("hex"); }
 
+// Linux pathname sockets have 108 bytes including NUL. Durable JSON here is
+// navigation and physical CAS only; it cannot issue a controller or requester.
+const ADDRESS_ROOT_SCHEMA='pipeline.session-power-address-root.v1';
+const ADDRESS_BINDING_SCHEMA='pipeline.session-power-address-binding.v1';
+function addressStat(s){return {dev:String(s.dev),ino:String(s.ino),mode:s.mode,uid:s.uid,gid:s.gid};}
+function strictAddressChain(target,{privateLeaf=false}={}){
+  if(typeof target!=='string'||!isAbsolute(target)||resolve(target)!==target||target.includes('\0')||typeof process.getuid!=='function')fail('SP-ADDRESS','physical address custody unavailable');
+  let cursor=parse(target).root;
+  const rows=[];
+  for(const segment of relative(cursor,target).split(sep).filter(Boolean)){
+    cursor=join(cursor,segment);const s=lstatSync(cursor);
+    if(!s.isDirectory()||s.isSymbolicLink()||(s.mode&0o022)!==0||realpathSync(cursor)!==cursor)fail('SP-ADDRESS','unsafe address ancestry');
+    if(cursor===target&&(s.uid!==process.getuid()||privateLeaf&&(s.mode&0o7777)!==0o700))fail('SP-ADDRESS','foreign or nonprivate address parent');
+    rows.push({path:cursor,...addressStat(s)});
+  }
+  return rows;
+}
+function addressRootRecord(repo,repositoryFingerprint){return {schema:ADDRESS_ROOT_SCHEMA,repositoryFingerprint,primaryRoot:repo.primaryRoot,commonDir:repo.commonDir};}
+function addressDirectory(repo,repositoryFingerprint){
+  const home=userInfo().homedir;strictAddressChain(home);
+  const directory=join(home,'.apsp',repositoryFingerprint.slice(0,16));
+  // Even a shortest valid token must fit before any Source publication.
+  const probe=join(directory,'0'.repeat(24)+'.sock');
+  if(probe.includes('\0')||Buffer.byteLength(probe,'utf8')>107)fail('SP-ADDRESS','physical OS home cannot hold a Linux socket address');
+  return directory;
+}
+function addressRead(filePath){const read=authorityReadSource({namespaceId:'session-power-records',filePath,semantic:({value})=>value});if((read.sourceFact.identity.mode&0o7777)!==0o600)fail('SP-ADDRESS','address metadata requires exact mode0600');return read;}
+function readAddressAnchor(repo,repositoryFingerprint,directory){
+  const before=strictAddressChain(directory,{privateLeaf:true}),read=addressRead(join(directory,'anchor.json'));
+  if(authorityDigest(read.value)!==authorityDigest(addressRootRecord(repo,repositoryFingerprint))||authorityDigest(before)!==authorityDigest(strictAddressChain(directory,{privateLeaf:true})))fail('SP-ADDRESS','address root collision or physical drift');
+  return read;
+}
+function immutableAddressRecord(filePath,value){
+  const parent=dirname(filePath),before=strictAddressChain(parent,{privateLeaf:true});
+  try{const actual=addressRead(filePath);if(authorityDigest(actual.value)!==authorityDigest(value)||authorityDigest(before)!==authorityDigest(strictAddressChain(parent,{privateLeaf:true})))fail('SP-ADDRESS','address full-subject collision or parent drift');return actual;}
+  catch(error){if(error.code!=='ENOENT')throw error;}
+  const bytes=Buffer.from(JSON.stringify(value)),fd=openSync(filePath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+  let publishedIdentity;try{const opened=fstatSync(fd);if(!opened.isFile()||opened.nlink!==1||(opened.mode&0o7777)!==0o600||opened.uid!==process.getuid())fail('SP-ADDRESS','address record ownership');writeFileSync(fd,bytes);fsyncSync(fd);const after=fstatSync(fd);if(authorityDigest(addressStat(opened))!==authorityDigest(addressStat(after))||after.nlink!==1||after.size!==bytes.length)fail('SP-ADDRESS','address original descriptor drift');publishedIdentity={dev:String(after.dev),ino:String(after.ino),mode:after.mode,nlink:after.nlink};}finally{closeSync(fd);}
+  const directoryFd=openSync(parent,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);try{fsyncSync(directoryFd);}finally{closeSync(directoryFd);}
+  const actual=addressRead(filePath);
+  if(authorityDigest(actual.value)!==authorityDigest(value)||authorityDigest(actual.sourceFact.identity)!==authorityDigest(publishedIdentity)||authorityDigest(before)!==authorityDigest(strictAddressChain(parent,{privateLeaf:true})))fail('SP-ADDRESS','address publication physical drift');
+  return actual;
+}
+function prepareAddressRoot(repo,repositoryFingerprint){
+  const directory=addressDirectory(repo,repositoryFingerprint),home=userInfo().homedir;
+  // Only this Source factory may create the fixed private namespace. Existing
+  // objects are validated, never repaired, chmodded, adopted or removed.
+  let createdRepositoryRoot=false;
+  for(const target of [join(home,'.apsp'),directory]){
+    const parent=dirname(target),before=strictAddressChain(parent,{privateLeaf:parent!==home});
+    if(target===directory){
+      const names=readdirSync(parent).sort();
+      if(names.length>4096||names.some(name=>!/^[a-f0-9]{16}$/.test(name)))fail('SP-ADDRESS','unknown fixed address namespace');
+      for(const name of names){const slot=join(parent,name);strictAddressChain(slot,{privateLeaf:true});const anchor=addressRead(join(slot,'anchor.json'));
+        if(!exactKeys(anchor.value,new Set(['schema','repositoryFingerprint','primaryRoot','commonDir']))||anchor.value.schema!==ADDRESS_ROOT_SCHEMA||!digest(anchor.value.repositoryFingerprint)||anchor.value.repositoryFingerprint.slice(0,16)!==name||!isAbsolute(anchor.value.primaryRoot)||!isAbsolute(anchor.value.commonDir))fail('SP-ADDRESS','foreign fixed address slot');}
+      if(authorityDigest(names)!==authorityDigest(readdirSync(parent).sort()))fail('SP-ADDRESS','fixed address namespace changed');
+    }
+    try{mkdirSync(target,{mode:0o700});if(target===directory)createdRepositoryRoot=true;}catch(error){if(error.code!=='EEXIST')throw error;}
+    strictAddressChain(target,{privateLeaf:true});
+    if(authorityDigest(before)!==authorityDigest(strictAddressChain(parent,{privateLeaf:parent!==home})))fail('SP-ADDRESS','address parent changed during creation');
+  }
+  if(createdRepositoryRoot){
+    if(readdirSync(directory).length!==0)fail('SP-ADDRESS','new address root raced in');
+    immutableAddressRecord(join(directory,'anchor.json'),addressRootRecord(repo,repositoryFingerprint));
+  }
+  readAddressAnchor(repo,repositoryFingerprint,directory);
+  return directory;
+}
+function addressSubject(context){return {repositoryFingerprint:context.repoFingerprint,sessionId:context.sessionId,descriptorSha256:context.descriptorSha256};}
+function addressBinding(context){return {schema:ADDRESS_BINDING_SCHEMA,repositoryFingerprint:context.repoFingerprint,primaryRoot:context.repo.primaryRoot,commonDir:context.repo.commonDir,sessionId:context.sessionId,descriptorSha256:context.descriptorSha256,recordPath:context.recordPath,controlPath:context.controlPath};}
+function addressBindingPath(context){return join(context.directory,authorityDigest(addressSubject(context)).slice(0,24)+'.binding.json');}
+export function readSessionPowerAddressBinding(context){
+  if(process.platform!=='linux')return null;
+  const actual=resolveSessionPowerContext(context.repo.primaryRoot,context.sessionId,context.descriptorSha256);
+  if(authorityDigest(actual)!==authorityDigest(context))fail('SP-ADDRESS','address descriptor context drift');
+  readAddressAnchor(actual.repo,actual.repoFingerprint,actual.directory);
+  const read=addressRead(addressBindingPath(actual));
+  if(authorityDigest(read.value)!==authorityDigest(addressBinding(actual)))fail('SP-ADDRESS','address binding full-subject collision');
+  return read;
+}
+
 export function resolveSessionPowerPaths(repoRoot, sessionId, options = {}) {
   if (typeof sessionId !== "string" || !SAFE_ID.test(sessionId)) fail("SP-SESSION", "session ID is invalid");
   const repo = discoverRepository(repoRoot, options);
@@ -318,7 +404,7 @@ export function resolveSessionPowerPaths(repoRoot, sessionId, options = {}) {
     directory,
     recordPath: join(directory, `${sessionId}.json`),
     lockPath: join(directory, `${sessionId}.json.lock`),
-    // POSIX control endpoint is adjacent to the record.  The controller owns it.
+    // Non-Linux legacy path is unchanged; Linux context selects a bounded path.
     controlPath: join(directory, `${sessionId}.json.sock`),
   };
 }
@@ -328,7 +414,13 @@ export function resolveSessionPowerContext(repoRoot, sessionId, expectedDescript
   const paths = resolveSessionPowerPaths(repoRoot, sessionId, options);
   const descriptor = loadSessionDescriptor(paths.repo.primaryRoot, sessionId, { expectedDescriptorSha256 });
   if (!sameBytes(descriptor.descriptorSha256, expectedDescriptorSha256)) fail("SP-DESCRIPTOR", "descriptor digest changed during load");
-  return { ...paths, descriptorSha256: descriptor.descriptorSha256 };
+  const context={ ...paths, descriptorSha256: descriptor.descriptorSha256 };
+  if(process.platform==='linux'){
+    context.directory=addressDirectory(paths.repo,paths.repoFingerprint);
+    context.controlPath=join(context.directory,authorityDigest(addressSubject(context)).slice(0,24)+'.sock');
+    if(context.controlPath.includes('\0')||Buffer.byteLength(context.controlPath,'utf8')>107)fail('SP-ADDRESS','Linux socket address byte bound');
+  }
+  return context;
 }
 
 export function readSessionPowerRecord(context) {
@@ -347,12 +439,12 @@ export function readSessionPowerRecord(context) {
   return record;
 }
 
-export function writeSessionPowerRecord(context, record) {
+function writeSessionPowerRecordUnregistered(context, record) {
   const valid = validateSessionPowerRecord(record);
   if (!valid.ok || record.repoFingerprint !== context.repoFingerprint || record.sessionId !== context.sessionId || record.descriptorSha256 !== context.descriptorSha256) {
     fail("SP-RECORD", "refusing to write an invalid or unbound session-power record");
   }
-  ensurePrivateDirectory(context.directory);
+  ensurePrivateDirectory(dirname(context.recordPath));
   writePrivateJsonAtomic(context.recordPath, record);
   return clone(record);
 }
@@ -362,9 +454,9 @@ function wait(milliseconds) {
 }
 
 /** A bounded adjacent lock.  It never guesses ownership from a process name. */
-export function withSessionPowerLock(context, operation, { timeoutMs = 2_000 } = {}) {
+function withSessionPowerLockUnregistered(context, operation, { timeoutMs = 2_000 } = {}) {
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 10_000) fail("SP-LOCK", "lock timeout is invalid");
-  ensurePrivateDirectory(context.directory);
+  ensurePrivateDirectory(dirname(context.lockPath));
   const started = Date.now();
   const token = JSON.stringify({ schema: "pipeline.session-power-lock.v1", pid: process.pid, nonce: randomBytes(16).toString("hex") });
   for (;;) {
@@ -487,4 +579,128 @@ export function sessionPowerCommandResult(operation, record) {
     failureClass: record.failureClass,
     observedAt: record.observedAt,
   };
+}
+
+const powerAuthorityOwners=new Map(),powerAuthorityPorts=new WeakMap();
+const ownedPowerOperations=new WeakMap();
+function powerAuthorityOwner(repository){
+  const repo=authorityActualRepository(repository);const repositoryFingerprint=derivePoGateRepositoryFingerprint({gitCommonDir:repo.commonDir,primaryRoot:repo.primaryRoot});
+  const key=JSON.stringify(repo);
+  if(powerAuthorityOwners.has(key)){
+    if(process.platform==='linux')readAddressAnchor(repo,repositoryFingerprint,addressDirectory(repo,repositoryFingerprint));
+    return powerAuthorityOwners.get(key);
+  }
+  const endpointRoot=process.platform==='linux'?prepareAddressRoot(repo,repositoryFingerprint):null;
+  registerSessionPowerAuthorityRepository({repository:repo});
+  const namespaces=['session-power-records','session-power-locks'];
+  const commonScan=()=>authorityScanDomain({rootPath:join(repo.commonDir,'agent-pipeline','session-power'),namespaceIds:namespaces,classifyEntry(entry){const {relativePath:p,value}=entry;
+    if(/^authority-lifetimes\/[a-f0-9]{64}\.json$/.test(p))return authorityClassifyLifetime(entry,'session-power',namespaces[0],repo);
+    if(/^[a-f0-9]{64}\/[A-Za-z0-9._-]+\.json$/.test(p)&&validateSessionPowerRecord(value).ok)return {namespaceId:namespaces[0],active:['starting','active','cleanup-pending'].includes(value.status),semantic:value};
+    if(/^[a-f0-9]{64}\/[A-Za-z0-9._-]+\.json\.lock$/.test(p)&&value?.schema==='pipeline.session-power-lock.v1')return {namespaceId:namespaces[1],active:true,semantic:value};
+    if(/^[a-f0-9]{64}\/[A-Za-z0-9._-]+\.json\.sock$/.test(p)) {
+      const observed=readOwnedSessionPowerEndpointSource({namespaceId:namespaces[0],filePath:entry.path});
+      if(authorityDigest(observed.value)!==authorityDigest(value))authorityOwnerFailure('session-power:endpoint-source-drift');
+      return {namespaceId:namespaces[0],active:true,semantic:observed.value};
+    }
+    authorityOwnerFailure('session-power:unknown-entry-or-retained-endpoint');
+  }});
+  const endpointScan=()=>authorityScanDomain({rootPath:endpointRoot,namespaceIds:namespaces,classifyEntry(entry){
+    const {relativePath:p,value}=entry;
+    if(!p.endsWith('.sock')&&(lstatSync(entry.path).mode&0o7777)!==0o600)authorityOwnerFailure('session-power:address-metadata-exact-mode');
+    if(p==='anchor.json'&&authorityDigest(value)===authorityDigest(addressRootRecord(repo,repositoryFingerprint)))return {namespaceId:namespaces[0],active:false,semantic:value};
+    if(/^[a-f0-9]{24}\.binding\.json$/.test(p)&&exactKeys(value,new Set(['schema','repositoryFingerprint','primaryRoot','commonDir','sessionId','descriptorSha256','recordPath','controlPath']))&&value.schema===ADDRESS_BINDING_SCHEMA){
+      // Inactive historical navigation is not current descriptor authority.
+      // A live socket still requires actual resolveContext/requester/ACK custody.
+      if(typeof value.sessionId!=='string'||!SAFE_ID.test(value.sessionId)||!digest(value.descriptorSha256))authorityOwnerFailure('session-power:address-binding-shape');
+      const context={repo,repoFingerprint:repositoryFingerprint,sessionId:value.sessionId,descriptorSha256:value.descriptorSha256,directory:endpointRoot,recordPath:join(repo.commonDir,'agent-pipeline','session-power',repositoryFingerprint,value.sessionId+'.json')};
+      context.controlPath=join(endpointRoot,authorityDigest(addressSubject(context)).slice(0,24)+'.sock');
+      if(entry.path!==addressBindingPath(context)||authorityDigest(value)!==authorityDigest(addressBinding(context)))authorityOwnerFailure('session-power:foreign-address-binding');
+      return {namespaceId:namespaces[0],active:false,semantic:value};
+    }
+    if(/^[a-f0-9]{24}\.sock$/.test(p)){
+      const observed=readOwnedSessionPowerEndpointSource({namespaceId:namespaces[0],filePath:entry.path});
+      if(authorityDigest(observed.value)!==authorityDigest(value))authorityOwnerFailure('session-power:address-endpoint-drift');
+      return {namespaceId:namespaces[0],active:true,semantic:observed.value};
+    }
+    authorityOwnerFailure('session-power:unknown-address-namespace-entry');
+  }});
+  const scan=()=>{if(!endpointRoot)return commonScan();readAddressAnchor(repo,repositoryFingerprint,endpointRoot);return authorityMergeSnapshots([commonScan(),endpointScan()],namespaces);};
+  const owner=authorityCreateDomainOwner({repository:repo,producerId:'session-power',kinds:['armed-capability'],namespaceIds:namespaces,scan,transitionScope(identity){if(!identity?.recordPath||!identity?.lockPath||!identity.descriptorSha256)authorityOwnerFailure('session-power:source-context-required');const rootPath=join(repo.commonDir,'agent-pipeline','session-power'),rel=relativePowerPath(rootPath,identity.recordPath),creations=[{rootPath,relativePattern:'^'+rel.replaceAll('.','\\.')+'(?:\\.lock)?$'}];if(endpointRoot&&identity.controlPath){const context=resolveSessionPowerContext(repo.primaryRoot,identity.sessionId,identity.descriptorSha256);if(context.controlPath!==identity.controlPath||context.recordPath!==identity.recordPath||context.lockPath!==identity.lockPath)authorityOwnerFailure('session-power:address-transition-context');const token=authorityDigest(addressSubject(context)).slice(0,24);creations.push({rootPath:endpointRoot,relativePattern:'^'+token+'(?:\\.binding\\.json|\\.sock)$'});}return {mutablePaths:[identity.recordPath,identity.lockPath,...(identity.controlPath?[identity.controlPath]:[])],creations};},sourceModulePaths:[import.meta.url,...['session-authority-domain-owner.mjs','session-authority-registry.mjs','session-power-owned-lifecycle.mjs','../scripts/session-power-controller.mjs'].map(p=>new URL(p,import.meta.url).href)].map(authorityFileURLToPath),terminalObservation(result,identity){const snapshot=scan();const records=snapshot.entries.filter(e=>e.value?.schema===SESSION_POWER_RECORD_SCHEMA&&(!identity?.recordPath||e.path===identity.recordPath));if(!records.length||records.some(e=>!['disabled','unavailable'].includes(e.value.status))||snapshot.entries.some(e=>e.path===identity?.lockPath||e.path===identity?.controlPath))return null;return {terminal:'stopped',sourceFacts:records.map(e=>e.sourceFact)};}});
+  powerAuthorityOwners.set(key,owner);powerAuthorityPorts.set(owner.port,repo);return owner;
+}
+export function createSessionPowerAuthorityProducerPort({repository}){return powerAuthorityOwner(repository).port;}
+export function isOwnedSessionPowerAuthorityProducerPort(port,{repository}){try{return JSON.stringify(powerAuthorityPorts.get(port))===JSON.stringify(authorityActualRepository(repository));}catch{return false;}}
+function relativePowerPath(root,path){const prefix=root+'/';if(typeof path!=='string'||!path.startsWith(prefix)||path.slice(prefix.length).includes('..'))authorityOwnerFailure('session-power:owned-path-required');return path.slice(prefix.length);}
+function withPowerAuthority(context,operation){const actual=resolveSessionPowerContext(context.repo.primaryRoot,context.sessionId,context.descriptorSha256);if(authorityDigest(actual)!==authorityDigest(context))authorityOwnerFailure('session-power:descriptor-context-drift');return powerAuthorityOwner(authorityRepositoryFromRoot(actual.repo.primaryRoot)).run({sessionId:actual.sessionId,descriptorSha256:actual.descriptorSha256,recordPath:actual.recordPath,lockPath:actual.lockPath},operation);}
+
+export function writeSessionPowerRecord(context,record){return withPowerAuthority(context,()=>writeSessionPowerRecordUnregistered(context,record));}
+export function withSessionPowerLock(context,operation,options){return withPowerAuthority(context,()=>withSessionPowerLockUnregistered(context,operation,options));}
+
+
+// The only persistent Power operation is issued to the actual Source controller.
+function ownedPowerOperation(handle){
+  const activation=inspectOwnedSessionPowerController(handle),operation=ownedPowerOperations.get(handle);
+  if(!operation||authorityDigest(activation.context)!==operation.contextSha256)authorityOwnerFailure('session-power:owned-controller-operation-required');
+  return {activation,...operation};
+}
+export function reserveOwnedSessionPowerController(handle){
+  const activation=inspectOwnedSessionPowerController(handle);
+  if(ownedPowerOperations.has(handle))authorityOwnerFailure('session-power:controller-reserve-replay');
+  const context=activation.context,owner=powerAuthorityOwner(authorityRepositoryFromRoot(context.repo.primaryRoot));
+  const identity={sessionId:context.sessionId,descriptorSha256:context.descriptorSha256,recordPath:context.recordPath,lockPath:context.lockPath,controlPath:context.controlPath};
+  const operationHandle=owner.reserve(identity);
+  ownedPowerOperations.set(handle,{owner,operationHandle,contextSha256:authorityDigest(context),bindingSha256:authorityDigest(identity)});
+  return Object.freeze({bindingSha256:authorityDigest(identity)});
+}
+/** Full binding is published only under the genuine original Source handle. */
+export function prepareOwnedSessionPowerEndpointAddress(handle){
+  const operation=ownedPowerOperation(handle),context=operation.activation.context;
+  if(process.platform!=='linux')return null;
+  return operation.owner.transitionExisting(operation.operationHandle,()=>{
+    readAddressAnchor(context.repo,context.repoFingerprint,context.directory);
+    if(existsSync(context.controlPath))fail('SP-ADDRESS','existing socket is never adopted');
+    immutableAddressRecord(addressBindingPath(context),addressBinding(context));
+    return readSessionPowerAddressBinding(context).sourceFact;
+  });
+}
+/** Read-only private binding lookup. It never scans or invokes Registry. */
+export function readOwnedSessionPowerOperationBinding(handle){
+  const operation=ownedPowerOperations.get(handle);
+  if(!operation)authorityOwnerFailure('session-power:unreserved-controller');
+  return Object.freeze({bindingSha256:operation.bindingSha256,contextSha256:operation.contextSha256});
+}
+export function observeOwnedSessionPowerEffects(handle){const operation=ownedPowerOperation(handle);return operation.owner.observeEffects(operation.operationHandle);}
+export function writeOwnedSessionPowerRecord(handle,record,{expectedRevision}={}){
+  const operation=ownedPowerOperation(handle),context=operation.activation.context;
+  if(!(expectedRevision===null||Number.isSafeInteger(expectedRevision)&&expectedRevision>=0))authorityOwnerFailure('session-power:record-CAS-required');
+  return operation.owner.transitionExisting(operation.operationHandle,()=>withSessionPowerLockUnregistered(context,()=>{
+    const current=readSessionPowerRecord(context);
+    if((current?.revision??null)!==expectedRevision)authorityOwnerFailure('session-power:record-revision-CAS');
+    if(current&&record.revision!==current.revision+1||!current&&record.revision!==0)authorityOwnerFailure('session-power:record-revision-successor');
+    return writeSessionPowerRecordUnregistered(context,record);
+  }));
+}
+/** Only the Source leaf may initiate its actual retained Server close. */
+export function closeOwnedSessionPowerEndpoint(handle){
+  const operation=ownedPowerOperation(handle);
+  return operation.owner.transitionExisting(operation.operationHandle,()=>beginOwnedSessionPowerEndpointClose(handle));
+}
+export function unlinkOwnedSessionPowerEndpoint(handle){
+  const operation=ownedPowerOperation(handle),context=operation.activation.context;
+  return operation.owner.transitionExisting(operation.operationHandle,()=>{
+    const before=readOwnedSessionPowerEndpointSource({namespaceId:'session-power-records',filePath:context.controlPath});
+    const actual=lstatSync(context.controlPath);
+    if(String(actual.dev)!==before.sourceFact.identity.dev||String(actual.ino)!==before.sourceFact.identity.ino||actual.mode!==before.sourceFact.identity.mode||actual.nlink!==1)authorityOwnerFailure('session-power:endpoint-unlink-CAS');
+    unlinkSync(context.controlPath);
+    return null;
+  });
+}
+export function releaseOwnedSessionPowerController(handle){
+  const operation=ownedPowerOperation(handle);
+  if(!operation.activation.terminalObserved)authorityOwnerFailure('session-power:controller-terminal-unproved');
+  const record=readSessionPowerRecord(operation.activation.context);
+  if(!record||!['disabled','unavailable'].includes(record.status))authorityOwnerFailure('session-power:no-context-terminal-required');
+  const released=operation.owner.terminal(operation.operationHandle,record);
+  if(released)ownedPowerOperations.delete(handle);
+  return released;
 }

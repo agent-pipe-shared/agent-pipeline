@@ -1,3 +1,4 @@
+import {readAuthoritySourceFile,authorityOwnerFailure} from './session-authority-domain-owner.mjs';
 // SPDX-License-Identifier: SUL-1.0
 /** Machine-local, secret-free D1 supervisor-state repair. No worker is launched here. */
 import { createHash, randomBytes } from "node:crypto";
@@ -167,3 +168,5 @@ export function repairLocalSupervisorState({ root, repositoryFingerprint, candid
     return { ok: true, code: prepared === null ? "LSS-CREATE" : "LSS-RECOVER-OWNED", disposition: prepared === null ? "create" : "recover-owned", state: readback };
   } catch { return { ok: false, code: "LSS-IO", disposition: "unavailable", state: null }; } finally { try { closeSync(lock); } catch {} try { rmSync(lockPath, { force: true }); } catch {} }
 }
+
+export function readLocalSupervisorAuthorityAnchor({root}){const observed=readAuthoritySourceFile({namespaceId:'supervisor-state',filePath:join(root,'state.json'),semantic:({value})=>{if(!validateLocalSupervisorState(value).ok)authorityOwnerFailure('local-supervisor-state:invalid-anchor');return value;}});return Object.freeze({record:observed.value,sourceFact:observed.sourceFact});}

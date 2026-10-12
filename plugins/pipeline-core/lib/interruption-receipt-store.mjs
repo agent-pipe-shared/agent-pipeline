@@ -10,7 +10,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { canonicalInvocationJson } from "./invocation-reliability.mjs";
 import { buildInterruptionReceipt, validateInterruptionReceipt } from "./interruption-receipts.mjs";
-import registry from "../../../policies/interruption-registry.v1.json" with { type: "json" };
+import registry from "../config/interruption-registry.v1.json" with { type: "json" };
 
 const CREATE_SCHEMA = "pipeline.interruption-store-create-result.v1";
 const OPERATION_SCHEMA = "pipeline.interruption-store-operation-result.v1";

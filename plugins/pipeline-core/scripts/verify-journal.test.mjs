@@ -1909,7 +1909,10 @@ function rf1ChildScript(f, runId, seamBody) {
     `const marker = ${JSON.stringify(join(f.root, `${runId}.marker`))};`,
     "const interrupted = (signal) => ({ status: null, signal, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error: undefined, cancellation: { proven: true, method: \"test-seam\", identity: { pid: 1, startId: \"1\", pgrp: 1 }, remaining: 0 } });",
     `const spawn = (command, args, options) => { ${seamBody} };`,
+    // A pending test-seam Promise alone cannot keep Node alive until an OS signal arrives.
+    'const keepAlive = setInterval(() => {}, 1_000);',
     `await runVerifyJournal({ gitCommonDir: join(root, ".git"), repoRoot: root, candidate: { commit: ${JSON.stringify(candidate.commit)}, tree: ${JSON.stringify(candidate.tree)} }, suites: [{ name: "fixture-suite", file: ${JSON.stringify(f.suiteFile)} }], policyInputs: { harness: "rf1-child" }, runId: ${JSON.stringify(runId)}, spawn });`,
+    'clearInterval(keepAlive);',
     'console.log("RF1-CHILD-RETURNED");',
     "",
   ].join("\n"), { mode: 0o600 });
@@ -1959,16 +1962,41 @@ test("ALFRED-RF1: a second signal while the first is still being honored forces 
 
 test("ALFRED-RF1: a real SIGINT delivered by the operating system retires the owner", { skip: process.platform === "win32" ? "native Windows terminates a process signalled via kill() without running its handlers, so OS-level SIGINT delivery cannot be exercised; the synthetic process.emit cases above cover the handler on every platform" : false }, async () => {
   const f = rf1Checkout("verify-journal-rf1-os-sigint-");
+  let child = null;
+  let waitForClose = null;
   try {
     const script = rf1ChildScript(f, "verify-rf1-os-sigint", 'return new Promise((resolve) => { options.signal.addEventListener("abort", () => resolve(interrupted("SIGINT")), { once: true }); writeFileSync(marker, "started"); });');
-    const child = spawnChild(process.execPath, [script], { cwd: f.root, stdio: ["ignore", "pipe", "pipe"], env: rf1ChildEnv });
+    child = spawnChild(process.execPath, [script], { cwd: f.root, stdio: ["ignore", "pipe", "pipe"], env: rf1ChildEnv });
+    // Observe termination before yielding: a child that exits during marker polling must not
+    // leave the test waiting for a close event that has already been delivered.
+    const childClosed = new Promise((resolveClose) => {
+      child.once("error", (error) => resolveClose({ code: null, signal: null, error }));
+      child.once("close", (code, signal) => resolveClose({ code, signal }));
+    });
+    waitForClose = async (timeoutMs) => {
+      let timer;
+      try {
+        return await Promise.race([childClosed, new Promise((resolveTimeout) => {
+          timer = setTimeout(() => resolveTimeout({ timedOut: true }), timeoutMs);
+        })]);
+      } finally { clearTimeout(timer); }
+    };
     const marker = join(f.root, "verify-rf1-os-sigint.marker");
     const deadline = Date.now() + 15_000;
     while (!existsSync(marker) && Date.now() < deadline) await new Promise((resolveDelay) => setTimeout(resolveDelay, 20));
     assert.equal(existsSync(marker), true, "the child reached its running suite");
     child.kill("SIGINT");
-    const closed = await new Promise((resolveClose) => child.once("close", (code, signal) => resolveClose({ code, signal })));
+    const closed = await waitForClose(15_000);
+    assert.notEqual(closed.timedOut, true, "the signalled fixture child closed within the deadline");
     assert.equal(closed.code, 128 + osConstants.signals.SIGINT);
     assert.deepEqual(rf1Residue(f), RF1_NO_RESIDUE);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally {
+    try {
+      if (child !== null && waitForClose !== null) {
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+        const closed = await waitForClose(5_000);
+        assert.notEqual(closed.timedOut, true, "the owned fixture child closed during teardown");
+      }
+    } finally { rmSync(f.root, { recursive: true, force: true }); }
+  }
 });

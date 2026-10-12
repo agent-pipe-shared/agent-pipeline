@@ -14,6 +14,7 @@ import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, validateCriticDecision } fr
 
 export const NATIVE_GOLDFISH_RETURN_SCHEMA = "pipeline.native-goldfish-host-return.v1";
 export const NATIVE_GOLDFISH_BRIEFING_SCHEMA = "pipeline.native-goldfish-host-briefing.v1";
+export const NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA = "pipeline.native-goldfish-host-briefing.v3";
 export const NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA = "pipeline.native-goldfish-host-briefing.v2";
 export const NATIVE_GOLDFISH_HOST_DIRECTIVE = "NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.";
 
@@ -44,39 +45,41 @@ function fail(code) { return { ok: false, code }; }
 /** Parse exactly one host-generated binding block from the dispatched prompt. */
 export function parseNativeGoldfishBriefing(prompt) {
   if (typeof prompt !== "string" || prompt.length > 2 * 1024 * 1024) return fail("NGHR-BRIEFING-INPUT");
-  const markers = ["<!-- pipeline-native-goldfish-host-commit:v1\n", "<!-- pipeline-native-goldfish-host-commit:v2\n"];
+  const markers = ["<!-- pipeline-native-goldfish-host-commit:v1\n", "<!-- pipeline-native-goldfish-host-commit:v2\n", "<!-- pipeline-native-goldfish-host-commit:v3\n"];
   const found = markers.map((marker) => ({ marker, start: prompt.indexOf(marker) })).filter(({ start }) => start >= 0);
   if (found.length !== 1 || prompt.indexOf(found[0].marker, found[0].start + found[0].marker.length) >= 0) return fail("NGHR-BRIEFING-MARKER");
   const { marker, start } = found[0];
-  const version = marker.includes(":v2") ? 2 : 1;
+  const version = marker.includes(":v3") ? 3 : marker.includes(":v2") ? 2 : 1;
   const bodyStart = start + marker.length;
   const end = prompt.indexOf("\n-->", bodyStart);
   if (end < 0) return fail("NGHR-BRIEFING-MARKER");
   const trailing = prompt.slice(end + 4);
-  if (trailing.includes("<!-- pipeline-native-goldfish-host-commit:v1") || trailing.includes("<!-- pipeline-native-goldfish-host-commit:v2")) return fail("NGHR-BRIEFING-MARKER");
+  if (/<!-- pipeline-native-goldfish-host-commit:v[123]/u.test(trailing)) return fail("NGHR-BRIEFING-MARKER");
   if (prompt.split(NATIVE_GOLDFISH_HOST_DIRECTIVE).length !== 2) return fail("NGHR-BRIEFING-DIRECTIVE");
   let binding;
   try { binding = parseStrictJson(prompt.slice(bodyStart, end)); } catch { return fail("NGHR-BRIEFING-JSON"); }
-  const validFields = version === 2 ? CODEX_BRIEFING_FIELDS : BRIEFING_FIELDS;
-  if (!exact(binding, validFields) || binding.schema !== (version === 2 ? NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA : NATIVE_GOLDFISH_BRIEFING_SCHEMA)
+  const codexNative = version === 2 || version === 3 && binding.runner === "codex";
+  const validFields = [...(codexNative ? CODEX_BRIEFING_FIELDS : BRIEFING_FIELDS),...(version === 3 ? ["itemDelivery"] : [])];
+  if (!exact(binding, validFields) || binding.schema !== (version === 3 ? NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA : version === 2 ? NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA : NATIVE_GOLDFISH_BRIEFING_SCHEMA)
     || !["claude", "codex"].includes(binding.runner)
     || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")
     || !OID.test(binding.candidateTree ?? "") || !Object.hasOwn(ROLE_TO_AGENT, binding.role)
-    || (version === 1 && binding.agentType !== ROLE_TO_AGENT[binding.role])
-    || (version === 2 && (binding.runner !== "codex" || binding.nativeAgentType !== "worker"))
+    || (!codexNative && binding.agentType !== ROLE_TO_AGENT[binding.role])
+    || (codexNative && (binding.runner !== "codex" || binding.nativeAgentType !== "worker"))
     || typeof binding.model !== "string" || binding.model.length === 0 || binding.model.length > 128
     || typeof binding.effort !== "string" || binding.effort.length === 0 || binding.effort.length > 32
     || !SHA.test(binding.rulesetSha ?? "") || !Array.isArray(binding.allowedPaths)
     || binding.allowedPaths.length === 0 || binding.allowedPaths.length > 64
     || !binding.allowedPaths.every(normalizedPath)
     || new Set(binding.allowedPaths).size !== binding.allowedPaths.length) return fail("NGHR-BRIEFING-SHAPE");
+  if(version === 3 && (!validateItemDeliveryBriefing(binding.itemDelivery).ok || !binding.allowedPaths.every(path=>binding.itemDelivery.checks.some(check=>check.dependencies.includes(path)))))return fail("NGHR-ITEM-DELIVERY-SHAPE");
   try {
     const required = binding.criticDecision?.schema === CRITIC_REQUIRED_SCHEMA;
     if (!required && binding.criticDecision?.schema !== CRITIC_SKIP_SCHEMA) return fail("NGHR-BRIEFING-CRITIC-DISPOSITION");
     binding.criticDecision = validateCriticDecision(binding.criticDecision, { required });
   } catch { return fail("NGHR-BRIEFING-CRITIC-DISPOSITION"); }
   return { ok: true, code: "NGHR-BRIEFING-VALID", binding: { ...binding,
-    ...(version === 2 ? { agentType: ROLE_TO_AGENT[binding.role], adapterVersion: 2 } : {}),
+    ...(codexNative ? { agentType: ROLE_TO_AGENT[binding.role], adapterVersion: 2 } : {}),
     allowedPaths: [...binding.allowedPaths] } };
 }
 
@@ -147,4 +150,22 @@ export function observeCodexGoldfishReturn(input, pending) {
     || typeof input.last_assistant_message !== "string") return fail("NGHR-CODEX-CORRELATION");
   const final = validateNativeGoldfishFinal(input.last_assistant_message, { binding: pending.binding });
   return final.ok ? { ...final, runner: "codex", assurance: "host-observed-subagent-start-stop-and-session-route" } : final;
+}
+
+/** Typed selection data; original approval and actual source bytes are checked
+ * independently by the authenticated continuation writer. */
+export function validateItemDeliveryBriefing(value) {
+  const locator=value?.criterionLocator;
+  if(!exact(value,['schema','sliceId','itemId','criterionLocator','checks'])||value.schema!=='pipeline.item-delivery-briefing.v1'
+    ||!ID.test(value.sliceId??'')||!ID.test(value.itemId??'')
+    ||!exact(locator,['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
+    ||locator.schema!=='pipeline.critic-criterion-locator.v1'||!normalizedPath(locator.sourcePath)
+    ||!SHA.test(locator.sourceSha256??'')||!SHA.test(locator.excerptSha256??'')||!/^AC-[1-9][0-9]*$/u.test(locator.criterionId??'')
+    ||!Number.isSafeInteger(locator.startByte)||!Number.isSafeInteger(locator.endByte)||locator.startByte<0||locator.endByte<=locator.startByte||locator.endByte-locator.startByte>4096
+    ||!Array.isArray(value.checks)||value.checks.length<1||value.checks.length>16
+    ||new Set(value.checks.map(check=>check.id)).size!==value.checks.length
+    ||value.checks.some(check=>!exact(check,['id','path','dependencies'])||!ID.test(check.id??'')||!normalizedPath(check.path)
+      ||!/(?:\.test\.mjs|\.test\.cjs)$/u.test(check.path)||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
+      ||!check.dependencies.every(normalizedPath)||new Set(check.dependencies).size!==check.dependencies.length))return fail('NGHR-ITEM-DELIVERY-SHAPE');
+  return {ok:true,code:'NGHR-ITEM-DELIVERY-VALID'};
 }

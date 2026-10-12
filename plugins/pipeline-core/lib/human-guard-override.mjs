@@ -1,23 +1,30 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { createHash, createHmac, randomBytes } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   chmodSync,
   closeSync,
+  constants,
   existsSync,
   fsyncSync,
+  fstatSync,
   linkSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   openSync,
   readFileSync,
+  readSync,
   readdirSync,
   realpathSync,
   renameSync,
+  rmdirSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { hostname, uptime } from "node:os";
+import { observeWindowsProcessIdentity } from "./windows-process-identity.mjs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -25,7 +32,7 @@ import {
   CHAT_GATE_CONFIRMATION_MISMATCH,
   CHAT_GATE_NOT_ATTENDED,
   chatAttributionRecord,
-  requireAttendedChatGateConfirmation,
+  runRegisteredAttendedChatGateConfirmation,
 } from "./chat-gate-ceremony.mjs";
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import {
@@ -70,12 +77,20 @@ import {
 } from "./windows-private-state.mjs";
 import { buildGovernanceHgoConsumptionSource } from "./governance-hgo-consumption-source.mjs";
 import { PrivateBoundaryError, ensureAgentPipelineSegmentOf } from "./private-boundary.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { readSourceOwnedAuthorityContext, createSignedCleanupRequesterObserver } from "./session-requester-bridge.mjs";
+import * as sessionAuthorityRegistry from "./session-authority-registry.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9._-]{1,120}$/u;
 const REQUEST_SCHEMA = "pipeline.human-guard-override-request.v3";
 const PLAN_SCHEMA = "pipeline.human-guard-override-plan.v3";
 const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v3";
+const NATIVE_REQUEST_SCHEMA = "pipeline.human-guard-override-request.v4";
+const NATIVE_PLAN_SCHEMA = "pipeline.human-guard-override-plan.v4";
+const NATIVE_CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v4";
+export const HGO_NATIVE_TARGET_PREIMAGES_SCHEMA = "pipeline.hgo-native-target-preimages.v1";
+const HGO_DISCLOSURE_INDEX_SCHEMA = "pipeline.hgo-disclosure-index.v1";
 const AUDIT_SCHEMA = "pipeline.human-guard-override-audit.v1";
 const AUDIT_HEAD_SCHEMA = "pipeline.human-guard-override-audit-head.v1";
 const AUDIT_STATE_SCHEMA = "pipeline.human-guard-override-audit-state.v1";
@@ -144,6 +159,15 @@ function sha(value) {
   return createHash("sha256").update(typeof value === "string" || Buffer.isBuffer(value)
     ? value
     : canonical(value)).digest("hex");
+}
+
+// Bash description is runner presentation only. Every other own input remains bound.
+// Non-Bash tools retain their complete original input identity. Stored proofs are not migrated.
+function toolInputIdentitySha256(toolName, toolInput) {
+  const effective = toolName === "Bash" && object(toolInput) && Object.getPrototypeOf(toolInput) === Object.prototype
+    ? Object.fromEntries(Object.entries(toolInput).filter(([name]) => name !== "description"))
+    : toolInput;
+  return sha(effective);
 }
 
 // `createPoApprovalIntent` requires a `planSha256`/`specSha256` pair (feature-plan
@@ -868,6 +892,8 @@ function policyIdentity(root, pluginRoot, denials) {
     "project/guard-config.json",
     "project/pipeline.json",
     ".agents/hooks.json",
+    ".claude/pipeline.yaml",
+    "project/pipeline.yaml",
   ].map((path) => {
     const absolute = join(root, path);
     if (!existsSync(absolute)) return { path, status: "absent", sha256: null };
@@ -1005,6 +1031,13 @@ function armTimeFreshnessCheck({ repo, pluginRoot, planned, spawn }) {
   const plugin = pluginIdentity(pluginRoot, boundPluginProvider(planned.plugin));
   if (canonical(plugin) !== canonical(planned.plugin)) {
     fail("HGO-PLUGIN-DRIFT", "override machinery plugin identity drifted before arming");
+  }
+  if (planned.schema === NATIVE_PLAN_SCHEMA) {
+    assertNativeTargets(repo.root, planned);
+    if (repository.head !== planned.repository.head || repository.tree !== planned.repository.tree
+      || canonical(repository.state) !== canonical(planned.repository.state)) {
+      fail("HGO-CANDIDATE-DRIFT", "native signed candidate or lifecycle state changed before arming");
+    }
   }
   return repository;
 }
@@ -1350,6 +1383,29 @@ function bindingDenialReason(reason) {
     .map((headline) => value.indexOf(`\n${headline}`))
     .filter((index) => index >= 0);
   return (starts.length === 0 ? value : value.slice(0, Math.min(...starts))).trimEnd();
+}
+
+function assertRawDenials(denials) {
+  if (!Array.isArray(denials) || denials.length === 0
+    || denials.some((denial) => !object(denial)
+      || typeof denial.guard !== "string" || denial.guard.trim() === ""
+      || typeof denial.reason !== "string" || denial.reason.trim() === "")) {
+    fail("HGO-DENIAL", "denial set requires nonempty guard and reason strings");
+  }
+}
+
+function persistedDenialsValid(value) {
+  if (!Array.isArray(value.denials) || value.denials.length === 0
+    || value.denials.some((denial) => !exactKeys(denial, ["guard", "sha256"])
+      || typeof denial.guard !== "string" || denial.guard.trim() === ""
+      || typeof denial.sha256 !== "string" || !SHA256.test(denial.sha256))
+    || !object(value.preview) || !Array.isArray(value.preview.guardRationale)
+    || value.preview.guardRationale.length !== value.denials.length) return false;
+  return value.preview.guardRationale.every((row, index) =>
+    exactKeys(row, ["guard", "denialSha256", "rationale"])
+    && row.guard === value.denials[index].guard
+    && row.denialSha256 === value.denials[index].sha256
+    && typeof row.rationale === "string" && row.rationale.length <= 2_000);
 }
 
 function denialRationale(denials) {
@@ -2059,6 +2115,115 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
   };
 }
 
+
+// v4 is a separate native Edit/Write contract. No legacy proof is upgraded.
+const NATIVE_TARGET_MAX_FILES = 64;
+const NATIVE_TARGET_MAX_BYTES = 16 * 1024 * 1024;
+function readHgoBoundedRegularBytes(fd, maxBytes, code) {
+  const size = fstatSync(fd).size;
+  if (!Number.isSafeInteger(size) || size < 0 || size > maxBytes) fail(code, "record bytes exceed the closed read bound");
+  const buffer = Buffer.alloc(size + 1); let used = 0;
+  while (used < buffer.length) {
+    const count = readSync(fd, buffer, used, buffer.length - used, null);
+    if (count === 0) break;
+    used += count;
+  }
+  if (used > size) fail(code, "record grew beyond its frozen read bound");
+  return buffer.subarray(0, used);
+}
+
+function nativeTargetStat(info) {
+  return { dev: String(info.dev), ino: String(info.ino), mode: info.mode & 0o777,
+    uid: typeof info.uid === "number" ? info.uid : null };
+}
+function nativeTargetsValid(value, paths) {
+  if (!Array.isArray(paths) || !exactKeys(value, ["schema", "targets"]) || value.schema !== HGO_NATIVE_TARGET_PREIMAGES_SCHEMA
+    || !Array.isArray(value.targets) || value.targets.length < 1 || value.targets.length > NATIVE_TARGET_MAX_FILES
+    || canonical(value.targets.map(row => row?.path)) !== canonical(paths)
+    || paths.some((path,index) => typeof path !== "string" || path === "" || (index > 0 && paths[index-1] >= path))) return false;
+  const stat = row => exactKeys(row,["dev","ino","mode","uid"])
+    && typeof row.dev === "string" && /^\d+$/u.test(row.dev) && typeof row.ino === "string" && /^\d+$/u.test(row.ino)
+    && Number.isSafeInteger(row.mode) && row.mode >= 0 && row.mode <= 0o777
+    && (row.uid === null || Number.isSafeInteger(row.uid));
+  return value.targets.every(row => exactKeys(row,["path","ancestors","preimage"])
+    && Array.isArray(row.ancestors) && row.ancestors.length > 0
+    && row.ancestors.every(parent => exactKeys(parent,["path","status"])
+      ? typeof parent.path === "string" && parent.status === "absent"
+      : exactKeys(parent,["path","status","identity"]) && typeof parent.path === "string" && parent.status === "directory" && stat(parent.identity))
+    && (exactKeys(row.preimage,["status"]) && row.preimage.status === "absent"
+      || exactKeys(row.preimage,["status","identity","bytes","mtimeMs","ctimeMs","sha256"])
+        && row.preimage.status === "file" && stat(row.preimage.identity)
+        && Number.isSafeInteger(row.preimage.bytes) && row.preimage.bytes >= 0
+        && Number.isFinite(row.preimage.mtimeMs) && Number.isFinite(row.preimage.ctimeMs) && SHA256.test(row.preimage.sha256)));
+}
+function captureNativeTargetPreimages(root, paths) {
+  if (!Array.isArray(paths) || paths.length < 1 || paths.length > NATIVE_TARGET_MAX_FILES) fail("HGO-NATIVE-TARGET-BOUND", "native target set exceeds its closed bound");
+  const physical = physicalRoot(root); let total = 0;
+  const targets = paths.map((path,index) => {
+    if (typeof path !== "string" || path === "" || (process.platform === "win32" && path.includes("\\")) || isAbsolute(path)
+      || path.split("/").some(part => part === "" || part === "." || part === "..")
+      || (index > 0 && paths[index-1] >= path)) fail("HGO-NATIVE-TARGET-PATH", "native target set is not canonical");
+    const parts = path.split("/"), ancestors = []; let absent = false;
+    for (let depth=0; depth<parts.length; depth+=1) {
+      const rel = parts.slice(0,depth).join("/"), absolute = rel === "" ? physical : join(physical,rel);
+      if (absent) { ancestors.push({path:rel,status:"absent"}); continue; }
+      let info; try { info = lstatSync(absolute); } catch (error) {
+        if (error.code !== "ENOENT") fail("HGO-NATIVE-TARGET-UNAVAILABLE", "native target ancestry cannot be observed");
+        absent = true; ancestors.push({path:rel,status:"absent"}); continue;
+      }
+      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(absolute) !== absolute) fail("HGO-NATIVE-TARGET-UNSAFE", "native target ancestry is unsafe");
+      ancestors.push({path:rel,status:"directory",identity:nativeTargetStat(info)});
+    }
+    const absolute = join(physical,path);
+    if (absent) return {path,ancestors,preimage:{status:"absent"}};
+    let info; try { info = lstatSync(absolute); } catch (error) {
+      if (error.code === "ENOENT") return {path,ancestors,preimage:{status:"absent"}};
+      fail("HGO-NATIVE-TARGET-UNAVAILABLE", "native target cannot be observed");
+    }
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(absolute) !== absolute) fail("HGO-NATIVE-TARGET-UNSAFE", "native target must be an exclusive regular file");
+    if (!Number.isSafeInteger(info.size) || info.size < 0 || (total += info.size) > NATIVE_TARGET_MAX_BYTES) fail("HGO-NATIVE-TARGET-BOUND", "native target bytes exceed their closed bound");
+    let fd;
+    try {
+      fd = openSync(absolute, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+      const before = fstatSync(fd); if (before.dev !== info.dev || before.ino !== info.ino || before.size !== info.size || before.nlink !== 1 || !before.isFile()) fail("HGO-NATIVE-TARGET-DRIFT", "native target changed during observation");
+      const bytes = readHgoBoundedRegularBytes(fd, NATIVE_TARGET_MAX_BYTES, "HGO-NATIVE-TARGET-BOUND"); const after = fstatSync(fd), named = lstatSync(absolute);
+      for (const key of ["dev","ino","mode","uid","size","mtimeMs","ctimeMs","nlink"]) if (before[key] !== after[key] || before[key] !== named[key]) fail("HGO-NATIVE-TARGET-DRIFT", "native target changed during full observation");
+      if (bytes.length !== before.size || bytes.length > NATIVE_TARGET_MAX_BYTES) fail("HGO-NATIVE-TARGET-BOUND", "native target full read exceeds its closed bound");
+      return {path,ancestors,preimage:{status:"file",identity:nativeTargetStat(before),bytes:bytes.length,mtimeMs:before.mtimeMs,ctimeMs:before.ctimeMs,sha256:sha(bytes)}};
+    } finally { if (fd !== undefined) closeSync(fd); }
+  });
+  // A later target read must not conceal an ancestor replacement or an absent path appearing.
+  for (const target of targets) {
+    for (const ancestor of target.ancestors) {
+      const absolute = ancestor.path === "" ? physical : join(physical,ancestor.path);
+      let info; try { info = lstatSync(absolute); } catch (error) {
+        if (error.code === "ENOENT" && ancestor.status === "absent") continue;
+        fail("HGO-NATIVE-TARGET-DRIFT", "native target ancestry changed during observation");
+      }
+      if (ancestor.status !== "directory" || !info.isDirectory() || info.isSymbolicLink()
+        || realpathSync(absolute) !== absolute || canonical(nativeTargetStat(info)) !== canonical(ancestor.identity)) fail("HGO-NATIVE-TARGET-DRIFT", "native target ancestry changed during observation");
+    }
+    if (target.preimage.status === "absent") {
+      try { lstatSync(join(physical,target.path)); } catch (error) { if (error.code === "ENOENT") continue; fail("HGO-NATIVE-TARGET-DRIFT", "native absence changed during observation"); }
+      fail("HGO-NATIVE-TARGET-DRIFT", "native absent target appeared during observation");
+    }
+  }
+  const result = {schema:HGO_NATIVE_TARGET_PREIMAGES_SCHEMA,targets};
+  if (!nativeTargetsValid(result,paths)) fail("HGO-NATIVE-TARGET-SHAPE", "native target observation is not closed");
+  return result;
+}
+function assertNativeTargets(root, record) {
+  if (!nativeTargetsValid(record.nativeTargets,record.eligiblePaths)
+    || !new Set(["Edit","Write"]).has(record.toolName)
+    || canonical(captureNativeTargetPreimages(root,record.eligiblePaths)) !== canonical(record.nativeTargets)) {
+    fail("HGO-NATIVE-TARGET-DRIFT", "signed native target preimages changed");
+  }
+}
+function nativeRepositoryMatches(bound, observed) {
+  const withoutStatus = value => Object.fromEntries(Object.entries(value).filter(([key]) => key !== "statusSha256"));
+  return canonical(withoutStatus(bound)) === canonical(withoutStatus(observed));
+}
+
 function requestPath(paths, digest) {
   if (!SHA256.test(digest)) fail("HGO-DIGEST", "request digest is invalid");
   return join(paths.requests, `${digest}.json`);
@@ -2106,12 +2271,15 @@ function planPath(paths, requestSha256, authorSourceRoot) {
   return join(paths.plans, `${sha({ requestSha256, authorSourceRoot })}.json`);
 }
 
-function validatedPlan(path) {
-  const value = readJson(path);
+function validatedPlan(path, value = readJson(path)) {
   const core = Object.fromEntries(Object.entries(value).filter(([name]) => name !== "planSha256"));
-  if (!exactKeys(value, PLAN_KEYS) || value.schema !== PLAN_SCHEMA || value.status !== "planned"
+  const native = value.schema === NATIVE_PLAN_SCHEMA;
+  if (!exactKeys(value, native ? [...PLAN_KEYS, "nativeTargets"] : PLAN_KEYS)
+    || !(value.schema === PLAN_SCHEMA || native) || value.status !== "planned"
+    || (native && !nativeTargetsValid(value.nativeTargets, value.eligiblePaths))
     || !SHA256.test(value.requestSha256 ?? "") || !SHA256.test(value.planSha256 ?? "")
     || typeof value.externalReadOnly !== "boolean"
+    || !persistedDenialsValid(value)
     || sha(core) !== value.planSha256) {
     fail("HGO-PLAN", "persisted override plan is invalid");
   }
@@ -2234,6 +2402,7 @@ function procStart(pid) {
 //   uptimeSeconds  number               win32 only; with nowMs it derives the boot minute
 //   nowMs          number               default Date.now()
 //   pidAlive       (pid) => boolean     default process.kill(pid, 0); false only for ESRCH
+//   processIdentity (pid) => observation default fixed native Windows process start query
 // The Linux branch still reads /proc/<pid>/stat for the process start time, so injecting
 // platform "linux" on a host without /proc is unsupported.
 const WIN32_BOOT_MINUTE = /^[0-9]{1,15}$/u;
@@ -2271,7 +2440,8 @@ function resolveAuditLockHost(injected) {
     || (seam.bootId !== undefined && typeof seam.bootId !== "string")
     || (seam.uptimeSeconds !== undefined && typeof seam.uptimeSeconds !== "number")
     || (seam.nowMs !== undefined && typeof seam.nowMs !== "number")
-    || (seam.pidAlive !== undefined && typeof seam.pidAlive !== "function")) {
+    || (seam.pidAlive !== undefined && typeof seam.pidAlive !== "function")
+    || (seam.processIdentity !== undefined && typeof seam.processIdentity !== "function")) {
     fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock host seam is invalid");
   }
   const platform = seam.platform ?? process.platform;
@@ -2285,6 +2455,7 @@ function resolveAuditLockHost(injected) {
       return "unavailable";
     },
     pidAlive: seam.pidAlive ?? defaultPidAlive,
+    processIdentity: seam.processIdentity ?? ((pid) => observeWindowsProcessIdentity({ pid })),
   };
 }
 
@@ -2300,7 +2471,8 @@ function localAuditLockOwner(host = resolveAuditLockHost()) {
     hostId,
     bootId,
     pid: process.pid,
-    processStart: linux ? procStart(process.pid) : "unavailable",
+    processStart: linux ? procStart(process.pid) : host.platform === "win32"
+      ? windowsAuditProcessIdentity(process.pid, host)?.processStart ?? "unavailable" : "unavailable",
     nonce: randomBytes(16).toString("hex"),
   };
 }
@@ -2426,10 +2598,22 @@ function linuxAuditLockOwnerState(owner, host) {
   catch (error) { return error?.code === "ENOENT" ? "dead" : "ambiguous"; }
 }
 
-// win32 keeps no per-process start identity, so a present pid is never proof of a live owner
-// (it may be reused) and this branch never answers "live": a missing pid is dead, a present
-// pid from another boot is dead, and everything else is ambiguous. Only a pid probe that
-// proves the pid gone, or two usable boot minutes that differ, may declare an owner dead.
+// Only a closed actual process observation contributes a Windows start identity.
+// The dependency seam is methodological; it does not itself certify native evidence.
+function windowsAuditProcessIdentity(pid, host) {
+  let observed;
+  try { observed = host.processIdentity(pid); } catch { return null; }
+  if (!object(observed) || observed.pid !== pid) return null;
+  if (observed.status === "absent" && exactKeys(observed, ["status", "pid"])) return observed;
+  if (observed.status !== "present" || !exactKeys(observed, ["status", "pid", "processStart"])
+    || typeof observed.processStart !== "string") return null;
+  const match = /^win32-([1-9][0-9]{0,18})$/u.exec(observed.processStart ?? "");
+  if (match === null || BigInt(match[1]) > 3155378975999999999n) return null;
+  return observed;
+}
+
+// Original Windows acceptance: a live/reused/unverifiable present PID is ambiguous,
+// including across boots. Boot-minute estimates alone cannot reclaim that PID's lock.
 function win32AuditLockOwnerState(owner, host) {
   let localHost;
   try { localHost = host.hostId(); } catch { return "ambiguous"; }
@@ -2438,11 +2622,10 @@ function win32AuditLockOwnerState(owner, host) {
   try { present = host.pidAlive(owner.pid); } catch { return "ambiguous"; }
   if (present === false) return "dead";
   if (present !== true) return "ambiguous";
-  let localBoot;
-  try { localBoot = host.bootId(); } catch { return "ambiguous"; }
-  // A legacy "unavailable" record, or an unusable local boot time, cannot prove another boot.
-  if (!WIN32_BOOT_MINUTE.test(owner.bootId) || !WIN32_BOOT_MINUTE.test(localBoot)) return "ambiguous";
-  return Math.abs(Number(owner.bootId) - Number(localBoot)) > WIN32_BOOT_MINUTE_TOLERANCE ? "dead" : "ambiguous";
+  const observed = windowsAuditProcessIdentity(owner.pid, host);
+  if (observed?.status === "absent") return "dead";
+  // Equal identity is still live; different identity is PID reuse. Neither is recoverable.
+  return "ambiguous";
 }
 
 function auditLockOwnerState(record, host = resolveAuditLockHost()) {
@@ -2958,8 +3141,10 @@ function journaledExternalOperatorRoute(route, {
       }),
       occurredAtEpochMs: nowMs,
     });
-    recordGuardHandoffOffer({ offer, append: (value) => appendCommandOffer(value, { paths }) });
-    return route;
+    return hgoPlanningPublication({repo, paths, entry: "record-denial", intendedPath: paths.commandOffers, inputSha256: sha(offer)}, () => {
+      recordGuardHandoffOffer({ offer, append: (value) => appendCommandOffer(value, { paths }) });
+      return route;
+    });
   } catch {
     const refused = Object.fromEntries(
       Object.entries(route).filter(([name]) => name !== "nextAction"),
@@ -3011,8 +3196,10 @@ function capabilityMac(secret, value) {
 
 function validatedCapability(paths, path) {
   const value = readJson(path);
-  if (!exactKeys(value, CAPABILITY_KEYS)
-    || value.schema !== CAPABILITY_SCHEMA
+  const native = value.schema === NATIVE_CAPABILITY_SCHEMA;
+  if (!exactKeys(value, native ? [...CAPABILITY_KEYS, "nativeTargets"] : CAPABILITY_KEYS)
+    || !(value.schema === CAPABILITY_SCHEMA || native)
+    || (native && (!new Set(["Edit", "Write"]).has(value.toolName) || !nativeTargetsValid(value.nativeTargets, value.eligiblePaths)))
     || !new Set(["armed", "consumed"]).has(value.status)
     || !SHA256.test(value.requestSha256 ?? "")
     || !SHA256.test(value.planSha256 ?? "")
@@ -3032,6 +3219,7 @@ function validatedCapability(paths, path) {
         && typeof value.signedCandidate.commit === "string" && value.signedCandidate.commit !== ""
         && typeof value.signedCandidate.tree === "string" && value.signedCandidate.tree !== ""))
     || !object(value.policy) || !object(value.preview)
+    || !persistedDenialsValid(value)
     || !new Set(["standard", "pipeline-author-repair", "global-plugin-install"]).has(value.mode)
     || !(value.authorSourceRoot === null || typeof value.authorSourceRoot === "string")
     || !SHA256.test(value.mac ?? "")
@@ -3055,17 +3243,19 @@ function hasAuthorizedAuditEntry(paths, capability) {
     && event.at === capability.authorizedAt);
 }
 
-function validatedRequest(paths, requestSha256) {
-  const request = readJson(requestPath(paths, requestSha256));
+function validatedRequest(paths, requestSha256, request = readJson(requestPath(paths, requestSha256))) {
+  const native = request.schema === NATIVE_REQUEST_SCHEMA;
   if (!exactKeys(request, [
     "schema", "root", "plugin", "repository", "toolName", "toolInputSha256", "denials",
     "policy", "preview", "eligiblePaths", "commandClass", "externalReadOnly", "mode", "authorSourceRoot", "createdAt", "expiresAt",
+    ...(native ? ["nativeTargets"] : []),
   ])
-    || request.schema !== REQUEST_SCHEMA || request.root === undefined
+    || !(request.schema === REQUEST_SCHEMA || native) || request.root === undefined
+    || (native && (!new Set(["Edit", "Write"]).has(request.toolName) || !nativeTargetsValid(request.nativeTargets, request.eligiblePaths)))
     || !new Set(["standard", "pipeline-author-repair-candidate", "global-plugin-install"]).has(request.mode)
     || request.authorSourceRoot !== null
     || typeof request.externalReadOnly !== "boolean"
-    || !SHA256.test(request.toolInputSha256) || !Array.isArray(request.denials)
+    || !SHA256.test(request.toolInputSha256) || !persistedDenialsValid(request)
     || sha(request) !== requestSha256) fail("HGO-REQUEST", "override request is invalid");
   return request;
 }
@@ -3233,7 +3423,7 @@ export function recordHumanGuardDenial({
   // always journals through this module's own fsync'd writer.
   appendCommandOffer = appendCommandOfferJournal,
 } = {}) {
-  if (!Array.isArray(denials) || denials.length === 0) fail("HGO-DENIAL", "denial set is empty");
+  assertRawDenials(denials);
   const lifecycleRecovery = lifecycleNotReadyRecovery(denials);
   if (lifecycleRecovery !== null) return lifecycleRecovery;
   const physicalRootDir = physicalRoot(rootDir);
@@ -3303,13 +3493,18 @@ export function recordHumanGuardDenial({
     commandClass,
     denials,
   });
+  const nativeTargets = new Set(["Edit", "Write"]).has(toolName)
+    && (eligible.mode === "standard" || eligible.authorCandidate === true)
+    && eligible.paths.length > 0
+    ? captureNativeTargetPreimages(repo.root, eligible.paths) : null;
   const request = {
-    schema: REQUEST_SCHEMA,
+    schema: nativeTargets === null ? REQUEST_SCHEMA : NATIVE_REQUEST_SCHEMA,
+    ...(nativeTargets === null ? {} : { nativeTargets }),
     root: repo.root,
     plugin: pluginIdentity(pluginRoot, provider),
     repository,
     toolName,
-    toolInputSha256: sha(toolInput),
+    toolInputSha256: toolInputIdentitySha256(toolName, toolInput),
     commandClass,
     // This fact never admits a command by itself. It is bound to the exact
     // command and denial digests; at consumption the lifecycle guard reruns
@@ -3329,6 +3524,7 @@ export function recordHumanGuardDenial({
   };
   const requestSha256 = sha(request);
   const path = requestPath(paths, requestSha256);
+  return hgoPlanningPublication({repo, paths, entry: "record-denial", intendedPath: path, inputSha256: requestSha256}, () => {
   if (!existsSync(path)) writeExclusive(path, Buffer.from(`${JSON.stringify(request)}\n`, "utf8"));
   else if (sha(readJson(path)) !== requestSha256) fail("HGO-REQUEST", "request replay conflicts");
   appendAudit(paths, {
@@ -3359,6 +3555,7 @@ export function recordHumanGuardDenial({
       candidateSourceRoot: eligible.candidateSourceRoot,
     }
     : { status: "planned", requestSha256, root: repo.root };
+  });
 }
 
 function buildPlanResult(record, scriptPath) {
@@ -3485,8 +3682,10 @@ export function planHumanGuardOverride({
   } else if (selectedAuthorSourceRoot !== null) {
     fail("HGO-AUTHOR-SCOPE", "author repair root does not match this request");
   }
+  if (request.schema === NATIVE_REQUEST_SCHEMA) assertNativeTargets(repo.root, request);
   const payload = {
-    schema: PLAN_SCHEMA,
+    schema: request.schema === NATIVE_REQUEST_SCHEMA ? NATIVE_PLAN_SCHEMA : PLAN_SCHEMA,
+    ...(request.schema === NATIVE_REQUEST_SCHEMA ? { nativeTargets: request.nativeTargets } : {}),
     status: "planned",
     root: repo.root,
     requestSha256,
@@ -3507,8 +3706,10 @@ export function planHumanGuardOverride({
   const planSha256 = sha(payload);
   const record = { ...payload, planSha256 };
   const path = planPath(paths, requestSha256, selectedAuthorSourceRoot);
+  return hgoPlanningPublication({repo, paths, entry: "plan-override", intendedPath: path, inputSha256: sha(record)}, () => {
   writeExclusive(path, Buffer.from(`${JSON.stringify(record)}\n`, "utf8"));
   return buildPlanResult(record, scriptPath);
+  });
 }
 
 /**
@@ -3561,6 +3762,7 @@ export function refreezeHumanGuardOverridePlan({
   if (canonical(plugin) !== canonical(request.plugin)) {
     fail("HGO-DRIFT", "override plugin identity drifted before refreeze");
   }
+  if (priorPlan.schema === NATIVE_PLAN_SCHEMA) assertNativeTargets(repo.root, priorPlan);
   const refreshedPayload = {
     ...priorPlan,
     plugin,
@@ -3573,6 +3775,7 @@ export function refreezeHumanGuardOverridePlan({
   const planSha256 = sha(refreshedPayload);
   const record = { ...refreshedPayload, planSha256 };
   const path = planPath(paths, requestSha256, authorSourceRoot);
+  return hgoPlanningPublication({repo, paths, entry: "refreeze-plan", intendedPath: path, inputSha256: sha(record)}, () => {
   writeAtomic(path, Buffer.from(`${JSON.stringify(record)}\n`, "utf8"));
   appendAudit(paths, {
     type: "replanned",
@@ -3591,6 +3794,7 @@ export function refreezeHumanGuardOverridePlan({
     planSha256,
     expiresAt: record.expiresAt,
   };
+  });
 }
 
 export function prepareHumanGuardOverrideAuthorization({
@@ -3659,7 +3863,7 @@ export function prepareHumanGuardOverrideAuthorization({
       mutation: true,
       requiresConfirmation: true,
       executionBoundary: "local-process",
-      expected: { schema: CAPABILITY_SCHEMA, status: "armed" },
+      expected: { schema: planned.schema === NATIVE_PLAN_SCHEMA ? NATIVE_CAPABILITY_SCHEMA : CAPABILITY_SCHEMA, status: "armed" },
     },
   };
 }
@@ -3742,6 +3946,8 @@ export function prepareHumanGuardOverrideForSignature({
   } catch {
     fail("HGO-SIGNATURE-INTENT-INVALID", "signed authorization intent could not be built from the current repository observation");
   }
+  const indexed = indexHumanGuardOverrideSelection({rootDir,pluginRoot,requestSha256,planSha256:planned.planSha256,authorSourceRoot,nowMs,spawn,scriptPath});
+  if (indexed.intentSha256 !== intent.sha256) fail("HGO-DISCLOSURE-INDEX", "prepared disclosure intent conflicts");
   return {
     schema: "pipeline.human-guard-override-prepare-for-signature.v1",
     status: "prepared",
@@ -3886,7 +4092,8 @@ export function authorizeHumanGuardOverride({
   const globalChat = approval.scope === "global" && approval.source === "pipeline.user.yaml";
   if (!globalChat && !externalReadOnlyPoChat) {
     const confirmationExpected = `HGO-${selectionSha256.slice(0, 8).toUpperCase()}`;
-    const confirmation = requireAttendedChatGateConfirmation({
+    const confirmation = runRegisteredAttendedChatGateConfirmation({
+      repository: inspectSignedDescriptorCustodyRepository(rootDir),
       summaryLines: [
         "HUMAN GUARD OVERRIDE ACTIVATION CONFIRMATION -- read before you type the value:",
         `  reason: ${reason}`,
@@ -3896,7 +4103,6 @@ export function authorizeHumanGuardOverride({
         `  confirmation value: ${confirmationExpected}`,
       ],
       expected: confirmationExpected,
-      dependencies,
     });
     if (!confirmation.ok) {
       fail(
@@ -3918,7 +4124,8 @@ export function authorizeHumanGuardOverride({
   // capabilityCore.repository below (design doc §1.4 step 3's own instruction).
   const freshRepository = armTimeFreshnessCheck({ repo, pluginRoot, planned, spawn });
   const capabilityCore = {
-    schema: CAPABILITY_SCHEMA,
+    schema: planned.schema === NATIVE_PLAN_SCHEMA ? NATIVE_CAPABILITY_SCHEMA : CAPABILITY_SCHEMA,
+    ...(planned.schema === NATIVE_PLAN_SCHEMA ? { nativeTargets: planned.nativeTargets } : {}),
     status: "armed",
     root: repo.root,
     requestSha256,
@@ -3947,6 +4154,7 @@ export function authorizeHumanGuardOverride({
     expiresAt: planned.expiresAt,
     consumedAt: null,
   };
+  return hgoPublishAuthorizedAuthority({repo, paths, capabilityCore, pluginRoot}, () => {
   const capability = {
     ...capabilityCore,
     mac: capabilityMac(key(paths), capabilityCore),
@@ -3968,7 +4176,7 @@ export function authorizeHumanGuardOverride({
           authorSourceRoot: capability.authorSourceRoot,
         });
       }
-      return { schema: CAPABILITY_SCHEMA, status: "armed", planSha256, requestSha256, mutated: false };
+      return { schema: capabilityCore.schema, status: "armed", planSha256, requestSha256, mutated: false };
     }
     fail("HGO-REPLAY", "override plan is already used or conflicts");
   }
@@ -3993,7 +4201,8 @@ export function authorizeHumanGuardOverride({
     } catch {}
     throw error;
   }
-  return { schema: CAPABILITY_SCHEMA, status: "armed", planSha256, requestSha256, mutated: true };
+  return { schema: capabilityCore.schema, status: "armed", planSha256, requestSha256, mutated: true };
+  });
 }
 
 /**
@@ -4223,7 +4432,8 @@ export function authorizeHumanGuardOverrideBySignature({
     );
   }
   const capabilityCore = {
-    schema: CAPABILITY_SCHEMA,
+    schema: planned.schema === NATIVE_PLAN_SCHEMA ? NATIVE_CAPABILITY_SCHEMA : CAPABILITY_SCHEMA,
+    ...(planned.schema === NATIVE_PLAN_SCHEMA ? { nativeTargets: planned.nativeTargets } : {}),
     status: "armed",
     root: repo.root,
     requestSha256,
@@ -4248,6 +4458,7 @@ export function authorizeHumanGuardOverrideBySignature({
     expiresAt: planned.expiresAt,
     consumedAt: null,
   };
+  return hgoPublishAuthorizedAuthority({repo, paths, capabilityCore, pluginRoot}, () => {
   const capability = {
     ...capabilityCore,
     mac: capabilityMac(key(paths), capabilityCore),
@@ -4269,7 +4480,7 @@ export function authorizeHumanGuardOverrideBySignature({
           authorSourceRoot: capability.authorSourceRoot,
         });
       }
-      return { schema: CAPABILITY_SCHEMA, status: "armed", planSha256, requestSha256, mutated: false };
+      return { schema: capabilityCore.schema, status: "armed", planSha256, requestSha256, mutated: false };
     }
     fail("HGO-REPLAY", "override plan is already used or conflicts");
   }
@@ -4294,10 +4505,11 @@ export function authorizeHumanGuardOverrideBySignature({
     } catch {}
     throw error;
   }
-  return { schema: CAPABILITY_SCHEMA, status: "armed", planSha256, requestSha256, mutated: true };
+  return { schema: capabilityCore.schema, status: "armed", planSha256, requestSha256, mutated: true };
+  });
 }
 
-export function consumeHumanGuardOverride({
+function consumeHumanGuardOverrideCore({
   rootDir,
   pluginRoot,
   provider = "codex",
@@ -4308,6 +4520,7 @@ export function consumeHumanGuardOverride({
   spawn = spawnSync,
   codexSpawn = spawnSync,
 } = {}) {
+  assertRawDenials(denials);
   const lifecycleRecovery = lifecycleNotReadyRecovery(denials);
   if (lifecycleRecovery !== null) return lifecycleRecovery;
   // NVA-CROSSREPOLEDGER-1: this is the OTHER entry point codex-pretool-guard.mjs calls
@@ -4336,12 +4549,14 @@ export function consumeHumanGuardOverride({
     try { repo = controlPathTopology(rootDir); }
     catch { return { status: "absent" }; }
   }
+  return hgoConsumptionBoundary(repo, () => {
   const paths = storage(repo.common);
-  const toolInputSha256 = sha(toolInput);
+  const toolInputSha256 = toolInputIdentitySha256(toolName, toolInput);
   const currentDenialDigests = denialDigests(denials);
   const files = [];
   let replanRequired = false;
   let driftReplanRequired = false;
+  let inputMismatch = null;
   // NVA-SIGDISCLOSE-1 Finding 6: a capability file this process cannot read or validate
   // at all (unreadable, malformed JSON, a stale/wrong schema version, a bad MAC) is
   // SKIPPED and RECORDED here, never treated as a whole-store failure. Before this fix,
@@ -4367,7 +4582,6 @@ export function consumeHumanGuardOverride({
       continue;
     }
     if (capability.status !== "armed" || capability.toolName !== toolName
-      || capability.toolInputSha256 !== toolInputSha256
       || canonical(capability.denials) !== canonical(currentDenialDigests)) continue;
     const lock = join(paths.locks, `${planSha256}.lock`);
     let lockFd;
@@ -4391,6 +4605,15 @@ export function consumeHumanGuardOverride({
         ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
         : repositoryObservation(repo.root, spawn);
       const expired = new Date(capability.expiresAt).getTime() <= nowMs;
+      let nativeTargetDrift = false;
+      if (capability.schema === NATIVE_CAPABILITY_SCHEMA) {
+        try {
+          const reclassified = eligibility(repo.root, toolName, toolInput, { selectedAuthorSourceRoot: capability.authorSourceRoot });
+          if (!reclassified.eligible || canonical(reclassified.paths) !== canonical(capability.eligiblePaths)
+            || !(reclassified.mode === "standard" || reclassified.authorCandidate === true)) nativeTargetDrift = true;
+          assertNativeTargets(repo.root, capability);
+        } catch { nativeTargetDrift = true; }
+      }
       const driftChecks = {
         status: capability.status !== "armed",
         root: capability.root !== repo.root,
@@ -4399,11 +4622,14 @@ export function consumeHumanGuardOverride({
         denials: canonical(capability.denials) !== canonical(currentDenialDigests),
         plugin: canonical(capability.plugin) !== canonical(plugin),
         policy: canonical(capability.policy) !== canonical(policy),
-        repository: canonical(capability.repository) !== canonical(repository),
+        repository: capability.schema === NATIVE_CAPABILITY_SCHEMA
+          ? !nativeRepositoryMatches(capability.repository, repository)
+          : canonical(capability.repository) !== canonical(repository),
+        ...(capability.schema === NATIVE_CAPABILITY_SCHEMA ? { nativeTargets: nativeTargetDrift } : {}),
         authorEligiblePaths: capability.mode === "pipeline-author-repair"
           && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null,
       };
-      const drifted = Object.values(driftChecks).some(Boolean);
+      const drifted = Object.entries(driftChecks).some(([check, changed]) => check !== "toolInputSha256" && changed);
       if (expired || drifted) {
         appendAudit(paths, {
           type: expired ? "expired" : "rejected",
@@ -4423,6 +4649,20 @@ export function consumeHumanGuardOverride({
         // An authenticated stale match is refused and audited, but cannot hide
         // a separately authorized matching capability later in the store.
         driftReplanRequired = true;
+        continue;
+      }
+      // Only authenticated, current-context authority may disclose bound hashes.
+      // Keep searching so a later exact capability retains consumption precedence.
+      if (driftChecks.toolInputSha256) {
+        inputMismatch ??= {
+          schema: "pipeline.human-guard-override-input-mismatch.v1",
+          code: "HGO-INPUT-MISMATCH",
+          requestSha256: capability.requestSha256,
+          planSha256: capability.planSha256,
+          expectedToolInputSha256: capability.toolInputSha256,
+          observedToolInputSha256: toolInputSha256,
+          differingInputs: ["toolInputSha256"],
+        };
         continue;
       }
       const consumedCore = {
@@ -4456,9 +4696,11 @@ export function consumeHumanGuardOverride({
   }
   return {
     ...(driftReplanRequired ? { status: "replan", code: "HGO-DRIFT" }
-      : replanRequired ? { status: "replan", code: "HGO-EXPIRED" } : { status: "absent" }),
+      : replanRequired ? { status: "replan", code: "HGO-EXPIRED" }
+      : inputMismatch ? { status: "replan", code: "HGO-INPUT-MISMATCH", inputMismatch } : { status: "absent" }),
     ...(skippedInvalidRecords.length ? { skippedInvalidRecords } : {}),
   };
+  });
 }
 
 /**
@@ -4574,7 +4816,8 @@ export function repairHumanGuardOverrideAudit({
     fail("HGO-AUDIT-REPAIR-DRIFT", "audit repair preimage no longer matches");
   }
   const challenge = `HGO-AUDIT-${expectedPreimageSha256.slice(0, 12).toUpperCase()}`;
-  const confirmation = requireAttendedChatGateConfirmation({
+  const confirmation = runRegisteredAttendedChatGateConfirmation({
+    repository: inspectSignedDescriptorCustodyRepository(rootDir),
     summaryLines: [
       "Human Guard Override audit repair",
       `Repository: ${repo.root}`,
@@ -4584,7 +4827,6 @@ export function repairHumanGuardOverrideAudit({
       `Confirmation: ${challenge}`,
     ],
     expected: challenge,
-    dependencies,
   });
   if (!confirmation.ok) {
     const code = confirmation.code === CHAT_GATE_NOT_ATTENDED
@@ -4669,17 +4911,98 @@ export function repairHumanGuardOverrideAudit({
 // `buildHumanGuardOverrideSignatureIntent()` recipe the verifier uses, to the digest
 // about to be signed. A request whose stored bytes no longer re-derive to any digest --
 // edited, or simply superseded since -- stops matching; it never starts describing a
-// lie. Mirrors the enumerate-then-validate loop shape `consumeHumanGuardOverride()`
-// already uses over `paths.capabilities` (readdirSync + filter + sort + a per-entry
-// try/catch that skips what it cannot use), over `paths.requests` instead.
+// lie. A digest-keyed private index selects exactly one strict request/plan pair.
+// The resolver never scans requests or creates a plan while displaying a signature.
 // ---------------------------------------------------------------------------------
+
+const HGO_DISCLOSURE_MAX_RECORD_BYTES = 1024 * 1024;
+function disclosureIndexPath(paths, intentSha256) {
+  if (!SHA256.test(intentSha256)) fail("HGO-DIGEST", "disclosure intent digest is invalid");
+  return join(paths.plans, intentSha256 + ".disclosure.json");
+}
+function boundedDisclosureRecord(path) {
+  const before = safePrivateFile(path);
+  if (before.size > HGO_DISCLOSURE_MAX_RECORD_BYTES) fail("HGO-DISCLOSURE-BOUND", "disclosure record exceeds its closed bound");
+  let fd;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    const opened = fstatSync(fd); if (!opened.isFile() || opened.nlink !== 1 || opened.dev !== before.dev || opened.ino !== before.ino) fail("HGO-DISCLOSURE-DRIFT", "disclosure record changed");
+    const bytes = readHgoBoundedRegularBytes(fd, HGO_DISCLOSURE_MAX_RECORD_BYTES, "HGO-DISCLOSURE-BOUND"), after = fstatSync(fd), named = safePrivateFile(path);
+    if (bytes.length > HGO_DISCLOSURE_MAX_RECORD_BYTES || bytes.length !== opened.size) fail("HGO-DISCLOSURE-BOUND", "disclosure full read exceeds its closed bound");
+    for (const key of ["dev","ino","mode","size","nlink","mtimeMs","ctimeMs"]) if (opened[key] !== after[key] || opened[key] !== named[key]) fail("HGO-DISCLOSURE-DRIFT", "disclosure record changed during read");
+    let value; try { value = JSON.parse(bytes.toString("utf8")); } catch { fail("HGO-DISCLOSURE-INDEX", "disclosure record is malformed"); }
+    return {value, sha256: sha(bytes), bytes: bytes.length};
+  } finally { if (fd !== undefined) closeSync(fd); }
+}
+function boundedDisclosureJson(path) { return boundedDisclosureRecord(path).value; }
+function validatedDisclosureIndex(path) {
+  const value = boundedDisclosureJson(path);
+  if (!exactKeys(value,["schema","root","intentSha256","requestSha256","planSha256","selectionSha256","reasonSha256","authorSourceRoot","expiresAt"])
+    || value.schema !== HGO_DISCLOSURE_INDEX_SCHEMA || typeof value.root !== "string"
+    || [value.intentSha256,value.requestSha256,value.planSha256,value.selectionSha256,value.reasonSha256].some(digest => !SHA256.test(digest))
+    || !(value.authorSourceRoot === null || typeof value.authorSourceRoot === "string")
+    || typeof value.expiresAt !== "string" || !Number.isFinite(Date.parse(value.expiresAt))
+    || basename(path) !== value.intentSha256 + ".disclosure.json") fail("HGO-DISCLOSURE-INDEX", "disclosure index is not closed");
+  return value;
+}
+export function indexHumanGuardOverrideSelection({rootDir,pluginRoot,requestSha256,planSha256,authorSourceRoot=null,nowMs=Date.now(),spawn=spawnSync,scriptPath}={}) {
+  const repo = topology(rootDir,spawn), paths = storage(repo.common);
+  const persisted = readPersistedPlan(paths,requestSha256,authorSourceRoot);
+  if (persisted === null || persisted.planSha256 !== planSha256) fail("HGO-PLAN", "disclosure requires the exact persisted plan");
+  const request = validatedRequest(paths,requestSha256); assertRequestNotExpired(request,repo,nowMs); assertPlanNotExpired(persisted,nowMs);
+  const planned = buildPlanResult(persisted,scriptPath);
+  const prepared = prepareHumanGuardOverrideAuthorization({rootDir,pluginRoot,requestSha256,planSha256,reason:HGO_SIGNATURE_REASON,nowMs,spawn,scriptPath,authorSourceRoot});
+  const intent = buildHumanGuardOverrideSignatureIntent({prepared,planned});
+  const record = {schema:HGO_DISCLOSURE_INDEX_SCHEMA,root:repo.root,intentSha256:intent.sha256,requestSha256,planSha256,
+    selectionSha256:prepared.selectionSha256,reasonSha256:prepared.reasonSha256,authorSourceRoot,expiresAt:planned.expiresAt};
+  const path = disclosureIndexPath(paths,intent.sha256);
+  return hgoPlanningPublication({repo,paths,entry:"plan-override",intendedPath:path,inputSha256:sha(record)},()=>{
+    if (existsSync(path)) { if (canonical(validatedDisclosureIndex(path)) !== canonical(record)) fail("HGO-DISCLOSURE-INDEX", "disclosure index conflicts"); }
+    else writeExclusive(path,Buffer.from(JSON.stringify(record)+"\n","utf8"));
+    return {schema:"pipeline.hgo-disclosure-index-result.v1",status:"indexed",intentSha256:intent.sha256,requestSha256,planSha256};
+  });
+}
+function readIndexedDisclosurePlan({repo,intentSha256,nowMs}) {
+  const base = join(repo.common,"agent-pipeline","human-guard-overrides"), paths = {base,requests:join(base,"requests"),plans:join(base,"plans")};
+  for (const path of [base,paths.requests,paths.plans]) hgoAuthorityDirectory(path);
+  const index = validatedDisclosureIndex(disclosureIndexPath(paths,intentSha256));
+  if (index.root !== repo.root || index.intentSha256 !== intentSha256 || Date.parse(index.expiresAt) <= nowMs) fail("HGO-DISCLOSURE-INDEX", "disclosure index context is stale");
+  // Validate the bounded parsed bytes directly; never reopen an unbounded second copy.
+  const request = validatedRequest(paths,index.requestSha256,boundedDisclosureJson(requestPath(paths,index.requestSha256)));
+  const path = planPath(paths,index.requestSha256,index.authorSourceRoot);
+  const physicalPlan = boundedDisclosureRecord(path);
+  const planned = validatedPlan(path,physicalPlan.value);
+  if (request.root !== repo.root || planned.root !== repo.root || planned.requestSha256 !== index.requestSha256
+    || planned.planSha256 !== index.planSha256 || planned.authorSourceRoot !== index.authorSourceRoot || planned.expiresAt !== index.expiresAt
+    || planned.toolName !== request.toolName || planned.toolInputSha256 !== request.toolInputSha256
+    || canonical(planned.denials) !== canonical(request.denials) || canonical(planned.policy) !== canonical(request.policy)
+    || canonical(planned.preview) !== canonical(request.preview) || canonical(planned.eligiblePaths) !== canonical(request.eligiblePaths)
+    || canonical(planned.plugin) !== canonical(request.plugin)
+    || (planned.schema === NATIVE_PLAN_SCHEMA && canonical(planned.nativeTargets) !== canonical(request.nativeTargets))) fail("HGO-DISCLOSURE-INDEX", "disclosure index does not bind its original request and plan");
+  const reasonSha256=sha(Buffer.from(HGO_SIGNATURE_REASON,"utf8"));
+  const selection={schema:"pipeline.human-guard-override-authorization-selection.v1",requestSha256:index.requestSha256,planSha256:index.planSha256,reasonSha256};
+  const prepared={...selection,selectionSha256:sha(selection)};
+  const intent=buildHumanGuardOverrideSignatureIntent({prepared,planned});
+  if (intent.sha256 !== intentSha256 || prepared.selectionSha256 !== index.selectionSha256 || reasonSha256 !== index.reasonSha256) fail("HGO-DISCLOSURE-INDEX", "disclosure intent does not rederive");
+  return {planned, materialArtifact: {path, sha256: physicalPlan.sha256, bytes: physicalPlan.bytes},
+    requestBinding: {requestSha256: index.requestSha256, planSha256: index.planSha256, selectionSha256: index.selectionSha256}};
+}
+function hgoRedactDisclosure(value) {
+  return (typeof value === "string" ? value : "")
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*/gu,"[redacted private key]")
+    .replace(/(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})/gu,"[redacted credential]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/giu,"Bearer [redacted]")
+    .replace(/((?:token|password|secret|authorization)\s*[:=]\s*)["']?[^\s,;"']+/giu,"$1[redacted]")
+    .replace(/(^|[\s"'(])(?:[A-Za-z]:[\\/]|\/)[^\s"')]+/gu,"$1[redacted absolute path]");
+}
+
 const HGO_SUMMARY_MAX_LINES = 8;
 const HGO_SUMMARY_MAX_LINE_CHARS = 240;
 const HGO_SUMMARY_MAX_RATIONALE_CHARS = 160;
 const HGO_SUMMARY_MAX_PATHS = 8;
 
 function hgoDisplayText(value, limit) {
-  const flat = (typeof value === "string" ? value : "").replace(/\p{C}/gu, " ").replace(/\s+/gu, " ").trim();
+  const flat = hgoRedactDisclosure(value).replace(/\p{C}/gu, " ").replace(/\s+/gu, " ").trim();
   return flat.length <= limit
     ? { text: flat, truncated: false, length: flat.length }
     : { text: `${flat.slice(0, limit)}...`, truncated: true, length: flat.length };
@@ -4711,59 +5034,55 @@ function unresolvedHumanGuardOverrideSelection(code) {
  * "the eligible paths, the denying guard's rationale, and the expiry are all already
  * in the prepared selection's decisionPreview").
  *
- * Enumerates every stored `requestSha256` under `paths.requests` (the same store
- * `recordHumanGuardDenial()` writes to) and, for each, recomputes its selection
- * (fixed `HGO_SIGNATURE_REASON`, exactly as the signed path always uses) and intent
- * digest via `buildHumanGuardOverrideSignatureIntent()` -- the SAME shared helper
- * `authorizeHumanGuardOverrideBySignature()` gates arming on. Only a request whose
- * recomputed digest equals `intentSha256` exactly is ever returned; a request this
- * repository cannot currently plan/prepare (expired, wrong root, author-repair without
- * a selected root, `global-plugin-install` mode) is skipped, never guessed at.
+ * Looks up one digest-keyed index and bounded original request/persisted plan,
+ * recomputes the fixed selection and genuine pure intent, then displays only an
+ * exact match. Unknown, stale or unindexed historical digests remain unresolved.
+ * This path performs no planning publication, capability activation or store scan.
  */
-export function describeHumanGuardOverrideSelection({ rootDir, pluginRoot, intentSha256, scriptPath, spawn = spawnSync } = {}) {
+function describeHumanGuardOverrideSelectionCore({ rootDir, pluginRoot, intentSha256, scriptPath, spawn = spawnSync } = {}, includeFullMaterial = false, signatureRequest = null) {
   try {
     if (!SHA256.test(intentSha256 ?? "")) return unresolvedHumanGuardOverrideSelection("HGO-RECORD-DIGEST-INVALID");
-    let repo;
-    try { repo = topology(rootDir, spawn); } catch { return unresolvedHumanGuardOverrideSelection("HGO-RECORD-REPOSITORY-UNAVAILABLE"); }
-    const paths = storage(repo.common);
-    let files;
-    try { files = readdirSync(paths.requests).filter((name) => name.endsWith(".json")).sort(); }
-    catch { return unresolvedHumanGuardOverrideSelection("HGO-RECORD-ABSENT"); }
-    const nowMs = Date.now();
-    for (const name of files) {
-      const requestSha256 = name.slice(0, -5);
-      if (!SHA256.test(requestSha256)) continue;
-      try {
-        const planned = planHumanGuardOverride({ rootDir, pluginRoot, requestSha256, nowMs, spawn, scriptPath, authorSourceRoot: null });
-        const prepared = prepareHumanGuardOverrideAuthorization({
-          rootDir, pluginRoot, requestSha256, planSha256: planned.planSha256, reason: HGO_SIGNATURE_REASON, nowMs, spawn, scriptPath, authorSourceRoot: null,
-        });
-        const intent = buildHumanGuardOverrideSignatureIntent({ prepared, planned });
-        if (intent.sha256 !== intentSha256) continue;
-
-        const pathsTotal = planned.eligiblePaths.length;
-        const eligiblePaths = planned.eligiblePaths.slice(0, HGO_SUMMARY_MAX_PATHS).map((path) => hgoDisplayText(path, 200).text);
-        const pathsNote = pathsTotal > eligiblePaths.length ? ` [showing ${eligiblePaths.length} of ${pathsTotal}]` : "";
-        const rationale = (planned.preview?.guardRationale ?? []).map(({ guard, rationale: text }) => {
-          const rendered = hgoDisplayText(text, HGO_SUMMARY_MAX_RATIONALE_CHARS);
-          return `${hgoDisplayText(guard, 64).text}: "${rendered.text}"${rendered.truncated ? " [truncated]" : ""}`;
-        }).join("; ");
-        const expiresAt = hgoDisplayTimestamp(planned.expiresAt);
-
-        return {
-          resolved: true,
-          code: "HGO-RECORD-RESOLVED",
-          lines: hgoClipLines([
-            `recorded request: ${REQUEST_SCHEMA} (tool ${hgoDisplayText(planned.toolName, 32).text}, class ${hgoDisplayText(planned.commandClass, 64).text})`,
-            `eligible paths this override would admit: ${eligiblePaths.join(", ")}${pathsNote}`,
-            `denying guard rationale: ${rationale || "(none recorded)"}`,
-            `window expires at (signed, absolute): ${expiresAt}`,
-          ]),
-        };
-      } catch { continue; }
-    }
-    return unresolvedHumanGuardOverrideSelection("HGO-RECORD-DIGEST-MISMATCH");
+    let repo; try { repo = topology(rootDir,spawn); } catch { return unresolvedHumanGuardOverrideSelection("HGO-RECORD-REPOSITORY-UNAVAILABLE"); }
+    let planned, materialArtifact, requestBinding;
+    try { ({planned, materialArtifact, requestBinding} = readIndexedDisclosurePlan({repo,intentSha256,nowMs:Date.now()})); }
+    catch { return unresolvedHumanGuardOverrideSelection("HGO-RECORD-INDEX-UNAVAILABLE"); }
+    if (includeFullMaterial && (signatureRequest === null
+      || signatureRequest.requestSha256 !== requestBinding.requestSha256
+      || signatureRequest.planSha256 !== requestBinding.planSha256
+      || signatureRequest.selectionSha256 !== requestBinding.selectionSha256
+      || signatureRequest.intentSha256 !== intentSha256)) return null;
+    const pathsTotal = planned.eligiblePaths.length;
+    const eligiblePaths = planned.eligiblePaths.slice(0,HGO_SUMMARY_MAX_PATHS).map(path=>hgoDisplayText(path,200).text);
+    const pathsNote = pathsTotal > eligiblePaths.length ? " [showing " + eligiblePaths.length + " of " + pathsTotal + "]" : "";
+    const rationale = (planned.preview?.guardRationale ?? []).map(({guard,rationale:text})=>{
+      const rendered=hgoDisplayText(text,HGO_SUMMARY_MAX_RATIONALE_CHARS);
+      return hgoDisplayText(guard,64).text+": \""+rendered.text+"\""+(rendered.truncated?" [truncated]":"");
+    }).join("; ");
+    return {resolved:true,code:"HGO-RECORD-RESOLVED",materialArtifact,requestBinding,
+      ...(includeFullMaterial ? {fullReviewMaterial: planned} : {}),lines:hgoClipLines([
+      "recorded request: "+(planned.schema===NATIVE_PLAN_SCHEMA?NATIVE_REQUEST_SCHEMA:REQUEST_SCHEMA)+" (tool "+hgoDisplayText(planned.toolName,32).text+", class "+hgoDisplayText(planned.commandClass,64).text+")",
+      "eligible paths this override would admit: "+eligiblePaths.join(", ")+pathsNote,
+      "denying guard rationale: "+(rationale||"(none recorded)"),
+      "window expires at (signed, absolute): "+hgoDisplayTimestamp(planned.expiresAt),
+      ...(planned.schema===NATIVE_PLAN_SCHEMA?[]:["legacy whole-worktree binding: sign and deliver serially; unrelated worktree edits invalidate this authorization"]),
+    ])};
   } catch { return unresolvedHumanGuardOverrideSelection("HGO-RECORD-UNREADABLE"); }
+}
+
+export function describeHumanGuardOverrideSelection({ rootDir, pluginRoot, intentSha256, scriptPath, spawn = spawnSync } = {}) {
+  return describeHumanGuardOverrideSelectionCore({rootDir, pluginRoot, intentSha256, scriptPath, spawn}, false);
+}
+
+// This pure descriptor accepts only the genuine emitter transport and the
+// same original indexed request/plan/selection/intent, never a new grant.
+export function describeHumanGuardOverrideSignatureRequest(record, {rootDir, pluginRoot, scriptPath, spawn = spawnSync} = {}) {
+  try {
+    if (!exactKeys(record, ["schema", "requestSha256", "planSha256", "selectionSha256", "intentSha256"])
+      || record.schema !== "pipeline.human-guard-override-signature-digest.v1"
+      || ![record.requestSha256, record.planSha256, record.selectionSha256, record.intentSha256].every(value => typeof value === "string" && SHA256.test(value))) return null;
+    const description = describeHumanGuardOverrideSelectionCore({rootDir, pluginRoot, scriptPath, spawn, intentSha256: record.intentSha256}, true, record);
+    return description?.resolved === true ? description : null;
+  } catch { return null; }
 }
 
 export const humanGuardOverrideInternals = {
@@ -4802,6 +5121,13 @@ export const humanGuardOverrideInternals = {
   pluginSourceTreeSha256,
   acquireAuditLock,
   releaseOwnedAuditLock,
+  resolveAuditLockHost,
+  localAuditLockOwner,
+  auditLockOwnerState,
+  captureNativeTargetPreimages,
+  nativeTargetsValid,
+  nativeRepositoryMatches,
+  hgoRedactDisclosure,
 };
 
 // ---------------------------------------------------------------------------------
@@ -4951,6 +5277,7 @@ export function createBriefedTestChangeAuthorization({
     proof: proof || null,
   };
 
+  return hgoPublishBriefedAuthority({repo, paths, record}, () => {
   const recordPath = join(paths.briefedAuthorizations, `${id}.json`);
   writeAtomic(recordPath, Buffer.from(JSON.stringify(record, null, 2) + "\n", "utf8"));
 
@@ -4964,6 +5291,7 @@ export function createBriefedTestChangeAuthorization({
     expiresAtMs,
     mode,
   };
+  });
 }
 
 export function readActiveBriefedTestAuthorizations({
@@ -5063,4 +5391,960 @@ export function isBriefedTestChangeEligible(filePath, { rootDir = null, livePlug
     } catch {}
   }
   return /\.(?:test|spec)\.[cm]?[jt]sx?$/iu.test(normalized);
+}
+
+// AUTH-I04: read-only physical inventory. These paths deliberately do not use
+// storage(), whose directory creation is a writer effect.
+const hgoAuthorityPorts = new WeakMap();
+const hgoAuthorityOperations = new WeakMap();
+const hgoAuthorityPlanning = new WeakMap();
+const hgoAuthorityPortByCommon = new Map();
+const hgoAuthorityExecutions = new WeakMap();
+const hgoAuthorityTerminals = new WeakMap();
+const hgoAuthorityExecuting = new AsyncLocalStorage();
+// Only the original synchronous direct writer can issue this temporary join.
+// A retained operation WeakMap row alone never grants a missing-index waiver.
+const hgoAuthorityDirectReservation = new AsyncLocalStorage();
+const HGO_AUTHORITY_NAMESPACES = Object.freeze([
+  "requests", "plans", "capabilities", "briefed-authorizations", "locks", "audit", "command-offers",
+]);
+function hgoAuthorityFailure(reason) {
+  const error = new HumanGuardOverrideError("SDC-AUTHORITY-UNAVAILABLE", reason);
+  error.reason = reason;
+  throw error;
+}
+function hgoAuthorityRepository(input) {
+  if (!exactKeys(input, ["primaryRoot", "commonDir", "candidate"])) hgoAuthorityFailure("hgo:repository-shape");
+  const actual = inspectSignedDescriptorCustodyRepository(input.primaryRoot);
+  if (canonical(actual) !== canonical(input)) hgoAuthorityFailure("hgo:repository-changed");
+  return actual;
+}
+function hgoAuthorityPaths(repository) {
+  const base = join(repository.commonDir, "agent-pipeline", "human-guard-overrides");
+  return {
+    base, requests: join(base, "requests"), plans: join(base, "plans"),
+    capabilities: join(base, "capabilities"), briefedAuthorizations: join(base, "briefed-authorizations"),
+    locks: join(base, "locks"), key: join(base, "audit.key"), audit: join(base, "audit.jsonl"),
+    auditHead: join(base, "audit.head.json"), auditLock: join(base, "audit.lock"),
+    auditLockRecovery: join(base, "audit.lock.recover"), commandOffers: join(base, "command-offers.jsonl"),
+    authorityHolds: join(base, "authority-holds"),
+  };
+}
+function hgoAuthorityFacts(inventory) {
+  return Object.freeze(inventory.memberships.flatMap(row => row.sourceFacts));
+}
+function hgoAuthorityPathDigest(repository, path) {
+  const local = relative(repository.commonDir, path);
+  if (local.startsWith("..") || isAbsolute(local)) hgoAuthorityFailure("hgo:planning-outside-common");
+  return sha(local.replace(/\\/gu, "/"));
+}
+const hgoLegacyAuthorityOperations = new WeakMap();
+export function isOwnedHumanGuardLegacyAuthorityOperation(handle, {primaryRoot, commonDir} = {}) {
+  const data = handle && hgoLegacyAuthorityOperations.get(handle);
+  if (!data || data.primaryRoot !== primaryRoot || data.commonDir !== commonDir) return false;
+  try {
+    const actual = controlPathTopology(data.primaryRoot);
+    return actual.root === data.primaryRoot && actual.common === data.commonDir;
+  } catch { return false; }
+}
+export function executeOwnedHumanGuardLegacyAuthorityOperation(handle) {
+  const data = handle && hgoLegacyAuthorityOperations.get(handle);
+  if (!data || data.executed || !isOwnedHumanGuardLegacyAuthorityOperation(handle, data)) hgoAuthorityFailure("hgo:legacy-operation-unowned");
+  data.executed = true;
+  return data.operation();
+}
+function hgoLegacyControlOperation(repo, operation) {
+  // This is reached only from existing validated private source closures.
+  // An absent catalogue is legacy custody, never a fabricated candidate/member.
+  const actual = controlPathTopology(repo.root);
+  if (actual.root !== repo.root || actual.common !== repo.common) hgoAuthorityFailure("hgo:legacy-control-changed");
+  if (typeof sessionAuthorityRegistry.executeSourceOwnedLegacySessionAuthorityOperation !== "function") {
+    hgoAuthorityFailure("hgo:legacy-registry-interface-unavailable");
+  }
+  const handle = Object.freeze({});
+  const data = {primaryRoot: actual.root, commonDir: actual.common, operation, executed: false};
+  hgoLegacyAuthorityOperations.set(handle, data);
+  try {
+    const observed = sessionAuthorityRegistry.executeSourceOwnedLegacySessionAuthorityOperation({
+      primaryRoot: actual.root, commonDir: actual.common,
+    }, handle);
+    if (exactKeys(observed, ["status", "result"]) && observed.status === "legacy-completed" && data.executed) return observed;
+    if (exactKeys(observed, ["status"]) && observed.status === "catalogue-present" && !data.executed) return observed;
+    hgoAuthorityFailure("hgo:legacy-registry-result-shape");
+  } finally { hgoLegacyAuthorityOperations.delete(handle); }
+}
+function hgoPlanningPublication({repo, paths, entry, intendedPath, additionalPaths = [], inputSha256}, publish) {
+  const legacy = hgoLegacyControlOperation(repo, publish);
+  if (legacy.status === "legacy-completed") return legacy.result;
+  // This closure is created only at the existing, fully validated source writer.
+  // No public callback constructor or supplied writer result can create a brand.
+  const repository = hgoAuthorityRepository(inspectSignedDescriptorCustodyRepository(repo.root));
+  return sessionAuthorityRegistry.withSessionAuthorityBoundary({repository}, boundary => {
+    let cataloguePresent;
+    try { lstatSync(join(repository.commonDir, "agent-pipeline", "session-authority", "catalogue.json")); cataloguePresent = true; }
+    catch (error) { if (error.code !== "ENOENT") throw error; cataloguePresent = false; }
+    if (!cataloguePresent) return publish(); // real legacy evidence remains unbound
+    const port = hgoAuthorityPortByCommon.get(repository.commonDir)
+      ?? createHumanGuardOverrideAuthorityProducerPort({repository});
+    const before = hgoAuthorityInventory(repository), handle = Object.freeze({});
+    const auditPaths = entry === "plan-override" ? [] : [paths.key, paths.audit, paths.auditHead];
+    const allowedPaths = [intendedPath, ...additionalPaths, ...auditPaths];
+    hgoAuthorityPlanning.set(handle, {port, repository, entry, inputSha256, publish, before,
+      allowedPaths, executed: false, result: null, after: null});
+    if (typeof sessionAuthorityRegistry.executeSourceOwnedSessionAuthorityPlanning !== "function") {
+      hgoAuthorityFailure("hgo:planning-registry-interface-unavailable");
+    }
+    return sessionAuthorityRegistry.executeSourceOwnedSessionAuthorityPlanning({boundary, producerPort: port, planningHandle: handle});
+  });
+}
+function hgoSweepSelection(repository, nowMs) {
+  const before = hgoAuthorityInventory(repository), paths = before.paths;
+  if (before.groups.get("locks").length) fail("HGO-SWEEP-HELD", "override locks require their original owning settlement");
+  if (!before.groups.get("requests").length) return {before, eligible: []};
+  const port = hgoAuthorityPortByCommon.get(repository.commonDir)
+    ?? createHumanGuardOverrideAuthorityProducerPort({repository});
+  hgoAuthorityValidatedInventory(port, before);
+  const audit = requireValidAuditState(paths, key(paths));
+  const referenced = new Set();
+  for (const row of before.groups.get("audit")) {
+    if (dirname(row.path) !== paths.authorityHolds) continue;
+    const {record} = hgoAuthorityReadHold(repository, row.path);
+    if (!Array.isArray(record.preimageRefs) || record.preimageRefs.length > 4096) fail("HGO-SWEEP-HELD", "retained authority preimage inventory is unavailable");
+    for (const ref of record.preimageRefs) {
+      if (!exactKeys(ref, ["path", "sha256", "size"]) || !SHA256.test(ref.sha256 ?? "")
+        || !Number.isSafeInteger(ref.size) || ref.size < 0 || typeof ref.path !== "string"
+        || !ref.path.startsWith(".git/agent-pipeline/human-guard-overrides/")
+        || ref.path.includes("\\") || ref.path.split("/").some(part => !part || part === "." || part === "..")) {
+        fail("HGO-SWEEP-HELD", "retained authority preimage is outside its original scope");
+      }
+      referenced.add(ref.path);
+    }
+  }
+  const capabilities = before.groups.get("capabilities").map(row => {
+    const value = validatedCapability(paths, row.path);
+    if (!hasAuthorizedAuditEntry(paths, value)) fail("HGO-SWEEP-HELD", "capability has no authenticated original authorization");
+    return value;
+  });
+  const eligible = [];
+  for (const row of before.groups.get("requests")) {
+    const digest = basename(row.path).slice(0, -5);
+    const request = validatedRequest(paths, digest, JSON.parse(row.bytes.toString("utf8")));
+    const expiry = Date.parse(request.expiresAt);
+    if (request.root !== repository.primaryRoot || !Number.isFinite(expiry)
+        || new Date(expiry).toISOString() !== request.expiresAt) fail("HGO-SWEEP-REQUEST", "request root or canonical expiry is invalid");
+    const matching = capabilities.filter(value => value.requestSha256 === digest);
+    if (referenced.has(row.ref.path) || matching.some(value => value.status === "armed")) continue;
+    const consumed = matching.length > 0 && matching.every(value => value.status === "consumed"
+      && audit.ledger.entries.some(({event}) => event.type === "consumed"
+        && event.requestSha256 === digest && event.planSha256 === value.planSha256 && event.at === value.consumedAt));
+    if (expiry <= nowMs || consumed) eligible.push(row);
+  }
+  return {before, eligible};
+}
+function hgoSweepPhysicalUnlink(repository, row) {
+  const observed = hgoAuthorityPhysical(repository, row.path, "requests"), original = safePrivateFile(row.path);
+  if (canonical(observed.ref) !== canonical(row.ref) || canonical(observed.fact) !== canonical(row.fact)) fail("HGO-SWEEP-CAS", "request physical preimage changed");
+  const parent = dirname(row.path), parentInfo = lstatSync(parent);
+  hgoAuthorityDirectory(parent);
+  const quarantineDirectory = mkdtempSync(join(parent, ".sweep-"));
+  const createdDirectory = lstatSync(quarantineDirectory);
+  let ownedDirectory = createdDirectory;
+  let quarantine = join(quarantineDirectory, "request.json"), moved = false, removed = false;
+  try {
+    secureDirectory(quarantineDirectory);
+    const securedDirectory = lstatSync(quarantineDirectory);
+    for (const field of ["dev", "ino", "uid", "gid"]) if (securedDirectory[field] !== createdDirectory[field]) fail("HGO-SWEEP-CAS", "created quarantine directory changed");
+    ownedDirectory = securedDirectory;
+    if (!ownedDirectory.isDirectory() || ownedDirectory.isSymbolicLink() || realpathSync(quarantineDirectory) !== quarantineDirectory
+        || ownedDirectory.uid !== original.uid || ownedDirectory.gid !== parentInfo.gid) fail("HGO-SWEEP-CAS", "quarantine custody is not the original owner");
+    hgoAuthorityDirectory(parent);
+    const currentParent = lstatSync(parent);
+    for (const field of ["dev", "ino", "mode", "uid", "gid"]) if (currentParent[field] !== parentInfo[field]) fail("HGO-SWEEP-CAS", "original request namespace changed");
+    const current = hgoAuthorityPhysical(repository, row.path, "requests"), named = safePrivateFile(row.path);
+    for (const field of ["dev", "ino", "mode", "uid", "gid", "nlink", "size"]) if (named[field] !== original[field]) fail("HGO-SWEEP-CAS", "request changed before quarantine");
+    if (canonical(current.ref) !== canonical(row.ref) || canonical(current.fact) !== canonical(row.fact)) fail("HGO-SWEEP-CAS", "request changed before quarantine");
+    renameSync(row.path, quarantine); moved = true;
+    const movedRow = hgoAuthorityPhysical(repository, quarantine, "requests"), movedInfo = safePrivateFile(quarantine);
+    for (const field of ["dev", "ino", "mode", "uid", "gid", "nlink", "size"]) if (movedInfo[field] !== original[field]) fail("HGO-SWEEP-CAS", "quarantined request is not the original inode");
+    if (movedRow.ref.sha256 !== row.ref.sha256 || movedRow.ref.size !== row.ref.size) fail("HGO-SWEEP-CAS", "quarantined request bytes changed");
+    const finalDirectory = lstatSync(quarantineDirectory), finalInfo = safePrivateFile(quarantine);
+    hgoAuthorityDirectory(parent);
+    const finalParent = lstatSync(parent);
+    for (const field of ["dev", "ino", "mode", "uid", "gid"]) if (finalParent[field] !== parentInfo[field]) fail("HGO-SWEEP-CAS", "original request namespace changed before removal");
+    for (const field of ["dev", "ino", "mode", "uid", "gid"]) if (finalDirectory[field] !== ownedDirectory[field]) fail("HGO-SWEEP-CAS", "quarantine directory changed");
+    for (const field of ["dev", "ino", "mode", "uid", "gid", "nlink", "size"]) if (finalInfo[field] !== original[field]) fail("HGO-SWEEP-CAS", "quarantined request changed before removal");
+    if (hgoAuthorityPhysical(repository, quarantine, "requests").ref.sha256 !== row.ref.sha256) fail("HGO-SWEEP-CAS", "quarantined request content changed before removal");
+    unlinkSync(quarantine); removed = true;
+  } finally {
+    const retainedDirectory = lstatSync(quarantineDirectory);
+    if (!retainedDirectory.isDirectory() || retainedDirectory.isSymbolicLink() || realpathSync(quarantineDirectory) !== quarantineDirectory) fail("HGO-SWEEP-CAS", "quarantine cleanup path changed");
+    for (const field of ["dev", "ino", "mode", "uid", "gid"]) if (retainedDirectory[field] !== ownedDirectory[field]) fail("HGO-SWEEP-CAS", "quarantine cleanup ownership changed");
+    if (moved && !removed) {
+      // Best-effort same-inode restoration only; never overwrite a replacement
+      // or report a rollback when an interrupted prefix remains held.
+      try {
+        const held = safePrivateFile(quarantine);
+        if (!existsSync(row.path) && held.dev === original.dev && held.ino === original.ino
+            && held.mode === original.mode && held.uid === original.uid && held.gid === original.gid
+            && held.nlink === original.nlink && held.size === original.size
+            && hgoAuthorityPhysical(repository, quarantine, "requests").ref.sha256 === row.ref.sha256) {
+          linkSync(quarantine, row.path); unlinkSync(quarantine);
+        }
+      } catch {}
+    }
+    rmdirSync(quarantineDirectory); // Empty own directory only; unexpected content is retained.
+  }
+}
+function hgoSweepRequestsCore(rootDir) {
+  const repo = topology(rootDir), repository = hgoAuthorityRepository(inspectSignedDescriptorCustodyRepository(repo.root));
+  const nowMs = Date.now(), {before, eligible} = hgoSweepSelection(repository, nowMs);
+  const originalCount = before.groups.get("requests").length;
+  if (!eligible.length) return Object.freeze({status: "absent", removed: 0, retained: originalCount, remainingEligible: 0});
+  const selected = eligible.slice(0, 61), removedPaths = new Set(), paths = before.paths;
+  const inputSha256 = sha({entry: "sweep-requests", nowMs, refs: selected.map(row => row.ref), before: before.memberships});
+  return hgoPlanningPublication({repo, paths, entry: "sweep-requests", intendedPath: selected[0].path,
+    additionalPaths: selected.slice(1).map(row => row.path), inputSha256}, () => {
+    for (const row of selected) {
+      const current = hgoAuthorityInventory(repository);
+      for (const [namespace, rows] of before.groups) {
+        const expected = rows.filter(item => !removedPaths.has(item.path)).map(item => item.fact);
+        if (canonical(current.groups.get(namespace).map(item => item.fact)) !== canonical(expected)) fail("HGO-SWEEP-CAS", "source inventory changed before request removal");
+      }
+      hgoSweepPhysicalUnlink(repository, row); removedPaths.add(row.path);
+    }
+    const current = hgoAuthorityInventory(repository);
+    for (const [namespace, rows] of before.groups) {
+      if (canonical(current.groups.get(namespace).map(item => item.fact)) !== canonical(rows.filter(item => !removedPaths.has(item.path)).map(item => item.fact))) fail("HGO-SWEEP-CAS", "request cleanup changed unowned source inventory");
+    }
+    appendAudit(paths, {type: "requests-swept", at: new Date(nowMs).toISOString(),
+      requests: selected.map(row => ({requestSha256: basename(row.path).slice(0, -5), sourceSha256: row.ref.sha256, size: row.ref.size}))});
+    requireValidAuditState(paths, key(paths));
+    return Object.freeze({status: "swept", removed: selected.length, retained: originalCount - selected.length, remainingEligible: eligible.length - selected.length});
+  });
+}
+export function sweepHumanGuardOverrideRequests({rootDir} = {}) {
+  try { return hgoSweepRequestsCore(rootDir); }
+  catch (error) {
+    if (error instanceof HumanGuardOverrideError) throw error;
+    fail("HGO-SWEEP-CAS", "request cleanup did not complete; retain original ownership evidence");
+  }
+}
+
+function hgoAuthorityDirectory(path) {
+  const info = lstatSync(path);
+  if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path
+      || (typeof process.getuid === "function" && info.uid !== process.getuid())) {
+    hgoAuthorityFailure("hgo:unsafe-namespace");
+  }
+  if (process.platform === "win32") {
+    if (assessWindowsPrivatePath(path).status !== "secure") hgoAuthorityFailure("hgo:namespace-dacl");
+  } else if ((info.mode & 0o077) !== 0) hgoAuthorityFailure("hgo:namespace-permissions");
+}
+function hgoAuthorityScopePresent(repository, path) {
+  const local = relative(repository.commonDir, path);
+  if (local.startsWith("..") || isAbsolute(local)) hgoAuthorityFailure("hgo:scope-outside-common");
+  let current = repository.commonDir;
+  for (const part of local.split(/[\\/]/u)) {
+    current = join(current, part);
+    try { lstatSync(current); }
+    catch (error) { if (error.code === "ENOENT") return false; throw error; }
+    hgoAuthorityDirectory(current);
+  }
+  return true;
+}
+function hgoAuthorityPhysical(repository, path, namespaceId) {
+  const local = relative(repository.commonDir, path);
+  if (local.startsWith("..") || isAbsolute(local)) hgoAuthorityFailure("hgo:outside-common-directory");
+  let cursor = repository.commonDir;
+  for (const part of local.split(/[\\/]/u)) {
+    cursor = join(cursor, part);
+    if (lstatSync(cursor).isSymbolicLink()) hgoAuthorityFailure("hgo:symlink-component");
+  }
+  const before = safePrivateFile(path);
+  if (before.size > 1048576 || (typeof process.getuid === "function" && before.uid !== process.getuid())) {
+    hgoAuthorityFailure("hgo:source-bound-or-owner");
+  }
+  let bytes, after;
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const opened = fstatSync(fd);
+    if (opened.dev !== before.dev || opened.ino !== before.ino || opened.mode !== before.mode
+        || opened.nlink !== 1 || opened.size !== before.size) hgoAuthorityFailure("hgo:opened-source-identity");
+    const first = Buffer.alloc(before.size + 1), second = Buffer.alloc(before.size + 1);
+    const firstCount = readSync(fd, first, 0, first.length, 0), secondCount = readSync(fd, second, 0, second.length, 0);
+    bytes = first.subarray(0, firstCount); after = safePrivateFile(path);
+    const final = fstatSync(fd);
+    if (firstCount !== before.size || secondCount !== before.size || sha(bytes) !== sha(second.subarray(0, secondCount))
+        || before.dev !== after.dev || before.ino !== after.ino || before.mode !== after.mode || before.size !== after.size
+        || final.dev !== before.dev || final.ino !== before.ino || final.mode !== before.mode || final.nlink !== 1 || final.size !== before.size) {
+      hgoAuthorityFailure("hgo:physical-source-drift");
+    }
+  } finally { closeSync(fd); }
+  const fact = Object.freeze({
+    namespaceId, pathSha256: sha(local.replace(/\\/gu, "/")), sha256: sha(bytes), size: bytes.length,
+    identity: Object.freeze({dev: String(after.dev), ino: String(after.ino), mode: after.mode, nlink: after.nlink}),
+    semanticSha256: sha(bytes),
+  });
+  return {path, bytes, fact, ref: Object.freeze({path: `.git/${local.replace(/\\/gu, "/")}`, sha256: sha(bytes), size: bytes.length})};
+}
+function hgoAuthorityInventory(repository) {
+  const paths = hgoAuthorityPaths(repository), groups = new Map(HGO_AUTHORITY_NAMESPACES.map(id => [id, []]));
+  let count = 0, total = 0;
+  function file(path, namespaceId) {
+    const observed = hgoAuthorityPhysical(repository, path, namespaceId);
+    if (++count > 4096 || (total += observed.bytes.length) > 16777216) hgoAuthorityFailure("hgo:inventory-bound");
+    groups.get(namespaceId).push(observed);
+  }
+  function directory(path, namespaceId, depth = 0) {
+    if (depth > 6) hgoAuthorityFailure("hgo:namespace-depth");
+    hgoAuthorityDirectory(path);
+    for (const name of readdirSync(path).sort()) {
+      const entry = join(path, name), info = lstatSync(entry);
+      if (info.isDirectory()) hgoAuthorityFailure("hgo:unknown-nested-namespace");
+      else file(entry, namespaceId);
+    }
+  }
+  if (hgoAuthorityScopePresent(repository, paths.base)) {
+    hgoAuthorityDirectory(paths.base);
+    for (const name of readdirSync(paths.base).sort()) {
+      if (["requests", "plans", "capabilities", "briefed-authorizations", "locks"].includes(name)) {
+        directory(join(paths.base, name), name);
+      } else if (name === "authority-holds") {
+        directory(join(paths.base, name), "audit");
+      } else if (["audit.key", "audit.jsonl", "audit.head.json"].includes(name)) {
+        file(join(paths.base, name), "audit");
+      } else if (name === "command-offers.jsonl") {
+        file(join(paths.base, name), "command-offers");
+      } else if (name.startsWith("audit.lock") || name.endsWith(".tmp")) {
+        file(join(paths.base, name), "locks");
+      } else hgoAuthorityFailure("hgo:unknown-private-entry");
+    }
+  }
+  const memberships = HGO_AUTHORITY_NAMESPACES.map(namespaceId => {
+    const entries = groups.get(namespaceId), sourceFacts = entries.map(entry => entry.fact);
+    const physical = namespaceId === "briefed-authorizations" ? paths.briefedAuthorizations
+      : namespaceId === "audit" || namespaceId === "command-offers" ? paths.base : paths[namespaceId];
+    return Object.freeze({namespaceId, rootSha256: sha({commonDir: repository.commonDir, path: physical}),
+      entrySetSha256: sha(sourceFacts), entryCount: entries.length, sourceFacts: Object.freeze(sourceFacts)});
+  });
+  if (groups.get("audit").length > 0) {
+    const state = auditState(paths, key(paths));
+    if (state.status !== "valid") hgoAuthorityFailure("hgo:authenticated-audit-unavailable");
+  }
+  return {paths, groups, memberships: Object.freeze(memberships)};
+}
+function hgoAuthorityLegacyOperation(port, observed, capability) {
+  const handle = Object.freeze({}), data = hgoAuthorityPorts.get(port);
+  const association = Object.freeze({state: "unbound", target: null});
+  hgoAuthorityOperations.set(handle, {port, repository: data.repository, association,
+    entry: "legacy-authenticated-capability", path: observed.path, planSha256: capability.planSha256,
+    bindingSha256: sha({repository: data.repository, association, capabilitySha256: observed.ref.sha256}),
+    phase: "armed", sourceFacts: Object.freeze([observed.fact])});
+  return handle;
+}
+function hgoAuthorityReference(repository, reference, namespaceId = "audit") {
+  if (!exactKeys(reference, ["path", "sha256", "size"]) || !SHA256.test(reference.sha256)
+      || !Number.isSafeInteger(reference.size) || reference.size < 0
+      || typeof reference.path !== "string" || !reference.path.startsWith(".git/")
+      || reference.path.includes("\\") || reference.path.split("/").some(part => part === ".." || part === "." || !part)) {
+    hgoAuthorityFailure("hgo:source-reference-shape");
+  }
+  const actual = hgoAuthorityPhysical(repository, join(repository.commonDir, reference.path.slice(5)), namespaceId);
+  if (canonical(actual.ref) !== canonical(reference)) hgoAuthorityFailure("hgo:source-reference-cas");
+  return actual;
+}
+function hgoAuthorityAssociation(repository, requesterHandle) {
+  const context = readSourceOwnedAuthorityContext({repository});
+  if (context.status !== "bound" || context.requesterHandle !== requesterHandle) hgoAuthorityFailure("hgo:originating-source-context");
+  const actual = createSignedCleanupRequesterObserver({repository, requesterHandle})({repository});
+  if (actual.status !== "bound") hgoAuthorityFailure("hgo:requester-observation-unavailable");
+  const {sessionId, descriptorSha256, ownerNonceSha256} = actual.requester;
+  return Object.freeze({state: "bound", target: Object.freeze({sessionId, descriptorSha256, ownerNonceSha256})});
+}
+function hgoAuthorityOperation(port, handle) {
+  const data = hgoAuthorityOperations.get(handle);
+  if (!data || data.port !== port) hgoAuthorityFailure("hgo:unowned-operation");
+  hgoAuthorityRepository(data.repository);
+  return data;
+}
+function hgoAuthorityNoLocks(repository, planSha256 = null) {
+  const inventory = hgoAuthorityInventory(repository);
+  if (inventory.groups.get("locks").length) hgoAuthorityFailure("hgo:retained-producer-lock");
+  // Inventory includes every lock, not just a PID or the current plan's file.
+  return inventory;
+}
+function hgoAuthorityHoldCore(data) {
+  return {schema: "pipeline.hgo-session-authority-hold.v1", repository: data.repository,
+    association: data.association, entry: data.entry, input: data.input, inputSha256: data.inputSha256,
+    bindingSha256: data.bindingSha256, memberRef: data.memberRef, preimageRefs: data.preimageRefs,
+    authorizationPath: relative(data.repository.commonDir, data.authorizationPath).replace(/\\/gu, "/")};
+}
+function hgoAuthorityWriteHold(data) {
+  const paths = hgoAuthorityPaths(data.repository), core = hgoAuthorityHoldCore(data);
+  const record = {...core, mac: capabilityMac(key(paths), core)};
+  secureDirectory(paths.authorityHolds);
+  const path = join(paths.authorityHolds, `${data.bindingSha256}.json`);
+  writeExclusive(path, Buffer.from(`${JSON.stringify(record)}\n`, "utf8"));
+  data.holdPath = path;
+}
+function hgoAuthorityReadHold(repository, path) {
+  const observed = hgoAuthorityPhysical(repository, path, "audit"), record = JSON.parse(observed.bytes.toString("utf8"));
+  if (!exactKeys(record, ["schema", "repository", "association", "entry", "input", "inputSha256", "bindingSha256",
+    "memberRef", "preimageRefs", "authorizationPath", "mac"]) || record.schema !== "pipeline.hgo-session-authority-hold.v1") {
+    hgoAuthorityFailure("hgo:hold-schema");
+  }
+  const {mac: actualMac, ...core} = record;
+  if (actualMac !== capabilityMac(key(hgoAuthorityPaths(repository)), core) || canonical(record.repository) !== canonical(repository)
+      || !SHA256.test(record.bindingSha256) || basename(path) !== `${record.bindingSha256}.json`
+      || typeof record.authorizationPath !== "string" || record.authorizationPath.includes("\\")
+      || record.authorizationPath.split("/").some(part => !part || part === ".." || part === ".")) {
+    hgoAuthorityFailure("hgo:hold-authentication");
+  }
+  const allowed = ["authorize-signature", "authorize-chat"].includes(record.entry) ? "agent-pipeline/human-guard-overrides/capabilities/"
+    : record.entry === "authorize-briefed" ? "agent-pipeline/human-guard-overrides/briefed-authorizations/" : null;
+  if (!allowed || !record.authorizationPath.startsWith(allowed)) hgoAuthorityFailure("hgo:hold-authorization-scope");
+  return {record, observed};
+}
+function hgoAuthorityBriefed(repository, path) {
+  const record = JSON.parse(hgoAuthorityPhysical(repository, path, "briefed-authorizations").bytes.toString("utf8"));
+  if (!exactKeys(record, ["schema", "kind", "id", "targetPath", "briefingDigest", "expiry", "expiresAtMs", "grantedAt", "mode", "reason", "signer", "proof"])
+      || record.schema !== BRIEFED_TEST_AUTHORIZATION_SCHEMA || record.kind !== BRIEFED_TEST_CHANGE_KIND
+      || record.id !== briefedAuthorizationId(record.targetPath, record.briefingDigest)
+      || canonicalBriefedTarget(repository.primaryRoot, record.targetPath) !== record.targetPath
+      || !SHA256.test(record.briefingDigest) || !Number.isFinite(record.expiresAtMs)
+      || record.expiry !== new Date(record.expiresAtMs).toISOString()) hgoAuthorityFailure("hgo:briefed-schema");
+  if (record.mode === "signature") {
+    const signer = recognizedBriefedSigner(repository.primaryRoot, record.proof);
+    if (!signer || canonical(signer) !== canonical(record.signer)
+        || !verifyPoApprovalProof({intent: briefedTestIntent(record.targetPath, record.briefingDigest, record.expiresAtMs),
+          trustPolicy: signer, proof: record.proof}).verified) hgoAuthorityFailure("hgo:briefed-proof");
+  } else if (record.mode !== "chat" || record.proof !== null || record.signer !== null) hgoAuthorityFailure("hgo:briefed-mode");
+  // Expiry never discharges retained authority in this owner inventory.
+  return record;
+}
+function hgoAuthorityPrepare(port, requesterHandle, entry, input) {
+  const {repository} = hgoAuthorityPorts.get(port), paths = hgoAuthorityPaths(repository);
+  const association = hgoAuthorityAssociation(repository, requesterHandle);
+  const fields = entry === "authorize-signature"
+    ? ["pluginRoot", "requestSha256", "planSha256", "proofRef", "scriptPath", "authorSourceRoot"]
+    : entry === "authorize-briefed" ? ["targetPath", "briefingDigest", "expiry", "mode", "reason", "proofRef"] : null;
+  if (!fields || !exactKeys(input, fields)) hgoAuthorityFailure("hgo:operation-entry-input");
+  const ownedInput = JSON.parse(canonical(input));
+  const proofObservation = hgoAuthorityReference(repository, ownedInput.proofRef);
+  const proof = JSON.parse(proofObservation.bytes.toString("utf8")), preimages = [proofObservation];
+  let authorizationPath;
+  if (entry === "authorize-signature") {
+    if (!SHA256.test(ownedInput.requestSha256) || !SHA256.test(ownedInput.planSha256)
+        || !isAbsolute(ownedInput.pluginRoot) || !isAbsolute(ownedInput.scriptPath)
+        || !(ownedInput.authorSourceRoot === null || isAbsolute(ownedInput.authorSourceRoot))) hgoAuthorityFailure("hgo:signature-intent-input");
+    const planFile = planPath(paths, ownedInput.requestSha256, ownedInput.authorSourceRoot);
+    const planned = validatedPlan(planFile), request = validatedRequest(paths, ownedInput.requestSha256);
+    if (planned.planSha256 !== ownedInput.planSha256 || request.root !== repository.primaryRoot) hgoAuthorityFailure("hgo:planned-source-binding");
+    preimages.push(hgoAuthorityPhysical(repository, requestPath(paths, ownedInput.requestSha256), "requests"),
+      hgoAuthorityPhysical(repository, planFile, "plans"));
+    const prepared = prepareHumanGuardOverrideAuthorization({rootDir: repository.primaryRoot, ...ownedInput,
+      reason: HGO_SIGNATURE_REASON});
+    const intent = buildHumanGuardOverrideSignatureIntent({prepared, planned});
+    const policy = readCriticalHumanProofPolicy(repository.primaryRoot);
+    const anchors = policy.trustAnchor !== null ? [policy.trustAnchor] : policy.trustAnchors;
+    if (!policy.ok || !Array.isArray(anchors) || !anchors.some(anchor => anchor?.publicKeySha256 === sha(proof.publicKey ?? ""))
+        || !verifyAgainstTrustAnchors({intent, anchors, proof}).verified) hgoAuthorityFailure("hgo:actual-signature-policy");
+    authorizationPath = join(paths.capabilities, `${ownedInput.planSha256}.json`);
+  } else {
+    if (ownedInput.mode !== "signature" || typeof ownedInput.reason !== "string") hgoAuthorityFailure("hgo:briefed-operation-mode");
+    const intent = buildBriefedTestChangeAuthorizationIntent({rootDir: repository.primaryRoot, ...ownedInput});
+    const signer = recognizedBriefedSigner(repository.primaryRoot, proof);
+    if (!signer || !verifyPoApprovalProof({intent, trustPolicy: signer, proof}).verified) hgoAuthorityFailure("hgo:actual-briefed-proof");
+    const target = canonicalBriefedTarget(repository.primaryRoot, ownedInput.targetPath);
+    authorizationPath = join(paths.briefedAuthorizations, `${briefedAuthorizationId(target, ownedInput.briefingDigest)}.json`);
+  }
+  if (existsSync(authorizationPath)) hgoAuthorityFailure("hgo:authorization-already-retained");
+  const preimageRefs = Object.freeze(preimages.map(row => row.ref)), inputSha256 = sha(ownedInput);
+  const bindingSha256 = sha({repository, association, entry, inputSha256, preimageRefs});
+  const handle = Object.freeze({});
+  hgoAuthorityOperations.set(handle, {port, repository, association, entry, input: ownedInput, proof,
+    inputSha256, bindingSha256, preimageRefs, preimageFacts: Object.freeze(preimages.map(row => row.fact)), authorizationPath,
+    phase: "reserved", memberHandle: null, memberRef: null, holdPath: null});
+  return {status: "prepared", operationHandle: handle, inputSha256, preimageRefs};
+}
+function hgoAuthorityObserved(data) {
+  const kinds = ["override", "armed-capability"];
+  let sourceFacts;
+  if (data.phase === "reserved") {
+    sourceFacts = data.preimageRefs.map((reference, index) => hgoAuthorityReference(data.repository, reference, data.preimageFacts[index].namespaceId).fact);
+    if (existsSync(data.authorizationPath)) hgoAuthorityFailure("hgo:unindexed-arming-effect");
+  } else {
+    const hold = hgoAuthorityReadHold(data.repository, data.holdPath);
+    if (hold.record.bindingSha256 !== data.bindingSha256 || canonical(hold.record.association) !== canonical(data.association)) hgoAuthorityFailure("hgo:operation-hold-binding");
+    let path = data.authorizationPath;
+    if (data.entry === "authorize-briefed") {
+      if (!existsSync(path)) path = path.replace(/\.json$/u, ".revoked.json");
+      const record = hgoAuthorityBriefed(data.repository, path), paths = hgoAuthorityPaths(data.repository);
+      const audit = auditState(paths, key(paths));
+      const revoked = path.endsWith(".revoked.json");
+      const type = revoked ? "briefed-revoked" : "briefed-authorized";
+      if (audit.status !== "valid" || !audit.ledger.entries.some(row => row.event.type === type
+          && row.event.authorizationId === record.id && row.event.bindingSha256 === data.bindingSha256)) hgoAuthorityFailure("hgo:briefed-owning-audit");
+      data.phase = revoked ? "terminal-observed" : "armed";
+    } else {
+      const paths = hgoAuthorityPaths(data.repository), capability = validatedCapability(paths, path);
+      if (!hasAuthorizedAuditEntry(paths, capability) || capability.planSha256 !== data.input.planSha256) hgoAuthorityFailure("hgo:capability-owning-binding");
+      if (capability.status === "consumed") {
+        const audit = auditState(paths, key(paths));
+        if (audit.status !== "valid" || !audit.ledger.entries.some(row => row.event.type === "consumed" && row.event.planSha256 === capability.planSha256)) hgoAuthorityFailure("hgo:consume-owning-audit");
+        data.phase = "terminal-observed";
+      } else if (capability.status === "armed") data.phase = "armed";
+      else hgoAuthorityFailure("hgo:unknown-owning-terminal");
+    }
+    sourceFacts = [hgoAuthorityPhysical(data.repository, path, data.entry === "authorize-briefed" ? "briefed-authorizations" : "capabilities").fact, hold.observed.fact];
+    if (data.phase === "terminal-observed") hgoAuthorityNoLocks(data.repository);
+  }
+  return {association: data.association, kinds, phase: data.phase, bindingSha256: data.bindingSha256, sourceFacts};
+}
+function hgoAuthorityIndexedData(port, holdPath) {
+  const {repository} = hgoAuthorityPorts.get(port), {record} = hgoAuthorityReadHold(repository, holdPath);
+  if (record.inputSha256 !== sha(record.input)
+      || record.bindingSha256 !== sha({repository, association: record.association, entry: record.entry,
+        inputSha256: record.inputSha256, preimageRefs: record.preimageRefs})) hgoAuthorityFailure("hgo:hold-binding-digest");
+  if (!exactKeys(record.memberRef, ["path", "sha256", "size"]) || typeof record.memberRef.path !== "string"
+      || !record.memberRef.path.startsWith(".git/agent-pipeline/session-authority/")
+      || record.memberRef.path.includes("\\") || record.memberRef.path.split("/").some(part => !part || part === ".." || part === ".")) {
+    hgoAuthorityFailure("hgo:indexed-member-reference");
+  }
+  const originalMember = hgoAuthorityPhysical(repository, join(repository.commonDir, record.memberRef.path.slice(5)), "audit");
+  const member = JSON.parse(originalMember.bytes.toString("utf8"));
+  if (member.producerId !== "human-guard-override" || member.bindingSha256 !== record.bindingSha256
+      || canonical(member.association) !== canonical(record.association)) hgoAuthorityFailure("hgo:indexed-member-binding");
+  return {port, repository, association: record.association, entry: record.entry, input: record.input,
+    inputSha256: record.inputSha256, bindingSha256: record.bindingSha256, preimageRefs: record.preimageRefs,
+    authorizationPath: join(repository.commonDir, record.authorizationPath), phase: "armed", holdPath,
+    memberRef: originalMember.ref, memberHandle: null};
+}
+function hgoAuthorityValidatedInventory(port, inventory) {
+  const {repository} = hgoAuthorityPorts.get(port), indexed = new Map();
+  for (const observed of inventory.groups.get("audit")) {
+    if (dirname(observed.path) !== inventory.paths.authorityHolds) continue;
+    if (!/^[a-f0-9]{64}\.json$/u.test(basename(observed.path))) hgoAuthorityFailure("hgo:unknown-hold-index");
+    const data = hgoAuthorityIndexedData(port, observed.path);
+    if (indexed.has(data.authorizationPath)) hgoAuthorityFailure("hgo:duplicate-authorization-owner");
+    hgoAuthorityObserved(data); indexed.set(data.authorizationPath, data);
+  }
+  for (const row of inventory.groups.get("requests")) {
+    if (!/^[a-f0-9]{64}\.json$/u.test(basename(row.path))) hgoAuthorityFailure("hgo:unknown-request");
+    validatedRequest(inventory.paths, basename(row.path).slice(0, -5));
+  }
+  for (const row of inventory.groups.get("plans")) {
+    if (basename(row.path).endsWith(".disclosure.json")) {
+      const index = validatedDisclosureIndex(row.path);
+      if (index.root !== hgoAuthorityPorts.get(port).repository.primaryRoot) hgoAuthorityFailure("hgo:disclosure-index-root");
+      continue;
+    }
+    const planned = validatedPlan(row.path);
+    if (row.path !== planPath(inventory.paths, planned.requestSha256, planned.authorSourceRoot)) hgoAuthorityFailure("hgo:unknown-plan-path");
+  }
+  const legacyOperations = [];
+  for (const observed of inventory.groups.get("capabilities")) {
+    if (!/^[a-f0-9]{64}\.json$/u.test(basename(observed.path))) hgoAuthorityFailure("hgo:unknown-capability");
+    const capability = validatedCapability(inventory.paths, observed.path);
+    if (!hasAuthorizedAuditEntry(inventory.paths, capability)) hgoAuthorityFailure("hgo:capability-audit-unavailable");
+    const data = indexed.get(observed.path);
+    if (capability.status === "armed") {
+      if (data) { const handle = Object.freeze({}); hgoAuthorityOperations.set(handle, data); legacyOperations.push(handle); }
+      else legacyOperations.push(hgoAuthorityLegacyOperation(port, observed, capability));
+    }
+  }
+  for (const observed of inventory.groups.get("briefed-authorizations")) {
+    const record = hgoAuthorityBriefed(repository, observed.path), data = indexed.get(observed.path.replace(/\.revoked\.json$/u, ".json"));
+    if (!data) hgoAuthorityFailure("hgo:unbound-briefed-authority-held");
+    if (basename(observed.path) !== `${record.id}.json` && basename(observed.path) !== `${record.id}.revoked.json`) hgoAuthorityFailure("hgo:unknown-briefed-path");
+    if (data.phase === "armed") { const handle = Object.freeze({}); hgoAuthorityOperations.set(handle, data); legacyOperations.push(handle); }
+  }
+  if (inventory.groups.get("locks").length) hgoAuthorityFailure("hgo:producer-lock-held");
+  return {indexed, legacyOperations};
+}
+function hgoAuthorityCurrentReservedPublication(port, member) {
+  const cursor = hgoAuthorityDirectReservation.getStore();
+  if (!cursor || cursor.lifetime.active !== true) return null;
+  const data = cursor.data;
+  if (cursor.port !== port || data.port !== port
+      || hgoAuthorityOperations.get(cursor.operationHandle) !== data
+      || data.phase !== "reserved" || data.memberHandle !== null
+      || data.memberRef !== null || data.holdPath !== null
+      || member.phase !== "reserved" || member.releaseRef !== null
+      || member.bindingSha256 !== data.bindingSha256
+      || canonical(member.association) !== canonical(data.association)
+      || canonical(member.kinds) !== canonical(["override", "armed-capability"])) return null;
+  const repository = hgoAuthorityRepository(data.repository);
+  if (canonical(cursor.repository) !== canonical(repository)
+      || canonical(hgoAuthorityPorts.get(port)?.repository) !== canonical(repository)) return null;
+  const sameBoundary = sessionAuthorityRegistry.withSessionAuthorityBoundary({repository},
+    actualBoundary => actualBoundary === cursor.boundary);
+  if (!sameBoundary) return null;
+  const context = readSourceOwnedAuthorityContext({repository});
+  if (context.status !== "bound") hgoAuthorityFailure("hgo:originating-source-context");
+  const association = hgoAuthorityAssociation(repository, context.requesterHandle);
+  if (canonical(association) !== canonical(data.association)
+      || data.inputSha256 !== sha(data.input)
+      || data.bindingSha256 !== sha({repository, association: data.association,
+        entry: data.entry, inputSha256: data.inputSha256, preimageRefs: data.preimageRefs})) {
+    hgoAuthorityFailure("hgo:reserved-publication-binding");
+  }
+  // Existing observation reopens each exact preimage and rejects arming effects.
+  const observed = hgoAuthorityObserved(data);
+  if (canonical(observed) !== canonical({association: member.association,
+      kinds: member.kinds, phase: member.phase, bindingSha256: member.bindingSha256,
+      sourceFacts: member.sourceFacts})) hgoAuthorityFailure("hgo:reserved-publication-source-drift");
+  return data;
+}
+function hgoAuthorityDirectPublication({repository, entry, input, authorizationPath, preimages}, publish, boundary) {
+  const context = readSourceOwnedAuthorityContext({repository});
+  if (context.status !== "bound") return publish();
+  const port = hgoAuthorityPortByCommon.get(repository.commonDir) ?? createHumanGuardOverrideAuthorityProducerPort({repository});
+  const association = hgoAuthorityAssociation(repository, context.requesterHandle), inputSha256 = sha(input);
+  const preimageRefs = Object.freeze(preimages.map(row => row.ref)), operationHandle = Object.freeze({});
+  const data = {port, repository, association, entry, input, inputSha256, preimageRefs,
+    preimageFacts: preimages.map(row => row.fact), authorizationPath,
+    bindingSha256: sha({repository, association, entry, inputSha256, preimageRefs}),
+    phase: "reserved", memberHandle: null, memberRef: null, holdPath: null};
+  hgoAuthorityOperations.set(operationHandle, data);
+  const lifetime = {active: true};
+  const cursor = Object.freeze({port, repository, boundary, operationHandle, data, lifetime});
+  try {
+    return hgoAuthorityDirectReservation.run(cursor, () => {
+      const reserved = sessionAuthorityRegistry.reserveSessionAuthorityMember({boundary, producerPort: port,
+        association, operationHandle});
+      data.memberHandle = reserved.memberHandle; data.memberRef = reserved.memberRef;
+      const result = publish();
+      if (entry === "authorize-briefed") {
+        const record = hgoAuthorityBriefed(repository, authorizationPath), paths = hgoAuthorityPaths(repository);
+        appendAudit(paths, {type: "briefed-authorized", at: new Date().toISOString(), authorizationId: record.id,
+          bindingSha256: data.bindingSha256, authorizationSha256: sha(readFileSync(authorizationPath))});
+      }
+      hgoAuthorityWriteHold(data); data.phase = "armed";
+      hgoAuthorityObserved(data);
+      const advanced = sessionAuthorityRegistry.advanceSessionAuthorityMember({boundary, producerPort: port,
+        memberHandle: data.memberHandle, expectedMemberRef: data.memberRef, operationHandle});
+      data.memberRef = advanced.memberRef;
+      return result;
+    });
+  } finally {
+    // Also revokes any captured asynchronous ALS continuation after return/throw.
+    lifetime.active = false;
+  }
+}
+function hgoPublishAuthorizedAuthority({repo, paths, capabilityCore, pluginRoot}, publish) {
+  const legacy = hgoLegacyControlOperation(repo, publish);
+  if (legacy.status === "legacy-completed") return legacy.result;
+  const active = hgoAuthorityExecuting.getStore();
+  const repository = inspectSignedDescriptorCustodyRepository(repo.root);
+  return sessionAuthorityRegistry.withSessionAuthorityBoundary({repository}, boundary => {
+    if (active) {
+      if (active.entry !== "authorize-signature" || canonical(active.repository) !== canonical(repository)
+          || active.input.planSha256 !== capabilityCore.planSha256 || !active.memberHandle) hgoAuthorityFailure("hgo:publication-reservation-binding");
+      const result = publish();
+      hgoAuthorityWriteHold(active); active.phase = "armed";
+      return result;
+    }
+    const entry = capabilityCore.humanApproval.mode === "signature-verified" ? "authorize-signature" : "authorize-chat";
+    const input = {pluginRoot, requestSha256: capabilityCore.requestSha256, planSha256: capabilityCore.planSha256,
+      authorSourceRoot: capabilityCore.authorSourceRoot, mode: capabilityCore.humanApproval.mode};
+    const preimages = [hgoAuthorityPhysical(repository, requestPath(paths, input.requestSha256), "requests"),
+      hgoAuthorityPhysical(repository, planPath(paths, input.requestSha256, input.authorSourceRoot), "plans")];
+    return hgoAuthorityDirectPublication({repository, entry, input,
+      authorizationPath: join(paths.capabilities, `${input.planSha256}.json`), preimages}, publish, boundary);
+  });
+}
+function hgoPublishBriefedAuthority({repo, paths, record}, publish) {
+  const legacy = hgoLegacyControlOperation(repo, publish);
+  if (legacy.status === "legacy-completed") return legacy.result;
+  const active = hgoAuthorityExecuting.getStore(), repository = inspectSignedDescriptorCustodyRepository(repo.root);
+  return sessionAuthorityRegistry.withSessionAuthorityBoundary({repository}, boundary => {
+    if (active) {
+      if (active.entry !== "authorize-briefed" || canonical(active.repository) !== canonical(repository)
+          || active.authorizationPath !== join(paths.briefedAuthorizations, `${record.id}.json`) || !active.memberHandle) hgoAuthorityFailure("hgo:briefed-publication-reservation-binding");
+      const result = publish();
+      appendAudit(paths, {type: "briefed-authorized", at: new Date().toISOString(), authorizationId: record.id,
+        bindingSha256: active.bindingSha256, authorizationSha256: sha(readFileSync(active.authorizationPath))});
+      hgoAuthorityWriteHold(active); active.phase = "armed";
+      return result;
+    }
+    const input = {targetPath: record.targetPath, briefingDigest: record.briefingDigest, expiry: record.expiry,
+      mode: record.mode, reason: record.reason};
+    return hgoAuthorityDirectPublication({repository, entry: "authorize-briefed", input,
+      authorizationPath: join(paths.briefedAuthorizations, `${record.id}.json`), preimages: []}, publish, boundary);
+  });
+}
+export function consumeHumanGuardOverride(input = {}) {
+  return consumeHumanGuardOverrideCore(input);
+}
+function hgoConsumptionBoundary(repo, consume) {
+  const legacy = hgoLegacyControlOperation(repo, consume);
+  if (legacy.status === "legacy-completed") return legacy.result;
+  const repository = inspectSignedDescriptorCustodyRepository(repo.root);
+  return sessionAuthorityRegistry.withSessionAuthorityBoundary({repository}, boundary => {
+    const active = hgoAuthorityExecuting.getStore();
+    if (active && canonical(active.repository) === canonical(repository) && active.memberHandle) return consume();
+    const paths = hgoAuthorityPaths(repository), recovered = [];
+    if (hgoAuthorityScopePresent(repository, paths.authorityHolds)) {
+      const port = hgoAuthorityPortByCommon.get(repository.commonDir) ?? createHumanGuardOverrideAuthorityProducerPort({repository});
+      const inventory = hgoAuthorityInventory(repository), {indexed} = hgoAuthorityValidatedInventory(port, inventory);
+      for (const data of indexed.values()) {
+        if (data.entry === "authorize-briefed" || data.phase !== "armed") continue;
+        const actual = port.recoverOperation({memberRef: data.memberRef});
+        const operation = hgoAuthorityOperation(port, actual.operationHandle);
+        sessionAuthorityRegistry.inspectSourceOwnedSessionAuthorityMember({boundary, producerPort: port,
+          memberHandle: operation.memberHandle, operationHandle: actual.operationHandle, expectedMemberRef: operation.memberRef});
+        recovered.push({port, operationHandle: actual.operationHandle, operation});
+      }
+    }
+    const result = consume();
+    if (result?.status === "consumed") {
+      const matches = recovered.filter(row => row.operation.input.planSha256 === result.planSha256);
+      if (matches.length > 1) hgoAuthorityFailure("hgo:ambiguous-owning-consumption");
+      if (matches.length === 1) {
+        const {port, operationHandle, operation} = matches[0], observed = hgoAuthorityObserved(operation);
+        if (observed.phase !== "terminal-observed") hgoAuthorityFailure("hgo:consumption-terminal-readback");
+        const advanced = sessionAuthorityRegistry.advanceSessionAuthorityMember({boundary, producerPort: port,
+          memberHandle: operation.memberHandle, expectedMemberRef: operation.memberRef, operationHandle});
+        operation.memberRef = advanced.memberRef;
+        const terminalHandle = Object.freeze({});
+        hgoAuthorityTerminals.set(terminalHandle, {port, operationHandle, terminal: "consumed"});
+        const released = sessionAuthorityRegistry.releaseSessionAuthorityMember({boundary, producerPort: port,
+          memberHandle: operation.memberHandle, expectedMemberRef: operation.memberRef, terminalHandle});
+        operation.memberRef = released.memberRef;
+      }
+    }
+    return result;
+  });
+}
+export function isOwnedHumanGuardOverrideAuthorityProducerPort(port, {repository} = {}) {
+  const data = hgoAuthorityPorts.get(port);
+  if (!data) return false;
+  try { return canonical(hgoAuthorityRepository(repository)) === canonical(data.repository); }
+  catch { return false; }
+}
+export function createHumanGuardOverrideAuthorityProducerPort({repository: input} = {}) {
+  const repository = hgoAuthorityRepository(input);
+  const context = readSourceOwnedAuthorityContext({repository});
+  let assurance = "physical-readback";
+  if (context.status === "bound") {
+    const observation = createSignedCleanupRequesterObserver({repository, requesterHandle: context.requesterHandle})({repository});
+    if (observation.status !== "bound") hgoAuthorityFailure("hgo:source-context-unavailable");
+    assurance = observation.requester.assurance === "controlled-unit-method" ? "controlled-unit-method" : "physical-readback";
+  }
+  const port = Object.freeze({
+    prepareOperation({requesterHandle, entry, input}) {
+      return hgoAuthorityPrepare(port, requesterHandle, entry, input);
+    },
+    async executeOperation({operationHandle, memberHandle, expectedMemberRef}) {
+      const operation = hgoAuthorityOperation(port, operationHandle);
+      if (operation.phase !== "reserved" || operation.memberHandle) hgoAuthorityFailure("hgo:execution-already-entered");
+      sessionAuthorityRegistry.withSessionAuthorityBoundary({repository}, boundary => {
+        if (typeof sessionAuthorityRegistry.inspectSourceOwnedSessionAuthorityMember !== "function") hgoAuthorityFailure("hgo:member-inspector-unavailable");
+        sessionAuthorityRegistry.inspectSourceOwnedSessionAuthorityMember({boundary, producerPort: port,
+          memberHandle, operationHandle, expectedMemberRef});
+        hgoAuthorityObserved(operation); // physically reopen every preimage before the writer
+        operation.memberHandle = memberHandle; operation.memberRef = {...expectedMemberRef};
+      });
+      // Exit common custody before the original owner body; its publication
+      // helpers reacquire common before any producer-local mutation locks.
+      const ownerResult = hgoAuthorityExecuting.run(operation, () => {
+          if (operation.entry === "authorize-signature") {
+            const {proofRef: ignored, ...input} = operation.input;
+            return authorizeHumanGuardOverrideBySignature({rootDir: repository.primaryRoot, ...input, proof: operation.proof});
+          }
+          const {proofRef: ignored, ...input} = operation.input;
+          return createBriefedTestChangeAuthorization({rootDir: repository.primaryRoot, ...input, proof: operation.proof});
+        });
+      return sessionAuthorityRegistry.withSessionAuthorityBoundary({repository}, boundary => {
+        if (!["armed", "granted"].includes(ownerResult?.status) || !operation.holdPath) hgoAuthorityFailure("hgo:actual-publication-unavailable");
+        const observed = hgoAuthorityObserved(operation);
+        if (observed.phase !== "armed") hgoAuthorityFailure("hgo:actual-armed-readback");
+        const advanced = sessionAuthorityRegistry.advanceSessionAuthorityMember({boundary, producerPort: port,
+          memberHandle, expectedMemberRef, operationHandle});
+        operation.memberRef = advanced.memberRef;
+        const executionHandle = Object.freeze({});
+        hgoAuthorityExecutions.set(executionHandle, {port, operationHandle, ownerResult});
+        return {status: "executed", code: null, executionHandle, memberRef: {...operation.memberRef}, ownerResult,
+          sourceRefs: [hgoAuthorityPhysical(repository, operation.authorizationPath,
+            operation.entry === "authorize-briefed" ? "briefed-authorizations" : "capabilities").ref,
+            hgoAuthorityPhysical(repository, operation.holdPath, "audit").ref]};
+      });
+    },
+    async finishOperation({operationHandle, executionHandle, entry, input, expectedMemberRef}) {
+      const operation = hgoAuthorityOperation(port, operationHandle), execution = hgoAuthorityExecutions.get(executionHandle);
+      if (!execution || execution.port !== port || execution.operationHandle !== operationHandle || !operation.memberHandle) hgoAuthorityFailure("hgo:unowned-execution-terminal");
+      return sessionAuthorityRegistry.withSessionAuthorityBoundary({repository}, boundary => {
+        sessionAuthorityRegistry.inspectSourceOwnedSessionAuthorityMember({boundary, producerPort: port,
+          memberHandle: operation.memberHandle, operationHandle, expectedMemberRef});
+        const observed = hgoAuthorityObserved(operation);
+        if (observed.phase !== "armed") hgoAuthorityFailure("hgo:terminal-replay-or-phase");
+        if (operation.entry !== "authorize-briefed") {
+          if (entry !== "consume" || !exactKeys(input, ["provider", "toolName", "toolInput", "denials"])) hgoAuthorityFailure("hgo:consume-terminal-input");
+          const result = hgoAuthorityExecuting.run(operation, () => consumeHumanGuardOverride({rootDir: repository.primaryRoot,
+            pluginRoot: operation.input.pluginRoot, ...input}));
+          if (result?.status !== "consumed" || result.planSha256 !== operation.input.planSha256) hgoAuthorityFailure("hgo:actual-consumption-refused");
+        } else {
+          if (entry !== "revoke-briefed" || !exactKeys(input, ["expectedAuthorizationRef"])) hgoAuthorityFailure("hgo:revoke-terminal-input");
+          const source = hgoAuthorityReference(repository, input.expectedAuthorizationRef, "briefed-authorizations");
+          if (source.path !== operation.authorizationPath) hgoAuthorityFailure("hgo:revoke-foreign-authorization");
+          const record = hgoAuthorityBriefed(repository, source.path), paths = hgoAuthorityPaths(repository);
+          appendAudit(paths, {type: "briefed-revoked", at: new Date().toISOString(), authorizationId: record.id,
+            bindingSha256: operation.bindingSha256, authorizationSha256: source.ref.sha256});
+          const retainedPath = source.path.replace(/\.json$/u, ".revoked.json");
+          if (existsSync(retainedPath)) hgoAuthorityFailure("hgo:revocation-replay");
+          renameSync(source.path, retainedPath);
+        }
+        const terminalObservation = hgoAuthorityObserved(operation);
+        if (terminalObservation.phase !== "terminal-observed") hgoAuthorityFailure("hgo:owning-terminal-unavailable");
+        const advanced = sessionAuthorityRegistry.advanceSessionAuthorityMember({boundary, producerPort: port,
+          memberHandle: operation.memberHandle, expectedMemberRef, operationHandle});
+        operation.memberRef = advanced.memberRef;
+        const terminalHandle = Object.freeze({});
+        hgoAuthorityTerminals.set(terminalHandle, {port, operationHandle,
+          terminal: operation.entry === "authorize-briefed" ? "revoked" : "consumed"});
+        const sourcePath = operation.entry === "authorize-briefed" ? operation.authorizationPath.replace(/\.json$/u, ".revoked.json") : operation.authorizationPath;
+        return {status: "observed", terminalHandle, sourceRefs: [hgoAuthorityPhysical(repository, sourcePath,
+          operation.entry === "authorize-briefed" ? "briefed-authorizations" : "capabilities").ref,
+          hgoAuthorityPhysical(repository, operation.holdPath, "audit").ref]};
+      });
+    },
+    recoverOperation({memberRef}) {
+      if (typeof memberRef?.path !== "string" || !/^\.git\/agent-pipeline\/session-authority\/members\/human-guard-override\/member-[a-f0-9]{32}\.[1-9][0-9]*\.json$/u.test(memberRef.path)) {
+        hgoAuthorityFailure("hgo:recovery-member-path");
+      }
+      const memberSource = hgoAuthorityReference(repository, memberRef), member = JSON.parse(memberSource.bytes.toString("utf8"));
+      if (member.producerId !== "human-guard-override" || !SHA256.test(member.bindingSha256 ?? "") || member.phase === "released") hgoAuthorityFailure("hgo:recovery-member-domain");
+      const holdPath = join(hgoAuthorityPaths(repository).authorityHolds, `${member.bindingSha256}.json`);
+      const {record} = hgoAuthorityReadHold(repository, holdPath);
+      if (record.memberRef.path !== memberRef.path || record.bindingSha256 !== member.bindingSha256
+          || canonical(record.association) !== canonical(member.association)) hgoAuthorityFailure("hgo:recovery-owning-association");
+      const handle = Object.freeze({}), data = {port, repository, association: record.association,
+        entry: record.entry, input: record.input, inputSha256: record.inputSha256, bindingSha256: record.bindingSha256,
+        preimageRefs: record.preimageRefs, authorizationPath: join(repository.commonDir, record.authorizationPath),
+        phase: "armed", memberHandle: null, memberRef, holdPath};
+      hgoAuthorityOperations.set(handle, data);
+      const observed = hgoAuthorityObserved(data);
+      if (observed.phase !== member.phase || canonical(observed.kinds) !== canonical(member.kinds)
+          || canonical(observed.sourceFacts) !== canonical(member.sourceFacts)) hgoAuthorityFailure("hgo:recovery-source-member-cas");
+      const recovered = sessionAuthorityRegistry.withSessionAuthorityBoundary({repository}, boundary =>
+        sessionAuthorityRegistry.recoverSessionAuthorityMember({boundary, producerPort: port,
+          operationHandle: handle, expectedMemberRef: memberRef}));
+      data.memberHandle = recovered.memberHandle; data.memberRef = recovered.memberRef;
+      const executionHandle = Object.freeze({});
+      hgoAuthorityExecutions.set(executionHandle, {port, operationHandle: handle, sourceRecovery: true});
+      return {status: "recovered", operationHandle: handle, executionHandle};
+    },
+    observePlanningOperation(handle) {
+      const plan = hgoAuthorityPlanning.get(handle);
+      if (!plan || plan.port !== port || plan.executed) hgoAuthorityFailure("hgo:unowned-planning-operation");
+      const current = hgoAuthorityInventory(repository);
+      if (canonical(current.memberships) !== canonical(plan.before.memberships)) hgoAuthorityFailure("hgo:planning-preimage-drift");
+      return Object.freeze({entry: plan.entry, inputSha256: plan.inputSha256,
+        allowedNamespaces: Object.freeze(plan.entry === "record-denial" ? ["requests", "audit", "command-offers"]
+          : plan.entry === "plan-override" ? ["plans"] : plan.entry === "sweep-requests" ? ["requests", "audit"] : ["plans", "audit"]),
+        allowedPathSha256s: Object.freeze(plan.allowedPaths.map(path => hgoAuthorityPathDigest(repository, path))),
+        sourceFacts: hgoAuthorityFacts(current)});
+    },
+    executePlanningOperation(handle) {
+      const plan = hgoAuthorityPlanning.get(handle);
+      port.observePlanningOperation(handle);
+      plan.executed = true; // a failing actual writer cannot be replayed through this handle
+      plan.result = plan.publish();
+      plan.after = hgoAuthorityInventory(repository);
+      return plan.result;
+    },
+    observePlanningTerminal(handle) {
+      const plan = hgoAuthorityPlanning.get(handle);
+      if (!plan || plan.port !== port || !plan.executed || !plan.after) hgoAuthorityFailure("hgo:planning-terminal-unavailable");
+      const current = hgoAuthorityInventory(repository);
+      if (canonical(current.memberships) !== canonical(plan.after.memberships)) hgoAuthorityFailure("hgo:planning-terminal-drift");
+      for (const id of ["capabilities", "briefed-authorizations", "locks"]) {
+        if (canonical(current.groups.get(id).map(row => row.fact)) !== canonical(plan.before.groups.get(id).map(row => row.fact))) {
+          hgoAuthorityFailure("hgo:planning-armed-or-lock-effect");
+        }
+      }
+      const journalRefs = plan.allowedPaths.filter(path => existsSync(path)).map(path => {
+        const local = relative(repository.commonDir, path), namespace = local.includes("/requests/") ? "requests"
+          : local.includes("/plans/") ? "plans" : path === current.paths.commandOffers ? "command-offers" : "audit";
+        const row = hgoAuthorityPhysical(repository, path, namespace);
+        if (namespace === "requests") validatedRequest(current.paths, basename(path).slice(0, -5));
+        if (namespace === "plans") {
+          if (basename(path).endsWith(".disclosure.json")) validatedDisclosureIndex(path);
+          else validatedPlan(path);
+        }
+        return row.ref;
+      });
+      if (!journalRefs.length) hgoAuthorityFailure("hgo:planning-no-source-readback");
+      return Object.freeze({entry: plan.entry, inputSha256: plan.inputSha256, sourceFacts: hgoAuthorityFacts(current),
+        journalRefs: Object.freeze(journalRefs), result: plan.result});
+    },
+    readAssurance() { hgoAuthorityRepository(repository); return assurance; },
+    readBaseline() {
+      const inventory = hgoAuthorityInventory(repository);
+      const {legacyOperations} = hgoAuthorityValidatedInventory(port, inventory);
+      return {memberships: inventory.memberships, legacyOperations};
+    },
+    observeOperation(handle) {
+      const operation = hgoAuthorityOperations.get(handle);
+      if (!operation || operation.port !== port) hgoAuthorityFailure("hgo:unowned-operation");
+      if (operation.entry !== "legacy-authenticated-capability") return hgoAuthorityObserved(operation);
+      const paths = hgoAuthorityPaths(repository), observed = hgoAuthorityPhysical(repository, operation.path, "capabilities");
+      const capability = validatedCapability(paths, operation.path);
+      if (!hasAuthorizedAuditEntry(paths, capability)) hgoAuthorityFailure("hgo:operation-audit-unavailable");
+      if (capability.status !== "armed") hgoAuthorityFailure("hgo:legacy-terminal-owner-unavailable");
+      return {association: operation.association, kinds: ["override", "armed-capability"], phase: "armed",
+        bindingSha256: operation.bindingSha256, sourceFacts: [observed.fact]};
+    },
+    reconcile({producerRecord, memberRecords, releaseRecords}) {
+      if (!producerRecord || !Array.isArray(memberRecords) || !Array.isArray(releaseRecords)) hgoAuthorityFailure("hgo:reconcile-shape");
+      const inventory = hgoAuthorityInventory(repository), {indexed} = hgoAuthorityValidatedInventory(port, inventory);
+      for (const member of memberRecords) {
+        const data = [...indexed.values()].find(row => row.bindingSha256 === member.bindingSha256);
+        if (!data) {
+          if (hgoAuthorityCurrentReservedPublication(port, member)) continue;
+          // Genuine legacy unbound arms remain held; they cannot be attributed or
+          // silently discharged by an observer, expiry, or process liveness.
+          if (member.association?.state !== "unbound" || member.phase === "released") hgoAuthorityFailure("hgo:member-without-source-index");
+          const match = inventory.groups.get("capabilities").find(row => {
+            const cap = validatedCapability(inventory.paths, row.path);
+            return cap.status === "armed" && sha({repository, association: member.association, capabilitySha256: row.ref.sha256}) === member.bindingSha256;
+          });
+          if (!match) hgoAuthorityFailure("hgo:legacy-member-source-drift");
+          continue;
+        }
+        const observed = hgoAuthorityObserved(data);
+        if (canonical(observed.association) !== canonical(member.association) || canonical(observed.kinds) !== canonical(member.kinds)
+            || canonical(observed.sourceFacts) !== canonical(member.sourceFacts)
+            || (member.phase !== observed.phase && !(member.phase === "released" && observed.phase === "terminal-observed"))) {
+          hgoAuthorityFailure("hgo:member-owning-source-drift");
+        }
+      }
+      for (const release of releaseRecords) {
+        const data = [...indexed.values()].find(row => row.bindingSha256 === release.bindingSha256);
+        if (!data || hgoAuthorityObserved(data).phase !== "terminal-observed"
+            || release.terminal !== (data.entry === "authorize-briefed" ? "revoked" : "consumed")) hgoAuthorityFailure("hgo:release-owning-terminal-drift");
+      }
+      return inventory.memberships;
+    },
+    observeTerminal(handle) {
+      const terminal = hgoAuthorityTerminals.get(handle);
+      if (!terminal || terminal.port !== port) hgoAuthorityFailure("hgo:unowned-terminal");
+      const actual = hgoAuthorityObserved(hgoAuthorityOperation(port, terminal.operationHandle));
+      if (actual.phase !== "terminal-observed") hgoAuthorityFailure("hgo:retained-owning-authority");
+      return {terminal: terminal.terminal, sourceFacts: actual.sourceFacts};
+    },
+  });
+  hgoAuthorityPorts.set(port, {repository, context, assurance});
+  hgoAuthorityPortByCommon.set(repository.commonDir, port);
+  return port;
+}
+
+export function buildBriefedTestChangeAuthorizationIntent({rootDir, targetPath, briefingDigest, expiry} = {}) {
+  const normTarget = canonicalBriefedTarget(rootDir, targetPath);
+  const expiresAtMs = typeof expiry === "number" ? expiry : Date.parse(expiry);
+  if (normTarget === null || !SHA256.test(briefingDigest ?? "") || !Number.isFinite(expiresAtMs)) {
+    fail("HGO-BRIEFED-TARGET-INVALID", "briefed intent input is invalid");
+  }
+  return briefedTestIntent(normTarget, briefingDigest, expiresAtMs);
 }

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { readProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
 import { loadManifest } from "../lib/manifest.mjs";
 import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
 import { inspectConsumerBaseline } from "../lib/consumer-baseline-verify.mjs";
@@ -13,9 +15,16 @@ export function runConsumerVerifyCheck(check, commandId = null) {
   try {
     const artifact = resolveAuthorityArtifactPath("calibration", { rootDir: root });
     if (!["ready", "missing"].includes(artifact.authorityStatus)) throw new Error(`project authority is ${artifact.authorityStatus}`);
-    const calibration = JSON.parse(readFileSync(artifact.path, "utf8"));
-    if (!calibration || Array.isArray(calibration) || typeof calibration !== "object" || typeof calibration.project !== "string" || !calibration.project.trim()) throw new Error("calibration requires a non-empty project name");
-    if (check === "calibration") { console.log("project calibration and authority: passed"); return 0; }
+    const projectIdentity = readProjectCalibrationIdentity({ rootDir: root });
+    if (projectIdentity.status !== "resolved") throw new Error(`project calibration identity: ${projectIdentity.code}`);
+    const calibrationBytes = readFileSync(artifact.path);
+    if (projectIdentity.source.path !== artifact.relPath || projectIdentity.source.sha256 !== createHash("sha256").update(calibrationBytes).digest("hex")) throw new Error("project calibration identity: PCI-SOURCE-DRIFT");
+    const calibration = JSON.parse(calibrationBytes.toString("utf8"));
+    if (check === "calibration") {
+      console.log("project calibration and authority: passed");
+      console.log(JSON.stringify({ project: projectIdentity.project, projectIdentity }));
+      return 0;
+    }
     if (check === "manifest") {
       const manifest = loadManifest(root);
       console.log(JSON.stringify({ check, ...manifest }));

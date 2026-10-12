@@ -11,6 +11,7 @@ import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-pro
 export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action-approval-request.v1";
 // `release-preflight` adds the fourth member. ADR-0072 adds the fifth. PHX-WP-PAC08-
 // RECONCILE-APPROVAL (ADR-0056's 2026-08-11 Follow-up) adds the sixth. The three
+// AC-6's N12-approved signed baseline promotion adds the seventh, signature-only kind.
 // original kinds keep their exact behaviour: every use of this list in this file and in
 // every consumer is an `includes()` membership test, so a new member widens what is
 // admissible and changes nothing about how `push`/`deploy`/`publication` are treated.
@@ -20,7 +21,7 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
 // membership here only makes it a valid `kind` for `criticalActionSubjectSha256`/
 // `actionValid`, which `scripts/pipeline-state.mjs`'s reconcile approval wrapper needs.
 export const CRITICAL_ACTION_KINDS = Object.freeze([
-  "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile",
+  "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
 ]);
 
 const SHA = /^[a-f0-9]{64}$/u;

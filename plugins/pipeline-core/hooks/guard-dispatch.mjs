@@ -65,7 +65,7 @@ import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings } from 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
-import { prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
+import { prepareNativeGoldfishHostState, resolveGovernedItemQueue, prepareGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
@@ -127,6 +127,11 @@ export function extractAntigravityDispatches(subagents) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// A caller's prompt cannot turn a writable Goldfish capability into read-only.
+export function requiresGovernedItemAdmission(policy) {
+  return policy?.role === "goldfish";
+}
+
 // FANOUT slice S7: the dispatch-time slice-scope check (design:
 // specs/sprint-alfred-epic/design/fanout-enforcement-design.md 3.4), SHADOW by default.
 //
@@ -411,7 +416,8 @@ if (isDirectInvocation(import.meta.url)) {
   }
 
   const codexV2Marker = "<!-- pipeline-native-goldfish-host-commit:v2";
-  const markedV2 = dispatches.filter((dispatch) => dispatch.prompt.includes(codexV2Marker));
+  const itemV3Marker = "<!-- pipeline-native-goldfish-host-commit:v3";
+  const markedV2 = dispatches.filter((dispatch) => dispatch.prompt.includes(codexV2Marker) || input?.tool_name === "spawn_agent" && dispatch.prompt.includes(itemV3Marker));
   let policyDispatches = dispatches;
   if (markedV2.length > 0) {
     const parsed = markedV2.length === 1 && dispatches.length === 1 && input?.tool_name === "spawn_agent"
@@ -431,6 +437,25 @@ if (isDirectInvocation(import.meta.url)) {
     budget: dispatchBudgetBinding(dispatch),
   }));
   const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
+  const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
+  let itemGovernanceRequired = false;
+  if (productive.length > 0) {
+    const courseRoot=input.cwd??process.env.CLAUDE_PROJECT_DIR??process.cwd();
+    let governed=resolveGovernedItemQueue({root:courseRoot});
+    if(productive.length===1) {
+      const parsed=parseNativeGoldfishBriefing(productive[0].dispatch.prompt);
+      if(parsed.ok&&parsed.binding.itemDelivery)governed=prepareGovernedItemQueue({root:courseRoot,itemDelivery:parsed.binding.itemDelivery,
+        candidate:{commit:parsed.binding.candidateCommit,tree:parsed.binding.candidateTree},writeScope:parsed.binding.allowedPaths});
+    }
+    itemGovernanceRequired=governed.status==='required';
+    const unsupported = governed.status === "required" && productive.some(({ dispatch }) =>
+      !["direct", "codex"].includes(dispatch.transport)
+      || !parseNativeGoldfishBriefing(dispatch.prompt).ok);
+    if (governed.status === "refused" || unsupported) {
+      process.stderr.write(`BLOCKED (guard-dispatch): ${unsupported ? "SQ-NATIVE-ITEM-ADMISSION-REQUIRED" : governed.code}: ${governed.repair ?? "Use the authenticated native item admission; this transport has no qualified item reservation adapter."}\n`);
+      process.exit(2);
+    }
+  }
   if (blocked.length === 0) {
     // FANOUT slice S7: shadow by default; inactive without PIPELINE_FANOUT_CONFIG. Findings are
     // recorded now; the `launch` events only if every later existing check also admits the dispatch.
@@ -505,7 +530,7 @@ if (isDirectInvocation(import.meta.url)) {
       }
     }
     const nativeMarker = "<!-- pipeline-native-goldfish-host-commit:v1";
-    const markedNative = dispatches.filter((dispatch) => dispatch.prompt.includes(nativeMarker) || dispatch.prompt.includes(codexV2Marker));
+    const markedNative = dispatches.filter((dispatch) => dispatch.prompt.includes(nativeMarker) || dispatch.prompt.includes(codexV2Marker) || dispatch.prompt.includes(itemV3Marker));
     if (markedNative.length > 0) {
       const nativeRunner = ["Task", "Agent"].includes(input?.tool_name) ? "claude"
         : input?.tool_name === "spawn_agent" ? "codex" : null;
@@ -515,7 +540,7 @@ if (isDirectInvocation(import.meta.url)) {
         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
         const prepared = prepareNativeGoldfishHostState({ root: rootDir, runner: nativeRunner, input });
         if (!prepared.ok) {
-          if (markedV2.length > 0) {
+          if (markedV2.length > 0 || itemGovernanceRequired) {
             process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.\n`);
             process.exit(2);
           }

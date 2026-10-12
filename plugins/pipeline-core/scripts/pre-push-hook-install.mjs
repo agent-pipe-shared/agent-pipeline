@@ -36,7 +36,7 @@
  * repository's own checkout (a release is mid-flight).
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, chmodSync, rmdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, chmodSync, rmdirSync, closeSync, constants, fchmodSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, openSync, readSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +54,34 @@ function decorateInstalledImpl(content, pluginLibDir, deadline) {
   return content.replace("  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);", "  if (!await admitPipelineScope(projectRoot)) return;\n  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);") + renderGitHookSnapshotAdmission(runtimeSnapshot);
 }
 
+
+/** Final installer artifact durability; writable descriptor works on native Windows. */
+function writeDurableInstallArtifact(path, content, mode) {
+  const bytes = Buffer.from(content, "utf8");
+  const fd = openSync(path, constants.O_CREAT | constants.O_RDWR | (constants.O_NOFOLLOW ?? 0), mode);
+  try {
+    const before = fstatSync(fd), original = lstatSync(path);
+    if (!before.isFile() || before.nlink !== 1 || original.isSymbolicLink() || !original.isFile() || original.nlink !== 1
+        || before.dev !== original.dev || before.ino !== original.ino || before.uid !== original.uid || before.gid !== original.gid) throw Error("PRE-PUSH-INSTALL-ARTIFACT-CUSTODY");
+    ftruncateSync(fd, 0);
+    writeFileSync(fd, bytes);
+    fchmodSync(fd, mode);
+    fsyncSync(fd);
+    const observed = Buffer.alloc(bytes.length);
+    let count = 0;
+    while (count < observed.length) {
+      const read = readSync(fd, observed, count, observed.length - count, count);
+      if (read === 0) break;
+      count += read;
+    }
+    const after = fstatSync(fd), physical = lstatSync(path);
+    if (count !== bytes.length || !observed.equals(bytes) || after.size !== bytes.length
+        || physical.isSymbolicLink() || !physical.isFile() || after.nlink !== 1 || physical.nlink !== 1
+        || before.dev !== after.dev || before.ino !== after.ino || after.dev !== physical.dev || after.ino !== physical.ino
+        || before.uid !== after.uid || before.gid !== after.gid || after.uid !== physical.uid || after.gid !== physical.gid
+        || (process.platform !== "win32" && ((after.mode & 0o777) !== mode || (physical.mode & 0o777) !== mode))) throw Error("PRE-PUSH-INSTALL-ARTIFACT-READBACK");
+  } finally { closeSync(fd); }
+}
 
 export const INSTALLER_VERSION = "1";
 export const MARKER_SCHEMA = "pipeline.pre-push-hook-install.v1";
@@ -722,11 +750,14 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, o
   const { impl, implContent, shimContent, marker } = artifacts;
 
   ensureHardenedPrivateDirectory(commonDir, snapshotState);
-  writeFileSync(impl, implContent, { encoding: "utf8", mode: 0o600 });
-  writeFileSync(hookPath, shimContent, { encoding: "utf8", mode: 0o700 });
-  chmodSync(hookPath, 0o755);
-
-  writeFileSync(markerPath(commonDir), renderMarker(marker), { encoding: "utf8", mode: 0o600 });
+  try {
+    writeDurableInstallArtifact(impl, implContent, 0o600);
+    writeDurableInstallArtifact(hookPath, shimContent, 0o755);
+    writeDurableInstallArtifact(markerPath(commonDir), renderMarker(marker), 0o600);
+  } catch {
+    // Uncertain partial artifacts remain observable; never claim installation or erase them.
+    return {status: "durability-unavailable", code: "PRE-PUSH-INSTALL-DURABILITY-UNAVAILABLE"};
+  }
 
   return { status: "installed", hookPath, implPath: impl, markerPath: markerPath(commonDir) };
 }

@@ -7,9 +7,40 @@ import { join } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
-import { prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
+import { integrateNativeGoldfishItemDelivery, prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
 import { nativeGoldfishHookMessage } from "../hooks/native-goldfish-host.mjs";
 import { writeHostObservedNativeGoldfishDispatchRecord } from "../scripts/dispatch-record-write.mjs";
+
+import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
+import { createGovernanceScopeController } from "./governance-scope.mjs";
+import { fileURLToPath } from "node:url";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+import { initializeSessionAuthorityRegistry } from "./session-authority-registry.mjs";
+import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+import { commitAdmittedNativeGoldfishReturn } from "./agy-host-commit-execution.mjs";
+
+// Controlled METHOD fixture: genuine Source requester/member custody, not provider-host proof.
+function sourceRuntime(root) {
+  mkdirSync(join(root,".claude"),{recursive:true,mode:0o700});
+  writeFileSync(join(root,".claude/pipeline.yaml"),"schema: pipeline.manifest.v0\n");
+  const ref=path=>({path,sha256:"a".repeat(64)});
+  const continuity={schema:"pipeline.continuity.v0",featureId:"unit",revision:0,
+    runtime:{humanFacingLanguage:"en",activeDuty:"Coordinator",sessionCleanup:null},
+    authority:{prd:ref("specs/unit/prd.md"),spec:ref("specs/unit/spec.md"),result:null},
+    queueHead:{packageId:"unit-package",actionId:"finalizer-fixture",nextAction:"dispatch",productRetryCount:0,environmentRerouteCount:0,dispatch:null},
+    blocker:null,acknowledgedFinal:null,resume:{mode:"immediate",sourceRevision:0,reasonCode:"active-turn"},recovery:null,decisionTxn:null,closeTransition:null,
+    capacity:{concurrencyLimit:3,reservedCriticSlots:1,reservedRecoverySlots:1,fallbackPolicy:"defer"}};
+  writeFileSync(join(root,".claude/pipeline-state.json"),JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"unit",planPath:"specs/unit/prd.md",phase:"design"},planApproved:false,continuity}),{mode:0o600});
+  const repository=inspectSignedDescriptorCustodyRepository(root);
+  const runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,"agent-pipeline/controlled-method-fixtures/finalizer-owner"),sessionId:"finalizer-original-owner"});
+  const ports=createSessionAuthorityParticipantPorts({repository}); for(const row of ports)assert.doesNotThrow(()=>row.port.readBaseline(),row.producerId); const initialized=initializeSessionAuthorityRegistry({repository},ports); assert.equal(initialized.status,"initialized",JSON.stringify(initialized));
+  return runtime;
+}
+function fixtureRoot(prefix) {
+  const parent=nativeContractFixtureParent();
+  mkdirSync(parent,{recursive:true,mode:0o700}); return mkdtempSync(join(parent,prefix));
+}
 
 const COMMIT = "a".repeat(40); const TREE = "b".repeat(40); const POST = "c".repeat(40); const POST_TREE = "d".repeat(40);
 const rulesetSha = "e".repeat(64);
@@ -68,20 +99,24 @@ function fixture(run, runner = "claude", adapterVersion = 1) {
 
 const cases = [
   { id: "NGHF05", name: "Codex v2 commits through real Git and reads back the versioned worker observation", run: () => {
-    const root = mkdtempSync(join(tmpdir(), "native-goldfish-host-codex-finalizer-"));
+    const root = fixtureRoot("native-goldfish-host-codex-finalizer-");
     const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
     try {
       git("init", "-q"); git("config", "user.name", "Fixture");
       git("config", "user.email", "fixture@example.invalid"); git("config", "commit.gpgsign", "false");
       writeFileSync(join(root, "file.txt"), "before\n");
-      writeFileSync(join(root, ".gitignore"), "evidence/dispatch-record-*.json\n");
+      writeFileSync(join(root, ".gitignore"), "evidence/\n.claude/\n");
       git("add", "--", "file.txt", ".gitignore"); git("commit", "-q", "-m", "fixture baseline");
       mkdirSync(join(root, "evidence"));
+      writeFileSync(join(root,"pipeline.user.yaml"),readFileSync(join(nativeContractFixtureRepositoryRoot(),"pipeline.user.yaml")));
+      git("add","pipeline.user.yaml");git("commit","-qm","committed V3 configured route");
+      const runtime=sourceRuntime(root);
+      return runtime.run(()=> {
       const candidateCommit = git("rev-parse", "HEAD");
       const candidateTree = git("rev-parse", "HEAD^{tree}");
       const binding = { schema: "pipeline.native-goldfish-host-briefing.v2", dispatchId: "NGHF-CODEX-LIVE-2",
         candidateCommit, candidateTree, runner: "codex", role: "pipeline-core:goldfish-implementor",
-        nativeAgentType: "worker", model: "gpt-6-luna", effort: "medium", rulesetSha,
+        nativeAgentType: "worker", model: "gpt-6-luna", effort: "high", rulesetSha,
         allowedPaths: ["file.txt"], criticDecision };
       const prompt = `Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v2\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
       const preTool = { cwd: root, session_id: "session-codex-live", hook_event_name: "PreToolUse",
@@ -118,23 +153,28 @@ const cases = [
       const record = JSON.parse(readFileSync(join(root, finalized.record.target), "utf8"));
       assert.equal(record.candidateCommit, finalized.commit);
       assert.equal(record.outcomeClassification.kind, "authored-commit");
+      });
     } finally { rmSync(root, { recursive: true, force: true }); }
   } },
   { id: "NGHF06", name: "Claude return completes real Git commit, private receipt, and exclusive v4 writer in order", run: () => {
-    const root = mkdtempSync(join(tmpdir(), "native-goldfish-host-live-finalizer-"));
+    const root = fixtureRoot("native-goldfish-host-live-finalizer-");
     const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
     try {
       git("init", "-q"); git("config", "user.name", "Fixture");
       git("config", "user.email", "fixture@example.invalid"); git("config", "commit.gpgsign", "false");
       writeFileSync(join(root, "file.txt"), "before\n");
-      writeFileSync(join(root, ".gitignore"), "evidence/dispatch-record-*.json\n");
+      writeFileSync(join(root, ".gitignore"), "evidence/\n.claude/\n");
       git("add", "--", "file.txt", ".gitignore"); git("commit", "-q", "-m", "fixture baseline");
       mkdirSync(join(root, "evidence"));
+      writeFileSync(join(root,"pipeline.user.yaml"),readFileSync(join(nativeContractFixtureRepositoryRoot(),"pipeline.user.yaml")));
+      git("add","pipeline.user.yaml");git("commit","-qm","committed V3 configured route");
+      const runtime=sourceRuntime(root);
+      return runtime.run(()=> {
       const candidateCommit = git("rev-parse", "HEAD");
       const candidateTree = git("rev-parse", "HEAD^{tree}");
       const binding = { schema: "pipeline.native-goldfish-host-briefing.v1", dispatchId: "NGHF-LIVE-1",
         candidateCommit, candidateTree, runner: "claude", role: "pipeline-core:goldfish-implementor",
-        agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+        agentType: "goldfish-implementor", model: "sonnet", effort: "medium",
         rulesetSha, allowedPaths: ["file.txt"], criticDecision };
       const prompt = `Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v1\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
       const preTool = { cwd: root, session_id: "session-live", hook_event_name: "PreToolUse",
@@ -173,8 +213,38 @@ const cases = [
       } });
       assert.notEqual(replay.status, "authored-commit-recorded");
       assert.equal(git("rev-parse", "HEAD"), finalized.commit);
+      });
     } finally { rmSync(root, { recursive: true, force: true }); }
   } },
+
+  {id:"NGHF07",name:"Codex approved original item automatically prepares queue, executes candidate checks, and releases only genuine Main integration",run:()=>{
+    const root=fixtureRoot("native-codex-approved-item-");
+    const git=(...args)=>execFileSync("git",["-C",root,...args],{encoding:"utf8"}).trim();
+    try {
+      const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
+      const plan=controller.planDecision({rootDir:root,decision:"enroll",by:"controlled METHOD explicit selection"});controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});
+      const pipelineUserSource=readFileSync(join(nativeContractFixtureRepositoryRoot(),"pipeline.user.yaml"),"utf8").replace("gates:\n","gates:\n  human_approval: chat\n");
+      const original=prepareApprovedItemCourseFixture({root,pipelineUserSource});
+      git("config","user.name","Fixture");git("config","user.email","fixture@example.invalid");git("config","commit.gpgsign","false");
+      const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,"agent-pipeline/controlled-method-fixtures/codex-approved-owner"),sessionId:"codex-approved-owner"});
+      assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,"initialized");
+      return runtime.run(()=>{
+        const itemDelivery={schema:"pipeline.item-delivery-briefing.v1",sliceId:"CODEX-AC-1",itemId:"AC-1",criterionLocator:original.criterionLocator,checks:[{id:"original-criterion",path:"src/change.test.mjs",dependencies:["src/change.mjs","src/change.test.mjs"]}]};
+        const binding={schema:"pipeline.native-goldfish-host-briefing.v3",dispatchId:"CODEX-AC-1",candidateCommit:original.candidate.commit,candidateTree:original.candidate.tree,runner:"codex",role:"pipeline-core:goldfish-implementor",nativeAgentType:"worker",model:"gpt-6-luna",effort:"high",rulesetSha,allowedPaths:["src/change.mjs"],criticDecision,itemDelivery};
+        const prompt=`Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}\nSlice: CODEX-AC-1\nWrite scope: src/change.mjs\n`;
+        const pre={cwd:root,session_id:"codex-item-session",hook_event_name:"PreToolUse",tool_name:"spawn_agent",tool_use_id:"codex-item-tool",tool_input:{agent_type:"worker",message:prompt}};
+        const prepared=prepareNativeGoldfishHostState({root,runner:"codex",input:pre});assert.equal(prepared.ok,true,JSON.stringify(prepared));
+        assert.equal(finalizeNativeGoldfishHostReturn({root,runner:"codex",input:{...pre,hook_event_name:"SubagentStart",agent_id:"codex-item-worker",agent_type:"worker",model:binding.model}}).status,"agent-bound");
+        writeFileSync(join(root,"src/change.mjs"),"// actual approved Codex item change\nexport const value='expected';\n");
+        const text=JSON.stringify({schema:NATIVE_GOLDFISH_RETURN_SCHEMA,dispatchId:binding.dispatchId,candidateCommit:binding.candidateCommit,outcome:"succeeded",report:"Authored original criterion; candidate-bound check recorded.",changedPaths:["src/change.mjs"]});
+        const finalized=finalizeNativeGoldfishHostReturn({root,runner:"codex",input:{hook_event_name:"SubagentStop",session_id:pre.session_id,agent_id:"codex-item-worker",agent_type:"worker",model:binding.model,last_assistant_message:text}});
+        assert.equal(finalized.status,"authored-commit-recorded",JSON.stringify(finalized));assert.equal(finalized.delivery.checkStatus.verdict,"passed");
+        const integrated=integrateNativeGoldfishItemDelivery({root,pendingSha256:prepared.sha256});assert.equal(integrated.status,"integrated",JSON.stringify(integrated));
+        assert.equal(git("rev-parse","HEAD"),finalized.commit);assert.equal(git("show","HEAD:src/change.mjs"),"// actual approved Codex item change\nexport const value='expected';");
+      });
+    }finally{rmSync(root,{recursive:true,force:true});}
+  }},
+
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

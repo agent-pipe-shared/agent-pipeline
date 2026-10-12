@@ -1,3 +1,6 @@
+
+import {fileURLToPath as authorityFileURLToPath} from 'node:url';
+import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest, createControlledDomainTransitionObservation, beginControlledDomainTransitionObservation, finishControlledDomainTransitionObservation, readControlledDomainTransitionObservation} from './session-authority-domain-owner.mjs';
 // SPDX-License-Identifier: SUL-1.0
 /**
  * Inert private host store/controller for model-family invocations.
@@ -15,7 +18,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
-import { verifyModelFamilyAuthority, verifyModelFamilyPinDecision } from "./model-family-authority.mjs";
+import { verifyModelFamilyAuthority, verifyAggregateDesignModelFamilyAuthority, verifyModelFamilyPinDecision } from "./model-family-authority.mjs";
 import { evaluateModelFamilySelection } from "./model-family-latest-selection.mjs";
 
 const SHA = /^[a-f0-9]{64}$/u;
@@ -364,7 +367,7 @@ function mapPin(verifiedPin, assignment) {
     modelId: s.modelId, revision: s.revision };
 }
 
-function createFilesystemStore(rootDir) {
+function createFilesystemStore(rootDir, diagnosticScope = null) {
   const root = resolve(rootDir ?? "");
   if (!root.startsWith(sep) || root === sep) throw new TypeError("absolute fixture store root required");
   const directory = join(root, "model-family-host");
@@ -587,7 +590,8 @@ function createFilesystemStore(rootDir) {
       if (!validInvocationReceipt(receipt)) return fail("MODEL-FAMILY-RECEIPT-SHAPE");
       const filename = `${digest(key)}.json`;
       const receiptPath = join(receiptDir, filename);
-      try { writeNew(receiptPath, receipt); }
+      let wroteNewReceipt = false;
+      try { writeNew(receiptPath, receipt); wroteNewReceipt = true; }
       catch (error) {
         if (error?.code === "EEXIST") {
           const prior = parseStrictJson(safeRead(receiptPath));
@@ -597,6 +601,7 @@ function createFilesystemStore(rootDir) {
           }
         } else throw error;
       }
+      if (wroteNewReceipt) interruptControlledModelReceiptWrite(diagnosticScope, receiptPath, receipt);
       const entry = { ...key, receiptSha256: receipt.receiptSha256 };
       const receiptIndex = [...current.state.invocationIndex, entry];
       const watermarks = current.state.watermarks.filter((m) => JSON.stringify([m.runner,
@@ -623,6 +628,7 @@ function createFilesystemStore(rootDir) {
         || readback.receipts.at(-1)?.receiptSha256 !== receipt.receiptSha256) return fail("MODEL-FAMILY-STATE-READBACK");
       return { ok: true, code: "MODEL-FAMILY-RECEIPT-APPENDED", receipt, state: readback.state };
     } catch (error) {
+      if (modelWriteDiagnosticErrors.has(error)) throw error;
       return error?.code === "EEXIST" ? fail("CONCURRENT_RESELECTION_REQUIRED", true)
         : fail("MODEL-FAMILY-STORE-UNAVAILABLE");
     } finally { try { release?.(); } catch {} }
@@ -646,6 +652,10 @@ function validTime(value) {
 }
 
 function verifiedAuthority(inputs) {
+  if (strictObject(inputs, ["kind", "handle", "predecessor"]) && inputs.kind === "aggregate-design") {
+    const result = verifyAggregateDesignModelFamilyAuthority({ handle: inputs.handle, predecessor: inputs.predecessor });
+    return result.ok ? { value: result.value, trustAnchors: result.trustAnchors } : fail(result.code);
+  }
   if (!strictObject(inputs, ["bundle", "routeSource", "trustAnchors", "predecessor"])
     || !Array.isArray(inputs.trustAnchors) || inputs.trustAnchors.length === 0) return fail("MODEL-FAMILY-AUTHORITY-SOURCE");
   const result = verifyModelFamilyAuthority({ bundle: inputs.bundle, routeSource: inputs.routeSource,
@@ -695,13 +705,15 @@ function pinStateRecord(pin, authoritySha256) {
  * returns only {bundle,routeSource,trustAnchors}; this controller supplies the
  * branded predecessor to S1 and repeats the read and verification under lock.
  */
-export function createModelFamilyHostController({ rootDir, trustedSources, clock = () => Date.now() } = {}) {
+export function createModelFamilyHostController({ rootDir, trustedSources, clock = () => Date.now(), authorityLifecycle = null } = {}) {
   const required = ["readAuthorityInputs", "readPinInputs", "readFreshDiscovery", "readCurrentCandidate", "launchDriver"];
   if (typeof rootDir !== "string" || !rootDir.startsWith("/") || !trustedSources
     || required.some((name) => typeof trustedSources[name] !== "function") || typeof clock !== "function") {
     throw new TypeError("trusted family host source boundary is incomplete");
   }
-  const store = createFilesystemStore(rootDir);
+  const diagnosticScope = { active: null };
+  let controller;
+  const store = createFilesystemStore(rootDir, diagnosticScope);
   const nativeAdmissions = new Map();
   const nativeCapabilities = new WeakMap();
 
@@ -716,6 +728,9 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
     try { input = trustedSources.readSuccessorAuthorityInputs({
       predecessorAuthoritySha256: predecessor.authoritySha256 }); }
     catch { return fail("MODEL-FAMILY-SUCCESSOR-SOURCE"); }
+    if (strictObject(input, ["kind", "handle"]) && input.kind === "aggregate-design") {
+      return verifiedAuthority({ ...input, predecessor });
+    }
     if (!strictObject(input, ["bundle", "routeSource", "trustAnchors"]) || !Array.isArray(input.trustAnchors)
       || input.trustAnchors.length === 0) return fail("MODEL-FAMILY-SUCCESSOR-SOURCE");
     const verified = verifyModelFamilyAuthority({ ...input, predecessor });
@@ -961,7 +976,7 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
     return { ok: true, code: "MODEL-FAMILY-PRELAUNCH-READY", value: attempt };
   }
 
-  async function admitNativeRequest({ invocation, request } = {}) {
+  async function admitNativeRequestUnregistered({ invocation, request } = {}) {
     if (!invocation || !frozenHandles.has(invocation)) return fail("MODEL-FAMILY-PRELAUNCH-BINDING");
     if (typeof trustedSources.admitNativeRequest !== "function") return fail("MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED");
     let snapshot;
@@ -1008,7 +1023,7 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
     return fail("MODEL-FAMILY-LAUNCH-FAILED");
   }
 
-  function launch({ invocation, packetBindingSha256, nativeRequestCapability } = {}) {
+  function launchUnregistered({ invocation, packetBindingSha256, nativeRequestCapability } = {}) {
     const native = nativeRequestCapability === undefined ? null : nativeCapabilities.get(nativeRequestCapability);
     if (nativeRequestCapability !== undefined && (!native || native.invocation !== invocation
       || native.admission.status !== "issued")) return fail("MODEL-FAMILY-NATIVE-CAPABILITY-REQUIRED");
@@ -1056,9 +1071,63 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
     } catch { return fail("MODEL-FAMILY-LAUNCH-FAILED"); }
   }
 
-  return Object.freeze({ activate() { const loaded = loadAuthority(); return loaded?.value?.authoritySha256
-    ? store.activate(loaded.value) : loaded; }, transitionAuthority, prepare, prelaunch, admitNativeRequest,
-    launch, readState: store.readState });
+  const modelLaunched = new WeakMap();
+  const ownedLifetime = (identity, operation) => {
+    if (!authorityLifecycle || !isModelAuthorityLifecycleOwned(authorityLifecycle,rootDir)) return fail('MODEL-FAMILY-AUTHORITY-UNAVAILABLE');
+    return authorityLifecycle.run(identity, operation);
+  };
+  const admitNativeRequest = (input) => ownedLifetime({receiptSha256:input?.invocation?.receipt?.receiptSha256??null,kind:'native-admission'},()=>admitNativeRequestUnregistered(input));
+  const launch = (input) => {if(modelLaunched.get(input?.invocation)?.closed)return fail('MODEL-FAMILY-OWNER-CONTEXT-CLOSED');return ownedLifetime({receiptSha256:input?.invocation?.receipt?.receiptSha256??null,kind:'launch'},()=>{
+    const handle=authorityLifecycle.currentHandle(), result=launchUnregistered(input);
+    const remember=value=>{if(input?.invocation&&frozenHandles.has(input.invocation))modelLaunched.set(input.invocation,{handle,returned:value?.ok===true,native:input.nativeRequestCapability!==undefined,closed:false});return value;};
+    return result&&typeof result.then==='function'?Promise.resolve(result).then(remember):remember(result);
+  });};
+  function disposeInvocation({invocation}={}) {
+    const held=modelLaunched.get(invocation);
+    if(!held||held.closed||!held.returned||held.native||nativeAdmissions.has(invocation?.receipt?.receiptSha256))return {...fail('MODEL-FAMILY-OWNER-CONTEXT-HELD'),status:'held'};
+    const token=modelMethodTerminalToken(invocation,authorityLifecycle.repository,trustedSources.launchDriver);
+    if(!token)return {...fail('MODEL-FAMILY-OWNER-CONTEXT-HELD'),status:'held'};
+    const proof=modelMethodTerminalRead(token,{receiptSha256:invocation.receipt.receiptSha256});
+    if(!proof||!authorityLifecycle.terminal(held.handle,token))return {...fail('MODEL-FAMILY-OWNER-CONTEXT-HELD'),status:'held'};
+    held.closed=true;modelControlledDrivers.get(trustedSources.launchDriver).returned.delete(invocation.receipt.receiptSha256);
+    return {ok:true,status:'closed',code:'MODEL-FAMILY-INVOCATION-CLOSED',receiptSha256:invocation.receipt.receiptSha256,assurance:'controlled-unit-method',sourceRefs:proof.sourceFacts};
+  }
+  function prepareControlledWriteDiagnostic(input = {}) {
+    if (!own(input, ["key", "assignment", "diagnosticHandle"]) || !validKey(input.key)) {
+      return fail("MODEL-FAMILY-WRITE-DIAGNOSTIC-REQUIRED");
+    }
+    const held = modelWriteDiagnostics.get(input.diagnosticHandle);
+    if (!held || held.controller !== controller || held.scope !== diagnosticScope || held.used
+      || held.launchDriver !== trustedSources.launchDriver || !modelControlledDrivers.has(held.launchDriver)
+      || !isModelAuthorityLifecycleOwned(authorityLifecycle, rootDir)
+      || digest(authorityActualRepository(authorityLifecycle.repository)) !== held.repositorySha256) {
+      return fail("MODEL-FAMILY-WRITE-DIAGNOSTIC-REQUIRED");
+    }
+    held.used = true;
+    return ownedLifetime({ kind: 'prepare' }, () => {
+      if (diagnosticScope.active !== null) return fail("MODEL-FAMILY-WRITE-DIAGNOSTIC-REQUIRED");
+      diagnosticScope.active = input.diagnosticHandle;
+      try { return prepare({ key: input.key, assignment: input.assignment }); }
+      finally { diagnosticScope.active = null; }
+    });
+  }
+  function prepareControlledTransitionObservation(input={}) {
+    if(!own(input,["key","assignment","diagnosticHandle"])||!validKey(input.key))return fail('MODEL-FAMILY-TRANSITION-DIAGNOSTIC-REQUIRED');
+    const held=modelTransitionObservations.get(input.diagnosticHandle);
+    if(!held||held.used||held.controller!==controller||held.driver!==trustedSources.launchDriver||held.lifecycle!==authorityLifecycle||!modelControlledDrivers.has(held.driver)||diagnosticScope.active!==null)return fail('MODEL-FAMILY-TRANSITION-DIAGNOSTIC-REQUIRED');
+    held.used=true;
+    try{beginControlledDomainTransitionObservation(held.domainHandle);}catch{return fail('MODEL-FAMILY-TRANSITION-DIAGNOSTIC-REQUIRED');}
+    let result;
+    try{result=ownedLifetime({kind:'prepare'},()=>prepare({key:input.key,assignment:input.assignment}));return result;}
+    finally{finishControlledDomainTransitionObservation(held.domainHandle,result);}
+  }
+  controller = Object.freeze({ activate() { return ownedLifetime({kind:'activation'},()=>{const loaded=loadAuthority();return loaded?.value?.authoritySha256?store.activate(loaded.value):loaded;}); },
+    transitionAuthority:(input)=>ownedLifetime({kind:'transition'},()=>transitionAuthority(input)),
+    prepare:(input)=>ownedLifetime({kind:'prepare'},()=>prepare(input)), prepareControlledWriteDiagnostic, prepareControlledTransitionObservation,
+    prelaunch, admitNativeRequest, launch, disposeInvocation, readState:store.readState });
+  modelDiagnosticControllers.set(controller, { scope: diagnosticScope, rootDir,
+    authorityLifecycle, launchDriver: trustedSources.launchDriver });
+  return controller;
 }
 
 /** Offline held-receipt read: reads exactly one already-indexed invocation. */
@@ -1077,3 +1146,125 @@ export function readHeldModelFamilyInvocation({ rootDir, key } = {}) {
 /** Test-only fixture store seam is intentionally not exported. */
 export const MODEL_FAMILY_HOST_STORE_LIMITS = Object.freeze({ freshMs: FRESH_MS, casRetries: RETRIES,
   maxBytes: MAX_BYTES, maxReceipts: MAX_RECEIPTS });
+
+// AUTH-I08: actual physical model-store authority owner, no native promise.
+const modelAuthorityOwners = new Map(), modelAuthorityPorts = new WeakMap(), modelControlledDrivers = new WeakMap(), modelTerminalTokens = new WeakMap();
+/** A bounded unit-method driver owns its completion. This never launches a host. */
+export function createControlledModelFamilyHostDriver(){
+  const returned=new Map();
+  const launchDriver=({invocation,nativeRequest,driverContext}={})=>{if(nativeRequest!==undefined||driverContext!==undefined||!validInvocationReceipt(invocation)||!receiptDigest(invocation))return fail('MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED');const key=invocation.receiptSha256;if(returned.has(key))return fail('MODEL-FAMILY-CONTROLLED-REPLAY');returned.set(key,digest(invocation));return {ok:true,code:'MAIN_PRELAUNCH_OBSERVED',value:null};};
+  modelControlledDrivers.set(launchDriver,{returned});return Object.freeze({launchDriver,assurance:'controlled-unit-method'});
+}
+function modelMethodTerminalToken(invocation,repository,launchDriver){
+  if(!invocation||!frozenHandles.has(invocation))return null;
+  const driver=modelControlledDrivers.get(launchDriver);if(!driver||driver.returned.get(invocation.receipt.receiptSha256)!==digest(invocation.receipt))return null;
+  const token=Object.freeze({});modelTerminalTokens.set(token,{invocation,repository,launchDriver});return token;
+}
+function modelMethodTerminalRead(token,identity){
+  const held=modelTerminalTokens.get(token);if(!held||!frozenHandles.has(held.invocation)||!validKey(held.invocation.key)||identity?.receiptSha256!==held.invocation.receipt.receiptSha256)return null;
+  const driver=modelControlledDrivers.get(held.launchDriver);if(!driver||driver.returned.get(identity.receiptSha256)!==digest(held.invocation.receipt))return null;
+  const read=authorityReadSource({namespaceId:'receipts',filePath:join(held.repository.commonDir,'agent-pipeline','model-family-host','receipts',digest(held.invocation.key)+'.json'),semantic:({value})=>{if(!validInvocationReceipt(value)||receiptDigest(value)!==identity.receiptSha256||digest(value)!==digest(held.invocation.receipt))authorityOwnerFailure('model-family-host:terminal-receipt-drift');return value;}});
+  return {terminal:'completed',sourceFacts:[read.sourceFact]};
+}
+function modelAuthorityOwner(repository) {
+  const repo=authorityActualRepository(repository),key=JSON.stringify(repo);
+  if(modelAuthorityOwners.has(key))return modelAuthorityOwners.get(key);
+  const namespaces=['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes'];
+  const scan=()=>authorityScanDomain({rootPath:join(repo.commonDir,'agent-pipeline','model-family-host'),namespaceIds:namespaces,classifyEntry(entry){
+    const {relativePath:p,value}=entry;
+    if(/^authority-lifetimes\/[a-f0-9]{64}\.json$/.test(p))return authorityClassifyLifetime(entry,'model-family-host',namespaces[5],repo);
+    if(p===MARKER&&strictObject(value,['schema','activationId','authoritySha256','createdAt'])&&value.schema==='pipeline.model-family-host-activation.v1'&&SHA.test(value.activationId??'')&&SHA.test(value.authoritySha256??'')&&validTime(value.createdAt))return {namespaceId:namespaces[0],active:true,semantic:value};
+    if(p===STATE&&strictObject(value,['schema','generation','stateFile','stateSha256'])&&value.schema==='pipeline.model-family-host-state-pointer.v1'&&Number.isSafeInteger(value.generation)&&value.generation>=0&&SHA.test(value.stateSha256??'')&&value.stateFile===`generation-${value.generation}-${value.stateSha256}.json`)return {namespaceId:namespaces[1],active:false,semantic:value};
+    if(/^generation-\d+-[a-f0-9]{64}\.json$/.test(p)&&validateState(value)&&p===`generation-${value.generation}-${digest(value)}.json`)return {namespaceId:namespaces[2],active:false,semantic:value};
+    if(/^receipts\/[a-f0-9]{64}\.json$/.test(p)&&validInvocationReceipt(value)&&receiptDigest(value))return {namespaceId:namespaces[3],active:false,semantic:value};
+    if(p===LOCK)return {namespaceId:namespaces[4],active:true,semantic:{unresolvedWriterLock:true,bytesSha256:createHash('sha256').update(entry.bytes).digest('hex')}};
+    authorityOwnerFailure('model-family-host:unknown-or-invalid-entry');
+  }});
+  // A host must explicitly prove terminal disposal; a verified result alone is insufficient.
+  const owner=authorityCreateDomainOwner({repository:repo,producerId:'model-family-host',kinds:['armed-capability'],namespaceIds:namespaces,scan,transitionScope(){const rootPath=join(repo.commonDir,'agent-pipeline','model-family-host');return {mutablePaths:[MARKER,STATE,LOCK].map(p=>join(rootPath,p)),creations:[{rootPath,relativePattern:'^(?:activation\\.json|current\\.json|generation-[0-9]+-[a-f0-9]{64}\\.json|receipts/[a-f0-9]{64}\\.json|\\.writer\\.lock)$'}]};},terminalObservation:modelMethodTerminalRead,sourceModulePaths:[import.meta.url,...['model-family-runtime-host.mjs','model-family-invocation.mjs','session-authority-domain-owner.mjs','session-authority-registry.mjs'].map(p=>new URL(p,import.meta.url).href)].map(authorityFileURLToPath)});
+  modelAuthorityOwners.set(key,owner);modelAuthorityPorts.set(owner.port,repo);return owner;
+}
+export function createModelFamilyHostAuthorityProducerPort({repository}){return modelAuthorityOwner(repository).port;}
+export function isOwnedModelFamilyHostAuthorityProducerPort(port,{repository}){try{return JSON.stringify(modelAuthorityPorts.get(port))===JSON.stringify(authorityActualRepository(repository));}catch{return false;}}
+export function createModelFamilyHostAuthorityLifecycle({repository}){return modelAuthorityOwner(repository);}
+function isModelAuthorityLifecycleOwned(owner,rootDir){return [...modelAuthorityOwners.values()].includes(owner)&&join(owner.repository.commonDir,'agent-pipeline')===resolve(rootDir);}
+export function disposeModelFamilyHostDriverContext(context) {
+  const held=driverContexts.get(context);
+  // Existing native driver contexts have no qualified owner terminal port. The
+  // source-owned controlled method above is separate and never accepts this brand.
+  return {...fail(held?'MODEL-FAMILY-OWNER-CONTEXT-HELD':'MODEL-FAMILY-CONTEXT-TERMINAL-UNAVAILABLE'),status:'held'};
+}
+
+// Fixed METHOD-only physical write interruption. These maps issue no native authority.
+const modelDiagnosticControllers = new WeakMap(), modelWriteDiagnostics = new WeakMap();
+const modelWriteDiagnosticErrors = new WeakSet();
+export function createControlledModelFamilyWriteDiagnostic(input = {}) {
+  if (!own(input, ["controller", "launchDriver", "point"])
+    || input.point !== "after-new-receipt-before-generation") {
+    throw new TypeError("closed controlled model write diagnostic required");
+  }
+  const paired = modelDiagnosticControllers.get(input.controller);
+  if (!paired || paired.launchDriver !== input.launchDriver || !modelControlledDrivers.has(input.launchDriver)
+    || !isModelAuthorityLifecycleOwned(paired.authorityLifecycle, paired.rootDir)) {
+    throw new TypeError("genuine controlled controller and driver pairing required");
+  }
+  const handle = Object.freeze(Object.create(null));
+  modelWriteDiagnostics.set(handle, { controller: input.controller, scope: paired.scope,
+    launchDriver: input.launchDriver, repositorySha256: digest(authorityActualRepository(paired.authorityLifecycle.repository)),
+    used: false, interrupted: false });
+  return handle;
+}
+function interruptControlledModelReceiptWrite(scope, receiptPath, receipt) {
+  if (!scope || scope.active === null) return;
+  const held = modelWriteDiagnostics.get(scope.active);
+  if (!held || held.scope !== scope || !held.used || held.interrupted
+    || modelDiagnosticControllers.get(held.controller)?.scope !== scope
+    || !modelControlledDrivers.has(held.launchDriver)) return;
+  const expected = Buffer.from(`${canonicalizeJson(receipt)}\n`, "utf8");
+  if (!safeRead(receiptPath).equals(expected)) throw new Error("MODEL-DIAGNOSTIC-RECEIPT-RACED");
+  let physicalError, fd;
+  try {
+    fd = openSync(receiptPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
+      | (constants.O_NOFOLLOW ?? 0), 0o600);
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    physicalError = error;
+  }
+  if (!physicalError) {
+    closeSync(fd);
+    throw new Error("MODEL-DIAGNOSTIC-EXCLUSIVE-OPEN-UNEXPECTED");
+  }
+  held.interrupted = true;
+  const error = new Error("controlled model write interrupted after genuine immutable receipt", { cause: physicalError });
+  error.code = "MODEL-FAMILY-CONTROLLED-PARTIAL-WRITE";
+  modelWriteDiagnosticErrors.add(error);
+  throw error;
+}
+
+// Same-process genuine controlled pair correspondence; no native authority.
+const modelTransitionCounterparts=new WeakMap(),modelTransitionObservations=new WeakMap();
+function controlledModelPair(controller,launchDriver,lifecycle) {
+  const record=modelDiagnosticControllers.get(controller);
+  if(!record||record.launchDriver!==launchDriver||!modelControlledDrivers.has(launchDriver)||record.authorityLifecycle!==lifecycle||!isModelAuthorityLifecycleOwned(lifecycle,record.rootDir))throw new TypeError('genuine controlled Model controller driver lifecycle required');
+  const repository=authorityActualRepository(lifecycle.repository);
+  return {controller,launchDriver,lifecycle,record,repository};
+}
+export function registerControlledModelFamilyTransitionObservationCounterpart(input={}) {
+  if(!own(input,['controller','launchDriver','lifecycle','counterpartController','counterpartLaunchDriver','counterpartLifecycle']))throw new TypeError('closed Model counterpart enrollment required');
+  const primary=controlledModelPair(input.controller,input.launchDriver,input.lifecycle),counterpart=controlledModelPair(input.counterpartController,input.counterpartLaunchDriver,input.counterpartLifecycle);
+  if(modelTransitionCounterparts.has(primary.controller)||primary.repository.primaryRoot===counterpart.repository.primaryRoot||primary.repository.commonDir===counterpart.repository.commonDir)throw new TypeError('distinct once-enrolled Model counterpart required');
+  modelTransitionCounterparts.set(primary.controller,counterpart);
+}
+export function createControlledModelFamilyTransitionObservation(input={}) {
+  if(!own(input,['controller','launchDriver','lifecycle']))throw new TypeError('closed Model observation factory required');
+  const primary=controlledModelPair(input.controller,input.launchDriver,input.lifecycle),counterpart=modelTransitionCounterparts.get(primary.controller);
+  if(!counterpart)throw new TypeError('genuine Model counterpart enrollment required');
+  const secondary=controlledModelPair(counterpart.controller,counterpart.launchDriver,counterpart.lifecycle);
+  if(primary.repository.primaryRoot===secondary.repository.primaryRoot||primary.repository.commonDir===secondary.repository.commonDir)throw new TypeError('distinct Model repositories required');
+  const domainHandle=createControlledDomainTransitionObservation({owner:primary.lifecycle,counterpartOwner:secondary.lifecycle});
+  const handle=Object.freeze(Object.create(null));modelTransitionObservations.set(handle,{controller:primary.controller,driver:primary.launchDriver,lifecycle:primary.lifecycle,domainHandle,used:false});return handle;
+}
+export function readControlledTransitionObservation(handle) {
+  const held=modelTransitionObservations.get(handle);if(!held)return null;
+  return readControlledDomainTransitionObservation(held.domainHandle);
+}

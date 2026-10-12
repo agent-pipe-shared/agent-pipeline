@@ -5,9 +5,9 @@
  * Linux-only owner of HAW-B's fixed inhibitor child and authenticated endpoint.
  *
  * It receives its complete startup configuration on inherited FD 3.  Nothing
- * mutable is accepted through argv or environment.  The starter alone writes
- * starting/active/stopped records; after commit this controller may only make
- * the restricted heartbeat CAS and otherwise exits on any mismatch.
+ * mutable is accepted through argv or environment.  The actual transported controller owns
+ * the original Power member and every settled record phase until terminal.
+ * FD4 requester admission precedes FD3 configuration and all native effects.
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -23,12 +23,17 @@ import {
   heartbeatSessionPowerRecord,
   readLinuxProcessIdentity,
   readSessionPowerRecord,
+  resolveSessionPowerContext,
   withSessionPowerLock,
   writeSessionPowerRecord,
 } from "../lib/session-power.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { authorityRepositoryFromRoot } from "../lib/session-authority-domain-owner.mjs";
+import { createSourceOwnedChildRuntimePort, readRequesterTransport, withSourceOwnedAuthorityContext } from "../lib/session-requester-bridge.mjs";
+import { runOwnedSessionPowerController } from "../lib/session-power-owned-lifecycle.mjs";
 
 const CONFIG_SCHEMA = "pipeline.session-power-controller-config.v1";
+const BOUND_CONFIG_SCHEMA = "pipeline.session-power-controller-config.v2";
 const ACK_SCHEMA = "pipeline.session-power-controller-ack.v1";
 const HEX = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/u;
@@ -43,17 +48,32 @@ function sha(value) { return createHash("sha256").update(value).digest("hex"); }
 
 export function validateControllerConfig(value) {
   const top = ["schema", "activationNonce", "controller", "context", "nodePath", "helperPath", "controlPath", "leaseSeconds"];
+  const bound = value?.schema === BOUND_CONFIG_SCHEMA;
   const contextKeys = ["repoFingerprint", "sessionId", "descriptorSha256", "directory", "recordPath", "lockPath", "controlPath"];
-  if (!exactKeys(value, top) || value.schema !== CONFIG_SCHEMA || !HEX.test(value.activationNonce ?? "")
+  if (bound) contextKeys.push("repoRoot");
+  if (!exactKeys(value, top) || ![CONFIG_SCHEMA, BOUND_CONFIG_SCHEMA].includes(value.schema) || !HEX.test(value.activationNonce ?? "")
     || !exactKeys(value.controller, ["pid", "start", "executableSha256"])
     || !exactKeys(value.context, contextKeys)
     || !safePid(value.controller.pid) || typeof value.controller.start !== "string" || !HEX.test(value.controller.executableSha256 ?? "")
     || !HEX.test(value.context.repoFingerprint ?? "") || !SAFE_ID.test(value.context.sessionId ?? "") || !HEX.test(value.context.descriptorSha256 ?? "")
     || ![value.context.directory, value.context.recordPath, value.context.lockPath, value.context.controlPath, value.nodePath, value.helperPath, value.controlPath].every(absolute)
+    || (bound && !absolute(value.context.repoRoot))
     || value.context.controlPath !== value.controlPath || value.leaseSeconds !== SESSION_POWER_LEASE_SECONDS) {
     fail("controller configuration is invalid");
   }
   return structuredClone(value);
+}
+
+/** Reconstruct runtime context from the actual descriptor, never a wire repo object. */
+export function resolveControllerContext(configInput) {
+  const config = validateControllerConfig(configInput);
+  if (config.schema !== BOUND_CONFIG_SCHEMA) fail("controller configuration has no descriptor-bound repository root");
+  const context = resolveSessionPowerContext(config.context.repoRoot, config.context.sessionId, config.context.descriptorSha256);
+  if (context.repo.primaryRoot !== config.context.repoRoot
+    || ["repoFingerprint", "sessionId", "descriptorSha256", "directory", "recordPath", "lockPath", "controlPath"].some((key) => context[key] !== config.context[key])) {
+    fail("controller descriptor context changed");
+  }
+  return context;
 }
 
 function assertRegular(path, label) {
@@ -143,78 +163,23 @@ async function listenEndpoint(path, handler) {
   return server;
 }
 
-/** Starts the child only after every fixed Linux identity/argv check has passed. */
+/** The actual child requester scope owns the whole controller lifetime. */
 export async function runController(configInput, pipe, deps = {}) {
-  const config = validateControllerConfig(configInput);
-  const identityForPid = deps.identityForPid ?? readLinuxProcessIdentity;
-  const spawnChild = deps.spawnChild ?? spawn;
-  const clock = deps.now ?? (() => new Date());
-  if (process.platform !== "linux") fail("controller platform is unavailable");
-  const self = identityForPid(process.pid);
-  if (self.start !== config.controller.start || self.executableSha256 !== config.controller.executableSha256) fail("controller self identity mismatch");
-  assertRegular("/usr/bin/systemd-inhibit", "systemd-inhibit");
-  assertRegular(config.helperPath, "session-power helper");
-  const launch = fixedAdapterLaunch({ platform: "linux", nodePath: config.nodePath, helperPath: config.helperPath, controllerPid: process.pid, controllerStart: self.start });
-  const child = spawnChild(launch.command, launch.args, { shell: false, detached: false, stdio: "ignore", windowsHide: true });
-  if (!child?.pid || !safePid(child.pid)) fail("fixed adapter child did not start");
-  const ack = startupAcknowledgement(config, child, { identityForPid, now: clock() });
-  let committed = false;
-  let stopping = false;
-  let heartbeatTimer = null;
-  let leaseTimer = null;
-  let server = null;
-  const shutdown = async () => {
-    if (stopping) return;
-    stopping = true;
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
-    if (leaseTimer) clearTimeout(leaseTimer);
-    if (server) await new Promise((resolveClose) => server.close(resolveClose));
-    try { if (existsSync(config.controlPath)) unlinkSync(config.controlPath); } catch { /* controller owns only its endpoint */ }
-    try { child.kill("SIGTERM"); } catch { /* owned child may have already exited */ }
-    pipe.destroy();
-  };
-  server = await listenEndpoint(config.controlPath, async (request, socket) => {
-    if (!isObject(request) || request.activationNonce !== ack.activationNonce) return socket.destroy();
-    if (request.type === "proof") {
-      writeFrame(socket, { schema: ACK_SCHEMA, type: "proof", committed, ...exactProof(ack) });
-      socket.end();
-      return;
-    }
-    if (request.type === "stop" && committed && equalProof(request, ack)) {
-      writeFrame(socket, { schema: ACK_SCHEMA, type: "stopped", ...exactProof(ack) });
-      socket.end();
-      await shutdown();
-      return;
-    }
-    socket.destroy();
-  });
-  child.once("exit", () => { if (!stopping) void shutdown(); });
-  writeFrame(pipe, ack);
-  let commit;
-  try { commit = await readFrame(pipe, { timeoutMs: 5_000 }); } catch (error) { await shutdown(); throw error; }
-  if (!isObject(commit) || commit.type !== "commit" || commit.activationNonce !== ack.activationNonce || !equalProof(commit, ack)) {
-    await shutdown();
-    fail("commit acknowledgement is invalid");
-  }
-  committed = true;
-  writeFrame(pipe, { schema: ACK_SCHEMA, type: "committed-ack", ...exactProof(ack) });
-  heartbeatTimer = setInterval(() => {
-    try {
-      withSessionPowerLock(config.context, () => {
-        const current = readSessionPowerRecord(config.context);
-        if (!current || current.status !== "active" || !equalProof(current, ack)) fail("heartbeat tuple mismatch");
-        writeSessionPowerRecord(config.context, heartbeatSessionPowerRecord(current, { expectedRevision: current.revision, now: clock() }));
-      });
-    } catch { void shutdown(); }
-  }, SESSION_POWER_HEARTBEAT_SECONDS * 1_000);
-  leaseTimer = setTimeout(() => { void shutdown(); }, SESSION_POWER_LEASE_SECONDS * 1_000);
-  return { ack, shutdown };
+  if (!isObject(deps) || Object.keys(deps).length !== 0) fail("controller runtime dependency overrides are unavailable");
+  return runOwnedSessionPowerController(configInput, pipe);
 }
 
 async function direct() {
-  const pipe = new Socket({ fd: 3, readable: true, writable: true, allowHalfOpen: true });
-  const config = validateControllerConfig(await readFrame(pipe));
-  await runController(config, pipe);
+  const repository = authorityRepositoryFromRoot(process.cwd());
+  const runtimePort = createSourceOwnedChildRuntimePort({ repository });
+  const requester = readRequesterTransport({ repository, fd: 4 }, runtimePort);
+  if (requester.status !== "bound") fail("controller requester transport is unavailable");
+  await withSourceOwnedAuthorityContext({ requesterHandle: requester.requesterHandle, runtimePort }, async () => {
+    const pipe = new Socket({ fd: 3, readable: true, writable: true, allowHalfOpen: true });
+    const config = validateControllerConfig(await readFrame(pipe));
+    const controller = await runController(config, pipe);
+    await controller.terminal;
+  });
 }
 
 if (isDirectInvocation(import.meta.url)) {

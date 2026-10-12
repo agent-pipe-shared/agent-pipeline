@@ -1,3 +1,8 @@
+import {authorityRepositoryFromRoot} from './session-authority-domain-owner.mjs';
+import {withAfkAuthorityLifetime,executeSourceOwnedAfkProjectionLifetime,readSourceOwnedAfkProjectionPhysicalSnapshot} from './afk-ledger.mjs';
+import {AsyncLocalStorage} from 'node:async_hooks';
+import {readAuthoritySourceFile} from './session-authority-domain-owner.mjs';
+import {readSourceOwnedOnboardingAfkAdmission,settleSourceOwnedOnboardingAfkProjection,observeSourceOwnedControlledMethodAfkHostCheckpoint} from './onboarding-continuity.mjs';
 // SPDX-License-Identifier: SUL-1.0
 import { hostname } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -132,7 +137,7 @@ function append(commonDir, activationId, type, body, recordedAt) {
 }
 
 function hostLock(root, activationId, recordedAt) {
-  return acquireHostLock({
+  const acquired = acquireHostLock({
     root,
     activationId,
     recordedAt,
@@ -140,6 +145,13 @@ function hostLock(root, activationId, recordedAt) {
       return append(commonDir, activationId, "lock-recovered", body, recordedAt);
     },
   });
+  const row=ownedAfkHostScope.getStore();
+  if (row) {
+    ownedAfkCurrent(row.admissionHandle);
+    if (row.phase!=='executing'||row.lock||root!==row.binding.repository.primaryRoot||activationId!==row.binding.activationId) ownedAfkRefuse();
+    row.lock=acquired.lock;
+  }
+  return acquired;
 }
 
 function releaseWithOutcome(lock, outcome) {
@@ -162,7 +174,7 @@ function requireProjectionWriter(refreshProjection) {
     : fail("AFK-PROJECTION-WRITER-UNAVAILABLE");
 }
 
-export function executeAfkActivationHostTransaction({
+function executeAfkActivationHostTransactionUnregistered({
   root,
   receipt,
   recordedAt,
@@ -215,7 +227,7 @@ function completedEntry(ledger, intent) {
   return findRecords(ledger, "entry-applied").find(({ record }) => record.body.entryId === intent.body.entryId);
 }
 
-export function executeAfkEntryHostTransaction({
+function executeAfkEntryHostTransactionUnregistered({
   root,
   request,
   proposal,
@@ -307,7 +319,7 @@ function linkedFeatureCheckouts(root, featureRef) {
   return raw.split("\0").filter((line) => line === `branch ${featureRef}`).length;
 }
 
-export function executeAfkReviewHostTransaction({ root, activationId, reviewInput, refreshProjection }) {
+function executeAfkReviewHostTransactionUnregistered({ root, activationId, reviewInput, refreshProjection }) {
   if (!HEX32.test(activationId ?? "") || !reviewInput || !SAFE_HOST.test(reviewInput.reviewId ?? "")
     || !Array.isArray(reviewInput.dispositions) || !requireProjectionWriter(refreshProjection).ok) {
     return fail("AFK-REVIEW-HOST-INVALID");
@@ -389,4 +401,175 @@ export function executeAfkReviewHostTransaction({ root, activationId, reviewInpu
     outcome = fail("AFK-REVIEW-HOST-FAILED", null, "unknown");
   }
   return releaseWithOutcome(acquired.lock, outcome);
+}
+
+export function executeAfkActivationHostTransaction(input){return withAfkAuthorityLifetime({repository:authorityRepositoryFromRoot(input?.root),identity:{activationId:input?.activationId??input?.receipt?.activationId??input?.request?.activationId??null,kind:'executeAfkActivationHostTransaction'}},()=>executeAfkActivationHostTransactionUnregistered(input));}
+export function executeAfkEntryHostTransaction(input){return withAfkAuthorityLifetime({repository:authorityRepositoryFromRoot(input?.root),identity:{activationId:input?.activationId??input?.receipt?.activationId??input?.request?.activationId??null,kind:'executeAfkEntryHostTransaction'}},()=>executeAfkEntryHostTransactionUnregistered(input));}
+export function executeAfkReviewHostTransaction(input){return withAfkAuthorityLifetime({repository:authorityRepositoryFromRoot(input?.root),identity:{activationId:input?.activationId??input?.receipt?.activationId??input?.request?.activationId??null,kind:'executeAfkReviewHostTransaction'}},()=>executeAfkReviewHostTransactionUnregistered(input));}
+
+// Fixed owning route: wire selectors cannot create this synchronous scope.
+const ownedAfkHostScope = new AsyncLocalStorage();
+const ownedAfkAttempts = new WeakMap(), ownedAfkSettledResults = new WeakMap();
+const OWNED_AFK_CODES = new Set(['SDC-AUTHORITY-UNAVAILABLE','SDC-AUTHORITY-CAS','SDC-AUTHORITY-HELD','SDC-PRIVATE-PATH','SDC-LOCK-HELD']);
+const OWNED_AFK_STATE = new Set(['unchanged','committed','durability-unknown','indeterminate']);
+const ownedAfkSame = (a,b) => canonicalJson(a) === canonicalJson(b);
+function ownedAfkRefuse(code='SDC-AUTHORITY-UNAVAILABLE') {
+  const error=new Error('owned AFK transaction unavailable');
+  error.code=code; throw error;
+}
+function ownedAfkAdmission(admissionHandle) {
+  const value=readSourceOwnedOnboardingAfkAdmission({admissionHandle});
+  if (!value || Object.keys(value).sort().join(',')!=='activationId,input,kind,repository,stateDisposition'
+      || !HEX32.test(value.activationId??'') || !['activate','entry','review'].includes(value.kind)
+      || !OWNED_AFK_STATE.has(value.stateDisposition)
+      || !ownedAfkSame(authorityRepositoryFromRoot(value.repository?.primaryRoot),value.repository)) ownedAfkRefuse();
+  return value;
+}
+function ownedAfkCurrent(admissionHandle) {
+  const row=ownedAfkAttempts.get(admissionHandle);
+  if (!row || ownedAfkHostScope.getStore()!==row || row.closed) ownedAfkRefuse();
+  const fresh=ownedAfkAdmission(admissionHandle);
+  if (!ownedAfkSame(row.binding,{repository:fresh.repository,kind:fresh.kind,activationId:fresh.activationId,input:fresh.input})) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+  return row;
+}
+export function isCurrentSourceOwnedAfkProjectionAttempt({admissionHandle,repository,activationId}) {
+  try { const row=ownedAfkCurrent(admissionHandle); return ownedAfkSame(row.binding.repository,repository)&&row.binding.activationId===activationId; }
+  catch { return false; }
+}
+function ownedAfkObservation(row) {
+  const before=readSourceOwnedAfkProjectionPhysicalSnapshot({admissionHandle:row.admissionHandle});
+  const ledger=loadAfkLedger(row.binding.repository.commonDir,row.binding.activationId);
+  const ref=observeAfkGitAuthority(row.binding.repository.primaryRoot,`refs/agent-pipeline/afk/${row.binding.activationId}`);
+  const after=readSourceOwnedAfkProjectionPhysicalSnapshot({admissionHandle:row.admissionHandle});
+  if (!ledger.ok || !ref.ok || !ownedAfkSame(before,after)) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+  return {snapshot:after,ledger,ref};
+}
+function ownedAfkWriter(row) {
+  if (!row.lock?.ok || row.lock.path!==resolve(row.binding.repository.commonDir,'agent-pipeline','afk',row.binding.activationId,'writer.lock')) ownedAfkRefuse();
+  const read=readAuthoritySourceFile({namespaceId:'writer-recovery-locks',filePath:row.lock.path,semantic:({value})=>value});
+  if (!ownedAfkSame(read.value,row.lock.owner)) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+  return read.sourceFact;
+}
+function ownedAfkCapture(row,value) {
+  ownedAfkCurrent(row.admissionHandle);
+  if (row.phase!=='executing' || row.capture) ownedAfkRefuse();
+  const writer=ownedAfkWriter(row),observed=ownedAfkObservation(row);
+  const intents=findRecords(observed.ledger,'activation-intent'),ready=findRecords(observed.ledger,'activation-ready');
+  const receipt=intents[0]?.record.body.receipt;
+  const status=observed.ledger.frames.at(-1)?.record.type==='review-complete'?'complete':'active';
+  const updatedAt=row.binding.kind==='review'?row.binding.input.reviewInput?.reviewedAt:row.binding.input.recordedAt;
+  if (intents.length!==1 || ready.length!==1 || !validateActivationReceipt(receipt).ok
+      || receipt.activationId!==row.binding.activationId || observed.ref.refOid===null
+      || (row.binding.kind==='activate'&&!ownedAfkSame(receipt,row.binding.input.receipt))
+      || (row.binding.kind==='entry'&&receipt.receiptSha256!==row.binding.input.request?.activationReceiptSha256)
+      || (row.binding.kind==='review')!==(status==='complete')
+      || !ownedAfkSame(value,projection(row.binding.activationId,status,observed.ledger,observed.ref.refOid,updatedAt))
+      || !ownedAfkSame(writer,ownedAfkWriter(row))) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+  row.capture={projection:structuredClone(value),snapshot:observed.snapshot,ref:observed.ref};
+}
+function ownedAfkVerifyPostHost(row) {
+  const observed=ownedAfkObservation(row);
+  if (!row.capture || !ownedAfkSame(row.capture.ref,observed.ref)
+      || observed.ledger.sequence!==row.capture.projection.ledgerSequence
+      || observed.ledger.headSha256!==row.capture.projection.ledgerHeadSha256) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+  const generations=snapshot=>snapshot.memberships.find(m=>m.namespaceId==='activation-generations')?.sourceFacts;
+  if (!ownedAfkSame(generations(row.capture.snapshot),generations(observed.snapshot))) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+  if (row.postHost && !ownedAfkSame(row.postHost,observed.snapshot)) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+  return observed.snapshot;
+}
+export function executeSourceOwnedAfkHostEffect({admissionHandle}) {
+  const row=ownedAfkCurrent(admissionHandle);
+  if (row.phase!=='prepared') ownedAfkRefuse();
+  row.before=readSourceOwnedAfkProjectionPhysicalSnapshot({admissionHandle});
+  row.beforeRef=observeAfkGitAuthority(row.binding.repository.primaryRoot,`refs/agent-pipeline/afk/${row.binding.activationId}`);
+  if (!row.beforeRef.ok) ownedAfkRefuse();
+  row.phase='executing'; row.attempted=true;
+  const args={root:row.binding.repository.primaryRoot,activationId:row.binding.activationId,...structuredClone(row.binding.input),refreshProjection:value=>ownedAfkCapture(row,value)};
+  const result=row.binding.kind==='activate'?executeAfkActivationHostTransactionUnregistered(args)
+    :row.binding.kind==='entry'?executeAfkEntryHostTransactionUnregistered(args):executeAfkReviewHostTransactionUnregistered(args);
+  row.hostResult=result;
+  const after=readSourceOwnedAfkProjectionPhysicalSnapshot({admissionHandle});
+  const ref=observeAfkGitAuthority(row.binding.repository.primaryRoot,`refs/agent-pipeline/afk/${row.binding.activationId}`);
+  row.hostEffects=ref.ok&&ownedAfkSame(row.before,after)&&ownedAfkSame(row.beforeRef,ref)?'none':'retained';
+  if (!result?.ok || !row.capture) ownedAfkRefuse('SDC-AUTHORITY-HELD');
+  row.postHost=ownedAfkVerifyPostHost(row); row.phase='host-settled';
+  return result;
+}
+export function readSourceOwnedAfkProjectionSettlement({repository,activationId,ledgerHeadSha256}) {
+  const row=ownedAfkHostScope.getStore();
+  if (!row || row.closed || row.phase!=='projecting') return null;
+  ownedAfkCurrent(row.admissionHandle);
+  if (!ownedAfkSame(row.binding.repository,repository)||row.binding.activationId!==activationId
+      || row.capture?.projection.ledgerHeadSha256!==ledgerHeadSha256) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+  ownedAfkVerifyPostHost(row);
+  return Object.freeze(structuredClone(row.capture.projection));
+}
+export function settleSourceOwnedAfkHostProjection({admissionHandle,hostResult}) {
+  const row=ownedAfkCurrent(admissionHandle);
+  if (row.phase!=='host-settled'||row.hostResult!==hostResult) ownedAfkRefuse();
+  observeSourceOwnedControlledMethodAfkHostCheckpoint({admissionHandle});
+  ownedAfkVerifyPostHost(row); row.phase='projecting';
+  const settled=settleSourceOwnedOnboardingAfkProjection({admissionHandle});
+  if (settled&&typeof settled.then==='function') ownedAfkRefuse('SDC-AUTHORITY-HELD');
+  if (settled?.status!=='completed'||settled.entry!=='afk-project'||settled.exitCode!==0
+      || !settled.statePreimage||!settled.statePostimage||!settled.memberRef||typeof settled.assurance!=='string') {
+    if (OWNED_AFK_STATE.has(settled?.stateDisposition)) row.stateDisposition=settled.stateDisposition;
+    ownedAfkRefuse(OWNED_AFK_CODES.has(settled?.code)?settled.code:'SDC-AUTHORITY-HELD');
+  }
+  ownedAfkCurrent(admissionHandle); ownedAfkVerifyPostHost(row);
+  row.finalResult=Object.freeze({status:'completed',kind:row.binding.kind,hostResult:structuredClone(hostResult),
+    statePreimage:settled.statePreimage,statePostimage:settled.statePostimage,memberRef:settled.memberRef,assurance:settled.assurance});
+  row.phase='settled'; ownedAfkSettledResults.set(row.finalResult,row);
+  return row.finalResult;
+}
+export function isSettledSourceOwnedAfkProjectionResult(result,{repository,activationId}) {
+  try { const row=ownedAfkSettledResults.get(result); return !!row&&ownedAfkCurrent(row.admissionHandle)===row
+    &&row.phase==='settled'&&ownedAfkSame(row.binding.repository,repository)&&row.binding.activationId===activationId; }
+  catch { return false; }
+}
+export function executeSourceOwnedAfkHostTransaction(request) {
+  let row;
+  try {
+    if (!request||Object.keys(request).join(',')!=='admissionHandle'||ownedAfkHostScope.getStore()) ownedAfkRefuse();
+    const previous=ownedAfkAttempts.get(request.admissionHandle);
+    if(previous) {
+      if(previous.closed!==true||previous.phase!=='settled'||!previous.finalResult
+          ||ownedAfkSettledResults.get(previous.finalResult)!==previous) ownedAfkRefuse();
+      const before=ownedAfkAdmission(request.admissionHandle);
+      if(before.stateDisposition!=='committed'
+          ||!ownedAfkSame(previous.binding,{repository:before.repository,kind:before.kind,activationId:before.activationId,input:before.input}))
+        ownedAfkRefuse('SDC-AUTHORITY-CAS');
+      const after=ownedAfkAdmission(request.admissionHandle);
+      if(!ownedAfkSame(before,after)) ownedAfkRefuse('SDC-AUTHORITY-CAS');
+      // The actual one-use gate refused before any second host or State call.
+      // Fresh original admission readbacks authenticate the settled State image.
+      return Object.freeze({status:'unavailable',code:'SDC-AUTHORITY-UNAVAILABLE',attempted:false,hostEffects:'none',stateDisposition:'unchanged'});
+    }
+    const admission=ownedAfkAdmission(request.admissionHandle);
+    row={admissionHandle:request.admissionHandle,binding:{repository:admission.repository,kind:admission.kind,activationId:admission.activationId,input:admission.input},
+      phase:'prepared',closed:false,attempted:false,hostEffects:'none',stateDisposition:admission.stateDisposition};
+    ownedAfkAttempts.set(request.admissionHandle,row);
+    return ownedAfkHostScope.run(row,()=>{
+      try {
+        const result=executeSourceOwnedAfkProjectionLifetime({admissionHandle:row.admissionHandle});
+        if (result&&typeof result.then==='function') ownedAfkRefuse('SDC-AUTHORITY-HELD');
+        if (row.phase!=='settled'||!row.finalResult) ownedAfkRefuse('SDC-AUTHORITY-HELD');
+        return row.finalResult;
+      } catch (error) {
+        try { row.stateDisposition=ownedAfkAdmission(row.admissionHandle).stateDisposition; } catch { if (!['durability-unknown','indeterminate'].includes(row.stateDisposition)) row.stateDisposition='indeterminate'; }
+        return Object.freeze({status:'unavailable',code:OWNED_AFK_CODES.has(error?.code)?error.code:'SDC-AUTHORITY-UNAVAILABLE',
+          attempted:row.attempted,hostEffects:row.attempted&&row.hostEffects==='none'&&row.phase==='executing'?'unknown':row.hostEffects,stateDisposition:row.stateDisposition});
+      } finally { row.closed=true; }
+    });
+  } catch (error) {
+    return Object.freeze({status:'unavailable',code:OWNED_AFK_CODES.has(error?.code)?error.code:'SDC-AUTHORITY-UNAVAILABLE',attempted:false,hostEffects:'none',stateDisposition:'indeterminate'});
+  }
+}
+
+export function readSourceOwnedAfkProjectionSettlementSelector({admissionHandle}) {
+  const row=ownedAfkHostScope.getStore();
+  if (!row||row.closed||row.phase!=='projecting') return null;
+  if (row.admissionHandle!==admissionHandle) ownedAfkRefuse();
+  ownedAfkCurrent(admissionHandle); ownedAfkVerifyPostHost(row);
+  return Object.freeze({repository:structuredClone(row.binding.repository),activationId:row.binding.activationId,ledgerHeadSha256:row.capture.projection.ledgerHeadSha256});
 }

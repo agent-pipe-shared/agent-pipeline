@@ -29,6 +29,10 @@ import {
   SessionCleanupRecoveryError,
   applySessionCleanupRecovery,
   planSessionCleanupRecovery,
+  prepareSignedDescriptorCustody,
+  buildSignedDescriptorCustodyPackage,
+  verifySignedDescriptorCustodyPackage,
+  applySignedDescriptorCustody,
 } from "../lib/session-cleanup-recovery.mjs";
 import {
   GOVERNANCE_RECOVERY_SOURCE_SCHEMA,
@@ -72,6 +76,10 @@ const USAGE = `Usage:
   session-cleanup.mjs apply-privatization --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs plan-recovery --repo <checkout>
   session-cleanup.mjs plan-human-recovery --repo <checkout>
+  session-cleanup.mjs prepare-descriptor-custody --repo <checkout> --session-descriptor <id>
+  session-cleanup.mjs build-descriptor-custody --repo <checkout> --observation-file <private-json> --confirmation-file <private-json> --expires-at <UTC-time>
+  session-cleanup.mjs verify-descriptor-custody --repo <checkout> --package-file <private-json> --proof-file <private-json>
+  session-cleanup.mjs apply-descriptor-custody --repo <checkout> --package-file <private-json> --proof-file <private-json>
   session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate [--event-out <repo-relative-path>]
   session-cleanup.mjs register-intent --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> --type <scratch-file|scratch-directory> --path <absolute> --content-class <scratch|disposable-control|generated-output> --policy <unlink-file|remove-directory>
   session-cleanup.mjs finalize --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> [--canary <relative-file>]
@@ -203,6 +211,13 @@ function planHumanRecovery(repo, dependencies = {}) {
       });
     }
   } catch {}
+  // Signed custody retains resource-bearing descriptors and exposes genuine preparation.
+  try {
+    for (const descriptor of listActiveSessionDescriptors(repo)) {
+      const prepared = prepareSignedDescriptorCustody({ rootDir: repo, sessionId: descriptor.sessionId }, dependencies);
+      candidates.push({ id: "signed-descriptor-custody", mutation: false, effect: "signed-descriptor-custody-retain-resources", preparation: prepared });
+    }
+  } catch {}
   if (offerAttendedRecovery) {
     candidates.push({
       id: "attended-host-recovery",
@@ -313,6 +328,16 @@ function parseArchiveArgs(argv) {
 }
 
 function parseArgs(argv) {
+  if (["prepare-descriptor-custody", "build-descriptor-custody", "verify-descriptor-custody", "apply-descriptor-custody"].includes(argv[0])) {
+    const [command, ...args] = argv, flags = {};
+    const allowed = new Set(["repo", "runner", ...(command === "prepare-descriptor-custody" ? ["session-descriptor"] : command === "build-descriptor-custody" ? ["observation-file", "confirmation-file", "expires-at"] : ["package-file", "proof-file"])]);
+    for (let i = 0; i < args.length; i += 2) {
+      const key = args[i]?.slice(2), value = args[i + 1];
+      if (!args[i]?.startsWith("--") || !allowed.has(key) || value === undefined || value.startsWith("--") || Object.hasOwn(flags, key)) throw new Error(USAGE);
+      flags[key] = value;
+    }
+    return { command, flags };
+  }
   if (new Set(["plan-archive-orphan", "archive-orphan"]).has(argv[0])) return parseArchiveArgs(argv);
   const [command, ...rest] = argv;
   if (!new Set([
@@ -474,7 +499,26 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
   const write = dependencies.writeFn ?? ((value) => process.stdout.write(value));
   let output;
   let exitCode = 0;
-  if (command === "status") {
+  if (command.endsWith("-descriptor-custody")) {
+    const read = name => {
+      const path = required(flags, name), info = lstatSync(path);
+      if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || info.size > 1024 * 1024 || (process.platform !== "win32" && (info.mode & 0o077))) throw new Error("SDC-PRIVATE-PATH");
+      if (process.platform === "win32" && assessWindowsPrivatePath(path).status !== "secure") throw new Error("SDC-PRIVATE-PATH");
+      return JSON.parse(readFileSync(path, "utf8"));
+    };
+    if (command === "prepare-descriptor-custody") output = prepareSignedDescriptorCustody({ rootDir: repo, sessionId: required(flags, "session-descriptor") }, dependencies);
+    else if (command === "build-descriptor-custody") output = buildSignedDescriptorCustodyPackage({ observation: read("observation-file"), sessionEndedConfirmation: read("confirmation-file"), expiresAt: required(flags, "expires-at") });
+    else {
+      // Anchor comes only from an external trusted producer, never the proof or a CLI path.
+      const anchor = dependencies.resolveDescriptorCustodyAnchorFn?.({ rootDir: repo }) ?? null;
+      if (anchor === null) output = { schema: `pipeline.descriptor-custody-${command.startsWith("apply") ? "apply" : "verify"}-result.v1`, status: "unavailable", code: "SDC-ANCHOR", nextAction: "inspect-descriptor-custody" };
+      else {
+        const fn = command === "apply-descriptor-custody" ? applySignedDescriptorCustody : verifySignedDescriptorCustodyPackage;
+        output = fn({ rootDir: repo, package: read("package-file"), proof: read("proof-file"), anchor }, dependencies);
+      }
+    }
+    exitCode = ["prepared", "built", "verified", "archived", "already-archived"].includes(output.status) ? 0 : 1;
+  } else if (command === "status") {
     const listDescriptors = dependencies.listActiveSessionDescriptorsFn
       ?? listActiveSessionDescriptors;
     const inspectOwnerRuntime = dependencies.inspectSessionOwnerRuntimeFn

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import test from "node:test";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+const completionCases = [];
+function test(name, run) { completionCases.push({id: "CCA" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
-import { classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
+import { readCriticCourseAdmission, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
 
 const H = (c) => c.repeat(64);
@@ -73,8 +75,8 @@ function registeredFixture() {
   const synthetic = packet(0);
   const firstPacket = {
     ...synthetic,
-    candidate: { ...synthetic.candidate, commit: genesisCommit, tree: git(root, ["rev-parse", `${genesisCommit}^{tree}`]) },
-    diff: { ...synthetic.diff, commit: genesisCommit },
+    candidate: { ...synthetic.candidate, base: genesisCommit, commit: genesisCommit, tree: git(root, ["rev-parse", `${genesisCommit}^{tree}`]) },
+    diff: { ...synthetic.diff, base: genesisCommit, commit: genesisCommit },
   };
   const first = history(firstPacket)[0];
   const bytes = `${JSON.stringify(first)}\n`;
@@ -84,9 +86,9 @@ function registeredFixture() {
   git(root, ["add", "."]); git(root, ["commit", "-qm", "registered review"]);
   return { root, featureId, manifestPath, evidencePath, manifest, entry, first, genesisCommit, candidateCommit: git(root, ["rev-parse", "HEAD"]) };
 }
-function fourRoundHistory() {
+function fourRoundHistory(roundCount = 4) {
   const rows = history();
-  for (let index = 1; index < 4; index += 1) {
+  for (let index = 1; index < roundCount; index += 1) {
     const currentPacket = packet(index);
     rows.push(compileCriticReviewLineage({
       packet: currentPacket,
@@ -312,3 +314,60 @@ test("CCA13 an authority change cannot hide in an evidence registration commit",
   assert.deepEqual(result.evidenceOnlyCommits, [fx.candidateCommit]);
   assert.deepEqual(result.correctionCommits, [changedCommit]);
 });
+
+test("CCA14 one full and three successive parent-bound DIFF reviews are admitted", () => {
+  for (const retainedCount of [1, 2, 3]) {
+    const rows = fourRoundHistory(retainedCount);
+    const next = packet(retainedCount);
+    const decision = deriveCriticCourseAdmission({ history: rows, candidate: next.candidate, correctionCommitsInRange: 1, requestedMode: "delta", delta });
+    assert.equal(decision.attempt.round, retainedCount + 1);
+    assert.equal(decision.attempt.correctionCommits, retainedCount);
+    assert.equal(decision.admission.ok, true);
+    assert.equal(decision.admission.mode, "delta");
+    assert.equal(decision.parentRecordSha256, rows.at(-1).recordSha256);
+  }
+});
+
+test("CCA15 a new full review cannot be admitted after retained findings", () => {
+  const decision = deriveCriticCourseAdmission({ ...correction(), requestedMode: "full", delta: {} });
+  assert.equal(decision.admission.ok, false);
+  assert.equal(decision.admission.code, "RE-FOLLOWUP-DELTA-REQUIRED");
+});
+
+function runtimeRequest(fx, overrides = {}) {
+  return { repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.genesisCommit, candidateCommit: fx.candidateCommit, registrationCommit: fx.candidateCommit, requestedMode: "delta", acceptedReference: null, criterionLocator: null, deltaRequestPath: null, ...overrides };
+}
+
+test("CCA16 retained finding prose and replayed candidates never substitute for a consumed journal", () => {
+  const fx = registeredFixture();
+  for (const overrides of [{}, {requestedMode: "full"}, {baseCommit: fx.candidateCommit}]) {
+    const actual = readCriticCourseAdmission(runtimeRequest(fx, overrides));
+    assert.equal(actual.decision.status, "unavailable", JSON.stringify(actual));
+    assert.equal(actual.decision.code, "CVL-COURSE-JOURNAL-UNAVAILABLE");
+    assert.equal(actual.decision.mode, null);
+  }
+});
+
+test("CCA17 a renamed feature without a registered counterpart cannot reset the retained course", () => {
+  const fx = registeredFixture();
+  const alias = "renamed-course-feature";
+  mkdirSync(join(fx.root, "specs", alias), {recursive: true});
+  writeFileSync(join(fx.root, "specs", alias, "lifecycle.json"), JSON.stringify({ ...fx.manifest([]), feature: {id: alias}, supersedes: fx.featureId }));
+  git(fx.root, ["add", "."]); git(fx.root, ["commit", "-qm", "rename without bound alias"]);
+  const registrationCommit = git(fx.root, ["rev-parse", "HEAD"]);
+  const actual = resolveRegisteredCriticCourseIdentity({repoRoot: fx.root, featureId: alias, baseCommit: fx.genesisCommit, candidateCommit: fx.candidateCommit, registrationCommit, acceptedReference: null});
+  assert.equal(actual.ok, false);
+  assert.equal(actual.code, "CCA-ALIAS-MAPPING-UNAVAILABLE");
+});
+
+test("CCA18 dropping retained registration cannot create new genesis in the runtime reader", () => {
+  const fx = registeredFixture();
+  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(fx.manifest([])));
+  git(fx.root, ["add", "."]); git(fx.root, ["commit", "-qm", "drop history"]);
+  const registrationCommit = git(fx.root, ["rev-parse", "HEAD"]);
+  const actual = readCriticCourseAdmission(runtimeRequest(fx, {registrationCommit, requestedMode: "full"}));
+  assert.equal(actual.decision.status, "refused");
+  assert.equal(actual.decision.code, "CCA-REGISTRATION-REMOVED");
+});
+
+registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

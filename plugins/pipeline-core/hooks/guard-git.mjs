@@ -274,6 +274,7 @@ import { commitMessageFindings, commitTypeFindings, markerPolicyMode, parseInteg
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { verifyQualityPackageIntegrationPreCommit } from "../lib/signed-quality-package.mjs";
+import { hasAdministrativeDispatch, inspectAdministrativeCommit, administrativeCommitPathspec } from "../lib/administrative-commit-policy.mjs";
 import {
   LEGACY_GUARD_AUDIT,
   LEGACY_GUARD_CONFIG,
@@ -1078,6 +1079,12 @@ let inspection;
     requireDispatch: markerMode !== "off",
   });
   if (inspection.message !== null) {
+    if (hasAdministrativeDispatch(inspection.message)) {
+      const administrativeAdmission = invokingGitCwd === null ? null : inspectAdministrativeCommit({repoRoot:invokingGitCwd,message:inspection.message,pathspec:administrativeCommitPathspec(cmd)});
+      const verified = finishedCommitMessageFindings(inspection.message,{administrativeAdmission});
+      inspection.findings = inspection.findings.filter((finding)=>finding.code!=="GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED");
+      inspection.findings.push(...verified.findings.filter((finding)=>finding.code.startsWith("GIT-03-ADMINISTRATIVE-")));
+    }
     const integration = parseIntegrationTrailerBlock(inspection.message);
     if (integration.ok) {
       // Resolve Git's command context, including every leading `-C`, against the

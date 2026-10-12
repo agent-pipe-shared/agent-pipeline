@@ -3,11 +3,16 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join, isAbsolute, win32 } from "node:path";
-import { inspectSessionOwnerRuntime, loadSessionDescriptor } from "./worktree-lifecycle.mjs";
+import { inspectSessionOwnerRuntime, loadSessionDescriptor, inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { createPoApprovalIntent, canonical } from "./po-approval-proof.mjs";
 import { readCriticalHumanProofPolicy, readHumanApprovalMode, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { verifyModelFamilyAuthority } from "./model-family-authority.mjs";
 import { validateInvocationReadback } from "./model-family-execution.mjs";
+import { inspectSourceOwnedCurrentAuthorityContext, inspectSourceOwnedRequesterInvocation } from "./session-requester-bridge.mjs";
+import { withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, releaseSessionAuthorityMember,
+  recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord } from "./session-authority-registry.mjs";
+import { createAgyAuthorityJournalOwner, inspectAgyAuthorityRepository, readAgyAuthorityInventory, publishAgyAuthorityEntry,
+  removeAgyAuthorityEntry, withAgyAuthorityStoreTransaction } from "./agy-host-observed-store.mjs";
 
 export const AGY_CONSENT_SCHEMA = "pipeline.agy-session-consent.v1";
 const SHA = /^[a-f0-9]{64}$/u;
@@ -128,6 +133,100 @@ const restriction = v => {
 const failConsent = code => ({ ok: false, code });
 const frozenCopy = value => { const copy = structuredClone(value); const lock = v => { if (v && typeof v === "object") { Object.values(v).forEach(lock); Object.freeze(v); } }; lock(copy); return copy; };
 const familyAuthorityPorts = new WeakMap();
+const consentProducerPorts = new WeakMap();
+const consentAdmissions = new WeakMap();
+
+function consentAuthorityFailure(code) { throw Object.assign(new Error(code), { code }); }
+function consentLegacy(entry) {
+  if (entry.namespaceId === "agy-session-consent" && entry.name.endsWith(".json.revoked")) {
+    if (!Array.isArray(entry.value) || entry.value.some(v => !ID.test(v?.decisionId ?? "") || !SHA.test(v?.subjectSha256 ?? "") || !Number.isSafeInteger(v?.revokedAtMs))) consentAuthorityFailure("AGY-CONSENT-STORAGE-MALFORMED");
+    return null;
+  }
+  if (entry.namespaceId !== "agy-session-consent" || !entry.name.endsWith(".json")
+    || ![AGY_CONSENT_SCHEMA, AGY_FAMILY_CONSENT_SCHEMA].includes(entry.value?.schema)) consentAuthorityFailure("AGY-CONSENT-STORAGE-MALFORMED");
+  // Existing unadopted consent is retained as an unbound hold; its public
+  // session fields cannot manufacture a descriptor/nonce association.
+  return { state: "unbound", target: null };
+}
+export function createAgySessionConsentAuthorityProducerPort({ repository }) {
+  const repo = inspectAgyAuthorityRepository(repository);
+  const owner = createAgyAuthorityJournalOwner({ repository: repo, namespaceIds: ["agy-session-consent", "agy-session-consent-revocations"],
+    journalNamespace: "agy-session-consent-revocations", producerId: "agy-session-consent", kinds: ["armed-capability"], classifyLegacy: consentLegacy });
+  consentProducerPorts.set(owner.port, { repository: repo, owner });
+  return owner.port;
+}
+export function isOwnedAgySessionConsentAuthorityProducerPort(port, { repository } = {}) {
+  const owned = consentProducerPorts.get(port);
+  if (!owned) return false;
+  try { const actual=inspectAgyAuthorityRepository(repository);return owned.repository.primaryRoot===actual.primaryRoot&&owned.repository.commonDir===actual.commonDir; } catch { return false; }
+}
+function requesterForConsent(repository, sessionId, descriptorSha256, explicit = null) {
+  const current = explicit ? inspectSourceOwnedRequesterInvocation({ repository, currentInvocationHandle: explicit.currentInvocationHandle, runtimePort: explicit.runtimePort })
+    : inspectSourceOwnedCurrentAuthorityContext({ repository });
+  if (current?.status !== "bound" || current.currentRequester.sessionId !== sessionId || current.currentRequester.descriptorSha256 !== descriptorSha256
+    || !["controlled-unit-method", "physical-readback", "agy-native-session", "codex-native-thread"].includes(current.assurance)) consentAuthorityFailure("AGY-CONSENT-REQUESTER-UNAVAILABLE");
+  return current;
+}
+function consentBasis(repository, requester, purpose, consentRecordSha256) {
+  return { purpose, repositorySha256: digest(repository), association: { state: "bound", target: {
+    sessionId: requester.currentRequester.sessionId, descriptorSha256: requester.currentRequester.descriptorSha256,
+    ownerNonceSha256: requester.currentRequester.ownerNonceSha256 } }, consentRecordSha256,
+    invocationBindingSha256: requester.invocationBindingSha256, controllerIdentity: requester.controllerIdentity,
+    sourceRef: requester.sourceRef, assurance: requester.assurance };
+}
+/** Mutating writers require actual active source-owned requester context. They
+ * never infer native provenance from the consent JSON or session environment. */
+export function recordSourceOwnedAgySessionConsent({ root, sessionId, descriptorSha256, record, policy, familyAuthorityInputs }) {
+  const repository = inspectSignedDescriptorCustodyRepository(root), port = createAgySessionConsentAuthorityProducerPort({ repository });
+  const { owner } = consentProducerPorts.get(port);
+  return withSessionAuthorityBoundary({ repository }, boundary => {
+    const requester = requesterForConsent(repository, sessionId, descriptorSha256);
+    const live = loadLiveSession(root, sessionId, descriptorSha256);
+    if (!live.ok) consentAuthorityFailure(live.code);
+    const checked = validateConsentRecord(record, { root, repository, session: live.session, policy: readCriticalHumanProofPolicy(root),
+      configuredMode: configuredConsentMode(root).mode, familyAuthorityInputs });
+    if (!checked.ok) consentAuthorityFailure(checked.code);
+    const current = readAgyAuthorityInventory({ repository, namespaceIds: ["agy-session-consent", "agy-session-consent-revocations"] });
+    if (current.entries.some(e => e.namespaceId === "agy-session-consent" && e.name === `${sessionId}.json`)) consentAuthorityFailure("AGY-CONSENT-STORAGE-EXISTS");
+    for (const entry of current.entries) {
+      if (entry.name === `${sessionId}.json.revoked` && entry.value.some(v => v.decisionId === record.decisionId || v.subjectSha256 === record.subjectSha256)) consentAuthorityFailure("AGY-CONSENT-REAUTH-REQUIRED");
+      if (entry.value?.schema === "pipeline.agy-authority-lifetime.v1" && entry.value.terminal === "revoked"
+        && (entry.value.basis.consentRecordSha256 === digest(record) || entry.value.basis.decisionId === record.decisionId || entry.value.basis.subjectSha256 === record.subjectSha256)) consentAuthorityFailure("AGY-CONSENT-REAUTH-REQUIRED");
+    }
+    const operationHandle = owner.create({ ...consentBasis(repository, requester, "consent-record", digest(record)), decisionId: record.decisionId, subjectSha256: record.subjectSha256 });
+    const reservation = reserveSessionAuthorityMember({ boundary, producerPort: port, association: port.observeOperation(operationHandle).association, operationHandle });
+    return withAgyAuthorityStoreTransaction({ repository, boundary, producerPort: port }, () => {
+      const stored = publishAgyAuthorityEntry({ repository, boundary, producerPort: port, namespaceId: "agy-session-consent", name: `${sessionId}.json`, value: record });
+      owner.advance({ operationHandle, boundary, producerPort: port, phase: "armed", sourcePaths: [{ namespaceId: stored.namespaceId, pathSha256: stored.fact.pathSha256 }] });
+      const refs = advanceSessionAuthorityMember({ boundary, producerPort: port, memberHandle: reservation.memberHandle, expectedMemberRef: reservation.memberRef, operationHandle });
+      return { status: "recorded", sessionId, descriptorSha256, mode: checked.mode, assurance: requester.assurance, authorityMemberRef: refs.memberRef };
+    });
+  });
+}
+export function revokeSourceOwnedAgySessionConsent({ root, sessionId, descriptorSha256 }) {
+  const repository = inspectSignedDescriptorCustodyRepository(root), port = createAgySessionConsentAuthorityProducerPort({ repository });
+  const { owner } = consentProducerPorts.get(port);
+  return withSessionAuthorityBoundary({ repository }, boundary => {
+    requesterForConsent(repository, sessionId, descriptorSha256);
+    const observed = readAgyAuthorityInventory({ repository, namespaceIds: ["agy-session-consent", "agy-session-consent-revocations"] });
+    const consent = observed.entries.find(e => e.namespaceId === "agy-session-consent" && e.name === `${sessionId}.json`);
+    if (!consent) return { status: "missing", sessionId, descriptorSha256, released: false };
+    const producer = inspectSourceOwnedSessionAuthorityProducerRecord({ boundary, producerPort: port });
+    const candidates = producer.record.members.map(v => inspectSourceOwnedSessionAuthorityMemberRecord({ boundary, producerPort: port, memberRef: v.memberRef }))
+      .filter(v => v.record.phase === "armed" && v.record.sourceFacts.some(f => canonical(f) === canonical(consent.fact)));
+    // A legacy unbound file or interrupted partial cannot be casually adopted.
+    if (candidates.length !== 1) consentAuthorityFailure("AGY-CONSENT-REVOKE-RECOVERY-REQUIRED");
+    const previous = candidates[0], operationHandle = owner.restore(previous.record.bindingSha256);
+    const recovered = recoverSessionAuthorityMember({ boundary, producerPort: port, operationHandle, expectedMemberRef: previous.memberRef });
+    return withAgyAuthorityStoreTransaction({ repository, boundary, producerPort: port }, () => {
+      removeAgyAuthorityEntry({ repository, boundary, producerPort: port, namespaceId: consent.namespaceId, name: consent.name, expectedFact: consent.fact });
+      const terminalHandle = owner.advance({ operationHandle, boundary, producerPort: port, phase: "terminal-observed", terminal: "revoked" });
+      const refs = advanceSessionAuthorityMember({ boundary, producerPort: port, memberHandle: recovered.memberHandle, expectedMemberRef: recovered.memberRef, operationHandle });
+      const released = releaseSessionAuthorityMember({ boundary, producerPort: port, memberHandle: recovered.memberHandle, expectedMemberRef: refs.memberRef, terminalHandle });
+      return { status: "revoked", sessionId, descriptorSha256, releaseRef: released.releaseRef };
+    });
+  });
+}
 
 /** Source-owned dispatch port. A method-shaped object, copied handle or public
  * projection cannot supply the private complete-record admission. */
@@ -210,7 +309,28 @@ export function createAgyFamilyConsentAuthority({ readFamilyAuthority, readInvoc
   }
   const authority = Object.freeze({
     async admit(context) {
-      try { const checked = await current(context); if (!checked.ok) return checked; const handle = Object.freeze({}); admitted.set(handle, { context: frozenCopy(context), record: checked.record, hash: digest(checked.record) }); return { ok: true, handle, consentRecordSha256: digest(checked.record) }; }
+      try {
+        const checked = await current(context); if (!checked.ok) return checked;
+        const repository = inspectSignedDescriptorCustodyRepository(context.root), producerPort = createAgySessionConsentAuthorityProducerPort({ repository });
+        const { owner } = consentProducerPorts.get(producerPort);
+        return withSessionAuthorityBoundary({ repository }, boundary => {
+          const requester = requesterForConsent(repository, context.sessionId, context.descriptorSha256, context.currentInvocationHandle && context.runtimePort ? context : null);
+          const stored = loadStoredConsent(context.root, context.sessionId, context.descriptorSha256);
+          if (stored.revoked || !stored.record || digest(stored.record) !== digest(checked.record)) return failConsent("AGY-CONSENT-RECORD-CHANGED");
+          const operationHandle = owner.create(consentBasis(repository, requester, "consent-admission", digest(checked.record)));
+          const reservation = reserveSessionAuthorityMember({ boundary, producerPort, association: producerPort.observeOperation(operationHandle).association, operationHandle });
+          return withAgyAuthorityStoreTransaction({ repository, boundary, producerPort }, () => {
+            owner.advance({ operationHandle, boundary, producerPort, phase: "armed" });
+            const refs = advanceSessionAuthorityMember({ boundary, producerPort, memberHandle: reservation.memberHandle, expectedMemberRef: reservation.memberRef, operationHandle });
+            const handle = Object.freeze({});
+            const publicContext = { root: context.root, sessionId: context.sessionId, descriptorSha256: context.descriptorSha256, nowEpochMs: context.nowEpochMs ?? Date.now() };
+            admitted.set(handle, { context: frozenCopy(publicContext), record: checked.record, hash: digest(checked.record) });
+            consentAdmissions.set(handle, { authority, admitted, repository, producerPort, owner, operationHandle, memberHandle: reservation.memberHandle, memberRef: refs.memberRef,
+              currentInvocationHandle: context.currentInvocationHandle ?? requester.currentInvocationHandle, runtimePort: context.runtimePort ?? requester.runtimePort, requester });
+            return { ok: true, handle, consentRecordSha256: digest(checked.record), assurance: requester.assurance, authorityMemberRef: refs.memberRef };
+          });
+        });
+      }
       catch { return failConsent("AGY-CONSENT-ADMISSION-UNAVAILABLE"); }
     },
     async bind(handle, { invocationId, requestedModel, requestedEffort, role, scope, requiredPaths = [], fallbackPolicy, nowEpochMs = Date.now() } = {}) {
@@ -245,6 +365,35 @@ export function createAgyFamilyConsentAuthority({ readFamilyAuthority, readInvoc
     } catch { return failConsent("AGY-CONSENT-DISPATCH-UNAVAILABLE"); }
   });
   return authority;
+}
+
+/** Invalidates only this source-owned consent capability. It cannot certify
+ * another model driver or dispatch context as terminal. */
+export function releaseSourceOwnedAgyConsentAdmission({ authority, handle }) {
+  const lifetime = consentAdmissions.get(handle);
+  if (!lifetime || lifetime.authority !== authority) return failConsent("AGY-CONSENT-HANDLE-INVALID");
+  try {
+    const actual=inspectSignedDescriptorCustodyRepository(lifetime.repository.primaryRoot);
+    if(actual.primaryRoot!==lifetime.repository.primaryRoot||actual.commonDir!==lifetime.repository.commonDir)return failConsent('AGY-CONSENT-RELEASE-HELD');
+    lifetime.repository=actual;
+    return withSessionAuthorityBoundary({ repository: lifetime.repository }, boundary => {
+      const requester=requesterForConsent(actual,lifetime.requester.currentRequester.sessionId,lifetime.requester.currentRequester.descriptorSha256,lifetime);
+      if(requester.requesterHandle!==lifetime.requester.requesterHandle||requester.descriptorHandle!==lifetime.requester.descriptorHandle
+        ||requester.invocationBindingSha256!==lifetime.requester.invocationBindingSha256||canonical(requester.controllerIdentity)!==canonical(lifetime.requester.controllerIdentity)
+        ||canonical(requester.sourceRef)!==canonical(lifetime.requester.sourceRef))return failConsent('AGY-CONSENT-RELEASE-HELD');
+      return withAgyAuthorityStoreTransaction({ repository: lifetime.repository, boundary, producerPort: lifetime.producerPort }, () => {
+        // No source method can bind this handle after this deletion. A crash
+        // before terminal journal/release leaves the durable member held.
+        lifetime.admitted.delete(handle);
+        const terminalHandle = lifetime.owner.advance({ operationHandle: lifetime.operationHandle, boundary, producerPort: lifetime.producerPort, phase: "terminal-observed", terminal: "cancelled" });
+        const refs = advanceSessionAuthorityMember({ boundary, producerPort: lifetime.producerPort, memberHandle: lifetime.memberHandle, expectedMemberRef: lifetime.memberRef, operationHandle: lifetime.operationHandle });
+        lifetime.memberRef = refs.memberRef;
+        const released = releaseSessionAuthorityMember({ boundary, producerPort: lifetime.producerPort, memberHandle: lifetime.memberHandle, expectedMemberRef: lifetime.memberRef, terminalHandle });
+        consentAdmissions.delete(handle);
+        return { ok: true, releaseRef: released.releaseRef };
+      });
+    });
+  } catch { return failConsent("AGY-CONSENT-RELEASE-HELD"); }
 }
 
 function familyRestrictionSubset(requested, permitted) {

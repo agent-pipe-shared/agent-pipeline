@@ -4,7 +4,7 @@
 /**
  * Bounded, read-only recovery of a prior runner transcript.
  *
- * This is intentionally the only component allowed to inspect Codex's private
+ * This is intentionally the only command boundary allowed to inspect Codex's private
  * session collection.  Callers cannot supply a session directory or transcript
  * pathname: the Codex location is derived here, candidates must identify the
  * current repository in their own `session_meta` record, and the current session
@@ -17,6 +17,7 @@ import {
 import { homedir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 
+import { auditCurrentRunnerSession } from "../lib/runner-own-session-audit.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { repositoryPathIdentityOrSelf, windowsNotationCandidate } from "../lib/repository-path-identity.mjs";
 
@@ -164,7 +165,12 @@ function candidateMetadata(filePath, projectIdentity) {
   const metas = records.map(sessionMetaRecord).filter((value) => value !== null);
   if (metas.length === 0) return null;
   const projectPaths = metas.flatMap((meta) => stringsAtKnownKeys(meta, PROJECT_PATH_KEYS));
-  const sessionIds = metas.flatMap((meta) => stringsAtKnownKeys(meta, SESSION_ID_KEYS));
+  // Codex's declared session_meta schema uses payload.id (see runner-own-session-audit).
+  // Only that metadata record's own id is accepted; arbitrary event ids are not selectors.
+  const sessionIds = metas.flatMap((meta) => [
+    ...stringsAtKnownKeys(meta, SESSION_ID_KEYS),
+    ...[meta.id, meta.payload?.id].filter((id) => typeof id === "string" && id.trim() !== ""),
+  ]);
   if (projectPaths.length === 0 || sessionIds.length === 0) return null;
   const identities = projectPaths.map(metadataIdentity);
   if (identities.some((identity) => identity === null) || !identities.every((identity) => identity === projectIdentity)) return null;
@@ -281,11 +287,11 @@ export function listRunnerTranscripts(options = {}) {
 }
 
 /**
- * Read one session selected by its public session id.  A repeated id is not a
- * safe selector, so it fails closed rather than choosing by a host pathname or
- * recency.  This explicit, authenticated read intentionally has no transcript
- * size cap; only automatic metadata and excerpt paths are bounded.  `bytes` is
- * only emitted raw by the CLI's `read` operation below.
+ * Read every project-authenticated segment selected by one public session id.
+ * Storage mtime, then pathname, gives a deterministic storage order, not a claim
+ * about event chronology. No unrelated/current session or child session is inferred.
+ * This explicit read has no transcript size cap. Raw `bytes` are only emitted by
+ * the CLI's requested `read` operation; recovery/list stay bounded excerpts.
  */
 export function readRunnerTranscript({ sessionId, ...options } = {}) {
   const found = priorProjectMatchingCandidates(options);
@@ -294,13 +300,58 @@ export function readRunnerTranscript({ sessionId, ...options } = {}) {
     return unavailable(CODEX_RUNNER, "requested-session-unavailable");
   }
   const matches = found.candidates.filter((candidate) => candidate.sessionId === sessionId);
-  if (matches.length !== 1) return unavailable(CODEX_RUNNER, "requested-session-unavailable");
-  const bytes = readTranscriptBytes(matches[0].filePath);
-  if (bytes === null) return unavailable(CODEX_RUNNER, "requested-session-unavailable");
-  return { schema: SCHEMA, status: "available", runner: CODEX_RUNNER, bytes };
+  if (matches.length === 0) return unavailable(CODEX_RUNNER, "requested-session-unavailable");
+  const currentRoot = realDirectory(options.rootDir);
+  if (currentRoot === null) return unavailable(CODEX_RUNNER, "requested-session-unavailable");
+  const projectIdentity = repositoryPathIdentityOrSelf(currentRoot);
+  const segments = [...matches].sort((left, right) => left.mtimeMs - right.mtimeMs
+    || (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0));
+  const snapshots = [];
+  try {
+    for (const segment of segments) {
+      const before = lstatSync(segment.filePath);
+      if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) throw new Error("segment-unsafe");
+      const identity = candidateMetadata(segment.filePath, projectIdentity);
+      if (identity?.sessionId !== sessionId) throw new Error("segment-identity-changed");
+      const bytes = readTranscriptBytes(segment.filePath);
+      const after = lstatSync(segment.filePath);
+      if (bytes === null || before.dev !== after.dev || before.ino !== after.ino
+        || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs
+        || bytes.length !== after.size || !after.isFile() || after.nlink !== 1) throw new Error("segment-changed");
+      snapshots.push({ segment, identity: after, bytes });
+    }
+    // Conserved membership and all physical snapshots are rechecked before any output.
+    const fresh = priorProjectMatchingCandidates(options);
+    const selectedPaths = fresh.candidates?.filter((candidate) => candidate.sessionId === sessionId)
+      .map((candidate) => candidate.filePath).sort();
+    if (JSON.stringify(selectedPaths) !== JSON.stringify(segments.map((segment) => segment.filePath).sort())) throw new Error("segments-changed");
+    for (const snapshot of snapshots) {
+      const after = lstatSync(snapshot.segment.filePath), before = snapshot.identity;
+      if (!after.isFile() || after.nlink !== 1 || before.dev !== after.dev || before.ino !== after.ino
+        || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new Error("segment-changed");
+    }
+  } catch { return unavailable(CODEX_RUNNER, "requested-session-unavailable"); }
+  const chunks = [];
+  for (const snapshot of snapshots) {
+    if (chunks.length > 0 && chunks[chunks.length - 1].at(-1) !== 10) chunks.push(Buffer.from("\n"));
+    chunks.push(snapshot.bytes);
+  }
+  return { schema: SCHEMA, status: "available", runner: CODEX_RUNNER,
+    segmentCount: snapshots.length, segmentOrder: "storage-mtime-then-path", bytes: Buffer.concat(chunks) };
 }
 
 function parseArgs(argv) {
+  if (argv[0] === "audit-current") {
+    if (argv.length !== 7) return null;
+    const fields = new Map();
+    for (let index = 1; index < argv.length; index += 2) {
+      const flag = argv[index], value = argv[index + 1];
+      if (!["--root", "--runner", "--metadata-consent"].includes(flag)
+        || typeof value !== "string" || !value || value.startsWith("-") || fields.has(flag)) return null;
+      fields.set(flag, value);
+    }
+    return { operation: "audit-current", rootDir: fields.get("--root"), runner: fields.get("--runner"), metadataConsent: fields.get("--metadata-consent") };
+  }
   const operation = argv[0] === "list" || argv[0] === "read" ? argv[0] : "legacy";
   const values = operation === "legacy" ? argv : argv.slice(1);
   const expectedLength = operation === "read" ? 8 : 6;
@@ -327,6 +378,7 @@ function parseArgs(argv) {
 export function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   const result = args === null ? unavailable("unknown", "invalid-invocation") : (() => {
+    if (args.operation === "audit-current") return auditCurrentRunnerSession(args);
     if (args.operation === "list") return listRunnerTranscripts(args);
     if (args.operation === "read") return readRunnerTranscript(args);
     return recoverRunnerTranscript(args);

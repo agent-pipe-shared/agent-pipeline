@@ -1,3 +1,4 @@
+import {authorityRepositoryFromRoot} from './session-authority-domain-owner.mjs';
 // SPDX-License-Identifier: SUL-1.0
 /** Physical, read-only activation observation and source-owned S4 wiring. */
 import { execFileSync } from "node:child_process";
@@ -6,7 +7,7 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, parse, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseStrictJson } from "./governance-event.mjs";
-import { createModelFamilyHostController } from "./model-family-host-store.mjs";
+import { createModelFamilyHostController, createModelFamilyHostAuthorityLifecycle } from "./model-family-host-store.mjs";
 
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40}$/u;
@@ -144,7 +145,10 @@ export function createModelFamilyRuntimeHost({ cwd = process.cwd(), resolveCommo
             : { ok: false, code: "ADAPTER_CONTRACT_UNQUALIFIED", retryable: false };
         },
       };
-      controller = createModelFamilyHostController({ rootDir: root.privateRoot, trustedSources: sources, clock });
+      const authorityRepository=authorityRepositoryFromRoot(cwd);
+      if(authorityRepository.commonDir!==root.commonDir)throw new Error("MODEL-FAMILY-AUTHORITY-ROOT");
+      controller = createModelFamilyHostController({ rootDir: root.privateRoot, trustedSources: sources, clock,
+        authorityLifecycle:createModelFamilyHostAuthorityLifecycle({repository:authorityRepository}) });
     }
     return controller;
   }

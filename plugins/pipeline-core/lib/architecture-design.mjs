@@ -4,10 +4,12 @@ import { createHash } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+import { resolveProjectAuthorityPaths } from "./project-authority.mjs";
 import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
 import { rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
 import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+import { inspectApprovedDesignDecisionBindings, retainApprovedDesignArchitectureReference, prepareApprovedArchitectureMaterialization } from "./design-decision-bindings.mjs";
 import { designAdvisoryAdmission } from "./guard-devplan-policy.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
@@ -188,8 +190,10 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
   const root = resolve(rootDir);
   let prdPath = null;
   try {
-    const state = JSON.parse(bytes(root, "project/pipeline-state.json"));
+    const selection = selectedArchitectureState(root);
+    const state = JSON.parse(bytes(root, selection.state));
     const authority = state.planApproval?.poGateAuthority;
+    let prospective = null;
     requireValue(authority?.planPath && authority?.specPath, "ARCHITECTURE-DESIGN-APPROVAL-REQUIRED");
     prdPath = authority.planPath;
     const prd = bytes(root, authority.planPath);
@@ -206,12 +210,18 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
       expectedPlanSha256: observation.planSha256, expectedSpecSha256: observation.specSha256 });
     const bootstrapAcknowledgementValid = verified.ok
       && Object.entries(authority).every(([key, value]) => verified.value[key] === value);
-    if (state.planApproval?.schema === "pipeline.plan-approval.v8") {
-      // The complete stored v8 binding is authority. Reuse the implementation
+    if (["pipeline.plan-approval.v8", "pipeline.plan-approval.v9"].includes(state.planApproval?.schema)) {
+      // The complete stored v8/v9 binding is authority. Reuse the implementation
       // boundary's current-source, mode and actual proof checks; a bootstrap
       // acknowledgement cannot replace the final design approval.
       const finalDesignApproval = designAdvisoryAdmission(state, root, authority.planPath, authority.specPath);
       requireValue(finalDesignApproval.ok, finalDesignApproval.code ?? "ARCHITECTURE-DESIGN-APPROVAL-REQUIRED");
+    const decisionSubset = inspectApprovedDesignDecisionBindings({ rootDir: root, area: "architecture" });
+      requireValue(decisionSubset.ok, decisionSubset.code ?? "ARCHITECTURE-DESIGN-DECISION-SUBSET-STALE");
+      if (decisionSubset.required) {
+        prospective = prepareApprovedArchitectureMaterialization(decisionSubset.handle);
+        requireValue(prospective.ok, prospective.code);
+      }
     } else {
       const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
       requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
@@ -227,7 +237,10 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
       const greenfieldScaffold = initialGreenfieldMapTargets("fresh");
       if (greenfieldScaffold.every(target => !existsSync(join(root, target.path)))
         || !greenfieldScaffold.every(target => bytes(root, target.path) === target.bytes)) {
-        return { ok: true, status: "not-required", required: false, scope: null };
+        return prospective?.required && prospective.targets.length
+          ? { ok: true, status: "materialization-required", required: true, scope: null,
+            materializationKind: "prospective-adr-only", targets: prospective.targets }
+          : { ok: true, status: "not-required", required: false, scope: null };
       }
     }
     const input = parseArchitectureDesign(prd);
@@ -315,11 +328,26 @@ export function verifyFinalDesignWorkflowApproval(root, state, authority, observ
   } catch (error) { return { ok: false, code: error?.message ?? "DWP-FINAL-APPROVAL-ERROR" }; }
 }
 
-function assertLock(root, lock) {
-  requireValue(lock?.ok && lock.path === physical(root, "project/pipeline-state.json.lock"), "ARCHITECTURE-DESIGN-LOCK-REQUIRED");
+function selectedArchitectureState(root, expected = null) {
+  const current = resolveProjectAuthorityPaths({ rootDir: root });
+  requireValue(current.status === "ready" && ["neutral", "legacy"].includes(current.source),
+    current.code ?? "ARCHITECTURE-DESIGN-AUTHORITY-UNAVAILABLE");
+  requireValue(typeof current.state === "string" && /^[a-f0-9]{64}$/u.test(current.stateSha256 ?? "")
+    && /^[a-f0-9]{64}$/u.test(current.manifestSha256 ?? ""), "ARCHITECTURE-DESIGN-APPROVAL-REQUIRED");
+  const selection = { source: current.source, state: current.state, manifest: current.manifest,
+    stateSha256: current.stateSha256, manifestSha256: current.manifestSha256 };
+  requireValue(!expected || Object.keys(selection).every(key => selection[key] === expected[key]),
+    "ARCHITECTURE-DESIGN-AUTHORITY-CHANGED");
+  return selection;
+}
+function assertLock(root, lock, expectedSelection = null) {
+  requireValue(lock?.ok, "ARCHITECTURE-DESIGN-LOCK-REQUIRED");
+  const selection = selectedArchitectureState(root, expectedSelection);
+  requireValue(lock.path === physical(root, `${selection.state}.lock`), "ARCHITECTURE-DESIGN-LOCK-REQUIRED");
   const current = JSON.parse(readFileSync(lock.path, "utf8"));
   requireValue(current.schema === "pipeline.continuity-lock.v0" && current.token === lock.token
     && current.ownerNonce === lock.ownerNonce, "ARCHITECTURE-DESIGN-LOCK-CHANGED");
+  return selection;
 }
 const identity = path => { const row = lstatSync(path); return `${row.dev}:${row.ino}`; };
 
@@ -328,9 +356,10 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
   const root = resolve(rootDir);
   const applied = [];
   const temporary = [];
+  let selection = null;
   const write = io.writeFileSync ?? writeFileSync;
   try {
-    assertLock(root, lock);
+    selection = assertLock(root, lock);
     requireValue(validateAuthority(), "ARCHITECTURE-DESIGN-AUTHORITY-CHANGED");
     for (const target of targets) {
       const path = physical(root, target.path);
@@ -347,16 +376,16 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
       const record = { path, before, after: target.bytes, publishedIdentity: identity(tmp), published: false };
       // Record the exact preimage and staged inode BEFORE publication can mutate a target.
       applied.push(record);
-      assertLock(root, lock);
+      assertLock(root, lock, selection);
       requireValue(validateAuthority(), "ARCHITECTURE-DESIGN-AUTHORITY-CHANGED");
-      if (before === null) linkSync(tmp, path); // atomic create-only; a raced target is preserved
+      if (before === null) { linkSync(tmp, path); unlinkSync(tmp); } // create-only, then release the staging hardlink before DAB readback
       else {
         requireValue(identity(path) === beforeIdentity && readFileSync(path).equals(before), "ARCHITECTURE-DESIGN-TARGET-CHANGED");
         renameSync(tmp, path);
       }
       record.published = true;
     }
-    assertLock(root, lock);
+    assertLock(root, lock, selection);
     requireValue(validateAuthority(), "ARCHITECTURE-DESIGN-AUTHORITY-CHANGED");
     requireValue(targets.every(target => bytes(root, target.path) === target.bytes), "ARCHITECTURE-DESIGN-READBACK-FAILED");
     return { ok: true, status: "published" };
@@ -365,7 +394,7 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
     for (const target of applied.reverse()) {
       if (!target.published) continue;
       try {
-        assertLock(root, lock);
+        assertLock(root, lock, selection);
         requireValue(identity(target.path) === target.publishedIdentity && readFileSync(target.path, "utf8") === target.after,
           "ARCHITECTURE-DESIGN-ROLLBACK-CONFLICT");
         if (target.before === null) unlinkSync(target.path);
@@ -384,34 +413,68 @@ export function publishArchitectureDesignTargets({ rootDir, lock, targets, valid
   }
 }
 
-/** Fixed target writer; caller must hold the sanctioned lifecycle writer's project lock. */
+/** Fixed target writer; caller must hold the sanctioned lifecycle writer's selected State lock. */
+/** Read-only exact inventory shared by the Source companion and the locked writer. */
+export function inspectArchitectureMaterializationTargets(rootDir, deps = {}) {
+  const root = resolve(rootDir);
+  const inspected = inspectArchitectureDesign(root, null, deps);
+  if (!inspected.ok) return inspected;
+  const subset = inspectApprovedDesignDecisionBindings({ rootDir: root, area: "architecture" });
+  if (!subset.ok) return { ok: false, status: "blocked", code: subset.code };
+  const prospective = subset.required ? prepareApprovedArchitectureMaterialization(subset.handle)
+    : { ok: true, required: false, targets: [] };
+  if (!prospective.ok) return { ok: false, status: "blocked", code: prospective.code };
+  const mapTargets = inspected.receipt && inspected.status === "materialization-required"
+    ? [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }] : [];
+  // The retained authority is the final publication of the single transaction.
+  const targets = [...prospective.targets.filter(target => target.path !== prospective.referencePath),
+    ...mapTargets, ...prospective.targets.filter(target => target.path === prospective.referencePath)];
+  requireValue(new Set(targets.map(target => target.path)).size === targets.length, "ARCHITECTURE-DESIGN-DUPLICATE-TARGET");
+  const mapInventory = inspected.receipt
+    ? [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }] : [];
+  const prospectiveInventory = prospective.inventoryTargets ?? [];
+  const sealedTargets = [...prospectiveInventory.filter(target => target.path !== prospective.referencePath),
+    ...mapInventory, ...prospectiveInventory.filter(target => target.path === prospective.referencePath)];
+  return { ok: true, inspected, prospective, approvalBasis: subset.approvalBasis ?? null, targets, sealedTargets };
+}
+
 export function materializeArchitectureDesign(rootDir, { lock, ...inspectDeps } = {}) {
   const root = resolve(rootDir);
   try {
-    assertLock(root, lock);
-    const stateBytes = bytes(root, "project/pipeline-state.json");
-    const inspected = inspectArchitectureDesign(root, null, inspectDeps);
-    if (!inspected.ok || inspected.status !== "materialization-required") return inspected;
+    const selection = assertLock(root, lock);
+    const stateBytes = bytes(root, selection.state);
+    const inventory = inspectArchitectureMaterializationTargets(root, inspectDeps);
+    if (!inventory.ok) return inventory;
+    const inspected = inventory.inspected;
     const state = JSON.parse(stateBytes);
     const authority = state.planApproval.poGateAuthority;
-    const targets = [...inspected.targets, { path: "architecture/design-materialization.json", bytes: json(inspected.receipt) }];
-    const result = publishArchitectureDesignTargets({ rootDir: root, lock, targets, validateAuthority: () => {
-      if (bytes(root, "project/pipeline-state.json") !== stateBytes) return false;
-      const planSha256 = hash(bytes(root, authority.planPath));
-      const specSha256 = hash(bytes(root, authority.specPath));
-      if (planSha256 !== inspected.receipt.planSha256 || specSha256 !== inspected.receipt.specSha256) return false;
-      // Greenfield projects now carry the one final DWP decision after design,
-      // Advisor and readiness have been reviewed. Preserve the historical
-      // acknowledgement route when it is valid, while recognizing that exact
-      // final DWP approval as a complete source-bound authority in the same CAS.
-      const checked = validatePoGateAuthorityForRepository({ repoRoot: root,
-        expectedPlanSha256: inspected.receipt.planSha256, expectedSpecSha256: inspected.receipt.specSha256 });
-      const bootstrapAcknowledgementValid = checked.ok
-        && Object.entries(authority).every(([key, value]) => checked.value[key] === value);
-      const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority,
-        { planSha256, specSha256 }, inspectDeps);
-      return bootstrapAcknowledgementValid || finalWorkflowApproval.ok;
-    } });
-    return result.ok ? inspectArchitectureDesign(root, null, inspectDeps) : result;
+    const result = inventory.targets.length ? publishArchitectureDesignTargets({ rootDir: root, lock,
+      targets: inventory.targets, validateAuthority: () => {
+        selectedArchitectureState(root, selection);
+        if (bytes(root, selection.state) !== stateBytes) return false;
+        const planSha256 = hash(bytes(root, authority.planPath));
+        const specSha256 = hash(bytes(root, authority.specPath));
+        if (inspected.receipt && (planSha256 !== inspected.receipt.planSha256 || specSha256 !== inspected.receipt.specSha256)) return false;
+        if (["pipeline.plan-approval.v8", "pipeline.plan-approval.v9"].includes(state.planApproval?.schema)) {
+          const current = inspectApprovedDesignDecisionBindings({ rootDir: root, area: "architecture" });
+          return designAdvisoryAdmission(state, root, authority.planPath, authority.specPath).ok && current.ok
+            && JSON.stringify(current.approvalBasis ?? null) === JSON.stringify(inventory.approvalBasis);
+        }
+        const checked = validatePoGateAuthorityForRepository({ repoRoot: root, expectedPlanSha256: planSha256, expectedSpecSha256: specSha256 });
+        const bootstrapValid = checked.ok && Object.entries(authority).every(([key, value]) => checked.value[key] === value);
+        return bootstrapValid || verifyFinalDesignWorkflowApproval(root, state, authority, { planSha256, specSha256 }, inspectDeps).ok;
+      } }) : { ok: true, status: "published" };
+    if (!result.ok) return result;
+    const readback = inspectArchitectureMaterializationTargets(root, inspectDeps);
+    if (!readback.ok || readback.targets.length) return { ok: false, status: "blocked", code: readback.code ?? "ARCHITECTURE-DESIGN-READBACK" };
+    const subset = inspectApprovedDesignDecisionBindings({ rootDir: root, area: "architecture" });
+    if (!subset.ok) return { ok: false, status: "blocked", code: subset.code };
+    if (subset.required) {
+      const retained = retainApprovedDesignArchitectureReference(subset.handle);
+      if (!retained.ok) return { ok: false, status: "blocked", code: retained.code };
+    }
+    return inventory.prospective.required && readback.inspected.status === "not-required"
+      ? { ...readback.inspected, required: true, status: "materialized", materializationKind: "prospective-adr-only", referencePath: inventory.prospective.referencePath }
+      : readback.inspected;
   } catch (error) { return { ok: false, status: "blocked", code: error.message }; }
 }

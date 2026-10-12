@@ -89,6 +89,9 @@ import { performance } from "node:perf_hooks";
 import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
+  constants,
+  fchmodSync,
+  readSync,
   existsSync,
   fstatSync,
   fsyncSync,
@@ -104,7 +107,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -116,6 +119,7 @@ import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spa
 import {
   CRITICAL_HUMAN_PROOF_POLICY_PATH,
   CRITICAL_HUMAN_PROOF_POLICY_V3,
+  readCriticalHumanProofPolicy,
 } from "../lib/critical-human-proof-policy.mjs";
 import {
   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
@@ -610,6 +614,256 @@ export function applyTrustAnchorBootstrap({
     catch { return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-CLEANUP-FAILED"); }
   }
   return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode };
+}
+
+// Existing-public-authority reuse is a fixed first-anchor operation. The public
+// digest selects current observations; only this module's fresh private plan
+// authorizes its fixed writer. No setup, key import or pointer write is involved.
+export const EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA = "pipeline.existing-public-trust-anchor-materialization.v1";
+const existingPublicTrustAnchorPlans = new WeakMap();
+const EXISTING_ANCHOR_MAX_BYTES = 262144;
+function existingAnchorRefusal(code, stateDisposition = "unchanged") {
+  return { schema: EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA, status: "refused", ok: false, code, stateDisposition, nextAction: null };
+}
+function existingAnchorFailure(code) { throw Object.assign(new Error(code), { existingAnchorCode: code }); }
+function existingAnchorIdentity(stat) {
+  return ["dev", "ino", "mode", "nlink", "uid", "gid", "size", "mtimeNs", "ctimeNs"].map(key => String(stat[key]));
+}
+function existingAnchorSame(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
+function existingAnchorParents(path) {
+  const records = [];
+  let cursor = dirname(path);
+  while (true) {
+    const stat = lstatSync(cursor, { bigint: true });
+    if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(cursor) !== cursor) existingAnchorFailure("TRUST-ANCHOR-TRANSACTION-PREIMAGE-UNSAFE");
+    if (process.platform !== "win32" && (Number(stat.mode) & 0o022) !== 0
+      && (Number(stat.mode) & 0o1000) === 0) existingAnchorFailure("TRUST-ANCHOR-TRANSACTION-PREIMAGE-UNSAFE");
+    records.push({ path: cursor, identity: [stat.dev, stat.ino, stat.mode, stat.uid, stat.gid].map(String) });
+    const parent = dirname(cursor);
+    if (parent === cursor) return records;
+    cursor = parent;
+  }
+}
+function existingAnchorRead(path) {
+  const parents = existingAnchorParents(path);
+  const before = lstatSync(path, { bigint: true });
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n
+    || before.size < 1n || before.size > BigInt(EXISTING_ANCHOR_MAX_BYTES)
+    || realpathSync(path) !== path
+    || (process.platform !== "win32" && ((Number(before.mode) & 0o022) !== 0
+      || (typeof process.getuid === "function" && before.uid !== BigInt(process.getuid()))))) {
+    existingAnchorFailure("TRUST-ANCHOR-TRANSACTION-PREIMAGE-UNSAFE");
+  }
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const identity = existingAnchorIdentity(before);
+    if (!existingAnchorSame(identity, existingAnchorIdentity(fstatSync(fd, { bigint: true })))) existingAnchorFailure("TRUST-ANCHOR-PLAN-DRIFT");
+    const bytes = Buffer.alloc(Number(before.size));
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = readSync(fd, bytes, offset, bytes.length - offset, offset);
+      if (count < 1) existingAnchorFailure("TRUST-ANCHOR-PLAN-DRIFT");
+      offset += count;
+    }
+    if (readSync(fd, Buffer.alloc(1), 0, 1, offset) !== 0
+      || !existingAnchorSame(identity, existingAnchorIdentity(fstatSync(fd, { bigint: true })))
+      || !existingAnchorSame(identity, existingAnchorIdentity(lstatSync(path, { bigint: true })))
+      || !existingAnchorSame(parents, existingAnchorParents(path))) existingAnchorFailure("TRUST-ANCHOR-PLAN-DRIFT");
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return { path, parents, identity, bytes, text, sha256: createHash("sha256").update(bytes).digest("hex"), mode: Number(before.mode) & 0o777 };
+  } finally { closeSync(fd); }
+}
+function existingAnchorAssertInputs(inputs) {
+  for (const input of inputs) {
+    const current = existingAnchorRead(input.path);
+    if (current.sha256 !== input.sha256 || !existingAnchorSame(current.identity, input.identity)
+      || !existingAnchorSame(current.parents, input.parents)) existingAnchorFailure("TRUST-ANCHOR-PLAN-DRIFT");
+  }
+}
+// Locate top-level value spans without reformatting requiredKinds or waivers.
+// JSON.parse supplies syntax validation; this scanner additionally rejects
+// duplicate top-level keys rather than normalizing an ambiguous policy.
+function existingAnchorFields(text) {
+  JSON.parse(text);
+  let cursor = 0;
+  const fields = new Map();
+  const space = () => { while (/\s/u.test(text[cursor] ?? "") && cursor < text.length) cursor += 1; };
+  const stringEnd = () => {
+    const start = cursor++;
+    while (cursor < text.length) {
+      if (text[cursor] === "\\") cursor += 2;
+      else if (text[cursor++] === '"') return { start, end: cursor };
+    }
+    existingAnchorFailure("TRUST-ANCHOR-REPOSITORY-POLICY-INVALID");
+  };
+  space();
+  if (text[cursor++] !== "{") existingAnchorFailure("TRUST-ANCHOR-REPOSITORY-POLICY-INVALID");
+  space();
+  while (text[cursor] !== "}") {
+    const key = stringEnd();
+    const name = JSON.parse(text.slice(key.start, key.end));
+    if (fields.has(name)) existingAnchorFailure("TRUST-ANCHOR-REPOSITORY-POLICY-INVALID");
+    space(); cursor += 1; space();
+    const start = cursor;
+    let depth = 0;
+    while (cursor < text.length) {
+      const char = text[cursor];
+      if (char === '"') stringEnd();
+      else if (char === "{" || char === "[") { depth += 1; cursor += 1; }
+      else if (char === "}" || char === "]") { if (depth === 0) break; depth -= 1; cursor += 1; }
+      else if (char === "," && depth === 0) break;
+      else cursor += 1;
+    }
+    let end = cursor;
+    while (end > start && /\s/u.test(text[end - 1])) end -= 1;
+    fields.set(name, { start, end });
+    space();
+    if (text[cursor] === ",") { cursor += 1; space(); } else break;
+  }
+  return { fields, close: cursor };
+}
+function existingAnchorPostimage(policyInput, authority) {
+  const located = existingAnchorFields(policyInput.text);
+  const value = JSON.parse(policyInput.text);
+  const schema = located.fields.get("schema");
+  const additions = [];
+  const edits = [{ ...schema, bytes: JSON.stringify(CRITICAL_HUMAN_PROOF_POLICY_V3) }];
+  const anchorBytes = JSON.stringify([{ keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 }]);
+  if (located.fields.has("trustAnchors")) edits.push({ ...located.fields.get("trustAnchors"), bytes: anchorBytes });
+  else additions.push(`"trustAnchors": ${anchorBytes}`);
+  if (!Object.hasOwn(value, "waivedKinds")) additions.push('"waivedKinds": []');
+  if (additions.length) edits.push({ start: located.close, end: located.close, bytes: `, ${additions.join(", ")}` });
+  let text = policyInput.text;
+  for (const edit of edits.sort((a, b) => b.start - a.start)) text = text.slice(0, edit.start) + edit.bytes + text.slice(edit.end);
+  const post = JSON.parse(text);
+  if (JSON.stringify(post.requiredKinds) !== JSON.stringify(value.requiredKinds)
+    || JSON.stringify(post.waivedKinds) !== JSON.stringify(value.waivedKinds ?? [])) existingAnchorFailure("TRUST-ANCHOR-REPOSITORY-POLICY-INVALID");
+  return Buffer.from(text, "utf8");
+}
+export function planExistingPublicTrustAnchorMaterialization({ rootDir, runner } = {}) {
+  try {
+    if (!RUNNERS.has(runner) || typeof rootDir !== "string") return existingAnchorRefusal("TRUST-ANCHOR-EXISTING-AUTHORITY-UNAVAILABLE");
+    const root = resolve(rootDir);
+    if (realpathSync(root) !== root || !lstatSync(root).isDirectory()) return existingAnchorRefusal("TRUST-ANCHOR-TRANSACTION-PREIMAGE-UNSAFE");
+    const commonObservation = spawnSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], {
+      encoding: "utf8", shell: false, timeout: 5000, maxBuffer: 65536,
+    });
+    if (!isSuccessfulSpawn(commonObservation) || !isAbsolute(String(commonObservation.stdout ?? "").trim())) return existingAnchorRefusal("TRUST-ANCHOR-EXISTING-AUTHORITY-UNAVAILABLE");
+    const common = String(commonObservation.stdout).trim();
+    if (realpathSync(common) !== common) return existingAnchorRefusal("TRUST-ANCHOR-TRANSACTION-PREIMAGE-UNSAFE");
+    const receiptPath = resolveInitialAnswersState(root, "local", { requireGit: true }).receipt;
+    const receiptInput = existingAnchorRead(receiptPath);
+    const sourceInput = existingAnchorRead(join(root, "pipeline.user.yaml"));
+    const manifestInput = existingAnchorRead(join(root, "project", "pipeline.yaml"));
+    const receipt = JSON.parse(receiptInput.text);
+    existingAnchorFields(receiptInput.text);
+    const source = parseYaml(sourceInput.text);
+    const manifest = parseYaml(manifestInput.text);
+    if (receipt.schema !== PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA || receipt.root !== root || receipt.runner !== runner
+      || !["signature", "chat"].includes(receipt.pushApprovalPreference) || !["de", "en"].includes(receipt.language)
+      || !ADVISOR_EXPORT_CONSENT_MODES.has(receipt.advisorExportConsent) || !validatePipelineUserV3(source).ok
+      || source.gates?.human_approval !== receipt.pushApprovalPreference || source.gates?.push_approval !== receipt.pushApprovalPreference
+      || source.advisor_export?.consent !== receipt.advisorExportConsent || source.language?.human_facing !== receipt.language
+      || manifest.language?.human_facing !== receipt.language) return existingAnchorRefusal("TRUST-ANCHOR-INITIAL-ANSWERS-CONFLICT");
+    if (receipt.pushApprovalPreference === "chat") {
+      existingAnchorAssertInputs([receiptInput, sourceInput, manifestInput]);
+      return { schema: EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA, status: "not-required", ok: true, nextAction: null };
+    }
+    const home = process.env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE ?? homedir();
+    const machineDependencies = { homedirFn: () => home };
+    const machinePath = machinePlaneFilePath(machineDependencies);
+    if (machinePath === null) return existingAnchorRefusal("TRUST-ANCHOR-EXISTING-AUTHORITY-UNAVAILABLE");
+    const machineInput = existingAnchorRead(machinePath);
+    const plane = readMachinePlane(machineDependencies);
+    existingAnchorFields(machineInput.text);
+    if (plane.status !== "valid" || plane.plane.pushApprovalDefault !== "signature" || plane.plane.language !== receipt.language
+      || typeof plane.plane.poKeyDirectory !== "string" || !isAbsolute(plane.plane.poKeyDirectory)) return existingAnchorRefusal("TRUST-ANCHOR-EXISTING-AUTHORITY-UNAVAILABLE");
+    const directory = resolve(plane.plane.poKeyDirectory);
+    if (directory === root || directory.startsWith(`${root}${sep}`) || realpathSync(directory) !== directory) return existingAnchorRefusal("TRUST-ANCHOR-TRANSACTION-PREIMAGE-UNSAFE");
+    const authorityInput = existingAnchorRead(join(directory, "trust-policy.json"));
+    const pointerInput = existingAnchorRead(join(common, "agent-pipeline", "po-key-directory.json"));
+    const policyInput = existingAnchorRead(join(root, CRITICAL_HUMAN_PROOF_POLICY_PATH));
+    const authority = JSON.parse(authorityInput.text);
+    const pointer = JSON.parse(pointerInput.text);
+    existingAnchorFields(authorityInput.text); existingAnchorFields(pointerInput.text); existingAnchorFields(policyInput.text);
+    const authorityKeys = Object.keys(authority).sort();
+    if (!existingAnchorSame(authorityKeys, ["keyReference", "publicKeySha256"])
+      && !existingAnchorSame(authorityKeys, ["humanName", "keyReference", "publicKeySha256"])) return existingAnchorRefusal("TRUST-ANCHOR-EXISTING-AUTHORITY-UNAVAILABLE");
+    if (typeof authority.keyReference !== "string" || !authority.keyReference.trim()
+      || !/^[a-f0-9]{64}$/u.test(authority.publicKeySha256 ?? "")
+      || (Object.hasOwn(authority, "humanName") && (typeof authority.humanName !== "string" || !authority.humanName.trim()))) return existingAnchorRefusal("TRUST-ANCHOR-EXISTING-AUTHORITY-UNAVAILABLE");
+    if (pointer.schema !== "pipeline.po-key-directory.v1" || pointer.poKeyDirectory !== plane.plane.poKeyDirectory
+      || resolve(pointer.poKeyDirectory) !== directory) return existingAnchorRefusal("TRUST-ANCHOR-REPOSITORY-CONFLICT");
+    const policy = readCriticalHumanProofPolicy(root);
+    if (!policy.ok) return existingAnchorRefusal("TRUST-ANCHOR-REPOSITORY-POLICY-INVALID");
+    const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
+    const alreadyComplete = anchors.length === 1 && anchors[0].keyReference === authority.keyReference && anchors[0].publicKeySha256 === authority.publicKeySha256;
+    if (anchors.length > 0 && !alreadyComplete) return existingAnchorRefusal("TRUST-ANCHOR-REPOSITORY-CONFLICT");
+    const inputs = [receiptInput, sourceInput, manifestInput, machineInput, authorityInput, pointerInput, policyInput];
+    const postBytes = alreadyComplete ? policyInput.bytes : existingAnchorPostimage(policyInput, authority);
+    existingAnchorAssertInputs(inputs);
+    const planSha256 = createHash("sha256").update(canonicalJson({ root, runner,
+      inputs: inputs.map(input => ({ pathSha256: createHash("sha256").update(input.path).digest("hex"), identity: input.identity, sha256: input.sha256, parents: input.parents })),
+      postSha256: createHash("sha256").update(postBytes).digest("hex"), alreadyComplete,
+    })).digest("hex");
+    const action = Object.freeze({ kind: "command", executable: process.execPath,
+      argv: Object.freeze([ONBOARDING_SCRIPT_PATH, "materialize-existing-trust-anchor", "--root", root, "--runner", runner, "--plan-sha256", planSha256, "--activate"]),
+      mutation: true, requiresConfirmation: false,
+      expected: Object.freeze({ schema: EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA, statuses: Object.freeze(["materialized", "no-op"]) }) });
+    const plan = Object.freeze({ schema: EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA, status: "planned", ok: true, root, runner, planSha256, nextAction: action });
+    existingPublicTrustAnchorPlans.set(plan, { signature: canonicalJson(plan), inputs, policyInput, postBytes, alreadyComplete });
+    return plan;
+  } catch (error) { return existingAnchorRefusal(error?.existingAnchorCode ?? "TRUST-ANCHOR-EXISTING-AUTHORITY-UNAVAILABLE"); }
+}
+export function applyExistingPublicTrustAnchorMaterialization(plan) {
+  const state = plan && existingPublicTrustAnchorPlans.get(plan);
+  if (!state || canonicalJson(plan) !== state.signature) return existingAnchorRefusal("TRUST-ANCHOR-INVALID-PRIVATE-PLAN");
+  existingPublicTrustAnchorPlans.delete(plan);
+  let temporary = null; let temporaryIdentity = null; let fd; let renamed = false;
+  try {
+    existingAnchorAssertInputs(state.inputs);
+    if (state.alreadyComplete) return { schema: EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA, status: "no-op", ok: true, planSha256: plan.planSha256, alreadyComplete: true, nextAction: null };
+    const policyPath = state.policyInput.path;
+    temporary = `${policyPath}.existing-public-anchor-${randomBytes(12).toString("hex")}`;
+    fd = openSync(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), state.policyInput.mode);
+    temporaryIdentity = existingAnchorIdentity(fstatSync(fd, { bigint: true }));
+    fchmodSync(fd, state.policyInput.mode);
+    writeFileSync(fd, state.postBytes); fsyncSync(fd);
+    const writtenIdentity = existingAnchorIdentity(fstatSync(fd, { bigint: true }));
+    closeSync(fd); fd = undefined;
+    const temporaryReadback = existingAnchorRead(temporary);
+    if (!existingAnchorSame(temporaryReadback.identity, writtenIdentity)
+      || temporaryReadback.identity[0] !== temporaryIdentity[0] || temporaryReadback.identity[1] !== temporaryIdentity[1]
+      || temporaryReadback.sha256 !== createHash("sha256").update(state.postBytes).digest("hex")) existingAnchorFailure("TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-READBACK-FAILED");
+    existingAnchorAssertInputs(state.inputs);
+    renameSync(temporary, policyPath); renamed = true;
+    const directoryFd = openSync(dirname(policyPath), constants.O_RDONLY | (constants.O_DIRECTORY ?? 0) | (constants.O_NOFOLLOW ?? 0));
+    try {
+      const directoryStat = fstatSync(directoryFd, { bigint: true });
+      if (!existingAnchorSame([directoryStat.dev, directoryStat.ino, directoryStat.mode, directoryStat.uid, directoryStat.gid].map(String), state.policyInput.parents[0].identity)) existingAnchorFailure("TRUST-ANCHOR-PLAN-DRIFT");
+      fsyncSync(directoryFd);
+    } finally { closeSync(directoryFd); }
+    const post = existingAnchorRead(policyPath);
+    if (post.sha256 !== temporaryReadback.sha256 || post.mode !== state.policyInput.mode
+      || post.identity[0] !== temporaryReadback.identity[0] || post.identity[1] !== temporaryReadback.identity[1]) existingAnchorFailure("TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-READBACK-FAILED");
+    existingAnchorAssertInputs(state.inputs.filter(input => input !== state.policyInput));
+    const validated = readCriticalHumanProofPolicy(plan.root);
+    const finalReadback = existingAnchorRead(policyPath);
+    if (!validated.ok || finalReadback.sha256 !== post.sha256
+      || !existingAnchorSame(finalReadback.identity, post.identity) || !existingAnchorSame(finalReadback.parents, post.parents)) existingAnchorFailure("TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-READBACK-FAILED");
+    return { schema: EXISTING_PUBLIC_TRUST_ANCHOR_SCHEMA, status: "materialized", ok: true, planSha256: plan.planSha256, alreadyComplete: false, nextAction: null };
+  } catch (error) {
+    return existingAnchorRefusal(renamed ? "TRUST-ANCHOR-DURABILITY-UNKNOWN" : error?.existingAnchorCode ?? "TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-WRITE-FAILED", renamed ? "durability-unknown" : "unchanged");
+  } finally {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve first failure */ } }
+    if (!renamed && temporary !== null && temporaryIdentity !== null) {
+      try {
+        const current = existingAnchorRead(temporary);
+        if (current.identity[0] === temporaryIdentity[0] && current.identity[1] === temporaryIdentity[1]
+          && current.sha256 === createHash("sha256").update(state.postBytes).digest("hex")) unlinkSync(temporary);
+      } catch { /* retain unknown/foreign temporary state */ }
+    }
+  }
 }
 
 /**

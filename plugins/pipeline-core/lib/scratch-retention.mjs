@@ -7,6 +7,7 @@ import { lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 import { isPhysicalScratchTarget, scratchLivePluginRoots } from './physical-scratch-boundary.mjs';
+import { inspectPackageStaging } from './scratch-package-staging.mjs';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_AGE_DAYS = 14;
@@ -177,7 +178,13 @@ export function assessScratchDurability({ root, now = new Date() } = {}) {
 /** A PLAN only: the sweep candidates that are old enough and unreferenced (see assessScratchDurability). Never deletes. */
 export function planSweep({ root, now = new Date(), maxAgeDays = DEFAULT_MAX_AGE_DAYS } = {}) {
   const result = assess(root, now, maxAgeDays);
-  const plan = { delete: result.unreferencedOld };
+  const packages = inspectPackageStaging({ root });
+  const blocked = rel => packages.blockedStagingPaths.some(path => pathKey(rel) === pathKey(path)
+    || pathKey(rel).startsWith(`${pathKey(path)}/`));
+  const ageOnly = packages.unknownScope ? [] : result.unreferencedOld.filter(rel => !blocked(rel));
+  const plan = { delete: [...new Set([...ageOnly, ...packages.delete])].sort() };
   if (result.warning) plan.warning = result.warning;
+  if (packages.holds.length > 0) plan.warning = [plan.warning,
+    'registered package staging is held; no invalid registered set may fall through to age-only deletion'].filter(Boolean).join('; ');
   return plan;
 }

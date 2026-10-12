@@ -54,8 +54,9 @@ Four deliberately separated roles carry the model:
 - **Elephant** — the long-lived orchestrator session. Turns your intent into a spec,
   breaks it into small tasks, dispatches them, and prepares a go/no-go
   recommendation for the Product Owner.
-- **Goldfish** — a fresh-context implementor subagent. Executes exactly one clearly
-  defined task and reports back only with evidence, never a bare claim.
+- **Goldfish** — a fresh-context implementor subagent. Owns one complete, independently
+  checkable acceptance criterion or backlog outcome: analysis, test cases, code,
+  targeted checks and fixes stay in the same context. Reports actual evidence.
 - **Critic** — an independent, read-only reviewer with a fresh context. Never sees
   chat history or reasoning — only the result, judged on its own.
 
@@ -63,7 +64,8 @@ Around those roles:
 
 - **Review before expensive final qualification** — targeted, candidate-bound
   checks and Security evidence prepare an independent Critic review. Findings
-  are corrected and re-reviewed as needed; the full release Verify then
+  are corrected by one fresh Correction Goldfish for the coherent batch, with
+  one full review and at most three delta reviews; review stops on PASS. Full Verify then
   qualifies the reviewed candidate. A later Verify rerun alone does not
   invalidate a content-bound Critic review.
 - **Specs with checkable acceptance criteria** — every task has a Definition of
@@ -297,9 +299,10 @@ Vier bewusst getrennte Rollen tragen das Modell:
 - **Elephant** — die langlebige Orchestrator-Sitzung. Formt aus deiner Absicht eine
   Spezifikation, zerlegt sie in kleine Aufgaben, delegiert sie und bereitet eine
   Go/No-Go-Empfehlung für den Product Owner vor.
-- **Goldfish** — ein Subagent mit frischem Kontext. Führt genau eine klar
-  umrissene Aufgabe aus und meldet sich nur mit Nachweis zurück, nie mit einer
-  bloßen Behauptung.
+- **Goldfish** — ein Subagent mit frischem Kontext. Verantwortet ein vollständiges,
+  unabhängig prüfbares Akzeptanzkriterium oder Backlog-Ergebnis: Analyse, Testfälle,
+  Code, gezielte Checks und Korrekturen bleiben im selben Kontext. Meldet
+  tatsächliche Nachweise zurück.
 - **Critic** — ein unabhängiger Prüfer mit reinem Lesezugriff und frischem
   Kontext. Sieht nie Chat-Verlauf oder Begründungen — nur das Ergebnis, das er
   für sich beurteilt.
@@ -308,8 +311,9 @@ Ergänzend dazu:
 
 - **Review vor der teuren Abschlussprüfung** — gezielte, an den Kandidaten
   gebundene Checks und Security-Evidenz bereiten das unabhängige Critic-Review
-  vor. Befunde werden korrigiert und bei Bedarf erneut geprüft; anschließend
-  qualifiziert der vollständige Release-Verify den geprüften Kandidaten.
+  vor. Ein frischer Korrektur-Goldfish behält alle Befunde und Fixes im kohärenten
+  Batch. Ein Voll-Review plus höchstens drei Delta-Reviews; bei PASS stoppen.
+  Anschließend qualifiziert Full Verify den integrierten, geprüften Kandidaten.
   Ein bloßer Verify-Neulauf entwertet ein inhaltlich gebundenes Critic-Review
   nicht.
 - **Specs mit prüfbaren Akzeptanzkriterien** — keine Aufgabe ist „fertig" nach

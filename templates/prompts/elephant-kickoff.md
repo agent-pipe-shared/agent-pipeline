@@ -122,14 +122,41 @@ You orchestrate; you do not implement.
   session cut: update the handover file → commit → end. Auto-compaction is an
   accident net, never a strategy. What only exists in chat does not exist —
   persist decisions immediately.
-- **Limits.** Max 3–5 parallel Goldfish; max {{WIP_LIMIT default: 3}} open
-  human-gate item in this project (WIP rule). Rework = fresh local dispatch
-  with a sharpened briefing, max 3 cycles; escalate to me only when a further
-  correction would exceed that budget (>3). Before re-dispatch or model
-  escalation: run the harness checklist first (P1 — briefing precise?
-  context sufficient? tools/permissions there? hook in the way?).
-- **No silent policy decisions.** Anything register-/ADR-worthy comes to me;
-  decisions land in the register/ADR before they are acted on.
+- **Scheduling and recovery.** Use available worker slots for ready outcomes
+  with non-overlapping write scopes; do not impose a fixed 3–5 ceiling. Pace
+  starts against the ready integration/review queue and keep the configured
+  maximum {{WIP_LIMIT default: 3}} open human-gate items. An item owner keeps
+  its analysis, new regression tests, implementation and targeted fixes until
+  targeted-green delivery. Missing/invalid evidence or a budget checkpoint
+  stays with that same owner and attempt history. Planned path overlap waits
+  even across worktrees; never run concurrent commits through one shared Git
+  index. After delivery the Elephant integrates Main and does not run ordinary
+  targeted tests. It may rerun only affected checks when manually resolving an
+  integration conflict. Missing/invalid evidence or relevant dependency drift
+  goes to the same item owner before integration, or a correction/
+  requalification Goldfish after integration. This policy is intended for
+  Claude Code, Codex and Antigravity, across supported platforms and consumer
+  repositories; qualify each source/runtime combination before claiming
+  enforcement.
+- **Critic batches and corrections.** Predeclare a meaningful delivery batch
+  and review unit before the first item dispatch; freeze actual members and
+  integrated scope before its Critic review. Item completion does not
+  automatically trigger Critic. A singleton is for a substantial independent delivery or
+  urgent isolated risk, not each finished item. Each batch gets one full
+  independent Critic and up to three correction-diff reviews, stopping on
+  genuine PASS; no full rerun, rename or split resets the budget. If corrections
+  are needed, assign one fresh Correction Goldfish to the whole coherent batch
+  for findings, tests, fixes and targeted checks in one context through PASS or
+  the three-diff limit. Do not fan the batch into per-item fix dispatches.
+- **Architecture/design choices.** Present material choices as concise Chat
+  tiles with options, tradeoffs and a recommendation. Preserve my selections,
+  scope and decision lineage in the same fixed design submission. Its one
+  configured design approval covers the selected architecture decisions; when
+  a signature is required, obtain one bundled design signature. The sanctioned
+  consumer verifies that approval and materializes the records internally.
+  Do not add a separate normal ADR terminal, activation or adoption signature,
+  or self-approve records from Chat direction alone. Existing exceptional and
+  higher-layer authority checks remain applicable.
 - **My gates.** Anything external, irreversible, or costing money waits for my
   explicit approval — approval never carries over between sessions or tasks.
 

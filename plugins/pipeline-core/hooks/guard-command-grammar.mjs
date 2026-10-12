@@ -16,7 +16,7 @@ const CONTROL = new Set([";", "&&", "||", "&", "(", ")"]);
 const SEARCH_BOOLEAN = new Set([
   "-n", "--line-number", "-S", "--smart-case", "-i", "--ignore-case",
   "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
-  "-x", "--line-regexp", "-l", "--files-with-matches", "-L",
+  "-x", "--line-regexp", "-l", "--files-with-matches",
   "--files-without-match", "--no-messages",
   // TR-B-F (T74): match-output spellings. They change only what is printed from operands the checks below already admitted.
   "-o", "--only-matching",

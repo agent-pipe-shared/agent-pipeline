@@ -17,8 +17,10 @@ import {
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   prepareHumanGuardOverrideForSignature,
+  indexHumanGuardOverrideSelection,
   repairHumanGuardOverrideAudit,
   refreezeHumanGuardOverridePlan,
+  sweepHumanGuardOverrideRequests,
   verifyHumanGuardOverrideAudit,
 } from "../lib/human-guard-override.mjs";
 import {
@@ -53,6 +55,7 @@ function usage() {
     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs render-copy-safe --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
+    "  guard-human-override.mjs sweep-requests --repo <absolute-root>",
     "  guard-human-override.mjs publish-consumption-action --repo <absolute-root> --plan-sha256 <64hex> --event-out <repo-relative-path>",
     "  guard-human-override.mjs repair-audit --repo <absolute-root> --preimage-sha256 <64hex> --activate",
   ].join("\n");
@@ -187,6 +190,12 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
   };
   const [command, ...rest] = argv;
   try {
+    if (command === "sweep-requests") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo"]) || typeof parsed.repo !== "string") throw new Error(usage());
+      write(`${JSON.stringify(sweepHumanGuardOverrideRequests({rootDir: parsed.repo}))}\n`);
+      return 0;
+    }
     if (command === "verify-audit") {
       const parsed = flags(rest);
       if (!parsed || Object.keys(parsed).length !== 1 || typeof parsed.repo !== "string") throw new Error(usage());
@@ -420,6 +429,11 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         authorSourceRoot,
       });
       const intent = buildHumanGuardOverrideSignatureIntent({ prepared, planned });
+      // Reuse the authenticated Source publication corridor; the index grants no authority.
+      const indexed = indexHumanGuardOverrideSelection({rootDir: parsed.repo, pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"], planSha256: parsed["plan-sha256"],
+        scriptPath: SCRIPT, authorSourceRoot});
+      if (indexed.intentSha256 !== intent.sha256) throw new HumanGuardOverrideError("HGO-DISCLOSURE-INDEX", "emitted intent differs from its actual indexed preparation");
       write(`${JSON.stringify({
         schema: "pipeline.human-guard-override-signature-digest.v1",
         requestSha256: parsed["request-sha256"],

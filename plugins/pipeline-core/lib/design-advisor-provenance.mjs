@@ -11,6 +11,8 @@ const decode=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
 const fail=code=>({ok:false,code});
 function safePath(p){return typeof p==='string'&&/^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$/u.test(p)&&p.split('/').every(s=>s!==''&&!s.startsWith('.')&&!['scratch','node_modules'].includes(s));}
 function identity(a,b){return a.dev===b.dev&&a.ino===b.ino&&a.mode===b.mode&&a.nlink===b.nlink&&a.size===b.size&&a.mtimeNs===b.mtimeNs;}
+// Directory membership churn is not file custody drift. Bind the canonical ancestor itself.
+function parentIdentity(a,b){return a.dev===b.dev&&a.ino===b.ino&&a.mode===b.mode;}
 // FLAP3: a sibling create/delete in an ancestor directory (e.g. another agent's evidence/dispatch-record-*.json)
 // changes that ancestor's mtime/size/nlink between the walk and the re-check. That is the one confirmed
 // benign cause of DAP-PHYSICAL-PARENT-DRIFT, so only it is re-observed: a fresh full walk, 3 attempts,
@@ -34,8 +36,10 @@ function readAdvisorPhysicalBytesOnce(repoRoot,path,maxBytes){
   fd=openSync(target,constants.O_RDONLY|(constants.O_NOFOLLOW??0));const opened=fstatSync(fd,{bigint:true});if(!identity(before,opened))throw Error('DAP-PHYSICAL-OPEN');
   const buffer=Buffer.alloc(maxBytes+1);let offset=0;while(offset<buffer.length){const n=readSync(fd,buffer,offset,buffer.length-offset,null);if(n===0)break;offset+=n;}if(offset>maxBytes)throw Error('DAP-PHYSICAL-BOUND');
   const after=fstatSync(fd,{bigint:true}),pathAfter=lstatSync(target,{bigint:true});if(!identity(opened,after)||!identity(after,pathAfter)||BigInt(offset)!==after.size||realpathSync(target)!==target)throw Error('DAP-PHYSICAL-DRIFT');
-  for(const parent of parents){const now=lstatSync(parent.path,{bigint:true});if(!identity(parent.st,now)||!now.isDirectory()||now.isSymbolicLink()||realpathSync(parent.path)!==parent.path)throw Error('DAP-PHYSICAL-PARENT-DRIFT');}
-  const bytes=Buffer.from(buffer.subarray(0,offset));if(!Buffer.from(decode.decode(bytes),'utf8').equals(bytes))throw Error('DAP-UTF8');return bytes;
+  for(const parent of parents){const now=lstatSync(parent.path,{bigint:true});if(!parentIdentity(parent.st,now)||!now.isDirectory()||now.isSymbolicLink()||realpathSync(parent.path)!==parent.path)throw Error('DAP-PHYSICAL-PARENT-DRIFT');}
+  const bytes=Buffer.from(buffer.subarray(0,offset));let text;
+  try{text=decode.decode(bytes);}catch{throw Error('DAP-UTF8');}
+  if(!Buffer.from(text,'utf8').equals(bytes))throw Error('DAP-UTF8');return bytes;
  }finally{if(fd!==undefined)closeSync(fd);}
 }
 function git(repoRoot,args,maxBuffer=1048577){return execFileSync('git',['-C',resolve(repoRoot),...args],{encoding:null,maxBuffer,timeout:10000,stdio:['ignore','pipe','pipe']});}

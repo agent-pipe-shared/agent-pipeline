@@ -41,9 +41,12 @@
  */
 import { readFileSync, statSync } from "node:fs";
 
+import { readGovernedItemIntegrationReadiness } from "./native-goldfish-host-state.mjs";
+import { validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
 import { isSafeTaskId, isTerminalOutcome } from "./dispatch-record.mjs";
 
 export const SLICE_QUEUE_SCHEMA = "pipeline.slice-queue.v1";
+export const ITEM_QUEUE_SCHEMA = "pipeline.slice-queue.v2";
 export const SLICE_STATES = Object.freeze(["ready", "hold-po", "blocked-external", "deferred", "cancelled"]);
 export const SLICE_TIERS = Object.freeze(["mechanic", "implementor", "deep", "critic"]);
 export const COMMIT_MODES = Object.freeze(["host-commit", "worktree", "diff-only", "self-commit"]);
@@ -485,7 +488,8 @@ export function validateSliceQueue(input, options = {}) {
     return done();
   }
   for (const key of Object.keys(input)) if (!TOP_KEYS.has(key)) err("SQ-SCHEMA", `unknown top-level key ${JSON.stringify(key).slice(0, 40)}`);
-  if (input.schema !== SLICE_QUEUE_SCHEMA) err("SQ-SCHEMA", `schema must be ${SLICE_QUEUE_SCHEMA}`);
+  const itemOwned = input.schema === ITEM_QUEUE_SCHEMA;
+  if (!itemOwned && input.schema !== SLICE_QUEUE_SCHEMA) err("SQ-SCHEMA", `schema must be ${SLICE_QUEUE_SCHEMA} or ${ITEM_QUEUE_SCHEMA}`);
   if (typeof input.feature !== "string" || !FEATURE.test(input.feature)) err("SQ-SCHEMA", "feature must be a short safe token");
 
   const defaults = { commitMode: undefined, tier: undefined, loadClass: "light" };
@@ -550,7 +554,20 @@ export function validateSliceQueue(input, options = {}) {
       err("SQ-ID", `duplicate slice id ${id}`, { sliceId: id });
       return;
     }
-    for (const key of Object.keys(raw)) if (!SLICE_KEYS.has(key)) err("SQ-SCHEMA", `slice ${id}: unknown key ${JSON.stringify(key).slice(0, 40)}`, { sliceId: id });
+    for (const key of Object.keys(raw)) if (!SLICE_KEYS.has(key) && !(itemOwned && key === "delivery")) err("SQ-SCHEMA", `slice ${id}: unknown key ${JSON.stringify(key).slice(0, 40)}`, { sliceId: id });
+    if(itemOwned) {
+      const delivery=raw.delivery,keys=isObject(delivery)?Object.keys(delivery).sort().join(','):'';
+      const legacy=keys==='itemId,legacyQueueSha256,status'&&delivery.status==='unbound-legacy'
+        &&raw.state==='deferred'&&isSafeTaskId(delivery.itemId)&&/^[a-f0-9]{64}$/u.test(delivery.legacyQueueSha256??'');
+      const basic=['baseCommit,criteria,itemId','approvalSha256,baseCommit,checks,criteria,criterionLocator,itemId'].includes(keys)
+        &&isSafeTaskId(delivery.itemId)&&/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(delivery.baseCommit??'')
+        &&Array.isArray(delivery.criteria)&&delivery.criteria.length>0&&delivery.criteria.length<=64
+        &&delivery.criteria.every(isSafeTaskId)&&new Set(delivery.criteria).size===delivery.criteria.length;
+      const modern=keys==='approvalSha256,baseCommit,checks,criteria,criterionLocator,itemId';
+      const selected=modern&&validateItemDeliveryBriefing({schema:'pipeline.item-delivery-briefing.v1',sliceId:id,itemId:delivery.itemId,criterionLocator:delivery.criterionLocator,checks:delivery.checks}).ok
+        &&/^[a-f0-9]{64}$/u.test(delivery.approvalSha256??'')&&delivery.criteria.length===1&&delivery.criteria[0]===delivery.criterionLocator.criterionId;
+      if(!legacy&&(!basic||modern&&!selected))err('SQ-DELIVERY',`slice ${id}: v2 delivery binding is invalid`,{sliceId:id});
+    }
     if (!isLine(raw.title)) err("SQ-SCHEMA", `slice ${id}: title must be one non-empty line`, { sliceId: id });
     const state = SLICE_STATES.includes(raw.state) ? raw.state : null;
     if (state === null) err("SQ-SCHEMA", `slice ${id}: state must be one of ${SLICE_STATES.join("|")}`, { sliceId: id });
@@ -622,6 +639,7 @@ export function validateSliceQueue(input, options = {}) {
 
     const entry = {
       id,
+      ...(itemOwned ? { delivery: raw.delivery } : {}),
       title: typeof raw.title === "string" ? raw.title : "",
       state,
       holdReason,
@@ -764,7 +782,7 @@ export function validateSliceQueue(input, options = {}) {
   if (!matcher.checked) warn("SQ-WARN-PROTECTED-UNCHECKED", "no protected patterns or inventory were injected; protected slices cannot be flagged");
 
   normalizedQueue = {
-    schema: SLICE_QUEUE_SCHEMA,
+    schema: input.schema,
     feature: input.feature,
     defaults: { commitMode: defaults.commitMode ?? null, tier: defaults.tier ?? null, loadClass: defaults.loadClass },
     limits: { deadline: limits.deadline, maxAttemptsPerSlice: limits.maxAttemptsPerSlice ?? DEFAULT_MAX_ATTEMPTS },
@@ -854,9 +872,12 @@ export function readyAndLive(input, options = {}) {
     if (!isSafeTaskId(key)) continue;
     recordsBySlice.set(key, [...(recordsBySlice.get(key) ?? []), record]);
   }
-  const doneIds = new Set([...toIdList(options.terminalIds), ...toIdList(source.terminalIds)]);
+  const itemOwned = source.queue?.schema === ITEM_QUEUE_SCHEMA;
+  // Legacy terminal outcomes remain historical facts. They cannot certify a
+  // v2 delivery, integration or acceptance, including injected terminalIds.
+  const doneIds = new Set(itemOwned ? readGovernedItemIntegrationReadiness(source.integrationReadiness,source.queue) : [...toIdList(options.terminalIds), ...toIdList(source.terminalIds)]);
   for (const [id, records] of recordsBySlice) {
-    if (records.some((record) => isTerminalOutcome(record.outcome) && !isHandBack(record))) doneIds.add(id);
+    if (!itemOwned && records.some((record) => isTerminalOutcome(record.outcome) && !isHandBack(record))) doneIds.add(id);
   }
 
   const validation = validateSliceQueue(source.queue, { ...options, terminalIds: [...doneIds] });
@@ -909,11 +930,12 @@ export function readyAndLive(input, options = {}) {
     const beat = beats.get(entry.id);
     const sources = [];
     let ledgerCounts = ledgerEntry !== undefined;
-    if (ledgerCounts && terminalRecords.length > 0) {
+    if (!itemOwned && ledgerCounts && terminalRecords.length > 0) {
       const launchedMs = parseTime(ledgerEntry.launchedAt);
       ledgerCounts = terminalMs !== null && Number.isFinite(launchedMs) && launchedMs > terminalMs;
     }
     if (ledgerCounts) sources.push("ledger");
+    if (itemOwned && terminalRecords.some(record => !isHandBack(record))) sources.push("integration-pending-unqualified");
     if (openRecords.length > 0) sources.push("record");
     if (beat !== undefined && nowMs - beat <= staleMs && (terminalRecords.length === 0 || (terminalMs !== null && beat > terminalMs))) sources.push("heartbeat");
     if (sources.length === 0) continue;

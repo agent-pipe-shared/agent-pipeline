@@ -107,7 +107,7 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
     const planSha256 = advisorPackageSha256(root, planPath);
     const specSha256 = advisorPackageSha256(root, specPath);
     const approval = state?.planApproval;
-    if (approval?.schema === "pipeline.plan-approval.v8") {
+    if (["pipeline.plan-approval.v8", "pipeline.plan-approval.v9"].includes(approval?.schema)) {
       if (state?.planApproved !== true) return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
       const binding = approval.designApprovalBinding;
       const record = approval.designApproval;
@@ -256,7 +256,7 @@ export function lifecycleDesignApprovalDenial(state, lifecycle) {
     || lifecycle.phase !== "implementation"
     || lifecycle.submissionCurrent !== true
     || lifecycle.approvalCurrent !== false
-    || state?.planApproval?.schema !== "pipeline.plan-approval.v8") return null;
+    || !["pipeline.plan-approval.v8", "pipeline.plan-approval.v9"].includes(state?.planApproval?.schema)) return null;
   const approval = state.planApproval;
   if (approval.designApprovalBinding === null || approval.designApproval === null
     || !/^[a-f0-9]{64}$/u.test(approval.designApproval?.bindingSha256 ?? "")) return null;
@@ -474,16 +474,6 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
     ...(typeof planPath === "string" ? { planSha256: fileSha256(planPath) } : {}),
     ...(typeof specPath === "string" ? { specSha256: fileSha256(specPath) } : {}),
   });
-  if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
-    const admission = designAdvisoryAdmission(state, projectDir, planPath, specPath);
-    if (!admission.ok) return {
-      verdict: gate.mode === "warn" ? "warn" : "block",
-      reason: designAdvisoryRemediation(admission.code),
-      feature: activeFeature.id, lifecycleStatus: lifecycle.status,
-    };
-    return { verdict: "allow" };
-  }
-
   // ---- exempt paths -------------------------------------------------------------------
   const exemptPrefixes = [...DEFAULT_EXEMPT_PREFIXES];
   if (lifecycle.status === "draft"
@@ -506,6 +496,16 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
       && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))))
   );
   if (isExempt) return { verdict: "allow" };
+
+  if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
+    const admission = designAdvisoryAdmission(state, projectDir, planPath, specPath);
+    if (!admission.ok) return {
+      verdict: gate.mode === "warn" ? "warn" : "block",
+      reason: designAdvisoryRemediation(admission.code),
+      feature: activeFeature.id, lifecycleStatus: lifecycle.status,
+    };
+    return { verdict: "allow" };
+  }
 
   // ---- verdict --------------------------------------------------------------------------
   const lifecycleReason = lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"

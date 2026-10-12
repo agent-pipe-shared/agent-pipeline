@@ -22,6 +22,8 @@ import { parseVerifyCaseCompletion, validateVerifyCaseCompletionPolicy } from ".
 import { readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
 import { finalizeTemporaryResource, loadSessionDescriptor, registerTemporaryIntent } from "../lib/worktree-lifecycle.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+import { observeNativeWindowsProcess, sameNativeWindowsProcess } from "../lib/windows-native-process-observer.mjs";
+import { readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, createWindowsOwnedAuthorityDirectory, inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor } from "../lib/windows-owned-authority-backend.mjs";
 import { registerVerifyRunRecord, settleVerifyRunRecord, sweepStaleVerifyRunRecords } from "../lib/verify-run-record.mjs";
 
 const MAX_LOG_BYTES = 16 * 1024 * 1024;
@@ -90,12 +92,18 @@ async function terminateOwnedGroup(child, identity, graceMs = 750) {
 function ownerMatches(info) { return typeof process.getuid !== "function" || info.uid === process.getuid(); }
 
 function processStartIdentity(pid) {
+  if(process.platform==='win32'){const observed=observeNativeWindowsProcess({pid});if(observed.status!=='present')throw new Error('VERIFY-JOURNAL-PROCESS-UNAVAILABLE');return observed.process.start;}
   if (process.platform !== "linux") return `pid-${pid}`;
   try { return readFileSync(`/proc/${pid}/stat`, "utf8").trim().split(" ")[21] || `pid-${pid}`; }
   catch { return `pid-${pid}`; }
 }
 
 function processIdentityAlive(pid, startId) {
+  if(process.platform==='win32'){
+    if(!Number.isSafeInteger(pid)||pid<1||typeof startId!=='string'||!/^\d+$/.test(startId))return true;
+    const observed=observeNativeWindowsProcess({pid});if(observed.status==='absent')return false;
+    return observed.status!=='present'||observed.process.start===startId;
+  }
   if (!Number.isSafeInteger(pid) || pid < 1 || typeof startId !== "string") return true;
   try { process.kill(pid, 0); } catch (error) { return error?.code !== "ESRCH"; }
   return processStartIdentity(pid) === startId;
@@ -139,6 +147,7 @@ function assertPhysicalDirectory(path, { privateState = false, created = false }
 }
 
 function ensurePrivateDirectory(path) {
+  if(process.platform==='win32')return verifyWindowsDirectory(path,false);
   let created = false;
   try { mkdirSync(path, { mode: 0o700 }); created = true; } catch (error) { if (error?.code !== "EEXIST") throw error; }
   return assertPhysicalDirectory(path, { privateState: true, created });
@@ -158,12 +167,14 @@ function regularPhysicalFile(path) {
 }
 
 function writeDurable(path, bytes, flag) {
+  if(process.platform==='win32'){verifyWindowsWrite(path,bytes,flag);return;}
   const fd = openSync(path, flag, 0o600);
   try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
   if (!regularPrivateFile(path)) throw new Error("VERIFY-JOURNAL-FILE-NOT-PRIVATE");
 }
 
 function directoryDurability(path) {
+  if(process.platform==='win32')return verifyWindowsDirectoryDurability(path);
   let fd = null;
   try {
     fd = openSync(path, "r");
@@ -177,6 +188,7 @@ function directoryDurability(path) {
 }
 
 function atomicJson(path, value) {
+  if(process.platform==='win32'){verifyWindowsWrite(path,Buffer.from(JSON.stringify(value)+'\n'),'replace');return directoryDurability(dirname(path));}
   const temp = join(dirname(path), `.${basename(path)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
   writeDurable(temp, Buffer.from(`${JSON.stringify(value)}\n`), "wx");
   renameSync(temp, path);
@@ -308,8 +320,9 @@ function pathPresent(path) {
 // would otherwise make the registered run directory un-drainable.
 function closeRunLock(run, runId, clock) {
   if (run.lockClosed === true) return;
-  run.lockClosed = true;
+  if(process.platform!=='win32')run.lockClosed = true;
   const closed = Buffer.from(`${JSON.stringify(verifyRunLock(runId, "closed", clock))}\n`);
+  if(process.platform==='win32'){verifyWindowsWrite(run.lockPath,closed,'replace');run.lockClosed=true;return;}
   try { ftruncateSync(run.lockFd, 0); writeSync(run.lockFd, closed, 0, closed.length, 0); fsyncSync(run.lockFd); } finally { closeSync(run.lockFd); }
 }
 
@@ -358,18 +371,19 @@ export function createVerifyRun({ gitCommonDir, runId, candidate, policySha256, 
   const runDir = join(common, "agent-pipeline", "verify", "runs", runId);
   if (!validateCleanupRegistration(cleanupRegistration, { runId, runPath: runDir })) throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
   const runsRoot = resolveRunsRoot(gitCommonDir);
-  mkdirSync(runDir, { mode: 0o700 });
-  assertPhysicalDirectory(runDir, { privateState: true, created: true });
+  if(process.platform==='win32')verifyWindowsDirectory(runDir,true);else{mkdirSync(runDir, { mode: 0o700 });
+  assertPhysicalDirectory(runDir, { privateState: true, created: true });}
   const logsDir = join(runDir, "logs");
   const receiptsDir = join(runDir, "receipts");
   ensurePrivateDirectory(logsDir);
   ensurePrivateDirectory(receiptsDir);
   const lockPath = join(runDir, "run.lock");
-  const lockFd = openSync(lockPath, "wx", 0o600);
-  writeFileSync(lockFd, `${JSON.stringify(verifyRunLock(runId, "active", clock))}\n`);
-  fsyncSync(lockFd);
+  const lockFd = process.platform==='win32'?null:openSync(lockPath, "wx", 0o600);
+  if(process.platform==='win32')verifyWindowsWrite(lockPath,Buffer.from(JSON.stringify(verifyRunLock(runId,"active",clock))+"\n"),"wx");
+  else{writeFileSync(lockFd, `${JSON.stringify(verifyRunLock(runId, "active", clock))}\n`);
+  fsyncSync(lockFd);}
   if (!regularPrivateFile(lockPath)) throw new Error("VERIFY-JOURNAL-LOCK-NOT-PRIVATE");
-  const durability = { regularFiles: "fsync-confirmed", directoryEntries: directoryDurability(runDir) };
+  const durability = { regularFiles: process.platform==='win32'?"native-flush-confirmed":"fsync-confirmed", directoryEntries: directoryDurability(runDir) };
   const manifest = {
     schema: RUN_MANIFEST_SCHEMA,
     runId,
@@ -388,6 +402,7 @@ export function createVerifyRun({ gitCommonDir, runId, candidate, policySha256, 
 }
 
 function readPrivateBytes(path) {
+  if(process.platform==='win32'){try{return verifyWindowsRead(path).bytes;}catch{return null;}}
   try {
     assertPhysicalDirectory(dirname(path), { privateState: true });
     if (!regularPrivateFile(path) || realpathSync(path) !== resolve(path)) return null;
@@ -666,10 +681,11 @@ function spawnAsync(command, argv, options = {}) {
     let overflowed = false;
     let spawnError;
     let settled = false;
-    let cancellation = null;
+    let cancellation = null;let nativeChildIdentity=null;
+    if(process.platform==='win32')child.once('spawn',()=>{const observed=observeNativeWindowsProcess({pid:child.pid});if(observed.status==='present'&&observed.process.parentPid===process.pid)nativeChildIdentity=observed.process;});
     const onAbort = () => {
       if (cancellation !== null) return;
-      cancellation = terminateOwnedGroup(child, linuxProcessGroupIdentity(child.pid));
+      cancellation = process.platform==='win32'?terminateNativeVerifyChild(child,nativeChildIdentity):terminateOwnedGroup(child, linuxProcessGroupIdentity(child.pid));
     };
     if (options.signal instanceof AbortSignal) {
       if (options.signal.aborted) onAbort();
@@ -1290,4 +1306,54 @@ export function deriveVerifyExecutionMetrics({ steps, startedAt, completedAt, co
     reused,
     parallelWorkRatio
   };
+}
+
+// Native private journal custody; these facts do not issue authority or a cleanup proof.
+const verifyWindowsFiles=new Map(),verifyWindowsFlushedDirectories=new Set();
+function verifyWindowsFault(){throw new Error('VERIFY-JOURNAL-WINDOWS-ASSURANCE');}
+function verifyWindowsAncestors(path){const rows=[];let cursor=dirname(path);while(true){const row=observeWindowsAuthorityAncestor({path:cursor});rows.push({path:cursor,...row});const parent=dirname(cursor);if(parent===cursor)break;cursor=parent;}return rows;}
+function verifyWindowsSame(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+function verifyWindowsDirectory(path,exclusive){
+  const absolute=resolve(path),before=verifyWindowsAncestors(absolute);let exists=true;
+  try{lstatSync(absolute);}catch(error){if(error.code!=='ENOENT')throw error;exists=false;}
+  if(exclusive&&exists)verifyWindowsFault();
+  if(!exists){const created=createWindowsOwnedAuthorityDirectory({path:absolute});if(created.committed!==true)verifyWindowsFault();verifyWindowsFlushedDirectories.add(dirname(absolute));}
+  inspectWindowsOwnedAuthorityPath({path:absolute,directory:true});
+  if(!verifyWindowsSame(before,verifyWindowsAncestors(absolute)))verifyWindowsFault();return absolute;
+}
+function verifyWindowsRead(path){
+  const before=verifyWindowsAncestors(path),read=readWindowsOwnedAuthorityFile({path,maxBytes:1048576});
+  if(!verifyWindowsSame(before,verifyWindowsAncestors(path)))verifyWindowsFault();
+  const previous=verifyWindowsFiles.get(path),fact={sha256:sha(read.bytes),nativeFacts:read.nativeFacts,nativeFactsSha256:read.nativeFactsSha256,helperSha256:read.helperSha256,size:read.bytes.length};
+  if(previous&&!verifyWindowsSame(previous,fact))verifyWindowsFault();
+  return {...read,fact};
+}
+function verifyWindowsWrite(path,bytes,flag){
+  if(!Buffer.isBuffer(bytes)||!['wx','a','replace'].includes(flag))verifyWindowsFault();
+  const before=verifyWindowsAncestors(path);let exists=true;
+  try{lstatSync(path);}catch(error){if(error.code!=='ENOENT')throw error;exists=false;}
+  if(flag==='wx'&&exists)verifyWindowsFault();
+  let previous=null;
+  if(exists){previous=verifyWindowsRead(path);if(!verifyWindowsFiles.has(path))verifyWindowsFault();}
+  const output=flag==='a'&&previous?Buffer.concat([previous.bytes,bytes]):bytes;
+  if(output.length>1048576)throw new Error('VERIFY-JOURNAL-WINDOWS-ARTIFACT-BOUND');
+  const published=publishWindowsOwnedAuthorityFile({path,bytes:output,expectedSha256:previous?.fact.sha256??null,expectedFacts:previous?.nativeFacts??null});
+  if(published.committed!==true)verifyWindowsFault();
+  // A committed write whose readback fails remains a genuine partial effect.
+  const read=readWindowsOwnedAuthorityFile({path,maxBytes:1048576});
+  if(!read.bytes.equals(output)||read.nativeFacts!==published.nativeFacts||read.helperSha256!==published.helperSha256
+    ||!verifyWindowsSame(before,verifyWindowsAncestors(path)))verifyWindowsFault();
+  verifyWindowsFiles.set(path,{sha256:sha(read.bytes),nativeFacts:read.nativeFacts,nativeFactsSha256:read.nativeFactsSha256,helperSha256:read.helperSha256,size:read.bytes.length});
+  verifyWindowsFlushedDirectories.add(dirname(path));
+}
+function verifyWindowsDirectoryDurability(path){return verifyWindowsFlushedDirectories.has(path)?'native-flush-confirmed':'directory-handle-unavailable';}
+async function terminateNativeVerifyChild(child,captured){
+  const unknown={proven:false,remaining:null,method:'native-direct-child-only'};
+  if(!captured||captured.pid!==child.pid)return unknown;
+  const current=observeNativeWindowsProcess({pid:child.pid});
+  if(current.status==='absent')return unknown;
+  if(current.status!=='present'||!sameNativeWindowsProcess({...captured,cwd:null},{...current.process,cwd:null}))return unknown;
+  try{child.kill();}catch{return unknown;}
+  // Actual close is handled by spawnAsync. No native process-tree closure is inferred.
+  return unknown;
 }

@@ -282,6 +282,10 @@
           "docs/adr/0081-boundary-aware-impacted-verify.md",
           "docs/adr/0082-bounded-continuity-self-repair.md",
           "docs/adr/0084-ci-failure-reporter-public-log-boundary.md",
+          "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.json",
+          "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.md",
+          "docs/adr/0087-owning-verification-authenticated-controller-test-channel.json",
+          "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md",
           "docs/adr/README.md"
         ]
       },
@@ -322,6 +326,8 @@
           "docs/adr/draft-design-stage-architecture-materialization.md",
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.json",
           "docs/adr/draft-functional-model-roles-at-session-bootstrap.md",
+          "docs/adr/draft-item-owned-egm-retained-quality-gates.json",
+          "docs/adr/draft-item-owned-egm-retained-quality-gates.md",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.json",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.md",
           "docs/adr/draft-read-scope-containment-boundary.md",

@@ -32,6 +32,12 @@
  */
 
 export const MUTATING_ONBOARDING_ARGV_SHAPES = Object.freeze({
+  "materialize-existing-trust-anchor": Object.freeze({
+    required: Object.freeze(["--activate"]),
+    requiredValue: Object.freeze(["--root", "--plan-sha256"]),
+    requiredValueOneOf: Object.freeze([]),
+    optionalValue: Object.freeze([]),
+  }),
   // NVA-V10B-INTAKEONEROUND: `--text`/`--text-file` are additionally admitted here, both
   // individually optional (never `requiredValueOneOf` -- that shape demands exactly one be
   // PRESENT, which is wrong for a flag pair that may legitimately be omitted entirely on this

@@ -146,6 +146,7 @@ import { checkCheckpointPushApproval, checkpointApprovalMode, classifyCheckpoint
 import { inspectArchitecturePushCurrency } from "../lib/architecture-push-currency.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
+import { classifyGhCommand } from "../lib/gh-cmd.mjs";
 import { CHECKPOINT_LANE, classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -183,6 +184,7 @@ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validat
 // calls-it.md, Point 3): read-only observer, no mkdirSync/physicalScratchRoot call -- see
 // buildScratchOrphanAdvisory below for the full rationale.
 import { planOrphanScratchRetirement } from "../lib/session-cleanup-recovery.mjs";
+import { reportScratchCustody } from "../lib/scratch-custody-report.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
@@ -347,6 +349,12 @@ if (!cmd) process.exit(0);
 // (NVA-A7FIX-2, fixing Critic F-1: a caller that reimplemented only the whole-string
 // branch silently lost detection for shapes like `git.exe -C repo push` or
 // `sh -c "git push"`).
+// Shared delivery refusals precede the non-push fast path. Read-only/data and
+// the existing PR-create lane remain unchanged; this grants no delivery authority.
+const ghDelivery = classifyGhCommand(cmd);
+if (ghDelivery.kind === "refused") emit(2, [
+  `[guard-push] ${ghDelivery.code}: ${ghDelivery.reason}`,
+]);
 const isPush = commandIsGitPush(cmd);
 if (!isPush) process.exit(0); // fast path: not a push at all
 
@@ -2672,7 +2680,17 @@ if (allFailures.length === 0) {
   // config warning, shown to the user); the process.exit(0) below is reached only when there
   // is nothing to advise.
   const scratchAdvisory = buildScratchOrphanAdvisory(fallbackProjectDir());
-  if (scratchAdvisory !== null) emit(1, [scratchAdvisory]);
+  let custodyReport;
+  try {
+    custodyReport = reportScratchCustody({ root: fallbackProjectDir(), pushCommit: sourceCommit });
+  } catch {
+    custodyReport = { schema: "pipeline.scratch-custody-report.v1", mode: "report-only", warnings: [{ code: "observer-unavailable" }], views: [] };
+  }
+  const custodyAdvisory = custodyReport.warnings.length
+    ? `[guard-push] WARN (report-only): scratch custody has ${custodyReport.warnings.length} typed finding(s) for pushed source ${sourceCommit}.\n${JSON.stringify(custodyReport)}\nThis report does not change Push-Gate policy or refuse the push.`
+    : null;
+  const advisories = [scratchAdvisory, custodyAdvisory].filter(Boolean);
+  if (advisories.length) emit(1, advisories);
   allowExit(); // all-green -- allow (NVA-B-TAGNOTICE3: routes any pending ancestry notice through WARN=1 instead of discarding it at exit 0)
 }
 

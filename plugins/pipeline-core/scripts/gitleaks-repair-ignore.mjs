@@ -59,6 +59,7 @@ export async function repairStaleIgnoreEntry({
   binaryPath,
   timeoutMs = 60000,
   env = process.env,
+  recomputeOnly = false,
 }) {
   if (typeof rootDir !== "string" || rootDir.length === 0) return { ok: false, reason: "rootDir is required" };
   if (typeof targetPath !== "string" || targetPath.length === 0) return { ok: false, reason: "path is required" };
@@ -98,7 +99,7 @@ export async function repairStaleIgnoreEntry({
   }
 
   const scanResult = await run({ rootDir, config: { binaryPath: resolvedBinaryPath }, spawnFn, timeoutMs, env });
-  if (scanResult.raw === null) {
+  if (scanResult.raw === null || (recomputeOnly && scanResult.status === "ERROR")) {
     return { ok: false, reason: `gitleaks scan did not produce a report: ${scanResult.reason ?? scanResult.status}` };
   }
   let parsedRaw;
@@ -141,32 +142,54 @@ export async function repairStaleIgnoreEntry({
   }
 
   const newLine = typeof matches[0]?.StartLine === "number" ? matches[0].StartLine : matches[0]?.line;
+  // Recompute uses the same reviewed-value and ambiguity checks, without writing.
+  if (recomputeOnly) return { ok: true, oldLine, newLine, newEntry, mode: "recompute", mutated: false };
   lines[staleIndex] = newEntry;
   writeFileSync(resolvedIgnorePath, lines.join("\n"));
 
   return { ok: true, ignoreFilePath: resolvedIgnorePath, oldLine, newLine, newEntry };
 }
 
-function parseArgv(argv) {
+/** Read-only display of one uniquely matched, value-bound stale entry. */
+export async function recomputeStaleIgnoreEntry(options) {
+  return repairStaleIgnoreEntry({ ...options, recomputeOnly: true });
+}
+
+/** Closed CLI: no raw secret, arbitrary flag, duplicate selector or positional operand. */
+export function parseArgv(argv) {
   const args = {};
-  for (let i = 0; i < argv.length; i += 2) {
-    const key = argv[i];
-    if (!key.startsWith("--")) throw new Error(`unexpected argument: ${key}`);
-    args[key.slice(2)] = argv[i + 1];
+  const values = new Set(["root", "path", "rule", "column", "old-line"]);
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (token === "--recompute") {
+      if (Object.hasOwn(args, "recompute")) throw new Error("duplicate --recompute");
+      args.recompute = true;
+      continue;
+    }
+    if (typeof token !== "string" || !token.startsWith("--")) throw new Error("unexpected positional argument");
+    const key = token.slice(2);
+    if (!values.has(key) || Object.hasOwn(args, key)) throw new Error("unknown or duplicate selector");
+    const value = argv[++i];
+    if (typeof value !== "string" || value.length === 0 || value.startsWith("--") || /[\x00-\x1f\x7f]/u.test(value)) throw new Error("missing or invalid selector value");
+    if ((key === "column" || key === "old-line") && !/^[1-9][0-9]*$/u.test(value)) throw new Error("invalid positive integer selector");
+    args[key] = value;
   }
   return args;
 }
 
 async function main() {
-  const args = parseArgv(process.argv.slice(2));
+  let args;
+  try { args = parseArgv(process.argv.slice(2)); }
+  catch (error) { console.error(`gitleaks-repair-ignore: ${error.message}`); process.exitCode = 1; return; }
   const missing = ["path", "rule", "column", "old-line"].filter((k) => args[k] === undefined);
   if (missing.length > 0) {
     console.error(`gitleaks-repair-ignore: missing required flag(s): ${missing.map((k) => `--${k}`).join(", ")}`);
-    console.error("usage: node gitleaks-repair-ignore.mjs --path <repo-relative-path> --rule <ruleId> --column <n> --old-line <n> [--root <dir>]");
+    console.error("usage: node gitleaks-repair-ignore.mjs [--recompute] --path <repo-relative-path> --rule <ruleId> --column <n> --old-line <n> [--root <dir>]");
     process.exitCode = 1;
     return;
   }
-  const result = await repairStaleIgnoreEntry({
+  const action = args.recompute ? recomputeStaleIgnoreEntry : repairStaleIgnoreEntry;
+  const result = await action({
     rootDir: args.root ?? process.cwd(),
     path: args.path,
     rule: args.rule,
@@ -176,6 +199,11 @@ async function main() {
   if (!result.ok) {
     console.error(`gitleaks-repair-ignore: ${result.reason}`);
     process.exitCode = 1;
+    return;
+  }
+  if (args.recompute) {
+    console.log("gitleaks-repair-ignore: recomputed reviewed entry; ignore file unchanged");
+    console.log(result.newEntry);
     return;
   }
   console.log(`gitleaks-repair-ignore: replaced stale entry (line ${result.oldLine} -> ${result.newLine}) in ${result.ignoreFilePath}`);

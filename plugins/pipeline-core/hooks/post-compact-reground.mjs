@@ -36,6 +36,7 @@ import { isAbsolute, resolve } from "node:path";
 import { liveSlices } from "../lib/fanout-ledger.mjs";
 import { resolveFanoutConfig } from "../lib/fanout-governor.mjs";
 import { loadSliceQueue, readyAndLive } from "../lib/slice-queue.mjs";
+import { resolveGovernedItemQueue, inspectNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
 
 const FANOUT_MAX_RECORD_BYTES = 1024 * 1024;
 const FANOUT_SLICE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
@@ -333,7 +334,17 @@ export function decideOutput(input, state, { rootDir = null, env = process.env }
     : null;
   const baseMessage = buildRegroundMessage(bounded.value, { stateNarrative });
   const fanoutLine = projection.runtime === null ? null : buildFanoutSummaryLine(input, rootDir, env);
-  const message = fanoutLine === null ? baseMessage : `${baseMessage}\n${fanoutLine}`;
+  let message = fanoutLine === null ? baseMessage : `${baseMessage}\n${fanoutLine}`;
+  if(rootDir){
+    const governed=resolveGovernedItemQueue({root:rootDir});
+    if(governed.status==='refused')message+=`\nItem delivery: ${governed.code}; productive admission remains refused until governed recovery.`;
+    if(governed.status==='required'){
+      const ownership=inspectNativeGoldfishItemDelivery({root:rootDir});
+      message+=ownership.status==='observed'
+        ? `\nItem delivery: ${ownership.items.slice(0,10).map(item=>`${item.itemId} owner ${item.dispatchId} ${item.phase} pending ${item.pendingSha256}${item.checkpoint?` declared ${item.checkpoint.declaredPhase}; remaining ${item.checkpoint.remainingClauses.join(",")||"none declared"}; context ${item.checkpoint.contextPaths.join(",")||"none declared"}`:""}`).join('; ')||'no active owners'}${ownership.items.length>10?' (additional owners retained)':''}. Resume these owners; terminal returns do not authorize a replacement.`
+        : `\nItem delivery: ${ownership.code}; ownership readback required before productive admission.`;
+    }
+  }
   const measurement = measureBootstrapPayload(message, { mode: "compact" });
   const payload = {
     systemMessage: message,

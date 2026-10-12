@@ -9,6 +9,7 @@ import {
   TRUSTED_ENVIRONMENT_CODES,
   admitCapacity,
   admitReviewAttempt,
+  admitAuthenticatedReviewAttempt,
   buildCourseDecisionBrief,
   canonicalJson,
   classifyFailureEvidence,
@@ -22,11 +23,14 @@ import {
   validateCourseDecisionReceipt,
   validateWorkflowFallbackReceipt,
 } from "./review-economy.mjs";
+import reviewAttemptSchema from "../scripts/review-attempt.schema.json" with { type: "json" };
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+registerTestCaseCompletion({cases: [{id: "REC001", name: "complete original synchronous review economy checks", run: () => {
 const A = "a".repeat(64);
 const B = "b".repeat(64);
 const C = "c".repeat(64);
@@ -123,20 +127,27 @@ const delta = {
   trustBoundaryChanged: false,
   impactAmbiguous: false,
 };
-ok("RE14 first round is always full", admitReviewAttempt({ ...delta, round: 1 }).mode === "full");
-ok("RE15 explicit later full remains full", admitReviewAttempt({ ...delta, requestedMode: "full" }).mode === "full");
+ok("RE14 first round is always full", admitReviewAttempt({ ...delta, round: 1, requestedMode: "full" }).mode === "full");
+ok("RE15 additional full is refused", admitReviewAttempt({ ...delta, requestedMode: "full" }).code === "RE-FOLLOWUP-DELTA-REQUIRED");
 const admittedDelta = admitReviewAttempt(delta);
 ok("RE16 complete later evidence admits delta", admittedDelta.ok && admittedDelta.mode === "delta");
 ok("RE17 delta derives stable sorted invariant impact", JSON.stringify(admittedDelta.affectedInvariantIds) === JSON.stringify(["INV-01", "INV-02", "INV-03"]));
-ok("RE18 unknown changed path forces full", admitReviewAttempt({ ...delta, changedPaths: ["src/unknown.mjs"] }).mode === "full");
-ok("RE19 map digest drift forces full", admitReviewAttempt({ ...delta, pathInvariantMapSha256: B }).mode === "full");
-ok("RE20 prior receipt omission forces full", admitReviewAttempt({ ...delta, priorReceipt: null }).mode === "full");
-ok("RE21 new trust boundary forces full", admitReviewAttempt({ ...delta, trustBoundaryChanged: true }).mode === "full");
-ok("RE22 ambiguous impact forces full", admitReviewAttempt({ ...delta, impactAmbiguous: true }).mode === "full");
+ok("RE18 unknown changed path refuses fallback full", admitReviewAttempt({ ...delta, changedPaths: ["src/unknown.mjs"] }).mode === null);
+ok("RE19 map digest drift refuses fallback full", admitReviewAttempt({ ...delta, pathInvariantMapSha256: B }).mode === null);
+ok("RE20 prior receipt omission refuses fallback full", admitReviewAttempt({ ...delta, priorReceipt: null }).mode === null);
+ok("RE21 new trust boundary refuses fallback full", admitReviewAttempt({ ...delta, trustBoundaryChanged: true }).mode === null);
+ok("RE22 ambiguous impact refuses fallback full", admitReviewAttempt({ ...delta, impactAmbiguous: true }).mode === null);
 ok("RE23 fourth Critic round remains within the approved budget", admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
 ok("RE24 fourth Critic round creates course gate", admitReviewAttempt({ ...delta, round: 5 }).courseGateRequired === true);
 ok("RE25 third correction commit remains within the approved budget", admitReviewAttempt({ ...delta, correctionCommits: 3 }).courseGateRequired !== true);
 ok("RE26 fourth correction commit creates course gate", admitReviewAttempt({ ...delta, correctionCommits: 4 }).courseGateRequired === true);
+
+for (const round of [2, 3, 4]) {
+  ok(`RE26a round ${round} admits only a bound correction DIFF`, admitReviewAttempt({ ...delta, round, correctionCommits: round - 1 }).mode === "delta");
+  ok(`RE26b round ${round} refuses another full review`, admitReviewAttempt({ ...delta, round, requestedMode: "full" }).ok === false);
+  ok(`RE26c round ${round} refuses empty DIFF`, admitReviewAttempt({ ...delta, round, changedPaths: [] }).ok === false);
+}
+ok("RE26d accepted actual PASS criterion cannot extend the four-review budget", admitAuthenticatedReviewAttempt({ attempt: { ...delta, round: 5 }, acceptedCriterion: { ok: true } }).code === "RE-CRITIC-ROUND-LIMIT");
 
 const criticPath = "plugins/pipeline-core/lib/critic-review-lineage.mjs";
 const criticEdge = "critic-packet-claim";
@@ -524,9 +535,15 @@ ok("RE66 dot-segment authority path itself fails", validateWorkflowFallbackRecei
 const reviewSchema = JSON.parse(readFileSync(join(scriptsDir, "review-attempt.schema.json"), "utf8"));
 const fallbackSchema = JSON.parse(readFileSync(join(scriptsDir, "workflow-fallback-receipt.schema.json"), "utf8"));
 const courseSchema = JSON.parse(readFileSync(join(scriptsDir, "course-decision.schema.json"), "utf8"));
+ok("RE67a attempt schema admits the fourth review", reviewAttemptSchema.properties.review.properties.round.maximum === 4);
+ok("RE67b attempt budget schema admits four rounds", reviewAttemptSchema.properties.budgets.properties.criticRounds.maximum === 4);
+ok("RE67c attempt budget schema admits three corrections", reviewAttemptSchema.properties.budgets.properties.correctionCommits.maximum === 3);
 ok("RE67 review-attempt schema is a closed v1 root", reviewSchema.additionalProperties === false && reviewSchema.properties.schema.const === "pipeline.review-attempt.v1");
 ok("RE68 fallback receipt schema is Coordinator-only and non-delegating", fallbackSchema.properties.creatorDuty.const === "Coordinator" && fallbackSchema.properties.mayDelegate.const === false);
 ok("RE69 course schema owns exactly brief intent and receipt forms", Array.isArray(courseSchema.oneOf) && courseSchema.oneOf.length === 3 && courseSchema.$defs.brief.additionalProperties === false);
 
 console.log(`\n${checks - failures}/${checks} checks passed.`);
 if (failures > 0) process.exitCode = 1;
+
+if (failures > 0 || (process.exitCode !== undefined && process.exitCode !== 0)) throw new Error("Original review economy checks failed");
+}}], fd: 3, maxBytes: 8192});

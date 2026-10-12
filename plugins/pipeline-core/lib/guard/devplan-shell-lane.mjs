@@ -2,6 +2,9 @@
 // Guard module "devplan-shell-lane" (layer 5), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import { observeReaderPlanScope } from '../doc-reader-plan-scope.mjs';
+import { physicalBytes, jsonBytes, hash, requireFact } from '../doc-reader-documentation-snapshot.mjs';
+import { DOC_READER_COURSE_SCRIPT } from './constants.mjs';
 import { DEVPLAN_SHELL_DENIAL_CODE, devPlanGateVerdict, hooksDisableSettingsWriteFinding } from "../guard-devplan-policy.mjs";
 import { extractShellWriteTargets } from "../protected-test-paths.mjs";
 import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
@@ -9,7 +12,7 @@ import { PIPELINE_STATE_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT } from "./consta
 import { isReadOnlyDiagnosticCommand, simpleWords } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
 import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
-import { isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch } from "./command-catalogue.mjs";
+import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch, resolveBoundArtifactPublicationInvocation } from "./command-catalogue.mjs";
 
 /**
  * GUARD-DEVPLAN-SHELL -- the `Bash|PowerShell` lane of the Dev-Plan-Gate (`guard-devplan.mjs`),
@@ -54,26 +57,62 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
       ? powerShellDevPlanWriteTargets(command, root, extracted)
       : extracted;
     const words = toolName === "Bash" ? simpleWords(command, root) : null;
+    const observedOnboarding = toolName === "Bash"
+      ? observedOnboardingCommandMatch(command, root, dependencies)
+      : null;
+    // Bind a producer executable only for its exact current action, and only
+    // after the existing closed lifecycle validator accepts that invocation.
+    const lifecycleOptions = {
+      ...dependencies,
+      ...(observedOnboarding !== null && isSanctionedLifecycleCommand(command, root, {
+        ...dependencies, processExecPath: observedOnboarding.action.executable,
+      }) ? { processExecPath: observedOnboarding.action.executable } : {}),
+    };
     const invocation = words !== null
       ? resolveSanctionedScriptInvocation(command, root, {
         platform: dependencies.platform ?? process.platform,
-        ...(dependencies.processExecPath === undefined ? {} : { processExecPath: dependencies.processExecPath }),
+        ...(lifecycleOptions.processExecPath === undefined ? {} : { processExecPath: lifecycleOptions.processExecPath }),
       })
       : null;
+    if (invocation?.script === DOC_READER_COURSE_SCRIPT && isSanctionedLifecycleCommand(command, root, lifecycleOptions)) {
+      const args = invocation.args, storePath = args[4];
+      let scope;
+      if (args[0] === 'inspect') {
+        const store = jsonBytes(physicalBytes(root, storePath));
+        scope = store.courses?.find(c => c.courseId === args[6])?.scope;
+      } else {
+        const requestPath = relative(root, args[6]).split(sep).join('/');
+        const bytes = physicalBytes(root, requestPath);
+        requireFact(hash(bytes) === args[8], 'COURSE-INPUT-CHANGED');
+        const request = jsonBytes(bytes);
+        scope = args[0] === 'create' ? request.scope : jsonBytes(physicalBytes(root, storePath)).courses?.find(c => c.courseId === request.courseId)?.scope;
+      }
+      observeReaderPlanScope({ root, storePath, scope });
+    }
     const canonicalSettingsWriter = toolName === "Bash" && invocation?.script === SETTINGS_ALLOWLIST_MERGE_SCRIPT
       && isExactObservedRunnerPermissionsRepairAction(command, root, dependencies);
     const canonicalSettingsPlanner = toolName === "Bash" && invocation?.script === SETTINGS_ALLOWLIST_MERGE_SCRIPT
       && isExactObservedRunnerPermissionsPlannerAction(command, root, dependencies);
     const observedReadOnlyOnboardingPlanner = toolName === "Bash" && (() => {
-      const match = observedOnboardingCommandMatch(command, root, dependencies);
+      const match = observedOnboarding;
       if (!match || match.action.mutation !== false || match.action.requiresConfirmation !== false) return false;
       const [script, ...args] = match.action.argv;
       return script === PIPELINE_STATE_SCRIPT
         && args.length === 1 && args[0] === "po-authority-rebind-plan";
     })();
+    const artifactPublication = toolName === "Bash"
+      ? resolveBoundArtifactPublicationInvocation(command, root, lifecycleOptions) : null;
+    if (artifactPublication !== null) targets.push({
+      candidate: artifactPublication.outputPath, lane: "bound-artifact-publication",
+    });
+    const ownedVerification = toolName === "Bash"
+      && (isSourceOwnedContinuityVerificationCommand(command, root, dependencies)
+        || isSourceOwnedOwningVerificationControllerCommand(command, root, dependencies));
     const opaqueScript = words === null ? null : opaqueScriptExecutionCandidate(words, root);
     if (opaqueScript !== null
-      && !(invocation !== null && isSanctionedLifecycleCommand(command, root, dependencies))
+      && !ownedVerification
+      && !(invocation !== null && isSanctionedLifecycleCommand(command, root, lifecycleOptions))
+      && artifactPublication === null
       && !observedReadOnlyOnboardingPlanner
       && !canonicalSettingsWriter && !canonicalSettingsPlanner) {
       targets.push({ candidate: opaqueScript, lane: "opaque-script-execution", forceLifecycleGate: true });

@@ -48,6 +48,7 @@ import {
   cleanupSession,
   createDetachedWorktree,
   listActiveSessionDescriptors,
+  inspectSessionOwnerRuntime,
   loadSessionDescriptor,
   registerTemporaryIntent,
   retireSessionDescriptor,
@@ -1810,11 +1811,49 @@ test("multiple legacy orphans remain blocked when any cleanup manifest is active
   }
 });
 
+test("unbound recovery preserves the observed current-process owner archive policy", () => {
+  const root = fixture("orphan-live-owner-control");
+  try {
+    const first = startSessionDescriptor(root, { sessionId: "session-binding-current-first" });
+    const second = startSessionDescriptor(root, { sessionId: "session-binding-current-second" });
+    const owners = [first, second].map((descriptor) => inspectSessionOwnerRuntime(root, descriptor.sessionId));
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    const observable = owners.filter((owner) => owner.status === "live");
+    // Linux observes this running process as live. Hosts without exact owner
+    // observation may report unavailable; that is not evidence of owner death.
+    if (observable.length === owners.length) {
+      assert.deepEqual(plan, {
+        schema: "pipeline.session-cleanup-recovery-plan.v1",
+        status: "orphan-recovery-unavailable",
+        activeDescriptorCount: 2,
+      });
+      assert.equal(plan.archiveOrphan, undefined);
+    } else {
+      assert.deepEqual(owners.map((owner) => owner.status), ["unavailable", "unavailable"]);
+      assert.deepEqual(plan.archiveOrphan.candidates.map((candidate) => candidate.ownerStatus), ["unavailable", "unavailable"]);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("unbound recovery refuses multiple or replaced active descriptors", () => {
   const root = fixture("orphan-rebind-refusal");
   try {
-    const first = startSessionDescriptor(root, { sessionId: "session-binding-orphan-first" });
-    startSessionDescriptor(root, { sessionId: "session-binding-orphan-second" });
+    // Use the OS-observed PID of our own exited child, never a guessed dead
+    // PID. Creating the descriptor after exit cannot capture its start identity,
+    // so the actual stored ownerRuntime is null and observation is unavailable.
+    const owner = spawnSync(process.execPath, ["-e", "process.exit(0)"], {
+      cwd: root, encoding: "utf8", shell: false, timeout: 5_000,
+    });
+    assert.equal(owner.status, 0, owner.stderr);
+    assert.equal(owner.error, undefined);
+    assert.ok(Number.isSafeInteger(owner.pid) && owner.pid > 0);
+    assert.throws(() => process.kill(owner.pid, 0), (error) => error?.code === "ESRCH");
+    const first = startSessionDescriptor(root, { sessionId: "session-binding-orphan-first", ownerPid: owner.pid });
+    const second = startSessionDescriptor(root, { sessionId: "session-binding-orphan-second", ownerPid: owner.pid });
+    for (const descriptor of [first, second]) {
+      assert.equal(loadSessionDescriptor(root, descriptor.sessionId).ownerRuntime, null);
+      assert.equal(inspectSessionOwnerRuntime(root, descriptor.sessionId).status, "unavailable");
+    }
     const multiple = invoke(["plan-recovery", "--repo", root]).output;
     // RF2A + PO decision 2026-10-04: with no cleanup manifest active anywhere in
     // the repository, every zero-authority orphan is additionally offered the

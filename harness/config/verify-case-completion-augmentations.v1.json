@@ -188,6 +188,232 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "design-approval-route-e2e-tests",
+      "file": "plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DABC001",
+          "DABR001",
+          "DABR002",
+          "DABR003",
+          "DABR004",
+          "DABV001",
+          "DABX001",
+          "DABX002",
+          "DABX003",
+          "DABX004",
+          "DABX005",
+          "DABX006",
+          "DABX007",
+          "DABX008"
+        ],
+        "maxBytes": 16384
+      }
+    },
+    {
+      "name": "slice-queue-tests",
+      "file": "plugins/pipeline-core/lib/slice-queue.test.mjs",
+      "previousPolicySha256": "857f6afe2f67e705cc0cc47b0233d7df93df8a12805a36e5373a12f565df6259",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SQ01",
+          "SQ02",
+          "SQ03",
+          "SQ04",
+          "SQ05",
+          "SQ06",
+          "SQ07",
+          "SQ08",
+          "SQ09",
+          "SQ10",
+          "SQ11",
+          "SQ12",
+          "SQ13",
+          "SQ14",
+          "SQ15",
+          "SQ16",
+          "SQ17",
+          "SQ18",
+          "SQ19",
+          "SQ20",
+          "SQ21",
+          "SQ22",
+          "SQ23",
+          "SQ24",
+          "SQ25",
+          "SQ26",
+          "SQ27",
+          "SQ28",
+          "SQ29",
+          "SQ30",
+          "SQ31",
+          "SQ32",
+          "SQ33",
+          "SQ34",
+          "SQ35",
+          "SQ36",
+          "SQ37"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-goldfish-host-state-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+      "previousPolicySha256": "09c5e155ee7da838b85e6cafff92031cef3ed8f5ef460eff5dc31673243d8ceb",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHS01",
+          "NGHS02",
+          "NGHS03",
+          "NGHS04",
+          "NGHS05",
+          "NGHS06",
+          "NGHS07",
+          "NGHS08",
+          "NGHS09",
+          "NGHS10",
+          "NGHS11",
+          "NGHS12",
+          "NGHS13",
+          "NGHS14",
+          "NGHS15",
+          "NGHS16",
+          "NGHS17",
+          "NGHS18",
+          "NGHS19"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "critic-course-admission-tests",
+      "file": "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CCA001",
+          "CCA002",
+          "CCA003",
+          "CCA004",
+          "CCA005",
+          "CCA006",
+          "CCA007",
+          "CCA008",
+          "CCA009",
+          "CCA010",
+          "CCA011",
+          "CCA012",
+          "CCA013",
+          "CCA014",
+          "CCA015",
+          "CCA016",
+          "CCA017",
+          "CCA018"
+        ],
+        "maxBytes": 16384
+      }
+    },
+    {
+      "name": "critic-dispatch-preflight-tests",
+      "file": "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CDPF001",
+          "CDPF002",
+          "CDPF003",
+          "CDPF004",
+          "CDPF005",
+          "CDPF006",
+          "CDPF007",
+          "CDPF008",
+          "CDPF009",
+          "CDPF010",
+          "CDPF011",
+          "CDPF012",
+          "CDPF013",
+          "CDPF014",
+          "CDPF015",
+          "CDPF016",
+          "CDPF017",
+          "CDPF018",
+          "CDPF019",
+          "CDPF020",
+          "CDPF021",
+          "CDPF022",
+          "CDPF023",
+          "CDPF024",
+          "CDPF025",
+          "CDPF026",
+          "CDPF027",
+          "CDPF028",
+          "CDPF029",
+          "CDPF030",
+          "CDPF031",
+          "CDPF032",
+          "CDPF033",
+          "CDPF034",
+          "CDPF035",
+          "CDPF036",
+          "CDPF037",
+          "CDPF038",
+          "CDPF039",
+          "CDPF040",
+          "CDPF041",
+          "CDPF042",
+          "CDPF043",
+          "CDPF044",
+          "CDPF045",
+          "CDPF046"
+        ],
+        "maxBytes": 32768
+      }
+    },
+    {
+      "name": "review-economy-tests",
+      "file": "plugins/pipeline-core/lib/review-economy.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "REC001"
+        ],
+        "maxBytes": 8192
+      }
+    },
+    {
+      "name": "native-goldfish-host-finalizer-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+      "previousPolicySha256": "16bf76a388044fbda62668364006b2a9f601e0e0b0902e9fc85f0e2c8a0c3c32",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHF01",
+          "NGHF02",
+          "NGHF03",
+          "NGHF04"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "native-goldfish-host-finalizer-regression-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs",
+      "previousPolicySha256": "9a45ffbe424fee9dd898756f0ba7fb8247d750c6b467760e85aaff41008203f0",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHF05",
+          "NGHF06",
+          "NGHF07"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }

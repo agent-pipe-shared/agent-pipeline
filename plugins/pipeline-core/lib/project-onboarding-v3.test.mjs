@@ -5819,6 +5819,7 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["./yaml-lite.mjs", ["plugins", "pipeline-core", "lib", "yaml-lite.mjs"]],
       ["./schema-lite.mjs", ["plugins", "pipeline-core", "lib", "schema-lite.mjs"]],
       ["./worktree-lifecycle.mjs", ["plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"]],
+      ["./git-null-device.mjs", ["plugins", "pipeline-core", "lib", "git-null-device.mjs"]],
       ["./windows-private-state.mjs", ["plugins", "pipeline-core", "lib", "windows-private-state.mjs"]],
       ["./successful-spawn.mjs", ["plugins", "pipeline-core", "lib", "successful-spawn.mjs"]],
       ["../config/security/gitleaks-default.toml", ["plugins", "pipeline-core", "config", "security", "gitleaks-default.toml"]],

@@ -2,6 +2,7 @@
 // Committed-state course validation; no claim of reader identity or semantic completeness.
 import {parseStrictJson} from '../../plugins/pipeline-core/lib/governance-event.mjs';
 export const TERMINAL_READER_SCHEMA='pipeline.doc-reader-terminal-record.v1';
+export const TERMINAL_READER_SCHEMA_V2='pipeline.doc-reader-terminal-record.v2';
 export const parseTerminalReaderRecord=bytes=>JSON.parse(JSON.stringify(parseStrictJson(bytes)));
 const sha=/^[a-f0-9]{64}$/,oid=/^[a-f0-9]{40}$/,id=/^[a-z0-9][a-z0-9-]{0,62}$/;
 const findingId=/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
@@ -47,15 +48,18 @@ export function verifyTerminalReaderCourse({root,candidateCommit,featureId,recor
     ancestor(reviewedCommit,commits[0]);ancestor(commits[0],upper);
     if(commits[0]===reviewedCommit||!api.readBlob(root,commits[0],path,1024*1024).equals(bytes))fail(label+' immutable report changed');
   };
-  closed(record,['schema','courseId','rounds','correctionBatches','ownerDecision','final','policyTransition'],'record');
-  if(record.schema!==TERMINAL_READER_SCHEMA||!id.test(record.courseId??'')||!Array.isArray(record.rounds)||record.rounds.length!==4
-    ||!Array.isArray(record.correctionBatches)||record.correctionBatches.length!==4)fail('bounded 2+2 course');
+  const v2=record.schema===TERMINAL_READER_SCHEMA_V2;
+  closed(record,['schema','courseId','rounds','correctionBatches','ownerDecision','final','policyTransition',...(v2?['escalation']:[])],'record');
+  if(![TERMINAL_READER_SCHEMA,TERMINAL_READER_SCHEMA_V2].includes(record.schema)||!id.test(record.courseId??'')
+    ||!Array.isArray(record.rounds)||!(v2?[2,3]:[4]).includes(record.rounds.length)
+    ||!Array.isArray(record.correctionBatches)||record.correctionBatches.length!==record.rounds.length)fail(v2?'bounded 2+1 course':'bounded 2+2 course');
+  const roundCount=record.rounds.length,lastIndex=roundCount-1;
   const prefix=`specs/${featureId}/evidence/reader-review/`;
   const owner=jsonRef(record.ownerDecision,prefix+'owner-decision.json',65536,'owner decision');
-  closed(owner,['schema','courseId','authority','by','decision','maxRounds','maxCorrectionBatches','prohibitFifthReview','fourthReviewedCommit','acceptedFindingIds','source'],'owner decision');
-  if(owner.schema!=='pipeline.doc-reader-terminal-owner-decision.v1'||owner.courseId!==record.courseId||owner.authority!=='documentation-owner'
+  closed(owner,['schema','courseId','authority','by','decision','maxRounds','maxCorrectionBatches',...(v2?['prohibitFourthReview','lastReviewedCommit']:['prohibitFifthReview','fourthReviewedCommit']),'acceptedFindingIds','source'],'owner decision');
+  if(owner.schema!==(v2?'pipeline.doc-reader-terminal-owner-decision.v2':'pipeline.doc-reader-terminal-owner-decision.v1')||owner.courseId!==record.courseId||owner.authority!=='documentation-owner'
     ||typeof owner.by!=='string'||!owner.by.trim()||owner.by.length>120||owner.decision!=='authorize-terminal-correction'
-    ||owner.maxRounds!==4||owner.maxCorrectionBatches!==4||owner.prohibitFifthReview!==true
+    ||owner.maxRounds!==(v2?3:4)||owner.maxCorrectionBatches!==(v2?3:4)||owner[v2?'prohibitFourthReview':'prohibitFifthReview']!==true
     ||!Array.isArray(owner.acceptedFindingIds)||owner.acceptedFindingIds.length>256
     ||new Set(owner.acceptedFindingIds).size!==owner.acceptedFindingIds.length)fail('owner course authority');
   const policySources=['harness/reader-review-protocol.md','plugins/pipeline-core/skills/reader-review/SKILL.md'];
@@ -67,14 +71,14 @@ export function verifyTerminalReaderCourse({root,candidateCommit,featureId,recor
   const finalNow=api.snapshotReaderDocumentation({root,candidate:candidateCommit,featureId});
   if(record.final.docsetSha256!==finalNow.docsetSha256||!api.sameJson(record.final.coverage,finalNow.coverage)
     ||!api.sameJson(record.final.inputs,finalNow.inputs))fail('post-closure document or input drift');
-  for(let index=0;index<4;index++){
+  for(let index=0;index<roundCount;index++){
     const round=record.rounds[index],batch=record.correctionBatches[index];
     closed(round,['id','mode','reviewed','phaseOne','phaseTwo','disposition'],'round');
     if(!id.test(round.id??'')||roundIds.has(round.id)||!(index%2===0?['complete']:['complete','corrections-only']).includes(round.mode))fail('round ordering or mode');
     roundIds.add(round.id);snapshot(round.reviewed,true);
     closed(batch,['afterRound','commits'],'correction batch');
     if(batch.afterRound!==index+1||!Array.isArray(batch.commits)||batch.commits.length<1||batch.commits.length>32)fail('correction batch bound');
-    const upper=index===3?record.final.commit:record.rounds[index+1].reviewed.commit;
+    const upper=index===lastIndex?record.final.commit:record.rounds[index+1].reviewed.commit;
     ancestor(round.reviewed.commit,upper);let previous=round.reviewed.commit;
     for(const commit of batch.commits){
       if(commit===previous||allCommits.has(commit))fail('duplicate or pre-review correction');
@@ -104,22 +108,46 @@ export function verifyTerminalReaderCourse({root,candidateCommit,featureId,recor
       }else fail('unresolved finding');
     }
   }
-  if(!api.sameJson([...accepted].sort(),[...owner.acceptedFindingIds].sort())||owner.fourthReviewedCommit!==record.rounds[3].reviewed.commit)fail('owner finding or fourth-round binding');
+  if(!api.sameJson([...accepted].sort(),[...owner.acceptedFindingIds].sort())||owner[v2?'lastReviewedCommit':'fourthReviewedCommit']!==record.rounds[lastIndex].reviewed.commit)fail(v2?'owner finding or last-round binding':'owner finding or fourth-round binding');
+  if(v2){
+    if(roundCount===2){if(record.escalation!==null)fail('spurious third-round escalation');}
+    else{
+      const escalation=record.escalation;
+      closed(escalation,['afterRound','reason','source'],'third-round escalation');
+      if(escalation.afterRound!==2||typeof escalation.reason!=='string'||!escalation.reason.trim()
+        ||escalation.reason.length>500)fail('third-round escalation reason or position');
+      if(typeof escalation.source?.path!=='string'||!escalation.source.path.startsWith(prefix)
+        ||!/^[a-z0-9][a-z0-9-]{0,95}\.md$/.test(escalation.source.path.slice(prefix.length)))fail('third-round escalation source path');
+      const bytes=blobRef(escalation.source,escalation.source.path,65536,'third-round escalation source');
+      let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{fail('third-round escalation source UTF-8');}
+      if(!text.trim())fail('third-round escalation source empty');
+      const additions=api.git(root,['log','--format=%H','--diff-filter=A',candidateCommit,'--',escalation.source.path],'utf8');
+      const commits=additions.stdout.trim()?additions.stdout.trim().split('\n'):[];
+      const history=api.git(root,['log','--full-history','--no-renames','--format=%H',candidateCommit,'--',escalation.source.path],'utf8');
+      const changes=history.stdout.trim()?history.stdout.trim().split('\n'):[];
+      if(additions.status!==0||history.status!==0||commits.length!==1||changes.length!==1||changes[0]!==commits[0])fail('third-round escalation immutable source history');
+      // The third reviewed snapshot may be the justification publication
+      // commit itself; later publication cannot authorize that earlier review.
+      ancestor(record.correctionBatches[1].commits.at(-1),commits[0]);
+      ancestor(commits[0],record.rounds[2].reviewed.commit);
+      if(!api.readBlob(root,record.rounds[2].reviewed.commit,escalation.source.path,65536).equals(bytes))fail('third-round escalation prelaunch digest');
+    }
+  }
   // Include added-then-deleted reports: changing round IDs cannot erase a fifth committed round.
   const history=api.git(root,['log','--format=','--name-only','--diff-filter=A',candidateCommit,'--',prefix+'phase-one/',prefix+'phase-two/',prefix+'disposition/'],'utf8');
   if(history.status!==0||history.stdout.length>1024*1024)fail('course evidence history unavailable');
-  for(const path of history.stdout.split('\n').filter(Boolean))if(!expectedPaths.has(path))fail('unlisted fifth or renamed committed round');
+  for(const path of history.stdout.split('\n').filter(Boolean))if(!expectedPaths.has(path))fail(v2?'unlisted fourth or renamed committed round':'unlisted fifth or renamed committed round');
   const tree=api.git(root,['ls-tree','-r','--name-only',candidateCommit,'--',prefix+'phase-one/',prefix+'phase-two/',prefix+'disposition/'],'utf8');
   if(tree.status!==0||!api.sameJson(tree.stdout.trim().split('\n').sort(),[...expectedPaths].sort()))fail('missing or extra round evidence');
-  const fourth=record.rounds[3].reviewed.inputs,final=record.final.inputs;
+  const fourth=record.rounds[lastIndex].reviewed.inputs,final=record.final.inputs;
   if(fourth.capabilityInventorySha256!==final.capabilityInventorySha256||fourth.governanceSha256!==final.governanceSha256)fail('unreviewed inventory or governance transition');
   if(fourth.readerProtocolSha256===final.readerProtocolSha256){if(record.policyTransition!==null)fail('spurious policy transition');}
   else{
     const transition=record.policyTransition;
     closed(transition,['fromSha256','toSha256','commit'],'policy transition');
     if(transition.fromSha256!==fourth.readerProtocolSha256||transition.toSha256!==final.readerProtocolSha256
-      ||!record.correctionBatches[3].commits.includes(transition.commit))fail('unbound policy transition');
+      ||!record.correctionBatches[lastIndex].commits.includes(transition.commit))fail('unbound policy transition');
     if(api.sha256(api.readBlob(root,transition.commit,'harness/reader-review-protocol.md',1024*1024))!==transition.toSha256)fail('policy transition commit');
   }
-  return {reviewedCommit:record.rounds[3].reviewed.commit,docsetSha256:finalNow.docsetSha256};
+  return {reviewedCommit:record.rounds[lastIndex].reviewed.commit,docsetSha256:finalNow.docsetSha256};
 }

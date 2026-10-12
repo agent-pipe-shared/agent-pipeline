@@ -1,12 +1,14 @@
+import { createHash } from "node:crypto";
 // SPDX-License-Identifier: SUL-1.0
 // Guard module "sanctioned-args-scripts" (layer 2), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
 import { isPhysicalScratchTarget } from "../physical-scratch-boundary.mjs";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { basename, isAbsolute, join, resolve, sep } from "node:path";
 import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
+import { observeReaderPlanScope } from "../doc-reader-plan-scope.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
-import { HEX, START_PREFLIGHT_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT, HEX, START_PREFLIGHT_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { isRealpathedWithinBoundary, pathInside } from "./path-containment.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 
@@ -15,7 +17,7 @@ export function sanctionedSessionCriticFinalizerArgs(args, root) {
     || (args[1] === "--root" && args[2] === "."
       && resolve(root, args[2]) === resolve(root)
       && isRealpathedWithinBoundary(resolve(root, args[2]), root));
-  if (!(["admit", "finalize"].includes(args[0])) || !exactProjectRoot
+  if (!(["admit", "finalize", "register-batch", "append-correction"].includes(args[0])) || !exactProjectRoot
     || args[3] !== "--request" || args.length !== 5) return false;
   const request = args[4];
   if (typeof request !== "string" || request.length === 0 || request.length > 256
@@ -23,7 +25,8 @@ export function sanctionedSessionCriticFinalizerArgs(args, root) {
     || !request.endsWith(".json")) return false;
   const components = request.split("/");
   if (components[0] !== "scratch" || components.some((part) => part === "" || part === "." || part === "..")) return false;
-  return isRealpathedWithinBoundary(resolve(root, request), root);
+  return isRealpathedWithinBoundary(resolve(root, request), root)
+    && isPhysicalScratchTarget(request, { rootDir: root });
 }
 
 /**
@@ -137,6 +140,14 @@ export function sanctionedPushInitArgs(args, root) {
 }
 
 export function sanctionedTranscriptRecoveryArgs(args, root) {
+  // Explicit metadata-only current-session action; grants no path/content read.
+  if (args[0] === "audit-current") {
+    return matchFlagSpec(args.slice(1), { requiredValue: {
+      "--root": (value) => value === root,
+      "--runner": (value) => value === "codex",
+      "--metadata-consent": (value) => value === "approved",
+    } });
+  }
   const sessionId = (value) => typeof value === "string"
     && value.trim() !== "" && !value.startsWith("-") && Buffer.byteLength(value, "utf8") <= 500;
   const base = {
@@ -417,6 +428,18 @@ export function sanctionedPipelineStateArgs(args, root) {
     return true;
   }
   if (args[0] === "approve-plan") {
+    // Signature-mode inspect offers the producer's exact request without --by.
+    // Admit its closed transport only; the writer still verifies current
+    // presentation, submission, policy and PO proof and derives the signer.
+    if (args[1] === "--design-approval-request") {
+      const requestPath = args[2];
+      if (args.length !== 3
+        || !/^scratch\/design-approval-request-[a-f0-9]{64}\.json$/u.test(requestPath ?? "")) return false;
+      try {
+        return isPhysicalScratchTarget(requestPath, { rootDir: root })
+          && lstatSync(resolve(root, requestPath)).isFile();
+      } catch { return false; }
+    }
     if (args[3] === "--design-approval-request") {
       const requestPath = args[4];
       if (args.length !== 5 || args[1] !== "--by" || !validBy(args[2])
@@ -628,7 +651,11 @@ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
   const trustedNode = options.processExecPath ?? process.execPath;
   if (!words || words.length < 2 || ![...directNode, trustedNode].includes(words[0])) return null;
   const [script, ...args] = words.slice(1);
-  return { script, args };
+  // Windows accepts either separator spelling of this one trusted script identity.
+  // Keep every other script lexical and preserve case, roots, segments and argv.
+  const sameStartPreflight = platform === "win32"
+    && script.replace(/\//gu, "\\") === START_PREFLIGHT_SCRIPT.replace(/\//gu, "\\");
+  return { script: sameStartPreflight ? START_PREFLIGHT_SCRIPT : script, args };
 }
 
 /**
@@ -644,6 +671,19 @@ export function isSanctionedStartPreflightInvocation(command, root, options = {}
   return resolved !== null && resolved.script === START_PREFLIGHT_SCRIPT && resolved.args.length === 0;
 }
 
+// Only the immutable physical endpoint and exact selected root reach this lane.
+export function sanctionedGovernanceScopeDiagnosticArgs(args,root,options={}){
+  if(!Array.isArray(args)||args.length!==2||args[0]!=='--root'||args[1]!==root||typeof root!=='string'||!isAbsolute(root)||resolve(root)!==root||/[\x00-\x1f\x7f]/u.test(root))return false;
+  try{const st=(options.lstatSyncFn??lstatSync)(root);return st.isDirectory()&&!st.isSymbolicLink()&&(options.realpathSyncFn??realpathSync)(root)===root;}catch{return false;}
+}
+export function isSanctionedGovernanceScopeDiagnosticInvocation(command,root,options={}){
+  const invocation=resolveSanctionedScriptInvocation(command,root,options);
+  if(!invocation)return false;
+  const platform=options.platform??process.platform;
+  const script=platform==='win32'&&invocation.script.replace(/\//gu,'\\')===GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT.replace(/\//gu,'\\')?GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT:invocation.script;
+  if(script!==GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT||!sanctionedGovernanceScopeDiagnosticArgs(invocation.args,root,options))return false;
+  try{const st=(options.lstatSyncFn??lstatSync)(script);return st.isFile()&&!st.isSymbolicLink()&&(options.realpathSyncFn??realpathSync)(script)===script;}catch{return false;}
+}
 export function sanctionedOnboardingConsentMarkArgs(args, root) {
   if (args[0] !== "record") return false;
   const matchesRoot = exactRoot(args, root, 1)
@@ -654,4 +694,20 @@ export function sanctionedOnboardingConsentMarkArgs(args, root) {
   if (args[3] !== "--session-id" || typeof args[4] !== "string" || args[4].trim() === "") return false;
   if (args[5] !== "--answer" || (args[6] !== "yes" && args[6] !== "no")) return false;
   return args.length === 7;
+}
+
+// Reader admission preserves the existing readiness gate; observations are method seams.
+export function sanctionedDocReaderCourseArgs(args,root,options={}){
+ try{
+  if(!Array.isArray(args)||typeof root!=="string"||!isAbsolute(root)||resolve(root)!==root||realpathSync(root)!==root||!lstatSync(root).isDirectory())return false;
+  const ops=new Set(["create","reserve-stage","observe-attempt","recover","complete-stage","begin-batch","record-correction","close-batch","justify-third","close-course"]);
+  const relative=p=>typeof p==="string"&&p.length<=240&&!/[\\:\x00-\x1f\x7f]/u.test(p)&&p.split("/").every(x=>x&&x!=="."&&x!==".."&&!x.startsWith("."));
+  const physical=(p,missing=false)=>{if(!relative(p))return false;let at=root;const bits=p.split("/");for(let i=0;i<bits.length;i++){at=resolve(at,bits[i]);let st;try{st=lstatSync(at);}catch(e){if(e.code==="ENOENT"&&missing)return true;return false;}if(st.isSymbolicLink()||realpathSync(at)!==at||(i<bits.length-1?!st.isDirectory():!st.isFile()))return false;}return true;};
+  if(args[1]!=="--repo"||args[2]!==root||args[3]!=="--store"||!relative(args[4])||!args[4].endsWith("/course-state.json")||!physical(args[4],true))return false;
+  let request,scope;
+  if(args[0]==="inspect"){if(args.length!==7||args[5]!=="--course-id"||!/^[a-z0-9][a-z0-9-]{0,62}$/u.test(args[6]))return false;const state=JSON.parse(readFileSync(resolve(root,args[4]),"utf8"));scope=state.courses?.find(c=>c.courseId===args[6])?.scope;}
+  else{if(!ops.has(args[0])||args.length!==9||args[5]!=="--request"||args[7]!=="--request-sha256"||!HEX.test(args[8]??""))return false;const requestPath=args[6];if(typeof requestPath!=="string"||!requestPath.startsWith(root+sep)||resolve(requestPath)!==requestPath)return false;const relativeRequest=requestPath.slice(root.length+1).split(sep).join("/");if(!physical(relativeRequest))return false;const bytes=readFileSync(requestPath);if(bytes.length>262144||createHash("sha256").update(bytes).digest("hex")!==args[8])return false;request=JSON.parse(bytes.toString("utf8"));scope=request.scope;if(!scope&&physical(args[4]))scope=JSON.parse(readFileSync(resolve(root,args[4]),"utf8")).courses?.find(c=>c.courseId===request.courseId)?.scope;}
+  const observed=(options.observePlanScope??observeReaderPlanScope)({root,storePath:args[4],scope});
+  return observed!==null&&typeof observed==="object"&&!Array.isArray(observed)&&Object.keys(observed).length===1&&Object.keys(observed)[0]==="scope"&&typeof observed.scope?.evidenceRoot==="string"&&relative(observed.scope.evidenceRoot)&&args[4]===observed.scope.evidenceRoot+"/course-state.json"&&(!scope||JSON.stringify(observed.scope)===JSON.stringify(scope));
+ }catch{return false;}
 }

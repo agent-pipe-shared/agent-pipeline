@@ -230,11 +230,21 @@ function readStdinInput() {
   }
 }
 
-export function main({ projectDir, exists, input } = {}) {
+function validatedSessionRunner(runner) {
+  return runner === "claude" || runner === "codex" ? runner : null;
+}
+
+function sessionRunnerArgument(argv) {
+  return Array.isArray(argv) && argv.length === 2 && argv[0] === "--runner"
+    ? validatedSessionRunner(argv[1]) : null;
+}
+
+export function main({ projectDir, exists, input, runner = null } = {}) {
+  const declaredRunner = validatedSessionRunner(runner);
   const scope = observeGovernanceScope({ rootDir: projectDir ?? process.cwd() });
   if (!scope.requiresEnforcement) {
     if (scope.hintAllowed) {
-      const decision = sessionStartDecision(projectDir);
+      const decision = sessionStartDecision(projectDir, exists, null, declaredRunner);
       process.stdout.write(JSON.stringify({ systemMessage: decision.message, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: decision.context } }) + "\n");
     }
     return;
@@ -248,7 +258,7 @@ export function main({ projectDir, exists, input } = {}) {
   // payload carries, same field post-compact-reground.mjs already reads for the same
   // purpose one hook over -- never re-derived, never asserted by this hook itself.
   const sessionId = typeof input?.session_id === "string" ? input.session_id : null;
-  const decision = sessionStartDecision(projectDir, exists, sessionId);
+  const decision = sessionStartDecision(projectDir, exists, sessionId, declaredRunner);
   process.stdout.write(`${JSON.stringify({
     systemMessage: decision.message,
     hookSpecificOutput: {
@@ -258,4 +268,4 @@ export function main({ projectDir, exists, input } = {}) {
   })}\n`);
 }
 
-if (isDirectInvocation(import.meta.url)) main({ input: readStdinInput() });
+if (isDirectInvocation(import.meta.url)) main({ input: readStdinInput(), runner: sessionRunnerArgument(process.argv.slice(2)) });

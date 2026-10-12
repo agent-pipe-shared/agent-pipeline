@@ -86,7 +86,7 @@ const DISPATCH_VALUE = /^(\S+) \((goldfish|critic|elephant-generated)\)$/u;
 const PROVENANCE_SIGNAL = /^\s*(?:AI-Assisted|Dispatch)\s*:/imu;
 
 function admittedDispatchValue(value) {
-  if (value === "stage-0 (elephant)") return true;
+  if (value === "stage-0 (elephant)" || value === "administrative (elephant)") return true;
   if (/^quality-package-[a-f0-9]{64} \(integration\)$/u.test(value)) return true;
   const match = DISPATCH_VALUE.exec(value);
   if (!match) return false;
@@ -144,6 +144,7 @@ export function finishedCommitMessageFindings(message, {
   requireDispatch = false,
   requireProvenanceWhenSignaled = false,
   integrationAdmission,
+  administrativeAdmission,
 } = {}) {
   const text = String(message ?? "");
   const provenanceSignaled = PROVENANCE_SIGNAL.test(text);
@@ -176,6 +177,12 @@ export function finishedCommitMessageFindings(message, {
         detail: `the final \`Dispatch: ${dispatches[0].value}\` entry is not an admitted work-package binding`,
       });
     }
+  }
+  if (trailers.some((entry) => entry.key === "Dispatch" && entry.value === "administrative (elephant)")) {
+    const exact = trailers.length === 2 && trailers[0].key === "Dispatch" && trailers[1].key === "AI-Assisted" && trailers[1].value === "true";
+    const admitted = exact && administrativeAdmission?.ok === true && administrativeAdmission.schema === "pipeline.administrative-commit-content.v1"
+      && administrativeAdmission.code === "GIT-03-ADMINISTRATIVE-VERIFIED" && administrativeAdmission.messageSha256 === messageDigest(text);
+    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred"});
   }
   const integration = trailers.filter((entry) => entry.key === "Dispatch" && entry.value.startsWith("quality-package-"));
   if (integration.length > 0) {
@@ -210,8 +217,8 @@ const CORRELATION_RULES = Object.freeze([
   }),
 ]);
 
-/** Is this command line a `git commit` at all? Global options may sit before the verb. */
-function isGitCommit(tokens) {
+/** Locate an observable Git message verb; this does not admit the command. */
+function gitMessageCommand(tokens) {
   let i = 0;
   // Leading `NAME=value` assignments are part of the command, not the command name. Skipping
   // them is not cosmetic: without this, `PIPELINE_GUARD_OVERRIDE=… git commit -F msg.txt` --
@@ -220,12 +227,12 @@ function isGitCommit(tokens) {
   // Found by GIT03-5, which was written to prove the override cannot open this rule and
   // instead proved something worse. `guard-push` carries the same defence as PG-HD4.
   while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i] ?? "")) i += 1;
-  if (!/^(?:.*[/\\])?(?:env|git)(?:\.exe)?$/i.test(tokens[i] ?? "")) return false;
+  if (!/^(?:.*[/\\])?(?:env|git)(?:\.exe)?$/i.test(tokens[i] ?? "")) return null;
   // `env [-i] [NAME=value ...] git commit …` reaches the same place by another road.
   if (/^(?:.*[/\\])?env$/i.test(tokens[i])) {
     i += 1;
     while (tokens[i] !== undefined && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i]) || tokens[i].startsWith("-"))) i += 1;
-    if (!/^(?:.*[/\\])?git(?:\.exe)?$/i.test(tokens[i] ?? "")) return false;
+    if (!/^(?:.*[/\\])?git(?:\.exe)?$/i.test(tokens[i] ?? "")) return null;
   }
   i += 1;
   // Skip the global options git accepts before a subcommand. `-C`, `-c`, `--git-dir` and
@@ -243,7 +250,53 @@ function isGitCommit(tokens) {
     }
     break;
   }
-  return tokens[i] === "commit";
+  return tokens[i] === "commit" || tokens[i] === "merge" ? { verb: tokens[i], index: i } : null;
+}
+
+/**
+ * Project only explicit merge message operands into the existing message reader.
+ * Repository topology is unknown here: a potential merge commit may fast-forward
+ * or already be up to date. Explicit non-committing modes create no merge commit
+ * (although --no-commit alone can still fast-forward HEAD), so do not read files.
+ * Shell grammar, physical file admission and other Git guards remain separate.
+ */
+function mergeMessageOperands(tokens, index) {
+  const operands = [];
+  const valueOptions = new Set(["-s", "--strategy", "-X", "--strategy-option", "--into-name", "--cleanup"]);
+  let commit = true;
+  let squash = false;
+  let nonCommitting = false;
+  let stdinFile = false;
+  for (let i = index + 1; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token === "--") break;
+    if (token === "--commit") commit = true;
+    else if (token === "--no-commit") commit = false;
+    else if (token === "--squash") squash = true;
+    else if (token === "--no-squash") squash = false;
+    else if (["--ff-only", "--abort", "--quit"].includes(token)) nonCommitting = true;
+    else if (valueOptions.has(token)) i += 1;
+    else if (["-m", "--message", "-F", "--file"].includes(token)) {
+      const value = tokens[i + 1];
+      if (value !== undefined) {
+        const file = token === "-F" || token === "--file";
+        operands.push(file ? "-F" : "-m", value);
+        if (file && value === "-") stdinFile = true;
+        i += 1;
+      }
+    } else if (token.startsWith("--message=")) operands.push("-m", token.slice("--message=".length));
+    else if (token.startsWith("--file=")) {
+      const value = token.slice("--file=".length);
+      operands.push("-F", value);
+      if (value === "-") stdinFile = true;
+    } else if (token.startsWith("-m") && token.length > 2) operands.push("-m", token.slice(2));
+    else if (token.startsWith("-F") && token.length > 2) {
+      const value = token.slice(2);
+      operands.push("-F", value);
+      if (value === "-") stdinFile = true;
+    }
+  }
+  return !commit || squash || nonCommitting ? null : { operands, stdinFile };
 }
 
 /** Heredoc bodies, which is how a multi-line message reaches `git commit -F -`. */
@@ -268,8 +321,18 @@ function heredocBodies(cmd) {
  */
 export function commitMessageFindings(cmd, { readFile, requireMarker = false, requireDispatch = false } = {}) {
   if (typeof cmd !== "string" || cmd === "") return { inspected: false, sources: [], findings: [], message: null };
-  const tokens = tokenizeArgv(cmd);
-  if (!isGitCommit(tokens)) return { inspected: false, sources: [], findings: [], message: null };
+  let tokens = tokenizeArgv(cmd);
+  const command = gitMessageCommand(tokens);
+  if (command === null) return { inspected: false, sources: [], findings: [], message: null };
+  let messageCommand = cmd;
+  if (command.verb === "merge") {
+    const merge = mergeMessageOperands(tokens, command.index);
+    if (merge === null) return { inspected: false, sources: [], findings: [], message: null };
+    tokens = merge.operands;
+    // Merge has no --trailer option. Trailers must come from actual message
+    // bytes; only an explicit stdin file can make a heredoc a message source.
+    if (!merge.stdinFile) messageCommand = "";
+  }
 
   const parts = [];
   const trailers = [];
@@ -301,7 +364,7 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
       trailers.push(token.slice("--trailer=".length)); sources.push("--trailer=");
     }
   }
-  for (const body of heredocBodies(cmd)) { parts.push(body); sources.push("heredoc"); }
+  for (const body of heredocBodies(messageCommand)) { parts.push(body); sources.push("heredoc"); }
 
   // No inspectable message and no named-but-unreadable source: an editor commit. The caller
   // must not treat this as clean -- it is "not looked at", which is a different thing and is

@@ -1,3 +1,8 @@
+
+import {fileURLToPath as authorityFileURLToPath} from 'node:url';
+import {readSourceOwnedOnboardingAfkAdmission} from './onboarding-continuity.mjs';
+import {isCurrentSourceOwnedAfkProjectionAttempt,executeSourceOwnedAfkHostEffect,settleSourceOwnedAfkHostProjection,isSettledSourceOwnedAfkProjectionResult} from './afk-transaction-host.mjs';
+import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest} from './session-authority-domain-owner.mjs';
 // SPDX-License-Identifier: SUL-1.0
 import { randomBytes } from "node:crypto";
 import {
@@ -605,4 +610,50 @@ export function createAfkWriterOwner({ hostId, bootId, pid, processStart, activa
     acquiredAt,
   };
   return validLockOwner(owner) ? { ok: true, owner } : fail("AFK-WRITER-OWNER-INVALID");
+}
+
+const afkAuthorityOwners=new Map(),afkAuthorityPorts=new WeakMap(),afkAuthorityLedgerScans=new Map();
+function afkAuthorityOwner(repository){
+  const repo=authorityActualRepository(repository),key=JSON.stringify(repo);if(afkAuthorityOwners.has(key))return afkAuthorityOwners.get(key);
+  const namespaces=['registered-activations','activation-generations','writer-recovery-locks'];
+  const scanLedger=()=>{
+    const generations=new Map();
+    const ledger=authorityScanDomain({rootPath:join(repo.commonDir,'agent-pipeline','afk'),namespaceIds:namespaces,classifyEntry(entry){const {relativePath:p,value,bytes}=entry;
+      const match=/^([a-f0-9]{32})\/generations\/([0-9]{16})-([a-f0-9]{64})\.afklog$/.exec(p);
+      if(match){const parsed=parseAfkLedgerGeneration(bytes,match[1]);if(!parsed.ok||parsed.sequence!==Number(match[2])||parsed.headSha256!==match[3])authorityOwnerFailure('afk-ledger:invalid-generation');const rows=generations.get(match[1])??[];rows.push({path:entry.path,parsed});generations.set(match[1],rows);return {namespaceId:namespaces[1],active:false,semantic:{activationId:match[1],sequence:parsed.sequence,headSha256:parsed.headSha256,terminal:parsed.frames.at(-1)?.record.type??null}};}
+      if(/^[a-f0-9]{32}\/(?:writer|recovery)\.lock$/.test(p))return {namespaceId:namespaces[2],active:true,semantic:{unresolvedLock:true,rawSha256:sha256Canonical({raw:bytes.toString('base64')})}};
+      authorityOwnerFailure('afk-ledger:unknown-or-invalid-entry');
+    }});
+    for(const rows of generations.values()){rows.sort((a,b)=>a.parsed.sequence-b.parsed.sequence);for(let i=1;i<rows.length;i++){const previous=rows[i-1].parsed,current=rows[i].parsed;if(previous.sequence>=current.sequence||previous.frames.some((f,j)=>f.recordHash!==current.frames[j]?.recordHash))authorityOwnerFailure('afk-ledger:generation-prefix-divergence');}const latest=rows.at(-1);if(latest.parsed.frames.at(-1)?.record.type!=='review-complete'){const entry=ledger.entries.find(e=>e.path===latest.path);ledger.activeFacts.push(entry.sourceFact);}}
+    return ledger;
+  };
+  const scan=()=>{
+    const ledger=scanLedger();
+    const lives=authorityScanDomain({rootPath:join(repo.commonDir,'agent-pipeline','afk-ledger','authority-lifetimes'),namespaceIds:namespaces,classifyEntry:e=>authorityClassifyLifetime(e,'afk-ledger',namespaces[0],repo)});
+    return authorityMergeSnapshots([ledger,lives],namespaces);
+  };
+  const owner=authorityCreateDomainOwner({repository:repo,producerId:'afk-ledger',kinds:['armed-capability'],namespaceIds:namespaces,scan,transitionScope(identity){if(!/^[a-f0-9]{32}$/.test(identity?.activationId??''))authorityOwnerFailure('afk-ledger:source-activation-required');const rootPath=join(repo.commonDir,'agent-pipeline','afk'),activationId=identity.activationId;return {mutablePaths:['writer.lock','recovery.lock'].map(p=>join(rootPath,activationId,p)),creations:[{rootPath,relativePattern:'^'+activationId+'/(?:generations/[0-9]{16}-[a-f0-9]{64}\\.afklog|writer\\.lock|recovery\\.lock)$'}]};},sourceModulePaths:[import.meta.url,...['afk-transaction-host.mjs','onboarding-continuity.mjs','session-authority-domain-owner.mjs','session-authority-registry.mjs'].map(p=>new URL(p,import.meta.url).href)].map(authorityFileURLToPath),terminalObservation(result,identity){if(identity?.kind==='source-owned-afk-projection'&&!isSettledSourceOwnedAfkProjectionResult(result,{repository:repo,activationId:identity.activationId}))return null;const observed=scan();if(observed.activeFacts.some(f=>f.namespaceId!==namespaces[0]))return null;const facts=observed.memberships.find(m=>m.namespaceId===namespaces[1]).sourceFacts;if(!facts.length)return null;return {terminal:'completed',sourceFacts:facts};}});
+  afkAuthorityOwners.set(key,owner);afkAuthorityPorts.set(owner.port,repo);afkAuthorityLedgerScans.set(key,scanLedger);return owner;
+}
+export function createAfkLedgerAuthorityProducerPort({repository}){return afkAuthorityOwner(repository).port;}
+export function isOwnedAfkLedgerAuthorityProducerPort(port,{repository}){try{return JSON.stringify(afkAuthorityPorts.get(port))===JSON.stringify(authorityActualRepository(repository));}catch{return false;}}
+export function withAfkAuthorityLifetime({repository,identity},operation){return afkAuthorityOwner(repository).run(identity,operation);}
+
+function ownedAfkLifetimeAdmission(admissionHandle) {
+  const value=readSourceOwnedOnboardingAfkAdmission({admissionHandle});
+  if (!value || !isCurrentSourceOwnedAfkProjectionAttempt({admissionHandle,repository:value.repository,activationId:value.activationId})) authorityOwnerFailure('afk-ledger:owned-projection-admission');
+  return value;
+}
+export function executeSourceOwnedAfkProjectionLifetime({admissionHandle}) {
+  const admission=ownedAfkLifetimeAdmission(admissionHandle),owner=afkAuthorityOwner(admission.repository);
+  if (owner.currentHandle()) authorityOwnerFailure('afk-ledger:owned-projection-nested-lifetime');
+  return owner.run({activationId:admission.activationId,kind:'source-owned-afk-projection'},
+    ()=>executeSourceOwnedAfkHostEffect({admissionHandle}),
+    hostResult=>settleSourceOwnedAfkHostProjection({admissionHandle,hostResult}));
+}
+export function readSourceOwnedAfkProjectionPhysicalSnapshot({admissionHandle}) {
+  const admission=ownedAfkLifetimeAdmission(admissionHandle),repo=authorityActualRepository(admission.repository),key=JSON.stringify(repo);
+  const owner=afkAuthorityOwner(repo),scan=afkAuthorityLedgerScans.get(key);
+  if (!owner.currentHandle()||!scan) authorityOwnerFailure('afk-ledger:owned-projection-current-lifetime');
+  return structuredClone(scan());
 }

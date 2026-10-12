@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
 
 /**
  * Read-only admission for a path-only Critic dispatch.
@@ -27,8 +28,8 @@ import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
 } from "../lib/requirement-traceability.mjs";
-import { classifyRegisteredEvidenceOnlyCommits, CriticCourseAdmissionError } from "../lib/critic-course-admission.mjs";
-import { admitReviewAttempt, sha256Canonical } from "../lib/review-economy.mjs";
+import { readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
 export const EVIDENCE_SWEEP_SCHEMA = "pipeline.critic-dispatch-preflight-evidence-sweep.v1";
@@ -266,7 +267,7 @@ function requiredCandidateReadback(root, candidate, byPath, paths, label) {
  * state. Evidence is a local, bounded JSON observation that binds the frozen
  * candidate; Spec and guardrails are always read from that candidate tree.
  */
-export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null }, observer = null) {
+export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null }, observer = null) {
   let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
   try {
   if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
@@ -358,34 +359,48 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   if (featureId !== null && byPath.has(`specs/${featureId}/lifecycle.json`)) {
     stage = "critic-course";
     if (scope !== null) fail("CDP-COURSE-SCOPE", "A versioned feature Critic review requires an exact base-to-candidate range.");
-    let source;
-    try {
-      source = classifyRegisteredEvidenceOnlyCommits({ repoRoot: realRoot, featureId,
-        baseCommit: baseCommit ?? baseTree, candidateCommit });
-    } catch (error) {
-      if (error instanceof CriticCourseAdmissionError) fail("CDP-COURSE-SOURCE", "Retained Critic course or candidate range is invalid.");
-      throw error;
+    if (courseContext !== null && (!isObject(courseContext)
+      || Object.keys(courseContext).sort().join() !== ["acceptedReference", "criterionLocator", "deltaRequestPath", "featureId", "registrationCommit"].join()
+      || typeof courseContext.featureId !== "string" || !OID.test(courseContext.registrationCommit ?? ""))) {
+      fail("CDP-COURSE-CONTEXT", "Critic course context must be closed.");
     }
-    if ((source.history.length > 0) !== (priorReadback !== null)) {
-      fail("CDP-COURSE-PARENT", "Prior Critic evidence and retained course disagree.");
+    const context = courseContext ?? { featureId, registrationCommit: candidateCommit,
+      acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
+    const admission = readCriticCourseAdmission({ repoRoot: realRoot, featureId: context.featureId,
+      baseCommit: baseCommit ?? baseTree, candidateCommit, registrationCommit: context.registrationCommit,
+      requestedMode: context.deltaRequestPath === null ? "full" : "delta",
+      acceptedReference: context.acceptedReference, criterionLocator: context.criterionLocator,
+      deltaRequestPath: context.deltaRequestPath });
+    if (admission?.decision?.status !== "admitted") {
+      observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
+      return Object.freeze({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+        status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
+        dispatch: { childCreated: false, packetCreated: false, stateMutated: false, spawnAuthorized: false } });
     }
-    const round = source.history.length + 1;
-    const correctionCommits = source.history.length === 0 ? 0
-      : source.history.at(-1).course.correctionCommitCount + source.correctionCommits.length;
-    const course = admitReviewAttempt({ round, correctionCommits, requestedMode: "full" });
-    if (!course.ok) fail(course.courseGateRequired === true ? "CDP-COURSE-GATE" : "CDP-COURSE-INVALID",
-      "Critic course does not admit another dispatch.");
-    courseAdmission = Object.freeze({
-      featureId,
-      sourceSha256: sha256Canonical({ manifestSha256: source.manifestSha256,
-        historySha256: source.historySha256, baseCommit: source.baseCommit,
-        candidateCommit: source.candidateCommit, rangeCommits: source.rangeCommits,
-        correctionCommits: source.correctionCommits, evidenceOnlyCommits: source.evidenceOnlyCommits }),
-      decisionSha256: sha256Canonical({ round, correctionCommits, code: course.code, mode: course.mode }),
-      round,
-      correctionCommits,
-    });
+    // Defense at the actual packet preflight: history may remain readable in
+    // the historical four-round format, and the current one-full plus three-DIFF
+    // policy can produce a packet-ready result for this registered batch.
+    const round = admission.budgets?.reviewRound;
+    const expectedMode = round === 1 ? "full" : Number.isSafeInteger(round) && round > 1 ? "delta" : null;
+    if (expectedMode === null || round > CRITIC_DISPATCH_LIMITS.criticRounds
+      || admission.budgets.maxReviewRounds !== CRITIC_DISPATCH_LIMITS.criticRounds
+      || admission.decision.mode !== expectedMode
+      || (context.deltaRequestPath === null ? "full" : "delta") !== expectedMode) {
+      fail("CDP-COURSE-BUDGET", "Critic dispatch is limited to one full review and at most three correction-DIFF reviews per registered batch.");
+    }
+    if (admission.source?.reviewUnit?.specPath !== spec) {
+      fail("CDP-COURSE-CONTEXT", "The registered review unit must bind the requested feature Spec.");
+    }
+    if (admission.courseIdentity.originalFeatureId !== featureId && context.featureId !== featureId) {
+      fail("CDP-COURSE-CONTEXT", "Course identity does not bind the requested feature Spec.");
+    }
+    const { decision, ...subject } = admission;
+    courseAdmission = Object.freeze({ featureId: context.featureId,
+      sourceSha256: sha256Canonical(subject), decisionSha256: sha256Canonical(decision),
+      round: admission.budgets.reviewRound, correctionCommits: admission.budgets.correctionCommitCount });
   }
+
+  if (courseContext !== null && courseAdmission === null) fail("CDP-COURSE-CONTEXT", "Course context requires a registered feature package.");
 
   const result = {
     schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
@@ -476,10 +491,11 @@ export function enumerateEvidenceArtifacts({ root, taskId }) {
 
 export function parseCriticDispatchPreflightArgs(argv) {
   const values = { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null, sweepEvidenceTaskId: null };
+  const selectors = {};
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
+    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
     if (flag === "--root") values.root = value;
     else if (flag === "--base") values.base = value;
     else if (flag === "--candidate") values.candidate = value;
@@ -488,8 +504,30 @@ export function parseCriticDispatchPreflightArgs(argv) {
     else if (flag === "--evidence") values.evidencePaths.push(value);
     else if (flag === "--prior-critic") values.priorCriticEvidencePath = value;
     else if (flag === "--sweep-evidence") values.sweepEvidenceTaskId = value;
+    else if (["--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request"].includes(flag)) {
+      if (Object.hasOwn(selectors, flag)) fail("CDP-ARGUMENT", "Duplicate course selector.");
+      selectors[flag] = value;
+    }
     else fail("CDP-ARGUMENT", `Unknown argument: ${flag}`);
     index += 1;
+  }
+  if (Object.keys(selectors).length !== 0) {
+    if (values.sweepEvidenceTaskId !== null) fail("CDP-ARGUMENT", "Course selectors cannot be mixed with evidence sweep.");
+    if (!OID.test(selectors["--registration-commit"] ?? "")) fail("CDP-ARGUMENT", "An exact registration commit is required.");
+    const match = /^specs\/([^/]+)\//u.exec(values.specPath ?? "");
+    if (!match) fail("CDP-ARGUMENT", "Course selectors require a feature Spec.");
+    const acceptedPath = selectors["--accepted-contract"] === undefined ? null : normalizePath(selectors["--accepted-contract"], "accepted contract");
+    const locatorPath = selectors["--criterion-locator"] === undefined ? null : normalizePath(selectors["--criterion-locator"], "criterion locator");
+    let criterionLocator = null;
+    if (locatorPath !== null) {
+      try { criterionLocator = JSON.parse(localEvidence(values.root, locatorPath)); }
+      catch { fail("CDP-ARGUMENT", "Criterion locator is unavailable."); }
+      if (!isObject(criterionLocator) || Object.keys(criterionLocator).sort().join() !== ["criterionId", "endByte", "excerptSha256", "schema", "sourcePath", "sourceSha256", "startByte"].join()) fail("CDP-ARGUMENT", "Criterion locator must be closed.");
+    }
+    values.courseContext = { featureId: match[1], registrationCommit: selectors["--registration-commit"],
+      acceptedReference: acceptedPath === null ? null : { schema: "pipeline.accepted-delivery-contract-reference.v1", path: acceptedPath,
+        sha256: sha256(candidateBytes(values.root, selectors["--registration-commit"], acceptedPath)) },
+      criterionLocator, deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") };
   }
   return values;
 }
@@ -504,6 +542,7 @@ if (isDirectInvocation(import.meta.url)) {
     } else {
       const result = preflightCriticDispatch(args);
       process.stdout.write(`${JSON.stringify(result)}\n`);
+      if (result.status !== "packet-ready") process.exitCode = 1;
     }
   } catch (error) {
     const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
@@ -517,4 +556,23 @@ if (isDirectInvocation(import.meta.url)) {
     })}\n`);
     process.exitCode = 1;
   }
+}
+
+/** Explicit opaque launch-context entry; no observer or authority injection. */
+export function preflightCriticDispatchWithLaunchContext(input, options) {
+  if (options === undefined || (isObject(options) && Object.keys(options).length === 0)
+    || (isObject(options) && Object.keys(options).length === 1
+      && Object.hasOwn(options, "hostDispatchContext") && options.hostDispatchContext === undefined)) {
+    throw new CriticDispatchPreflightError("DBLO-CURRENT-HOST-UNAVAILABLE", "Launch observation refused.");
+  }
+  if (!isObject(options) || Object.keys(options).length !== 1 || !Object.hasOwn(options, "hostDispatchContext")) {
+    throw new CriticDispatchPreflightError("DBLO-HANDLE-INVALID", "Launch observation refused.");
+  }
+  const observed = readDispatchBudgetLaunchObservation({ rootDir: input?.root,
+    hostDispatchContext: options.hostDispatchContext });
+  if (!observed.ok) throw new CriticDispatchPreflightError(observed.code, "Launch observation refused.");
+  if (observed.value.status !== "working" && observed.value.status !== "not-applicable") {
+    throw new CriticDispatchPreflightError(observed.value.code, "Launch observation refused.");
+  }
+  return preflightCriticDispatch(input);
 }

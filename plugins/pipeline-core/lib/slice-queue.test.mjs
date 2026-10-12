@@ -654,7 +654,44 @@ check("the default stale-after threshold equals the ledger's, so liveSlices outp
   assert.equal(DEFAULT_STALE_AFTER_MINUTES, LEDGER_STALE_MINUTES);
 });
 
-assert.equal(cases.length, 34,"the complete slice-queue corpus must be registered before execution begins");
+check("v2 item envelope is closed and survives normalized queue projection", () => {
+  const q = queue([slice("ITEM-A", ["src/a.mjs"], {delivery:{itemId:"AC-1",criteria:["CR-1"],baseCommit:"a".repeat(40)}})]);
+  q.schema="pipeline.slice-queue.v2";
+  const result=validateSliceQueue(q,LINUX);
+  assert.equal(result.ok,true,JSON.stringify(result.errors));
+  assert.deepEqual(result.queue.slices[0].delivery,q.slices[0].delivery);
+  assert.equal(result.queue.schema,q.schema);
+  const invalid=structuredClone(q);invalid.slices[0].delivery.pass=true;
+  assert.equal(validateSliceQueue(invalid,LINUX).ok,false);
+  const legacy=structuredClone(q);legacy.schema="pipeline.slice-queue.v1";
+  assert.equal(validateSliceQueue(legacy,LINUX).ok,false,"v1 does not silently consume extra delivery authority");
+});
+check("v2 terminal prose and terminalIds retain owner and block dependent launch", () => {
+  const delivery=id=>({delivery:{itemId:id,criteria:["CR-1"],baseCommit:"a".repeat(40)}});
+  const q=queue([slice("ITEM-A",["src/a.mjs"],delivery("AC-1")),slice("ITEM-B",["src/b.mjs"],{...delivery("AC-2"),dependsOn:["ITEM-A"]})]);
+  q.schema="pipeline.slice-queue.v2";
+  const derived=readyAndLive({queue:q,records:[{taskId:"ITEM-A",outcome:"completed"}],terminalIds:["ITEM-A"],now:NOW},LINUX);
+  assert.equal(derived.valid,true,JSON.stringify(derived.errors));
+  assert.equal(derived.slices[0].status,"live");
+  assert.deepEqual(derived.slices[0].sources,["integration-pending-unqualified"]);
+  assert.equal(derived.slices[1].status,"blocked");
+  assert.deepEqual(derived.ready,[]);
+});
+check("v2 unbound legacy migration is readable and held; forged readiness and cross-platform path collisions cannot authorize launch",()=>{
+  const legacy={status:'unbound-legacy',itemId:'LEGACY-A',legacyQueueSha256:'a'.repeat(64)};
+  const q=queue([slice('LEGACY-A',['src/a.mjs'],{state:'deferred',holdReason:'Original binding pending',delivery:legacy})]);q.schema='pipeline.slice-queue.v2';
+  for(const platform of [LINUX,WIN,MAC]) {
+    assert.equal(validateSliceQueue(q,platform).ok,true);
+    const projection=readyAndLive({queue:q,now:NOW,integrationReadiness:{integrated:['LEGACY-A'],pass:true},records:[{taskId:'LEGACY-A',outcome:'completed'}]},platform);
+    assert.equal(projection.slices[0].status,'live');assert.deepEqual(projection.ready,[]);
+    const promoted=structuredClone(q);promoted.slices[0].state='ready';delete promoted.slices[0].holdReason;assert.equal(validateSliceQueue(promoted,platform).ok,false);
+    const escaped=structuredClone(q);escaped.slices[0].writeScope=['C:\\outside\\change.mjs'];assert.equal(validateSliceQueue(escaped,platform).ok,false);
+  }
+  const delivery=id=>({itemId:id,criteria:['AC-1'],baseCommit:'a'.repeat(40)});
+  const folded=queue([slice('ITEM-A',['src/Thing.mjs'],{delivery:delivery('AC-1')}),slice('ITEM-B',['src/thing.mjs'],{delivery:delivery('AC-2')})]);folded.schema='pipeline.slice-queue.v2';
+  assert.equal(validateSliceQueue(folded,WIN).ok,false);assert.equal(validateSliceQueue(folded,MAC).ok,false);
+});
+assert.equal(cases.length, 37,"the complete slice-queue corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

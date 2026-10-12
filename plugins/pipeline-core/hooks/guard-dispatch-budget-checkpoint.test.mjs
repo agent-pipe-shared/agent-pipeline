@@ -294,25 +294,25 @@ register("GDBC10", "hook: a Critic notice names critic-notes.md; the closing lan
   const notes = (rel) => (rel.startsWith("ABS:") ? join(root, rel.slice(4)) : rel);
   const write = (agentId, agentType, rel, toolName = "Write") => callGuard(root, subagentCall(root, agentId, agentType, toolName, { file_path: notes(rel), content: "x" }));
   const admitted = [
-    "ABS:scratch/dispatch/review-1/critic-notes.md",
-    "scratch/dispatch/review-1/critic-notes.md",
+    "ABS:scratch/dispatch/critic-review-1/critic-notes.md",
+    "scratch/dispatch/critic-review-1/critic-notes.md",
   ];
   admitted.forEach((rel, index) => {
     seed(root, { agentId: `ca${index}`, agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
     assert.equal(write(`ca${index}`, CRITIC, rel).status, 0, `admitted ${rel}`);
   });
   seed(root, { agentId: "ca-edit", agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
-  assert.equal(callGuard(root, subagentCall(root, "ca-edit", CRITIC, "Edit", { file_path: notes("ABS:scratch/dispatch/review-1/critic-notes.md"), old_string: "a", new_string: "b" })).status, 0);
+  assert.equal(callGuard(root, subagentCall(root, "ca-edit", CRITIC, "Edit", { file_path: notes("ABS:scratch/dispatch/critic-review-1/critic-notes.md"), old_string: "a", new_string: "b" })).status, 0);
   const refused = [
-    "ABS:scratch/dispatch/review-1/notes.md",
-    "ABS:scratch/dispatch/review-1/critic-notes.md.bak",
+    "ABS:scratch/dispatch/critic-review-1/notes.md",
+    "ABS:scratch/dispatch/critic-review-1/critic-notes.md.bak",
     "ABS:scratch/dispatch/critic-notes.md",
-    "ABS:scratch/dispatch/review-1/deeper/critic-notes.md",
-    "ABS:scratch/other/review-1/critic-notes.md",
+    "ABS:scratch/dispatch/critic-review-1/deeper/critic-notes.md",
+    "ABS:scratch/other/critic-review-1/critic-notes.md",
     "ABS:plugins/pipeline-core/hooks/critic-notes.md",
-    "scratch/dispatch/review-1/../review-2/critic-notes.md",
+    "scratch/dispatch/critic-review-1/../critic-review-2/critic-notes.md",
     "scratch/dispatch/../critic-notes.md",
-    "../scratch/dispatch/review-1/critic-notes.md",
+    "../scratch/dispatch/critic-review-1/critic-notes.md",
   ];
   refused.forEach((rel, index) => {
     seed(root, { agentId: `cr${index}`, agentType: CRITIC, maxTurns: CRITIC_MAX_TURNS, baseCalls: 15, count: 15 });
@@ -322,7 +322,7 @@ register("GDBC10", "hook: a Critic notice names critic-notes.md; the closing lan
     assert.match(result.stderr, /critic-notes\.md/u, "the denial names the Critic's hand-back file");
   });
   seed(root, { agentId: "gf", agentType: GOLDFISH, count: 20 });
-  assert.equal(write("gf", GOLDFISH, "ABS:scratch/dispatch/review-1/critic-notes.md").status, 2, "a Goldfish never gets the Critic's notes lane");
+  assert.equal(write("gf", GOLDFISH, "ABS:scratch/dispatch/critic-review-1/critic-notes.md").status, 2, "a Goldfish never gets the Critic's notes lane");
   assert.doesNotMatch(callGuard(root, subagentCall(root, "gf", GOLDFISH, "Read", { file_path: "x" })).stderr, /critic-notes/u, "non-Critic denial text is unchanged");
 });
 

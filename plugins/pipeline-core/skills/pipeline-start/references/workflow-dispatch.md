@@ -23,6 +23,42 @@ explicitly in its prompt: "never invoke the Workflow or Agent tool — report
 findings back for the Elephant to act on." A dispatched `goldfish-*`/`critic`
 agent needs no such instruction; it has no access to invoke either tool.
 
+## Outcome ownership, reservations and batch integration
+
+Dispatch one Goldfish per independently verifiable outcome. The item owner
+keeps analysis, test-case preparation, implementation and targeted fixes in
+one context through targeted-green delivery; do not split a bugfix into a
+test-author dispatch plus a fix dispatch by default. Before launching writers,
+the Elephant reserves their write paths and state. Any planned path overlap
+waits for the earlier owner to finish and integrate, even when each worker has
+a separate worktree. A worktree protects workspace state; it does not authorize
+same-file concurrency. Use currently available slots for disjoint outcomes,
+pace starts against the integration/review queue, and do not impose a fixed
+3–5 ceiling. Shared worktrees must never have concurrent committers through
+the same Git index.
+
+Before the first item dispatch, predeclare a meaningful delivery batch and its
+review unit. After each item delivery, integrate it into Main and resolve
+incidental conflicts. Consume valid source- and dependency-matched targeted
+evidence without an ordinary Elephant rerun. The Elephant may rerun only
+affected targeted checks when it manually resolves an integration conflict.
+Send missing or invalid evidence, or relevant dependency drift outside that
+conflict-resolution act, to the appropriate Goldfish for testing or
+requalification: the same item owner before integration, or a
+correction/requalification owner after integration. Freeze actual members and
+integrated scope before Critic review; item completion does not automatically
+trigger Critic. This policy is intended across Claude Code, Codex and
+Antigravity, supported platforms and consumer repositories, but each
+source/runtime combination still requires qualification before enforcement is
+claimed. When corrections are
+needed, one fresh Correction Goldfish owns the coherent batch's findings,
+test cases, fixes, targeted checks and subsequent correction-diff findings in
+the same context through PASS or the three-diff limit. Do not create one
+correction worker per item. Keep one full Critic plus at most three
+correction-diff reviews bound to that original batch; renaming or splitting
+does not reset the budget. A singleton batch requires a substantial independent
+delivery or urgent isolated risk.
+
 ## `isolation: "worktree"` self-heal (mandatory in every such briefing)
 
 See `CLAUDE.md`'s Environment note for the full root-cause writeup (the
@@ -223,11 +259,17 @@ not from reading the diff or trusting the report). The Elephant must
 NEVER decide a Workflow round's outcome from the tool result alone:
 after every `agent()`/Workflow completion — success-looking or not —
 run `git worktree list` to find the worktree(s), `git status --short` /
-`git diff` to see what is actually there, and run the DoD-specified test
-suites directly before doing anything else with the result (cherry-pick,
-close a backlog item, report to the PO). Silence or emptiness in the
-returned result is not evidence of "nothing happened" any more than a
-cheerful-sounding report is evidence that everything happened.
+`git diff` to see what is actually there, and verify the task-specific report,
+commit, exact targeted commands and machine-written evidence before doing
+anything else with the result (cherry-pick, close a backlog item, report to the
+PO). Do not run ordinary targeted tests yourself. If you manually resolve an
+integration conflict, rerun only affected checks and name the conflict and
+invalidation. Missing or invalid evidence, or relevant dependency drift outside
+that conflict-resolution act, goes to the appropriate Goldfish for testing or
+requalification: the same item owner before integration, or a
+correction/requalification owner after integration. Silence or emptiness in the returned result is not evidence
+of "nothing happened" any more than a cheerful-sounding report is evidence
+that everything happened.
 
 ## Never relay a scope-widening PO decision to a running dispatch via `SendMessage`
 
@@ -265,9 +307,13 @@ Do not discard a truncated dispatch's work without first checking: `git
 status --short` / `git diff` in its worktree or working directory almost
 always shows real, on-scope progress even when the final report came back
 empty (`journal.jsonl`'s `result` field is `""`, not `null` — that is not
-the same as the agent having done nothing). Resume by dispatching a
-"finish-in-place" task pointed at the EXACT existing directory (no new
-`isolation: "worktree"` — that would provision a fresh worktree and discard
-the progress), briefed to read the existing diff and the original backlog
-item's Triage, complete/verify/test/commit what's there, carrying the same
-tool-call-budget discipline above.
+the same as the agent having done nothing). Resume the same live outcome owner
+with a procedural continuation inside the original scope, pointing it at the
+EXACT existing directory (no new `isolation: "worktree"` — that would
+provision a fresh worktree and discard progress). Keep the original outcome
+identity, owner and attempt history; do not launch a replacement task to reset
+the budget. If the original owner cannot resume, checkpoint or block the same
+outcome with its recovery pointer rather than transferring ownership silently.
+The owner reads its existing diff, completes its original targeted checks and
+report, and uses the same tool-call-budget discipline above. A correction after
+batch review follows the separate coherent-batch Correction Goldfish rule.

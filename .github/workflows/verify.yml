@@ -58,6 +58,8 @@ jobs:
         run: node --test --test-name-pattern="onboarding pre-push offer executes" plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
       - name: Native runner activation
         run: node --test --test-name-pattern="actual inactive/declined scope" plugins/pipeline-core/scripts/antigravity-topology-integration.test.mjs
+      - name: Native secret-suppression path coverage
+        run: node --test plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs
 
   verify:
     runs-on: ubuntu-latest

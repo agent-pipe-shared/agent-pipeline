@@ -44,6 +44,52 @@ Rule IDs: `GIT-xx`.
 - **Why:** Commit history needs a durable, provider-neutral assistance signal without turning public history into a correlation index. Work-package provenance remains in the versioned dispatch record and its grounded `Dispatch:` trailer; full chat logs are not archived.
 - **Verification:** `git log -1 --format='%(trailers:only=true,unfold=true)' <commit>` samples both entries via structural trailer parsing (not a line-anchored text search). The Git guard applies the same final-block rule before an agent-issued commit by default. The onboarding-installed `commit-msg` backstop inspects the finished message, including editor and spawned-process commits: correlation data always blocks, and the presence of either `AI-Assisted:` or `Dispatch:` requires one complete, grounded pair in the final block. Git supplies no reliable agent-vs-human authorship bit, so a message with neither provenance signal remains allowed at that boundary; the direct agent command guard supplies the default requirement there. Project `commitTrailerPolicy: warn` is only for a dated migration; `off` is an explicit opt-out from the two provenance conventions and never disables the unconditional correlation-data refusal. A wrapped continuation or blank line inside the block makes the structural check fail instead of accepting body prose as provenance; the `/close` ritual checks the current block for prohibited correlation metadata.
 
+
+### Administrative Elephant commits (local, no PO decision)
+
+An Elephant may register backlog items and write planning artifacts as its
+ordinary role work. Use one honest final trailer block:
+
+```text
+Dispatch: administrative (elephant)
+AI-Assisted: true
+```
+
+This binding is independent of stage-0 file/line limits. It admits only ordinary
+`backlog/items/*.md` item blobs (not TEMPLATE), `backlog/transitions.ndjson`,
+the official `backlog/STATUS.md` and `backlog/index.json` projections, and
+planning Markdown under `specs/<topic>/` named `prd`, `spec`, `design`, `sdp`,
+`plan`, `acceptance` or `readiness` (optionally an underscore topic suffix).
+Evidence directories, code, tests, schemas, policies, hooks, runtime state and
+other paths are excluded; mixing them into the commit refuses this binding.
+The real commit boundary and history readers inspect exact Git blobs/paths,
+validate item schemas, and require changed projections to equal the official
+ledger projection. The result proves administrative content classification,
+never a Goldfish author, reviewer, model, completed task or approval.
+
+Ordinary local commits need no PO decision. Design approval, push approval,
+protected/signature boundaries, source authorship/review, atomic work packages,
+ledger integrity and existing lifecycle checks retain their separate rules.
+This administrative binding does not authorize editing an immutable approved
+design or protected file. Stage-0 remains the bounded production-fix exception.
+
+#### New open registrations: commit first, reconcile second
+
+Before the first item commit run
+`node plugins/pipeline-core/scripts/check-backlog-state.mjs --registration-commit`.
+It admits only Git-added schema-valid `open` items with no closure metadata,
+no existing ledger event, exact staged/worktree equality and a fully unchanged
+committed item/schema/ledger/projection baseline. It defers only each exact new
+item's missing initial event; all unrelated integrity failures remain blocking.
+Planning Markdown may accompany the registration; ledger/projection edits,
+existing-item edits, code and other paths cannot be staged in this first leg.
+Commit the items with the administrative binding, run the official reconciler
+once using that real commit as evidence, run the default strict backlog checker,
+and commit its generated ledger/projections using the same honest binding.
+The default checker and Verify never defer unregistered items. Do not handwrite
+ledger events, projection bytes, closure evidence or PO/author/reviewer records.
+Existing explicitly approved fixed registration exceptions remain unchanged.
+
 ## GIT-04 — No force-push, no history rewrite, no destructive bulk operations (guard union)
 
 - **MUST NOT** rewrite history that has been pushed/shared (`rebase` onto published history, `commit --amend` on pushed commits, `filter-branch`/`filter-repo`). Enforcement path: rewritten history only propagates via force-push — which the guard denies.
@@ -190,6 +236,7 @@ Rule IDs: `GIT-xx`.
 
 ## GIT-10 — Run the backlog-state checker before committing any ledger change
 
+- **MUST** use the exact open-registration precheck above for the first new-item commit; use the default strict checker for every ledger/projection commit and existing status/closure change.
 - **MUST** run `node plugins/pipeline-core/scripts/check-backlog-state.mjs`
   from the repository root before committing ANY change that touches a
   `backlog/items/*.md` file's `status:`/closure metadata, the append-only,

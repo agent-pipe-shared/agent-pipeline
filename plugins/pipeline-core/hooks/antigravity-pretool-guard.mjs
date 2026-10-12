@@ -34,6 +34,7 @@ import {
 } from "../lib/native-hook-failure-memory.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
+import { classifyGhCommand } from "../lib/gh-cmd.mjs";
 import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
@@ -542,7 +543,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
   const guardNames = toolName === "Bash"
     ? [
       ...( /\bgit(?:\.exe)?\b/iu.test(command) ? ["guard-git.mjs"] : []),
-      ...(commandIsGitPush(command) ? ["guard-push.mjs"] : []),
+      ...((commandIsGitPush(command) || classifyGhCommand(command).kind === "refused") ? ["guard-push.mjs"] : []),
     ]
     : ["Edit", "Write"].includes(toolName)
       ? ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs", "guard-handover-size.mjs"]
