@@ -2994,6 +2994,31 @@ One row per original Alfred delivery item (174). Each row's own original accepta
 (Spec §16); this register only gives every item a distinct, approval-bound criterion for governed item
 admission. Ids AC-101 and above are disjoint from the epic criteria AC-1 to AC-37 in acceptance.md.
 
+Population. The 174 rows are exactly the item rows resolved by the portable evidence manifest
+(`specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-evidence-manifest.json`), frozen at the
+approval of this register. They are not the live `sprint: alfred` backlog assignment named in §1. Adding,
+removing or replacing a row changes this Spec and needs design reopen and re-approval. Refining an existing
+item's backlog file (scope detail, findings) does not change its row.
+
+Evidence column. The Evidence cell names where the item's original acceptance is located. It is the
+source of the criterion, not proof of delivery. Delivery proof is the item's own evidence produced at
+delivery and bound by its dispatch, as for acceptance.md rows.
+
+Authoritative text. Where the portable original-requirements record
+(`specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json`) binds an
+approved original or approved prefix whose bytes differ from the cited public file, or records a normative
+finite additional acceptance suffix, the approved original together with that suffix is authoritative for
+the row. The public file alone is never a silent replacement (record `holds[0]` and `holds[1]`).
+
+Unresolved originals. The rows whose original the portable record lists as unresolved are AC-109, AC-122,
+AC-140, AC-146, AC-153, AC-166, AC-187, AC-190, AC-204, AC-211, AC-232 and AC-233; AC-134 and AC-154 have a
+public counterpart whose digest differs from the declared original. For these 14 rows the item's own
+dispatch must first locate the original acceptance or reconstruct it as an explicit, reviewable
+acceptance statement in the item's backlog file before any implementation, and the PO dispositions any row
+that cannot be reconstructed. Owner: the Coordinator of this epic. Due: before the item is dispatched for
+implementation, and no later than 2026-10-19. Such a row is never accepted on the existence of its cited
+file.
+
 | # | Criterion | Evidence |
 |---|---|---|
 | AC-101 | Original Alfred item a-read-only-probe-can-dump-the-process-environment-into-a-transcript is delivered as its own original acceptance states, on the integrated candidate | backlog/items/2026-10-07-a-read-only-probe-can-dump-the-process-environment-into-a-transcript.md |
