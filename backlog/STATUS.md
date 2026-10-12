@@ -58,6 +58,7 @@
 | pipeline.agent-decision-journal-no-production-producer | closed | requirement | pipeline | — | 2026-08-11 | — | — |
 | pipeline.agent-definitions-pin-the-review-tier-model | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
 | pipeline.agent-never-asks-po-for-key-directory-invents-one-instead | closed | defect | pipeline | — | 2026-08-10 | — | — |
+| pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses | open | workflow-improvement | pipeline | alfred | 2026-10-09 | 2026-10-31 | — |
 | pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.agent-talks-itself-out-of-the-pipeline | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -180,6 +181,7 @@
 | pipeline.codex-runtime-fixture-assumes-wsl2-in-ci | closed | defect | pipeline | nova-b | 2026-09-17 | — | — |
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | closed | defect | pipeline | — | 2026-08-19 | — | — |
+| pipeline.codex-signed-candidate-worktree-admission | open | defect | pipeline | alfred | 2026-10-11 | — | — |
 | pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it. |
 | pipeline.codex-worker-subagent-dispatch-capability-is-broken | closed | defect | pipeline | nova-b | 2026-08-29 | — | Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix. |
 | pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn | open | defect | pipeline | none | 2026-08-30 | — | Deferred by PO on 2026-09-11 to a future native-Windows Codex sandbox package; WSL is not an acceptance environment for this scope. |
@@ -284,6 +286,7 @@
 | pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.elephant-notes-and-critic-scratch-share-one-directory | closed | defect | pipeline | — | 2026-08-23 | 2026-08-30 | — |
 | pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
+| pipeline.empty-trust-anchors-admit-any-self-made-key-at-the-design-approval-boundary | open | defect | pipeline | alfred | 2026-10-09 | 2026-10-31 | — |
 | pipeline.enforce-kickoff-po-questions | open | workflow-improvement | pipeline | nightwing | 2026-08-21 | — | — |
 | pipeline.entry-point-reachability-check-substring-matches-whole-source-files | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission. |
 | pipeline.epic-file-contract-has-no-drift-check | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
@@ -543,6 +546,7 @@
 | pipeline.onboarding-spec-marker-has-no-preapproval-reconcile | closed | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.onboarding-test-runner-reports-async-pass-before-settlement | open | defect | pipeline | alfred | 2026-09-29 | — | 0.7 test integrity and bounded runtime; Source repair delivered, final candidate verification pending. |
 | pipeline.operating-model-not-shipped-with-the-plugin | closed | defect | pipeline | nova | 2026-08-29 | — | — |
+| pipeline.opus-critic-only-batched-for-architecture-and-security | open | requirement | pipeline | alfred | 2026-10-09 | — | — |
 | pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading. |
 | pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.outside-root-read-label-skips-option-value-file-tokens | open | defect | pipeline | alfred | 2026-10-05 | — | — |
@@ -685,6 +689,7 @@
 | pipeline.restart-barrier-can-precede-verbatim-intake-capture | closed | defect | pipeline | none | 2026-09-27 | — | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | — | 2026-08-06 | 2026-09-05 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
+| pipeline.restricted-governance-put-re-hardens-the-root-on-every-write | open | workflow-improvement | pipeline | alfred | 2026-10-09 | 2026-11-30 | — |
 | pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage | closed | defect | pipeline | nova-b | 2026-08-31 | 2026-10-31 | — |
 | pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation | closed | defect | pipeline | nova | 2026-08-29 | — | — |
@@ -876,7 +881,7 @@
 
 ## Counts
 
-- open: 190
+- open: 195
 - in_progress: 0
 - closed: 664
 - rejected: 3
