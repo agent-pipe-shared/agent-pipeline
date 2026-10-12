@@ -15,6 +15,7 @@ import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs
 import { assertPrivateRegularFile, writePrivateFileNoReplaceAtomic } from "./private-boundary.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
 import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 
 const PATHS = Object.freeze(["project/pipeline.json", ".claude/pipeline.json"]);
 const SCHEMA = "pipeline.calibration-verify-commit-transition.v1";
@@ -67,7 +68,7 @@ function repository(rootDir) {
   if (realpathSync(root) !== root || lstatSync(root).isSymbolicLink()) fail("CVCT-ROOT");
   const binary = resolveTrustedSystemExecutable("git");
   if (!binary.ok) fail("CVCT-GIT-UNAVAILABLE");
-  const env = { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null" };
+  const env = { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE };
   for (const key of Object.keys(env)) {
     if (["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT"].includes(key)
       || /^GIT_CONFIG_(?:KEY|VALUE)_/u.test(key)) delete env[key];

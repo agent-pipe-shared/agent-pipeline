@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { canonicalJson as canonicalCourseJson, sha256Canonical } from "./review-economy.mjs";
 import { validateCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -308,8 +309,8 @@ export function projectConsumedCriticFindings({ packetId, findings }) {
 function courseGitBytes(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], { shell: false, encoding: null,
     timeout: 10000, maxBuffer: 1024 * 1024, env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C",
-      GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: process.platform === "win32" ? "NUL" : "/dev/null",
-      GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" } });
+      GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,
+      GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" } });
   if (!isSuccessfulSpawn(result) || result.signal !== null) fail("CVL-COURSE-REGISTRATION-UNAVAILABLE", "Registered course observation unavailable.");
   return result.stdout;
 }
