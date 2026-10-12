@@ -111,6 +111,18 @@ and reuse the Codex results through
   runner whose native route is qualified (unverified — Codex also reported
   `SQ-DELIVERY-STATE-UNAVAILABLE`); C) hold productive dispatch and run only
   the non-productive analysis lane.
+- **T7 Security gate BLOCKING (2026-10-12, `security-scan.mjs`, HEAD `ba1e025e8`):**
+  gitleaks 111 high findings, semgrep timed out (60 s), osv-scanner skipped
+  (`untrusted_path`), license OK. Findings concentrate in committed checkpoint
+  evidence (`transfer-2026-10-08/bundle-evidence.json` 26,
+  `live-main-composition` 20, `wsl-intake-2026-10-09` 15,
+  `handover-2026-10-09` 8, `prepared-custody` 6) plus known test fixtures
+  (`po-human-approval*`, `*.fixture.mjs`) and one ignored root `evidence/`
+  file. Values were not printed. Likely digest/fixture false positives, but
+  each needs exact static classification (never automatic stripping); these
+  paths are already pushed. Classification is a dispatchable item once T6 is
+  resolved; scanner availability (semgrep timeout, osv path trust) on this
+  Windows host is a separate environment observation.
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
