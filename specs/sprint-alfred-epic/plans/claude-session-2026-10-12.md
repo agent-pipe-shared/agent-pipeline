@@ -231,6 +231,19 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
     - Existing State is migrated through a sanctioned plan/apply writer, never a hand edit.
   - Route: a production-code item, done by one Goldfish (deep tier, because it is guard code with design latitude) in the first wave after T10. Its own Critic falls in the batch FULL review.
 - **PO decision 2026-10-12 (T12 subset):** AC-144 `critic-scratch-notes-write-is-refused-again` takes option (a): a source-owned, dispatch-bound Critic notes writer, not an explicit text-only fallback. It is scheduled with AC-143, AC-169 and AC-120 in a normal Alfred wave, with no timing constraint.
+- **T15 Make the item-delivery operating model shipped Pipeline behaviour (PO question 2026-10-12):**
+  - Checked: the shipped reference `skills/pipeline-start/references/implementation-continuation.md` requires template-built Goldfish dispatch, and Agent/Workflow fan-out stays Elephant-only. It does not require any of the following:
+    - per-item criterion rows in the Spec
+    - default maximum parallel fanout over disjoint write scopes
+    - one Goldfish per item doing analysis, test, fix and test (EGM)
+    - a wave plan
+  - The guard enforces only item admission: criterion locator, per-criterion and write-scope collision, and the v3 binding.
+  - Today the operating model lives in this repo's `docs/state.md`, the session ledger and machine-local memory. A new session in another repository, or one after Compact, would not apply it unprompted.
+  - Proposed Source work, one Goldfish item in a first wave, to go into a Spec delta at the next design reopen:
+    1. Extend `implementation-continuation.md` with the EGM-per-item and maximum-disjoint-fanout default.
+    2. Ship the wave planner as a plugin script. It reads the item write and check scopes and emits disjoint waves.
+    3. Add the fanout default to the post-compact reground context.
+    4. Add a `pipeline-start` rule that an epic's item register is a Spec section.
 - **T13 Scope intake into a running sprint (PO concern, 2026-10-12; post-Alfred design topic):** with the §23 register, a new backlog item can only enter an implementing sprint through a spec change and a re-approval. That makes small bugfixes pay a design↔implementation switch.
   - Checked: item admission binds the §23 row text in `spec.md`, not the backlog file bytes. Grep of `native-goldfish-host-state.mjs` and `critic-accepted-contract.mjs` shows no backlog binding. So an admitted item's backlog file can still be refined and extended with findings without re-approval.
   - Open: a light intake lane for new in-sprint findings, for example reserved finding slots or a bugfix fast lane, as a Pipeline design item after Alfred.
