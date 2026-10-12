@@ -220,6 +220,16 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
     - No dispatch guard enforces the number. The only consumer is the Workflow failover recovery check at `workflow-writer-preflight.mjs:440-441`, which does not apply to Agent-tool dispatches.
     - So no source change is needed for 10 parallel: the effective bound is disjoint write scopes, enforced by the guard's collision check.
     - The State value stays 4. No sanctioned capacity migration writer exists, and protected State is not hand-edited.
+- **T11 verified live (2026-10-12, after PO install of `b1933ef` and hook refresh):** the probe `probe-hook-owner.mjs` against the pilot prompt is no longer refused with `SDC-AUTHORITY-UNAVAILABLE`.
+  - It now reports `SQ-ITEM-CANDIDATE-DRIFT`. The prompt was built for an older candidate HEAD, so it is rebuilt after T10.
+- **T14 Per-machine parallel dispatch ceiling (PO direction 2026-10-12):**
+  - Default 12, configurable per machine. The State seed of 4 is not acceptable.
+  - Proposed design: a machine-level setting in `pipeline.user.yaml`, read through its existing reader, with range 2..64 per `normalizeContinuityCapacity`.
+    - Onboarding seeds use it instead of the literal 4: `onboarding-continuity.mjs:1243/1345/4596` and `pipeline-state.mjs:10509`.
+    - Dispatch admission enforces it as an operator ceiling over running dispatches. Today no dispatch guard enforces the number.
+    - The shared-pool rule of `docs/adr/draft-shared-agent-capacity.md` applies: no idle reservations.
+    - Existing State is migrated through a sanctioned plan/apply writer, never a hand edit.
+  - Route: a production-code item, done by one Goldfish (deep tier, because it is guard code with design latitude) in the first wave after T10. Its own Critic falls in the batch FULL review.
 - **T13 Scope intake into a running sprint (PO concern, 2026-10-12; post-Alfred design topic):** with the §23 register, a new backlog item can only enter an implementing sprint through a spec change and a re-approval. That makes small bugfixes pay a design↔implementation switch.
   - Checked: item admission binds the §23 row text in `spec.md`, not the backlog file bytes. Grep of `native-goldfish-host-state.mjs` and `critic-accepted-contract.mjs` shows no backlog binding. So an admitted item's backlog file can still be refined and extended with findings without re-approval.
   - Open: a light intake lane for new in-sprint findings, for example reserved finding slots or a bugfix fast lane, as a Pipeline design item after Alfred.
