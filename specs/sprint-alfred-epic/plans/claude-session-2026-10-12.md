@@ -230,6 +230,7 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
     - The shared-pool rule of `docs/adr/draft-shared-agent-capacity.md` applies: no idle reservations.
     - Existing State is migrated through a sanctioned plan/apply writer, never a hand edit.
   - Route: a production-code item, done by one Goldfish (deep tier, because it is guard code with design latitude) in the first wave after T10. Its own Critic falls in the batch FULL review.
+- **PO decision 2026-10-12 (T12 subset):** AC-144 `critic-scratch-notes-write-is-refused-again` takes option (a): a source-owned, dispatch-bound Critic notes writer, not an explicit text-only fallback. It is scheduled with AC-143, AC-169 and AC-120 in a normal Alfred wave, with no timing constraint.
 - **T13 Scope intake into a running sprint (PO concern, 2026-10-12; post-Alfred design topic):** with the §23 register, a new backlog item can only enter an implementing sprint through a spec change and a re-approval. That makes small bugfixes pay a design↔implementation switch.
   - Checked: item admission binds the §23 row text in `spec.md`, not the backlog file bytes. Grep of `native-goldfish-host-state.mjs` and `critic-accepted-contract.mjs` shows no backlog binding. So an admitted item's backlog file can still be refined and extended with findings without re-approval.
   - Open: a light intake lane for new in-sprint findings, for example reserved finding slots or a bugfix fast lane, as a Pipeline design item after Alfred.
