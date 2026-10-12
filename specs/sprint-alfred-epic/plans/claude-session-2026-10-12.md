@@ -112,7 +112,9 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
 
 ## Collected signature-bound patches
 
-(none yet)
+- T11 option (a): [T11a-helper-eol-lf.patch](../implementation/claude-2026-10-12/patches/T11a-helper-eol-lf.patch). It adds a per-file `eol=lf` override to `.gitattributes`. `git apply --check` passes; the patch is not applied. After it is applied, the helper file needs one re-checkout on each machine, and then the installed copy needs a refresh.
+- T11 option (b): [T11-windows-helper-eol.patch](../implementation/claude-2026-10-12/patches/T11-windows-helper-eol.patch). It normalizes CRLF in the backend before the digest check. Not applied.
+- T10: [item-register-proposal.md](../implementation/claude-2026-10-12/item-register-proposal.md) proposes spec §23. Its locators must be recomputed after the actual edit.
 
 ## PO topics (to ask when the PO is present)
 
