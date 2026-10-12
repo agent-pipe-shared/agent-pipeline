@@ -1,0 +1,1223 @@
+{
+ "candidateSpecSha256": "31d4ed08540d2c0a77f925098b82f2f564a4d32637b0372451516d1ecc551afc",
+ "rows": [
+  {
+   "itemId": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+   "criterionId": "AC-101",
+   "startByte": 189449,
+   "endByte": 189618,
+   "excerptSha256": "dd9c954ac9134901a0aa2595645babf238d416264df9c3ce4f8d0db2092d1611"
+  },
+  {
+   "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+   "criterionId": "AC-102",
+   "startByte": 189731,
+   "endByte": 189874,
+   "excerptSha256": "b75c6a4c64ede25a60b0c5cdbffa2568a1fa7bcb369506b3e6b3b8a4f5fc76d1"
+  },
+  {
+   "itemId": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+   "criterionId": "AC-103",
+   "startByte": 189961,
+   "endByte": 190109,
+   "excerptSha256": "acfb5d43ca306e7535d513b74bdef8ff179b12a0fadf5e2f87584a692ffe8373"
+  },
+  {
+   "itemId": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+   "criterionId": "AC-104",
+   "startByte": 190201,
+   "endByte": 190362,
+   "excerptSha256": "1210047b3171427689d90705ca56fb45c4b209a56a8f1f80d8396a391fca73ac"
+  },
+  {
+   "itemId": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+   "criterionId": "AC-105",
+   "startByte": 190467,
+   "endByte": 190627,
+   "excerptSha256": "75838138d0c38b5a5db5e330fdc40193ed9ce5f52edcfc70734353cf39a7473f"
+  },
+  {
+   "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+   "criterionId": "AC-106",
+   "startByte": 190731,
+   "endByte": 190897,
+   "excerptSha256": "816b0ae9cdd000c89754f0ae74d54801268166b80c34f9be32cf1568e6ddba18"
+  },
+  {
+   "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+   "criterionId": "AC-107",
+   "startByte": 191007,
+   "endByte": 191177,
+   "excerptSha256": "cc8c67785989fba9e85a3aa41b82fb380224ddddf92ca555589d4c4c5ffd0988"
+  },
+  {
+   "itemId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+   "criterionId": "AC-108",
+   "startByte": 191291,
+   "endByte": 191440,
+   "excerptSha256": "754b08292bb7faec5101c70e4f5a99da5e6ea69fa44b2ee08845d3f40248d2e7"
+  },
+  {
+   "itemId": "pipeline.agy-el01-write-authorization-gap",
+   "criterionId": "AC-109",
+   "startByte": 191533,
+   "endByte": 191666,
+   "excerptSha256": "fd1ce80004074502dde908a568d1775ad3540ef202b24314a8ed5ed389592d34"
+  },
+  {
+   "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "criterionId": "AC-110",
+   "startByte": 191774,
+   "endByte": 191929,
+   "excerptSha256": "fdace3fc9d3c7b0095af958a63a3d0be0d8495ca44f0c1b78916b9e5c414e59c"
+  },
+  {
+   "itemId": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+   "criterionId": "AC-111",
+   "startByte": 192028,
+   "endByte": 192175,
+   "excerptSha256": "e9b0a708d0eeea19a5ad2d6da246bd60cea7887a3ed3a2f4a5c97d917e5a50a2"
+  },
+  {
+   "itemId": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+   "criterionId": "AC-112",
+   "startByte": 192266,
+   "endByte": 192408,
+   "excerptSha256": "21f29ccc6bb48450c9988bfdde672946c0112d6f3732c4b18817e753a89c415a"
+  },
+  {
+   "itemId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+   "criterionId": "AC-113",
+   "startByte": 192494,
+   "endByte": 192654,
+   "excerptSha256": "642b992404a27f465b127c736ddd12908118b8708edf9a698c1e3bf7192b036b"
+  },
+  {
+   "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+   "criterionId": "AC-114",
+   "startByte": 192758,
+   "endByte": 192910,
+   "excerptSha256": "3c9138d0e88bc39179b8081b577eac2bd0a671d2474da8991e86c3ea7a008137"
+  },
+  {
+   "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+   "criterionId": "AC-115",
+   "startByte": 193006,
+   "endByte": 193175,
+   "excerptSha256": "254b516864ae12657943c95b08f2c4c94587689e5d724076a906fc59376eeb31"
+  },
+  {
+   "itemId": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+   "criterionId": "AC-116",
+   "startByte": 193288,
+   "endByte": 193431,
+   "excerptSha256": "63005a181cfe2a56e4b623f9afbd651ba6524e58ff47e9c3a0972aebbed7b2d4"
+  },
+  {
+   "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+   "criterionId": "AC-117",
+   "startByte": 193518,
+   "endByte": 193673,
+   "excerptSha256": "6b91d86f73e21be5db991867460e76b3aa389d8e27a349ba714a638ab7c59926"
+  },
+  {
+   "itemId": "pipeline.bounded-reader-terminal-binding",
+   "criterionId": "AC-118",
+   "startByte": 193772,
+   "endByte": 193904,
+   "excerptSha256": "510c4dbf851033435109a79aec88e33c81d33c0c255d1fb9783a7921eca2f961"
+  },
+  {
+   "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+   "criterionId": "AC-119",
+   "startByte": 193980,
+   "endByte": 194146,
+   "excerptSha256": "1137c634c19efd26b1ea4cb3f5a0305b22176c0148763f473ff8aa6e78d196bb"
+  },
+  {
+   "itemId": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+   "criterionId": "AC-120",
+   "startByte": 194256,
+   "endByte": 194402,
+   "excerptSha256": "3215b7d4a694a93b6d3782b1b05044de3ed82d16facac436a3a44bfc10c3b375"
+  },
+  {
+   "itemId": "pipeline.capability-inventory-checker-is-red-at-head",
+   "criterionId": "AC-121",
+   "startByte": 194492,
+   "endByte": 194636,
+   "excerptSha256": "1ab9f832a1a42f13479029aae7fd9acc31d709b3888e508fa90e77cc1ca93443"
+  },
+  {
+   "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+   "criterionId": "AC-122",
+   "startByte": 194724,
+   "endByte": 194879,
+   "excerptSha256": "8fcb123c65bdcad513db69e2584ebc188fe2d047bdcf8d3206d9e0637b8fa553"
+  },
+  {
+   "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+   "criterionId": "AC-123",
+   "startByte": 194987,
+   "endByte": 195130,
+   "excerptSha256": "4fd31db1c2b55457c2419d0b2b7aa36cfd5482ce5ebbf7debfe8bd3f163cabec"
+  },
+  {
+   "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+   "criterionId": "AC-124",
+   "startByte": 195217,
+   "endByte": 195365,
+   "excerptSha256": "fb4b230f29b400dd22355b90b1ad1b9a770e16b3ab7a77df545d6575e9553244"
+  },
+  {
+   "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+   "criterionId": "AC-125",
+   "startByte": 195457,
+   "endByte": 195606,
+   "excerptSha256": "2a9b31dffff2b5959c060fb8d1c2db7ae9ab4bf95a42f7ec7d1e80c8e0852549"
+  },
+  {
+   "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+   "criterionId": "AC-126",
+   "startByte": 195699,
+   "endByte": 195857,
+   "excerptSha256": "031bc669b9cdb568f6fd4dbf4315801e7c705fa64d27f26622ac3ed2ec27a633"
+  },
+  {
+   "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+   "criterionId": "AC-127",
+   "startByte": 195959,
+   "endByte": 196108,
+   "excerptSha256": "fcaf445f8222be751ee4a3ad23ecb995a21bcf1125cf9d6035496cba86b975e1"
+  },
+  {
+   "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+   "criterionId": "AC-128",
+   "startByte": 196201,
+   "endByte": 196349,
+   "excerptSha256": "ca3b5a8d53c2d8e4e205cd29a77fdf9885c695d50f466390569b04748941c845"
+  },
+  {
+   "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+   "criterionId": "AC-129",
+   "startByte": 196441,
+   "endByte": 196588,
+   "excerptSha256": "ad128e3dd65ede004c3b15caeac30d467ff7b0adacee4db951d8eeed453edab4"
+  },
+  {
+   "itemId": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+   "criterionId": "AC-130",
+   "startByte": 196679,
+   "endByte": 196844,
+   "excerptSha256": "2dbc8eacf247c53b8e80f2ef398ce0141ef400ff77775e1b7fd837c65b33510d"
+  },
+  {
+   "itemId": "pipeline.codex-bootstrap-in-the-typed-next-action",
+   "criterionId": "AC-131",
+   "startByte": 196953,
+   "endByte": 197094,
+   "excerptSha256": "39718b3c10241085ca282be51b3a4fe27601c44db31d56c27a48cce47e4a52d7"
+  },
+  {
+   "itemId": "pipeline.codex-design-readiness-child-rejects-valid-review",
+   "criterionId": "AC-132",
+   "startByte": 197179,
+   "endByte": 197329,
+   "excerptSha256": "84ff968cf40e393e12a77bbe355cdee03ea1f2d186511a7af4636a0214981c5b"
+  },
+  {
+   "itemId": "pipeline.codex-own-session-audit-export-missing",
+   "criterionId": "AC-133",
+   "startByte": 197423,
+   "endByte": 197562,
+   "excerptSha256": "b2c92e90b52504bd692aaf479841dc27722f7dcda9f5ba26a5ceed7e8f99bd7f"
+  },
+  {
+   "itemId": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+   "criterionId": "AC-134",
+   "startByte": 197645,
+   "endByte": 197798,
+   "excerptSha256": "f22a528f580182c8abf0ac169f3704e90f3eac3cf5e6da5b5022a96549355ca1"
+  },
+  {
+   "itemId": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+   "criterionId": "AC-135",
+   "startByte": 197906,
+   "endByte": 198058,
+   "excerptSha256": "9b2cd324a0ec565e6b34690d7241b324583f80f6e2cd620108784cbfc1d235bb"
+  },
+  {
+   "itemId": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+   "criterionId": "AC-136",
+   "startByte": 198154,
+   "endByte": 198310,
+   "excerptSha256": "d67f78808caad4403e56398a6cd259225c27fc487519811e70f9fe1d1f6423c6"
+  },
+  {
+   "itemId": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+   "criterionId": "AC-137",
+   "startByte": 198410,
+   "endByte": 198573,
+   "excerptSha256": "8c94bc37056872a7541d580d23418e3cb08cf28f7b61839b7b92e89eb81584ac"
+  },
+  {
+   "itemId": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+   "criterionId": "AC-138",
+   "startByte": 198680,
+   "endByte": 198828,
+   "excerptSha256": "7064f6a741265c6c0e0a49d9ecc804145651e88c1bcb215319c168f078ca9d2d"
+  },
+  {
+   "itemId": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+   "criterionId": "AC-139",
+   "startByte": 198920,
+   "endByte": 199077,
+   "excerptSha256": "c816e2312640c568ca8943cf216532a64033f6e3e54739c38992830fec9ee83d"
+  },
+  {
+   "itemId": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+   "criterionId": "AC-140",
+   "startByte": 199178,
+   "endByte": 199332,
+   "excerptSha256": "0ba1b7e2bdb0587f68eec6084a7ff866b21c8741587d0e0def721af25e0ac2a1"
+  },
+  {
+   "itemId": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+   "criterionId": "AC-141",
+   "startByte": 199440,
+   "endByte": 199613,
+   "excerptSha256": "2ce1bcd9774a465d4e1620cd4f69bc2be1eb8d59e4569e2e383a8a0e7d1d8fed"
+  },
+  {
+   "itemId": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+   "criterionId": "AC-142",
+   "startByte": 199730,
+   "endByte": 199880,
+   "excerptSha256": "bd982640e394b15c050271b3ac1e7593b39de179ea97f7704b6972b4feccd8d3"
+  },
+  {
+   "itemId": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+   "criterionId": "AC-143",
+   "startByte": 199974,
+   "endByte": 200129,
+   "excerptSha256": "52a8a328f4d99271fe19d76770b1e751d2e8f06a5968a8f26d7055c9e7c74e72"
+  },
+  {
+   "itemId": "pipeline.critic-scratch-notes-write-is-refused-again",
+   "criterionId": "AC-144",
+   "startByte": 200228,
+   "endByte": 200372,
+   "excerptSha256": "1d77774911e59bbd178f354769899e7fe617e99def6c3414eb2b980bf053fe8c"
+  },
+  {
+   "itemId": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+   "criterionId": "AC-145",
+   "startByte": 200460,
+   "endByte": 200614,
+   "excerptSha256": "d3d005cdbb940254a203ea9950060ccfa828caa970221ea1d2e1a65704cf01e8"
+  },
+  {
+   "itemId": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+   "criterionId": "AC-146",
+   "startByte": 200712,
+   "endByte": 200872,
+   "excerptSha256": "cbdb0a5afb25cac0a0ccc8e24cc339008982cd03a2d72752079d683e0b7e6c63"
+  },
+  {
+   "itemId": "pipeline.declared-system-skill-read-requires-human-override",
+   "criterionId": "AC-147",
+   "startByte": 200980,
+   "endByte": 201131,
+   "excerptSha256": "0bfb68bb92bd4c4fbf66f63892bc8ab6cbfa6ff0ea7d5e4e6221d0db2a175d28"
+  },
+  {
+   "itemId": "pipeline.denial-names-a-diagnosis-it-refuses",
+   "criterionId": "AC-148",
+   "startByte": 201226,
+   "endByte": 201362,
+   "excerptSha256": "bfb32b77a067f3aae065cce02e7ed1d2795358e9ea9f78cbe4c3e08558b91de8"
+  },
+  {
+   "itemId": "pipeline.design-approval-validator-rejects-json-key-reordering",
+   "criterionId": "AC-149",
+   "startByte": 201442,
+   "endByte": 201596,
+   "excerptSha256": "74539c5b12dfa93dc061c7f2b9b23a4c019983bc50a953ff03c31e858a549f14"
+  },
+  {
+   "itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+   "criterionId": "AC-150",
+   "startByte": 201694,
+   "endByte": 201854,
+   "excerptSha256": "b74138caee64fc69d32213ee95ef7cef33c6ddbfdb8b9db10ed9418e9fd6bc51"
+  },
+  {
+   "itemId": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+   "criterionId": "AC-151",
+   "startByte": 201958,
+   "endByte": 202113,
+   "excerptSha256": "ff476165d45207c8009d74aa4d50f8bf92f542b4ef37458293dabdc3bb172b13"
+  },
+  {
+   "itemId": "pipeline.design-generator-repeats-large-source-material",
+   "criterionId": "AC-152",
+   "startByte": 202212,
+   "endByte": 202359,
+   "excerptSha256": "2dd7f14c21d7de2243a8366bacd5deadf663eb641c05009dea6405cfaef744ba"
+  },
+  {
+   "itemId": "pipeline.design-intake-generator-omits-question-answers",
+   "criterionId": "AC-153",
+   "startByte": 202450,
+   "endByte": 202597,
+   "excerptSha256": "e1b9d279a66f65759ab45011b8e74332faa12f3acbf838be557b6ef1c7d15368"
+  },
+  {
+   "itemId": "pipeline.design-package-parent-metadata-false-drift",
+   "criterionId": "AC-154",
+   "startByte": 202705,
+   "endByte": 202848,
+   "excerptSha256": "cefc5e4734d7e03bcdb050ebc4ad4b72e44905d75ede8fc60f37e7171388aaf4"
+  },
+  {
+   "itemId": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+   "criterionId": "AC-155",
+   "startByte": 202956,
+   "endByte": 203125,
+   "excerptSha256": "7610328b1a69946a0dece47ac39dfdca692d6b19b6becf0faacd2c7ebbd90c8e"
+  },
+  {
+   "itemId": "pipeline.design-trailer-verifier-lost-after-closure",
+   "criterionId": "AC-156",
+   "startByte": 203238,
+   "endByte": 203381,
+   "excerptSha256": "af3dc15b7fbc0ed162b7b003f8da14a31897709a7b456cfa2438536a2e6047cd"
+  },
+  {
+   "itemId": "pipeline.design-workflow-package-omits-contract",
+   "criterionId": "AC-157",
+   "startByte": 203468,
+   "endByte": 203607,
+   "excerptSha256": "fc2d9c6d98835610c22fff885358caf8880afcd24677cc4222ff4b25a06bb2c3"
+  },
+  {
+   "itemId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+   "criterionId": "AC-158",
+   "startByte": 203690,
+   "endByte": 203852,
+   "excerptSha256": "254bd69bc87ce3a48ae231e7394c1b413c1f734232ff2a4aba7c22ad52157ff7"
+  },
+  {
+   "itemId": "pipeline.desktop-app-support-is-unverified",
+   "criterionId": "AC-159",
+   "startByte": 203958,
+   "endByte": 204092,
+   "excerptSha256": "6d0364fada697bb51a95ddabd7bc41398d743eb487ac817ad938757a14535192"
+  },
+  {
+   "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+   "criterionId": "AC-160",
+   "startByte": 204170,
+   "endByte": 204321,
+   "excerptSha256": "43ee235603de99d7b33a4590e9ca16183dd81c50a2ce4d143aa482c25c27d58e"
+  },
+  {
+   "itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+   "criterionId": "AC-161",
+   "startByte": 204416,
+   "endByte": 204576,
+   "excerptSha256": "a0e1820f8f8f29d56c3d306869f7827efa803cef693ee97f0e7060f173ee4b47"
+  },
+  {
+   "itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+   "criterionId": "AC-162",
+   "startByte": 204680,
+   "endByte": 204836,
+   "excerptSha256": "76cf067231a2d34a3950f66215cbc4d88ee6e7c5ac1da2b10b18789de3a7b0bb"
+  },
+  {
+   "itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "criterionId": "AC-163",
+   "startByte": 204936,
+   "endByte": 205100,
+   "excerptSha256": "6a9cd9e5146b5bc4e32177026925bdbfbd625c47026a48d5588a283dda8e7099"
+  },
+  {
+   "itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+   "criterionId": "AC-164",
+   "startByte": 205208,
+   "endByte": 205362,
+   "excerptSha256": "67df96518dc687e4c700aba79ceb8e922e6d278f9682bb3ad9aa4afe3892a7ce"
+  },
+  {
+   "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+   "criterionId": "AC-165",
+   "startByte": 205460,
+   "endByte": 205603,
+   "excerptSha256": "73d3b9005b667315663d5629babe77d41c43e79ef80ec82ae1cb682af74eb366"
+  },
+  {
+   "itemId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+   "criterionId": "AC-166",
+   "startByte": 205690,
+   "endByte": 205846,
+   "excerptSha256": "55a9dfa96714ea5b284f9879b946a9d4697be1f79912fd849e30b9c2589b8cb4"
+  },
+  {
+   "itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "criterionId": "AC-167",
+   "startByte": 205954,
+   "endByte": 206109,
+   "excerptSha256": "10408be1778d19b8d05f7ec684feabb2261e37502846a0ba7a54edd3eaec6e60"
+  },
+  {
+   "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+   "criterionId": "AC-168",
+   "startByte": 206208,
+   "endByte": 206365,
+   "excerptSha256": "bc1868a20264be9339454c7a07ee610dd591dfc4fbbc8c4d58a04e1bf227e538"
+  },
+  {
+   "itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+   "criterionId": "AC-169",
+   "startByte": 206466,
+   "endByte": 206613,
+   "excerptSha256": "d2bd01c8e6ac94057e5ed5180521a36cf3f4647ab4d54204d785933d5d876c03"
+  },
+  {
+   "itemId": "pipeline.evidence-artifacts-carry-no-commit-identity",
+   "criterionId": "AC-170",
+   "startByte": 206704,
+   "endByte": 206848,
+   "excerptSha256": "bd7a4d9855ccf32057319370c492afa0596245e82c36652bcab4fc92a70b376e"
+  },
+  {
+   "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+   "criterionId": "AC-171",
+   "startByte": 206936,
+   "endByte": 207084,
+   "excerptSha256": "1d963c1181a5dcd46c713e24006522ba5a1f6209914fbe19e05edc2b5c7e86b1"
+  },
+  {
+   "itemId": "pipeline.feature-branch-push-admitted-without-signature-approval",
+   "criterionId": "AC-172",
+   "startByte": 207176,
+   "endByte": 207332,
+   "excerptSha256": "51eacbc2ed4dcda05d7c7a60eecf0a2a000a88f87a872ef4cb8717f3dddc3da1"
+  },
+  {
+   "itemId": "pipeline.first-enrollment-enters-retirement-before-consent",
+   "criterionId": "AC-173",
+   "startByte": 207432,
+   "endByte": 207582,
+   "excerptSha256": "47fd788b646b29aea087b8763ccda6decf3bb97ab58ef487cf9201c7abc1144a"
+  },
+  {
+   "itemId": "pipeline.foreign-worktree-closes-the-implementation-gate",
+   "criterionId": "AC-174",
+   "startByte": 207676,
+   "endByte": 207824,
+   "excerptSha256": "e4c6c259d6a7afa89c309e642cd5b0e922124493805ebab1919bcfa924d97dbd"
+  },
+  {
+   "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+   "criterionId": "AC-175",
+   "startByte": 207916,
+   "endByte": 208065,
+   "excerptSha256": "62756b2c1d3bd9723701763604dd9c34190db40df2dd31a645ee4f40bb45eb14"
+  },
+  {
+   "itemId": "pipeline.gh-delivery-classifier-is-not-wired",
+   "criterionId": "AC-176",
+   "startByte": 208158,
+   "endByte": 208294,
+   "excerptSha256": "bd02d110008d4640a18ca68f34049892852cbcd992b1a6c252122453fb98856c"
+  },
+  {
+   "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+   "criterionId": "AC-177",
+   "startByte": 208374,
+   "endByte": 208525,
+   "excerptSha256": "88b7ba0e8421a0e47770a34ec242503eee61826822def98219347e9b7b73c5f0"
+  },
+  {
+   "itemId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+   "criterionId": "AC-178",
+   "startByte": 208620,
+   "endByte": 208779,
+   "excerptSha256": "569b6816ebe09ec9cfbf521c915cbf52d730839999555b9594e516e0787f70eb"
+  },
+  {
+   "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+   "criterionId": "AC-179",
+   "startByte": 208882,
+   "endByte": 209039,
+   "excerptSha256": "7e4d9231aca02ead0d5dc09287362adffe5c7be2c9c924e603c9ce73f91b91df"
+  },
+  {
+   "itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+   "criterionId": "AC-180",
+   "startByte": 209140,
+   "endByte": 209289,
+   "excerptSha256": "0973408dbd219fd66e10813676b08650fbc237abe15aa7485aca10115349fef4"
+  },
+  {
+   "itemId": "pipeline.git-stash-list-classified-as-working-tree-write",
+   "criterionId": "AC-181",
+   "startByte": 209382,
+   "endByte": 209530,
+   "excerptSha256": "0a81b597bc64fe6838284fa0dbeebc127cb2621773f5644937a8dddcb8045546"
+  },
+  {
+   "itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+   "criterionId": "AC-182",
+   "startByte": 209622,
+   "endByte": 209777,
+   "excerptSha256": "a61a04d9326eda5df24ea02c7436d9fce478f97ba214bdf02ed124d81259394b"
+  },
+  {
+   "itemId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+   "criterionId": "AC-183",
+   "startByte": 209876,
+   "endByte": 210048,
+   "excerptSha256": "aa0a0d8d116a7560bb96d1eb366055862a162677461122f538ded03b13a2a1e3"
+  },
+  {
+   "itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+   "criterionId": "AC-184",
+   "startByte": 210164,
+   "endByte": 210313,
+   "excerptSha256": "a25d205128d7a4173aac7d938f5e266b3cd192338b6d9f99b8905c91ca508d9f"
+  },
+  {
+   "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+   "criterionId": "AC-185",
+   "startByte": 210406,
+   "endByte": 210549,
+   "excerptSha256": "cda210c72c1a16e97f018a90c1f2ae7618fec1044799566a2bf951e914264ca2"
+  },
+  {
+   "itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+   "criterionId": "AC-186",
+   "startByte": 210636,
+   "endByte": 210780,
+   "excerptSha256": "a68fe70d2c7e7f3a9cbacfb991e025d80c921646286bd363d65ab07feb6d7bff"
+  },
+  {
+   "itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+   "criterionId": "AC-187",
+   "startByte": 210868,
+   "endByte": 211028,
+   "excerptSha256": "9039c8466c1f0e5a82d611012f71fa203a9191d245fd58995d846d9f525add58"
+  },
+  {
+   "itemId": "pipeline.governance-scope-rejects-readonly-host-git-control",
+   "criterionId": "AC-188",
+   "startByte": 211136,
+   "endByte": 211287,
+   "excerptSha256": "5aca07dda13bd5a8e9a51e0c1f4cd6c07f36fa7e914b4c219ec0f3ad9dc703c2"
+  },
+  {
+   "itemId": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+   "criterionId": "AC-189",
+   "startByte": 211382,
+   "endByte": 211541,
+   "excerptSha256": "b95e0623b8ddd9c3a3c87f7bdafa407c72856e3664eb22084f57829241189f55"
+  },
+  {
+   "itemId": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+   "criterionId": "AC-190",
+   "startByte": 211644,
+   "endByte": 211801,
+   "excerptSha256": "6f4d2f6dedeb8bfa25e9bdccfe8020f78bbd6f03253477f03afbcffdcc930e0b"
+  },
+  {
+   "itemId": "pipeline.greenfield-design-course-cost-and-proportionality",
+   "criterionId": "AC-191",
+   "startByte": 211909,
+   "endByte": 212059,
+   "excerptSha256": "1edf6d45ba29a92c8c32b55ad99baecab6bf8baf7d28158fdddf9c4090de3344"
+  },
+  {
+   "itemId": "pipeline.greenfield-machine-output-and-skill-budget",
+   "criterionId": "AC-192",
+   "startByte": 212153,
+   "endByte": 212296,
+   "excerptSha256": "22b5e9895a07434fc947e4b83fdadc135aec080cbfb3a3dea13b8a85cc92be02"
+  },
+  {
+   "itemId": "pipeline.guard-override-request-digest-drifts-after-arming",
+   "criterionId": "AC-193",
+   "startByte": 212383,
+   "endByte": 212533,
+   "excerptSha256": "66a2fe97a21bc775b2c8ffef7404c30bf3fabbd3ce7d76e1272610ac3f3091ed"
+  },
+  {
+   "itemId": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+   "criterionId": "AC-194",
+   "startByte": 212627,
+   "endByte": 212801,
+   "excerptSha256": "ee2f3838b602fc0cb1153a5e1e4af54e208fb921ff21f849a740463dde57e37a"
+  },
+  {
+   "itemId": "pipeline.guard-push-refuses-read-only-git-without-push",
+   "criterionId": "AC-195",
+   "startByte": 212919,
+   "endByte": 213065,
+   "excerptSha256": "3e70f4870c341e4fe8ffc8576c80fc81368cb1ee93098984f04f3ac64dc9c7e6"
+  },
+  {
+   "itemId": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+   "criterionId": "AC-196",
+   "startByte": 213155,
+   "endByte": 213299,
+   "excerptSha256": "77d70b9bc3c839f50c64d05bd1e3e8f154c43a91cbbba69550378097ebb10f00"
+  },
+  {
+   "itemId": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+   "criterionId": "AC-197",
+   "startByte": 213387,
+   "endByte": 213532,
+   "excerptSha256": "b365098ce12da2fbe5ed21833626dc04dc831b49c0e26f3c8716dd23698737d6"
+  },
+  {
+   "itemId": "pipeline.handover-doc-committed-without-governance-classification",
+   "criterionId": "AC-198",
+   "startByte": 213621,
+   "endByte": 213778,
+   "excerptSha256": "a25117b14dedcf4f6a3950e3d5d74d5fbe05383d6059cff2e9026ba1b1615b69"
+  },
+  {
+   "itemId": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+   "criterionId": "AC-199",
+   "startByte": 213879,
+   "endByte": 214051,
+   "excerptSha256": "b73c0367dd19e039e3cbe7392bd0f94f66f4aa853500868a53863270459ccca3"
+  },
+  {
+   "itemId": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+   "criterionId": "AC-200",
+   "startByte": 214167,
+   "endByte": 214326,
+   "excerptSha256": "bb4a0625b717a745de9f55364f63092b5f02e337bb37f93c502fb11286c6973d"
+  },
+  {
+   "itemId": "pipeline.hgo-patch-preflight-before-signature",
+   "criterionId": "AC-201",
+   "startByte": 214434,
+   "endByte": 214571,
+   "excerptSha256": "2254cfc8001d0ea7279fa493cf9c6d16e01f2fae17c3f827340c95d4c3198fee"
+  },
+  {
+   "itemId": "pipeline.hgo-stale-capability-shadows-current-authorization",
+   "criterionId": "AC-202",
+   "startByte": 214652,
+   "endByte": 214803,
+   "excerptSha256": "a1eae5a613c1523c657ec93174aefa08c2d8501ac7f9c10d6168d157bf0582cd"
+  },
+  {
+   "itemId": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+   "criterionId": "AC-203",
+   "startByte": 214911,
+   "endByte": 215083,
+   "excerptSha256": "0850e3509882832ccd882bca933e6b4b059820597515d71de4cfd20cc4689dd2"
+  },
+  {
+   "itemId": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+   "criterionId": "AC-204",
+   "startByte": 215199,
+   "endByte": 215355,
+   "excerptSha256": "076da792d2f847dd47bd58710406ac832de46a6137b530fe829b34a92fec79e4"
+  },
+  {
+   "itemId": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+   "criterionId": "AC-205",
+   "startByte": 215463,
+   "endByte": 215621,
+   "excerptSha256": "ee4376751f7d1a971c07a47e81394cbc64c3a6f27545e066c64c0d26b2f5e688"
+  },
+  {
+   "itemId": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+   "criterionId": "AC-206",
+   "startByte": 215723,
+   "endByte": 215877,
+   "excerptSha256": "179b33d03eef7970afc567707768c3445720be0ae7b69f62e29cbf956952baf8"
+  },
+  {
+   "itemId": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+   "criterionId": "AC-207",
+   "startByte": 215975,
+   "endByte": 216140,
+   "excerptSha256": "55676672a8d79c97edd34297341df808528b62965beba80626cab2198cc13d37"
+  },
+  {
+   "itemId": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+   "criterionId": "AC-208",
+   "startByte": 216249,
+   "endByte": 216399,
+   "excerptSha256": "31c333f0f585a6a8c39b1bbcfa863492d80455a95876e5468c10962f046885da"
+  },
+  {
+   "itemId": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+   "criterionId": "AC-209",
+   "startByte": 216493,
+   "endByte": 216648,
+   "excerptSha256": "2bc2549ed9713e1261c4e519e6b6c990f45807e4251911de40eb7d01f2ccdad0"
+  },
+  {
+   "itemId": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+   "criterionId": "AC-210",
+   "startByte": 216747,
+   "endByte": 216904,
+   "excerptSha256": "e2d6e2dc694503ae58beba2f9171e3ca298976cdb002aa4d2246f01da4bff8f5"
+  },
+  {
+   "itemId": "pipeline.merge-commit-message-skips-conventional-type-check",
+   "criterionId": "AC-211",
+   "startByte": 217005,
+   "endByte": 217156,
+   "excerptSha256": "c6d9a8874aa0317f54d34b66c5e7242dd213f93eb55121f97b8f92b8add70c6b"
+  },
+  {
+   "itemId": "pipeline.model-family-approval-with-automatic-version-upgrades",
+   "criterionId": "AC-212",
+   "startByte": 217264,
+   "endByte": 217418,
+   "excerptSha256": "a949124cea527de16084fbbd4dedcbdc220275aafebe166d5e29ee154e6e6af9"
+  },
+  {
+   "itemId": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+   "criterionId": "AC-213",
+   "startByte": 217516,
+   "endByte": 217677,
+   "excerptSha256": "4120911be8aaa1fd9397660376e32736058d74aa37dcdefdb5b75929351397fa"
+  },
+  {
+   "itemId": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+   "criterionId": "AC-214",
+   "startByte": 217782,
+   "endByte": 217938,
+   "excerptSha256": "85cd2c6e7965d01289c724b03c10536504575c19760b2def3ca9301eca0fa2dd"
+  },
+  {
+   "itemId": "pipeline.native-patch-rename-drops-protected-content-markers",
+   "criterionId": "AC-215",
+   "startByte": 218038,
+   "endByte": 218190,
+   "excerptSha256": "6b372700358ea68a0d415b59d1df3836779fcc13f966585c1d101ad11fe3b121"
+  },
+  {
+   "itemId": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+   "criterionId": "AC-216",
+   "startByte": 218286,
+   "endByte": 218440,
+   "excerptSha256": "3151cb033aca529912d0bdc24ef43e843c91cc477e26b50fe652d09892c253de"
+  },
+  {
+   "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+   "criterionId": "AC-217",
+   "startByte": 218538,
+   "endByte": 218682,
+   "excerptSha256": "d37f50725d87daeb86fce07b618f01b22f35f716880413ff96cde3e7612ee97d"
+  },
+  {
+   "itemId": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+   "criterionId": "AC-218",
+   "startByte": 218770,
+   "endByte": 218932,
+   "excerptSha256": "bed5e0eae88c0a448816ba3ffbb444aea14f412908c9d262e134c6a7dac76e42"
+  },
+  {
+   "itemId": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+   "criterionId": "AC-219",
+   "startByte": 219038,
+   "endByte": 219191,
+   "excerptSha256": "e6b303199c4c40875a8f84b1f99f5cea4a5823e9e9be909fdaab2dd30e94cc41"
+  },
+  {
+   "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+   "criterionId": "AC-220",
+   "startByte": 219288,
+   "endByte": 219441,
+   "excerptSha256": "69dfcf304bcd6e6c59791e3ca99a9c8e45fdb073d2c181248ee852aba81e09bc"
+  },
+  {
+   "itemId": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+   "criterionId": "AC-221",
+   "startByte": 219538,
+   "endByte": 219698,
+   "excerptSha256": "96b4e3b8406f87c6a9bd103517679ee1107f9ce23c1f3c8b6969d363248c0daf"
+  },
+  {
+   "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+   "criterionId": "AC-222",
+   "startByte": 219802,
+   "endByte": 219957,
+   "excerptSha256": "57dc00a359dcecaccfe8522bbae8adba9653b247e783ed1844bdad535b197f92"
+  },
+  {
+   "itemId": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+   "criterionId": "AC-223",
+   "startByte": 220056,
+   "endByte": 220211,
+   "excerptSha256": "2a62de4296d5d81c580e257c38767ae865d83d4d97d6240c8063eb4444b9a0b5"
+  },
+  {
+   "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+   "criterionId": "AC-224",
+   "startByte": 220310,
+   "endByte": 220450,
+   "excerptSha256": "08b5d70eea26ac317514642f50a197f996ccdff12def4b8b9f77b472c9ca4b63"
+  },
+  {
+   "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+   "criterionId": "AC-225",
+   "startByte": 220534,
+   "endByte": 220702,
+   "excerptSha256": "8e48fccc6ddad1ec850ed7854aa3a4c06203144545b6c09d207fe55ac74cae4d"
+  },
+  {
+   "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+   "criterionId": "AC-226",
+   "startByte": 220814,
+   "endByte": 220969,
+   "excerptSha256": "e75449a2261a7e21fe81657a355335cdb0109aa8449de38e1afb5cf5f4b4a280"
+  },
+  {
+   "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+   "criterionId": "AC-227",
+   "startByte": 221068,
+   "endByte": 221222,
+   "excerptSha256": "f6631b40f574bd4b7a4bf6df92cb184b121c2f76577c122880e191b89478dec2"
+  },
+  {
+   "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+   "criterionId": "AC-228",
+   "startByte": 221320,
+   "endByte": 221465,
+   "excerptSha256": "9ea4bb2103294a4cc7677e45ba9503d2498b05985b0868fe5e6ff30615b8c934"
+  },
+  {
+   "itemId": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+   "criterionId": "AC-229",
+   "startByte": 221554,
+   "endByte": 221710,
+   "excerptSha256": "2dc4fe8378a6830fa12b6ddb86cdc29a2ac3638d8de171640bc761b6ed35038f"
+  },
+  {
+   "itemId": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+   "criterionId": "AC-230",
+   "startByte": 221810,
+   "endByte": 221982,
+   "excerptSha256": "a44c75c01342b32a361b0ad3f39b970197ed6b28b62c45b2ef0b1d084580e833"
+  },
+  {
+   "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+   "criterionId": "AC-231",
+   "startByte": 222098,
+   "endByte": 222251,
+   "excerptSha256": "380bc489b921a755566a349d8883f0c3e9447c0adcfc79a544b2cb0684fde6ee"
+  },
+  {
+   "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+   "criterionId": "AC-232",
+   "startByte": 222348,
+   "endByte": 222500,
+   "excerptSha256": "0f9900eaa374c1183b57997e569fefc14cfade4ea624f7f90d2acecbd6f92536"
+  },
+  {
+   "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+   "criterionId": "AC-233",
+   "startByte": 222608,
+   "endByte": 222757,
+   "excerptSha256": "f761e953984dd5cff1b1cf5633c8f0b0668616d1b23d013a9b34ea5581c010ea"
+  },
+  {
+   "itemId": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+   "criterionId": "AC-234",
+   "startByte": 222865,
+   "endByte": 223023,
+   "excerptSha256": "75fbf93a6ebdf2e1fbd1af1c340f39d64cdfc5213466e54c434168176c7b871c"
+  },
+  {
+   "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+   "criterionId": "AC-235",
+   "startByte": 223125,
+   "endByte": 223269,
+   "excerptSha256": "12171a921efe6aa6b92693b7a7408805383943d4b127484ceef540b2674fd953"
+  },
+  {
+   "itemId": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+   "criterionId": "AC-236",
+   "startByte": 223357,
+   "endByte": 223516,
+   "excerptSha256": "89f18e5879891cf6e3c6b301945a62d6f04c748710d4222a037b4cd103176f8a"
+  },
+  {
+   "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+   "criterionId": "AC-237",
+   "startByte": 223619,
+   "endByte": 223769,
+   "excerptSha256": "908509a172e2b40f7651e99c97fb5342110d0f933f5390e6d64e10c84dd7d73a"
+  },
+  {
+   "itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+   "criterionId": "AC-238",
+   "startByte": 223863,
+   "endByte": 224025,
+   "excerptSha256": "fe1d6a1d3d325846b13b72666c02612de80cd2fbda88b933120609d6b676fa40"
+  },
+  {
+   "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+   "criterionId": "AC-239",
+   "startByte": 224131,
+   "endByte": 224286,
+   "excerptSha256": "a11893bff4d713cf3b7912887ba02f46f1ae1b33b497b05a0788bb7b36d5cfb9"
+  },
+  {
+   "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+   "criterionId": "AC-240",
+   "startByte": 224385,
+   "endByte": 224537,
+   "excerptSha256": "dc4b8a6b05cb60c1256a8e8b90489ca9758c4bbfc6a2c261a5c2ae5d464d683a"
+  },
+  {
+   "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+   "criterionId": "AC-241",
+   "startByte": 224633,
+   "endByte": 224783,
+   "excerptSha256": "462da1897d55d2d372d0496f6daf0a33588adb8d0aa689d5b6558eed97e6deae"
+  },
+  {
+   "itemId": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+   "criterionId": "AC-242",
+   "startByte": 224877,
+   "endByte": 225031,
+   "excerptSha256": "141aa5d3ccc5b9a38a84b3cc7bb041075ac858150c10763afc3d89ae2a2d5625"
+  },
+  {
+   "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+   "criterionId": "AC-243",
+   "startByte": 225129,
+   "endByte": 225284,
+   "excerptSha256": "00a1f14758a0bf95e221ff533c086a75c5879d38fd2965d13429c8e46c33ad22"
+  },
+  {
+   "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+   "criterionId": "AC-244",
+   "startByte": 225383,
+   "endByte": 225539,
+   "excerptSha256": "254f17892d8abaadf74252bd419329cb0e73f77268b5543316f63a0410595b0e"
+  },
+  {
+   "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+   "criterionId": "AC-245",
+   "startByte": 225639,
+   "endByte": 225788,
+   "excerptSha256": "aca964149a751ddb9530abd2556cca00486cca8212399ed38ea844c047166ad6"
+  },
+  {
+   "itemId": "pipeline.scratch-has-no-retention-and-no-durability-check",
+   "criterionId": "AC-246",
+   "startByte": 225881,
+   "endByte": 226030,
+   "excerptSha256": "61bca392e279553f332b9dd534940e35a7d15f150e7fcb4469e1a1d991a937df"
+  },
+  {
+   "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+   "criterionId": "AC-247",
+   "startByte": 226123,
+   "endByte": 226276,
+   "excerptSha256": "fe8272af4779f3b97d91b5506b081df5d6ea5426e2c39e56a6bdeda8c38b1f29"
+  },
+  {
+   "itemId": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+   "criterionId": "AC-248",
+   "startByte": 226373,
+   "endByte": 226524,
+   "excerptSha256": "1dddd3eddb6350e5bdbdecba8ed67e299297c05f7149fe274930aacba2c391c4"
+  },
+  {
+   "itemId": "pipeline.security-scanner-failure-provenance",
+   "criterionId": "AC-249",
+   "startByte": 226619,
+   "endByte": 226755,
+   "excerptSha256": "7f7fdc6faad5b7bfbdc889482582c8a4477f0b14530d98c46c40589698fbf977"
+  },
+  {
+   "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+   "criterionId": "AC-250",
+   "startByte": 226863,
+   "endByte": 227005,
+   "excerptSha256": "f505b15c27f024a80a6f934f06f6ecac6830bd9051cee42039f9eb11aa1383ad"
+  },
+  {
+   "itemId": "pipeline.semgrep-offline-default-version-check",
+   "criterionId": "AC-251",
+   "startByte": 227091,
+   "endByte": 227229,
+   "excerptSha256": "024923413312d2cc914ffe5d196a4487050a5147fab2d6af12bbcfd15ef8e571"
+  },
+  {
+   "itemId": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+   "criterionId": "AC-252",
+   "startByte": 227337,
+   "endByte": 227490,
+   "excerptSha256": "3371b26a484db7b062d76fc564e82ba30a680020c5f7ffa1dc20757454ba1350"
+  },
+  {
+   "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+   "criterionId": "AC-253",
+   "startByte": 227587,
+   "endByte": 227744,
+   "excerptSha256": "5c222ff175c1d99f91fd535675624c69c3199a37f2eaf84786cff7004eef576b"
+  },
+  {
+   "itemId": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+   "criterionId": "AC-254",
+   "startByte": 227845,
+   "endByte": 227990,
+   "excerptSha256": "d93625320b1b5ce9b586d120c0a6d0f10897dd7ac360f7dd826abf77bbfbff0e"
+  },
+  {
+   "itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+   "criterionId": "AC-255",
+   "startByte": 228079,
+   "endByte": 228244,
+   "excerptSha256": "119e04651df6cea9169599524ed0e310bb79e9f1935e0ffa5eb35e2a1d34060a"
+  },
+  {
+   "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+   "criterionId": "AC-256",
+   "startByte": 228353,
+   "endByte": 228526,
+   "excerptSha256": "fdc3a8172f9214e39dd86dfdaba3191447c35022fb815e0113593cee81917090"
+  },
+  {
+   "itemId": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+   "criterionId": "AC-257",
+   "startByte": 228643,
+   "endByte": 228790,
+   "excerptSha256": "a188855a51f5d739fb9eed73250dcb461852cc00348ee1d795e1b4bced61f8fc"
+  },
+  {
+   "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+   "criterionId": "AC-258",
+   "startByte": 228881,
+   "endByte": 229034,
+   "excerptSha256": "c0c868fdf0ca66bf2add021a8b008505bdd88e569928e9a20f0da27e1fb95cc9"
+  },
+  {
+   "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+   "criterionId": "AC-259",
+   "startByte": 229131,
+   "endByte": 229293,
+   "excerptSha256": "ea7363d64f5d1283ccd0969b8561d300f0e60b482d53c6eb913c8184776721c0"
+  },
+  {
+   "itemId": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+   "criterionId": "AC-260",
+   "startByte": 229399,
+   "endByte": 229556,
+   "excerptSha256": "4f50910d48bb341022b2b02ace2027ee31020d49d20ec4f6cbbb5e8cd4747d05"
+  },
+  {
+   "itemId": "pipeline.signing-prompt-prints-the-whole-review-package",
+   "criterionId": "AC-261",
+   "startByte": 229657,
+   "endByte": 229804,
+   "excerptSha256": "a0c73458b039acf0a523bd8facaa27c20a392b2e6bbdede7482b9fa7f6d50121"
+  },
+  {
+   "itemId": "pipeline.signing-toolchain-readiness",
+   "criterionId": "AC-262",
+   "startByte": 229895,
+   "endByte": 230023,
+   "excerptSha256": "d6afeebd97e057ecd826e4a794506a273a509f3a21a8bc3df7ce258dac6dc957"
+  },
+  {
+   "itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+   "criterionId": "AC-263",
+   "startByte": 230095,
+   "endByte": 230257,
+   "excerptSha256": "b378c312cb59a0ca3d3b410dd5927d1327f118906101c69a89356d4f48959307"
+  },
+  {
+   "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
+   "criterionId": "AC-264",
+   "startByte": 230363,
+   "endByte": 230509,
+   "excerptSha256": "ffa9b60269622910eca55d7fb1d91ad12688388b87d970f0d9f0b09329736171"
+  },
+  {
+   "itemId": "pipeline.transfer-redaction-alters-digest-bound-files",
+   "criterionId": "AC-265",
+   "startByte": 230599,
+   "endByte": 230744,
+   "excerptSha256": "ec82cc4612a35c6560dca6375ffe6c8611d797816293e1e9081ded05455715af"
+  },
+  {
+   "itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+   "criterionId": "AC-266",
+   "startByte": 230833,
+   "endByte": 230978,
+   "excerptSha256": "2159dabd935faa944d93fbbdbe267bda3dec9883ded207aa634565f756dff63c"
+  },
+  {
+   "itemId": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+   "criterionId": "AC-267",
+   "startByte": 231067,
+   "endByte": 231219,
+   "excerptSha256": "d77ea168a7fb3f24a4d008d268990c0d201cc7f59d95def3a0d847fe0edf70a3"
+  },
+  {
+   "itemId": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+   "criterionId": "AC-268",
+   "startByte": 231315,
+   "endByte": 231482,
+   "excerptSha256": "d04d0f90e36b355fadce1435d75f64140a9bf58749d3424d8996c82cf316e1bf"
+  },
+  {
+   "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+   "criterionId": "AC-269",
+   "startByte": 231593,
+   "endByte": 231733,
+   "excerptSha256": "b70677184b80d5391ad6f08453a7f6b3e6a8853ed9c0fbf11c3126947e68916f"
+  },
+  {
+   "itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+   "criterionId": "AC-270",
+   "startByte": 231817,
+   "endByte": 231991,
+   "excerptSha256": "37d1bc6d2c433c592569decb8e1c5e30c31a432ece13d19cf60cb8cd5405be20"
+  },
+  {
+   "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+   "criterionId": "AC-271",
+   "startByte": 232109,
+   "endByte": 232269,
+   "excerptSha256": "05fd3d8938fd96c887f600046c3727f574f4f8459a519430b72deca03c17ba83"
+  },
+  {
+   "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+   "criterionId": "AC-272",
+   "startByte": 232373,
+   "endByte": 232526,
+   "excerptSha256": "ea91a0d1b7f059ea4fa1174f4cfec2ba2649629d9153870405d654be4a029f8c"
+  },
+  {
+   "itemId": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+   "criterionId": "AC-273",
+   "startByte": 232623,
+   "endByte": 232774,
+   "excerptSha256": "2509b8a2b110d027bbcfae7e5c71681194199e91d6214f250de09ce5d9b47cc4"
+  },
+  {
+   "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+   "criterionId": "AC-274",
+   "startByte": 232869,
+   "endByte": 233033,
+   "excerptSha256": "73a27b4d5a5610e446006ba7a2f7d9cc7a8425a1b17bba891baf12dc114b5145"
+  }
+ ]
+}

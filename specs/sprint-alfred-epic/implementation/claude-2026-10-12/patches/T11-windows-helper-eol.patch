@@ -1,0 +1,12 @@
+Prepared, NOT applied. Applies only after the PO decides T11 (see plans/claude-session-2026-10-12.md).
+Measures the helper after CRLF->LF normalization so the LF blob pin holds on a CRLF checkout
+(.gitattributes:18 `*.ps1 text eol=crlf`); the executed script text is the measured, normalized text.
+A regression test (CRLF working copy accepted, any other byte change still refused) goes with it.
+
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -19 +19 @@
+-function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>20000||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');if(digest(bytes)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return bytes.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
++function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>20000||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');
++  // .gitattributes checks *.ps1 out with CRLF; the pin is the LF blob. Measure and execute the LF-normalized text.
++  const measured=Buffer.from(bytes.toString('latin1').replaceAll('\r\n','\n'),'latin1');if(digest(measured)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return measured.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
