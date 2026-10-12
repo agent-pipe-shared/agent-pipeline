@@ -1,0 +1,874 @@
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * The dev-plan gate's exempt write prefixes, and its pure verdict function, in a
+ * module a reader can import.
+ *
+ * `guard-devplan.mjs` is a hook SCRIPT: it runs its whole decision at import
+ * time and calls `process.exit()`. Anything that merely wants to *know* its
+ * policy therefore cannot import it — the importing process dies. Before this
+ * module the only way to state the list elsewhere was to type it out again, and
+ * a hand-copied second copy of a rule a guard owns is precisely the drift this
+ * repository has been bitten by twice in one block.
+ *
+ * So the value lives here, with exactly one owner: the guard imports it to
+ * enforce, and the obligations generator (a source-checkout tool, so its path is
+ * deliberately not named here -- a shipped file must not point a consumer at
+ * something only this repository has) imports it to tell agents about it. A
+ * prefix added here reaches both at once, and the generator's contract test goes
+ * red until the shipped document is regenerated.
+ *
+ * `devPlanGateVerdict()` below carries the SAME "one owner, two readers" shape
+ * for the gate's full decision, not just its exempt-prefix list: `guard-
+ * devplan.mjs`'s Edit|Write lane calls it and translates the verdict into its
+ * own exit-code/stderr protocol; `guard-lifecycle-ready.mjs`'s `GUARD-DEVPLAN-
+ * SHELL` check (the `Bash|PowerShell` lane, closing the same route-choice gap
+ * `GUARD-TESTPATH-SHELL` closed for the test-path authority gate) calls the
+ * IDENTICAL function against every write-target candidate a shell command's
+ * syntax shows it touching (`lib/protected-test-paths.mjs`'s
+ * `extractShellWriteTargets()`) — so the two lanes can never independently
+ * decide a path's dev-plan-gate fate differently from each other.
+ */
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { gateConfig, loadManifest } from "./manifest.mjs";
+import { CURRENT_APPROVAL_SCHEMA, derivePlanLifecycle, validCurrentPlanApproval } from "./plan-spec-state-v2.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+  validatePortablePipelineState,
+} from "./project-authority.mjs";
+import {
+  CONFLICT_PATH_PLACEHOLDER,
+  rebaseAuthorityRetryActions,
+  resolveRebaseAuthority,
+} from "./rebase-authority.mjs";
+import { readDesignAdvisoryTransaction } from "./design-advisory-transaction.mjs";
+import { hasExactDesignAdvisorFinalApproval } from "./design-advisory-final-approval.mjs";
+import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
+import { rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
+import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
+import { readHumanApprovalMode, verifyAgainstTrustAnchors, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+
+import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
+
+// The v7 approval record is verified through the re-read of its package. The lib
+// constant for this schema is not exported, so the literal is local; a v8 record
+// is verified separately against its stored U3 binding.
+const V7_APPROVAL_SCHEMA = "pipeline.plan-approval.v7";
+
+// Validate before hashing: the final authority reader must never read a state-
+// selected path outside the physical package, or follow a symlink.
+function advisorPackageSha256(root, relativePath) {
+  const invalid = () => Object.assign(new Error("Advisor package path is not a physical repository file"), { code: "DAA-PATH" });
+  if (typeof relativePath !== "string" || !relativePath || isAbsolute(relativePath)
+    || relativePath.includes("\\") || relativePath.split("/").some((part) => ["", ".", ".."].includes(part))) throw invalid();
+  const target = resolve(root, relativePath);
+  const rel = relative(root, target);
+  if (!rel || isAbsolute(rel) || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\")) throw invalid();
+  try {
+    if (realpathSync(target) !== target || !lstatSync(target).isFile()) throw invalid();
+  } catch {
+    throw invalid();
+  }
+  return createHash("sha256").update(readFileSync(target)).digest("hex");
+}
+
+function currentGitCandidate(root) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const commit = spawnSync("git", ["-C", root, "rev-parse", "HEAD"], {
+    encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+  });
+  const tree = spawnSync("git", ["-C", root, "rev-parse", "HEAD^{tree}"], {
+    encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+  });
+  const commitId = String(commit.stdout ?? "").trim();
+  const treeId = String(tree.stdout ?? "").trim();
+  if (commit.status !== 0 || tree.status !== 0
+    || !/^[a-f0-9]{40,64}$/u.test(commitId) || !/^[a-f0-9]{40,64}$/u.test(treeId)) return null;
+  return { commit: commitId, tree: treeId };
+}
+
+/** Read both the package projection and its actual repository-private transaction.
+ * Git environment overrides must not redirect this authority read to another repo.
+ * Neither public flags nor the legacy planApproved projection grant the exception.
+ */
+export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
+  const featureId = state?.activeFeature?.id;
+  if (typeof featureId !== "string" || !featureId || typeof planPath !== "string" || typeof specPath !== "string") {
+    return { ok: false, code: "DAA-BINDING" };
+  }
+  try {
+    const root = realpathSync(projectDir);
+    const planSha256 = advisorPackageSha256(root, planPath);
+    const specSha256 = advisorPackageSha256(root, specPath);
+    const approval = state?.planApproval;
+    if (approval?.schema === "pipeline.plan-approval.v8") {
+      if (state?.planApproved !== true) return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
+      const binding = approval.designApprovalBinding;
+      const record = approval.designApproval;
+      if (state?.planSubmission?.profile === "mini") {
+        return validCurrentPlanApproval(approval) && binding === null && record === null
+          ? { ok: true, id: "mini-no-design-approval", mode: "not-required" }
+          : { ok: false, code: "DAA-DESIGN-APPROVAL-BINDING-DRIFT" };
+      }
+      const checked = validateDesignApprovalBinding(binding);
+      if (!checked.ok || checked.bindingSha256 !== record?.bindingSha256 || binding.featureId !== featureId)
+        return { ok: false, code: "DAA-DESIGN-APPROVAL-BINDING-DRIFT" };
+      if (!["feature", "epic"].includes(state?.planSubmission?.profile)
+        || !validCurrentPlanApproval(approval) || record.approvedBy !== approval.approvedBy)
+        return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
+      if (readHumanApprovalMode(root).mode === "signature" && record.mode === "chat")
+        return { ok: false, code: "DAA-PO-APPROVAL-MODE-MISMATCH" };
+      if (record.mode === "signature") {
+        const trust = readCriticalHumanProofPolicy(root);
+        if (!trust.ok) return { ok: false, code: "DAA-PO-APPROVAL-TRUST-POLICY" };
+        const anchors = trust.trustAnchors ?? (trust.trustAnchor === null ? [] : [trust.trustAnchor]);
+        if (anchors.length === 0) return { ok: false, code: "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP" };
+        const verified = verifyAgainstTrustAnchors({ intent: { sha256: record.intentSha256 }, anchors, proof: record.proof });
+        if (!verified.verified) return { ok: false, code: `DAA-${verified.code ?? "PO-APPROVAL-PROOF-INVALID"}` };
+        if (verified.proofSha256 !== record.proofSha256) return { ok: false, code: "DAA-PO-APPROVAL-RECORD-DRIFT" };
+      }
+      const sources = binding.sources;
+      if (sources.prd.path !== planPath || sources.spec.path !== specPath)
+        return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" };
+      try {
+        for (const source of [sources.prd, sources.spec, ...sources.companions]) {
+          if (advisorPackageSha256(root, source.path) !== source.sha256)
+            return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" };
+        }
+      } catch { return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" }; }
+      return { ok: true, id: checked.bindingSha256, mode: `approved-design-${record.mode}` };
+    }
+    if (approval?.schema === V7_APPROVAL_SCHEMA && state?.planApproved === true) {
+      if (state?.planSubmission?.profile === "mini"
+        && approval.designWorkflowPackagePath === null
+        && approval.designWorkflowPackageSha256 === null
+        && approval.designWorkflowApproval === null) {
+        return { ok: true, id: "mini-no-design-workflow-package", mode: "not-required" };
+      }
+      if (!["epic", "feature"].includes(state?.planSubmission?.profile)) {
+        return { ok: false, code: "DAA-WORKFLOW-PROFILE" };
+      }
+      const readCandidate = () => currentGitCandidate(root);
+      const workflow = rereadApprovedDesignWorkflowPackage({
+        repoRoot: root,
+        packagePath: approval.designWorkflowPackagePath,
+        packageSha256: approval.designWorkflowPackageSha256,
+        featureId,
+        planPath,
+        planSha256,
+        specPath,
+        specSha256,
+        advisorExceptionBinding: approval.designWorkflowApproval?.advisorException ?? null,
+      });
+      if (!workflow.ok) return { ok: false, code: workflow.code ?? "DWP-APPROVAL-INVALID" };
+      const packageApproval = approval.designWorkflowApproval;
+      if (packageApproval?.mode === "signature") {
+        const trust = readCriticalHumanProofPolicy(root);
+        if (!trust.ok) return { ok: false, code: "DAA-PO-APPROVAL-TRUST-POLICY" };
+        const anchors = trust.trustAnchors ?? (trust.trustAnchor === null ? [] : [trust.trustAnchor]);
+        const verified = verifyStoredDesignWorkflowPackageSignature({
+          repoRoot: root,
+          packagePath: approval.designWorkflowPackagePath,
+          packageSha256: approval.designWorkflowPackageSha256,
+          featureId,
+          planPath,
+          planSha256,
+          specPath,
+          specSha256,
+          approval: packageApproval,
+          anchors,
+          readCandidate,
+        });
+        if (!verified.ok) return { ok: false, code: `DAA-${verified.code ?? "PO-APPROVAL-INVALID"}` };
+      } else if (packageApproval?.mode !== "chat"
+        || packageApproval.packageSha256 !== workflow.packageSha256
+        || packageApproval.approvedBy !== approval.approvedBy) {
+        return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
+      }
+      return { ok: true, id: workflow.packageSha256, mode: `approved-workflow-package-${packageApproval.mode}` };
+    }
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+    const git = spawnSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"],
+      { encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000 });
+    if (git.status !== 0) return { ok: false, code: "DAA-COMMON-UNAVAILABLE" };
+    const lines = String(git.stdout ?? "").trim().split(/\r?\n/u);
+    if (lines.length !== 2 || realpathSync(lines[0]) !== root) return { ok: false, code: "DAA-COMMON-INVALID" };
+    const common = realpathSync(lines[1]);
+    let record;
+    try { record = JSON.parse(readFileSync(join(root, DESIGN_ADVISORY_RECORD_PATH), "utf8")); }
+    catch (error) {
+      if (error.code !== "ENOENT") return { ok: false, code: "DAA-PUBLIC-INVALID" };
+    }
+
+    if (!record) {
+      // Missing advisory record: allow if we have a valid direct final ledger approval
+      const approval = state?.planApproval;
+      if (approval?.schema === "pipeline.plan-approval.v4" && state?.planApproved === true) {
+        if (approval.poGateAuthority?.planSha256 === planSha256 && approval.poGateAuthority?.specSha256 === specSha256) {
+          return { ok: true, id: "ledger-fallback-v4", mode: "unavailable" };
+        }
+      }
+
+      const reference = state?.planApproval?.humanDecision;
+      if (reference?.candidate?.commit && reference?.candidate?.tree) {
+        const directApprovalValid = hasExactDesignAdvisorFinalApproval({
+          state, projectDir: root, featureId, planPath, specPath,
+          planSha256, specSha256,
+          candidateCommit: reference.candidate.commit,
+          candidateTree: reference.candidate.tree,
+        });
+        if (directApprovalValid) return { ok: true, id: "ledger-fallback", mode: "unavailable" };
+      }
+      return { ok: false, code: "DAA-PUBLIC-UNAVAILABLE" };
+    }
+
+    const unavailable = record?.admission?.advisor?.status === "unavailable";
+    const workflow = record?.admission?.workflow;
+    const finalApprovalValid = unavailable && hasExactDesignAdvisorFinalApproval({
+      state, projectDir: root, featureId, planPath, specPath,
+      planSha256, specSha256,
+      candidateCommit: workflow?.candidateCommit, candidateTree: workflow?.candidateTree,
+    });
+    if (unavailable && !finalApprovalValid) return { ok: false, code: "DAA-UNAVAILABLE-FINAL-APPROVAL" };
+    const result = readDesignAdvisoryTransaction({
+      repoRoot: root, gitCommonDir: common, featureId, planPath, specPath, finalApprovalValid,
+    });
+    return { ok: true, id: result.id, mode: result.mode };
+  } catch (error) {
+    return { ok: false, code: typeof error?.code === "string" && error.code.startsWith("DAA-") ? error.code : "DAA-PRIVATE-INVALID" };
+  }
+}
+
+/** Diagnostic only: classify an already-denied implementation envelope.
+ * Never call admission here or turn a successful diagnostic into authority.
+ * A malformed or half-null pair retains the ordinary lifecycle refusal.
+ */
+export function lifecycleDesignApprovalDenial(state, lifecycle) {
+  if (lifecycle?.ok !== false
+    || lifecycle.code !== "PLAN-LIFECYCLE-IMPLEMENTATION-UNAUTHORIZED"
+    || lifecycle.nextAction !== "reopen-design"
+    || lifecycle.phase !== "implementation"
+    || lifecycle.submissionCurrent !== true
+    || lifecycle.approvalCurrent !== false
+    || state?.planApproval?.schema !== "pipeline.plan-approval.v8") return null;
+  const approval = state.planApproval;
+  if (approval.designApprovalBinding === null || approval.designApproval === null
+    || !/^[a-f0-9]{64}$/u.test(approval.designApproval?.bindingSha256 ?? "")) return null;
+  const checked = validateDesignApprovalBinding(approval.designApprovalBinding);
+  if (!checked.ok || checked.bindingSha256 === approval.designApproval.bindingSha256) return null;
+  return designAdvisoryRemediation("DAA-DESIGN-APPROVAL-BINDING-DRIFT");
+}
+
+export function designAdvisoryRemediation(code) {
+  const prefix = `[guard-devplan] implementation requires a valid design approval (${code}).`;
+  if (code === "DAA-DESIGN-APPROVAL-BINDING-DRIFT") return [prefix,
+    "Current design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
+  if (code === "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP") return [prefix,
+    "Complete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode."].join("\n");
+  const contentDrift = ["DAA-DESIGN-SOURCE-DRIFT", "DWP-APPROVAL-SOURCE-DRIFT", "DWP-APPROVAL-PLAN-SPEC-MISMATCH", "DAA-DWP-APPROVAL-SOURCE-DRIFT", "DAA-DWP-APPROVAL-PLAN-SPEC-MISMATCH"];
+  if (contentDrift.includes(code)) return [prefix,
+    "Current design content differs from the approved sources. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
+  return [prefix,
+    "Re-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.",
+    "Use one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution."].join("\n");
+
+}
+
+
+/**
+ * Why `scratch/` is here, and why it is the safest of the five rather than the
+ * riskiest (kept with the value it explains):
+ *
+ * The Pipeline's own shipped instructions send every agent to `scratch/` and
+ * describe it as the one place needing no exception —
+ * `skills/pipeline-start/SKILL.md` calls it "the only location the containment
+ * guard permits without an exception", and the Goldfish briefing template says
+ * the same. Both were speaking about the CONTAINMENT guard
+ * (`guard-lifecycle-ready`), which does permit it, while this gate blocked it in
+ * the `draft` phase — the phase every fresh project starts in. A consumer
+ * following the shipped instruction was refused by a guard the instruction had
+ * never cleared, and pointed at a plan approval that has nothing to do with
+ * writing a throwaway probe script.
+ *
+ * `docs/`, `specs/`, `.claude/` and `backlog/` are tracked directories whose
+ * contents ship; `scratch/` holds throwaways by definition. Implementation
+ * smuggled there is not implementation until it moves into a real source path,
+ * and that move is exactly what this gate still catches.
+ *
+ * backlog: 2026-08-08-shipped-guidance-sends-agents-to-a-directory-a-gate-refuses.md
+ */
+export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claude/", "backlog/", "scratch/"]);
+
+// A dispatched role must create this receipt as its opening act. It is
+// coordination evidence rather than product implementation, so only this
+// canonical receipt filename is admitted before plan approval.
+const DISPATCH_RECORD_PATH = /^evidence\/dispatch-record-[A-Za-z0-9][A-Za-z0-9._-]*\.json$/u;
+
+export function isCriticScratchNotesPath(normalizedPath) {
+  if (typeof normalizedPath !== "string") return false;
+  return normalizedPath.startsWith("scratch/dispatch/")
+    || /(?:^|\/)scratch\/.*critic-notes\.md$/u.test(normalizedPath)
+    || normalizedPath.endsWith("/critic-notes.md");
+}
+
+export function isDispatchRecordCoordinationPath(normalizedPath) {
+  return typeof normalizedPath === "string" && DISPATCH_RECORD_PATH.test(normalizedPath);
+}
+
+// The denial code `guard-lifecycle-ready.mjs`'s `Bash|PowerShell` lane names for this gate
+// (GUARD-DEVPLAN-SHELL, the shell-lane sibling of GUARD-TESTPATH-SHELL) -- co-located with the
+// policy it denies for rather than with `protected-test-paths.mjs`, whose own
+// `TESTPATH_SHELL_DENIAL_CODE` this mirrors, because that module has no ownership stake in
+// this gate's decision (it only supplies the shared candidate-extraction function both shell
+// lanes call, `extractShellWriteTargets()`).
+export const DEVPLAN_SHELL_DENIAL_CODE = "GUARD-DEVPLAN-SHELL";
+
+// The plugin root this policy module is itself running from -- same self-location
+// resolution guard-devplan.mjs's own PLUGIN_ROOT used before this function moved here
+// (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`). Both `hooks/guard-devplan.mjs`
+// and `lib/guard-devplan-policy.mjs` sit exactly one directory below the plugin root, so
+// the same relative walk resolves to the identical path from either location.
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Runnable reference to pipeline-state.mjs under the plugin actually enforcing this
+ * guard. Degrades to a locate-it hint (never a broken path or an empty string) if the
+ * script cannot be found under PLUGIN_ROOT.
+ */
+function pipelineStateScriptRef() {
+  const script = join(PLUGIN_ROOT, "scripts", "pipeline-state.mjs");
+  return existsSync(script)
+    ? script
+    : "pipeline-state.mjs (locate it under your installed pipeline-core plugin's scripts directory)";
+}
+
+function normalize(p) {
+  return String(p ?? "").replace(/\\/g, "/").toLowerCase();
+}
+
+/**
+ * The Dev-Plan-Gate's pure decision function, moved nearly verbatim out of
+ * `guard-devplan.mjs` (see that file's own header for the full rationale behind
+ * each step -- absolute/relative resolution, traversal hardening, the
+ * unconditional `scratch/` allow, the manifest/state fail-open contract, plan/
+ * spec authority immutability). This function never touches stdin, never calls
+ * `process.exit()`, and never writes anything -- it is a READER of the manifest
+ * and State exactly like the hook it now backs.
+ *
+ * @param {{filePath: string, projectDir: string}} args `filePath` as delivered by
+ *   the calling tool's own contract (may be absolute or relative, forward- or
+ *   backslash-separated); `projectDir` the resolved project root to evaluate against.
+ * @returns {{verdict: "allow"|"block"|"warn", reason?: string, feature?: string,
+ *   planPath?: string|null, lifecycleStatus?: string}} `reason` carries the exact
+ *   multi-line message text `guard-devplan.mjs` has always emitted to stderr for a
+ *   BLOCKED/WARN outcome; absent for a plain "allow".
+ */
+export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = false }) {
+  if (typeof filePath !== "string" || filePath === "") return { verdict: "allow" };
+
+  // ---- resolve absolute file_path against the project root (C1 fix) ----------------
+  let relPath = filePath;
+  if (isAbsolute(filePath)) {
+    const rel = relative(projectDir, filePath);
+    const relSlashes = rel.replace(/\\/g, "/");
+    const outsideRoot = rel === ".." || relSlashes.startsWith("../") || isAbsolute(rel);
+    if (outsideRoot) return { verdict: "allow" }; // not this project's file -- allow unconditionally
+    relPath = rel;
+  }
+  // Collapse ".."/"." traversal segments BEFORE the prefix match (see guard-devplan.mjs
+  // header "TRAVERSAL HARDENING"). Slashify backslashes FIRST, then collapse with POSIX
+  // semantics explicitly -- platform-native `path.normalize` only treats "\" as a separator
+  // on win32.
+  relPath = posix.normalize(relPath.replace(/\\/g, "/"));
+  const normalizedPath = normalize(relPath);
+
+  // ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
+  if (!forceLifecycleGate && (normalizedPath.startsWith("scratch/") || isCriticScratchNotesPath(normalizedPath))) return { verdict: "allow" };
+  if (!forceLifecycleGate && isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
+
+  // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
+  const manifestResult = loadManifest(projectDir);
+  if (manifestResult.status === "absent") return { verdict: "allow" };
+  if (manifestResult.status === "invalid" && manifestResult.manifest === undefined) {
+    const reason = manifestResult.errors?.[0]?.reason ?? "YAML error";
+    return {
+      verdict: "warn",
+      reason: [
+        `[guard-devplan] WARN: .claude/pipeline.yaml is not readable (${reason}).`,
+        `Dev-Plan gate is being skipped (fail-open) -- please repair the manifest file.`,
+      ].join("\n"),
+    };
+  }
+  const manifest = manifestResult.manifest;
+  const gate = gateConfig(manifest, "dev-plan");
+  if (!gate || gate.mode === "off") return { verdict: "allow" };
+
+  // ---- state: activeFeature / planApproved (fail-open on absent, WARN on malformed) --
+  const projectAuthority = resolveProjectAuthorityPaths({ rootDir: projectDir });
+  const statePath = join(
+    projectDir,
+    projectAuthority.status === "ready"
+      ? projectAuthority.state
+      : (existsSync(join(projectDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE),
+  );
+  let stateRaw;
+  try {
+    stateRaw = readFileSync(statePath, "utf8");
+  } catch {
+    return { verdict: "allow" }; // no state file at all -- fail-open
+  }
+  let state;
+  try {
+    state = JSON.parse(stateRaw);
+  } catch (e) {
+    return {
+      verdict: "warn",
+      reason: [
+        `[guard-devplan] WARN: ${statePath} contains invalid JSON (${e.message}).`,
+        `Dev-Plan gate is being skipped (fail-open) -- please repair the state file (rewrite only via ` +
+          `${pipelineStateScriptRef()}, never by hand).`,
+      ].join("\n"),
+    };
+  }
+
+  const activeFeature = state && typeof state === "object" ? state.activeFeature : undefined;
+  if (!activeFeature || typeof activeFeature !== "object" || typeof activeFeature.id !== "string" || activeFeature.id === "") {
+    return { verdict: "allow" }; // no active feature -- nothing to enforce
+  }
+
+  if (statePath === join(projectDir, NEUTRAL_STATE)) {
+    const portability = validatePortablePipelineState(state);
+    if (!portability.ok) {
+      const blockingMode = gate.mode !== "warn";
+      return {
+        verdict: blockingMode ? "block" : "warn",
+        reason: [
+          `[guard-devplan] ${blockingMode ? "BLOCKED" : "WARN"}: neutral State contains private cleanup identity (${portability.code}).`,
+          "Repair through the sanctioned cleanup recovery transaction; direct State edits are not authority.",
+        ].join("\n"),
+        feature: activeFeature.id,
+      };
+    }
+  }
+
+  function fileSha256(path) {
+    try { return createHash("sha256").update(readFileSync(resolve(projectDir, path))).digest("hex"); }
+    catch { return null; }
+  }
+
+  const submitted = state.planSubmission;
+  const approvalAuthority = state.planApproval?.poGateAuthority;
+  const planPath = typeof submitted?.planPath === "string"
+    ? submitted.planPath
+    : approvalAuthority?.planPath;
+  const specPath = typeof submitted?.specPath === "string"
+    ? submitted.specPath
+    : approvalAuthority?.specPath;
+  const lifecycle = derivePlanLifecycle(state, {
+    ...(typeof planPath === "string" ? { planSha256: fileSha256(planPath) } : {}),
+    ...(typeof specPath === "string" ? { specSha256: fileSha256(specPath) } : {}),
+  });
+  if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
+    const admission = designAdvisoryAdmission(state, projectDir, planPath, specPath);
+    if (!admission.ok) return {
+      verdict: gate.mode === "warn" ? "warn" : "block",
+      reason: designAdvisoryRemediation(admission.code),
+      feature: activeFeature.id, lifecycleStatus: lifecycle.status,
+    };
+    return { verdict: "allow" };
+  }
+
+  // ---- exempt paths -------------------------------------------------------------------
+  const exemptPrefixes = [...DEFAULT_EXEMPT_PREFIXES];
+  if (lifecycle.status === "draft"
+    && typeof activeFeature.planPath === "string"
+    && activeFeature.planPath !== "") {
+    exemptPrefixes.push(activeFeature.planPath);
+  }
+  if (Array.isArray(gate.exemptPaths)) {
+    for (const p of gate.exemptPaths) if (typeof p === "string" && p !== "") exemptPrefixes.push(p);
+  }
+
+  const authoritativePaths = [planPath, specPath]
+    .filter((path) => typeof path === "string")
+    .map(normalize);
+  const touchesAuthority = authoritativePaths.some((path) => normalizedPath === path);
+  const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
+  const isExempt = !forceLifecycleGate && (
+    isDraftAuthority
+    || (!touchesAuthority
+      && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))))
+  );
+  if (isExempt) return { verdict: "allow" };
+
+  // ---- verdict --------------------------------------------------------------------------
+  const lifecycleReason = lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
+    ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
+    : lifecycle.status === "awaiting-approval"
+      ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
+      : lifecycle.status === "approved"
+        ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
+        : "The feature is still in draft design and has no implementation authority.");
+  const message = [
+    `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" lifecycle is "${lifecycle.status ?? "invalid"}".`,
+    `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,
+    `File: ${filePath}`,
+    `Why: ${lifecycleReason}`,
+  ].join("\n");
+
+  return {
+    verdict: gate.mode === "warn" ? "warn" : "block",
+    reason: message,
+    feature: activeFeature.id,
+    planPath: typeof activeFeature.planPath === "string" ? activeFeature.planPath : null,
+    lifecycleStatus: lifecycle.status ?? "invalid",
+  };
+}
+
+const STAGED_PATH_MAX_BYTES = 16 * 1024;
+
+function isHookSettingsPath(path) {
+  return typeof path === "string" && /^\.claude\/settings[^/]*\.json$/iu.test(path);
+}
+
+function stagedRelativePath(value) {
+  if (typeof value !== "string" || value === "" || value.includes("\0")) return null;
+  const slashed = value.replace(/\\/gu, "/");
+  if (slashed.startsWith("/") || /^[A-Za-z]:\//u.test(slashed)) return null;
+  const parts = slashed.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return null;
+  const normalized = posix.normalize(slashed);
+  if (normalized === "." || normalized.startsWith("../") || normalized === "..") return null;
+  return normalized;
+}
+
+function containsDisableAllHooksTrue(value) {
+  const pending = [value];
+  let visited = 0;
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === null || typeof current !== "object") continue;
+    visited += 1;
+    if (visited > 4096) return { valid: false };
+    for (const [key, child] of Object.entries(current)) {
+      if (key === "disableAllHooks" && child === true) return { valid: true, disabled: true };
+      if (child !== null && typeof child === "object") pending.push(child);
+    }
+  }
+  return { valid: true, disabled: false };
+}
+
+function canonicalJson(value, depth = 0, budget = { visited: 0 }) {
+  budget.visited += 1;
+  if (budget.visited > 4096 || depth > 64) throw new Error("settings structure exceeds inspection bound");
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(item => canonicalJson(item, depth + 1, budget)).join(",")}]`;
+  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(value[key], depth + 1, budget)}`).join(",")}}`;
+}
+
+function hookSettingsAuthorityProjection(value) {
+  const rows = [];
+  const pending = [{ value, path: "" }];
+  let visited = 0;
+  while (pending.length > 0) {
+    const item = pending.pop();
+    if (item.value === null || typeof item.value !== "object") continue;
+    visited += 1;
+    if (visited > 4096) throw new Error("settings structure exceeds inspection bound");
+    for (const key of Object.keys(item.value).sort()) {
+      const child = item.value[key];
+      const path = item.path ? `${item.path}.${key}` : key;
+      if (key === "hooks" || (key === "disableAllHooks" && child === true)) rows.push([path, canonicalJson(child)]);
+      if (child !== null && typeof child === "object") pending.push({ value: child, path });
+    }
+  }
+  rows.sort((left, right) => left[0].localeCompare(right[0]));
+  return JSON.stringify(rows);
+}
+
+function readCurrentSettingsContent(absolutePath) {
+  try {
+    const metadata = lstatSync(absolutePath);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > STAGED_PATH_MAX_BYTES) return { ok: false };
+    return { ok: true, content: readFileSync(absolutePath, "utf8") };
+  } catch (error) {
+    return error?.code === "ENOENT" ? { ok: true, content: null } : { ok: false };
+  }
+}
+
+/** Protect hook authority in project settings while allowing unrelated setting edits. */
+export function hooksDisableSettingsWriteFinding({ filePath, content, projectDir, operation = "shell", existingContent } = {}) {
+  if (typeof filePath !== "string" || filePath === "" || typeof projectDir !== "string" || projectDir === "") return null;
+  const absolute = isAbsolute(filePath) ? resolve(filePath) : resolve(projectDir, filePath);
+  const relativePath = relative(resolve(projectDir), absolute).replace(/\\/gu, "/");
+  if (!isHookSettingsPath(relativePath)) return null;
+  if (operation === "shell") {
+    return { code: "PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER", reason: "hook settings must be changed through the canonical owned settings writer" };
+  }
+  if (operation === "edit") {
+    return { code: "PIPELINE-HOOKS-SETTINGS-REQUIRES-CANONICAL-WRITER", reason: "partial edits cannot prove the existing hook configuration is preserved" };
+  }
+  if (operation !== "write" || typeof content !== "string" || Buffer.byteLength(content, "utf8") > STAGED_PATH_MAX_BYTES) {
+    return { code: "PIPELINE-HOOKS-SETTINGS-UNAVAILABLE", reason: "the proposed hook-settings content exceeds the inspection bound" };
+  }
+  const existing = existingContent === undefined ? readCurrentSettingsContent(absolute) : { ok: true, content: existingContent };
+  if (!existing.ok || (existing.content !== null
+    && (typeof existing.content !== "string" || Buffer.byteLength(existing.content, "utf8") > STAGED_PATH_MAX_BYTES))) {
+    return { code: "PIPELINE-HOOKS-SETTINGS-UNAVAILABLE", reason: "the current hook-settings file cannot be safely inspected" };
+  }
+  try {
+    const proposed = JSON.parse(content);
+    const prior = existing.content === null ? {} : JSON.parse(existing.content);
+    if (proposed === null || typeof proposed !== "object" || Array.isArray(proposed)
+      || prior === null || typeof prior !== "object" || Array.isArray(prior)) throw new Error("settings are not objects");
+    const disabled = containsDisableAllHooksTrue(proposed);
+    if (!disabled.valid) throw new Error("settings exceed inspection bound");
+    if (disabled.disabled) return { code: "PIPELINE-HOOKS-DISABLE-FORBIDDEN", reason: "a governed session cannot set disableAllHooks to true" };
+    if (hookSettingsAuthorityProjection(prior) !== hookSettingsAuthorityProjection(proposed)) {
+      return { code: "PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN", reason: "hook registration and disable state must be changed through the canonical owned settings writer" };
+    }
+  } catch {
+    return { code: "PIPELINE-HOOKS-SETTINGS-UNAVAILABLE", reason: "hook-settings JSON could not be safely compared" };
+  }
+  return null;
+}
+
+/**
+ * Rechecks the exact paths already staged in Git against the same per-path
+ * lifecycle policy used by Edit/Write and shell lanes. The commit boundary calls
+ * this after it obtains `git diff --cached --name-only -z --no-renames`; it does
+ * not require PO approval for an otherwise allowed commit. The single settings
+ * special case prevents a staged Claude project setting from turning off all
+ * hooks before the next governed tool call.
+ */
+export function evaluateStagedDevPlanPaths({
+  projectDir,
+  stagedPaths,
+  stagedContentByPath = {},
+  baselineContentByPath = {},
+  devPlanGateVerdictFn = devPlanGateVerdict,
+} = {}) {
+  const unavailable = (code, detail) => ({
+    ok: false,
+    code: "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE",
+    findings: [{ code, detail }],
+  });
+  if (typeof projectDir !== "string" || projectDir === "" || !Array.isArray(stagedPaths)
+    || stagedContentByPath === null || typeof stagedContentByPath !== "object" || Array.isArray(stagedContentByPath)
+    || baselineContentByPath === null || typeof baselineContentByPath !== "object" || Array.isArray(baselineContentByPath)
+    || typeof devPlanGateVerdictFn !== "function") {
+    return unavailable("PIPELINE-STAGED-INPUT-INVALID", "the staged-path observation has an invalid shape");
+  }
+
+  const findings = [];
+  const seen = new Set();
+  for (const rawPath of stagedPaths) {
+    const path = stagedRelativePath(rawPath);
+    if (path === null) return unavailable("PIPELINE-STAGED-PATH-INVALID", "Git returned a non-canonical staged path");
+    if (seen.has(path)) continue;
+    seen.add(path);
+
+    if (isHookSettingsPath(path)) {
+      const content = stagedContentByPath[path];
+      if (!Object.hasOwn(baselineContentByPath, path)) {
+        return unavailable("PIPELINE-STAGED-BASELINE-UNAVAILABLE", "the base hook-settings blob was not supplied for comparison");
+      }
+      const baseline = baselineContentByPath[path];
+      if (baseline !== null && (typeof baseline !== "string" || Buffer.byteLength(baseline, "utf8") > STAGED_PATH_MAX_BYTES)) {
+        return unavailable("PIPELINE-STAGED-BASELINE-INVALID", "the base hook-settings blob exceeds the inspection bound");
+      }
+      if (content !== null && (typeof content !== "string" || Buffer.byteLength(content, "utf8") > STAGED_PATH_MAX_BYTES)) {
+        return unavailable("PIPELINE-STAGED-CONTENT-UNAVAILABLE", "the staged hook-settings blob exceeds the inspection bound");
+      }
+      let prior = {}, proposed = {};
+      try {
+        if (baseline !== null) prior = JSON.parse(baseline);
+        if (content !== null) proposed = JSON.parse(content);
+        for (const parsed of [prior, proposed]) {
+          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("settings are not objects");
+        }
+        const observed = containsDisableAllHooksTrue(proposed);
+        if (!observed.valid) throw new Error("settings exceed inspection bound");
+        if (observed.disabled || hookSettingsAuthorityProjection(prior) !== hookSettingsAuthorityProjection(proposed)) {
+          findings.push({
+            code: observed.disabled ? "PIPELINE-HOOKS-DISABLE-FORBIDDEN" : "PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN",
+            path,
+            reason: observed.disabled
+              ? "a governed commit cannot set disableAllHooks to true"
+              : "a governed commit cannot alter hook registration or disable state outside the canonical settings writer",
+          });
+        }
+      } catch {
+        return unavailable("PIPELINE-STAGED-SETTINGS-INVALID", "the base or staged hook-settings JSON could not be safely compared");
+      }
+    }
+
+    let result;
+    try { result = devPlanGateVerdictFn({ filePath: path, projectDir }); }
+    catch { return unavailable("PIPELINE-STAGED-POLICY-FAILED", "the lifecycle policy could not evaluate a staged path"); }
+    if (result === null || typeof result !== "object" || !["allow", "block", "warn"].includes(result.verdict)) {
+      return unavailable("PIPELINE-STAGED-POLICY-INVALID", "the lifecycle policy returned an invalid result");
+    }
+    if (result.verdict === "block") {
+      findings.push({
+        code: "GUARD-DEVPLAN-LIFECYCLE",
+        path,
+        reason: typeof result.reason === "string" ? result.reason : "the staged path is not authorized by the current lifecycle",
+        lifecycleStatus: result.lifecycleStatus ?? null,
+      });
+    }
+  }
+
+  if (findings.some((finding) => finding.code === "PIPELINE-HOOKS-DISABLE-FORBIDDEN"
+    || finding.code === "PIPELINE-HOOKS-SETTINGS-CHANGE-FORBIDDEN"
+    || finding.code === "GUARD-DEVPLAN-LIFECYCLE")) {
+    return { ok: false, code: "PIPELINE-STAGED-LIFECYCLE-BLOCKED", findings };
+  }
+  return { ok: true, code: "PIPELINE-STAGED-LIFECYCLE-ALLOW", findings };
+}
+
+// ---- rebase authority: the dev-plan gate's ONE relief, and its disclosure ----------------
+//
+// backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md
+//
+// WHY THIS LIVES NEXT TO THE DEV-PLAN GATE AND NOWHERE ELSE
+//   The refusal the live incident produced is this gate's: during a rebase the partially
+//   replayed working tree shows `planApproved: false`, so `devPlanGateVerdict()` above reads a
+//   draft lifecycle and blocks every conflict resolution. The authority that answers it is
+//   resolved entirely by `lib/rebase-authority.mjs` (a side-effect-free reader of `orig-head`);
+//   nothing here re-decides anything it decided. What lives here is the part BOTH of this
+//   gate's lanes need and neither may own privately: the block-to-allow relief, and the
+//   denial disclosure. `hooks/guard-devplan.mjs` (Edit|Write) and
+//   `hooks/guard-lifecycle-ready.mjs` (GUARD-DEVPLAN-SHELL) each call these; a second
+//   hand-written copy in either hook is exactly the drift this module's header exists to stop.
+//
+// WHAT IT DELIBERATELY DOES NOT DO (Requirement 4)
+//   It never widens anything but the dev-plan objection. It is not consulted for the
+//   gate-strength lane, the protected-test-path lane, the cross-repository lane or the
+//   readiness kernel, and it cannot be: it returns a relief for a PATH inside the resolved
+//   conflict surface, and a string. There is no flag, environment variable or argument that
+//   turns it on — `resolveActiveRebaseAuthority()` takes a project root and nothing else, and
+//   returns null unless the repository is genuinely mid-rebase from a validly approved
+//   `orig-head` (Requirement 5: the authority is never opt-in).
+
+/** Schema of the machine-readable surface block printed alongside every mid-rebase denial. */
+export const REBASE_AUTHORITY_SURFACE_SCHEMA = "pipeline.rebase-authority-surface.v1";
+
+/**
+ * The resolved authority for a project root, or null.
+ *
+ * Cheap by construction: with no injected resolver it first checks that a `.git` entry exists
+ * at all, so the overwhelmingly common "no rebase anywhere near this call" case costs one
+ * `existsSync` rather than a git spawn. Every failure mode — an unreadable root, a throw
+ * inside the resolver, a refusal — collapses to null, because a fault in an ADVISORY relief
+ * must leave the underlying refusal exactly as it stood.
+ *
+ * @param {string} projectDir resolved project root
+ * @param {{resolveRebaseAuthorityFn?: Function, existsSyncFn?: Function}} dependencies
+ * @returns {object|null} an `authorized` result from `resolveRebaseAuthority()`, or null
+ */
+export function resolveActiveRebaseAuthority(projectDir, dependencies = {}) {
+  if (typeof projectDir !== "string" || projectDir === "") return null;
+  const injected = dependencies.resolveRebaseAuthorityFn;
+  try {
+    if (injected === undefined && !(dependencies.existsSyncFn ?? existsSync)(join(projectDir, ".git"))) {
+      return null;
+    }
+    const result = (injected ?? resolveRebaseAuthority)({ rootDir: projectDir });
+    return result !== null && typeof result === "object" && result.status === "authorized" && result.authority
+      ? result
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The surface as machine-readable data, so a session can act on a denial without parsing prose.
+ *
+ * Deliberately a hand-picked projection, never a spread of `result.authority`: that object
+ * carries `repository.root`/`gitDir`/`commonDir`, which are absolute machine paths and must
+ * never reach a denial text (SEC/no-machine-paths). The three "no" facts are stated rather
+ * than omitted, for the same reason the resolver states them.
+ */
+export function rebaseAuthoritySurface(result) {
+  const authority = result.authority;
+  return {
+    schema: REBASE_AUTHORITY_SURFACE_SCHEMA,
+    headName: authority.headName,
+    origHead: authority.origHead,
+    onto: authority.onto,
+    feature: authority.originalFeature.id,
+    lifecycle: authority.lifecycle.status,
+    conflictPaths: [...authority.conflictPaths],
+    conflictPathPlaceholder: CONFLICT_PATH_PLACEHOLDER,
+    nextCommand: authority.nextCommand,
+    permittedContinuations: [...authority.permittedContinuations],
+    resolutionShapes: [...authority.resolutionShapes],
+    pushAuthority: false,
+    remoteAuthority: false,
+    sessionWide: false,
+  };
+}
+
+/**
+ * The block appended to EVERY denial a guard emits while an authorized rebase is in progress.
+ *
+ * Requirement 5, both halves, in one renderer: the exact continuation is stated verbatim in
+ * prose (`nextCommand` — a mutation, so it can never ride in the retry-action envelope, whose
+ * only in-repo consumer drops any action that is not `mutation: false`), and the read-only
+ * diagnostics that let a session SEE its own surface ride in the envelope, which is non-empty
+ * for every result carrying the resolver's schema. Both the prose and the envelope are derived
+ * from the resolver's own tables, so the advice can never drift from what is actually
+ * permitted.
+ *
+ * @param {object} result an `authorized` result from `resolveRebaseAuthority()`
+ * @returns {string} newline-terminated, or "" for anything that is not such a result
+ */
+export function rebaseAuthorityDisclosure(result) {
+  const authority = result?.authority;
+  if (!authority || !Array.isArray(authority.conflictPaths)) return "";
+  const paths = authority.conflictPaths.length > 0
+    ? authority.conflictPaths.join(", ")
+    : "(none right now — every replayed conflict is already resolved and staged)";
+  return [
+    `[rebase-authority] A genuine rebase of ${authority.headName} onto ${authority.onto} is in `
+      + `progress, and the state at its orig-head ${authority.origHead} (feature `
+      + `"${authority.originalFeature.id}", lifecycle ${authority.lifecycle.status}) is validly `
+      + "approved, so that approval carries the rebase to completion: finishing it needs no fresh "
+      + "human signature, and no session-wide exception exists or is needed.",
+    `Current conflict surface (${authority.conflictPaths.length}): ${paths}`,
+    `Permitted on that surface ONLY: Edit/Write/apply_patch on those exact paths, plus `
+      + `${authority.resolutionShapes.join(" ; ")} — substituting one of the paths above for `
+      + `${CONFLICT_PATH_PLACEHOLDER}.`,
+    `Exact next command once every conflict path above is resolved and staged: `
+      + `${authority.nextCommand}`,
+    `Also admitted while this rebase runs: ${authority.permittedContinuations.join(" ; ")} — and `
+      + `"git rebase --abort" through its own separate recovery lane.`,
+    "This authority is not session-wide, grants no push and no force-push, covers no path outside "
+      + "the surface listed above, and admits no --skip, no --edit-todo, no --exec and no "
+      + "arbitrary -c option.",
+    JSON.stringify(rebaseAuthoritySurface(result)),
+    JSON.stringify(rebaseAuthorityRetryActions(result)),
+    "",
+  ].join("\n");
+}
+
+/**
+ * The one line a guard prints when it ADMITS something it would otherwise have blocked. Kept
+ * as loud as the refusal it replaces: a lifecycle gate that suspends itself silently is
+ * indistinguishable, in an audit, from a gate that was never armed.
+ */
+export function rebaseAuthorityAdmissionNotice(result, subject) {
+  const authority = result.authority;
+  return `[rebase-authority] dev-plan gate suspended for this ${subject}: it lies inside the `
+    + `current conflict surface of the active rebase of ${authority.headName} onto `
+    + `${authority.onto}, whose orig-head ${authority.origHead} is validly approved and in `
+    + "implementation. Nothing else is lifted, and no push authority is granted.";
+}

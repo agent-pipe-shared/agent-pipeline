@@ -1,0 +1,1544 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+/**
+ * NVA-B-GUIDEDINIT: one guided entry point that drives project-onboarding-v3.mjs's
+ * deterministic onboarding chain (the ~31-entry `ONBOARDING_SUBCOMMANDS` table) to
+ * completion in ONE invocation, stopping only where a human genuinely decides something.
+ *
+ * Same move, one layer up, as pipeline-start-preflight.mjs
+ * (`plugins/pipeline-core/scripts/pipeline-start-preflight.mjs`): that file consolidates
+ * the bootstrap checks into one call instead of making the agent perform each one by
+ * hand. This file does the identical thing for the onboarding chain -- purely additive,
+ * nothing existing changes behaviour.
+ *
+ * GENERIC OVER THE nextAction PROTOCOL, NO DOMAIN KNOWLEDGE: this driver never reasons
+ * about what any individual onboarding status (`kickoff-required`, `intake-required`,
+ * `portable-seed-required`, ...) actually means. It only reads the `nextAction` field
+ * every onboarding-cli result carries (lib/project-onboarding-v3.mjs) and recognizes
+ * exactly two of its kinds:
+ *   - `kind: "command"`  -- a ready-to-run `{ executable, argv }` this driver executes
+ *     itself, then loops back to read the new state.
+ *   - `kind: "collect-input"` -- a genuine human question. The driver stops here and
+ *     returns that action's own `inputs`/`input`/`guidance` fields VERBATIM (via the raw
+ *     final onboarding-cli response, never re-worded or summarized).
+ *
+ * SURFACES PUBLISHED PENDING ASKS, NEVER INVENTS ANSWERS: any `nextAction` (of either kind
+ * above) can additionally carry a `pendingAsks` array (the library's own
+ * `withPendingAsksSurfacedOnNextAction()` side-channel merge). The driver reads it
+ * generically -- a well-formed entry is any object with a string `kind`, the same shape a
+ * `collect-input` action already has -- and on a `command` step with a non-empty
+ * `pendingAsks`, stops and reports `outcome: "pending-asks"` INSTEAD OF executing the
+ * command, so a published ask is never silently stepped past. On a `collect-input` step, any
+ * sibling `pendingAsks` is surfaced alongside the primary question, not dropped. It still
+ * never invents an answer. One explicit re-entry surface is deliberately domain-specific:
+ * the first-anchor collect-input action returns this driver's closed `--trust-anchor-*`
+ * argv. Once the runner substitutes the PO's four answers and invokes that exact action,
+ * the driver performs the one attended setup transaction and re-enters the generic loop.
+ *
+ * RE-ANCHORS AFTER A SILENT SUCCESS, INSTEAD OF STOPPING THERE: a step this driver just
+ * EXECUTED (a `command` action it ran, not the bootstrap `inspect` itself) can come back
+ * successful with no `nextAction` and a `status` other than `"ready"` -- some plan/apply
+ * builders settle without naming what comes next. Rather than stopping there, the driver
+ * re-runs the same bare `inspect --root <root>` it starts every invocation with, and
+ * continues the loop from whatever that reveals. This holds no domain knowledge either:
+ * "after acting, re-read the state" is generic control flow, not a routing table over
+ * onboarding statuses -- the driver still never names one.
+ *
+ * Two things bound the re-anchor so it cannot become the very loop it exists to shortcut:
+ *   - It only fires once per executed step. If the anchoring `inspect` ITSELF is the one
+ *     that rests with no `nextAction`, that is the standalone-response case below, not
+ *     another re-anchor -- re-anchoring an anchor would spin on the identical command
+ *     forever without ever executing anything new.
+ *   - Progress is verified, not assumed. Each re-anchor's `inspect` response is compared,
+ *     full canonical (key-sorted) equality, against the immediately preceding anchor's
+ *     response. Equivalent means the executed step in between changed nothing the CLI's
+ *     own state reports, so the driver stops with its own `"no-progress"` outcome instead
+ *     of retrying toward the step cap -- this is exactly the shape of an earlier defect
+ *     (`inspect` -> `bootstrap-bind-plan` -> `inspect` -> ... forever), caught after the
+ *     first repeat rather than after fifty wasted commands.
+ *
+ * Anything else it cannot safely act on, so it also stops rather than guessing:
+ *   - `nextAction` absent/null while `status` is not `"ready"`, reached from the
+ *     anchoring `inspect` itself with no executed step since the last anchor -- e.g. a
+ *     standalone recovery command's own plan response (`plan-partial-authority`'s
+ *     `"selection-required"`, which uses a `selection` field instead of `nextAction` and
+ *     is never reached by a fresh repository's own `inspect` walk in the first place).
+ *   - `kind: "external-operator"` -- a typed, attended host step such as a
+ *     detached PO signature. The driver surfaces it verbatim and stops; it
+ *     never downgrades that deliberate pause to an "unsupported" error.
+ *   - any other `nextAction.kind` (e.g. `"restart-process"`), which this
+ *     driver cannot provide.
+ *
+ * NEVER INVENTS A VALUE. Not a language, not a profile, not a git author identity, not a
+ * goal -- those are the human's. This driver holds no logic that could fabricate one: a
+ * `collect-input` stop always returns the action untouched.
+ *
+ * RE-ENTRANT BY CONSTRUCTION, not by any state this file itself keeps. Every invocation
+ * starts a fresh `inspect --root <root>` and walks forward from whatever the underlying
+ * CLI's own durable, on-disk state says right now. A human supplying an answer means
+ * someone runs the specific mutating command the `collect-input` action named, with the
+ * real answer values, exactly once; re-running this driver afterward picks up from the new
+ * state. The first-anchor action names this driver itself, which performs setup and then
+ * continues from a fresh inspect in that same invocation. There is nothing to double-apply,
+ * because durable repository/machine readback -- not process memory -- records progress.
+ */
+
+import { spawnSync } from "node:child_process";
+import { performance } from "node:perf_hooks";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  closeSync,
+  existsSync,
+  fstatSync,
+  fsyncSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  renameSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
+import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
+import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
+import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
+import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import {
+  CRITICAL_HUMAN_PROOF_POLICY_PATH,
+  CRITICAL_HUMAN_PROOF_POLICY_V3,
+} from "../lib/critical-human-proof-policy.mjs";
+import {
+  PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
+  shellWord,
+} from "../lib/project-onboarding-v3.mjs";
+import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
+import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
+import {
+  MACHINE_PLANE_SCHEMA,
+  machinePlaneFilePath,
+  readMachinePlane,
+  writeMachinePlane,
+} from "../lib/machine-plane.mjs";
+
+export const SCHEMA = "pipeline.onboarding-init.v1";
+
+// "roughly thirty subcommands" (this task's own briefing) is the real chain length a
+// fresh repository walks; this cap gives headroom above that without being unbounded, so
+// a malformed or non-converging chain (a `nextAction` that keeps pointing back at itself)
+// cannot spin forever.
+export const DEFAULT_STEP_CAP = 50;
+// Leave a margin below the normal 120-second tool timeout. A step cap alone
+// cannot bound the time spent in one child process.
+export const DEFAULT_RUN_BUDGET_MS = 90_000;
+
+const ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
+const PO_HUMAN_APPROVAL_SCRIPT_PATH = fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url));
+const BOOTSTRAP_TRUST_RECOVERY_SCRIPT_PATH = fileURLToPath(new URL("./bootstrap-trust-recovery.mjs", import.meta.url));
+const TRUST_ANCHOR_MODES = new Set(["existing", "new"]);
+const PUSH_APPROVAL_MODES = new Set(["signature", "chat"]);
+const ADVISOR_EXPORT_CONSENT_MODES = new Set(["approved", "declined"]);
+const TRUST_ANCHOR_RECOVERY_SCHEMA = "pipeline.first-anchor-bootstrap-recovery.v1";
+const INITIAL_JOURNAL_FAILURES = new Map([
+  ["INITIAL-ANSWERS-JOURNAL-ANSWER-CONFLICT", "INITIAL-ANSWERS-TRANSACTION-ANSWER-CONFLICT"],
+  ["INITIAL-ANSWERS-JOURNAL-DRIFT", "INITIAL-ANSWERS-TRANSACTION-DRIFT"],
+  ["INITIAL-ANSWERS-JOURNAL-PREIMAGE-DRIFT", "INITIAL-ANSWERS-TRANSACTION-PREIMAGE-DRIFT"],
+]);
+function initialJournalFailure(error) {
+  return { ok: false, code: INITIAL_JOURNAL_FAILURES.get(error?.message)
+    ?? "INITIAL-ANSWERS-TRANSACTION-RECOVERY-REQUIRED" };
+}
+
+function usage() {
+  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --human-approval signature|chat --language de|en --advisor-export-consent approved|declined] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
+}
+
+// The runner lane, pinned rather than inherited.
+//
+// The onboarding CLI resolves its runner from the ENVIRONMENT when `--runner` is absent
+// (`resolveActiveRunner`, scripts/project-onboarding-v3.mjs): `CLAUDECODE=1` means claude,
+// an Antigravity marker means antigravity, and everything else falls into an else-branch
+// that answers `codex` -- including a plain human terminal, which is no runner at all.
+//
+// That guess reaches this driver as a real behavioural difference, not a label: a fresh
+// repository resolved as codex is handed a Codex restart barrier, whose `nextAction.kind`
+// is `restart-process`, which this driver correctly refuses to execute. The identical
+// invocation therefore reaches a `collect-input` question inside a Claude Code session and
+// `unsupported-next-action` in the operator's own shell -- measured 2026-08-28, where this
+// file's own suite passed eight times under an agent and failed deterministically under
+// `env -u CLAUDECODE`.
+//
+// So the lane is a caller decision here, threaded into the first `inspect` (every later
+// command is constructed BY the CLI, which carries its own resolved runner forward). An
+// omitted `--runner` keeps the CLI's existing environment resolution unchanged -- this adds
+// a way to be explicit, it does not change the default -- and the resolved-or-null value is
+// reported in the result so a caller can see which lane it is on instead of assuming.
+const RUNNERS = new Set(["claude", "codex", "antigravity"]);
+
+function parseArgs(argv) {
+  const output = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--root") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) return { error: "--root requires a project directory" };
+      output.root = value;
+      index += 1;
+    } else if (arg === "--runner") {
+      const value = argv[index + 1];
+      if (!RUNNERS.has(value)) return { error: `--runner requires one of: ${[...RUNNERS].join(", ")}` };
+      output.runner = value;
+      index += 1;
+    } else if (arg === "--step-cap") {
+      const raw = argv[index + 1];
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 1) return { error: "--step-cap requires a positive integer" };
+      output.stepCap = value;
+      index += 1;
+    } else if (arg === "--trust-anchor-mode") {
+      const value = argv[index + 1];
+      if (!TRUST_ANCHOR_MODES.has(value)) return { error: "--trust-anchor-mode requires existing or new" };
+      output.trustAnchorMode = value;
+      index += 1;
+    } else if (arg === "--trust-anchor-directory") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || !isAbsolute(value)) return { error: "--trust-anchor-directory requires an absolute path" };
+      output.trustAnchorDirectory = value;
+      index += 1;
+    } else if (arg === "--trust-anchor-human-name") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--trust-anchor-human-name requires a non-empty attribution" };
+      output.trustAnchorHumanName = value;
+      index += 1;
+    } else if (arg === "--trust-anchor-existing-key") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) return { error: "--trust-anchor-existing-key requires an absolute path or the literal none" };
+      output.trustAnchorExistingKey = value;
+      index += 1;
+    } else if (arg === "--git-author-name") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--git-author-name requires a non-empty value" };
+      output.gitAuthorName = value;
+      index += 1;
+    } else if (arg === "--git-author-email") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--git-author-email requires a non-empty value" };
+      output.gitAuthorEmail = value;
+      index += 1;
+    } else if (arg === "--human-approval" || arg === "--push-approval") {
+      const value = argv[index + 1];
+      if (!PUSH_APPROVAL_MODES.has(value)) return { error: "--human-approval requires signature or chat" };
+      output.pushApproval = value;
+      index += 1;
+    } else if (arg === "--language") {
+      const value = argv[index + 1];
+      if (value !== "de" && value !== "en") return { error: "--language requires de or en" };
+      output.language = value;
+      index += 1;
+    } else if (arg === "--advisor-export-consent") {
+      const value = argv[index + 1];
+      if (!ADVISOR_EXPORT_CONSENT_MODES.has(value)) return { error: "--advisor-export-consent requires approved or declined" };
+      output.advisorExportConsent = value;
+      index += 1;
+    } else if (arg === "--help" || arg === "-h") {
+      output.help = true;
+    } else {
+      return { error: `unknown argument: ${arg}` };
+    }
+  }
+  if (!output.help && !output.root) return { error: "--root is required" };
+  const setupValues = [output.trustAnchorMode, output.trustAnchorDirectory, output.trustAnchorHumanName, output.trustAnchorExistingKey];
+  const identityValues = [output.gitAuthorName, output.gitAuthorEmail];
+  if (identityValues.some((value) => value !== undefined) && identityValues.some((value) => value === undefined)) {
+    return { error: "initial answers require both --git-author-name and --git-author-email" };
+  }
+  if ((identityValues.some((value) => value !== undefined) || output.pushApproval !== undefined) && !output.pushApproval) {
+    return { error: "initial answers require --human-approval" };
+  }
+  if (output.pushApproval !== undefined && output.language === undefined) return { error: "initial answers require --language" };
+  if (output.language !== undefined && output.pushApproval === undefined) return { error: "--language requires --human-approval" };
+  if (output.advisorExportConsent !== undefined && output.pushApproval === undefined) return { error: "--advisor-export-consent requires --human-approval" };
+  if (output.pushApproval !== undefined && output.advisorExportConsent === undefined) return { error: "initial answers require --advisor-export-consent" };
+  if (output.pushApproval !== undefined && !output.runner) return { error: "initial answers require an explicit --runner" };
+  if (output.pushApproval !== undefined && output.stepCap !== undefined) return { error: "initial answers do not accept --step-cap" };
+  if (output.pushApproval !== undefined && setupValues.some((value) => value !== undefined)) {
+    return { error: "initial answers do not accept trust-anchor bootstrap flags" };
+  }
+  if (setupValues.some((value) => value !== undefined)) {
+    if (setupValues.some((value) => value === undefined)) return { error: "trust-anchor bootstrap requires all four --trust-anchor-* flags" };
+    if (!output.runner) return { error: "trust-anchor bootstrap requires an explicit --runner" };
+    if (output.stepCap !== undefined) return { error: "trust-anchor bootstrap does not accept --step-cap" };
+    if (output.trustAnchorMode === "existing" && !isAbsolute(output.trustAnchorExistingKey)) {
+      return { error: "existing trust-anchor bootstrap requires an absolute --trust-anchor-existing-key path" };
+    }
+    if (output.trustAnchorMode === "new" && output.trustAnchorExistingKey !== "none") {
+      return { error: "new trust-anchor bootstrap requires --trust-anchor-existing-key none" };
+    }
+  }
+  return output;
+}
+
+function childEnvironment(env) {
+  if (!env) return null;
+  const override = env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE;
+  return typeof override === "string" && override.length > 0
+    ? { ...env, HOME: override, USERPROFILE: override }
+    : env;
+}
+
+function parseJsonFile(path, read) {
+  try { return JSON.parse(read(path, "utf8")); } catch { return null; }
+}
+
+function repositoryAnchors(policy) {
+  if (policy?.schema === CRITICAL_HUMAN_PROOF_POLICY_V3 && Array.isArray(policy.trustAnchors)) return policy.trustAnchors;
+  return policy?.trustAnchor && typeof policy.trustAnchor === "object" ? [policy.trustAnchor] : [];
+}
+
+function validAuthority(authority, humanName) {
+  return typeof authority?.keyReference === "string"
+    && typeof authority?.publicKeySha256 === "string"
+    && /^[a-f0-9]{64}$/u.test(authority.publicKeySha256)
+    && authority.humanName === humanName;
+}
+
+function recoveryReceiptMatches(receipt, { root, directory, authority, humanName }) {
+  return receipt?.schema === TRUST_ANCHOR_RECOVERY_SCHEMA
+    && receipt.root === root
+    && receipt.directory === directory
+    && receipt.humanName === humanName
+    && receipt.keyReference === authority?.keyReference
+    && receipt.publicKeySha256 === authority?.publicKeySha256;
+}
+
+function fileSnapshot(path, { exists, lstat, read }) {
+  if (!exists(path)) return { path, present: false, bytes: null, mode: null };
+  const stat = lstat(path);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return null;
+  return { path, present: true, bytes: read(path), mode: stat.mode & 0o777 };
+}
+
+function atomicReplaceFile(path, bytes, mode = 0o600) {
+  mkdirSync(dirname(path), { recursive: true });
+  const temporary = `${path}.trust-anchor-bootstrap-${randomBytes(12).toString("hex")}`;
+  let fd;
+  let created;
+  try {
+    fd = openSync(temporary, "wx", mode);
+    created = fstatSync(fd);
+    writeFileSync(fd, bytes);
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    renameSync(temporary, path);
+  } catch (error) {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve first failure */ } }
+    try {
+      const current = lstatSync(temporary);
+      if (created && current.dev === created.dev && current.ino === created.ino) unlinkSync(temporary);
+    } catch { /* unknown replacement is not ours to remove */ }
+    throw error;
+  }
+}
+
+function restoreSnapshots(snapshots, exists = existsSync) {
+  try {
+    for (const snapshot of [...snapshots].reverse()) {
+      if (snapshot.present) atomicReplaceFile(snapshot.path, snapshot.bytes, snapshot.mode);
+      else if (exists(snapshot.path)) unlinkSync(snapshot.path);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeOwnedPemImportDirectory(directory, { exists, lstat }) {
+  if (!exists(directory)) return true;
+  const allowed = new Set(["po-private.pem", "po-public.pem", "trust-policy.json"]);
+  try {
+    const names = readdirSync(directory);
+    if (names.some((name) => !allowed.has(name))) return false;
+    for (const name of names) {
+      const path = join(directory, name);
+      const stat = lstat(path);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return false;
+    }
+    for (const name of names) unlinkSync(join(directory, name));
+    rmdirSync(directory);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// A key already located at the canonical authority path is a reuse request, not
+// an import. Resolve physical identities so Windows drive-letter case and slash
+// spelling, as well as an alias to the same file, do not change this decision.
+function isCanonicalExistingKey(existingKey, targetDirectory) {
+  try {
+    const actual = realpathSync.native(existingKey);
+    const canonical = realpathSync.native(join(targetDirectory, "po-private.pem"));
+    return process.platform === "win32"
+      ? actual.toLowerCase() === canonical.toLowerCase()
+      : actual === canonical;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One attended first-anchor transaction owned by the public onboarding driver. The
+ * underlying setup command is deliberately not published as a raw shell command: this
+ * function supplies its exact argv, suppresses its JSON stdout (which contains filesystem
+ * paths), verifies both durable directory pointers, and materializes only the public
+ * key-reference/digest pair into the repository policy. The parent driver never reads or
+ * returns private-key bytes; the attended po-human-approval child exclusively owns key
+ * generation/import, and that child's ordinary stdout is suppressed from the driver JSON.
+ */
+export function applyTrustAnchorBootstrap({
+  rootDir,
+  mode,
+  directory,
+  humanName,
+  existingKey,
+  env = null,
+  runSetup = spawnSync,
+  runGit = spawnSync,
+  read = readFileSync,
+  exists = existsSync,
+  lstat = lstatSync,
+  writeMachine = writeMachinePlane,
+  writePolicy = atomicReplaceFile,
+} = {}) {
+  const root = resolve(rootDir);
+  const targetDirectory = resolve(directory);
+  const targetDirectoryExisted = exists(targetDirectory);
+  const effectiveEnv = childEnvironment(env) ?? process.env;
+  const policyPath = join(root, CRITICAL_HUMAN_PROOF_POLICY_PATH);
+  const existingPolicy = exists(policyPath) ? parseJsonFile(policyPath, read) : null;
+  if (exists(policyPath) && existingPolicy === null) return { ok: false, code: "TRUST-ANCHOR-REPOSITORY-POLICY-INVALID" };
+
+  const home = effectiveEnv.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE
+    ?? effectiveEnv.HOME
+    ?? effectiveEnv.USERPROFILE
+    ?? homedir();
+  const machineDependencies = { homedirFn: () => home };
+  const machinePath = machinePlaneFilePath(machineDependencies);
+  if (machinePath === null) return { ok: false, code: "TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE" };
+  const common = runGit("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    encoding: "utf8", shell: false, env: effectiveEnv,
+  });
+  if (!isSuccessfulSpawn(common)) return { ok: false, code: "TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED" };
+  const commonDir = resolve(root, String(common.stdout ?? "").trim());
+  const repositoryPointerPath = join(commonDir, "agent-pipeline", "po-key-directory.json");
+  const recoveryPath = join(commonDir, "agent-pipeline", "first-anchor-bootstrap-recovery.json");
+  const snapshots = [policyPath, machinePath, repositoryPointerPath]
+    .map((path) => fileSnapshot(path, { exists, lstat, read }));
+  if (snapshots.some((snapshot) => snapshot === null)) return { ok: false, code: "TRUST-ANCHOR-TRANSACTION-PREIMAGE-UNSAFE" };
+  let setupStarted = false;
+  const fail = (code) => {
+    if (!setupStarted) return { ok: false, code };
+    const stateRestored = restoreSnapshots(snapshots, exists);
+    const importedCopyRestored = mode !== "existing" || targetDirectoryExisted
+      || removeOwnedPemImportDirectory(targetDirectory, { exists, lstat });
+    return stateRestored && importedCopyRestored
+      ? { ok: false, code }
+      : { ok: false, code: `${code}-ROLLBACK-FAILED` };
+  };
+
+  const observedPlane = readMachinePlane(machineDependencies);
+  if (observedPlane.status === "invalid") return fail("TRUST-ANCHOR-MACHINE-PLANE-INVALID");
+  if (observedPlane.status === "valid"
+    && typeof observedPlane.plane.poKeyDirectory === "string"
+    && observedPlane.plane.poKeyDirectory.length > 0
+    && resolve(observedPlane.plane.poKeyDirectory) !== targetDirectory) {
+    return fail("TRUST-ANCHOR-MACHINE-CONFLICT");
+  }
+  const beforeRepositoryPointer = parseJsonFile(repositoryPointerPath, read);
+  if (beforeRepositoryPointer !== null
+    && resolve(beforeRepositoryPointer.poKeyDirectory ?? ".") !== targetDirectory) {
+    return fail("TRUST-ANCHOR-REPOSITORY-POINTER-CONFLICT");
+  }
+  const beforeAuthority = parseJsonFile(join(targetDirectory, "trust-policy.json"), read);
+  const recoveryReceipt = parseJsonFile(recoveryPath, read);
+  if (exists(recoveryPath)
+    && (mode !== "new" || !validAuthority(beforeAuthority, humanName)
+      || !recoveryReceiptMatches(recoveryReceipt, {
+        root, directory: targetDirectory, authority: beforeAuthority, humanName,
+      }))) {
+    return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-CONFLICT");
+  }
+  const recoveringNewAuthority = mode === "new" && recoveryReceipt !== null
+    && validAuthority(beforeAuthority, humanName)
+    && recoveryReceiptMatches(recoveryReceipt, {
+      root, directory: targetDirectory, authority: beforeAuthority, humanName,
+    });
+  const currentAnchors = repositoryAnchors(existingPolicy);
+  if (currentAnchors.length > 0) {
+    const same = currentAnchors.length === 1
+      && beforeAuthority !== null
+      && currentAnchors[0].keyReference === beforeAuthority.keyReference
+      && currentAnchors[0].publicKeySha256 === beforeAuthority.publicKeySha256;
+    if (!same) return fail("TRUST-ANCHOR-REPOSITORY-CONFLICT");
+    const pointersMatch = observedPlane.status === "valid"
+      && resolve(observedPlane.plane.poKeyDirectory ?? ".") === targetDirectory
+      && resolve(beforeRepositoryPointer?.poKeyDirectory ?? ".") === targetDirectory;
+    if (pointersMatch) {
+      if (recoveringNewAuthority) {
+        try { unlinkSync(recoveryPath); } catch { return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-CLEANUP-FAILED"); }
+      }
+      return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode, alreadyComplete: true };
+    }
+    return fail("TRUST-ANCHOR-PARTIAL-STATE-REQUIRES-NOVA-B");
+  }
+
+  const setupArgs = [
+    PO_HUMAN_APPROVAL_SCRIPT_PATH,
+    "setup",
+    "--repo-root", root,
+    "--directory", targetDirectory,
+    "--human-name", humanName,
+  ];
+  if (mode === "existing" && !isCanonicalExistingKey(existingKey, targetDirectory)) {
+    setupArgs.push("--existing-key", resolve(existingKey));
+  }
+  setupStarted = true;
+  if (!recoveringNewAuthority) {
+    const setup = runSetup(process.execPath, setupArgs, {
+      shell: false,
+      stdio: ["inherit", "ignore", "inherit"],
+      env: effectiveEnv,
+    });
+    if (!isSuccessfulSpawn(setup)) return fail("TRUST-ANCHOR-SETUP-FAILED");
+  }
+
+  const authority = parseJsonFile(join(targetDirectory, "trust-policy.json"), read);
+  if (!validAuthority(authority, humanName)) {
+    return fail("TRUST-ANCHOR-AUTHORITY-READBACK-FAILED");
+  }
+  if (mode === "new" && !recoveringNewAuthority) {
+    try {
+      atomicReplaceFile(recoveryPath, `${JSON.stringify({
+        schema: TRUST_ANCHOR_RECOVERY_SCHEMA,
+        root,
+        directory: targetDirectory,
+        humanName,
+        keyReference: authority.keyReference,
+        publicKeySha256: authority.publicKeySha256,
+      }, null, 2)}\n`);
+    } catch {
+      return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-WRITE-FAILED");
+    }
+  }
+
+  const anchoredAlready = currentAnchors.length === 1
+    && currentAnchors[0].keyReference === authority.keyReference
+    && currentAnchors[0].publicKeySha256 === authority.publicKeySha256;
+  if (currentAnchors.length > 0 && !anchoredAlready) return fail("TRUST-ANCHOR-REPOSITORY-CONFLICT");
+
+  // Bootstrap owns the repository pointer on every path that reaches here: the setup child writes the machine
+  // plane only (decision AC), so the pointer binding this repository to its key directory is written here.
+  try {
+    atomicReplaceFile(repositoryPointerPath, `${JSON.stringify({
+      schema: "pipeline.po-key-directory.v1",
+      poKeyDirectory: targetDirectory,
+      updatedAt: new Date().toISOString(),
+    }, null, 2)}\n`);
+  } catch {
+    return fail("TRUST-ANCHOR-REPOSITORY-POINTER-WRITE-FAILED");
+  }
+  const repositoryPointer = parseJsonFile(repositoryPointerPath, read);
+  if (resolve(repositoryPointer?.poKeyDirectory ?? ".") !== targetDirectory) {
+    return fail("TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED");
+  }
+  const nextPlane = observedPlane.status === "valid"
+    ? { ...observedPlane.plane, poKeyDirectory: targetDirectory, updatedAt: new Date().toISOString() }
+    : {
+      schema: MACHINE_PLANE_SCHEMA,
+      poKeyDirectory: targetDirectory,
+      pushApprovalDefault: "signature",
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    };
+  try { writeMachine(nextPlane, machineDependencies); }
+  catch { return fail("TRUST-ANCHOR-MACHINE-POINTER-WRITE-FAILED"); }
+  const machinePlane = readMachinePlane(machineDependencies);
+  if (machinePlane.status !== "valid" || resolve(machinePlane.plane.poKeyDirectory ?? ".") !== targetDirectory) {
+    return fail("TRUST-ANCHOR-MACHINE-POINTER-READBACK-FAILED");
+  }
+
+  if (!exists(policyPath)) return fail("TRUST-ANCHOR-REPOSITORY-POLICY-MISSING");
+  const stat = lstat(policyPath);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) {
+    return fail("TRUST-ANCHOR-REPOSITORY-POLICY-UNSAFE");
+  }
+  if (!anchoredAlready) {
+    const waivedKinds = Array.isArray(existingPolicy.waivedKinds) ? [...existingPolicy.waivedKinds] : [];
+    const nextPolicy = {
+      ...existingPolicy,
+      schema: CRITICAL_HUMAN_PROOF_POLICY_V3,
+      waivedKinds,
+      trustAnchors: [{ keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 }],
+    };
+    delete nextPolicy.trustAnchor;
+    try { writePolicy(policyPath, `${JSON.stringify(nextPolicy, null, 2)}\n`, stat.mode & 0o777); }
+    catch { return fail("TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-WRITE-FAILED"); }
+  }
+  const readback = parseJsonFile(policyPath, read);
+  const anchors = repositoryAnchors(readback);
+  if (anchors.length !== 1
+    || anchors[0].keyReference !== authority.keyReference
+    || anchors[0].publicKeySha256 !== authority.publicKeySha256) {
+    return fail("TRUST-ANCHOR-REPOSITORY-MATERIALIZATION-READBACK-FAILED");
+  }
+  if (mode === "new" && exists(recoveryPath)) {
+    try { unlinkSync(recoveryPath); }
+    catch { return fail("TRUST-ANCHOR-RECOVERY-RECEIPT-CLEANUP-FAILED"); }
+  }
+  return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode };
+}
+
+/**
+ * Applies the first driver question as one bounded, replayable transaction. The values
+ * remain argv data throughout: no shell string is assembled. Git identity is held in
+ * the root-bound private receipt until the first commit, never written to Git config here.
+ * The generated source is changed only at its validated approval scalars,
+ * and a repo-private receipt makes the per-repository confirmation durable across restart.
+ */
+export function applyInitialOnboardingAnswers({
+  rootDir,
+  runner,
+  gitAuthorName = null,
+  gitAuthorEmail = null,
+  pushApproval,
+  language,
+  advisorExportConsent = "declined",
+  trustAnchor = null,
+  env = null,
+  runGit = spawnSync,
+  applyTrustAnchor = applyTrustAnchorBootstrap,
+  afterInitialPublication = null,
+} = {}) {
+  const root = resolve(rootDir);
+  const effectiveEnv = childEnvironment(env) ?? process.env;
+  if (!RUNNERS.has(runner)) return { ok: false, code: "INITIAL-ANSWERS-RUNNER-INVALID" };
+  if (!PUSH_APPROVAL_MODES.has(pushApproval)) return { ok: false, code: "INITIAL-ANSWERS-PUSH-APPROVAL-INVALID" };
+  if (language !== "de" && language !== "en") return { ok: false, code: "INITIAL-ANSWERS-LANGUAGE-INVALID" };
+  if (!ADVISOR_EXPORT_CONSENT_MODES.has(advisorExportConsent)) return { ok: false, code: "INITIAL-ANSWERS-ADVISOR-CONSENT-INVALID" };
+  if (trustAnchor !== null) return { ok: false, code: "INITIAL-ANSWERS-TRUST-ANCHOR-CONFLICT" };
+  if (afterInitialPublication !== null && typeof afterInitialPublication !== "function") {
+    return { ok: false, code: "INITIAL-ANSWERS-PUBLISH-HOOK-INVALID" };
+  }
+  if ((gitAuthorName === null) !== (gitAuthorEmail === null)) return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-INCOMPLETE" };
+  if (gitAuthorName !== null && (![gitAuthorName, gitAuthorEmail].every((value) => typeof value === "string"
+    && value.trim().length > 0 && value.length <= 320 && !/[\r\n\0]/u.test(value)))) {
+    return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-INVALID" };
+  }
+
+  const sourcePath = join(root, "pipeline.user.yaml");
+  const manifestPath = join(root, "project", "pipeline.yaml");
+  let receiptPath;
+  let pendingPath = null;
+  let hostManaged = false;
+  const home = effectiveEnv.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE
+    ?? effectiveEnv.HOME
+    ?? effectiveEnv.USERPROFILE
+    ?? homedir();
+  const machineDependencies = { homedirFn: () => home };
+  const machinePath = machinePlaneFilePath(machineDependencies);
+  if (machinePath === null || !existsSync(sourcePath) || !existsSync(manifestPath)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-MISSING" };
+  let priorIntake;
+  try {
+    const repository = observeCodexOnboardingCapabilities({ rootDir: root, intent: "onboarding" });
+    if (repository.mode !== "local" && repository.mode !== "host-managed") {
+      return { ok: false, code: "INITIAL-ANSWERS-REPOSITORY-UNAVAILABLE" };
+    }
+    hostManaged = repository.mode === "host-managed";
+    const answerState = resolveInitialAnswersState(root, repository.mode, {
+      requireGit: repository.mode === "local",
+    });
+    receiptPath = answerState.receipt;
+    pendingPath = answerState.pending;
+    priorIntake = readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: repository.mode });
+  } catch { return { ok: false, code: "INITIAL-ANSWERS-INTAKE-UNAVAILABLE" }; }
+  if (hostManaged && gitAuthorName === null) {
+    return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-REQUIRED" };
+  }
+  const answerSha256 = createHash("sha256").update(JSON.stringify({
+    root, runner, gitAuthorName, gitAuthorEmail, pushApproval, language, advisorExportConsent,
+  })).digest("hex");
+  const transactionTargets = [
+    { role: "source", path: sourcePath },
+    { role: "machine", path: machinePath },
+    { role: "receipt", path: receiptPath },
+    { role: "manifest", path: manifestPath },
+  ];
+  const publishHostEntry = (role, path, bytes, mode) => {
+    if (role === "machine") writeMachinePlane(JSON.parse(bytes.toString("utf8")), machineDependencies);
+    else atomicReplaceFile(path, bytes, mode);
+    afterInitialPublication?.(role);
+  };
+  const completeLegacyManifest = () => {
+    const before = fileSnapshot(manifestPath, { exists: existsSync, lstat: lstatSync, read: readFileSync });
+    if (!before?.present) throw new Error("INITIAL-ANSWERS-JOURNAL-LEGACY-MANIFEST-UNSAFE");
+    const source = before.bytes.toString("utf8");
+    let observed;
+    try { observed = parseYaml(source)?.language?.human_facing; }
+    catch { throw new Error("INITIAL-ANSWERS-JOURNAL-LEGACY-MANIFEST-INVALID"); }
+    if (observed === language) return;
+    if (observed !== "en" || [...source.matchAll(/^language:\r?\n[ ]+human_facing:\s*"?(?:de|en)"?\s*$/gmu)].length !== 1) {
+      throw new Error("INITIAL-ANSWERS-JOURNAL-LEGACY-MANIFEST-DRIFT");
+    }
+    const next = source.replace(/^(language:\r?\n[ ]+human_facing):\s*"?(?:de|en)"?\s*$/mu, `$1: ${language}`);
+    atomicReplaceFile(manifestPath, next, before.mode);
+    afterInitialPublication?.("manifest");
+  };
+  if (hostManaged && existsSync(pendingPath)) {
+    try {
+      completeInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256,
+        targets: transactionTargets, publish: publishHostEntry, completeLegacy: completeLegacyManifest });
+    } catch (error) { return initialJournalFailure(error); }
+  }
+  const intakeLanguage = priorIntake.status === "present" ? priorIntake.value.values.language : null;
+  if (intakeLanguage !== null && intakeLanguage !== language) {
+    return { ok: false, code: "INITIAL-ANSWERS-INTAKE-LANGUAGE-CONFLICT" };
+  }
+  const snapshots = [sourcePath, machinePath, receiptPath, manifestPath]
+    .map((path) => fileSnapshot(path, { exists: existsSync, lstat: lstatSync, read: readFileSync }));
+  if (snapshots.some((snapshot) => snapshot === null)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-UNSAFE" };
+  const rollback = (code) => {
+    const filesRestored = restoreSnapshots(snapshots, existsSync);
+    return filesRestored ? { ok: false, code } : { ok: false, code: `${code}-ROLLBACK-FAILED` };
+  };
+
+  const currentPlane = readMachinePlane(machineDependencies);
+  if (currentPlane.status === "invalid") return { ok: false, code: "INITIAL-ANSWERS-MACHINE-PLANE-INVALID" };
+  let sourceBytes;
+  try { sourceBytes = readFileSync(sourcePath, "utf8"); }
+  catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-UNREADABLE" }; }
+  let manifestBytes;
+  try { manifestBytes = readFileSync(manifestPath, "utf8"); }
+  catch { return { ok: false, code: "INITIAL-ANSWERS-MANIFEST-UNREADABLE" }; }
+  const manifestLanguageLines = manifestBytes.match(/^language:\r?\n[ ]+human_facing:\s*(?:"?(?:de|en)"?)\s*$/gmu) ?? [];
+  if (manifestLanguageLines.length !== 1) return { ok: false, code: "INITIAL-ANSWERS-MANIFEST-SHAPE-INVALID" };
+  const pushApprovalLines = sourceBytes.match(/^\s*push_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
+  const humanApprovalLines = sourceBytes.match(/^\s*human_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
+  const advisorConsentLines = sourceBytes.match(/^advisor_export:\r?\n[ ]+consent:\s*"(?:approved|declined)"\s*$/gmu) ?? [];
+  const humanLanguageLines = sourceBytes.match(/^language:\r?\n(?:[ ]+agent_facing:\s*"(?:de|en)"\r?\n)?[ ]+human_facing:\s*"(?:de|en)"\s*$/gmu) ?? [];
+  if (pushApprovalLines.length !== 1 || humanApprovalLines.length > 1 || advisorConsentLines.length !== 1
+    || humanLanguageLines.length !== 1) {
+    return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" };
+  }
+  if (snapshots[2].present) {
+    let prior;
+    try { prior = JSON.parse(snapshots[2].bytes.toString("utf8")); }
+    catch { return { ok: false, code: "INITIAL-ANSWERS-RECEIPT-INVALID" }; }
+    if (prior?.schema !== PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
+      || prior.root !== root || prior.runner !== runner
+      || prior.pushApprovalPreference !== pushApproval
+      || prior.advisorExportConsent !== advisorExportConsent
+      || prior.gitAuthorName !== gitAuthorName || prior.gitAuthorEmail !== gitAuthorEmail
+      || (prior.language !== undefined && prior.language !== language)) {
+      return { ok: false, code: "INITIAL-ANSWERS-RECEIPT-CONFLICT" };
+    }
+    if (prior.language === language) {
+      const selected = JSON.stringify(pushApproval);
+      if (!pushApprovalLines[0].trim().endsWith(`: ${selected}`)
+        || humanApprovalLines.length !== 1
+        || !humanApprovalLines[0].trim().endsWith(`: ${selected}`)
+        || !advisorConsentLines[0].trim().endsWith(`: ${JSON.stringify(advisorExportConsent)}`)
+        || !humanLanguageLines[0].trim().endsWith(`: ${JSON.stringify(language)}`)) {
+        return { ok: false, code: "INITIAL-ANSWERS-SOURCE-DRIFT" };
+      }
+      if (currentPlane.status !== "valid"
+        || currentPlane.plane.pushApprovalDefault !== pushApproval
+        || currentPlane.plane.language !== language) {
+        return { ok: false, code: "INITIAL-ANSWERS-MACHINE-DRIFT" };
+      }
+      let manifestLanguage;
+      try { manifestLanguage = parseYaml(manifestBytes)?.language?.human_facing; }
+      catch { return { ok: false, code: "INITIAL-ANSWERS-MANIFEST-DRIFT" }; }
+      if (manifestLanguage !== language) {
+        return { ok: false, code: "INITIAL-ANSWERS-MANIFEST-DRIFT" };
+      }
+      return { ok: true, code: "INITIAL-ANSWERS-APPLIED", pushApprovalPreference: pushApproval,
+        language, advisorExportConsent, trustAnchor: "not-requested" };
+    }
+  }
+  let nextSource = sourceBytes.replace(
+    /^(\s*)push_approval:\s*"(?:signature|chat)"\s*$/mu,
+    `$1push_approval: ${JSON.stringify(pushApproval)}`,
+  );
+  nextSource = humanApprovalLines.length === 1
+    ? nextSource.replace(
+      /^(\s*)human_approval:\s*"(?:signature|chat)"\s*$/mu,
+      `$1human_approval: ${JSON.stringify(pushApproval)}`,
+    )
+    : nextSource.replace(
+      /^(\s*)push_approval:\s*"(?:signature|chat)"\s*$/mu,
+      `$1push_approval: ${JSON.stringify(pushApproval)}\n$1human_approval: ${JSON.stringify(pushApproval)}`,
+    );
+  nextSource = nextSource.replace(
+    /^(advisor_export:\r?\n[ ]+consent):\s*"(?:approved|declined)"\s*$/mu,
+    `$1: ${JSON.stringify(advisorExportConsent)}`,
+  );
+  nextSource = nextSource.replace(
+    /^(language:\r?\n(?:[ ]+agent_facing:\s*"(?:de|en)"\r?\n)?[ ]+human_facing):\s*"(?:de|en)"\s*$/mu,
+    `$1: ${JSON.stringify(language)}`,
+  );
+  const nextManifest = manifestBytes.replace(
+    /^(language:\r?\n[ ]+human_facing):\s*"?(?:de|en)"?\s*$/mu,
+    `$1: ${language}`,
+  );
+  let parsedSource;
+  try { parsedSource = parseYaml(nextSource); }
+  catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" }; }
+  if (!validatePipelineUserV3(parsedSource).ok) return { ok: false, code: "INITIAL-ANSWERS-SOURCE-VALIDATION-FAILED" };
+
+  const nextPlane = currentPlane.status === "valid"
+    ? { ...currentPlane.plane, pushApprovalDefault: pushApproval, language, updatedAt: new Date().toISOString() }
+    : {
+      schema: MACHINE_PLANE_SCHEMA,
+      poKeyDirectory: null,
+      pushApprovalDefault: pushApproval,
+      routing: null,
+      language,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    };
+  const nextReceipt = `${JSON.stringify({
+    schema: PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
+    root,
+    runner,
+    pushApprovalPreference: pushApproval,
+    advisorExportConsent,
+    language,
+    gitAuthorName,
+    gitAuthorEmail,
+    updatedAt: new Date().toISOString(),
+  }, null, 2)}\n`;
+  if (hostManaged) {
+    try {
+      const state = resolveInitialAnswersState(root, "host-managed", { create: true });
+      if (state.receipt !== receiptPath || state.pending !== pendingPath) {
+        return { ok: false, code: "INITIAL-ANSWERS-PRIVATE-STATE-DRIFT" };
+      }
+      const targets = [
+        { ...transactionTargets[0], postBytes: Buffer.from(nextSource), postMode: snapshots[0].mode,
+          expectedPre: { bytes: snapshots[0].bytes, mode: snapshots[0].mode } },
+        { ...transactionTargets[1], postBytes: Buffer.from(`${JSON.stringify(nextPlane, null, 2)}\n`), postMode: 0o600,
+          expectedPre: { bytes: snapshots[1].bytes, mode: snapshots[1].mode } },
+        { ...transactionTargets[2], postBytes: Buffer.from(nextReceipt), postMode: 0o600,
+          expectedPre: { bytes: snapshots[2].bytes, mode: snapshots[2].mode } },
+        { ...transactionTargets[3], postBytes: Buffer.from(nextManifest), postMode: snapshots[3].mode,
+          expectedPre: { bytes: snapshots[3].bytes, mode: snapshots[3].mode } },
+      ];
+      beginInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256, targets });
+      completeInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256,
+        targets, publish: publishHostEntry });
+    } catch (error) { return initialJournalFailure(error); }
+    return { ok: true, code: "INITIAL-ANSWERS-APPLIED", pushApprovalPreference: pushApproval,
+      language, advisorExportConsent, trustAnchor: "not-requested" };
+  }
+  try { atomicReplaceFile(sourcePath, nextSource, lstatSync(sourcePath).mode & 0o777); }
+  catch { return rollback("INITIAL-ANSWERS-SOURCE-WRITE-FAILED"); }
+  try { writeMachinePlane(nextPlane, machineDependencies); }
+  catch { return rollback("INITIAL-ANSWERS-MACHINE-WRITE-FAILED"); }
+  try {
+    atomicReplaceFile(receiptPath, nextReceipt);
+  } catch {
+    return rollback("INITIAL-ANSWERS-RECEIPT-WRITE-FAILED");
+  }
+  try { atomicReplaceFile(manifestPath, nextManifest, snapshots[3].mode); }
+  catch { return rollback("INITIAL-ANSWERS-MANIFEST-WRITE-FAILED"); }
+
+  let bootstrap = null;
+  if (trustAnchor !== null) {
+    bootstrap = applyTrustAnchor({ rootDir: root, ...trustAnchor, env: effectiveEnv });
+    if (!bootstrap.ok) return rollback(bootstrap.code);
+  }
+  return {
+    ok: true,
+    code: "INITIAL-ANSWERS-APPLIED",
+    pushApprovalPreference: pushApproval,
+    language,
+    advisorExportConsent,
+    trustAnchor: bootstrap?.code ?? "not-requested",
+  };
+}
+
+/**
+ * Runs one onboarding-cli invocation and classifies the outcome. Never throws: every
+ * failure mode (the process itself could not start, stdout was not valid JSON, or the
+ * process exited non-zero) is folded into a typed `ok: false` result the caller reports
+ * rather than crashes on.
+ */
+function runOnboardingStep({ executable, argv, run, env = null, projectRoot = null, timeout }) {
+  const options = { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024, timeout, killSignal: "SIGKILL" };
+  // Supplying `env` lets callers override what the spawned
+  // `project-onboarding-v3.mjs` CLI resolves its homedir against (see that script's own
+  // `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE` handling), extending across the process
+  // boundary the same injected-dependency pattern the in-process library callers already
+  // have (lib/machine-plane.mjs `homedirFn`). Explicit-`--root` actions with no supplied
+  // environment keep spawnSync's normal environment inheritance unchanged.
+  // Some returned project actions intentionally use the pipeline-state CLI,
+  // whose project selector is CLAUDE_PROJECT_DIR rather than --root. Bind only
+  // that closed, root-less shape: actions that already carry --root preserve
+  // their published argv and their normal child environment exactly as before.
+  const bindProjectRoot = typeof projectRoot === "string"
+    && projectRoot.length > 0
+    && Array.isArray(argv)
+    && !argv.includes("--root");
+  if (env || bindProjectRoot) {
+    const inherited = env ?? process.env;
+    const homedirOverride = inherited.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE;
+    // The project-onboarding CLI consumes the explicit variable above, while a few
+    // machine-plane helpers it delegates to still reach Node's process-level
+    // `os.homedir()` default. Keep both reads on the same caller-selected fixture home:
+    // POSIX resolves that default through HOME and Windows through USERPROFILE. Without
+    // this bridge, a driver call carrying an explicit hermetic home could still seed the
+    // real operator's registered key into the disposable project.
+    options.env = {
+      ...inherited,
+      ...(typeof homedirOverride === "string" && homedirOverride.length > 0
+        ? { HOME: homedirOverride, USERPROFILE: homedirOverride }
+        : {}),
+      ...(bindProjectRoot ? { CLAUDE_PROJECT_DIR: projectRoot } : {}),
+    };
+  }
+  const result = run(executable, argv, options);
+  if (result?.error?.code === "ETIMEDOUT") {
+    return { ok: false, faultCode: "execution-budget-exhausted", exitCode: result.status ?? null, stderr: "The child exceeded the remaining onboarding budget. Its operation may be partial; re-inspect before any retry." };
+  }
+  if (result?.error && !isSuccessfulSpawn(result)) {
+    return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? "") };
+  }
+  const exitCode = result?.status ?? null;
+  let parsed = null;
+  let parseFailed = false;
+  try {
+    parsed = JSON.parse(String(result?.stdout ?? ""));
+  } catch {
+    parseFailed = true;
+  }
+  if (parseFailed) {
+    return {
+      ok: false,
+      faultCode: "unparseable-output",
+      exitCode,
+      stdout: String(result?.stdout ?? "").slice(0, 4000),
+      stderr: String(result?.stderr ?? "").slice(0, 4000),
+    };
+  }
+  if (exitCode !== 0) {
+    return { ok: false, faultCode: "nonzero-exit", exitCode, output: parsed, stderr: String(result?.stderr ?? "").slice(0, 4000) };
+  }
+  return { ok: true, exitCode, output: parsed };
+}
+
+function isPlainSuccessfulCommandOutput(stepResult) {
+  if (stepResult?.faultCode !== "unparseable-output" || stepResult.exitCode !== 0) return false;
+  const trimmed = String(stepResult.stdout ?? "").trimStart();
+  // A JSON-shaped document that failed parsing is malformed protocol output,
+  // never a successful human-text command. Empty stdout and ordinary CLI
+  // status prose are both legitimate success shapes for a published command
+  // whose durable effect is observed by the following fresh inspect.
+  return !trimmed.startsWith("{") && !trimmed.startsWith("[");
+}
+
+function buildInspectArgv(root, runner) {
+  return runner === null
+    ? [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root]
+    : [ONBOARDING_SCRIPT_PATH, "inspect", "--root", root, "--runner", runner];
+}
+
+/**
+ * Deterministic, key-sorted JSON serialization used only to compare two `inspect`
+ * responses for equivalence (the re-anchor progress check in `driveOnboardingInit`). Plain
+ * `JSON.stringify` equality would already hold for two same-shaped objects produced by the
+ * same code path, but sorting keys first removes any dependence on insertion order, which
+ * is not part of the onboarding CLI's contract -- so this cannot flag a false "no progress"
+ * over a harmless key-ordering difference.
+ */
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map((entry) => canonicalJson(entry)).join(",")}]`;
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Reads `nextAction.pendingAsks` (the library's own sibling-ask channel;
+ * lib/project-onboarding-v3.mjs `withPendingAsksSurfacedOnNextAction()`) generically: this
+ * driver holds no knowledge of what any individual ask MEANS, only that a well-formed
+ * pending ask is an object carrying a string `kind` -- the same shape every `collect-input`
+ * action already uses elsewhere in this protocol, so recognizing it is protocol handling,
+ * not domain knowledge. Absent is not malformed -- most `nextAction`s carry none.
+ * Present-but-not-an-array, or an array with any entry that is not itself an object with a
+ * string `kind`, is malformed: reported rather than either crashed on or silently treated
+ * as "no pending asks" (NVA-V3-PENDINGASKS DoD 4).
+ */
+function extractPendingAsks(nextAction) {
+  const raw = nextAction && typeof nextAction === "object" ? nextAction.pendingAsks : undefined;
+  if (raw === undefined) return { present: false, malformed: false, asks: [] };
+  if (!Array.isArray(raw)) return { present: true, malformed: true, asks: [] };
+  const wellShaped = raw.every((entry) => entry !== null && typeof entry === "object" && typeof entry.kind === "string");
+  if (!wellShaped) return { present: true, malformed: true, asks: [] };
+  return { present: true, malformed: false, asks: raw };
+}
+
+// A planner may return an attended external action after the driver has
+// executed its safe, repository-local preparation step (for example, writing
+// the exact signature request).  Preserve its structured argv, but add the
+// shared bounded renderer before returning it to a runner.  Otherwise the
+// runner sees a long dynamic signing command without the copy-safe rendering
+// that the same action receives when surfaced directly by V4 inspection.
+function renderExternalOperatorAction(action) {
+  if (typeof action?.executable !== "string"
+    || !Array.isArray(action.argv)
+    || !action.argv.every((part) => typeof part === "string")) return action;
+  try {
+    const command = [action.executable, ...action.argv].map(shellWord).join(" ");
+    return {
+      ...action,
+      action: {
+        executable: action.executable,
+        argv: [...action.argv],
+        command,
+        copyCommand: boundedOpaqueCopyCommand(command),
+      },
+    };
+  } catch {
+    // The underlying external action remains authoritative.  Never substitute
+    // an invented rendering when an argv value is not safely renderable.
+    return action;
+  }
+}
+
+const TRUST_ANCHOR_BOOTSTRAP_FLAGS = new Set([
+  "--trust-anchor-mode",
+  "--trust-anchor-directory",
+  "--trust-anchor-human-name",
+  "--trust-anchor-existing-key",
+]);
+
+function isTrustAnchorAction(action) {
+  const argv = action?.applyAction?.argv;
+  return Array.isArray(argv) && argv.some((part) => TRUST_ANCHOR_BOOTSTRAP_FLAGS.has(part));
+}
+
+function initialAnswersActionWithoutTrustAnchor(action) {
+  if (!isTrustAnchorAction(action) || !action.applyAction.argv.includes("--human-approval")) return action;
+  const asksLanguage = action.inputs?.some((input) => input?.name === "language") === true;
+  const argv = [];
+  for (let index = 0; index < action.applyAction.argv.length; index += 1) {
+    const part = action.applyAction.argv[index];
+    if (TRUST_ANCHOR_BOOTSTRAP_FLAGS.has(part)) {
+      index += 1;
+      continue;
+    }
+    argv.push(part);
+  }
+  return {
+    ...action,
+    inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
+    guidance: `Collect this initial PO round: the repository-local Git author, shared human-approval policy, and explicit approved|declined repository-data export consent for the same-runner Advisor${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}. Declined keeps the Advisor disabled; never infer approval from using the Pipeline. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval, and later intake consent reuses the confirmed language without asking again. A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
+    applyAction: { ...action.applyAction, argv },
+  };
+}
+
+function persistedInitialPushApproval(root, repositoryCapability = "local") {
+  let receiptPath;
+  try { receiptPath = resolveInitialAnswersState(root, repositoryCapability).receipt; }
+  catch { return null; }
+  const receipt = parseJsonFile(receiptPath, readFileSync);
+  return receipt?.schema === PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
+    && receipt.root === root
+    && PUSH_APPROVAL_MODES.has(receipt.pushApprovalPreference)
+    ? receipt.pushApprovalPreference
+    : null;
+}
+
+function normalizeOnboardingDriverOutput(output, root) {
+  const nextAction = output?.nextAction;
+  if (!nextAction || typeof nextAction !== "object" || !Array.isArray(nextAction.pendingAsks)) return output;
+  const pushApproval = persistedInitialPushApproval(root, output?.repository?.mode ?? "local");
+  const pendingAsks = nextAction.pendingAsks
+    .map(initialAnswersActionWithoutTrustAnchor)
+    .filter((action) => pushApproval !== "chat" || !isTrustAnchorAction(action));
+  return pendingAsks.length === nextAction.pendingAsks.length
+    && pendingAsks.every((action, index) => action === nextAction.pendingAsks[index])
+    ? output
+    : { ...output, nextAction: { ...nextAction, pendingAsks } };
+}
+
+/**
+ * The driver loop itself. `run` (spawnSync-shaped: `(executable, argv, options) =>
+ * { status, stdout, stderr, error }`) is the sole injection seam, so tests can either
+ * spawn the real onboarding CLI against a real temporary directory, or supply a synthetic
+ * responder to exercise the step-cap path without a genuinely non-converging real chain.
+ *
+ * `env`, when supplied, is threaded into every spawned step's own `options.env`
+ * (`runOnboardingStep`) -- a caller-supplied override the default `spawnSync` respects
+ * exactly like any other spawn option. Left `null` (the default), a step's options carry
+ * no `env` key at all, so the child inherits the real process environment exactly as
+ * before this parameter existed. The intended use is threading a fixture `HOME` (via
+ * `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE`, honoured by `project-onboarding-v3.mjs`'s own
+ * `main()`) across the process boundary, so this driver's result does not depend on
+ * whatever machine-plane state happens to live under the real caller's `$HOME`
+ * (backlog: 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess).
+ */
+export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {} } = {}) {
+  const root = resolve(rootDir);
+  const steps = [];
+  if (!Number.isSafeInteger(runBudgetMs) || runBudgetMs < 1) throw new Error("runBudgetMs must be a positive safe integer");
+  const deadline = now() + runBudgetMs;
+  const seenCommandResponses = new Set();
+  const recovery = { kind: "command", executable: "node", argv: buildInspectArgv(root, runner), mutation: false, requiresConfirmation: false, guidance: "Re-inspect durable state before retrying; an interrupted command may have partially applied. Never replay its old mutation blindly." };
+  let executable = "node";
+  let argv = buildInspectArgv(root, runner);
+
+  // `isAnchorStep` marks the step about to run as the bootstrap/re-anchor `inspect` call,
+  // as opposed to a `command` action being executed from a previous result. `lastAnchorOutput`
+  // holds the most recent anchor's own response (null before the first one completes), for
+  // the progress comparison below. `executedSinceAnchor` becomes true once at least one
+  // non-anchor step has run since the last anchor -- re-anchoring requires it, so an anchor
+  // can never immediately re-anchor itself (see header comment).
+  let isAnchorStep = true;
+  let lastAnchorOutput = null;
+  let executedSinceAnchor = false;
+  let completedMigrationActivation = false;
+  // Retain the public action that led to a child failure.  Without this, an
+  // agent only receives a generic spawn error when (for example) a newly
+  // stamped Codex script permission is missing, even though the preceding
+  // inspection published the exact digest-bound repair.  This is diagnostic
+  // evidence, not permission to replay a possibly partial mutation: callers
+  // must re-inspect and use the newly returned action.
+  let attemptedAction = null;
+
+  for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
+    const remaining = Math.floor(deadline - now());
+    if (remaining < 1) return { schema: SCHEMA, runner, root, outcome: "execution-budget-exhausted", stepCap, stepsExecuted: steps.length, steps, recovery, final: lastAnchorOutput };
+    onStep({ step: stepIndex + 1, stepCap, remainingMs: remaining, isAnchor: isAnchorStep });
+    const stepResult = runOnboardingStep({ executable, argv, run, env, projectRoot: root, timeout: remaining });
+    steps.push({
+      executable,
+      argv,
+      exitCode: stepResult.exitCode,
+      faultCode: stepResult.ok ? null : stepResult.faultCode,
+    });
+
+    if (!stepResult.ok) {
+      if (!isAnchorStep && isPlainSuccessfulCommandOutput(stepResult)) {
+        // A command action is allowed to be an ordinary human-facing CLI, not
+        // another JSON protocol endpoint. Exit 0 is the success contract; its
+        // durable result is established by re-entering through the public
+        // inspect anchor, exactly like a parsed successful command that
+        // settles without nextAction. Never apply this to the anchor itself:
+        // inspect owns the JSON protocol and malformed/plain output there is
+        // still an error.
+        steps[steps.length - 1].faultCode = null;
+        steps[steps.length - 1].outputKind = "plain-success";
+        executable = "node";
+        argv = buildInspectArgv(root, runner);
+        isAnchorStep = true;
+        continue;
+      }
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "error",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        ...(stepResult.faultCode === "execution-budget-exhausted" ? { recovery } : {}),
+        error: {
+          faultCode: stepResult.faultCode,
+          exitCode: stepResult.exitCode,
+          stderr: stepResult.stderr ?? null,
+          stdout: stepResult.stdout ?? null,
+        },
+        blockedAction: attemptedAction === null ? null : {
+          action: attemptedAction,
+          priorStatus: typeof lastAnchorOutput?.status === "string" ? lastAnchorOutput.status : null,
+          diagnostics: Array.isArray(lastAnchorOutput?.diagnostics) ? lastAnchorOutput.diagnostics : [],
+          guidance: "The returned action could not be executed in this runner context. Re-run the public inspection; if it returns this action again, address its stated diagnostic before retrying. Do not reconstruct or blindly replay a stale mutating action.",
+        },
+        final: stepResult.output ?? null,
+      };
+    }
+
+    const output = normalizeOnboardingDriverOutput(stepResult.output, root);
+    const nextAction = output && typeof output === "object" ? output.nextAction : undefined;
+
+    // A mutation's advertised contract is the point at which a driver must
+    // stop. Replanning after an unexpected status can replay an identical
+    // digest-bound write indefinitely (or hide a rolled-back transaction).
+    if (!isAnchorStep && attemptedAction?.mutation === true
+      && Array.isArray(attemptedAction.expected?.statuses)
+      && (output?.schema !== attemptedAction.expected.schema
+        || !attemptedAction.expected.statuses.includes(output?.status))) {
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "error",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        error: { faultCode: "unexpected-mutation-outcome", exitCode: stepResult.exitCode, stderr: stepResult.stderr ?? null, stdout: stepResult.stdout ?? null },
+        blockedAction: { action: attemptedAction, priorStatus: lastAnchorOutput?.status ?? null, diagnostics: Array.isArray(output?.diagnostics) ? output.diagnostics : [] },
+        final: output,
+      };
+    }
+
+    const wasAnchorStep = isAnchorStep;
+    isAnchorStep = false;
+    if (wasAnchorStep) {
+      const previousAnchorOutput = lastAnchorOutput;
+      lastAnchorOutput = output;
+      executedSinceAnchor = false;
+      if (previousAnchorOutput !== null && canonicalJson(output) === canonicalJson(previousAnchorOutput)) {
+        // The step(s) executed since the previous anchor changed nothing the CLI's own
+        // state reports -- stop and say so explicitly rather than spending the remaining
+        // step cap re-anchoring at the same non-converging state (see header comment).
+        return {
+          schema: SCHEMA,
+          runner,
+          root,
+          outcome: "no-progress",
+          stepCap,
+          stepsExecuted: steps.length,
+          steps,
+          final: output,
+        };
+      }
+    } else {
+      executedSinceAnchor = true;
+      completedMigrationActivation ||= typeof argv[0] === "string"
+        && argv[0].endsWith("/runner-profile-migration-v3.mjs")
+        && argv[1] === "apply"
+        && argv.includes("--activate");
+    }
+
+    // A V4 `ready` readback after the exact migration activation completes the
+    // migration route. It may additionally advertise an optional Pipeline-State
+    // handover command, which belongs after this migration and must not obscure
+    // its terminal receipt. This exception is intentionally limited to that
+    // completed migration route: a greenfield V4 `ready` response still follows
+    // every published command nextAction through the generic path below. A
+    // required collect-input action is different: it remains on that generic
+    // path, as do genuine pending asks attached to the optional command. The
+    // flag is set only from the actual migration apply response, so a
+    // classification `inspect` can never claim readiness before planning and
+    // activation.
+    if (completedMigrationActivation
+      && wasAnchorStep
+      && output?.schema === "pipeline.project-onboarding.v4"
+      && output?.status === "ready"
+      && nextAction?.kind !== "collect-input") {
+      if (nextAction?.kind === "command") {
+        const pendingAsksInfo = extractPendingAsks(nextAction);
+        if (pendingAsksInfo.malformed) {
+          steps[steps.length - 1].pendingAsksFault = "malformed-pending-asks-ignored";
+        } else if (pendingAsksInfo.asks.length > 0) {
+          return {
+            schema: SCHEMA,
+            runner,
+            root,
+            outcome: "pending-asks",
+            stepCap,
+            stepsExecuted: steps.length,
+            steps,
+            pendingAsks: pendingAsksInfo.asks,
+            final: output,
+          };
+        }
+      }
+      return { schema: SCHEMA, runner, root, outcome: "ready", stepCap, stepsExecuted: steps.length, steps, final: output };
+    }
+
+    if (nextAction && typeof nextAction === "object" && nextAction.kind === "command") {
+      const pendingAsksInfo = extractPendingAsks(nextAction);
+      if (pendingAsksInfo.malformed) {
+        // Not stop-worthy -- malformed metadata cannot honestly be presented to a human as
+        // a question -- but not silently swallowed either: visible on the step record that
+        // is already carried in every terminal return below.
+        steps[steps.length - 1].pendingAsksFault = "malformed-pending-asks-ignored";
+      } else if (pendingAsksInfo.asks.length > 0) {
+        // A published pending ask exists on this exact step -- stop and surface it rather
+        // than executing straight past it (NVA-V3-PENDINGASKS). The command itself is left
+        // untouched on disk; a re-entrant run continues once the human (or the CLI command
+        // the ask names) resolves whatever made it pending.
+        return {
+          schema: SCHEMA,
+          runner,
+          root,
+          outcome: "pending-asks",
+          stepCap,
+          stepsExecuted: steps.length,
+          steps,
+          pendingAsks: pendingAsksInfo.asks,
+          final: output,
+        };
+      }
+
+      const argvValid = typeof nextAction.executable === "string"
+        && Array.isArray(nextAction.argv)
+        && nextAction.argv.every((part) => typeof part === "string");
+      if (!argvValid) {
+        return {
+          schema: SCHEMA,
+          runner,
+          root,
+          outcome: "error",
+          stepCap,
+          stepsExecuted: steps.length,
+          steps,
+          error: { faultCode: "malformed-command-action", exitCode: null, stderr: null, stdout: null },
+          final: output,
+        };
+      }
+      // Detect a command chain returning to an identical action and response.
+      // Do not replace inspect progress checks or stop a legitimate changing chain.
+      const responseKey = canonicalJson({ executable, argv, output });
+      if (!wasAnchorStep && seenCommandResponses.has(responseKey)) return { schema: SCHEMA, runner, root, outcome: "no-progress", stepCap, stepsExecuted: steps.length, steps, final: output };
+      if (!wasAnchorStep) seenCommandResponses.add(responseKey);
+      executable = nextAction.executable;
+      argv = nextAction.argv;
+      attemptedAction = {
+        kind: "command",
+        executable: nextAction.executable,
+        argv: [...nextAction.argv],
+        mutation: nextAction.mutation === true,
+        requiresConfirmation: nextAction.requiresConfirmation === true,
+        expected: nextAction.expected ?? null,
+      };
+      continue;
+    }
+
+    if (nextAction && typeof nextAction === "object" && nextAction.kind === "collect-input") {
+      const pendingAsksInfo = extractPendingAsks(nextAction);
+      if (pendingAsksInfo.malformed) {
+        steps[steps.length - 1].pendingAsksFault = "malformed-pending-asks-ignored";
+      }
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "collect-input",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        collectInput: nextAction,
+        // A collect-input action can ALSO carry sibling pendingAsks (a genuine question of
+        // its own, plus an unrelated pending ask on the same step) -- both are surfaced,
+        // neither lost (NVA-V3-PENDINGASKS DoD 3).
+        pendingAsks: pendingAsksInfo.asks,
+        final: output,
+      };
+    }
+
+    if (nextAction && typeof nextAction === "object" && nextAction.kind === "external-operator") {
+      const externalOperator = renderExternalOperatorAction(nextAction);
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "external-operator",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        externalOperator,
+        final: output,
+      };
+    }
+
+    const isUnappliedMigrationPlan = output?.schema === "pipeline.runner-profile-migration-plan.v3"
+      && output?.status === "ready"
+      && (output?.activation?.required === true || (Array.isArray(output?.changes) && output.changes.length > 0));
+
+    if ((nextAction === null || nextAction === undefined) && isUnappliedMigrationPlan) {
+      // A migration plan that still has mutations is not a readiness receipt.  In
+      // particular, do not re-anchor here: a later unrelated `inspect` could be
+      // ready while the published plan was never activated.  The plan contract
+      // requires its exact apply action, so a missing action is a terminal driver
+      // fault rather than permission to infer a recovery step.
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "error",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        error: { faultCode: "migration-action-missing", exitCode: null, stderr: null, stdout: null },
+        final: output,
+      };
+    }
+
+    if ((nextAction === null || nextAction === undefined)
+      && output?.status === "ready"
+      && wasAnchorStep
+      && !isUnappliedMigrationPlan) {
+      // A command action can return its own successful protocol document with
+      // `status: "ready"` (for example the digest-bound local settings merge).
+      // That is confirmation that the repair wrote successfully, not proof that
+      // the onboarding lifecycle is ready. Only a fresh inspect anchor may
+      // terminate this driver as ready; every executed command therefore
+      // re-enters through inspect below. The driver deliberately accepts its
+      // generic test protocol here too: the boundary is whether this was the
+      // anchor, not the schema string chosen by a test responder.
+      return { schema: SCHEMA, runner, root, outcome: "ready", stepCap, stepsExecuted: steps.length, steps, final: output };
+    }
+
+    if (nextAction === null || nextAction === undefined) {
+      if (executedSinceAnchor) {
+        // A step this driver EXECUTED settled with no `nextAction` and a non-"ready"
+        // status -- re-anchor on a fresh `inspect` rather than stopping (see header
+        // comment). This is the only place `isAnchorStep`/`argv` are reset outside the
+        // initial setup above.
+        executable = "node";
+        argv = buildInspectArgv(root, runner);
+        isAnchorStep = true;
+        continue;
+      }
+      // Reached with no executed step since the last anchor -- the anchoring `inspect`
+      // itself rested here (its own resting response, or a re-anchor that already passed
+      // the progress check above). Never re-anchor from here: that would re-run the
+      // identical anchor command with nothing having executed in between. E.g. a
+      // standalone recovery command's own plan response (`plan-partial-authority`'s
+      // `"selection-required"`, which uses a `selection` field instead of `nextAction`) --
+      // not reachable by a fresh repository's own `inspect` walk, but never guessed at if
+      // it somehow is: report and stop.
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "no-automatic-next-step",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        final: output,
+      };
+    }
+
+    // A `nextAction` with a kind this driver does not execute (e.g. `restart-process`,
+    // which needs an attended external terminal) -- reported honestly, never attempted.
+    return {
+      schema: SCHEMA,
+      runner,
+      root,
+      outcome: "unsupported-next-action",
+      stepCap,
+      stepsExecuted: steps.length,
+      steps,
+      final: output,
+    };
+  }
+
+  return { schema: SCHEMA, runner, root, outcome: "step-cap-exceeded", stepCap, stepsExecuted: steps.length, steps, final: null };
+}
+
+export function main(args = process.argv.slice(2), {
+  write = process.stdout.write.bind(process.stdout),
+  writeError = process.stderr.write.bind(process.stderr),
+  env = null,
+  applyInitialAnswers = applyInitialOnboardingAnswers,
+  applyTrustAnchor = applyTrustAnchorBootstrap,
+  drive = driveOnboardingInit,
+} = {}) {
+  const options = parseArgs(args);
+  if (options.help) {
+    write(`${usage()}\n`);
+    return 0;
+  }
+  if (options.error) {
+    writeError(`${usage()}\n${options.error}\n`);
+    return 2;
+  }
+  let bootstrap = null;
+  let initialAnswers = null;
+  if (options.pushApproval) {
+    initialAnswers = applyInitialAnswers({
+      rootDir: options.root,
+      runner: options.runner,
+      gitAuthorName: options.gitAuthorName ?? null,
+      gitAuthorEmail: options.gitAuthorEmail ?? null,
+      pushApproval: options.pushApproval,
+      language: options.language,
+      advisorExportConsent: options.advisorExportConsent,
+      trustAnchor: options.trustAnchorMode ? {
+        mode: options.trustAnchorMode,
+        directory: options.trustAnchorDirectory,
+        humanName: options.trustAnchorHumanName,
+        existingKey: options.trustAnchorExistingKey,
+      } : null,
+      env,
+    });
+    if (!initialAnswers.ok) {
+      write(`${JSON.stringify({ schema: SCHEMA, runner: options.runner, root: resolve(options.root), outcome: "error", initialAnswers }, null, 2)}\n`);
+      return 1;
+    }
+  } else if (options.trustAnchorMode) {
+    bootstrap = applyTrustAnchor({
+      rootDir: options.root,
+      mode: options.trustAnchorMode,
+      directory: options.trustAnchorDirectory,
+      humanName: options.trustAnchorHumanName,
+      existingKey: options.trustAnchorExistingKey,
+      env,
+    });
+    if (!bootstrap.ok) {
+      const recovery = {
+        kind: "external-operator",
+        code: "BTR-EXTERNAL-ATTENDED-RECOVERY",
+        executable: process.execPath,
+        argv: [BOOTSTRAP_TRUST_RECOVERY_SCRIPT_PATH, "plan", "--root", resolve(options.root),
+          "--mode", options.trustAnchorMode, "--directory", resolve(options.trustAnchorDirectory),
+          "--human-name", options.trustAnchorHumanName,
+          "--existing-key", options.trustAnchorExistingKey],
+        guidance: "The PO runs this plan in an external attended terminal, then its digest-bound apply. Terminal confirmation is audited and does not waive any approval gate.",
+      };
+      write(`${JSON.stringify({ schema: SCHEMA, runner: options.runner, root: resolve(options.root), outcome: "error", bootstrap, recovery }, null, 2)}\n`);
+      return 1;
+    }
+  }
+  const result = drive({ rootDir: options.root, runner: options.runner ?? null, stepCap: options.stepCap, env,
+    onStep: ({ step, stepCap, remainingMs, isAnchor }) => writeError(`[onboarding-init] step ${step}/${stepCap}: ${isAnchor ? "inspect" : "published action"}; budget ${remainingMs}ms\n`),
+  });
+  if (bootstrap) result.bootstrap = bootstrap;
+  if (initialAnswers) result.initialAnswers = initialAnswers;
+  const printed = result.outcome === "pending-asks" && Array.isArray(result.pendingAsks)
+    && result.final?.nextAction && Array.isArray(result.final.nextAction.pendingAsks)
+    ? { ...result, final: { ...result.final,
+        nextAction: Object.fromEntries(Object.entries(result.final.nextAction)
+          .filter(([key]) => key !== "pendingAsks")) } }
+    : result;
+  write(`${JSON.stringify(printed)}\n`);
+  return result.outcome === "ready"
+    || result.outcome === "collect-input"
+    || result.outcome === "external-operator"
+    || result.outcome === "pending-asks"
+    || ((initialAnswers !== null || bootstrap !== null) && result.outcome === "unsupported-next-action") ? 0 : 1;
+}
+
+if (isDirectInvocation(import.meta.url)) process.exit(main());

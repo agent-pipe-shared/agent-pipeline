@@ -1,0 +1,834 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * pre-push-hook-install — installs/removes a git-level `.git/hooks/pre-push` backstop
+ * for guard-push.mjs's Push-Gate (NVA-PREPUSH-1).
+ *
+ * WHY THIS FILE EXISTS
+ *   guard-push.mjs (plugins/pipeline-core/hooks/guard-push.mjs) only intercepts an
+ *   agent's own Bash/PowerShell tool calls inside a live, supervised session. A push
+ *   issued by a sub-process the session merely spawns, by a human running `git push`
+ *   directly, or after the plugin hook layer has failed to load at all, is invisible to
+ *   it -- see plugins/pipeline-core/lib/protected-test-paths.mjs ("NOT COVERED").
+ *   Commit a8f861cc removed an earlier, broken attempt at exactly this same file: it
+ *   fell open whenever no session env var was set, hardcoded a repo-relative guard
+ *   path, and reconstructed `git push $1` from argv even though git's own pre-push
+ *   contract delivers ref updates on stdin, not argv. This rebuild fixes all three
+ *   (see generated hook's own header, `renderImpl` below, for the point-by-point fix).
+ *
+ * WHAT THIS INSTALLS
+ *   Two files, both generated, both attributed to this script's own version:
+ *     - `<git-common-dir>/hooks/pre-push` (or wherever `core.hooksPath` points): a tiny
+ *       POSIX `/bin/sh` shim. A shim, not the real logic, because a bare hook file
+ *       (no `.mjs` extension) has ambiguous Node module-type detection across the wide
+ *       range of Node versions a consumer project might run; `exec`-ing a real `.mjs`
+ *       file removes that ambiguity entirely regardless of Node version.
+ *     - `<git-common-dir>/agent-pipeline/pre-push-hook/impl.mjs`: the actual ESM
+ *       evaluation logic, importing the pipeline's OWN already-exported lib helpers
+ *       (never a copy) from an absolute path fixed at this exact install.
+ *   Plus an install marker at `<git-common-dir>/agent-pipeline/pre-push-hook/
+ *   install-marker.json` recording what was written and its content hash, so removal
+ *   can prove it is deleting exactly what THIS installer wrote and never a hook a human
+ *   already had (`planInstall`/`planRemoval` below).
+ *
+ * NOT installed anywhere as a side effect of running this script directly -- callers
+ * decide when to `applyInstall`. NVA-PREPUSH-1 explicitly does not install it into this
+ * repository's own checkout (a release is mid-flight).
+ */
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, chmodSync, rmdirSync, closeSync, constants, fchmodSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, openSync, readSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
+import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+import { ensureHardenedPrivateDirectory } from "../lib/hardened-private-directory.mjs";
+function decorateInstalledImpl(content, pluginLibDir, deadline) {
+  const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/pre-push-hook\/runtime-([a-f0-9]{64}))\/lib$/);
+  if (!matched) return content;
+  const runtimeSnapshot = {root:matched[1],manifestSha256:matched[2]};
+  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256,deadline});
+  if (content.split("  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);").length !== 2) throw Error("GHA-RENDER-ANCHOR");
+  return content.replace("  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);", "  if (!await admitPipelineScope(projectRoot)) return;\n  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);") + renderGitHookSnapshotAdmission(runtimeSnapshot);
+}
+
+
+/** Final installer artifact durability; writable descriptor works on native Windows. */
+function writeDurableInstallArtifact(path, content, mode) {
+  const bytes = Buffer.from(content, "utf8");
+  const fd = openSync(path, constants.O_CREAT | constants.O_RDWR | (constants.O_NOFOLLOW ?? 0), mode);
+  try {
+    const before = fstatSync(fd), original = lstatSync(path);
+    if (!before.isFile() || before.nlink !== 1 || original.isSymbolicLink() || !original.isFile() || original.nlink !== 1
+        || before.dev !== original.dev || before.ino !== original.ino || before.uid !== original.uid || before.gid !== original.gid) throw Error("PRE-PUSH-INSTALL-ARTIFACT-CUSTODY");
+    ftruncateSync(fd, 0);
+    writeFileSync(fd, bytes);
+    fchmodSync(fd, mode);
+    fsyncSync(fd);
+    const observed = Buffer.alloc(bytes.length);
+    let count = 0;
+    while (count < observed.length) {
+      const read = readSync(fd, observed, count, observed.length - count, count);
+      if (read === 0) break;
+      count += read;
+    }
+    const after = fstatSync(fd), physical = lstatSync(path);
+    if (count !== bytes.length || !observed.equals(bytes) || after.size !== bytes.length
+        || physical.isSymbolicLink() || !physical.isFile() || after.nlink !== 1 || physical.nlink !== 1
+        || before.dev !== after.dev || before.ino !== after.ino || after.dev !== physical.dev || after.ino !== physical.ino
+        || before.uid !== after.uid || before.gid !== after.gid || after.uid !== physical.uid || after.gid !== physical.gid
+        || (process.platform !== "win32" && ((after.mode & 0o777) !== mode || (physical.mode & 0o777) !== mode))) throw Error("PRE-PUSH-INSTALL-ARTIFACT-READBACK");
+  } finally { closeSync(fd); }
+}
+
+export const INSTALLER_VERSION = "1";
+export const MARKER_SCHEMA = "pipeline.pre-push-hook-install.v1";
+// NVA-PREPUSHOFFER-1: a human declining the onboarding offer for this hook is
+// recorded so a later bootstrap can report "not installed, declined on <date>"
+// instead of asking indefinitely -- deliberately its own marker file, never
+// folded into MARKER_SCHEMA's install marker, so an install and a decline can
+// never be confused for one another and a later install never has to first
+// erase a decline record to proceed (declining is not a permanent refusal).
+export const DECLINE_MARKER_SCHEMA = "pipeline.pre-push-hook-decline.v1";
+
+// This installer's own plugin root -- same self-location idiom guard-push.mjs and
+// guard-lifecycle-ready.mjs already use (`resolve(dirname(fileURLToPath(import.meta.
+// url)), "..")`), never a second mechanism.
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const DEFAULT_PLUGIN_LIB_DIR = join(PLUGIN_ROOT, "lib");
+
+function sha256(text) {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/**
+ * Resolves the repository's own git-common-dir and hook path FROM THE REPOSITORY,
+ * never from a session environment variable or an assumed cwd -- the second and
+ * third defects the removed workaround (a8f861cc) carried. `git rev-parse` is asked
+ * for the answer directly; if it cannot answer, installation/removal both refuse
+ * rather than guess (fail-closed, matching the generated hook's own doctrine).
+ */
+function resolveGitPaths(rootDir) {
+  // NVA-R9-PREPUSHHOOK: `stdio` pins stdin/stderr to "ignore" -- stdout stays piped
+  // (captured into the returned string) unchanged. Onboarding now calls this
+  // unconditionally on every apply (install-by-default), including against fixtures
+  // whose `.git` is not a real repository; without this, git's own "fatal: not a git
+  // repository" diagnostic leaked to the parent process's stderr on every such call,
+  // even though it was already caught and handled as a plain resolution failure below.
+  const run = (args) => execFileSync("git", args, { cwd: rootDir, encoding: "utf8", timeout: 10000, stdio: ["ignore", "pipe", "ignore"] }).trim();
+  let commonDir;
+  let hookPath;
+  try {
+    commonDir = run(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    hookPath = run(["rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-push"]);
+  } catch {
+    return null;
+  }
+  return { commonDir, hookPath };
+}
+
+function markerPath(commonDir) {
+  return join(commonDir, "agent-pipeline", "pre-push-hook", "install-marker.json");
+}
+function implPath(commonDir) {
+  return join(commonDir, "agent-pipeline", "pre-push-hook", "impl.mjs");
+}
+function declineMarkerPath(commonDir) {
+  return join(commonDir, "agent-pipeline", "pre-push-hook", "decline-marker.json");
+}
+
+function readMarkerRecord(commonDir) {
+  try {
+    const raw = readFileSync(markerPath(commonDir), "utf8");
+    const marker = JSON.parse(raw);
+    if (marker?.schema !== MARKER_SCHEMA) return null;
+    return { marker, raw };
+  } catch {
+    return null;
+  }
+}
+
+function readMarker(commonDir) {
+  return readMarkerRecord(commonDir)?.marker ?? null;
+}
+
+function readDeclineMarker(commonDir) {
+  try {
+    const parsed = JSON.parse(readFileSync(declineMarkerPath(commonDir), "utf8"));
+    if (parsed?.schema !== DECLINE_MARKER_SCHEMA) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function renderMarker(marker) {
+  return `${JSON.stringify(marker, null, 2)}\n`;
+}
+
+function expectedArtifacts({ hookPath, commonDir, pluginLibDir, installedAt, deadline }) {
+  const impl = implPath(commonDir);
+  const implContent = decorateInstalledImpl(renderImpl(pluginLibDir), pluginLibDir, deadline);
+  const shimContent = renderShim(impl);
+  const marker = {
+    schema: MARKER_SCHEMA,
+    installerVersion: INSTALLER_VERSION,
+    installedAt,
+    hookPath,
+    implPath: impl,
+    pluginLibDir,
+    hookSha256: sha256(shimContent),
+    implSha256: sha256(implContent),
+  };
+  return { impl, implContent, shimContent, marker, markerContent: renderMarker(marker) };
+}
+
+/**
+ * Proves that the three installed artifacts still belong together before an install is
+ * allowed to replace them. The marker records the exact artifact hashes at installation;
+ * comparing it to the current renderer would instead misclassify every legitimate renderer
+ * upgrade as a foreign hook. Currentness is evaluated separately by `planInstall`.
+ */
+function installedArtifactsMatch({ hookPath, commonDir, pluginLibDir, record }) {
+  const { marker, raw } = record;
+  if (marker?.schema !== MARKER_SCHEMA || marker?.installerVersion !== INSTALLER_VERSION
+    || typeof marker?.installedAt !== "string" || marker.installedAt.trim() === ""
+    || marker.hookPath !== hookPath || marker.implPath !== implPath(commonDir)
+    || marker.pluginLibDir !== pluginLibDir
+    || !/^[a-f0-9]{64}$/u.test(marker.hookSha256 ?? "")
+    || !/^[a-f0-9]{64}$/u.test(marker.implSha256 ?? "")) return false;
+  let hookContent;
+  let implContent;
+  try {
+    hookContent = readFileSync(hookPath, "utf8");
+    implContent = readFileSync(marker.implPath, "utf8");
+  } catch {
+    return false;
+  }
+  return raw === renderMarker(marker)
+    && sha256(hookContent) === marker.hookSha256
+    && sha256(implContent) === marker.implSha256;
+}
+
+/** The `/bin/sh` shim installed at the actual hook path. `implAbsPath` is DATA baked in
+ * at install time (this exact repository's resolved impl.mjs location), not a guess. */
+export function renderShim(implAbsPath) {
+  return [
+    "#!/bin/sh",
+    "# GENERATED by plugins/pipeline-core/scripts/pre-push-hook-install.mjs -- do not hand-edit.",
+    "# Re-run the installer to update; use its --remove verb to uninstall cleanly.",
+    `exec node ${JSON.stringify(implAbsPath)} "$@"`,
+    "",
+  ].join("\n");
+}
+
+/** The real ESM evaluation logic. `pluginLibDir` is baked in as an absolute path fixed
+ * at install time (DoD (b)) -- see this function's own generated header for the full
+ * scope/fail-closed contract. Kept as one exported render function (never copied
+ * inline at each call site) so the installed hook's content stays byte-identical to
+ * whatever `pre-push-hook-install.test.mjs` exercises. */
+export function renderImpl(pluginLibDir) {
+  const lib = JSON.stringify(pluginLibDir);
+  return `#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * pre-push (agent-pipeline generated, installer v${INSTALLER_VERSION}) -- git-level
+ * backstop for the Push-Gate guard-push.mjs enforces inside an agent session.
+ *
+ * GENERATED FILE. Installed by plugins/pipeline-core/scripts/pre-push-hook-install.mjs.
+ * Do not hand-edit -- re-run the installer to update, or use its --remove verb.
+ *
+ * WHY THIS FILE EXISTS
+ *   guard-push.mjs only intercepts an agent's OWN Bash/PowerShell tool calls inside a
+ *   live session. A push issued by a spawned sub-process, by a human running \`git
+ *   push\` directly, or after the plugin hook layer has failed to load at all, was never
+ *   evaluated by anything (plugins/pipeline-core/lib/protected-test-paths.mjs, "NOT
+ *   COVERED"; commit a8f861cc removed an earlier, broken attempt at this same file).
+ *   This hook closes that gap at the one place every one of those paths must still
+ *   pass through: git's own pre-push contract.
+ *
+ * SCOPE (deliberately narrower than guard-push.mjs -- see the NVA-PREPUSH-1 dispatch
+ * report for the full reasoning; this is a backstop, not a full replacement):
+ *   - (a) evidence/verify-latest.json freshness + exact pushed-commit binding.
+ *   - (b) evidence/security-latest.json v1 candidate binding, when gates.security is
+ *     configured and not "off".
+ *   - (b.2) the v2 policy-complete verdict, via the SAME exported
+ *     \`checkSecurityCompleteness\` guard-push.mjs itself calls -- reused, not copied.
+ *   - (c) push approval, GENERAL MODE ONLY: gates.push.approval === "standing-approved"
+ *     auto-passes; otherwise state.pushApproval.lastApproved.forCommit/destination must
+ *     match this exact push. This is "necessary but not sufficient" under guard-
+ *     push.mjs's own signature-mode contract -- NOT mirrored here: the Ed25519
+ *     critical-proof chain, the refs/heads/main fixed-publication-executor boundary,
+ *     the anonymous-public-push identity checks, the external push ledger, the H-AC-12
+ *     decision-reference dual-evaluation, and the deploy-release branch. Those are
+ *     self-application-specific, orchestration-specific, or session-anchored
+ *     mechanisms that a bare git hook firing with no agent session cannot faithfully
+ *     reconstruct. A repository relying on the critical-proof chain for real protection
+ *     (this Pipeline repository included) still needs guard-push.mjs's in-session gate
+ *     for that half -- this hook is the evidence/approval backstop, not a substitute.
+ *   - (d) the FEATURE-CHECKPOINT lane (PUSHSIG; specs/sprint-alfred-epic/design/
+ *     feature-branch-push-signature-design.md, 3.5). This is the ONE exception to the (c)
+ *     note above: in "signature" mode -- the default, and also what an unreadable proof
+ *     policy resolves to -- a checkpoint push is admitted only with a current Ed25519
+ *     "push" approval bound to this exact commit, remote name, destination, threat model
+ *     and plan/spec authority, verified by the SAME shared checkCheckpointPushApproval the
+ *     in-session guard calls (lib/checkpoint-push-approval.mjs; reused, never copied). No
+ *     Verify/security evidence is read for it. The trust anchor and the mode lookup are
+ *     read from this repository's own root (a hook is per repository). "chat" and
+ *     "standing-approved" keep admitting a clean exact checkpoint without an approval. In
+ *     signature mode the one tolerated dirty entry is the tracked state record that
+ *     approve-push rewrites after signing (" M <state path>", classified by the shared
+ *     classifyCheckpointPorcelain on the RAW porcelain text); any other dirt blocks. The
+ *     approval binds the remote NAME, so a push addressed by URL is never admitted here.
+ *     A failure to load the shared module is a fault and blocks like every other fault.
+ *
+ * FAIL-CLOSED, DELIBERATELY UNLIKE THE PLUGIN GUARD FAMILY'S FAIL-OPEN CONVENTION
+ *   Every plugin PreToolUse guard (guard-push.mjs included) fails OPEN on unparseable
+ *   input or an unanticipated fault -- "never silent-block" is the documented contract,
+ *   because that guard is a safety net layered on top of a live, supervised session.
+ *   This hook exists precisely for the moment that supervision is gone, so here
+ *   "cannot tell" must not mean "allow". An unresolved repository root, a manifest that
+ *   IS present but unreadable/unparseable, missing or corrupt evidence, an unreadable
+ *   push-approval state file, or any other unexpected exception all BLOCK the push.
+ *
+ * THE HUMAN ESCAPE, AND ITS OWN LIMIT
+ *   \`git push --no-verify\` skips every git hook, this one included -- git's own
+ *   documented behaviour, and the accepted operator escape so a human is never stuck.
+ *   Precisely because git does not invoke the hook at all under --no-verify, this file
+ *   CANNOT record a bypass -- nothing runs to record it. What it DOES do: append a
+ *   durable record of every push it DOES see (allowed or blocked) to
+ *   <git-common-dir>/agent-pipeline/pre-push-hook/log.jsonl. A later check comparing
+ *   the remote's actual tip against these records is what would make a --no-verify
+ *   push detectable after the fact (not built in this dispatch -- the record shape is
+ *   designed to make that check possible later).
+ *
+ * INSTALL-TIME BINDING
+ *   PLUGIN_LIB_DIR below is fixed by the installer at install time -- DATA, not a
+ *   repo-relative guess. If that plugin copy later moves or is removed, every push
+ *   blocks (fail-closed, per above) with a diagnostic naming the failure, until the
+ *   hook is reinstalled or removed.
+ */
+import { spawnSync } from "node:child_process";
+import { readFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
+
+const PLUGIN_LIB_DIR = ${lib};
+const HOOK_LOG_SCHEMA = "pipeline.pre-push-hook-log.v1";
+const ZERO_OID = /^0{40}$|^0{64}$/;
+
+function git(args, cwd) {
+  return spawnSync("git", args, { cwd, encoding: "utf8", timeout: 10000 });
+}
+
+function resolveProjectRoot() {
+  const result = git(["rev-parse", "--show-toplevel"], process.cwd());
+  return result.status === 0 && result.stdout?.trim() ? result.stdout.trim() : null;
+}
+
+function resolveGitCommonDir() {
+  const result = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], process.cwd());
+  return result.status === 0 && result.stdout?.trim() ? result.stdout.trim() : null;
+}
+
+function resolveEvidenceProjectRoot(projectRoot, commonDir) {
+  // Verify and security-scan publish their mutable latest evidence once per
+  // repository, at the primary worktree that owns the shared git common dir.
+  // A linked worktree must therefore read the same canonical location.
+  return basename(commonDir) === ".git" ? dirname(commonDir) : projectRoot;
+}
+
+function recordLog(commonDir, entry) {
+  if (!commonDir) return;
+  try {
+    const dir = join(commonDir, "agent-pipeline", "pre-push-hook");
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    appendFileSync(
+      join(dir, "log.jsonl"),
+      \`\${JSON.stringify({ schema: HOOK_LOG_SCHEMA, at: new Date().toISOString(), ...entry })}\\n\`,
+      { encoding: "utf8", mode: 0o600 },
+    );
+  } catch {
+    // The push verdict must never depend on the log write succeeding -- an unwritable
+    // log is a durability problem, not grounds to revisit a fail-closed decision that
+    // was already made either way by the time this runs.
+  }
+}
+
+export function parseRefUpdates(stdinText) {
+  const updates = [];
+  for (const line of stdinText.split("\\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const parts = trimmed.split(/\\s+/);
+    if (parts.length !== 4) continue; // malformed line -- ignored, never fabricated
+    const [localRef, localSha, remoteRef, remoteSha] = parts;
+    updates.push({ localRef, localSha, remoteRef, remoteSha, isDelete: ZERO_OID.test(localSha) });
+  }
+  return updates;
+}
+
+function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, classify, validCheckpointIntent, checkpointAuditRecord, recordCheckpointPushAttempt, approvalPolicy) {
+  if (classify.lane !== "feature-checkpoint") return null;
+  if (localRef !== remoteRef) {
+    return "checkpoint source and destination must be the same explicit feature ref";
+  }
+  const head = git(["-C", projectRoot, "rev-parse", "--verify", "HEAD^{commit}"], projectRoot);
+  if (head.status !== 0 || head.stdout.trim() !== commit) return "checkpoint source is not the clean checked-out candidate";
+  const status = git(["-C", projectRoot, "status", "--porcelain"], projectRoot);
+  if (status.status !== 0) return "checkpoint working tree is not clean";
+  // The RAW porcelain text, never trimmed: entries start with a significant space (PUSHSIG 3.4).
+  // Clean decision = clean || (signatureMode && approvalRecordOnly); every other mode keeps the
+  // strict "no entries at all" reading it always had.
+  const porcelain = approvalPolicy.classifyCheckpointPorcelain(status.stdout, [approvalPolicy.stateRelPath]);
+  if (!(porcelain.clean || (approvalPolicy.signatureMode && porcelain.approvalRecordOnly))) return "checkpoint working tree is not clean";
+  const trailers = git(["-C", projectRoot, "show", "-s", "--format=%(trailers:key=Checkpoint-Intent,valueonly)", commit], projectRoot);
+  const values = trailers.status === 0 ? trailers.stdout.split("\\n").map((value) => value.trim()).filter(Boolean) : [];
+  if (values.length !== 1 || !validCheckpointIntent(values[0])) return "checkpoint candidate needs exactly one bounded Checkpoint-Intent commit trailer";
+  const tree = git(["-C", projectRoot, "rev-parse", String(commit) + "^{tree}"], projectRoot);
+  if (tree.status !== 0) return "checkpoint candidate tree cannot be resolved";
+  if (approvalPolicy.signatureMode) {
+    // Signature mode: a current, commit-bound Ed25519 approval, checked AFTER the eligibility
+    // messages above (so they keep appearing first) and BEFORE the audit write (an unapproved
+    // push leaves no checkpoint-attempt record). Any unreadable state is an absent approval.
+    let state = null;
+    try {
+      state = JSON.parse(readFileSync(join(projectRoot, approvalPolicy.stateRelPath), "utf8"));
+    } catch {
+      state = null;
+    }
+    const verdict = approvalPolicy.checkCheckpointPushApproval({
+      projectDir: projectRoot,
+      anchorDir: projectRoot,
+      state,
+      candidate: { commit, tree: tree.stdout.trim() },
+      remote,
+      destination: remoteRef,
+      now: new Date().toISOString(),
+    });
+    if (verdict?.ok !== true) {
+      // Fixed texts only: the remote (a possibly credential-bearing URL) is never interpolated (SEC-01).
+      return "checkpoint push: signature mode requires a current approval bound to this exact commit, remote and destination ("
+        + String(verdict?.code ?? "CHECKPOINT-APPROVAL-VERIFIER-FAULT") + ": " + String(verdict?.reason ?? "no verdict") + ").";
+    }
+  }
+  const record = checkpointAuditRecord({ commit, tree: tree.stdout.trim(), remote, destination: remoteRef, intent: values[0] });
+  if (!record) return "checkpoint audit record cannot be constructed";
+  const audit = recordCheckpointPushAttempt({ projectDir: projectRoot, record });
+  return audit.ok ? null : audit.reason;
+}
+
+export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit) {
+  const failures = [];
+  let raw;
+  try {
+    raw = readFileSync(join(projectRoot, relPath), "utf8");
+  } catch {
+    failures.push(\`\${relPath} missing.\`);
+    return failures;
+  }
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (error) {
+    failures.push(\`\${relPath} is corrupted (invalid JSON: \${error.message}).\`);
+    return failures;
+  }
+  if (data?.exitCode !== 0) failures.push(\`\${relPath}: exitCode=\${JSON.stringify(data?.exitCode)} (expected 0).\`);
+  if (data?.commit !== sourceCommit) failures.push(\`\${relPath}: commit=\${JSON.stringify(data?.commit)} is stale (pushed source commit: \${sourceCommit}).\`);
+  return failures;
+}
+
+async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, remote, localRef, remoteRef }) {
+  const { loadManifest, gateConfig } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "manifest.mjs")).href);
+  const { VERIFY_EVIDENCE_DEFAULT_PATH } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "verify-evidence-path.mjs")).href);
+  const { checkSecurityCompleteness } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "security-completeness-gate.mjs")).href);
+  const { classifyPushDestination, validCheckpointIntent } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "push-destination-policy.mjs")).href);
+  const { checkpointAuditRecord, recordCheckpointPushAttempt } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "checkpoint-push-audit.mjs")).href);
+  const { resolveProjectAuthorityPaths, NEUTRAL_STATE, LEGACY_STATE } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "project-authority.mjs")).href);
+  // PUSHSIG: the shared checkpoint approval decision. A load fault throws out of here and is
+  // blocked by main()'s fault boundary -- fail closed, like every import above.
+  const { checkpointApprovalMode, checkCheckpointPushApproval, classifyCheckpointPorcelain } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "checkpoint-push-approval.mjs")).href);
+  const { criticalProofWaiverFor } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "critical-human-proof-policy.mjs")).href);
+  // The repository-relative path of the pipeline state record: the one place a push approval is
+  // read from, and the one dirty entry a signature-mode checkpoint tolerates (design 3.4).
+  const stateRelPathFor = () => {
+    const authority = resolveProjectAuthorityPaths({ rootDir: projectRoot });
+    return authority.status === "ready"
+      ? authority.state
+      : (existsSync(join(projectRoot, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  };
+
+  const manifestResult = loadManifest(projectRoot);
+  if (manifestResult.status === "absent") {
+    // Mirrors guard-push.mjs step 3 exactly: the whole feature stays opt-in.
+    return { hardBlock: null, failures: [], securityFailures: [], pushGateMode: "blocking", securityGateMode: "blocking", skipped: true };
+  }
+  if (manifestResult.status !== "ok") {
+    // Present but unreadable/unparseable/semantically invalid: guard-push.mjs treats
+    // this as a non-blocking WARN. This hook does NOT -- a manifest the repository
+    // clearly tried to configure that this hook cannot read is a "cannot evaluate"
+    // case per its own fail-closed doctrine (see file header), not a silent pass.
+    return { hardBlock: "the Push-Gate manifest is present but could not be read (invalid or unparseable); cannot evaluate the Push-Gate.", failures: [], securityFailures: [], pushGateMode: "blocking", securityGateMode: "blocking", skipped: false };
+  }
+  const manifest = manifestResult.manifest;
+
+  const pushGate = gateConfig(manifest, "push");
+  if (!pushGate || pushGate.mode === "off") {
+    return { hardBlock: null, failures: [], securityFailures: [], pushGateMode: "blocking", securityGateMode: "blocking", skipped: true };
+  }
+  const pushGateMode = pushGate.mode === "warn" ? "warn" : "blocking";
+
+  const failures = [];
+  const securityFailures = [];
+  let securityGateMode = "blocking";
+
+  const checkpointClass = classifyPushDestination({
+    manifestStatus: manifestResult.status,
+    policy: manifest.pushDestinationPolicy,
+    binding: { ok: true, remote, sourceRef: localRef, destination: remoteRef },
+  });
+  // PUSHSIG: which approval mode governs a checkpoint push. The waiver lookup and the trust anchor
+  // use this repository's root. A fault while reading the proof policy can only TIGHTEN the mode
+  // (an unreadable policy resolves to "signature"; checkpointApprovalMode never throws).
+  let approvalPolicy = null;
+  if (checkpointClass.lane === "feature-checkpoint") {
+    let waiver = { waived: false, code: "CHECKPOINT-WAIVER-READ-FAULT" };
+    try {
+      waiver = criticalProofWaiverFor(projectRoot, "push");
+    } catch {
+      // keep the strict default above
+    }
+    approvalPolicy = {
+      signatureMode: checkpointApprovalMode({ pushGate, waiver }) === "signature",
+      classifyCheckpointPorcelain,
+      checkCheckpointPushApproval,
+      stateRelPath: stateRelPathFor(),
+    };
+  }
+  const checkpointBlock = checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, checkpointClass, validCheckpointIntent, checkpointAuditRecord, recordCheckpointPushAttempt, approvalPolicy);
+  if (checkpointClass.lane === "feature-checkpoint") {
+    return checkpointBlock
+      ? { hardBlock: checkpointBlock, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: false }
+      : { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true };
+  }
+
+  const treeResult = git(["-C", projectRoot, "rev-parse", \`\${commit}^{tree}\`], projectRoot);
+  const sourceTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
+
+  // (a) verify evidence.
+  failures.push(...checkEvidenceFreshness(evidenceProjectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit));
+
+  // (b)/(b.2) security evidence, only when configured and not "off".
+  const securityGate = gateConfig(manifest, "security");
+  if (securityGate && securityGate.mode !== "off") {
+    securityGateMode = securityGate.mode === "warn" ? "warn" : "blocking";
+    securityFailures.push(...checkEvidenceFreshness(evidenceProjectRoot, "evidence/security-latest.json", commit));
+    securityFailures.push(...checkSecurityCompleteness({ projectDir: evidenceProjectRoot, commit, tree: sourceTree }));
+  }
+
+  // (c) approval -- general mode only, see file header SCOPE.
+  if (pushGate.approval !== "standing-approved") {
+    const authority = resolveProjectAuthorityPaths({ rootDir: projectRoot });
+    const stateRelPath = authority.status === "ready"
+      ? authority.state
+      : (existsSync(join(projectRoot, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+    let state = null;
+    try {
+      state = JSON.parse(readFileSync(join(projectRoot, stateRelPath), "utf8"));
+    } catch (error) {
+      failures.push(\`push approval state \${stateRelPath} is missing or unreadable (\${error.code ?? "unparseable"}); cannot confirm approval.\`);
+    }
+    if (state) {
+      const approval = state?.pushApproval?.lastApproved;
+      if (!approval || approval.forCommit !== commit) {
+        failures.push(\`push approval missing or stale: expected state.pushApproval.lastApproved.forCommit=\${commit}, found \${JSON.stringify(approval?.forCommit ?? null)}.\`);
+      } else if (approval.destination !== remoteRef) {
+        failures.push(\`push approval is bound to a different destination ref (\${JSON.stringify(approval.destination)}) than this push (\${remoteRef}).\`);
+      }
+    }
+  }
+
+  return { hardBlock: null, failures, securityFailures, pushGateMode, securityGateMode, skipped: false };
+}
+
+function block(lines) {
+  process.stderr.write(
+    [
+      \`BLOCKED (agent-pipeline pre-push hook): \${lines[0]}\`,
+      ...lines.slice(1),
+      "",
+      "HUMAN OPERATOR ONLY: git itself provides operator-level ways to bypass hook enforcement for a human working directly, outside any agent session. An agent MUST NOT use any such bypass under any circumstance or instruction -- if this push must proceed, stop and hand it to a human operator.",
+    ].join("\\n") + "\\n",
+  );
+  process.exitCode = 1;
+}
+
+async function main() {
+  const stdinText = readFileSync(0, "utf8");
+  const remote = process.argv[2] ?? "";
+  const updates = parseRefUpdates(stdinText);
+  const projectRoot = resolveProjectRoot();
+  const commonDir = resolveGitCommonDir();
+  if (!projectRoot || !commonDir) {
+    block(["this repository's own root/common-dir could not be resolved via \`git rev-parse\` -- cannot evaluate the Push-Gate."]);
+    return;
+  }
+  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);
+
+  const allFindings = [];
+  let anyBlocking = false;
+
+  const nonEmptyLines = stdinText.split("\\n").map((line) => line.trim()).filter(Boolean);
+  if (updates.length !== nonEmptyLines.length) {
+    block(["pre-push input contained a malformed ref-update line; cannot evaluate the push safely."]);
+    return;
+  }
+
+  for (const update of updates) {
+    if (update.isDelete) {
+      allFindings.push(String(update.remoteRef) + ": ref deletion is not permitted by the installed pre-push backstop.");
+      anyBlocking = true;
+      recordLog(commonDir, { verdict: "blocked", note: "ref deletion", localRef: update.localRef, remoteRef: update.remoteRef });
+      continue;
+    }
+    let result;
+    try {
+      result = await evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit: update.localSha, remote, localRef: update.localRef, remoteRef: update.remoteRef });
+    } catch (error) {
+      // Fault boundary: unlike guard-push.mjs, an unexpected exception here ALWAYS
+      // blocks, never mode-gated (file header FAIL-CLOSED section).
+      allFindings.push(\`\${update.remoteRef}: Push-Gate evaluation faulted unexpectedly (\${error?.name ?? "Error"}).\`);
+      anyBlocking = true;
+      recordLog(commonDir, { verdict: "blocked", commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef, reasons: ["evaluation fault"] });
+      continue;
+    }
+    if (result.hardBlock) {
+      allFindings.push(\`\${update.remoteRef} (\${update.localSha}): \${result.hardBlock}\`);
+      anyBlocking = true;
+      recordLog(commonDir, { verdict: "blocked", commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef, reasons: [result.hardBlock] });
+      continue;
+    }
+    if (result.skipped) {
+      recordLog(commonDir, { verdict: "allowed", commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef, note: "push gate not configured or off" });
+      continue;
+    }
+    const blocking = (result.failures.length > 0 && result.pushGateMode !== "warn")
+      || (result.securityFailures.length > 0 && result.securityGateMode !== "warn");
+    const all = [...result.failures, ...result.securityFailures];
+    if (all.length > 0) allFindings.push(\`\${update.remoteRef} (\${update.localSha}):\`, ...all.map((f) => \`  - \${f}\`));
+    if (blocking) anyBlocking = true;
+    recordLog(commonDir, {
+      verdict: blocking ? "blocked" : (all.length > 0 ? "allowed-with-warnings" : "allowed"),
+      commit: update.localSha, localRef: update.localRef, remoteRef: update.remoteRef,
+      reasons: all,
+    });
+  }
+
+  if (anyBlocking) {
+    block(allFindings.length ? allFindings : ["Push-Gate check failed."]);
+    return;
+  }
+  if (allFindings.length > 0) {
+    process.stderr.write(["[pre-push] WARN: Push-Gate findings are non-blocking (mode \\"warn\\"):", ...allFindings].join("\\n") + "\\n");
+  }
+}
+
+// Guarded like plugins/pipeline-core/lib/entrypoint.mjs's isDirectInvocation() (not
+// imported here so this generated file stays standalone/self-contained -- it must run
+// in a project that never installed the pipeline-core plugin's own module graph): only
+// runs main() when this exact file is the process entry point, so a test harness can
+// \`import()\` it to reach its pure exported helpers without a live stdin read /
+// process.exit as a side effect of import alone.
+function isDirectlyInvoked() {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return fileURLToPath(import.meta.url) === resolve(argv1);
+  } catch {
+    return false;
+  }
+}
+if (isDirectlyInvoked()) {
+  main().then(() => process.exit(process.exitCode ?? 0)).catch((error) => {
+    block([\`this hook's own evaluation faulted before producing a verdict (\${error?.name ?? "Error"}).\`]);
+  });
+}
+`;
+}
+
+/** Read-only: what an install would do, without writing anything. A hook actually
+ * present on disk always wins over a decline record (checked first, below) -- a
+ * stale decline marker left over from before an install, or from before a foreign
+ * hook was placed, must never suppress reporting what is really there now. */
+export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, inspectSource } = {}) {
+  const paths = resolveGitPaths(rootDir);
+  if (!paths) return { status: "repository-unresolved" };
+  const { commonDir, hookPath } = paths;
+  const markerRecord = readMarkerRecord(commonDir);
+  if (existsSync(hookPath) && !markerRecord) {
+    return { status: "foreign-hook-present", hookPath };
+  }
+  if (existsSync(hookPath) && markerRecord) {
+    const recordedPluginLibDir = markerRecord.marker.pluginLibDir;
+    if (typeof recordedPluginLibDir !== "string"
+      || !installedArtifactsMatch({ hookPath, commonDir, pluginLibDir: recordedPluginLibDir, record: markerRecord })) {
+      return {
+        status: "foreign-hook-present",
+        hookPath,
+        detail: "existing hook, implementation, or install marker was modified after this installer wrote it",
+      };
+    }
+    // Currentness is the shared reading (lib/hook-currentness.mjs): the recorded lib path is the
+    // loaded one, or its runtime snapshot digest equals the loaded tree's. Never publishes.
+    // `inspectSource` is optional (HOOKREFRESH-S1c): a caller planning several hooks passes one shared inspector.
+    const { current, updateRequired } = assessHookCurrentness({ recordedPluginLibDir, pluginLibDir, inspectSource });
+    return {
+      status: "ready-to-upgrade",
+      hookPath,
+      commonDir,
+      pluginLibDir,
+      current,
+      updateRequired,
+    };
+  }
+  const decline = readDeclineMarker(commonDir);
+  if (decline) {
+    return { status: "declined", hookPath, commonDir, pluginLibDir, declinedAt: decline.declinedAt };
+  }
+  return { status: "ready", hookPath, commonDir, pluginLibDir };
+}
+// ESM hoists this import; it sits beside its only use so the extraction stays one local change.
+import { assessHookCurrentness } from "../lib/hook-currentness.mjs";
+
+/** Read-only: whether a decline can be recorded (mirrors `planInstall`'s
+ * fail-closed root resolution; declining never inspects hook content). */
+export function planDecline({ rootDir } = {}) {
+  const paths = resolveGitPaths(rootDir);
+  if (!paths) return { status: "repository-unresolved" };
+  return { status: "ready", commonDir: paths.commonDir };
+}
+
+/** Writes the decline marker only -- never touches the hook, its impl file, or the
+ * install marker. Declining is always reversible: a later `applyInstall` call is
+ * governed entirely by `planInstall`'s hook-presence checks above, which run before
+ * the decline check and are therefore never blocked by a decline record. */
+export function applyDecline({ rootDir } = {}) {
+  const plan = planDecline({ rootDir });
+  if (plan.status !== "ready") return plan;
+  const { commonDir } = plan;
+  const marker = {
+    schema: DECLINE_MARKER_SCHEMA,
+    declinedAt: new Date().toISOString(),
+  };
+  ensureHardenedPrivateDirectory(commonDir, join(commonDir, "agent-pipeline", "pre-push-hook"));
+  writeFileSync(declineMarkerPath(commonDir), `${JSON.stringify(marker, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  return { status: "declined", declinedAt: marker.declinedAt };
+}
+
+/** Writes the hook, its impl file, and the install marker. Refuses (never overwrites) a
+ * hook this installer did not write -- see `planInstall` above for the exact check. */
+export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, onProgress, timeBudgetMs } = {}) {
+  const plan = planInstall({ rootDir, pluginLibDir });
+  if (plan.status === "repository-unresolved") return { status: "repository-unresolved" };
+  if (plan.status === "foreign-hook-present") return { status: "refused-foreign-hook", hookPath: plan.hookPath, detail: plan.detail };
+
+  const { hookPath, commonDir } = plan;
+  const snapshotState = join(commonDir, "agent-pipeline", "pre-push-hook");
+  ensureHardenedPrivateDirectory(commonDir, snapshotState);
+  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState, onProgress, timeBudgetMs });
+  pluginLibDir = join(runtimeSnapshot.root, "lib");
+  const artifacts = expectedArtifacts({
+    hookPath,
+    commonDir,
+    pluginLibDir,
+    deadline: runtimeSnapshot.deadline,
+    installedAt: new Date().toISOString(),
+  });
+  const { impl, implContent, shimContent, marker } = artifacts;
+
+  ensureHardenedPrivateDirectory(commonDir, snapshotState);
+  try {
+    writeDurableInstallArtifact(impl, implContent, 0o600);
+    writeDurableInstallArtifact(hookPath, shimContent, 0o755);
+    writeDurableInstallArtifact(markerPath(commonDir), renderMarker(marker), 0o600);
+  } catch {
+    // Uncertain partial artifacts remain observable; never claim installation or erase them.
+    return {status: "durability-unavailable", code: "PRE-PUSH-INSTALL-DURABILITY-UNAVAILABLE"};
+  }
+
+  return { status: "installed", hookPath, implPath: impl, markerPath: markerPath(commonDir) };
+}
+
+/** Read-only: whether removal can safely proceed. */
+export function planRemoval({ rootDir } = {}) {
+  const paths = resolveGitPaths(rootDir);
+  if (!paths) return { status: "repository-unresolved" };
+  const { commonDir, hookPath } = paths;
+  const marker = readMarker(commonDir);
+  if (!marker) return { status: "nothing-to-remove", hookPath };
+  if (!existsSync(hookPath)) return { status: "already-absent", hookPath };
+  let current;
+  try {
+    current = readFileSync(hookPath, "utf8");
+  } catch {
+    return { status: "unreadable-hook", hookPath };
+  }
+  if (sha256(current) !== marker.hookSha256) {
+    return { status: "refused-modified-hook", hookPath, detail: "the installed hook was modified since installation; removal refused" };
+  }
+  return { status: "ready", hookPath, commonDir, marker };
+}
+
+/** Deletes exactly what THIS installer wrote (hook, impl, marker) -- never a foreign or
+ * human-modified hook. See `planRemoval` above for the exact refusal conditions. */
+export function applyRemoval({ rootDir } = {}) {
+  const plan = planRemoval({ rootDir });
+  if (plan.status !== "ready") return plan;
+  const { commonDir, hookPath } = plan;
+  unlinkSync(hookPath);
+  try { unlinkSync(implPath(commonDir)); } catch { /* already absent -- fine */ }
+  try { unlinkSync(markerPath(commonDir)); } catch { /* already absent -- fine */ }
+  try { rmdirSync(join(commonDir, "agent-pipeline", "pre-push-hook")); } catch { /* not empty or absent -- fine, never forced */ }
+  return { status: "removed", hookPath };
+}
+
+// ---- CLI -----------------------------------------------------------------------------
+if (isDirectInvocation(import.meta.url)) {
+  const [verb] = process.argv.slice(2);
+  const rootDir = process.cwd();
+  if (verb === "--install") {
+    try {
+      const result = applyInstall({ rootDir, onProgress: ({ phase, completed, total }) => {
+        console.error(`[pipeline-core] hook snapshot ${phase} ${completed}/${total}`);
+      } });
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(result.status === "installed" ? 0 : 1);
+    } catch (error) {
+      // Keep the thrown error's OWN typed refusal code (GHS-*, PB-WINDOWS-ASSURANCE, ...): a typed
+      // code is a hyphenated upper-case identifier, which cannot carry a path or message text. Only an
+      // error with no typed code (a plain Error, or a bare errno such as EACCES) falls back.
+      const code = typeof error?.code === "string" && error.code.length <= 64 && /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/.test(error.code)
+        ? error.code : "PREPUSH-INSTALL-UNAVAILABLE";
+      console.log(JSON.stringify({ status: "refused", code }));
+      process.exit(1);
+    }
+  } else if (verb === "--remove") {
+    const result = applyRemoval({ rootDir });
+    console.log(JSON.stringify(result, null, 2));
+    process.exit(result.status === "removed" ? 0 : 1);
+  } else if (verb === "--plan-install") {
+    console.log(JSON.stringify(planInstall({ rootDir }), null, 2));
+  } else if (verb === "--plan-remove") {
+    console.log(JSON.stringify(planRemoval({ rootDir }), null, 2));
+  } else if (verb === "--decline") {
+    const result = applyDecline({ rootDir });
+    console.log(JSON.stringify(result, null, 2));
+    process.exit(result.status === "declined" ? 0 : 1);
+  } else {
+    console.error("usage: pre-push-hook-install.mjs --plan-install|--install|--plan-remove|--remove|--decline");
+    process.exit(2);
+  }
+}

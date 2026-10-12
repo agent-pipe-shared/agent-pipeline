@@ -52,13 +52,20 @@ admission defect. The official reconciler then recorded five initial open events
 the strict backlog checker passed, with 22 accepted historical DRIFT findings.
 Ledger/projection commit: `7530c94fc`. No item closure was asserted.
 
-The live Main worktree still contains the prior Alfred changes. Their exact
-protected Source checkpoint must use a new matching authorization; the retained
-144-path proof binds another HEAD and cannot authorize the expanded Main.
+The live Main Alfred changes are now committed at
+`d02409a8a7e63067f3cc2964b98e7d39e6ab57b6`: 317 public files, parent
+`8d87a95bcb04a9edfad3998fd34ed7d827039156` (portable documentation/evidence).
+The human signed intent
+`ee0b27b272019a22e935c85ccc4efebb713f2577fe6245ead641d3e6f36d1aae`;
+the installed official authorizer verified the exact staged package and the
+native Commit hook accepted its integration binding. The earlier 144-path
+proof was not reused. Working tracked Source was unchanged after commit.
 The [transparent composition helper](../specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/live-main-composition/README.md)
-prepares an explicit public scope after documentary commits. It requires real
-strict checks outside every Git repository before emitting a signable request.
-Signing and Source commit are not yet complete.
+records the explicit scope, real strict check outside every Git repository,
+and exact 317-blob staged readback. Both PowerShell blobs retain matching LF
+bytes. Its request, public proof and actual signing review material are retained
+with canonical artifact hashes. This is packaging evidence, not functional
+test, independent Critic or Full Verify evidence.
 
 A feature checkpoint push supports honest WIP without claiming Critic/Full Verify
 PASS. It still requires a clean final HEAD, one Checkpoint-Intent trailer and the

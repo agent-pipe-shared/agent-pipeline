@@ -1,0 +1,694 @@
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * rigor-floor.mjs -- Deterministic Minimum Rigor Floor Derivation.
+ *
+ * Implements pure derivation of minimum lifecycle rigor floor from change surface,
+ * reversibility, and observable inputs (WP-B1, Issue #105, AC-7, Spec §5.1).
+ */
+
+import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+
+export const SCHEMA_RIGOR_DERIVATION = "pipeline.rigor-derivation.v1";
+export const DEFAULT_DERIVATION_REVISION = "b1-r2-bindings";
+
+export const PROFILES = Object.freeze(["mini", "feature", "epic"]);
+export const PROFILE_RANKS = Object.freeze({
+  mini: 0,
+  feature: 1,
+  epic: 2
+});
+
+export const BASE_EVIDENCE_CLASSES = Object.freeze({
+  mini: ["verify"],
+  feature: ["verify", "critic"],
+  epic: ["verify", "critic", "security"]
+});
+
+export const KNOWN_DIMENSIONS = Object.freeze([
+  "plannedPaths",
+  "actualPaths",
+  "protectedTouches",
+  "contractDeltas",
+  "reversibility",
+  "diffStats",
+  "selectedProfile",
+  "protectedIdentity",
+  "architectureProfile",
+  "fitnessOutcomes",
+  "interruptionLineage"
+]);
+
+const BINDING_DIMENSIONS = new Set(["protectedIdentity", "architectureProfile", "fitnessOutcomes", "interruptionLineage"]);
+const SHA256 = /^[a-f0-9]{64}$/u;
+const BINDING_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const exactBinding = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+  && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+
+/** New B1 inputs are observations, never authority grants or calibrated scores. */
+function normalizeBinding(dimension, value) {
+  if (dimension === "protectedIdentity") {
+    if (!exactBinding(value, ["baselineRevision", "baselineDigest", "mergedDigest"])
+      || !Number.isSafeInteger(value.baselineRevision) || value.baselineRevision < 1
+      || !SHA256.test(value.baselineDigest) || !SHA256.test(value.mergedDigest)) return null;
+    return { baselineRevision: value.baselineRevision, baselineDigest: value.baselineDigest, mergedDigest: value.mergedDigest };
+  }
+  if (dimension === "architectureProfile") {
+    if (!exactBinding(value, ["id", "source", "sha256"]) || typeof value.id !== "string" || !BINDING_ID.test(value.id)
+      || typeof value.source !== "string" || value.source.length > 512
+      || !value.source.split("/").every(part => /^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(part) && part !== "." && part !== "..")
+      || !SHA256.test(value.sha256)) return null;
+    return { id: value.id, source: value.source, sha256: value.sha256 };
+  }
+  if (dimension === "fitnessOutcomes") {
+    if (!exactBinding(value, ["sourceSha256", "outcomes"]) || !SHA256.test(value.sourceSha256)
+      || !Array.isArray(value.outcomes) || value.outcomes.length < 1 || value.outcomes.length > 128) return null;
+    const outcomes = [];
+    const ids = new Set();
+    for (const row of value.outcomes) {
+      if (!exactBinding(row, ["classId", "propertyId", "outcome"]) || !Number.isSafeInteger(row.classId) || row.classId < 1
+        || typeof row.propertyId !== "string" || !BINDING_ID.test(row.propertyId) || !["pass", "finding", "unavailable", "unsupported", "unknown", "excepted"].includes(row.outcome)
+        || ids.has(row.classId)) return null;
+      ids.add(row.classId);
+      outcomes.push({ classId: row.classId, propertyId: row.propertyId, outcome: row.outcome });
+    }
+    outcomes.sort((a, b) => a.classId - b.classId);
+    return { sourceSha256: value.sourceSha256, outcomes };
+  }
+  if (!exactBinding(value, ["featureId", "snapshotSha256", "lineageCount", "receiptCount"])
+    || typeof value.featureId !== "string" || !BINDING_ID.test(value.featureId) || !SHA256.test(value.snapshotSha256)
+    || !Number.isSafeInteger(value.lineageCount) || value.lineageCount < 0
+    || !Number.isSafeInteger(value.receiptCount) || value.receiptCount < value.lineageCount) return null;
+  return { featureId: value.featureId, snapshotSha256: value.snapshotSha256, lineageCount: value.lineageCount, receiptCount: value.receiptCount };
+}
+
+/**
+ * Known protected baseline patterns (A3 / TP paths).
+ */
+export const PROTECTED_PATTERNS = Object.freeze([
+  /^plugins\/pipeline-core\/hooks\/guard-git\.test\.mjs$/,
+  /^plugins\/pipeline-core\/hooks\/guard-testpath\.test\.mjs$/,
+  /^harness\/scripts\/verify\.mjs$/,
+  /^plugins\/pipeline-core\/hooks\/hooks\.json$/,
+  /^(?:plugins\/pipeline-core\/hooks\/guard-push(?:-v2)?|harness\/scripts\/pipeline-state)\.test\.mjs$/,
+  /^plugins\/pipeline-core\/hooks\/guard-gate-strength\.test\.mjs$/,
+  /^plugins\/pipeline-core\/hooks\/guard-testpath-override\.test\.mjs$/,
+  /^plugins\/pipeline-core\/lib\/entrypoint\.test\.mjs$/,
+  /^plugins\/pipeline-core\/lib\/critical-human-proof-policy\.test\.mjs$/,
+  /^plugins\/pipeline-core\/hooks\/notebook-write-coverage\.test\.mjs$/,
+  /^plugins\/pipeline-core\/lib\/public-core-origin-allowlist\.test\.mjs$/,
+  /^plugins\/pipeline-core\/lib\/self-application-attestation-gate\.test\.mjs$/,
+  /^plugins\/pipeline-core\/hooks\//,
+  /^plugins\/pipeline-core\/lib\/protected-baseline\.mjs$/,
+  /^plugins\/pipeline-core\/protected-baseline\.json$/,
+  /^project\/guard-config\.json$/,
+  /^\.claude\/settings(?:\.json)?$/
+]);
+
+/**
+ * Public contracts, schemas, core dependencies, and storage patterns.
+ */
+export const CONTRACT_PATTERNS = Object.freeze([
+  /^schemas\//,
+  /^policies\//,
+  /^package\.json$/,
+  /^package-lock\.json$/,
+  /^pnpm-lock\.yaml$/,
+  /^yarn\.lock$/,
+  /^pipeline-manifest\.schema\.json$/,
+  /^pipeline\.user\.schema\.json$/,
+  /^specs\/.*\/design\/contract-freeze\.json$/
+]);
+
+export function normalizePath(filePath) {
+  if (typeof filePath !== "string") return "";
+  return filePath.replace(/\\/g, "/").replace(/^\.\//, "").trim();
+}
+
+export function isProtectedPath(filePath) {
+  const norm = normalizePath(filePath);
+  return PROTECTED_PATTERNS.some((pattern) => pattern.test(norm));
+}
+
+export function isContractPath(filePath) {
+  const norm = normalizePath(filePath);
+  return CONTRACT_PATTERNS.some((pattern) => pattern.test(norm));
+}
+
+/**
+ * Canonical JSON serialization with recursively sorted object keys.
+ */
+export function canonicalJson(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return "[" + value.map(canonicalJson).join(",") + "]";
+  }
+  const keys = Object.keys(value).sort();
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJson(value[k])).join(",") + "}";
+}
+
+/**
+ * Calculate SHA-256 digest from canonical JSON of normalized inputs.
+ */
+export function computeInputDigest(normalizedInputs) {
+  const canonical = canonicalJson(normalizedInputs);
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
+/**
+ * Normalize raw input object into canonical dimensions.
+ * Each dimension is guaranteed to be { value, status, sourceContract }.
+ */
+export function normalizeInputs(rawInputs = {}) {
+  const src = (rawInputs && typeof rawInputs === "object" && !Array.isArray(rawInputs))
+    ? rawInputs
+    : {};
+
+  const normalized = {};
+
+  for (const dim of KNOWN_DIMENSIONS) {
+    const rawDim = src[dim];
+
+    if (BINDING_DIMENSIONS.has(dim)) {
+      // Only the accepted observation envelope is supported for new dimensions.
+      // Naked values and malformed available observations never become clean inputs.
+      const wrapped = exactBinding(rawDim, ["value", "status", "sourceContract"])
+        && typeof rawDim.sourceContract === "string" && rawDim.sourceContract.trim().length > 0
+        && rawDim.sourceContract.length <= 512;
+      const suppliedStatus = wrapped && ["available", "unavailable", "unknown"].includes(rawDim.status) ? rawDim.status : "unknown";
+      const value = suppliedStatus === "available" ? normalizeBinding(dim, rawDim.value) : null;
+      normalized[dim] = {
+        value,
+        status: suppliedStatus === "available" && value === null ? "unknown" : suppliedStatus,
+        sourceContract: wrapped ? rawDim.sourceContract : "unspecified",
+      };
+      continue;
+    }
+
+    let value = null;
+    let status = "unavailable";
+    let sourceContract = "unspecified";
+
+    if (rawDim !== undefined && rawDim !== null) {
+      if (typeof rawDim === "object" && !Array.isArray(rawDim) && Object.hasOwn(rawDim, "value")) {
+        value = rawDim.value;
+        status = typeof rawDim.status === "string" ? rawDim.status.toLowerCase().trim() : (value !== null && value !== undefined ? "available" : "unavailable");
+        sourceContract = typeof rawDim.sourceContract === "string" ? rawDim.sourceContract : "unspecified";
+      } else {
+        // Direct value passed without wrapping object
+        value = rawDim;
+        status = "available";
+        sourceContract = "inferred";
+      }
+    }
+
+    if (!["available", "unavailable", "unknown"].includes(status)) {
+      status = "unknown";
+    }
+
+    // Value normalization per dimension
+    if (status === "available" && value !== null && value !== undefined) {
+      if (dim === "plannedPaths" || dim === "actualPaths") {
+        if (Array.isArray(value)) {
+          const uniquePaths = Array.from(new Set(value.map(normalizePath).filter(Boolean))).sort();
+          value = uniquePaths;
+        } else if (typeof value === "string") {
+          value = [normalizePath(value)].filter(Boolean);
+        } else {
+          value = [];
+        }
+      } else if (dim === "protectedTouches") {
+        if (Array.isArray(value)) {
+          value = Array.from(new Set(value.map(normalizePath).filter(Boolean))).sort();
+        } else if (typeof value === "boolean") {
+          value = Boolean(value);
+        } else if (typeof value === "object" && value !== null) {
+          const normObj = {};
+          for (const k of Object.keys(value).sort()) {
+            normObj[k] = value[k];
+          }
+          value = normObj;
+        } else {
+          value = Boolean(value);
+        }
+      } else if (dim === "contractDeltas") {
+        if (Array.isArray(value)) {
+          value = Array.from(new Set(value.map(normalizePath).filter(Boolean))).sort();
+        } else if (typeof value === "boolean") {
+          value = Boolean(value);
+        } else if (typeof value === "object" && value !== null) {
+          const normObj = {};
+          for (const k of Object.keys(value).sort()) {
+            normObj[k] = value[k];
+          }
+          value = normObj;
+        } else {
+          value = Boolean(value);
+        }
+      } else if (dim === "reversibility") {
+        value = typeof value === "string" ? value.toLowerCase().trim() : "unknown";
+      } else if (dim === "diffStats") {
+        if (typeof value === "object" && value !== null) {
+          const files = Number.isSafeInteger(value.files) ? value.files : (Number.isSafeInteger(value.filesChanged) ? value.filesChanged : 0);
+          const lines = Number.isSafeInteger(value.lines) ? value.lines : (Number.isSafeInteger(value.totalLines) ? value.totalLines : ((value.linesAdded || 0) + (value.linesDeleted || 0)));
+          value = { files, lines };
+        } else {
+          value = { files: 0, lines: 0 };
+        }
+      } else if (dim === "selectedProfile") {
+        value = typeof value === "string" ? value.toLowerCase().trim() : null;
+      }
+    } else if (status !== "available") {
+      value = null;
+    }
+
+    normalized[dim] = {
+      value,
+      status,
+      sourceContract
+    };
+  }
+
+  return normalized;
+}
+
+/**
+ * Load policy file from path or root directory.
+ */
+export function loadPolicy(rootOrPath) {
+  let candidate = rootOrPath;
+  if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+    candidate = path.join(candidate, "policies", "rigor-derivation.v1.json");
+  }
+  if (!fs.existsSync(candidate)) {
+    // Fallback relative to import.meta.url
+    const fallback = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../../policies/rigor-derivation.v1.json");
+    if (fs.existsSync(fallback)) candidate = fallback;
+  }
+  if (fs.existsSync(candidate)) {
+    try {
+      return JSON.parse(fs.readFileSync(candidate, "utf8"));
+    } catch {
+      // ignore parse error, return null
+    }
+  }
+  return null;
+}
+
+/**
+ * Pure function: deriveMinimumRigor(inputs, policy)
+ *
+ * Evaluates minimum rigor floor deterministically.
+ */
+export function deriveMinimumRigor(inputs, policy = null) {
+  const normalized = normalizeInputs(inputs);
+  const inputDigest = computeInputDigest(normalized);
+
+  const derivationRevision = policy?.derivationRevision ? `${policy.derivationRevision}+bindings-v2` : DEFAULT_DERIVATION_REVISION;
+  const maxChangedFiles = policy?.diffThresholds?.maxChangedFiles ?? 5;
+  const maxChangedLines = policy?.diffThresholds?.maxChangedLines ?? 150;
+
+  const escalationTriggers = [];
+  const triggerReasons = [];
+  let currentRank = PROFILE_RANKS.mini; // baseline floor is mini
+
+  const requiredEvidenceSet = new Set(BASE_EVIDENCE_CLASSES.mini);
+
+  function escalate(targetProfile, trigger, reason, extraEvidence = []) {
+    const targetRank = PROFILE_RANKS[targetProfile] ?? PROFILE_RANKS.mini;
+    if (targetRank > currentRank) {
+      currentRank = targetRank;
+    }
+    if (!escalationTriggers.includes(trigger)) {
+      escalationTriggers.push(trigger);
+    }
+    triggerReasons.push(reason);
+    for (const ev of (policy?.profileEvidenceClasses?.[targetProfile] ?? BASE_EVIDENCE_CLASSES[targetProfile] ?? [])) {
+      requiredEvidenceSet.add(ev);
+    }
+    for (const ev of extraEvidence) {
+      requiredEvidenceSet.add(ev);
+    }
+  }
+
+  // The existing policy's wildcard unknown/unavailable rule applies to these
+  // accepted dimensions too. Known counts and findings are digest-bound, not
+  // assigned a new uncalibrated numerical weight or a new promotion authority.
+  for (const dimension of BINDING_DIMENSIONS) {
+    const observation = normalized[dimension];
+    const incompleteFitness = dimension === "fitnessOutcomes" && observation.value?.outcomes
+      .some(row => ["unknown", "unavailable", "unsupported"].includes(row.outcome));
+    if (observation.status !== "available" || incompleteFitness) {
+      escalate("feature", `UNAVAILABLE_OR_UNKNOWN_INPUT:${dimension}`, `Accepted ${dimension} observation is ${incompleteFitness ? "incomplete" : observation.status}`);
+    }
+  }
+
+  // 1. Evaluate protectedTouches
+  const pt = normalized.protectedTouches;
+  if (pt.status === "unavailable" || pt.status === "unknown") {
+    escalate("feature", "UNAVAILABLE_OR_UNKNOWN_INPUT:protectedTouches", "Protected surface touches status is " + pt.status);
+  } else if (pt.status === "available") {
+    let hasProtectedTouch = false;
+    if (Array.isArray(pt.value) && pt.value.length > 0) {
+      hasProtectedTouch = true;
+    } else if (typeof pt.value === "boolean" && pt.value === true) {
+      hasProtectedTouch = true;
+    } else if (typeof pt.value === "object" && pt.value !== null && Object.values(pt.value).some(Boolean)) {
+      hasProtectedTouch = true;
+    }
+    if (hasProtectedTouch) {
+      escalate("epic", "TOUCHES_PROTECTED_BASELINE", "Touches protected baseline surface", ["security"]);
+    }
+  }
+
+  // Check actualPaths for protected touches directly (anti-tampering invariant)
+  const ap = normalized.actualPaths;
+  if (ap.status === "available" && Array.isArray(ap.value)) {
+    const protectedMatches = ap.value.filter(isProtectedPath);
+    if (protectedMatches.length > 0) {
+      escalate("epic", "TOUCHES_PROTECTED_BASELINE", "Actual paths include protected baseline files: " + protectedMatches.slice(0, 3).join(", "), ["security"]);
+    }
+  }
+
+  // 2. Evaluate reversibility
+  const rev = normalized.reversibility;
+  if (rev.status === "unavailable" || rev.status === "unknown") {
+    escalate("feature", "UNAVAILABLE_OR_UNKNOWN_INPUT:reversibility", "Reversibility status is " + rev.status);
+  } else if (rev.status === "available") {
+    if (rev.value === "low" || rev.value === "irreversible") {
+      escalate("epic", "IRREVERSIBLE_OR_LOW_REVERSIBILITY", "Change reversibility is " + rev.value, ["security"]);
+    } else if (rev.value === "medium") {
+      escalate("feature", "MEDIUM_REVERSIBILITY", "Change reversibility is medium");
+    }
+  }
+
+  // 3. Evaluate contractDeltas
+  const cd = normalized.contractDeltas;
+  if (cd.status === "unavailable" || cd.status === "unknown") {
+    escalate("feature", "UNAVAILABLE_OR_UNKNOWN_INPUT:contractDeltas", "Public contract deltas status is " + cd.status);
+  } else if (cd.status === "available") {
+    let hasContractDelta = false;
+    if (Array.isArray(cd.value) && cd.value.length > 0) {
+      hasContractDelta = true;
+    } else if (typeof cd.value === "boolean" && cd.value === true) {
+      hasContractDelta = true;
+    } else if (typeof cd.value === "object" && cd.value !== null && Object.values(cd.value).some(Boolean)) {
+      hasContractDelta = true;
+    }
+    if (hasContractDelta) {
+      escalate("feature", "CONTRACT_OR_SCHEMA_DELTA", "Touches public contracts, schemas, or dependencies");
+    }
+  }
+
+  // Check actualPaths for contract deltas directly
+  if (ap.status === "available" && Array.isArray(ap.value)) {
+    const contractMatches = ap.value.filter(isContractPath);
+    if (contractMatches.length > 0) {
+      escalate("feature", "CONTRACT_OR_SCHEMA_DELTA", "Actual paths include public contract or schema files: " + contractMatches.slice(0, 3).join(", "));
+    }
+  }
+
+  // 4. Evaluate plannedPaths vs actualPaths (Surface Expansion Asymmetry)
+  const pp = normalized.plannedPaths;
+  if (pp.status === "available" && Array.isArray(pp.value) && ap.status === "available" && Array.isArray(ap.value)) {
+    if (pp.value.length > maxChangedFiles) {
+      escalate("feature", "PLANNED_SURFACE_EXCEEDS_THRESHOLD", "Planned file count " + pp.value.length + " exceeds mini threshold " + maxChangedFiles);
+    }
+    const plannedSet = new Set(pp.value);
+    const expandedPaths = ap.value.filter((p) => !plannedSet.has(p));
+    if (expandedPaths.length > 0) {
+      escalate("feature", "SURFACE_EXPANSION", "Actual surface expanded beyond planned paths: " + expandedPaths.slice(0, 3).join(", "));
+    }
+  } else if (pp.status === "unavailable" || pp.status === "unknown") {
+    // Missing planned paths cannot lower rigor; preserves or raises floor
+    if (ap.status === "available" && Array.isArray(ap.value) && ap.value.length > 0) {
+      escalate("feature", "UNAVAILABLE_OR_UNKNOWN_INPUT:plannedPaths", "Planned surface unavailable while actual surface has changes");
+    }
+  }
+
+  // 5. Evaluate diffStats
+  const ds = normalized.diffStats;
+  if (ds.status === "unavailable" || ds.status === "unknown") {
+    escalate("feature", "UNAVAILABLE_OR_UNKNOWN_INPUT:diffStats", "Diff stats status is " + ds.status);
+  } else if (ds.status === "available" && ds.value) {
+    const files = ds.value.files || 0;
+    const lines = ds.value.lines || 0;
+    if (files > maxChangedFiles || lines > maxChangedLines) {
+      escalate("feature", "DIFF_SIZE_EXCEEDED_THRESHOLD", "Diff stats exceeded mini threshold (files: " + files + " > " + maxChangedFiles + " or lines: " + lines + " > " + maxChangedLines + ")");
+    }
+  }
+
+  // Also check actualPaths count against maxChangedFiles
+  if (ap.status === "available" && Array.isArray(ap.value) && ap.value.length > maxChangedFiles) {
+    escalate("feature", "DIFF_SIZE_EXCEEDED_THRESHOLD", "Actual file count " + ap.value.length + " exceeds mini threshold " + maxChangedFiles);
+  }
+
+  // Determine minProfile
+  const minProfile = PROFILES[currentRank];
+
+  // Sync requiredEvidenceClasses with final minProfile
+  for (const ev of (policy?.profileEvidenceClasses?.[minProfile] ?? BASE_EVIDENCE_CLASSES[minProfile] ?? [])) {
+    requiredEvidenceSet.add(ev);
+  }
+  const requiredEvidenceClasses = Array.from(requiredEvidenceSet).sort();
+
+  // 6. Explanation formulation
+  let explanation = "";
+  if (escalationTriggers.length === 0) {
+    explanation = "Routine change qualifies for mini profile: no protected surface touches, high reversibility, no public contract deltas, and diff within threshold.";
+  } else {
+    explanation = "Derived minimum rigor floor is " + minProfile + " due to triggers: " + escalationTriggers.join(", ") + ". " + triggerReasons.join("; ") + ".";
+  }
+
+  // 7. Disagreement detection (selectedProfile vs minProfile)
+  let disagreementLog = undefined;
+  const sp = normalized.selectedProfile;
+  if (sp.status === "available" && typeof sp.value === "string" && PROFILE_RANKS[sp.value] !== undefined) {
+    const selectedRank = PROFILE_RANKS[sp.value];
+    if (selectedRank < currentRank) {
+      disagreementLog = {
+        selected: sp.value,
+        derived: minProfile,
+        reason: "Selected profile '" + sp.value + "' is below derived minimum rigor floor '" + minProfile + "'. Escalation triggers: " + escalationTriggers.join(", ")
+      };
+      explanation += " Disagreement detected: selected profile '" + sp.value + "' is below derived floor '" + minProfile + "'.";
+    } else if (selectedRank > currentRank) {
+      explanation += " Human-selected profile '" + sp.value + "' is higher than derived floor '" + minProfile + "' and is respected beside the floor.";
+    }
+  }
+
+  const result = {
+    schema: SCHEMA_RIGOR_DERIVATION,
+    minProfile,
+    requiredEvidenceClasses,
+    escalationTriggers,
+    derivationRevision,
+    inputDigest,
+    explanation
+  };
+
+  if (disagreementLog) {
+    result.disagreementLog = disagreementLog;
+  }
+
+  return result;
+}
+
+/**
+ * Infer inputs from working tree if no inputs file is supplied.
+ */
+export function inferInputsFromRepo(root, { execFileSyncFn = execFileSync } = {}) {
+  // A failed Git read is unknown evidence, never an empty working tree. Keep
+  // ambient GIT_* overrides from redirecting the observation to another repo.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const git = (args) => execFileSyncFn("git", ["--no-optional-locks", "-C", root, ...args], {
+    encoding: null, maxBuffer: 4 * 1024 * 1024, timeout: 10_000, env,
+  });
+  const pathsFromNul = (bytes) => {
+    if (!Buffer.isBuffer(bytes) || (bytes.length > 0 && bytes.at(-1) !== 0)) throw new Error("invalid Git path output");
+    if (bytes.length === 0) return [];
+    const decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return decoded.slice(0, -1).split("\0").map((name) => {
+      // Do not silently canonicalize an unusual Git filename into a different
+      // policy path. The caller must review it as unknown instead.
+      if (!name || normalizePath(name) !== name || name.includes("\n") || name.includes("\r")) {
+        throw new Error("unsupported Git path");
+      }
+      return name;
+    });
+  };
+  let actualPaths = null;
+  let untrackedPaths = null;
+  try {
+    const changed = pathsFromNul(git(["diff", "--name-only", "-z", "HEAD"]));
+    untrackedPaths = pathsFromNul(git(["ls-files", "--others", "--exclude-standard", "-z"]));
+    actualPaths = [...new Set([...changed, ...untrackedPaths])].sort();
+  } catch { /* unknown, not empty */ }
+
+  let diffStats = null;
+  if (actualPaths !== null && untrackedPaths.length === 0) {
+    try {
+      const output = git(["diff", "--shortstat", "HEAD"]);
+      if (!Buffer.isBuffer(output)) throw new Error("invalid Git stat output");
+      const stat = new TextDecoder("utf-8", { fatal: true }).decode(output).trim();
+      const insertions = /(?:^|,\s*)(\d+) insertions?\(\+\)/u.exec(stat);
+      const deletions = /(?:^|,\s*)(\d+) deletions?\(-\)/u.exec(stat);
+      if (stat && !insertions && !deletions) throw new Error("unrecognized Git stat output");
+      diffStats = { files: actualPaths.length, lines: Number(insertions?.[1] ?? 0) + Number(deletions?.[1] ?? 0) };
+    } catch { /* unknown line count */ }
+  }
+
+  const actualStatus = actualPaths === null ? "unknown" : "available";
+  const observedStatus = actualPaths === null ? "unknown" : "available";
+
+  return {
+    plannedPaths: {
+      value: null,
+      status: "unknown",
+      sourceContract: "requires-plan-authority"
+    },
+    actualPaths: {
+      value: actualPaths,
+      status: actualStatus,
+      sourceContract: "git.working-tree"
+    },
+    protectedTouches: {
+      value: actualPaths === null ? null : actualPaths.some(isProtectedPath),
+      status: observedStatus,
+      sourceContract: "pipeline.protected-baseline.v1"
+    },
+    contractDeltas: {
+      value: actualPaths === null ? null : actualPaths.some(isContractPath),
+      status: observedStatus,
+      sourceContract: "pipeline.contract-freeze.v1"
+    },
+    reversibility: {
+      value: "high",
+      status: "available",
+      sourceContract: "pipeline.reversibility-assessment.v1"
+    },
+    diffStats: {
+      value: diffStats,
+      status: diffStats === null ? "unknown" : "available",
+      sourceContract: "git.diff-stat"
+    },
+    selectedProfile: {
+      value: null,
+      status: "unknown",
+      sourceContract: "requires-po-bound-plan"
+    },
+    // The working-tree adapter does not possess D2/D3/C1 authority observations.
+    // Their sanctioned owners must supply exact bound observations at lifecycle
+    // boundaries. Missing collection/profile/identity is not an empty baseline.
+    protectedIdentity: { value: null, status: "unavailable", sourceContract: "pipeline.protected-baseline.v1" },
+    architectureProfile: { value: null, status: "unavailable", sourceContract: "pipeline.architecture-profile.v1" },
+    fitnessOutcomes: { value: null, status: "unavailable", sourceContract: "pipeline.fitness-evidence.v1" },
+    interruptionLineage: { value: null, status: "unavailable", sourceContract: "pipeline.interruption-store-snapshot.v1" }
+  };
+}
+
+/**
+ * Pure owner-facing report-only lifecycle projection. The caller is a sanctioned
+ * State/Verify writer, not a guard-read side effect. Returned bytes neither grant
+ * reauthorization nor approve a profile. Durable publication remains that
+ * writer's CAS/journal duty. Previous evidence must already be owner-validated.
+ */
+export function deriveLifecycleRigorObservation({ boundary, featureId, candidate, inputs, previous = null, policy = null } = {}) {
+  if (!["plan-submission", "pre-close"].includes(boundary) || typeof featureId !== "string" || !BINDING_ID.test(featureId)
+    || !exactBinding(candidate, ["commit", "tree"]) || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.commit)
+    || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.tree) || candidate.commit.length !== candidate.tree.length) {
+    throw new TypeError("RIGOR-LIFECYCLE-BINDING");
+  }
+  if (previous !== null && (!exactBinding(previous, ["featureId", "minProfile", "inputDigest"])
+    || previous.featureId !== featureId || !PROFILES.includes(previous.minProfile) || !SHA256.test(previous.inputDigest))) {
+    throw new TypeError("RIGOR-LIFECYCLE-PREVIOUS");
+  }
+  const derivation = deriveMinimumRigor(inputs, policy);
+  const retainedProfile = previous && PROFILE_RANKS[previous.minProfile] > PROFILE_RANKS[derivation.minProfile]
+    ? previous.minProfile : derivation.minProfile;
+  const normalized = normalizeInputs(inputs);
+  const selected = normalized.selectedProfile.status === "available" && PROFILES.includes(normalized.selectedProfile.value)
+    ? normalized.selectedProfile.value : null;
+  const disagreement = selected === null ? null : {
+    selected, derived: retainedProfile, agrees: PROFILE_RANKS[selected] >= PROFILE_RANKS[retainedProfile],
+  };
+  return Object.freeze({
+    schema: "pipeline.rigor-lifecycle-observation.v1", mode: "report-only", boundary, featureId,
+    candidate: Object.freeze({ ...candidate }), derivation, retainedProfile,
+    previousInputDigest: previous?.inputDigest ?? null, disagreement,
+    reauthorization: selected === null ? "selected-profile-unavailable" : PROFILE_RANKS[selected] < PROFILE_RANKS[retainedProfile]
+      ? "existing-profile-reauthorization-required-before-enforcing-promotion" : "not-required-by-floor",
+    promotionAuthority: "unavailable-no-threshold-promotion-granted",
+  });
+}
+
+export function parseArgs(argv) {
+  const options = {
+    root: process.cwd(),
+    inputsPath: null,
+    format: "text"
+  };
+
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--root" && i + 1 < argv.length) {
+      options.root = path.resolve(argv[++i]);
+    } else if (arg === "--inputs" && i + 1 < argv.length) {
+      options.inputsPath = path.resolve(argv[++i]);
+    } else if (arg === "--format" && i + 1 < argv.length) {
+      options.format = argv[++i];
+    }
+  }
+
+  return options;
+}
+
+export function main() {
+  const options = parseArgs(process.argv);
+  const policy = loadPolicy(options.root);
+
+  let rawInputs = null;
+  if (options.inputsPath) {
+    try {
+      rawInputs = JSON.parse(fs.readFileSync(options.inputsPath, "utf8"));
+    } catch (err) {
+      console.error("Failed to read inputs file: " + err.message);
+      process.exit(1);
+    }
+  } else {
+    rawInputs = inferInputsFromRepo(options.root);
+  }
+
+  const result = deriveMinimumRigor(rawInputs, policy);
+
+  if (options.format === "json") {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log("Minimum Rigor Floor Derivation");
+    console.log("===============================");
+    console.log("minProfile:              " + result.minProfile);
+    console.log("derivationRevision:      " + result.derivationRevision);
+    console.log("inputDigest:             " + result.inputDigest);
+    console.log("requiredEvidenceClasses: " + result.requiredEvidenceClasses.join(", "));
+    console.log("escalationTriggers:      " + (result.escalationTriggers.length > 0 ? result.escalationTriggers.join(", ") : "none"));
+    if (result.disagreementLog) {
+      console.log("");
+      console.log("DISAGREEMENT LOG:");
+      console.log("  Selected: " + result.disagreementLog.selected);
+      console.log("  Derived:  " + result.disagreementLog.derived);
+      console.log("  Reason:   " + result.disagreementLog.reason);
+    }
+    console.log("");
+    console.log("Explanation: " + result.explanation);
+  }
+}
+
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname);
+if (isMain) {
+  main();
+}

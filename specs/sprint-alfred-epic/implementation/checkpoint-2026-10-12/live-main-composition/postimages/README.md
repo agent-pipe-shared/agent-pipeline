@@ -1,0 +1,460 @@
+# Agent-Pipeline
+
+A versioned operating model for teams that need agent-assisted delivery to be
+reviewable, traceable, and measurable. It turns a change into a bounded task,
+machine evidence, independent review, and a durable record that a team can
+inspect later.
+
+**At a glance, Agent-Pipeline helps you to:**
+
+- **Specify what can be checked:** turn an idea into a scoped brief and, when its
+  stakes warrant it, a PRD or spec with EARS-style acceptance criteria linked
+  to tests and review.
+- **Preserve architecture across sessions:** assess the impact of a change,
+  record significant choices in ADRs, and use an OKF-based, machine-readable
+  map and architecture-fitness checks where the project has adopted them.
+- **Keep agent work bounded:** split implementation into fresh-context tasks
+  with explicit scope, handovers, and role/model effort matched to the work.
+- **Verify the actual candidate:** apply configured project policies and
+  Git/write guardrails, then run tests and security checks against the exact
+  candidate. Depending on the project's setup, these cover secrets,
+  dependency vulnerabilities, licenses, and static analysis; optional SBOM
+  and provenance checks make supply-chain inputs inspectable.
+- **Separate review from authority:** obtain independent Critic findings,
+  while people retain plan acceptance, go/no-go, and approval of consequential
+  external actions.
+- **Leave an inspectable trail:** retain candidate-bound receipts, decision
+  records, and offline audit bundles; missing or unavailable checks stay
+  visible rather than becoming an implied pass.
+
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+> **Newcomer path:** Read this page, then follow [SETUP](SETUP.md) for the
+> normal consumer adoption flow, continue with [PIPELINE_FLOW](PIPELINE_FLOW.md)
+> for the lifecycle, and then use [Usage](docs/usage.md). The links below are
+> optional reference.
+
+## The problem
+
+Teams with audit obligations often need more than a chat transcript or a claim
+that a test passed. They need a repeatable delivery record: who made a decision,
+what was checked against which candidate, what was refused, and what remained
+outside the evidence. Agent-Pipeline supplies that shared method without making
+it a compliance certification or a claim about every host's enforcement.
+
+## What you get
+
+Four deliberately separated roles carry the model:
+
+<!-- capability:human-accountability-roles -->
+<a id="capability-human-accountability-roles"></a>
+
+- **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
+  final sign-off.
+- **Elephant** — the long-lived orchestrator session. Turns your intent into a spec,
+  breaks it into small tasks, dispatches them, and prepares a go/no-go
+  recommendation for the Product Owner.
+- **Goldfish** — a fresh-context implementor subagent. Owns one complete, independently
+  checkable acceptance criterion or backlog outcome: analysis, test cases, code,
+  targeted checks and fixes stay in the same context. Reports actual evidence.
+- **Critic** — an independent, read-only reviewer with a fresh context. Never sees
+  chat history or reasoning — only the result, judged on its own.
+
+Around those roles:
+
+- **Review before expensive final qualification** — targeted, candidate-bound
+  checks and Security evidence prepare an independent Critic review. Findings
+  are corrected by one fresh Correction Goldfish for the coherent batch, with
+  one full review and at most three delta reviews; review stops on PASS. Full Verify then
+  qualifies the reviewed candidate. A later Verify rerun alone does not
+  invalidate a content-bound Critic review.
+- **Specs with checkable acceptance criteria** — every task has a Definition of
+  Done something or someone can actually check, not a "done"-on-a-feeling.
+- **Git and write-path guardrails** — configured integrations can refuse unsafe
+  commands, protected-path writes, force-pushes, history rewrites, and skipped
+  hooks. The exact live controls depend on the installed runner and project
+  configuration; see [enforcement](docs/enforcement.md).
+- **A model/token policy** — role-tiered model routing (design / implement /
+  mechanic / review / optional advisor) configured to your own subscription.
+  It supports task-appropriate routing; it does not estimate your cost.
+- **Evidence discipline** — "done" means a machine-written log or output, the exact
+  command, and its exit code — never a model-formulated claim that something
+  "should work."
+- **Explicit human authority** — plan, acceptance, and remote-action decisions
+  remain with the human where the project calibration and action require them;
+  evidence never creates that authority.
+
+> **What you can inspect:** a candidate-bound Verify receipt, security-scan
+> status, review and approval records where the project requires them, and a
+> validated Feature Package or offline Audit Bundle. These artifacts support an
+> audit trail; they do not certify compliance or replace an auditor. Start with
+> [audit and evidence](docs/audit-and-evidence.md).
+
+> **Measurement boundary:** [measurement guidance](docs/cost-and-measurement.md)
+> documents what is and is not measured. It is not an onboarding estimate,
+> runner comparison, or promise for your project.
+
+## The front door: optional design pre-stage
+
+Before the pipeline itself there's deliberately no mandatory step, just a
+front door: idea → optional design brainstorming with any chat AI (guide +
+standard prompt + lean export template under
+[`docs/design/README.md`](docs/design/README.md)) → requirements export →
+feeds the pipeline. If a requirement looks large at triage (multiple
+modules/projects affected, new architecture, several plausible options, a
+larger security/data surface), the Elephant flags it **non-blocking** and
+links the guide — you can always skip the design pre-stage and go straight to
+work. An external design export never gets a free pass: the Elephant
+challenges it and re-derives it through the normal path (interview → spec →
+readiness) instead of adopting it as an already-approved design. For large
+topics, the Elephant also proposes a cut into several self-contained backlog
+items and waits for confirmation or correction — the existing per-item PRD
+review stays the only check point, nothing new is added. Details:
+[`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
+
+## How it works
+
+```mermaid
+flowchart LR
+    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(orchestrator)"]
+    Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
+    Goldfish -->|"evidence"| Gates["Targeted checks<br/>(tests, security, lint)"]
+    Gates -.->|"fail"| Goldfish
+    Gates -->|"pass"| Critic["Critic<br/>(independent reviewer)"]
+    Critic -->|"findings"| Elephant
+    Critic -->|"reviewed candidate"| FullVerify["Full Verify<br/>(release qualification)"]
+    FullVerify -->|"candidate evidence"| Elephant
+    Elephant -->|"go/no-go recommendation"| PO
+```
+
+> **Documentation line: `0.7.0`.** This describes the next distributed
+> architecture capability. Until it is released, consumer repositories should
+> continue to use the approved GitHub-distributed version they already have;
+> a maintainer's local candidate is neither an installation source nor evidence
+> that its release gates passed.
+
+<a id="capability-architecture-adoption-and-fitness"></a>
+<!-- capability:architecture-adoption-and-fitness -->
+
+The next distributed architecture capability adds decision assessment, a module
+inventory, machine-readable maps, and baseline/fitness checks. In an existing
+repository, start with the read-only adoption status and proposal described in
+[Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+Only then does the repository owner choose an explicitly bounded adoption
+decision. A valid deferred decision remains valid until its stated review or
+expiry date, explicit supersession, or a changed decision — an ordinary commit
+does not turn it into a partial lifecycle state. See the
+[release-scope overview](docs/overview.md).
+
+## Bring your own architecture rules & guardrails
+
+A project can bring its own house rules, split into two classes: **guidelines**
+are recommended principles you may deliberately deviate from, as long as the
+deviation is named; **policies** are binding rules whose enforcement follows
+their evaluation route. Start from the templates under
+[`governance/examples/`](governance/examples/README.md), copy the selected
+rules into project-owned paths, and configure those paths through the
+`governance` block in the project's manifest.
+
+Once configured, enforcement differs by class: applicable guidelines feed into
+the plan and become the Critic's review benchmark — an unnamed deviation is the
+finding, not the deviation itself. Evaluated machine-checkable policies can
+fail their applicable gate; human-checkable items become explicit obligations
+in the applicable review. A pattern played all the way through — from house
+rule to enforced rule — lives in the
+[worked example](governance/examples/worked-example.md).
+
+## Three dials, not one size fits all
+
+The method uses calibrated strictness: teams can match the written contract
+and implementation effort to the delivery's actual stakes. Three configuration
+choices shape that work:
+
+- **Rigor per task** — issue-only / delta-spec / spec-anchored
+- **Governance mode per rule set** — advisory / enforcing / off
+- **Work profile per topic** — epic / feature / mini (model and effort per
+  phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
+  bootstrap and consultation is on demand)
+
+**Risk is assessed separately.** Security, architecture, guardrail, irreversible,
+costly or externally visible impact can require stronger independent review
+and human approval even for a short change or a `mini` profile. See
+[Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review).
+
+## Learn more
+
+Follow the canonical [documentation map](docs/README.md): it keeps adoption,
+enforcement, evidence, security, cost, and maintainer references in one order.
+For the normative contract, read [`docs/operating-model.md`](docs/operating-model.md).
+- [`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional Permission; see [`docs/licensing.md`](docs/licensing.md).
+
+> **Beta licensing outlook:** The current license permits internal use by a
+> commercial company; monetizing Agent-Pipeline itself already requires a
+> separate agreement. If Agent-Pipeline proves useful at broader scale, a
+> future version of this product may require payment for commercial use under
+> a clearly published, proportionate fair-use policy. No such fee, threshold,
+> or change is in force today. This notice does not amend the current license
+> or retroactively change the terms for copies already received. See
+> [Licensing](docs/licensing.md).
+
+### Maintainer and runtime reference
+
+Source maintainers can find checkout commands and the V3 authority sequence in
+[Maintain a shared pipeline source](SETUP.md). Supported runner integrations
+can enforce configured guards, while the methodology remains portable; see
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for current boundaries
+and setup requirements.
+
+## Acknowledgments
+
+This operating model is a synthesis, not an invention. It adapts and builds on
+the ideas in three published works, and we thank their authors for the thinking
+that shaped it:
+
+- [Dave Rensin, **“Elephants, Goldfish and the New Golden Age of Software Engineering”**](https://research.google/pubs/elephants-goldfish-and-the-new-golden-age-of-software-engineering/) — source of the Elephant and Goldfish roles and the principle that the document, not the session, carries the knowledge;
+- [Addy Osmani, Shubham Saboo, Sokratis Kartakis, **“The New SDLC With Vibe Coding”**](https://addyosmani.com/blog/new-sdlc-vibe-coding/) — source of *Agent = Model + Harness*, the orchestrator capability model, and stakes-driven discipline;
+- [Google/Kaggle, **“Spec-Driven Production Grade Development in the Age of Vibe Coding”**](https://www.kaggle.com/whitepaper-spec-driven-production-grade-development-in-the-age-of-vibe-coding) — source of the approval-fatigue analysis behind the deliberately minimal set of human gates.
+
+Where Agent-Pipeline departs from these sources — for example, recasting the
+Goldfish as an executor rather than a checker — it says so, and why, in
+[`docs/operating-model.md`](docs/operating-model.md) and
+[`docs/design-decisions.md`](docs/design-decisions.md).
+
+---
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# Agent-Pipeline (Deutsch)
+
+Ein versioniertes Operating Model für Teams, die agentische Lieferung
+prüfbar, nachvollziehbar und messbar machen müssen. Es formt eine Änderung zu
+einer begrenzten Aufgabe, Maschinenevidenz, unabhängiger Prüfung und einem
+dauerhaften, später einsehbaren Nachweis.
+
+**Kurz gesagt hilft dir Agent-Pipeline dabei:**
+
+- **Prüfbar spezifizieren:** aus einer Idee einen begrenzten Auftrag und,
+  wenn die Tragweite es verlangt, PRD oder Spec mit EARS-artigen
+  Akzeptanzkriterien ableiten, die mit Tests und Review verknüpft sind.
+- **Architektur über Sitzungen hinweg bewahren:** Auswirkungen vor Änderungen
+  beurteilen, wichtige Entscheidungen in ADRs festhalten und – wo eingeführt –
+  eine OKF-basierte, maschinenlesbare Map samt Architektur-Fitness nutzen.
+- **Agentenarbeit begrenzen:** Umsetzung in Aufgaben mit frischem Kontext,
+  klarem Umfang und Übergaben aufteilen; Rollen und Modellaufwand passend
+  wählen.
+- **Den echten Kandidaten prüfen:** konfigurierte Projekt-Policies sowie Git-
+  und Schreibgrenzen anwenden; Tests und Sicherheitsprüfungen gegen genau
+  diesen Kandidaten ausführen. Je nach Projekteinstellung prüfen sie Secrets,
+  Schwachstellen in Abhängigkeiten, Lizenzen und statische Codebefunde;
+  optionale SBOM- und Provenienzprüfungen machen Lieferketten-Eingaben
+  nachvollziehbar.
+- **Review und Autorität trennen:** unabhängige Critic-Befunde einholen;
+  Planfreigabe, Go/No-Go und folgenreiche externe Aktionen bleiben menschliche
+  Entscheidungen.
+- **Eine prüfbare Spur hinterlassen:** kandidatengebundene Receipts,
+  Entscheidungsnachweise und Offline-Audit-Bundles erhalten; fehlende oder
+  nicht verfügbare Prüfungen werden nicht stillschweigend zu einem Pass.
+
+> **Einstieg für Neue:** Lies diese Seite und folge dann [SETUP](SETUP.md) für
+> den normalen Consumer-Ablauf, nutze danach [PIPELINE_FLOW](PIPELINE_FLOW.de.md)
+> für den Lifecycle und lies anschließend [Usage](docs/usage.md). Die weiteren Links sind
+> Nachschlagewerk.
+
+> **Lizenzausblick für die Beta:** Die geltende Lizenz erlaubt auch die interne
+> Nutzung in Unternehmen; wer Agent-Pipeline selbst vermarktet, benötigt schon
+> heute eine gesonderte Vereinbarung. Wenn sich Agent-Pipeline in breiterer
+> Nutzung bewährt, könnte eine künftige Version dieses Produkts für
+> kommerzielle Nutzung unter einer klar veröffentlichten, verhältnismäßigen
+> Fair-Use-Regelung kostenpflichtig werden. Heute gilt weder eine solche
+> Gebühr noch ein Schwellenwert oder eine entsprechende Lizenzänderung. Dieser
+> Hinweis ändert die geltende Lizenz nicht und stellt bereits erhaltene Kopien
+> nicht rückwirkend unter andere Bedingungen. Siehe
+> [Lizenzierung](docs/licensing.md).
+
+> **Was du prüfen kannst:** kandidatengebundene Verify-Receipts,
+> Security-Scan-Status sowie erforderliche Review- und Freigabe-Nachweise. Ein
+> validiertes Feature Package oder Offline-Audit-Bundle kann diese Artefakte
+> zusammenstellen. Das unterstützt eine Audit-Spur, ersetzt aber weder Auditor
+> noch Compliance-Zertifizierung. Siehe [Audit und Evidenz](docs/audit-and-evidence.md).
+
+> **Messgrenze:** Die [Messhinweise](docs/cost-and-measurement.md) benennen,
+> was gemessen ist und was nicht. Sie sind keine Onboarding-Schätzung,
+> kein Runner-Vergleich und keine Zusage für dein Projekt.
+
+## Das Problem
+
+Teams mit Audit-Pflichten brauchen oft mehr als einen Chat-Verlauf oder die
+Behauptung, ein Test sei grün. Sie brauchen einen wiederholbaren
+Delivery-Nachweis: Wer hat entschieden, was wurde gegen welchen Kandidaten
+geprüft, was wurde verweigert und was bleibt außerhalb der Evidenz.
+Agent-Pipeline liefert diese gemeinsame Methode, aber keine Compliance-
+Zertifizierung und keine Aussage über Enforcement auf jedem Host.
+
+## Was du bekommst
+
+Vier bewusst getrennte Rollen tragen das Modell:
+
+- **Product Owner (du)** — das menschliche Gate. Gibt die Richtung vor, prüft
+  Ergebnisse, erteilt die finale Freigabe.
+- **Elephant** — die langlebige Orchestrator-Sitzung. Formt aus deiner Absicht eine
+  Spezifikation, zerlegt sie in kleine Aufgaben, delegiert sie und bereitet eine
+  Go/No-Go-Empfehlung für den Product Owner vor.
+- **Goldfish** — ein Subagent mit frischem Kontext. Verantwortet ein vollständiges,
+  unabhängig prüfbares Akzeptanzkriterium oder Backlog-Ergebnis: Analyse, Testfälle,
+  Code, gezielte Checks und Korrekturen bleiben im selben Kontext. Meldet
+  tatsächliche Nachweise zurück.
+- **Critic** — ein unabhängiger Prüfer mit reinem Lesezugriff und frischem
+  Kontext. Sieht nie Chat-Verlauf oder Begründungen — nur das Ergebnis, das er
+  für sich beurteilt.
+
+Ergänzend dazu:
+
+- **Review vor der teuren Abschlussprüfung** — gezielte, an den Kandidaten
+  gebundene Checks und Security-Evidenz bereiten das unabhängige Critic-Review
+  vor. Ein frischer Korrektur-Goldfish behält alle Befunde und Fixes im kohärenten
+  Batch. Ein Voll-Review plus höchstens drei Delta-Reviews; bei PASS stoppen.
+  Anschließend qualifiziert Full Verify den integrierten, geprüften Kandidaten.
+  Ein bloßer Verify-Neulauf entwertet ein inhaltlich gebundenes Critic-Review
+  nicht.
+- **Specs mit prüfbaren Akzeptanzkriterien** — keine Aufgabe ist „fertig" nach
+  Gefühl; jede Aufgabe hat eine Definition of Done, die sich tatsächlich prüfen
+  lässt.
+- **Git- und Write-Path-Guardrails** — konfigurierte Integrationen können
+  unsichere Befehle, geschützte Writes, Force-Pushes, History-Rewrites und
+  übersprungene Hooks verweigern. Die aktiven Kontrollen hängen von Runner und
+  Projektkonfiguration ab; siehe [Enforcement](docs/enforcement.md).
+- **Eine Modell-/Token-Policy** — rollenabgestuftes Modell-Routing (Design /
+  Implementierung / Mechanik / Review / optionaler Advisor), das du auf dein
+  eigenes Abo einstellst. Es unterstützt aufgabengerechtes Routing, liefert
+  aber keine Kostenschätzung.
+- **Nachweispflicht** — „fertig" heißt: ein maschinell geschriebenes Log oder
+  Ergebnis, dazu der exakte Befehl und dessen Exit-Code — nie eine vom Modell
+  formulierte Behauptung, etwas „sollte funktionieren".
+- **Explizite menschliche Autorität** — Plan-, Abnahme- und Remote-Aktionen
+  bleiben dort beim Menschen, wo Projektkalibrierung und Aktion dies verlangen;
+  Evidenz erzeugt diese Autorität nicht.
+
+## Die Vordertür: optionale Design-Vorstufe
+
+Vor der eigentlichen Pipeline steht bewusst kein Pflichtschritt, sondern eine
+Vordertür: Idee → optionales
+Design-Brainstorming mit einer beliebigen Chat-KI (Guide + Standard-Prompt +
+schlankes Export-Template unter [`docs/design/README.md`](docs/design/README.md))
+→ Requirements-Export → speist die Pipeline. Wirkt eine Anforderung bei der
+Triage umfangreich (mehrere Module/Projekte betroffen, neue Architektur,
+mehrere plausible Optionen, größere Security-/Datenfläche), weist der
+Elephant **nicht-blockierend** darauf hin und verlinkt den Guide — wer sofort
+ohne Design weiterarbeiten will, kann das jederzeit tun. Ein externer
+Design-Export bekommt dabei nie einen Vertrauensvorschuss: Der Elephant
+challenged ihn und leitet ihn über den normalen Weg (Interview → Spec →
+Readiness) neu her, statt ihn als fertig genehmigtes Design zu übernehmen.
+Bei großen Themen schlägt der Elephant zusätzlich einen Schnitt in mehrere
+eigenständige Backlog-Items vor und wartet auf Bestätigung oder Korrektur —
+das bestehende PRD-Review pro Item bleibt der einzige Prüfpunkt, es kommt
+nichts Neues hinzu. Details: [`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
+
+## Wie es funktioniert
+
+```mermaid
+flowchart LR
+    PO["Product Owner<br/>(du)"] -->|"Absicht / Auftrag"| Elephant["Elephant<br/>(Orchestrator)"]
+    Elephant -->|"Spec + Dispatch"| Goldfish["Goldfish<br/>(frischer Kontext)"]
+    Goldfish -->|"Nachweis"| Gates["Gezielte Checks<br/>(Tests, Security, Lint)"]
+    Gates -.->|"fehlgeschlagen"| Goldfish
+    Gates -->|"bestanden"| Critic["Critic<br/>(unabhängiger Prüfer)"]
+    Critic -->|"Befunde"| Elephant
+    Critic -->|"geprüfter Kandidat"| FullVerify["Full Verify<br/>(Release-Qualifikation)"]
+    FullVerify -->|"Kandidatennachweis"| Elephant
+    Elephant -->|"Go/No-Go-Empfehlung"| PO
+```
+
+> **Dokumentationslinie: `0.7.0`.** Sie beschreibt die nächste auszuliefernde
+> Architektur-Funktion. Bis zu ihrem Release verwenden Consumer-Repositories
+> weiter ihre bereits freigegebene GitHub-distribuierte Version; ein lokaler
+> Maintainer-Kandidat ist weder Installationsquelle noch Nachweis bestandener
+> Release-Gates.
+
+Die nächste Architektur-Funktion ergänzt Entscheidungsbewertung,
+Modul-Inventar, maschinenlesbare Maps und Baseline-/Fitness-Checks. In einem
+bestehenden Repository beginnt die Übernahme mit dem lesenden Status und
+Vorschlag unter [Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+Erst danach wählt der Repository-Owner eine explizit begrenzte Entscheidung.
+Eine gültige Deferral-Entscheidung gilt bis zu ihrem Review-/Ablaufdatum,
+einer expliziten Ablösung oder einer geänderten Entscheidung; ein gewöhnlicher
+Commit macht sie nicht zu einem partiellen Lifecycle-Zustand. Siehe auch die
+[Release-Übersicht](docs/overview.md).
+
+## Eigene Architekturvorgaben & Guardrails
+
+Ein Projekt kann eigene Hausregeln mitbringen — getrennt in zwei Klassen:
+**Guidelines** sind empfohlene Prinzipien, von denen bewusst und benannt
+abgewichen werden darf; **Policies** sind verbindliche Regeln, die ein Gate
+gemäß ihrem Auswertungsweg durchgesetzt werden. Nutze die Vorlagen unter
+[`governance/examples/`](governance/examples/README.md) als Ausgangspunkt,
+kopiere die ausgewählten Regeln in projektverwaltete Pfade und konfiguriere
+diese Pfade über den `governance`-Block im Projektmanifest.
+
+Nach der Konfiguration wird jede Klasse unterschiedlich durchgesetzt:
+Anwendbare Guidelines fließen in den Plan ein und sind der Prüf-Maßstab des
+Critic — eine unbenannte Abweichung ist der Befund, nicht die Abweichung selbst.
+Ausgewertete maschinell prüfbare Policies können ihr anwendbares Gate
+blockieren; menschenprüfbare Punkte werden explizite Pflichten im anwendbaren
+Review. Ein Muster komplett durchgespielt — von der
+Hausregel bis zur erzwungenen Regel — steht im
+[Worked Example](governance/examples/worked-example.md).
+
+## Drei Drehregler statt einer Einheitsgröße
+
+Die Methode nutzt kalibrierte Strenge: Teams können schriftlichen Vertrag und
+Umsetzungsaufwand an die tatsächlichen Stakes einer Lieferung anpassen. Drei
+Konfigurationsentscheidungen prägen diese Arbeit:
+
+- **Rigor pro Aufgabe** — Issue-only / Delta-Spec / Spec-verankert
+- **Governance-Modus pro Regelwerk** — advisory / enforcing / off
+- **Arbeitsprofil pro Thema** — Epic / Feature / Mini (Modell und Effort je
+  Phase/Runner in `pipeline.user.yaml`; Advisor-Capability ist im Bootstrap
+  modellfrei und Consultation läuft on demand)
+
+**Risiko wird zusätzlich beurteilt.** Sicherheits-, Architektur- und
+Guardrail-Wirkung sowie irreversible, teure oder extern sichtbare Folgen
+können auch bei einer kurzen Änderung oder einem `Mini`-Profil stärkeren
+unabhängigen Review und menschliche Freigabe verlangen. Siehe
+[Pipeline Flow](PIPELINE_FLOW.de.md#2-umfang-von-design-und-review-entscheiden).
+
+## Source-Maintainer-Referenz
+
+Source-Maintainer finden die Checkout-Befehle und die V3-Autoritätsreihenfolge
+unter [Maintain a shared pipeline source](SETUP.md). Normale
+Consumer-Übernahmen folgen dem oben beschriebenen Consumer-Pfad.
+
+## Laufzeitumgebung
+
+Unterstützte Runner-Integrationen können konfigurierte Guards durchsetzen. Die
+Methodik bleibt übertragbar; die aktuellen Runner-Grenzen und Voraussetzungen
+stehen in [`docs/runtime-boundary.md`](docs/runtime-boundary.md).
+
+## Mehr erfahren
+
+Folge der kanonischen [Dokumentationskarte](docs/README.md): Sie ordnet
+Übernahme, Enforcement, Evidenz, Security, Kosten und Maintainer-Referenzen.
+Den normativen Vertrag beschreibt [`docs/operating-model.md`](docs/operating-model.md).
+- [`LICENSE`](LICENSE) und [`LICENSE-DOCS`](LICENSE-DOCS) verwenden die source-available Sustainable Use License 1.0 (SUL-1.0) mit der Agent-Pipeline Additional Permission; siehe [`docs/licensing.md`](docs/licensing.md).
+
+## Danksagung
+
+Dieses Operating Model ist eine Synthese, keine Erfindung. Es adaptiert die
+Ideen aus drei veröffentlichten Arbeiten und baut auf ihnen auf; wir danken
+ihren Autorinnen und Autoren für die Denkarbeit, die es geprägt hat:
+
+- [Dave Rensin, **„Elephants, Goldfish and the New Golden Age of Software Engineering“**](https://research.google/pubs/elephants-goldfish-and-the-new-golden-age-of-software-engineering/) — Quelle der Elephant- und Goldfish-Rollen und des Prinzips, dass das Dokument, nicht die Session, das Wissen trägt;
+- [Addy Osmani, Shubham Saboo, Sokratis Kartakis, **„The New SDLC With Vibe Coding“**](https://addyosmani.com/blog/new-sdlc-vibe-coding/) — Quelle von *Agent = Model + Harness*, des Orchestrator-Capability-Modells und der stakes-getriebenen Disziplin;
+- [Google/Kaggle, **„Spec-Driven Production Grade Development in the Age of Vibe Coding“**](https://www.kaggle.com/whitepaper-spec-driven-production-grade-development-in-the-age-of-vibe-coding) — Quelle der Approval-Fatigue-Analyse hinter dem bewusst minimalen Satz an Human-Gates.
+
+Wo Agent-Pipeline von diesen Quellen abweicht — etwa indem der Goldfish als
+Ausführender statt als Prüfer neu geschnitten wird —, sagt es das und warum, in
+[`docs/operating-model.md`](docs/operating-model.md) und
+[`docs/design-decisions.md`](docs/design-decisions.md).
+
+---
+
+Die deutsche Fassung ist eine Übersetzung des englischen Originals.

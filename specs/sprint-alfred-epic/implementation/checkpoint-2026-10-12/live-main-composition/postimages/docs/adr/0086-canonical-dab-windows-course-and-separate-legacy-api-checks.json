@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "ADR-0086",
+  "title": "Canonical DAB Windows course and separate legacy API checks",
+  "status": "accepted",
+  "digest": "349069ecba027f79f569456536f7c7843a652cad14cecb448db0ae6f9eb599e6",
+  "scope": "project",
+  "date": "2026-10-11"
+}

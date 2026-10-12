@@ -1,0 +1,311 @@
+# Git Guardrails
+
+> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3
+> Audience: every agent performing git operations in any pipeline-bound project and in this repo (self-application).
+
+**Precedence and enforcement:** as defined in `guardrails/global.md` (header). Deterministic enforcement of the destructive-operation rules is the git-guard union (`docs/adr/0013-git-guard-union.md`); everything it does not catch binds as instruction.
+
+Rule IDs: `GIT-xx`.
+
+> **Windows note (non-rule):** the `gh` CLI under Git-Bash rewrites a leading slash in API paths to a filesystem path before sending the request — always call `gh api repos/...`, never `gh api /repos/...` (the leading slash form silently breaks).
+
+---
+
+## GIT-01 — Commit message format: Conventional Commits, English
+
+- **MUST** write commit messages as Conventional Commits: `type(scope): summary` with `type` ∈ {feat, fix, docs, refactor, test, chore, build, ci, perf, style}; body explains the WHY (cause → effect), not a file list.
+- **MUST** write Public Core commit messages in English, per ADR-0011's English-canonical public boundary. The Conventional-Commits format core above (`type(scope): summary`, the type vocabulary, and the GIT-03 trailers) is unaffected and stays non-negotiable. A private overlay may use its configured operator-facing language for its own local history; that configuration never changes Public Core history.
+- **SHOULD** carry verification status and decision authorship in the body where applicable — e.g. `Verified: live on device` / `Decision: the PO`. Use the three-valued vocabulary where verification is partial: verified / open / not testable. Field labels (`Verified:`, `Decision:`) and the three-valued status tokens stay ENGLISH (parseable audit trail); free-text values follow the project human-facing language (default English). Example: `Verified: verify green 109/109`.
+- A project calibration MAY define an additional message prefix convention on top; the Conventional-Commits core and the trailers (GIT-03) are non-negotiable.
+- **Why:** A uniform, parseable history is the cheapest audit trail the pipeline has; the WHY-body is the only place future sessions find intent without replaying chats.
+- **Verification:** `git log --oneline -20` sample-check at close; the Critic flags non-conforming messages in reviewed diffs.
+
+## GIT-02 — Atomic commits per work package
+
+- **MUST** commit exactly one coherent work package per commit; **MUST NOT** bundle unrelated themes ("one Goldfish = one task = one revertable unit").
+- **MUST NOT** mix functional changes and unrelated doc/housekeeping sweeps in one commit; doc-sync commits accompanying a merge are their own commit.
+- **Why:** Theme-mix commits destroy revert granularity — the proven marathon-session failure.
+- **Verification:** Each merge/PR maps to one task/spec reference; the Critic flags recognizable theme-mix in diffs (tooling-policy AP-T3, verification section).
+
+## GIT-03 — Anonymous AI-assistance trailer (mandatory, all projects)
+
+- **MUST** end every agent-authored commit message with one grounded work-package binding and the anonymous marker in one final, contiguous Git trailer block:
+
+  ```text
+  Dispatch: <TASK_ID> (goldfish)
+  AI-Assisted: true
+  ```
+
+  The other admitted bindings are `Dispatch: stage-0 (elephant)`, `Dispatch: <TASK_ID> (critic)`, and a verified allowlisted generator's `Dispatch: <path> (elephant-generated)` form.
+
+  Signed-artifact integration has one separate binding: `Dispatch: quality-package-<64 lowercase hex intent digest> (integration)` followed by exactly one `AI-Assisted: true` in the final trailer block. Precommit boundaries and postcommit provenance readers independently verify the selected signed authorization against its unique parent, complete changed-path set, and exact committed blobs and modes. A verified import is classified only as `signed-artifact-integration`; it proves import of that exact package and does not prove original authorship, model identity, review, tests, release, or installation qualification. A safely absent retained authorization is `UNVERIFIABLE`; present forged, stale, unsafe, malformed, or mismatched evidence is `FAIL`. This separate role never creates or counts as a legacy Goldfish dispatch record.
+
+- **MUST NOT** put provider- or model-specific co-author trailers, session URLs or IDs, account identifiers, or any other private correlation data into commit metadata. The anonymous marker is the complete AI-assistance signal; `Dispatch:` may identify a grounded work package but must not encode a provider, account, or session.
+- **Why:** Commit history needs a durable, provider-neutral assistance signal without turning public history into a correlation index. Work-package provenance remains in the versioned dispatch record and its grounded `Dispatch:` trailer; full chat logs are not archived.
+- **Verification:** `git log -1 --format='%(trailers:only=true,unfold=true)' <commit>` samples both entries via structural trailer parsing (not a line-anchored text search). The Git guard applies the same final-block rule before an agent-issued commit by default. The onboarding-installed `commit-msg` backstop inspects the finished message, including editor and spawned-process commits: correlation data always blocks, and the presence of either `AI-Assisted:` or `Dispatch:` requires one complete, grounded pair in the final block. Git supplies no reliable agent-vs-human authorship bit, so a message with neither provenance signal remains allowed at that boundary; the direct agent command guard supplies the default requirement there. Project `commitTrailerPolicy: warn` is only for a dated migration; `off` is an explicit opt-out from the two provenance conventions and never disables the unconditional correlation-data refusal. A wrapped continuation or blank line inside the block makes the structural check fail instead of accepting body prose as provenance; the `/close` ritual checks the current block for prohibited correlation metadata.
+
+
+### Administrative Elephant commits (local, no PO decision)
+
+An Elephant may register backlog items and write planning artifacts as its
+ordinary role work. Use one honest final trailer block:
+
+```text
+Dispatch: administrative (elephant)
+AI-Assisted: true
+```
+
+This binding is independent of stage-0 file/line limits. It admits only ordinary
+`backlog/items/*.md` item blobs (not TEMPLATE), `backlog/transitions.ndjson`,
+the official `backlog/STATUS.md` and `backlog/index.json` projections, and
+planning Markdown under `specs/<topic>/` named `prd`, `spec`, `design`, `sdp`,
+`plan`, `acceptance` or `readiness` (optionally an underscore topic suffix).
+Evidence directories, code, tests, schemas, policies, hooks, runtime state and
+other paths are excluded; mixing them into the commit refuses this binding.
+The real commit boundary and history readers inspect exact Git blobs/paths,
+validate item schemas, and require changed projections to equal the official
+ledger projection. The result proves administrative content classification,
+never a Goldfish author, reviewer, model, completed task or approval.
+
+Ordinary local commits need no PO decision. Design approval, push approval,
+protected/signature boundaries, source authorship/review, atomic work packages,
+ledger integrity and existing lifecycle checks retain their separate rules.
+This administrative binding does not authorize editing an immutable approved
+design or protected file. Stage-0 remains the bounded production-fix exception.
+
+#### New open registrations: commit first, reconcile second
+
+Before the first item commit run
+`node plugins/pipeline-core/scripts/check-backlog-state.mjs --registration-commit`.
+It admits only Git-added schema-valid `open` items with no closure metadata,
+no existing ledger event, exact staged/worktree equality and a fully unchanged
+committed item/schema/ledger/projection baseline. It defers only each exact new
+item's missing initial event; all unrelated integrity failures remain blocking.
+Planning Markdown may accompany the registration; ledger/projection edits,
+existing-item edits, code and other paths cannot be staged in this first leg.
+Commit the items with the administrative binding, run the official reconciler
+once using that real commit as evidence, run the default strict backlog checker,
+and commit its generated ledger/projections using the same honest binding.
+The default checker and Verify never defer unregistered items. Do not handwrite
+ledger events, projection bytes, closure evidence or PO/author/reviewer records.
+Existing explicitly approved fixed registration exceptions remain unchanged.
+
+## GIT-04 — No force-push, no history rewrite, no destructive bulk operations (guard union)
+
+- **MUST NOT** rewrite history that has been pushed/shared (`rebase` onto published history, `commit --amend` on pushed commits, `filter-branch`/`filter-repo`). Enforcement path: rewritten history only propagates via force-push — which the guard denies.
+- **MUST NOT** execute the following, all denied by the git-guard union (union of the three proven project guards, `docs/adr/0013-git-guard-union.md`):
+  - force-push in any form (`--force`, `--force-with-lease`, `+refspec`),
+  - `reset --hard`, `checkout -- .` / blanket discards of uncommitted work,
+  - `clean -f` variants (including against untracked content packs),
+  - deleting `main`/protected branches or protected tags (e.g. `archive/*`),
+  - `rm -rf` against the repo working tree,
+  - staging secret-bearing files (see `guardrails/security.md` SEC-02).
+- **MUST NOT** weaken, bypass, or locally patch the guard (no editing of hook config to make a command pass).
+- **MUST NOT** rely on interposed global git options (`git -C <path> push --force`, `-c`, `--git-dir`, etc.) to evade the rules above — recognized global options are normalized away before rule matching, closing a known evasion via interposed global options.
+- **MUST NOT** rely on GNU long-form `rm` flags (`--recursive`, `--recur`, …) to evade the `rm -rf` rule above — long forms and their unambiguous abbreviations are matched directly.
+- **MUST NOT** rely on PowerShell `-Recurse` abbreviations (`-r`, `-re`, `-rec`, `-recu`, `-recur`, `-recurs`) to evade the `Remove-Item` rule above — every unambiguous abbreviation is matched directly.
+- **MUST NOT** rely on quoting a destructive command inside an interpreter/remote wrapper (`ssh`, `bash -c`, `pwsh -Command`, `cmd /c`) to evade quote-stripping — a small, high-risk raw-string rule list (`GG-14`/`GG-15`/`GG-16`) additionally matches quoted interpreter payloads, a quoted `git add` of a protected target, and a quoted recursive `rm`/`Remove-Item` of a protected target; the general quote-stripping trade-off (see the guard header, `plugins/pipeline-core/hooks/guard-git.mjs`) remains otherwise unchanged.
+- **Double-confirmation override procedure — the legitimate escape when the guard blocks a needed command:**
+  1. The Elephant explains the blocked command, the reason, and the risk, and asks the PO.
+  2. The PO confirms.
+  3. The PO gives a second, explicit confirmation with the fixed phrase `OVERRIDE <rule-id>`.
+  4. Execution runs through the documented guard-override mechanism — one-time use, reason recorded, logged loudly, and entered in the handover/telemetry.
+
+  A guardrail diff that implements the override mechanism is itself Critic-mandatory (trigger T1).
+- **The signed-push admission that needs no phrase at all is a separate, broader mechanism — not `GG-03` ([ADR-0061](../docs/adr/0061-uniform-human-approval-ceremony.md)).** `GG-03` itself (`plugins/pipeline-core/hooks/guard-git.mjs:332-338`) matches only a push that deletes or directly overwrites `main`/`master` — via `--delete`/`-d ... main|master` or a `:refs/heads/main`-style colon refspec — so an ordinary push to a feature branch is never "matched by `GG-03`" in the first place; that route is unreachable for it. The mechanism that actually governs an ordinary branch push is the separate `guard-push.mjs` hook: its own `isPush` test (`plugins/pipeline-core/hooks/guard-push.mjs:335`) matches any `git push` (plus direct and shell-wrapper forms) regardless of destination branch, and its approval-enforcement branch (`plugins/pipeline-core/hooks/guard-push.mjs:1681-1759`) runs whenever the project's `gates.push_approval` resolves to `"required"` (or is absent — the safer default) rather than `"standing-approved"`. That branch verifies, via `authorizeRecordedPush`, a recorded approval for exactly this candidate commit, remote and destination ref against the committed trust anchor, and admits with no arming, no token, and no typed `OVERRIDE GG-03` — writing an audit entry naming the authorization it relied on; a denial names the returned `PUSH-PROOF-*` code. The reason this is not a weakening is ADR-0061's disposal test: the typed phrase prevents no agent behaviour the signature does not already prevent, and the signature is strictly stronger — per-commit, per-destination, verified against a committed anchor, and impossible for the agent to produce. `GG-03` itself keeps blocking a destructive push to `main`/`master` exactly as before, unattended-agent case included; a `--force` or `+refspec` push also matches `GG-01`/`GG-02` and therefore still blocks, approval or not. **The push must write out its destination ref** (`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`) — a command that does not name a ref cannot be matched against an attestation without guessing.
+- **Mechanism status: shipped.** Every deny rule (union `GG-01`…`GG-16`, file order, append-only; per-project extras `PX-<n>` or an explicit `"id"`) prints its stable rule ID in every BLOCK message — the referent `OVERRIDE <rule-id>` needs. **MUST NOT** (agents): self-arm the override — arming is for the PO's confirmed decision only, never an agent's own initiative.
+  - **Arming (visible inline prefix, parsed from the raw command before quote-stripping):**
+    - Bash: `PIPELINE_GUARD_OVERRIDE="<RULE-ID>|<token>|<reason>" <blocked command>`
+    - PowerShell: `$env:PIPELINE_GUARD_OVERRIDE='<RULE-ID>|<token>|<reason>'; <blocked command>`
+    - `process.env.PIPELINE_GUARD_OVERRIDE` is honored as a fallback for the PO's own session-level arming; if both an inline prefix and the env var are present, the inline prefix wins and the ignored env arming is noted on stderr.
+  - **Token/reason contract:** the value is exactly three segments split on the first two `|` (the reason may itself contain `|`); `token` is a fresh one-time value (convention `YYYYMMDD-<n>`); `reason` is mandatory and non-empty. A `rule|token` pair is bound on first successful use to the exact command (`commandSha256`), the observed candidate commit, the physical project target, and a lifetime (`overrideArmingTtlSeconds`, default 3600s). Re-presenting it for the **byte-identical command at the same `HEAD` inside that lifetime** is admitted again and appended as a `retry` entry — the same authorized act, retried, not a second one. Anything else — a different command, a moved `HEAD`, an expired arming, a different target, or a candidate that cannot be observed — blocks naming the prior consumption, and so does any pre-existing ledger entry written in the older unbound shape. **Why this is not a weakening:** the human authorized *that command against that candidate*, and the failure this closes is real — a harness- or remote-level refusal arrives *after* the guard has already consumed the token, so a push that never happened used to burn a PO-authorized arming (measured twice in the 0.5.3 release session).
+  - **Ledger:** `.claude/guard-override.log.jsonl` under `$CLAUDE_PROJECT_DIR` (same lookup as `guard-config.json`) — one JSON line per successful override, `{ts, rule, token, reason, command}`; committed as the audit trail.
+  - **Fail-closed rule (deliberate inversion of the guard's own fail-open):** malformed arming (fewer than three segments, empty token/reason, or an unknown rule ID) is ignored — rules evaluate as if unarmed, and an "override malformed" warning is always emitted, never silently. A ledger that cannot be appended (e.g. `.claude/` missing) means the override is NOT applied — normal block, explanatory reason. All deny rules are always evaluated; the token is consumed only when EVERY matching rule is the single armed rule — if any other rule also matches, the guard blocks via that rule and consumes/ledgers nothing.
+  - **Fallback (mechanism unavailable, e.g. ledger directory missing on this machine):** the original emergency escape stays — STOP and let the PO run the command manually in his own terminal.
+- **Project-local `PX-<n>` pattern-writing guidance:** `PX-<n>` entries are project-local `extraDenyPatterns` — the union cannot fix a project's own regex, only document how to write a correct one. Abbreviation classes (a flag with several accepted unambiguous prefixes) MUST be encoded GG-13-style as a nested-optional regex, never as a hand-enumerated alternation that can silently miss a valid prefix — worked example for `Remove-Item -Recurse`: `-r(?:e(?:c(?:u(?:r(?:s(?:e)?)?)?)?)?)?\b` matches every unambiguous abbreviation (`-r`, `-re`, `-rec`, `-recu`, `-recur`, `-recurs`, `-recurse`) in one pattern. This is documentation only — no union code change; a project's own regex gaps stay the project's own fix.
+- Guard design invariants (do not "fix" them away): broad allows + targeted deny, exit 2 with plain-text reason, fail-open as safety net not prison, why-header per guard (ADR-0013).
+- **Why:** These operations destroy work irreversibly; the union exists because the three project guards diverged and NO single incarnation was a superset — every gap was an unprotected project.
+- **Verification:** PreToolUse guard active is a bootstrap-check condition (`harness/session-bootstrap.md` step 1/3); guard lives ONLY in the plugin, project repos carry deny-config only — a guard copy in a project repo is itself a finding. Union implemented: `plugins/pipeline-core/hooks/guard-git.mjs`; per-deny-rule test cases (block + allow counter-case each): `plugins/pipeline-core/hooks/guard-git.test.mjs` (run with `node`).
+
+## GIT-05 — Branch, merge, and push rules follow the project calibration
+
+- **MUST** follow the committed project calibration at its resolved authority tier (`project/pipeline.json`, else `.claude/pipeline.json`: `branchModel`, `autonomy`, `wipLimit`, `worktree`) for branching (pr-flow vs. direct-push+staging), merge form, and push autonomy; **MUST NOT** improvise a different flow.
+- **MUST** pass the project's defined merge/completion gate before anything reaches `main`: deterministic checks green + evidence (`guardrails/quality-gates.md`) + Critic per risk class (`harness/review-protocol.md` §2.1, *Trigger decision table*).
+- Push/merge autonomy is whatever the calibration grants — and no more; consent for outward-effective actions never carries across contexts (`guardrails/global.md` GL-04). In this repo since 2026-08-06 (PO decision, superseding ADR-0017's standing approval): the push gate is `approval: required` — every push needs an approval recorded against the exact candidate commit. How a human clears it is `gates.push_approval` in `pipeline.user.yaml` ([ADR-0056](../docs/adr/0056-push-approval-mode.md)): `signature` (default, and this repo's value) demands a detached Ed25519 proof, `chat` an in-session clearance that is still commit-bound and labelled but is attribution, not proof. Unreadable or unrecognised resolves to `signature`. Destructive push forms remain guard-blocked regardless.
+- Writing tasks run in a worktree per project calibration (ADR-0008); OPEN (Phase 4): validated worktree tier + fallback per project.
+- **Why:** The gate is the central invariant, the form is calibrated — <PROJECT_C>'s PR flow and <PROJECT_A>/<PROJECT_B> direct-push are deliberate differences, not drift.
+- **Verification:** Calibration file names the branch model; gate evidence exists before merge; the WIP rule (a Kanban-style cap on concurrently open blocks/worktrees, calibration wipLimit, base default 3 -- not a cap on parallel Goldfish dispatch within one already-open block, which stays ungated as long as files/state don't conflict) is checked at dispatch time.
+
+## GIT-06 — Merge-completion gate
+
+- After every merge/block completion, **MUST** update the project's single handover file (and append the HISTORY entry with lessons) BEFORE the block counts as closed; the "open items / next block" section in HISTORY is generated from or references the handover file — never hand-duplicated.
+- **MUST NOT** end a session between merge and handover update ("merge now, doc sync later" is the proven drift point).
+- **Why:** Exactly at the post-merge step the documented handover lie arose (<PROJECT_C>: CLAUDE.md claimed a PR unmerged while HEAD was already the merge).
+- **Verification:** Deterministic post-merge check in the `/close` skill blocks until the handover file reflects the new state (Phase 3 hook; until then a mandatory ritual step). The session-end commit containing the handover update exists (`git log` shows it after the merge commit).
+
+## GIT-07 — Hook-bypass forms technically blocked by the git-guard (gate honesty)
+
+- **MUST NOT** rely on the following hook-bypass forms to skip the pre-commit/commit-msg hooks (`git commit`) or the pre-push hook (`git push`) — the git-guard technically blocks each, by rule id: `--no-verify` on any `git` subcommand (`GG-17`); the `git commit -n` short flag (`GG-18` — note `-n` on `git push` means `--dry-run` and on `git merge` means `--no-stat`, neither is a hook-skip, and both stay allowed); `-c`/`--config-env core.hooksPath` transient rebind (`GG-19`); `git config [set] core.hooksPath` persistent rebind (`GG-20`).
+- **MUST NOT** claim hook-bypass is "impossible" — it is not. The following vectors are documented, not silently claimed covered, in the guard header's "WHAT THIS GUARD DOES NOT BLOCK" section (`plugins/pipeline-core/hooks/guard-git.mjs`): the quoted-value form `git -c "core.hooksPath=..."` (the general quote-stripping trade-off, same as elsewhere in this guard); `--config-env` breaking `git commit` adjacency, which evades `GG-18` specifically (`GG-17` still catches the `--no-verify` form of the same intent); `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_<n>`/`GIT_CONFIG_VALUE_<n>` environment-variable config injection; `GIT_CONFIG_GLOBAL=<file>` indirection (uncatchable — the key never appears in the command string); and alias indirection (`git -c alias.x="commit -n" x`).
+- `GG-17`…`GG-20` have no agent-side override route. They protect the hook boundary that evaluates every other Git rule, so letting that same boundary authorize its own bypass would be circular. A supplied arming is ignored and the original command remains blocked (ADR-0079).
+- **Why:** A ruleset that claims more than the guard technically enforces is worse than no rule at all — a false sense of protection invites exactly the bypass it claims to prevent (`docs/operating-model.md`, *What the model protects* — rule 3, "Prefer deterministic checks", gate honesty).
+- **Verification:** `plugins/pipeline-core/hooks/guard-git.test.mjs` carries a BLOCK case and an ALLOW counter-case per rule id (`GG-17`…`GG-20`); `node harness/scripts/verify.mjs` runs the full suite.
+
+## GIT-08 — Standing push approval does NOT cover a deploy-triggering ref
+
+- **MUST NOT** treat the standing push approval (GIT-05) as covering a push to a deploy-triggering ref (a release tag/branch pattern declared under a manifest `release` section, e.g. `refs/tags/v*`). `standing-approved` covers ORDINARY commits to `main`; it is explicitly carved out for deploy triggers.
+- **MUST** obtain a fresh `deployApproval` bound to `{artifact, environment}` (`harness/scripts/pipeline-state.mjs approve-deploy --env <env> --artifact <tag-or-sha> --by <name>`) before a push that fires a `promote:prod`-class deployment to a `human-gate` environment — even when the repo's push gate is otherwise `standing-approved`.
+- Enforced by the `guard-push` deploy branch: the deploy branch's approval check runs INDEPENDENT of `gates.push.approval`, so it is never satisfied by the standing approval — see `guardrails/deploy.md` DP-01 for the full rule and `docs/adr/0017-push-policy-standing-approval.md`'s follow-up note for the ADR-side carve-out.
+- **Why:** Without this carve-out, `git push origin v1.0.0` would auto-pass under the standing approval and silently fire a prod deploy in CI — a composition bypass. A blanket "pushing to main is fine" approval was never meant to also mean "promoting to prod is fine".
+- **Verification:** `plugins/pipeline-core/hooks/guard-push.test.mjs` carries a case where a deploy-triggering push is BLOCKED despite `gates.push.approval === "standing-approved"`; `node harness/scripts/verify.mjs` runs the full suite.
+
+## GIT-09 — GG-22: a commit may not leave a backlog status-flip unreconciled
+
+- **MUST NOT** stage any path outside `backlog/items/**`, the append-only,
+  hash-chained source ledger `backlog/transitions.ndjson`, and its two
+  generated projections (`backlog/STATUS.md`, `backlog/index.json`)
+  whenever an earlier commit already changed a
+  `backlog/items/*.md` file's `status:` line without a matching ledger
+  reconciliation since the last commit that touched
+  `backlog/transitions.ndjson`. The trigger is the unreconciled status-flip
+  debt alone — it fires whether or not a ledger file is also staged in the
+  same commit, and whether or not `reconcile-backlog-ledger.mjs --activate`
+  has ever been run in this working tree; GG-22 recomputes debt fresh from
+  repository history on every commit, it does not track whether the
+  reconciler was invoked.
+- **One precondition, and it is the only thing that switches GG-22 off
+  entirely:** the rule no-ops while `backlog/transitions.ndjson` has never
+  been committed in this repository's history. It has no earlier ledger
+  commit to measure debt against, so it declines rather than diffing against
+  an empty ref. A freshly onboarded project therefore has **no** GG-22
+  protection until its first ledger commit lands — stated here because the
+  population this affects is exactly the one least able to notice it, and
+  because a ruleset that claims more than the guard enforces is worse than
+  no rule at all (GIT-07). Enforced by the git-guard union as `GG-22` — a
+  plain deny with no override token (`OVERRIDE GG-22`): the fix is always
+  the same cheap, mechanical sequence, so there is no legitimate reason to
+  bypass it.
+- **The usual `git commit -- <exact paths>` discipline DOES scope this
+  check — but only when the commit's own flag set proves that pathspec is
+  the commit's exclusive content.** `GG-22` evaluates exactly the paths
+  named after an explicit `--` pathspec when nothing else on that
+  invocation can add unnamed content to the commit (message/authorship/
+  signing/display flags only, read from `git-commit(1)` itself — see
+  `plugins/pipeline-core/hooks/guard-git.mjs`'s `PATHSPEC_EXCLUSIVE_SAFE_FLAGS`/
+  `PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS`). A commit carrying `-i`/`--include`,
+  `-a`/`--all`, `-p`/`--patch`, `--amend`, or any OTHER flag this allowlist
+  does not recognize is conservatively treated as NOT pathspec-exclusive
+  (git's own documented semantics make several of these add unnamed staged
+  content to the commit) and falls back, unchanged, to inspecting the WHOLE
+  staged index (`git diff --cached --name-only`) — an unrelated staged file
+  fails such a commit regardless of how narrowly its own pathspec names
+  paths. Concretely: several `backlog/items/*.md` status edits MAY be
+  batched into one commit (or several separate commits) before reconciling —
+  that is an established, legitimate pattern — but while the debt is
+  outstanding, `backlog/items/**` edits, the source ledger, and its two
+  generated projections are the only paths that may land in the effective
+  content of any commit (its exclusive pathspec, or its whole staged index
+  when no pathspec is provably exclusive); anything else is blocked, in
+  every commit made while the debt exists, not only in the commit that
+  eventually lands the reconciliation. (Restored to this pathspec-aware
+  form 2026-09-06 by `NVA-B-GG22FIX-1`/`-2`, after a several-day period
+  where a plain `git commit -F <msg> -- <paths>` was blocked by an
+  unrelated concurrent dispatch's staged files regardless of its own exact
+  pathspec — `backlog/items/2026-09-03-gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit.md`.)
+- **Remediation order:** before closing an item, fill in its `closure_commit`
+  (and the item's other closure fields) — `reconcile-backlog-ledger.mjs
+  --activate` refuses to write anything while any closed item is missing a
+  required closure field, so an incomplete closure blocks the reconciliation
+  step below, not just the item's own validity. Then commit pending
+  `backlog/items/` status edits first (batching several closures into one
+  commit is fine), run `node
+  plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate`
+  once, then commit the resulting `backlog/STATUS.md` /
+  `backlog/index.json` / `backlog/transitions.ndjson` changes last. Running
+  reconciliation before every pending item edit is committed makes it
+  consume working-tree transitions that have not landed yet, creating fresh,
+  unreconcilable debt (confirmed live 2026-08-29,
+  `backlog/items/2026-08-29-gg-22s-own-remediation-order-creates-unclearable-ledger-debt.md`).
+- **Why:** Without this guard, closing a `backlog/items/*.md` item's
+  `status:` and reconciling the ledger stay two separate, manually-sequenced
+  steps; forgetting the second one is the recurring drift `GG-22` exists to
+  make structural rather than a habit `verify.mjs` only catches after the
+  fact (`backlog/README.md`, Ledger section).
+- **Verification:** `plugins/pipeline-core/hooks/guard-git.mjs` (search
+  `GG-22`); `node plugins/pipeline-core/hooks/guard-git.test.mjs`.
+
+## GIT-10 — Run the backlog-state checker before committing any ledger change
+
+- **MUST** use the exact open-registration precheck above for the first new-item commit; use the default strict checker for every ledger/projection commit and existing status/closure change.
+- **MUST** run `node plugins/pipeline-core/scripts/check-backlog-state.mjs`
+  from the repository root before committing ANY change that touches a
+  `backlog/items/*.md` file's `status:`/closure metadata, the append-only,
+  hash-chained source ledger `backlog/transitions.ndjson`, or either of its
+  two generated projections (`backlog/STATUS.md`, `backlog/index.json`) —
+  never rely on `verify.mjs` to catch it later. `reconcile-backlog-ledger.mjs`'s
+  own item read (`readItems`) is not a substitute: it only requires each item
+  to parse to a usable `id` and never checks `parsed.errors` (schema
+  validity) before planning a transition, so a schema-invalid item's own
+  reconciliation run will not surface the defect — only this checker does.
+- **What to read in the output before proceeding:** a line prefixed `DRIFT
+  backlog state: ...` is printed unconditionally but never blocks. The
+  script's own severity classifier (`classifyBacklogFindings`,
+  `BACKLOG_FINDING_SEVERITY.DRIFT`,
+  `plugins/pipeline-core/lib/backlog-state.mjs`) assigns DRIFT only to an
+  `evidence.commit is not a reachable local Git commit` /
+  `must be a full lowercase Git commit OID` finding at or below a fixed
+  historical cutoff sequence (`LEDGER_DRIFT_CUTOFF_SEQUENCE`), plus a
+  `closure_commit` cross-check finding it can prove was caused by that same
+  drifted event; every other finding defaults to `INTEGRITY`. A line
+  prefixed `FAIL backlog state: ...` IS blocking — the script's `cli()`
+  exits `2` on any `INTEGRITY` finding (or on bad usage) and nothing may be
+  committed until it is fixed; a clean run prints `Backlog state, transition
+  ledger, closure evidence, and generated projections are valid.` and exits
+  `0` (no explicit `process.exit` call on that path — Node's default). This
+  repository's own run currently prints 22 `DRIFT` lines alongside that
+  success line, and they are not one uniform batch: 20 carry an explicit
+  `(known 2026-07-19..2026-07-22 historical batch)` suffix
+  (`isKnownHistoricalUnreachableFinding`, `check-backlog-state.mjs`) —
+  unreachable historical `evidence.commit` values lost in the sanctioned
+  2026-08-01 history rewrite, legitimately and permanently accepted. The
+  remaining 2 carry no such suffix and are NOT accepted: `ledger event 403:
+  evidence.commit must be a full lowercase Git commit OID` is a live, open
+  defect, a stored abbreviated OID
+  (`backlog/items/2026-09-01-a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair.md`),
+  and the `closure_commit` cross-check line is DRIFT only because
+  `classifyBacklogFindings` traces it to that same event 403 — the item it
+  names closed on event 403, not on any event in the annotated batch. A
+  reader separates the accepted batch from a new problem by the `(known ...
+  historical batch)` suffix, never by the total `DRIFT` line count: the
+  un-suffixed pair, like the annotated batch, never blocks a commit, but
+  unlike the annotated batch it is not this repository's settled baseline —
+  its presence is expected to end once that OID is repaired.
+- **`closure_commit` must be a full lowercase Git commit OID (40 hex
+  characters), never an abbreviated SHA.** Enforced by `backlog-state.mjs`'s
+  `OID` pattern (`/^[a-f0-9]{40}$/u`), checked by `check-backlog-state.mjs`. An
+  abbreviated SHA looks correct to a human reviewer and bakes a schema
+  violation straight into the hash chain; catch it by running the checker
+  above before committing, not after.
+- **Recovery for a bad reconciliation that is still UNCOMMITTED:** `git
+  checkout -- backlog/transitions.ndjson backlog/index.json
+  backlog/STATUS.md`, fix the offending item, and re-run
+  `reconcile-backlog-ledger.mjs --activate`. Once the bad reconciliation has
+  been committed, that discard route is gone — the ledger is append-only and
+  hash-chained, so hand-patching it breaks the chain — and the only correct
+  repair is `planBacklogEvidenceAmendment`'s heavier evidence-amendment
+  machinery (`plugins/pipeline-core/lib/backlog-state.mjs`), never a manual
+  edit of the projection files.
+- **Why:** confirmed live 2026-08-27 — six backlog items were filed against
+  a schema they did not satisfy (`type: decision`, `owner: po`, neither in
+  the enum), and the violation surfaced only because
+  `check-backlog-state.mjs` was run afterwards; ten of thirteen findings in
+  that run were self-inflicted and would have been caught before committing.
+  This is a discipline the reader holds themselves: unlike GIT-09/`GG-22`
+  above, no guard invokes this checker at commit time, so nothing currently
+  blocks a commit that skips it.
+- **Verification:** run the command above from the repository root; `node
+  plugins/pipeline-core/scripts/check-backlog-state.mjs --write` regenerates
+  `backlog/STATUS.md`/`backlog/index.json` when projection drift is the only
+  remaining issue.
+  `plugins/pipeline-core/scripts/check-backlog-state.test.mjs` covers the
+  checker's own severity classification and exit behaviour.

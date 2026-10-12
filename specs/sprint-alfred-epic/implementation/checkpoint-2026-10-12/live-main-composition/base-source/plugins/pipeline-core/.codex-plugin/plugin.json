@@ -1,0 +1,24 @@
+{
+  "name": "pipeline-core",
+  "version": "0.7.0+codex.20261009185206.808a0b04",
+  "description": "Provider-aware Agent-Pipeline operating model with session skills, independent review, and command safety hooks.",
+  "hooks": "./hooks/codex-hooks.json",
+  "author": {
+    "name": "agent-pipeline"
+  },
+  "license": "SUL-1.0",
+  "interface": {
+    "displayName": "Agent Pipeline Core",
+    "shortDescription": "Safe agentic delivery workflows for Codex.",
+    "longDescription": "Loads the Agent-Pipeline operating model, role skills, review workflow, and command safety hooks for Codex projects.",
+    "developerName": "agent-pipeline",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills",
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Start the Agent-Pipeline session bootstrap."
+    ]
+  }
+}

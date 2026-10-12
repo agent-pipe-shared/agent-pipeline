@@ -1,0 +1,45 @@
+// Root-reviewed public administrative readback. No index/Source/signature writes.
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const own=path.dirname(fileURLToPath(import.meta.url));
+const repo=path.resolve(own,'../../../../..');
+const logical=p=>path.relative(repo,p).split(path.sep).join('/');
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const load=n=>{const bytes=fs.readFileSync(path.join(own,n));return {path:logical(path.join(own,n)),sha256:hash(bytes),value:JSON.parse(bytes)};};
+const manifest=load('manifest.json'),request=load('quality-request.json'),check=load('strict-check-receipt.json');
+assert.equal(manifest.sha256,'23af80a1c2e0ca7e9ba22006d7190811bc9b162b488605097716a4bd492d9182');
+assert.equal(request.sha256,'3566d90adcdc8ade2c99abec6d95f6c4df7cf79a2dbca0585ef56a5784e27b12');
+assert.equal(check.sha256,'809e5ec1992f059ee2c8bc4068885f4e5cc7d34f00c91cb6bc815c30ea33ddf7');
+assert.equal(check.value.schema,'alfred.live-main-strict-check.v2');
+assert.equal(check.value.exitCode,0);assert.equal(check.value.fullTargetSetMatched,true);
+assert.equal(check.value.actualGitParsedTargetCount,317);
+const git=args=>{const p=spawnSync('git',args,{cwd:repo,encoding:null,maxBuffer:64*1024*1024,timeout:30000});assert.equal(p.status,0,'Git read failed '+args[0]);return p.stdout;};
+const head=git(['rev-parse','HEAD']).toString().trim();
+assert.equal(head,manifest.value.baseCommit);assert.equal(request.value.baseCommit,head);
+assert.equal(request.value.intentSha256,'ee0b27b272019a22e935c85ccc4efebb713f2577fe6245ead641d3e6f36d1aae');
+const expected=manifest.value.rows.map(r=>r.path).sort();
+const cached=git(['diff','--cached','--name-only','-z']).toString().split('\0').filter(Boolean).sort();
+assert.deepEqual(cached,expected);assert.deepEqual(Object.keys(request.value.expectedDigests).sort(),expected);assert.equal(cached.length,317);
+assert(!cached.some(p=>p.split('/').some(s=>['.git','.claude','scratch','private','private-state','privateState','keys','transcripts','sessions'].includes(s))));
+const entries=git(['ls-files','--stage','-z','--',...expected]).toString().split('\0').filter(Boolean);
+const indexed=new Map(entries.map(line=>{const m=/^(100644|100755) ([a-f0-9]{40,64}) 0\t(.+)$/.exec(line);assert(m,'nonregular or unmerged index entry');return [m[3],{mode:m[1],oid:m[2]}];}));
+assert.equal(indexed.size,317);
+const rows=manifest.value.rows.map(row=>{
+ const entry=indexed.get(row.path);assert(entry);
+ const bytes=git(['cat-file','blob',entry.oid]),observed=hash(bytes),post=fs.readFileSync(path.join(repo,row.postimage)),postObserved=hash(post);
+ const mode=entry.mode==='100755'?0o755:0o644;
+ assert.equal(observed,row.postSha256);assert.equal(observed,request.value.expectedDigests[row.path]);assert.equal(postObserved,observed);assert.equal(mode,row.postMode);assert.equal(bytes.length,row.postBytes);
+ const result={path:row.path,indexBlob:entry.oid,indexMode:entry.mode,indexSha256:observed,manifestPostSha256:row.postSha256,requestExpectedSha256:request.value.expectedDigests[row.path],postimageReadbackSha256:postObserved,bytes:bytes.length,matched:true};
+ if(row.path.endsWith('.ps1')){const text=bytes.toString('utf8'),snapshot=post.toString('utf8');result.lineEndings={indexCRLF:(text.match(/\r\n/g)||[]).length,indexLF:(text.match(/\n/g)||[]).length,indexLoneCR:(text.match(/\r(?!\n)/g)||[]).length,postimageCRLF:(snapshot.match(/\r\n/g)||[]).length,postimageLF:(snapshot.match(/\n/g)||[]).length,rawBytesConserved:bytes.equals(post)};}
+ return result;
+});
+assert.equal(git(['rev-parse','HEAD']).toString().trim(),head);
+assert.deepEqual(git(['diff','--cached','--name-only','-z']).toString().split('\0').filter(Boolean).sort(),cached);
+const receipt={schema:'alfred.live-main-staged-packaging-readback.v1',status:'ACTUAL317INDEXBLOBS_SHA_MODE_MATCHED',baseCommit:head,manifest:{path:manifest.path,sha256:manifest.sha256},request:{path:request.path,sha256:request.sha256,intentSha256:request.value.intentSha256},strictCheck:{path:check.path,sha256:check.sha256,schema:check.value.schema,exitCode:check.value.exitCode,actualGitParsedTargetCount:check.value.actualGitParsedTargetCount,fullTargetSetMatched:check.value.fullTargetSetMatched},pathCount:317,indexEntriesMatched:317,postimageCopiesMatched:317,forbiddenIndexPaths:[],powerShell:rows.filter(r=>r.path.endsWith('.ps1')),rows,priorRefusedCommandShape:{action:'multiline node -e administrative readback',executed:false,codes:['guard-push ambiguous-prefix false positive','GUARD-PARSE-UNSUPPORTED newline'],retryActions:[],rootRebrief:'Explicit original standalone administrative script and one plain node command admitted as shape correction; no path/authority bypass, push or HGO'},indexChangedByThisCheck:false,sourceModified:false,testsRun:0,criticRun:false,signed:false,committed:false,pushed:false};
+const target=path.join(own,'staged-packaging-readback.json');
+fs.writeFileSync(target,JSON.stringify(receipt,null,2)+'\n',{flag:'wx',mode:0o644});
+console.log(JSON.stringify({path:logical(target),sha256:hash(fs.readFileSync(target)),pathCount:317,matched:317,powerShell:receipt.powerShell},null,2));

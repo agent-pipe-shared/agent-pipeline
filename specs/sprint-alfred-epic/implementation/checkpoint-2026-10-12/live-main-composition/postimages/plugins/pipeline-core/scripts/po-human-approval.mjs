@@ -1,0 +1,2864 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * PO proof helper with a deliberately split responsibility boundary.
+ *
+ * `prepare` writes only public candidate-bound requests and is agent work.
+ * `setup` and `approve` are intentionally for a terminal operated by the
+ * approving human. `authorize-critical` is the single human-terminal command
+ * for a critical action (push/deploy/publication/feature-package-reconcile/
+ * release-preflight, ADR-0061 port PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL):
+ * it prepares the request and signs that exact request in one invocation, so
+ * a request left on disk by an earlier, possibly failed preparation can never
+ * be the thing that gets signed. It changes nothing about where key material
+ * lives or who is prompted for the passphrase; `prepare-critical`/
+ * `approve-critical` stay available as the two-step form. The encrypted
+ * private key stays outside the checkout and OpenSSL reads its passphrase
+ * from that terminal. No password, passphrase, recovery code or private key
+ * is accepted as an argument, environment value, stdin payload, repository
+ * file, or pipeline state. `verify` is public readback and is agent work
+ * again.
+ */
+import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { constants as fsConstants, fstatSync, fsyncSync, chmodSync, closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { basename, dirname, isAbsolute, join, posix as posixPath, resolve, win32 as win32Path } from "node:path";
+import { fileURLToPath } from "node:url";
+import { isatty as nodeIsatty } from "node:tty";
+
+import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
+import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-gate-ceremony.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
+import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
+import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatureRequest } from "../lib/human-guard-override.mjs";
+import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
+import { PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA, validatePortableAgyAuthorshipRequest } from "../lib/portable-agy-authorship-export.mjs";
+import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { DESIGN_APPROVAL_REQUEST_SCHEMA, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
+import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { parseStrictJson } from "../lib/governance-event.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
+import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir, resolveRepoScopedDirectory } from "../lib/po-key-directory.mjs";
+import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import {
+  DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA,
+  validateDesignWorkflowPackageApprovalRequest,
+} from "../lib/design-workflow-approval.mjs";
+import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
+import { ORGANIZATION_ARCHITECTURE_CONFIG_PATH, organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
+import { MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA, describeModelFamilyApprovalRequest } from "./model-family-approval-request.mjs";
+import { canonical as canonicalProofJson } from "../lib/po-approval-proof.mjs";
+
+// NVA-SIGENTRY-1: the same resolved-plugin-root derivation guard-human-override.mjs
+// already uses (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`) -- needed
+// here only so `sign-intent` can call describeHumanGuardOverrideSelection(), which
+// needs a `pluginRoot` to re-plan/re-prepare a candidate HGO request the same way the
+// signature-mode ceremony itself does.
+const SCRIPT = fileURLToPath(import.meta.url);
+const PORTABLE_AGY_AUTHORSHIP_EXPORT_SCRIPT = fileURLToPath(new URL("./portable-agy-authorship-export.mjs", import.meta.url));
+const PORTABLE_CRITIC_EXPORT_SCRIPT = fileURLToPath(new URL("./portable-critic-export.mjs", import.meta.url));
+const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
+
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] [--existing-key <path-to-an-already-existing-private-key-pem>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> [--directory <external-dir>] (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | set-po-key-directory --directory <absolute-dir> [--replace <current-value>] | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
+// This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
+// PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
+// PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
+// follows that convention rather than inventing a new one, and is read ONLY as a
+// fallback when no explicit --directory is supplied on the command line.
+const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
+const BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-request.v1";
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function describeBootstrapAcknowledgementRequest(record, intentSha256) {
+  const action = record?.action;
+  const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+  const sha = (value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+  if (record?.schema !== BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA || record.intentSha256 !== intentSha256
+    || !exactKeys(action, ["kind", "decision", "root", "featureId", "checkpoint", "prd", "spec"])
+    || action.kind !== "bootstrap-plan-acknowledgement" || action.decision !== "content-sound-and-spec-consistent"
+    || typeof action.root !== "string" || typeof action.featureId !== "string"
+    || !exactKeys(action.checkpoint, ["revision", "sha256"]) || !Number.isSafeInteger(action.checkpoint.revision) || !sha(action.checkpoint.sha256)
+    || !exactKeys(action.prd, ["path", "sha256"]) || !exactKeys(action.spec, ["path", "sha256"])
+    || !sha(action.prd.sha256) || !sha(action.spec.sha256)
+    || createHash("sha256").update(canonicalJson(action), "utf8").digest("hex") !== intentSha256) return null;
+  return {
+    resolved: true,
+    lines: [
+      "action: acknowledge the reviewed bootstrap staging plan before it can be bound",
+      `repository root: ${action.root}`,
+      `feature id: ${action.featureId}`,
+      `staging PRD: ${action.prd.path} (sha256 ${action.prd.sha256})`,
+      `staging specification: ${action.spec.path} (sha256 ${action.spec.sha256})`,
+      `intake checkpoint: revision ${action.checkpoint.revision}, sha256 ${action.checkpoint.sha256}`,
+      "decision: the PRD is content-sound and consistent with the specification",
+    ],
+  };
+}
+
+function describePortableAgyAuthorshipRequest(record, intentSha256) {
+  if (record?.schema !== PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA
+    || record.intentSha256 !== intentSha256
+    || !validatePortableAgyAuthorshipRequest(record)) return null;
+  return { resolved: true, lines: [
+    "action: approve a redacted, portable Agy host-observed authorship export",
+    `dispatch id: ${record.subject.taskId}`,
+    `authored commit: ${record.subject.authoredCommit}`,
+    `authored tree: ${record.subject.authoredTree}`,
+    `parent commit: ${record.subject.parentCommit}`,
+    `host-observed model: ${record.subject.model} (${record.subject.effort})`,
+    `local host receipt sha256: ${record.subject.hostReceiptSha256}`,
+    `consent subject sha256: ${record.subject.consentSubjectSha256}`,
+    `result sha256: ${record.subject.resultSha256}`,
+    `export destination: ${record.exportPath}`,
+    "this approves a host observation, NOT cryptographic provider model attestation, a push, or a release",
+  ] };
+}
+
+function checkPortableAgyAuthorshipRequestOnHost({ repository, requestPath, taskId, intentSha256 }) {
+  const checked = spawnSync(process.execPath, [PORTABLE_AGY_AUTHORSHIP_EXPORT_SCRIPT,
+    "check", "--root", repository, "--task-id", taskId], {
+    cwd: repository, encoding: "utf8", shell: false, timeout: 20_000, maxBuffer: 8192,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (checked.error || checked.status !== 0) return false;
+  try {
+    const value = JSON.parse(checked.stdout);
+    return value?.ok === true && value.code === "AGY-EXPORT-LOCAL-PASS-BOUND"
+      && value.requestPath === requestPath && value.intentSha256 === intentSha256;
+  } catch { return false; }
+}
+
+function describePortableCriticExportRequest(record, intentSha256) {
+  if (record?.schema !== portableCriticExportProvider?.PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA
+    || record.intentSha256 !== intentSha256
+    || !portableCriticExportProvider.validatePortableCriticExportRequest(record, {
+      planSha256: record.approvalIntent?.value?.planSha256,
+      specSha256: record.approvalIntent?.value?.specSha256,
+    })) return null;
+  return { resolved: true, lines: [
+    "action: approve a redacted, portable export of one consumed independent Critic review",
+    `reviewed commit: ${record.subject.candidate.commit}`,
+    `reviewed tree: ${record.subject.candidate.tree}`,
+    `private Critic packet: ${record.subject.producer.packetId}`,
+    `private receipt sha256: ${record.subject.producer.receiptSha256}`,
+    `verdict sha256: ${record.subject.producer.verdictSha256}`,
+    `export destination: ${record.exportPath}`,
+    "this does not approve source changes, a release, a push, or provider identity",
+  ] };
+}
+
+export function describeArchitectureInheritedSourcesRequest(record, intentSha256, repository) {
+  if (record?.schema !== "pipeline.organization-architecture-config-request.v1"
+    || record.intentSha256 !== intentSha256
+    || organizationArchitectureConfigIntentSha256(record.subject) !== intentSha256
+    || Object.keys(record).sort().join("\0") !== ["schema", "subject", "intentSha256"].sort().join("\0")) return null;
+  if (typeof repository !== "string" || !isAbsolute(repository)) return null;
+  const projectPath = join(repository, "project");
+  try {
+    const projectStat = lstatSync(projectPath);
+    if (!projectStat.isDirectory() || projectStat.isSymbolicLink()
+      || realpathSync(projectPath) !== projectPath) return null;
+  } catch { return null; }
+  const configPath = join(repository, ORGANIZATION_ARCHITECTURE_CONFIG_PATH);
+  let currentSha256 = null;
+  let stat;
+  try { stat = lstatSync(configPath); }
+  catch (error) { if (error?.code !== "ENOENT") return null; }
+  if (stat) {
+    try {
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size === 0 || stat.size > 128 * 1024
+        || realpathSync(configPath) !== configPath) return null;
+      currentSha256 = createHash("sha256").update(readFileSync(configPath)).digest("hex");
+    } catch { return null; }
+  }
+  if (currentSha256 !== record.subject.expectedPriorSha256) return null;
+  return { resolved: true, lines: [
+    "action: authorize this repository's exact inherited architecture-source registry",
+    `previous registry sha256: ${record.subject.expectedPriorSha256 ?? "none (first activation)"}`,
+    ...record.subject.sources.map((source) =>
+      `source: ${source.sourceId} | ${source.layer} | ${source.required ? "mandatory" : "optional"} | key ${source.trustAnchor.keyReference} | public key sha256 ${source.trustAnchor.publicKeySha256}`),
+    "this pins source identities and trust anchors; it does not sign the source contents, approve an ADR waiver, or authorize a release or push",
+  ] };
+}
+
+const ADOPTION_APPROVAL_REQUEST_SCHEMA = "pipeline.adoption-approval-request.v1";
+
+/**
+ * ADOPT-SIGN-F: the disclosure for an architecture-adoption approval request, derived from the
+ * request file ALONE. It deliberately does not call verifyAdoptionAuthority(): that rebinds the
+ * repository fingerprint, the candidate and the live adoption snapshot of a checkout, and a PO may
+ * legitimately sign a request prepared for another root. What the PO is shown is bound to what is
+ * signed, which is all a disclosure must guarantee: intent.sha256 must equal the hash of the
+ * intent's own value, and that value must carry the hash of the very subject being displayed (plus
+ * its decision and candidate). The deeper derivation of the intent from the subject (plan and
+ * spec digests) is not repeated here; verifyAdoptionAuthority() re-derives it in full at apply
+ * time, so a request forged to be self-consistent here still cannot be applied. Disclosure, never
+ * authority. Returns null when anything does not bind, so the caller refuses before any
+ * confirmation or signing.
+ */
+function describeAdoptionApprovalRequest(record, intentSha256) {
+  if (record?.schema !== ADOPTION_APPROVAL_REQUEST_SCHEMA) return null;
+  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  const exactKeys = (value, keys) => isObject(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+  const sha = (value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+  const oid = (value) => typeof value === "string" && /^[a-f0-9]{40,64}$/u.test(value);
+  const dateOrNull = (value) => value === null || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/u.test(value));
+  const nonEmptyText = (value) => typeof value === "string" && value.trim() !== "";
+  const sha256Of = (value) => createHash("sha256").update(canonicalProofJson(value)).digest("hex");
+  try {
+    const { intent, subject } = record;
+    if (!exactKeys(record, ["schema", "mode", "intent", "subject", "subjectSha256"])
+      || !["signature", "chat-attributed-unattested"].includes(record.mode)
+      || !exactKeys(intent, ["value", "sha256"]) || !isObject(intent.value)
+      || intent.sha256 !== intentSha256 || sha256Of(intent.value) !== intent.sha256
+      || !isObject(subject) || !sha(record.subjectSha256) || sha256Of(subject) !== record.subjectSha256
+      || intent.value.kind !== "architecture-adoption" || intent.value.policyRevision !== "adoption-authority-v1"
+      || intent.value.subjectSha256 !== record.subjectSha256 || intent.value.decision !== subject.decision
+      || !["approved-scoped", "deferred", "partial"].includes(subject.decision)
+      || !Array.isArray(subject.scope) || subject.scope.length === 0 || !subject.scope.every(nonEmptyText)
+      || !nonEmptyText(subject.decisionRef) || !nonEmptyText(subject.rationale)
+      || typeof subject.decidedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/u.test(subject.decidedAt)
+      || !dateOrNull(subject.expiresAt) || !dateOrNull(subject.reviewDate) || !sha(subject.repositoryFingerprint)
+      || !exactKeys(subject.candidate, ["commit", "tree"]) || !oid(subject.candidate.commit) || !oid(subject.candidate.tree)
+      || sha256Of(intent.value.candidate) !== sha256Of(subject.candidate)) return null;
+    // Free text is rendered through JSON.stringify so a hostile request cannot add a line of its own.
+    return { resolved: true, lines: [
+      "action: record this architecture adoption decision for the repository identified below",
+      `decision: ${subject.decision}`,
+      `decision ref: ${JSON.stringify(subject.decisionRef)}`,
+      ...subject.scope.map((entry) => `scope: ${JSON.stringify(entry)}`),
+      `rationale: ${JSON.stringify(subject.rationale.trim())}`,
+      `decided at: ${subject.decidedAt}`,
+      `expires at: ${subject.expiresAt ?? "none"}`,
+      `review date: ${subject.reviewDate ?? "none"}`,
+      `candidate commit: ${subject.candidate.commit}`,
+      `repository fingerprint: ${subject.repositoryFingerprint}`,
+      `request mode: ${record.mode}`,
+      "this signs the decision only; applying it, and any push or release, need their own approval",
+    ] };
+  } catch { return null; }
+}
+
+function currentGitCandidate(repository) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const commit = spawnSync("git", ["-C", repository, "rev-parse", "HEAD"], {
+    encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+  });
+  const tree = spawnSync("git", ["-C", repository, "rev-parse", "HEAD^{tree}"], {
+    encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+  });
+  const commitId = String(commit.stdout ?? "").trim();
+  const treeId = String(tree.stdout ?? "").trim();
+  return commit.status === 0 && tree.status === 0 && /^[a-f0-9]{40,64}$/u.test(commitId)
+    && /^[a-f0-9]{40,64}$/u.test(treeId) ? { commit: commitId, tree: treeId } : null;
+}
+
+function describeDesignWorkflowApprovalRequest(record, intentSha256, repository) {
+  if (record?.schema !== DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA
+    || record.approvalIntent?.sha256 !== intentSha256
+    || record.approvalIntent?.value?.kind !== "design-workflow-package") return null;
+  const intent = record.approvalIntent.value;
+  const packageRead = readDesignWorkflowPackageFromRepository({ repoRoot: repository,
+    packagePath: record.packagePath, readCandidate: () => currentGitCandidate(repository) });
+  if (!packageRead.ok) return null;
+  const pkg = packageRead.workflowPackage;
+  const rebound = validateDesignWorkflowPackageApprovalRequest({
+    repoRoot: repository, request: record,
+    featureId: intent.featureId,
+    planPath: pkg.sources.prd.path, planSha256: intent.planSha256,
+    specPath: pkg.sources.spec.path, specSha256: intent.specSha256,
+    readCandidate: () => currentGitCandidate(repository),
+  });
+  if (!rebound.ok) return null;
+  return {
+    resolved: true,
+    lines: [
+      "action: approve the complete design workflow package for the exact submitted feature",
+      `feature: ${intent.featureId}`,
+      `design package: ${record.packagePath} (sha256 ${record.packageSha256})`,
+      `candidate provenance: ${intent.candidate.commit} / ${intent.candidate.tree}`,
+      `PRD sha256: ${intent.planSha256}`,
+      `Spec sha256: ${intent.specSha256}`,
+      "complete bounded review material follows (exact bytes were re-read and validated before signing):",
+      JSON.stringify(packageRead.approvalReview, null, 2),
+      "this approves only the package-bound design-to-implementation plan decision; it does not approve push, release or publication",
+    ],
+  };
+}
+
+// CLAUDE-P2: source-owned public observations; never a caller authority flag.
+const DESIGN_SIGNING_MAX_BYTES = 1024 * 1024;
+function designSigningHash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+function readDesignSigningFile(repository, path, { optional = false, request = false, maxBytes = DESIGN_SIGNING_MAX_BYTES } = {}) {
+  const root = realpathSync(resolve(repository));
+  if (typeof path !== "string" || path.length === 0 || path.length > 240 || path.includes("\\") || path.includes("\0")
+    || isAbsolute(path) || /^[A-Za-z]:/u.test(path) || path.split("/").some(part => part === "" || part === "." || part === "..")) throw Error("DAB-SIGN-PATH-UNSAFE");
+  const inspect = () => {
+    let cursor = root;
+    for (const part of path.split("/")) {
+      cursor = join(cursor, part);
+      const metadata = lstatSync(cursor);
+      if (metadata.isSymbolicLink() || realpathSync(cursor) !== cursor
+        || (cursor !== join(root, path) && !metadata.isDirectory())) throw Error("DAB-SIGN-PATH-UNSAFE");
+    }
+    const metadata = lstatSync(cursor);
+    if (!metadata.isFile() || metadata.size > maxBytes || (request && (metadata.nlink !== 1 || metadata.size === 0))) throw Error("DAB-SIGN-FILE-UNSAFE");
+    return { target: cursor, metadata };
+  };
+  let initial;
+  try { initial = inspect(); }
+  catch (error) { if (optional && error?.code === "ENOENT") return null; throw error; }
+  const fd = openSync(initial.target, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+  try {
+    const opened = fstatSync(fd);
+    if (!opened.isFile() || opened.dev !== initial.metadata.dev || opened.ino !== initial.metadata.ino || opened.size > maxBytes) throw Error("DAB-SIGN-FILE-DRIFT");
+    const bytes = readFileSync(fd), final = inspect().metadata;
+    if (bytes.length !== opened.size || final.dev !== opened.dev || final.ino !== opened.ino || final.size !== opened.size
+      || final.mode !== opened.mode || final.nlink !== opened.nlink) throw Error("DAB-SIGN-FILE-DRIFT");
+    return { bytes, sha256: designSigningHash(bytes) };
+  } finally { closeSync(fd); }
+}
+function designSigningGit(repository, argv) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const result = spawnSync("git", ["-C", repository, ...argv], { env, shell: false, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000, maxBuffer: DESIGN_SIGNING_MAX_BYTES });
+  if (result.error || result.signal || result.status !== 0) throw Error("DAB-SIGN-GIT-UNAVAILABLE");
+  return result.stdout;
+}
+function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
+  try {
+    if (!own(record, ["schema", "binding", "bindingSha256", "approvalIntent"]) || record.schema !== DESIGN_APPROVAL_REQUEST_SCHEMA
+      || !SHA.test(intentSha256 ?? "") || record.approvalIntent?.sha256 !== intentSha256 || !validateDesignApprovalBinding(record.binding).ok) return null;
+    const root = realpathSync(resolve(repository)), requestPath = `scratch/design-approval-request-${record.bindingSha256}.json`;
+    const facts = new Map(), observe = (path, options) => {
+      const file = readDesignSigningFile(root, path, options);
+      facts.set(path, file?.sha256 ?? null); return file;
+    };
+    const requestFile = observe(requestPath, { request: true });
+    const physicalRequest = parseStrictJson(requestFile.bytes);
+    if (canonicalProofJson(physicalRequest) !== canonicalProofJson(record)) return null;
+    const receipts = record.binding.reviewReceipts.map(ref => {
+      const file = observe(ref.path);
+      if (file.sha256 !== ref.sha256) throw Error("DAB-SIGN-RECEIPT-DRIFT");
+      const summary = summarizeDesignReviewReceipt({ path: ref.path, bytes: file.bytes });
+      if (!summary.ok || summary.summary.featureId !== record.binding.featureId) throw Error("DAB-SIGN-RECEIPT-INVALID");
+      const report = observe(summary.summary.report.path);
+      if (report.sha256 !== summary.summary.report.sha256) throw Error("DAB-SIGN-REPORT-DRIFT");
+      return { path: ref.path, bytes: file.bytes, summary: summary.summary };
+    });
+    const source = ref => ({ path: ref.path, sha256: observe(ref.path).sha256 });
+    const currentSources = { prd: source(record.binding.sources.prd), spec: source(record.binding.sources.spec),
+      companions: receipts.at(-1).summary.sources.companions.map(ref => ({ path: ref.path, sha256: observe(ref.path, { optional: true })?.sha256 ?? null })) };
+    const checked = verifyDesignApprovalRequest({ request: physicalRequest, featureId: record.binding.featureId,
+      receipts: receipts.map(({ path, bytes }) => ({ path, bytes })), currentSources });
+    if (!checked.ok || checked.intentSha256 !== intentSha256) return null;
+    for (const [path, sha256] of facts) {
+      if (path === requestPath) continue;
+      if (sha256 === null) {
+        if (designSigningGit(root, ["ls-tree", "HEAD", "--", path]).trim() !== "") return null;
+      } else {
+        designSigningGit(root, ["ls-files", "--error-unmatch", "--", path]);
+        if (designSigningGit(root, ["status", "--porcelain", "--", path]).length !== 0) return null;
+      }
+    }
+    const candidate = { commit: designSigningGit(root, ["rev-parse", "HEAD"]).trim(), tree: designSigningGit(root, ["rev-parse", "HEAD^{tree}"]).trim() };
+    if (canonicalProofJson(candidate) !== canonicalProofJson(checked.candidate)) return null;
+    observe("pipeline.user.yaml", { optional: true });
+    observe("project/critical-human-proof.json", { optional: true, maxBytes: 32768 });
+    const mode = readHumanApprovalMode(root), policy = readCriticalHumanProofPolicy(root);
+    if (!policy.ok) return null;
+    const policySnapshot = { requiredKinds: [...policy.requiredKinds].sort(), waivers: [...policy.waivers].sort(), trustAnchor: policy.trustAnchor, trustAnchors: policy.trustAnchors };
+    // Re-read every exact public byte after all observations, including committed mode lookup.
+    for (const [path, sha256] of facts) if ((readDesignSigningFile(root, path, { optional: sha256 === null, request: path === requestPath })?.sha256 ?? null) !== sha256) return null;
+    const finalCandidate = { commit: designSigningGit(root, ["rev-parse", "HEAD"]).trim(), tree: designSigningGit(root, ["rev-parse", "HEAD^{tree}"]).trim() };
+    if (canonicalProofJson(finalCandidate) !== canonicalProofJson(candidate)) return null;
+    const snapshotSha256 = designSigningHash(canonicalProofJson({ root, candidate, mode, policy: policySnapshot, files: [...facts].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) }));
+    return { snapshotSha256, requestPath, description: { resolved: true, lines: [
+      "action: approve the exact reviewed design-to-implementation plan decision",
+      `feature: ${record.binding.featureId}`,
+      `candidate commit: ${candidate.commit}`,
+      `candidate tree: ${candidate.tree}`,
+      `design binding sha256: ${checked.bindingSha256}`,
+      ...receipts.map(({ summary }) => `review report: ${summary.report.path} (sha256: ${summary.report.sha256})`),
+      `selected approval mode: ${mode.mode} (${mode.source})`,
+      `public trust posture: ${policy.trustAnchors === null ? "legacy singular anchor" : "v3 anchor set"}`,
+      "complete bounded design binding follows (current sources and actual receipt/report bytes validated):",
+      JSON.stringify(physicalRequest.binding, null, 2),
+      "this signs only the exact design decision digest; approve-plan must independently consume it. It is not push, release, publication or a guard override.",
+    ] } };
+  } catch { return null; }
+}
+/** Read-only, source-proven purpose; no configured observer/authorization seam. */
+export function describeDesignApprovalSigningRequest(record, intentSha256, repository) {
+  return observeDesignApprovalSigningRequest(record, intentSha256, repository)?.description ?? null;
+}
+
+const SIGNING_REVIEW_MAX_BYTES = 16 * 1024 * 1024;
+function publishSigningReviewMaterial(repository, requestPath, requestSha256, intentSha256, record) {
+  const relativeRequest = repoScratchRelativePath(repository, requestPath);
+  if (relativeRequest === null || !SHA.test(requestSha256 ?? "") || !SHA.test(intentSha256 ?? "")) fail("PO-SIGN-REVIEW-REQUEST-CUSTODY");
+  const request = readDesignSigningFile(repository, relativeRequest, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES });
+  if (request.sha256 !== requestSha256) fail("PO-SIGN-REVIEW-REQUEST-DRIFT");
+  if (record?.resolved !== true || !Array.isArray(record.lines) || !record.lines.every(line => typeof line === "string")) fail("PO-SIGN-REVIEW-DESCRIPTION");
+  const value = { schema: "pipeline.po-signing-review-material.v1", intentSha256,
+    request: { path: relativeRequest, sha256: requestSha256, record: JSON.parse(request.bytes.toString("utf8")) }, fullDisclosureLines: record.lines,
+    ...(record.fullReviewMaterial === undefined ? {} : {fullReviewMaterial: record.fullReviewMaterial}) };
+  const bytes = Buffer.from(canonicalJson(value) + "\n", "utf8");
+  if (bytes.length > SIGNING_REVIEW_MAX_BYTES) fail("PO-SIGN-REVIEW-BOUND");
+  const sha256 = designSigningHash(bytes);
+  const path = join(dirname(requestPath), `review-${intentSha256}-${sha256}.json`);
+  const relativePath = repoScratchRelativePath(repository, path);
+  if (relativePath === null || relativePath.length > 240 || realpathSync(dirname(path)) !== dirname(path)) fail("PO-SIGN-REVIEW-PATH");
+  assertUnlinkedRegularFileOrAbsent(path, "signing review material must be a single-link regular artifact beside its actual request");
+  if (!existsSync(path)) {
+    const fd = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | (fsConstants.O_NOFOLLOW ?? 0), 0o600);
+    try {
+      const opened = fstatSync(fd);
+      if (!opened.isFile() || opened.nlink !== 1) fail("PO-SIGN-REVIEW-CUSTODY");
+      writeFileSync(fd, bytes); fsyncSync(fd);
+      const after = fstatSync(fd), named = lstatSync(path);
+      for (const key of ["dev", "ino", "mode", "uid", "gid", "nlink"]) if (after[key] !== opened[key] || named[key] !== opened[key]) fail("PO-SIGN-REVIEW-CUSTODY");
+      if (after.size !== bytes.length || named.size !== bytes.length) fail("PO-SIGN-REVIEW-READBACK");
+    } finally { closeSync(fd); }
+  }
+  const actual = readDesignSigningFile(repository, relativePath, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES });
+  if (actual.sha256 !== sha256 || !actual.bytes.equals(bytes)) fail("PO-SIGN-REVIEW-COLLISION");
+  if (readDesignSigningFile(repository, relativeRequest, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES }).sha256 !== requestSha256) fail("PO-SIGN-REVIEW-REQUEST-DRIFT");
+  return { path: relativePath, sha256, bytes: bytes.length };
+}
+function signingDisplayLine(value) {
+  const flat = value.replace(/\p{C}/gu, " ").replace(/\s+/gu, " ").trim();
+  return flat.length <= 240 ? flat : flat.slice(0, 237) + "...";
+}
+export function compactSigningDisclosure({ intentSha256, record, materialArtifact = null }) {
+  if (!SHA.test(intentSha256 ?? "")) fail("PO-SIGN-DISCLOSURE-DIGEST");
+  const source = record?.resolved === true && Array.isArray(record.lines)
+    ? record.lines.filter(line => typeof line === "string" && !/[\r\n]/u.test(line))
+    : ["purpose unavailable: this signs only the exact digest; no recorded authorization purpose is resolved."];
+  const facts = source.slice(0, 15).map(signingDisplayLine);
+  if (materialArtifact !== null && (typeof materialArtifact.path !== "string" || materialArtifact.path.length > 240 || /\p{C}/u.test(materialArtifact.path) || !SHA.test(materialArtifact.sha256 ?? ""))) fail("PO-SIGN-DISCLOSURE-MATERIAL");
+  return [
+    `intent sha256: ${intentSha256}`, ...facts,
+    ...(materialArtifact === null ? [] : ["full review material: " + JSON.stringify(materialArtifact.path), "full review material sha256: " + materialArtifact.sha256]),
+    ...(source.length > facts.length || (record?.lines?.length ?? 0) > source.length ? [materialArtifact === null ? "additional review details omitted: full review material is unavailable" : "additional validated review material is retained at the bound artifact"] : []),
+    "this approval covers exactly this digest; changed scope, expiry, reason or candidate requires another approval.",
+  ];
+}
+export function formatHumanApprovalCliResult(result, { humanFacing = process.stdout.isTTY === true } = {}) {
+  if (humanFacing && result?.ok === true && ["PO-HUMAN-SIGN-INTENT-READY", "PO-HUMAN-PROOF-READY", "PO-HUMAN-CRITICAL-AUTHORIZATION-READY"].includes(result.code)) {
+    return JSON.stringify({ ok: true, code: result.code, proofPath: result.paths?.proof ?? null }) + "\n";
+  }
+  return JSON.stringify(result, null, 2) + "\n";
+}
+
+function checkPortableCriticExportRequestOnHost({ repository, requestPath, packetId, intentSha256 }) {
+  const checked = spawnSync(process.execPath, [PORTABLE_CRITIC_EXPORT_SCRIPT,
+    "check", "--root", repository, "--packet-id", packetId], {
+    cwd: repository, encoding: "utf8", shell: false, timeout: 20_000, maxBuffer: 8192,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (checked.error || checked.status !== 0) return false;
+  try {
+    const value = JSON.parse(checked.stdout);
+    return value?.ok === true && value.code === "CRITIC-EXPORT-CONSUMED-REVIEW-BOUND"
+      && value.requestPath === requestPath && value.intentSha256 === intentSha256;
+  } catch { return false; }
+}
+// SETUP-2b/AC-13: a third source, ordered between --directory and the environment
+// fallback (SETUP-2b/AC-11) -- the machine-scoped configuration plane's own
+// poKeyDirectory field (specs/sprint-nova-epic/plans/nova-setup-bootstrap.md SS2/SS6a).
+function directorySourceLabel(source) {
+  if (source === "environment") return `the ${PO_APPROVAL_DIRECTORY_ENV} environment variable`;
+  if (source === "machine-plane") return "the machine-scoped configuration plane (poKeyDirectory)";
+  if (source === "repo-scope") return "this repository's own remembered PO key directory";
+  return "--directory";
+}
+// GF-080 Gap A: the read side above (values.directory = plane.plane.poKeyDirectory) was
+// wired in from day one, but nothing ever WROTE poKeyDirectory back into the plane -- so
+// that fallback could never fire on a machine where nobody had hand-authored
+// ~/.agent-pipeline/machine.json outside this tool entirely. `setup` is the one point a
+// human/agent first establishes a directory on purpose; an explicit --directory there is
+// persisted so a LATER command, on the same machine, in a DIFFERENT project, does not
+// need to repeat it. This is best-effort and additive only: it never blocks or fails
+// `setup` itself (a write failure here is swallowed, not surfaced), it does nothing for a
+// plane- or environment-sourced directory (there is nothing new to persist in either
+// case -- the value already came from a source that already has it), it never touches a
+// plane that already fails its own validation (a corrupt plane is reported by AC-12 the
+// next time something reads it, not silently repaired here), and it never overwrites a
+// DIFFERENT already-valid poKeyDirectory a human previously chose without them knowing --
+// only an absent/null value, or the identical one, is ever written.
+// NVA-V1-KEYDIRPTR (backlog: 2026-08-28-a-dead-key-directory-pointer-is-
+// permanent-and-silent.md): the "already-valid poKeyDirectory" this function
+// must never overwrite means a directory that still RESOLVES on disk, not
+// merely a non-empty string. The predicate below narrows exactly that one
+// branch (`poKeyDirectoryStillExists`); every other property documented
+// above it -- best-effort, additive-only, never touches an invalid plane,
+// never fires for a non-flag source -- is unchanged.
+export function persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies) {
+  if (args.directorySource !== "flag") return;
+  const readPlane = dependencies.readMachinePlaneFn ?? readMachinePlane;
+  const writePlane = dependencies.writeMachinePlaneFn ?? writeMachinePlane;
+  const plane = readPlane(dependencies);
+  if (plane.status === "invalid") return;
+  const current = plane.status === "valid" ? plane.plane : null;
+  if (current?.poKeyDirectory === directory) return;
+  if (current && text(current.poKeyDirectory) && poKeyDirectoryStillExists(current.poKeyDirectory, dependencies)) return;
+  const next = current
+    ? { ...current, poKeyDirectory: directory, updatedAt: new Date().toISOString() }
+    : {
+      schema: MACHINE_PLANE_SCHEMA,
+      poKeyDirectory: directory,
+      pushApprovalDefault: "signature",
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    };
+  try { writePlane(next, dependencies); } catch (error) {
+    // best-effort: never fails setup itself -- but a silent swallow left an
+    // operator with no way to notice a real writeMachinePlane() failure
+    // short of independently inspecting the resulting state (backlog:
+    // 2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-error.md).
+    const writeStderr = dependencies.stderrWriteFn ?? ((text) => process.stderr.write(text));
+    writeStderr(`PO-HUMAN-APPROVAL-WARN: failed to persist poKeyDirectory into the machine plane: ${error.message}\n`);
+  }
+}
+
+/** Existence check only -- never opens or inspects anything INSIDE the
+ * directory (mirrors machine-plane.mjs's own `validPoKeyDirectory`
+ * discipline). A non-directory at the path, or any read error, is treated as
+ * "does not resolve" -- the conservative direction for a predicate deciding
+ * whether a recorded pointer is still worth protecting from replacement. */
+function poKeyDirectoryStillExists(directory, dependencies) {
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  try {
+    if (!exists(directory)) return false;
+    const stat = dependencies.statSyncFn ?? statSync;
+    return stat(directory).isDirectory();
+  } catch { return false; }
+}
+
+// PO-KEYDIR-01(A), 2026-08-11 PO decision, SUPERSEDED by R7-6-T11 (decision AC, 2026-10-07):
+// `setup`'s auto-persist (persistExplicitDirectoryPointers, below) now writes the MACHINE
+// plane through persistExplicitDirectoryIntoMachinePlane above and no longer calls this
+// repo-scoped writer; the per-repository store is read-only (a legacy fallback in
+// parseHumanArgs). The writer is kept defined, unused by setup, with its original
+// best-effort, additive-only, never-clobber-a-different-value discipline.
+/** The directory is created owner-private (0700, mirroring lib/human-guard-
+ * override.mjs's secureDirectory() convention this script cannot import -- see
+ * resolveGitCommonDir's own doc comment) and the file itself owner-private
+ * (0600), matching every other artifact this script writes. */
+function writeRepoKeyDirectory(gitCommonDir, value, dependencies) {
+  const dir = join(gitCommonDir, "agent-pipeline");
+  const mkdir = dependencies.mkdirSyncFn ?? mkdirSync;
+  mkdir(dir, { recursive: true, mode: 0o700 });
+  const chmod = dependencies.chmodSyncFn ?? chmodSync;
+  try { chmod(dir, 0o700); } catch { /* best-effort hardening only */ }
+  const write = dependencies.writeFileSyncFn ?? writeFileSync;
+  write(repoScopedKeyDirectoryPath(gitCommonDir), `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+}
+
+function persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies) {
+  if (args.directorySource !== "flag") return;
+  if (gitCommonDir === null) return; // best-effort: no git-common-dir resolved, nothing to persist into
+  const read = dependencies.readRepoKeyDirectoryFn ?? readRepoKeyDirectory;
+  const write = dependencies.writeRepoKeyDirectoryFn ?? writeRepoKeyDirectory;
+  const current = read(gitCommonDir, dependencies);
+  if (current.status === "invalid") return; // never silently repair a corrupt store here (mirrors AC-12's discipline)
+  if (current.status === "valid" && current.directory === directory) return;
+  if (current.status === "valid" && text(current.directory)) return; // never overwrite a different already-valid value
+  try {
+    write(gitCommonDir, { schema: REPO_KEY_DIRECTORY_SCHEMA, poKeyDirectory: directory, updatedAt: new Date().toISOString() }, dependencies);
+  } catch { /* best-effort: never fails setup itself */ }
+}
+
+// R7-6-T11 (decision AC, 2026-10-07): `setup --directory` writes the MACHINE-WIDE default, and only
+// when the plane records no live directory (absent plane, null value, or a recorded directory that no
+// longer exists -- NVA-V1-KEYDIRPTR). The legacy per-repository store is read-only: the repo-scope
+// writer above is no longer called from here. A different LIVE default is left byte-identical, setup
+// still succeeds, and the repair command is reported on stderr.
+function persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies) {
+  if (args.directorySource !== "flag") return;
+  const readPlane = dependencies.readMachinePlaneFn ?? readMachinePlane;
+  const plane = readPlane(dependencies);
+  if (plane.status === "invalid") return;
+  const recorded = plane.status === "valid" && text(plane.plane.poKeyDirectory) ? plane.plane.poKeyDirectory : null;
+  if (recorded !== null && recorded !== directory && poKeyDirectoryStillExists(recorded, dependencies)) {
+    let sameDirectory = false;
+    try { sameDirectory = realpathSync(recorded) === realpathSync(directory); } catch { /* compare raw values only */ }
+    if (sameDirectory) return;
+    const writeStderr = dependencies.stderrWriteFn ?? ((chunk) => process.stderr.write(chunk));
+    writeStderr(`PO-HUMAN-APPROVAL-NOTE: the machine-wide PO key directory stays ${recorded}; this setup used ${directory} and did not change it. To make it the default run: po-human-approval.mjs set-po-key-directory --directory ${directory} --replace ${recorded}\n`);
+    return;
+  }
+  persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
+}
+
+const SET_PO_KEY_DIRECTORY_COMMAND = "set-po-key-directory";
+function setPoKeyDirectoryParse(argv) {
+  const values = {};
+  const rest = argv.slice(1);
+  if (rest.length % 2 !== 0) fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: expected --directory <absolute-dir> [--replace <current-value>]`);
+  for (let index = 0; index < rest.length; index += 2) {
+    const key = rest[index]; const value = rest[index + 1];
+    const name = key === "--directory" ? "directory" : key === "--replace" ? "replace" : null;
+    if (name === null || typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(values, name)) {
+      fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: expected --directory <absolute-dir> [--replace <current-value>]`);
+    }
+    values[name] = value;
+  }
+  if (!Object.hasOwn(values, "directory")) fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: --directory <absolute-dir> is required`);
+  return values;
+}
+
+/** Existence/ancestry check only, no git spawn: a `.git` path segment, or an ancestor holding a `.git`
+ * entry (file or directory), puts the path inside a repository. */
+function insideRepository(realDirectory, dependencies) {
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  for (let current = realDirectory; ; current = dirname(current)) {
+    if (basename(current) === ".git" || exists(join(current, ".git"))) return true;
+    if (dirname(current) === current) return false;
+  }
+}
+
+/** R7-6-T11 (decision AC): the writer of the machine-wide default. Touches only poKeyDirectory and
+ * updatedAt of the machine plane; never the key directory, never trust anchors. */
+function runSetPoKeyDirectory(argv, dependencies) {
+  const { directory, replace } = setPoKeyDirectoryParse(argv);
+  if (!isAbsolute(directory)) fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: --directory must be an absolute path`);
+  let realDirectory;
+  try {
+    const stat = (dependencies.statSyncFn ?? statSync)(directory);
+    if (!stat.isDirectory()) throw new Error("not a directory");
+    realDirectory = realpathSync(directory);
+  } catch { fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: --directory must name an existing directory`); }
+  if (insideRepository(realDirectory, dependencies)) fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: --directory must not be inside a repository or a .git directory`);
+  const readPlane = dependencies.readMachinePlaneFn ?? readMachinePlane;
+  const writePlane = dependencies.writeMachinePlaneFn ?? writeMachinePlane;
+  const plane = readPlane(dependencies);
+  if (plane.status === "invalid") {
+    fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: the machine plane is invalid (${plane.code}); it was not changed -- repair or remove it first`);
+  }
+  const current = plane.status === "valid" ? plane.plane : null;
+  const stored = current !== null && text(current.poKeyDirectory) ? current.poKeyDirectory : null;
+  if (stored === directory) return { ok: true, code: "PO-HUMAN-SET-PO-KEY-DIRECTORY-READY", directory, changed: false };
+  if (stored !== null && replace !== stored) {
+    fail(`${SET_PO_KEY_DIRECTORY_COMMAND}: the machine plane already records ${stored}; to replace it pass --replace ${stored}`);
+  }
+  const updatedAt = new Date().toISOString();
+  const next = current !== null
+    ? { ...current, poKeyDirectory: directory, updatedAt }
+    : {
+      schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: directory, pushApprovalDefault: "signature",
+      routing: null, language: null, session: null, usage: null, updatedAt,
+    };
+  writePlane(next, dependencies);
+  return { ok: true, code: "PO-HUMAN-SET-PO-KEY-DIRECTORY-READY", directory, changed: true, replaced: stored };
+}
+// Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
+// (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
+// parseGateArgs() return value with assert.deepStrictEqual, which considers only own
+// enumerable properties. A plain `values.directorySource = ...` would fail every one of
+// those unrelated, pre-existing checks; this keeps the value fully readable by this
+// file's own code (args.directorySource) without joining the object's public shape.
+function setDirectorySource(values, source) { Object.defineProperty(values, "directorySource", { value: source, enumerable: false, configurable: true }); }
+const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+/**
+ * `trustPolicy`/`authority` specifically may also carry `humanName` — the
+ * SETUP-1 human-readable label some operators' external `trust-policy.json`
+ * already carries (mirrors `po-approval-proof.mjs`'s `ownTrustPolicy`). It is
+ * never part of what is cryptographically checked here, so its presence must
+ * not fail-close a genuinely valid trust policy; any OTHER unrecognised extra
+ * key still must.
+ */
+const ownTrustPolicy = (value) => own(value, ["keyReference", "publicKeySha256"]) || own(value, ["keyReference", "publicKeySha256", "humanName"]);
+const SHA = /^[a-f0-9]{64}$/u;
+const text = (value) => typeof value === "string" && value.trim() !== "";
+
+// NVA-WINPATH-1 (backlog/items/2026-08-17-po-human-approval-outside-check-uses-a-posix-only-
+// separator-on-windows.md): mirrors guard-human-override.mjs's own externalJson() fix for the
+// exact same defect class. node:path's default (host-platform) export makes relative() return
+// backslash-separated paths on win32, so a POSIX-only `rel.startsWith("../")` check never
+// matches a genuinely external same-drive path there, silently misclassifying it as "inside".
+// `platform` is injected (default process.platform) so the win32 answer is provable from
+// either host, exactly like the sibling fix's own test seam.
+export function outside(repoRoot, path, platform = process.platform) {
+  const api = platform === "win32" ? win32Path : posixPath;
+  const root = api.resolve(repoRoot); const target = api.resolve(path);
+  const raw = api.relative(root, target);
+  // NVA-WINPATH-2 (Critic round-1 F1): the backslash-to-forward-slash normalization
+  // below is a win32-only concern (path.relative() on win32 returns backslash-
+  // separated output). On POSIX a backslash is an ORDINARY filename character, never
+  // a path separator -- normalizing it unconditionally rewrote a legal POSIX name
+  // like `..\keys` into `../keys`, which then misclassified a directory that is
+  // actually INSIDE the repository as "outside": a fail-open regression in the exact
+  // check that keeps private Ed25519 signing-key material out of the repository
+  // working tree. Scoping the normalization to win32 keeps the same-drive fix intact
+  // there while leaving POSIX relative-path strings untouched.
+  const rel = platform === "win32" ? raw.split("\\").join("/") : raw;
+  return rel === "" ? false : rel === ".." || rel.startsWith("../") || api.isAbsolute(rel);
+}
+
+/**
+ * NVA-SWEEP-F2: `sign-intent --request` is deliberately scoped to this repository's
+ * OWN `scratch/` tree, not "anywhere inside the repository" -- the one hand-off
+ * location an agent session may write to directly (templates/prompts/agent-
+ * obligations.md SS3: guard-devplan's exempt prefixes) and the PO's own unguarded
+ * shell already reaches alongside the external `--directory`, with no guard-boundary
+ * change. Returns the repo-relative path (posix-separated, always starting
+ * `scratch/` or exactly `scratch`) on success, `null` on anything else -- outside the
+ * repository, equal to the repository root itself, or inside the repository but
+ * outside `scratch/`. Mirrors outside()'s own win32/posix relative-path handling
+ * (same drive-letter/backslash care) rather than a second, naive comparison.
+ */
+function repoScratchRelativePath(repoRoot, path, platform = process.platform) {
+  const api = platform === "win32" ? win32Path : posixPath;
+  const root = api.resolve(repoRoot); const target = api.resolve(path);
+  const raw = api.relative(root, target);
+  const rel = platform === "win32" ? raw.split("\\").join("/") : raw;
+  if (rel === "" || rel === ".." || rel.startsWith("../") || api.isAbsolute(rel)) return null;
+  return rel === "scratch" || rel.startsWith("scratch/") ? rel : null;
+}
+
+/**
+ * NVA-SWEEP-F2: derives the sibling proof/signer path next to a `--request` file by
+ * substituting the FIRST occurrence of "request" in its basename (never its
+ * directory, so a `scratch/reconcile-request/` directory segment is left alone) --
+ * `scratch/reconcile-request-42.json` yields `scratch/reconcile-proof-42.json` for
+ * `replacement === "proof"`. Returns `null` when the basename carries no such
+ * literal (nothing to substitute), so the caller fails closed instead of silently
+ * writing back to the request's own path.
+ */
+function scratchSiblingPath(requestPath, replacement) {
+  const dir = dirname(requestPath); const base = basename(requestPath);
+  if (!base.includes("request")) return null;
+  return join(dir, base.replace("request", replacement));
+}
+function fail(message) { throw new Error(message); }
+function json(path) { return JSON.parse(readFileSync(path, "utf8")); }
+function publicKeyPolicy(publicKey, keyReference) {
+  createPublicKey(publicKey);
+  return { keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+}
+// SETUP-1: the human types their name ONCE, at key creation, rather than on every
+// approval -- approvals happen every push/deploy while a key is created rarely, so
+// re-prompting for a name that never changes would be repeated friction for no benefit.
+// It becomes a field of the key's OWN local authority record (never the proof itself,
+// whose exact 5-key shape is a contract shared by every verifier -- see signIntentIntoProof).
+function localAuthority(publicKey, keyReference, humanName) {
+  return { ...publicKeyPolicy(publicKey, keyReference), humanName };
+}
+// FIXTURE-2: shared by every branch of `setup` that is about to WRITE a brand-new
+// authority record (no record exists yet, so there is nothing to read a name from) --
+// the fresh-generation branch and the branch that recovers an authority for keys that
+// already exist on disk without one. A branch that already has an authority record on
+// disk reads its stored name instead; see runHumanApproval's "setup" handling.
+const SETUP_NEW_AUTHORITY_NEEDS_NAME = 'setup requires --human-name "<the human this key\'s approvals will be attributed to>": no PO authority record exists yet to read a name from.';
+function externalDirectory(repository, directory, { create = false, source = "--directory" } = {}) {
+  // `source` names where this directory came from (--directory or the environment-variable
+  // fallback) so a failure message can say which one was used. It is a fixed label, never the
+  // resolved path itself: nothing here prints an absolute path into any string that could end up
+  // in a committed artifact.
+  if (!outside(repository, directory)) fail(`approval directory (from ${source}) must be outside the repository`);
+  let canonicalRepository; let ancestor = directory; const missing = [];
+  try { canonicalRepository = realpathSync(repository); }
+  catch { fail("approval directory or repository is missing or unreadable"); }
+  for (;;) {
+    try { lstatSync(ancestor); break; }
+    catch (error) {
+      if (error?.code !== "ENOENT") fail(`approval directory (from ${source}) is unreadable`);
+      const parent = dirname(ancestor); if (parent === ancestor) fail(`approval directory (from ${source}) is missing or unreadable`);
+      missing.unshift(basename(ancestor)); ancestor = parent;
+    }
+  }
+  let canonicalAncestor;
+  try { canonicalAncestor = realpathSync(ancestor); }
+  catch { fail(`approval directory (from ${source}) is missing or unreadable`); }
+  if (!outside(canonicalRepository, canonicalAncestor)) fail(`approval directory (from ${source}) must be outside the repository`);
+  const target = missing.reduce((path, segment) => join(path, segment), canonicalAncestor);
+  if (create) mkdirSync(target, { recursive: true, mode: 0o700 });
+  let canonicalDirectory;
+  try { canonicalDirectory = realpathSync(target); }
+  catch { fail(`approval directory (from ${source}) is missing or unreadable`); }
+  if (!outside(canonicalRepository, canonicalDirectory)) fail(`approval directory (from ${source}) must be outside the repository`);
+  if (!statSync(canonicalDirectory).isDirectory()) fail(`approval directory (from ${source}) must be a directory`);
+  if (create) chmodSync(canonicalDirectory, 0o700);
+  return canonicalDirectory;
+}
+// NVA-SWEEP-F2f-REWORK (Critic finding 1): the symlink/hardlink/non-regular-file guard
+// every artifactPath() write target already got, factored out so the sign-intent
+// scratch/ mirror targets (below) can apply the identical check immediately before each
+// write rather than drifting from it. A path that does not exist yet is fine -- there is
+// nothing there to reject; anything already present that is not an unlinked regular file
+// fails closed via fail(message).
+function assertUnlinkedRegularFileOrAbsent(path, message) {
+  try {
+    const metadata = lstatSync(path);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1) fail(message);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+}
+function artifactPath(directory, name) {
+  const path = join(directory, name);
+  assertUnlinkedRegularFileOrAbsent(path, "approval artifacts must be unlinked regular files outside the repository");
+  return path;
+}
+
+/**
+ * The agent-side half of a push approval must never need to name the human's
+ * external key directory. `authorize-critical` mirrors the public request,
+ * proof, and authority it has just produced into the repository's scratch
+ * directory; push preparation consumes these exact names.
+ */
+export function criticalPushScratchArtifactPaths(repository, gitCommonDir = repository) {
+  const root = resolve(repository);
+  const fingerprint = derivePoGateRepositoryFingerprint({
+    gitCommonDir: gitCommonDir ?? root,
+    primaryRoot: root,
+  }).slice(0, 12);
+  const scratch = join(root, "scratch");
+  return {
+    request: join(scratch, `critical-push-request-${fingerprint}.json`),
+    proof: join(scratch, `critical-push-proof-${fingerprint}.json`),
+    authority: join(scratch, `critical-push-authority-${fingerprint}.json`),
+    signer: join(scratch, `critical-push-signer-${fingerprint}.json`),
+  };
+}
+
+function mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, paths, io) {
+  const artifacts = criticalPushScratchArtifactPaths(repository, gitCommonDir);
+  const scratch = dirname(artifacts.request);
+  mkdirSync(scratch, { recursive: true, mode: 0o700 });
+  const scratchMetadata = lstatSync(scratch);
+  if (!scratchMetadata.isDirectory() || scratchMetadata.isSymbolicLink()) {
+    fail("critical push scratch artifacts require a real scratch directory inside the repository");
+  }
+  const writeMirror = (path, data) => {
+    assertUnlinkedRegularFileOrAbsent(path, "critical push scratch artifacts must be unlinked regular files inside this repository's own scratch/ directory");
+    io.write(path, data, { mode: 0o600 });
+  };
+  writeMirror(artifacts.request, `${JSON.stringify(request, null, 2)}\n`);
+  writeMirror(artifacts.proof, `${JSON.stringify(signed.proof, null, 2)}\n`);
+  writeMirror(artifacts.authority, io.read(paths.authority, "utf8"));
+  writeMirror(artifacts.signer, `${JSON.stringify(signed.signer, null, 2)}\n`);
+  return artifacts;
+}
+
+/**
+ * The three fork-disposition commands (ADR-0072). They are a sibling of the
+ * `-critical` trio, not a fourth `--kind` for it: a fork disposition's subject
+ * is DERIVED from the fork that actually exists, so the parameters that locate
+ * that fork replace the ones `prepare-critical` accepts verbatim.
+ */
+const FORK_DISPOSITION_COMMANDS = new Set(["prepare-fork-disposition", "approve-fork-disposition", "verify-fork-disposition"]);
+
+export const HUMAN_SIGNING_COMMANDS = Object.freeze([
+  "setup",
+  "approve",
+  "approve-all",
+  "approve-critical",
+  "authorize-critical",
+  "sign-intent",
+  "approve-fork-disposition",
+]);
+
+// NVA-CLI-FEEDBACK-1 (backlog/items/2026-08-09-critical-push-signing-
+// ceremony-gives-no-path-feedback.md): the fixed set of recognised
+// subcommands, named once and reused both for validation (below) and for the
+// "did you mean" suggestion on an unrecognised one -- a single list, never
+// two that could drift apart. Includes the fork-disposition trio (ADR-0072)
+// so an unrecognised fork-disposition subcommand also gets a suggestion.
+// The lifecycle guard imports this semantic subset rather than restating it.
+// Keep it distinct from KNOWN_COMMANDS: prepare/verify commands are deliberately
+// agent work, while these commands cross the attended human signing boundary.
+export const HUMAN_PO_SIGNING_COMMANDS = Object.freeze([
+  "setup",
+  "approve",
+  "approve-all",
+  "approve-critical",
+  "authorize-critical",
+  "sign-intent",
+  "approve-fork-disposition",
+]);
+
+const KNOWN_COMMANDS = ["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent", ...FORK_DISPOSITION_COMMANDS];
+
+// NVA-CLI-FEEDBACK-1: standard O(len(a)*len(b)) Levenshtein edit distance
+// (insert/delete/substitute, each cost 1) between two subcommand strings.
+// Used only to power the unknown-subcommand suggestion below -- it never
+// gates or widens what counts as a valid subcommand.
+function levenshteinDistance(a, b) {
+  const rows = a.length + 1; const cols = b.length + 1;
+  const distances = Array.from({ length: rows }, (_, row) => {
+    const line = new Array(cols).fill(0);
+    line[0] = row;
+    return line;
+  });
+  for (let col = 1; col < cols; col += 1) distances[0][col] = col;
+  for (let row = 1; row < rows; row += 1) {
+    for (let col = 1; col < cols; col += 1) {
+      const cost = a[row - 1] === b[col - 1] ? 0 : 1;
+      distances[row][col] = Math.min(
+        distances[row - 1][col] + 1,
+        distances[row][col - 1] + 1,
+        distances[row - 1][col - 1] + cost,
+      );
+    }
+  }
+  return distances[rows - 1][cols - 1];
+}
+
+// NVA-CLI-FEEDBACK-1: names the single closest known subcommand to an
+// unrecognised one typed by an agent or human, so a plausible-but-wrong guess
+// (e.g. "aprove-critical") gets a concrete "did you mean" hint instead of
+// only the generic usage dump -- closing the gap the backlog item above
+// documents ("a single guess costs the entire CLI-driven path rather than
+// one retry"). Returns `null` for an empty/non-string input, or when even the
+// closest candidate is farther than SUBCOMMAND_SUGGESTION_MAX_DISTANCE --
+// a wild guess must never manufacture a misleading suggestion.
+const SUBCOMMAND_SUGGESTION_MAX_DISTANCE = 4;
+function suggestSubcommand(input, candidates) {
+  if (typeof input !== "string" || input.length === 0) return null;
+  let best = null; let bestDistance = Infinity;
+  for (const candidate of candidates) {
+    const distance = levenshteinDistance(input, candidate);
+    if (distance < bestDistance) { bestDistance = distance; best = candidate; }
+  }
+  return best !== null && bestDistance <= SUBCOMMAND_SUGGESTION_MAX_DISTANCE ? best : null;
+}
+
+/**
+ * The `--kind` values `prepare-critical`/`approve-critical`/`verify-critical`
+ * accept — deliberately a fixed literal list, spelled out here rather than
+ * taken from `CRITICAL_ACTION_KINDS`.
+ *
+ * That import is what admitted `governance-fork-disposition` the moment the
+ * family grew a fourth member (ADR-0072), and every branch behind it is wrong
+ * for that kind: `prepare-critical` binds the git candidate and real repository
+ * plan/spec bytes, none of which the disposition's verifier accepts, and it
+ * writes the request to `request-critical-governance-fork-disposition.json` --
+ * the very file `prepare-fork-disposition` owns, so the broken request silently
+ * replaced a valid one. Refusing the kind at the parser closes that route, the
+ * artifact-name collision and the direct `approve-critical` signing bypass with
+ * a single check, at the exact point every other invalid `--kind` is refused.
+ *
+ * A literal, not a filter over the shared family: a fifth kind must be an
+ * explicit decision here too, not an automatic membership.
+ *
+ * `"feature-package-reconcile"` was added 2026-08-18 (PHX-WP-POHUMAN-SIGNING-ERGO):
+ * it is a first-class `CRITICAL_ACTION_KINDS` member with no security concern
+ * analogous to `governance-fork-disposition`'s — it binds a real git candidate
+ * and repository plan/spec bytes exactly like `push`/`deploy`/`publication` do,
+ * so admitting it here closes the manual-copy workaround without reopening the
+ * hole this comment describes.
+ *
+ * `"release-preflight"` (GF-105/ADR-0064 Decision 4) is the same: it binds a
+ * real git candidate and repository plan/spec bytes, with its own additional
+ * `--subject`-derived digest (see `resolveSubjectPreimage`) and its own
+ * disclosure lines (see `releasePreflightConfirmationLines`) -- no
+ * governance-fork-disposition-style verification bypass concern either.
+ */
+const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion"]);
+const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
+const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+
+/**
+ * R7-6-F3 (PO decision AC): the ONE key-directory resolver for every entry point (this module's
+ * parseHumanArgs, toolchain-preflight.mjs, push-prepare.mjs). Tiers, in this exact order:
+ *   1. `explicit`            -> source "flag"           (the --directory argument)
+ *   2. PIPELINE_PO_APPROVAL_DIRECTORY -> source "environment" (per-terminal choice of a non-default key)
+ *   3. machine-wide poKeyDirectory    -> source "machine-plane" (one default per OS user)
+ *   4. legacy per-repository value    -> source "repo-scope", `legacy: true` (read-only)
+ *   5. nothing               -> status "unset" (callers report SIGN-KEY-DIRECTORY-UNSET)
+ * The result names the resolving tier. A store that is CONSULTED and invalid (the machine plane in
+ * tier 3, the legacy store in tier 4) is `status: "invalid"`, never "unset" and never a fall-through
+ * to a lower tier; but a higher tier that resolves is not blocked by an invalid lower store, because
+ * the lower stores are not consulted at all once a higher tier has resolved. Resolving a directory
+ * grants no trust: the committed anchor set decides whether the key found there may sign.
+ */
+export function resolvePoKeyDirectory({ explicit, repoRoot, dependencies = {} } = {}) {
+  if (text(explicit)) return { status: "resolved", directory: explicit, source: "flag", legacy: false };
+  const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
+  if (text(fromEnv)) return { status: "resolved", directory: fromEnv, source: "environment", legacy: false };
+  const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
+  if (plane.status === "invalid") {
+    return { status: "invalid", store: "machine-plane", code: plane.code, error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
+  }
+  if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
+    return { status: "resolved", directory: plane.plane.poKeyDirectory, source: "machine-plane", legacy: false };
+  }
+  // The legacy tier needs a git-common-dir computed from repoRoot; the authoritative repoRoot
+  // validation stays with the caller -- this check only SKIPS the tier when repoRoot is not yet a
+  // usable absolute path.
+  const repoScope = (text(repoRoot) && isAbsolute(repoRoot))
+    ? resolveRepoScopedDirectory(repoRoot, dependencies)
+    : { status: "absent", directory: null };
+  if (repoScope.status === "invalid") {
+    return { status: "invalid", store: "repo-scope", code: repoScope.code, error: `this repository's own remembered PO key-directory store is invalid (${repoScope.code}): fix or remove it, or pass --directory explicitly.` };
+  }
+  if (repoScope.status === "valid" && text(repoScope.directory)) {
+    return { status: "resolved", directory: repoScope.directory, source: "repo-scope", legacy: true };
+  }
+  return { status: "unset", directory: null, source: null, legacy: false };
+}
+
+export function parseHumanArgs(argv, dependencies = {}) {
+  const [command, ...tokens] = argv; const values = { command, keyReference: "local-po-key" }; const supplied = new Set();
+  for (let index = 0; index < tokens.length; index += 1) {
+    const key = tokens[index]; const value = tokens[index + 1];
+    if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
+    const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
+    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    supplied.add(normalized); values[normalized] = value; index += 1;
+  }
+  // GF-104: keyReference always carries a default ("local-po-key") even when the
+  // caller never passed --key-reference, so `setup`'s own mismatch check (below,
+  // in po-human-approval.mjs) cannot tell "explicitly asked for this key-reference"
+  // from "never mentioned it" by reading values.keyReference alone. Recorded
+  // non-enumerable for the same reason as directorySource (FIXTURE-2 note above
+  // setDirectorySource): pre-existing deepStrictEqual shape assertions elsewhere
+  // must not see a new own-enumerable field on this object.
+  Object.defineProperty(values, "keyReferenceSupplied", { value: supplied.has("keyReference"), enumerable: false, configurable: true });
+  if (!new Set(KNOWN_COMMANDS).has(command)) {
+    const suggestion = suggestSubcommand(command, [...KNOWN_COMMANDS, "set-po-key-directory"]);
+    return { error: suggestion ? `${USAGE}\nUnknown subcommand "${command}". Did you mean "${suggestion}"?` : USAGE };
+  }
+  // R7-6-F3 (PO decision AC, Spec 22.6 delta, supersedes the earlier PO-KEYDIR-01(A)/SETUP-2b/AC-11/
+  // R7-6-F orders): ONE resolver, resolvePoKeyDirectory() above, shared with toolchain-preflight.mjs
+  // and push-prepare.mjs. The order is: an explicit --directory (used exactly as given, never
+  // consulting any tier below); the PIPELINE_PO_APPROVAL_DIRECTORY environment variable (the
+  // per-terminal selection of a non-default key); the machine-wide poKeyDirectory (one per OS
+  // user, outside every repository and `.git`); the legacy per-repository private-state value
+  // (read-only fallback, reported as `legacy: true`); else absent (SIGN-KEY-DIRECTORY-UNSET). The
+  // result names the resolving tier (directorySource). Whichever tier resolves a value, that value
+  // then runs through the identical isAbsolute check below and, downstream, the identical
+  // externalDirectory() safety checks (AC-14) -- there is no separate, weaker path for any tier.
+  // Choosing a key by directory never grants trust: the committed anchor set decides (probe step (c)).
+  if (supplied.has("directory")) {
+    setDirectorySource(values, "flag");
+  } else {
+    const resolution = resolvePoKeyDirectory({ repoRoot: values.repoRoot, dependencies });
+    // AC-12: an invalid consulted store is a reported failure, never silently treated as absent.
+    if (resolution.status === "invalid") return { error: resolution.error };
+    if (resolution.status === "resolved") {
+      values.directory = resolution.directory;
+      setDirectorySource(values, resolution.source);
+      // Non-enumerable, like directorySource: exact-shape assertions elsewhere must not see it.
+      if (resolution.legacy) Object.defineProperty(values, "legacy", { value: true, enumerable: false, configurable: true });
+    }
+  }
+  if (!text(values.directory) || !isAbsolute(values.directory)) {
+    const required = `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, configure poKeyDirectory in the machine-scoped configuration plane (one value per OS user), let this repository's legacy remembered value stand (persisted by an earlier 'setup --directory'), or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path to choose a non-default key for one terminal (an explicit --directory always overrides the environment variable, which overrides the machine-scoped plane, which overrides the repository's legacy remembered value).`;
+    // Absent, as opposed to present but relative: the typed SIGN-KEY-DIRECTORY-UNSET result with its setup action.
+    if (!text(values.directory)) {
+      return { error: `${required}\nSIGN-KEY-DIRECTORY-UNSET: key-directory-unset; repair: set-po-key-directory (agent-executable, no signature) with the absolute key directory the PO states.`, code: "SIGN-KEY-DIRECTORY-UNSET", finding: keyDirectoryUnsetFinding() };
+    }
+    return { error: required };
+  }
+  if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) {
+    return { error: `${USAGE}\nrepository root is required and must be an absolute path: pass --repo-root <path> naming the repository this ceremony operates on (a relative path such as "." is not accepted).` };
+  }
+  // The fork-locating parameters exist only for the new commands; every
+  // pre-existing command rejects them exactly as it rejected any unknown flag
+  // before, so widening the accepted-key set above changes nothing for them.
+  if (!FORK_DISPOSITION_COMMANDS.has(command) && (values.repositoryFingerprint || values.streamId || values.sequence)) return { error: USAGE };
+  if (FORK_DISPOSITION_COMMANDS.has(command)) {
+    // No `--subject-sha256` here, ever: accepting a bare digest is precisely
+    // the self-minting route ADR-0072 closes. Nor plan/spec/feature paths --
+    // GOVERNANCE_FORK_DISPOSITION_APPROVAL fixes all three.
+    if (values.kind || values.subjectSha256 || values.featureId || values.plan || values.spec || values.model) return { error: USAGE };
+    if (!SHA.test(values.repositoryFingerprint ?? "") || !text(values.streamId) || !SEQUENCE.test(values.sequence ?? "")) return { error: USAGE };
+    if (command === "prepare-fork-disposition" ? !isoTimestamp(values.expiresAt) : values.expiresAt !== undefined) return { error: USAGE };
+  }
+  // FIXTURE-2: --human-name is validated where the authority directory's state is known
+  // (inside the "setup" branch of runHumanApproval), never here. The parser cannot see
+  // whether an authority record already exists on disk, and a `setup` that recovers or
+  // re-reads an existing record must not be forced to repeat a name it already has.
+  if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
+  if (command.endsWith("-critical") && !CRITICAL_COMMAND_KINDS.includes(values.kind)) return { error: USAGE };
+  // NVA-SWEEP-F2 (backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-after-
+  // the-po-signs.md, Triage confirmation 2026-08-18, direction b): `--request` is an
+  // ALTERNATIVE source for the digest, never a second one accepted alongside
+  // `--intent-sha256` -- exactly one of the two must be supplied.
+  // NVA-SWEEP-F2f-REWORK (Critic finding 3): mutual exclusion is decided on PRESENCE of
+  // `--intent-sha256` (`hasIntentSha = text(...)`), never on whether it happens to be a
+  // well-formed digest -- a malformed digest supplied TOGETHER with `--request` must be
+  // rejected here as "both flags together", not silently treated as absent because
+  // `SHA.test()` made it look that way. The pre-existing standalone-malformed-digest
+  // rejection (no `--request` supplied) is preserved by the explicit format check right
+  // below, which only runs once the presence-based mutual-exclusion check has already
+  // passed (i.e. exactly one of the two was supplied).
+  if (command === "sign-intent") {
+    const hasIntentSha = text(values.intentSha256);
+    const hasRequest = text(values.request);
+    if (hasIntentSha === hasRequest) return { error: USAGE };
+    if (hasIntentSha && !SHA.test(values.intentSha256)) return { error: USAGE };
+  }
+  return values;
+}
+
+/* ------------------------------------------------------------------ *
+ * R7-6-F (Spec 22.6, PO decisions #18-#21): signing readiness.
+ *
+ * The Pipeline chooses no signing executable. Exactly one function below starts
+ * OpenSSL (`spawnOpenssl`); its executable is the constant bare name and it has no
+ * executable parameter, so no code path can hand it another one. The name is
+ * resolved by the lookup of the PATH of the PO's own attended signing terminal.
+ * Neither the signing spawn nor the probe can start a program from the working
+ * directory or from any repository: both run from an explicit working directory
+ * outside every repository (the PO key directory for the signing spawn, the OS
+ * user's home directory for the probe), and on win32 the child environment carries
+ * NoDefaultCurrentDirectoryInExePath. Neither measure selects an executable.
+ * ------------------------------------------------------------------ */
+const OPENSSL = "openssl";
+const WINDOWS_EXECUTABLE_SUFFIX = ".exe";
+const PROBE_TIMEOUT_MS = 15_000;
+const PROBE_STDERR_HEAD_CHARS = 160;
+const PROBE_PAYLOAD = "pipeline signing-readiness probe payload";
+const UNREADABLE_CODES = new Set(["EACCES", "EPERM"]);
+const NOT_STARTED_CODES = new Set(["ENOENT", "EACCES", "EPERM", "ENOTDIR"]);
+// Candidate directory NAMES inside a Git installation: data, not code.
+const GIT_NATIVE_BIN_DIRECTORIES = Object.freeze(["mingw64/bin", "usr/bin", "bin"]);
+// An absolute path can hold spaces (a Windows profile directory, a macOS home), so the generic pattern
+// cannot stop at the first space. A QUOTED absolute path is taken up to its closing quote (a quote that
+// is followed by a word character is part of the name). An UNQUOTED one continues through a space only
+// while a path separator still follows within one path component (255 characters), so the fragments of
+// a spaced directory cannot survive. redactPaths first replaces the KNOWN absolute paths by exact
+// string, which also bounds a space inside a final component that no separator follows.
+const PATH_START = String.raw`(?:[A-Za-z]:[\\/]|(?<![\w.:-])[\\/](?=[\w.~-]))`;
+const PATH_REDACTION = new RegExp(
+  String.raw`(?<quote>["'])${PATH_START}[^\r\n]*?\k<quote>(?!\w)|${PATH_START}(?:[^\s"'\x60<>|;,)]| (?=[^\\/"'\x60<>|;,)\r\n]{0,255}[\\/]))*`,
+  "gu",
+);
+const PATH_PLACEHOLDER = "<path>";
+const KNOWN_PATH_MIN_LENGTH = 4;
+const REDACTION_WINDOW_CHARS = 4096;
+
+function spawnOpenssl(args, options, dependencies) {
+  const platform = dependencies.platform ?? process.platform;
+  const env = { ...process.env };
+  if (platform === "win32") env.NoDefaultCurrentDirectoryInExePath = "1";
+  return (dependencies.spawn ?? spawnSync)(OPENSSL, args, { ...options, env, shell: false });
+}
+
+/** The signing/setup spawn: inherits the terminal (the passphrase prompt) and runs from `cwd`,
+ * the PO key directory. It reports its exit code only -- it has no stderr to read. */
+function runOpenssl(args, cwd, dependencies) {
+  const result = spawnOpenssl(args, { cwd, stdio: "inherit" }, dependencies);
+  if (result?.status !== 0) fail(`openssl failed with exit code ${result?.status ?? "none (the process did not run to completion)"}; the human terminal must complete the local prompt`);
+}
+
+/** The absolute directories this process itself works in: the OS user's home and temporary directories
+ * and the working directory, each as given and as resolved. Read from the OS, never from a child. */
+function knownHostPaths() {
+  const found = [];
+  for (const read of [homedir, tmpdir, () => process.cwd()]) {
+    try {
+      const value = read();
+      if (typeof value !== "string") continue;
+      found.push(value);
+      try { found.push(realpathSync(value)); } catch { /* the plain value is still known */ }
+    } catch { /* a directory that cannot be read is not known */ }
+  }
+  return found.filter((value) => value.length >= KNOWN_PATH_MIN_LENGTH);
+}
+/** Exact-string replacement of each known absolute path in both separator forms, longest first, so a
+ * space inside a known path cannot leave a fragment. The boundary guards keep a known path from eating
+ * the front of a longer, different one. */
+function redactKnownPaths(value) {
+  const forms = new Set(knownHostPaths().flatMap((path) => [path, path.replaceAll("\\", "/"), path.replaceAll("/", "\\")]));
+  let result = String(value);
+  for (const form of [...forms].sort((left, right) => right.length - left.length)) {
+    const escaped = form.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    result = result.replace(new RegExp(String.raw`(?<![\w.~-])${escaped}(?![\w.~-])`, "gu"), PATH_PLACEHOLDER);
+  }
+  return result.replace(/(?:<path>){2,}/gu, PATH_PLACEHOLDER);
+}
+const redactPaths = (value) => redactKnownPaths(value).replace(PATH_REDACTION, (...args) => {
+  const quote = args.at(-1)?.quote;
+  return quote ? `${quote}${PATH_PLACEHOLDER}${quote}` : PATH_PLACEHOLDER;
+});
+function boundedHead(value) {
+  const first = String(value ?? "").split(/\r?\n/u).map((line) => line.trim()).find((line) => line !== "") ?? "";
+  const clean = redactPaths(first.slice(0, REDACTION_WINDOW_CHARS)).replace(/[^\x20-\x7e]/gu, "?");
+  return clean.length > PROBE_STDERR_HEAD_CHARS ? `${clean.slice(0, PROBE_STDERR_HEAD_CHARS)}...` : clean;
+}
+function exitDetail(result) {
+  if (result?.error) return `could not run to completion (${result.error.code ?? "error"})`;
+  const head = boundedHead(result?.stderr);
+  return `exit code ${result?.status ?? "none"}${head === "" ? "" : ` (${head})`}`;
+}
+
+const readinessFinding = (findingId, status, cause, repair) => ({ findingId, status, cause, repair });
+const okFinding = (findingId, cause = "ok") => readinessFinding(findingId, "ok", cause, null);
+// The typed setup action takes the value the PO states in chat. It is agent-runnable through this
+// script's own `set-po-key-directory --directory <dir>` command (R7-6-T11, ruling 10); it grants no
+// trust and accepts no signing-executable value.
+const keyDirectorySetAction = () => ({
+  kind: "set-po-key-directory", executable: "node", argv: [SCRIPT, "set-po-key-directory", "--directory", "<absolute-key-directory>"], mutation: true, requiresConfirmation: false,
+  setting: "poKeyDirectory", takes: "the absolute key directory the PO states in chat", expected: { schema: MACHINE_PLANE_SCHEMA },
+});
+const attendedRepair = (prerequisite, summary) => ({ kind: "attended-prerequisite", prerequisite, summary });
+export const keyDirectoryUnsetFinding = () => readinessFinding("po-key-directory", "repairable",
+  "key-directory-unset: no explicit argument, machine-wide value or legacy per-repository value names a PO key directory", keyDirectorySetAction());
+
+function readinessFailure(findings) {
+  const failing = findings.find((entry) => entry.status !== "ok");
+  const repair = failing.repair?.summary ?? failing.repair?.kind ?? "none";
+  const error = new Error(`SIGN-READINESS-FAILED: ${failing.cause}; repair: ${repair}`);
+  error.code = "SIGN-READINESS-FAILED"; error.finding = failing; error.findings = findings;
+  return error;
+}
+
+/** A directory name inside the Git installation that holds an OpenSSL file, derived at run time from the
+ * git executable the PATH finds -- by stat only, never a spawn. A suggestion, returned relative and
+ * redacted; the re-run probe in the PO's own terminal is its only test. */
+function gitNativeBinCandidate(dependencies) {
+  const platform = dependencies.platform ?? process.platform;
+  const pathKey = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH");
+  const entries = String(pathKey ? process.env[pathKey] : "").split(platform === "win32" ? ";" : ":").filter((entry) => entry !== "" && isAbsolute(entry));
+  const suffix = platform === "win32" ? WINDOWS_EXECUTABLE_SUFFIX : "";
+  const isFile = (path) => { try { return statSync(path).isFile(); } catch { return false; } };
+  const gitDirectory = entries.find((entry) => isFile(join(entry, `git${suffix}`)));
+  if (gitDirectory === undefined) return null;
+  for (const root of [dirname(gitDirectory), dirname(dirname(gitDirectory))]) {
+    for (const relative of GIT_NATIVE_BIN_DIRECTORIES) {
+      if (isFile(join(root, ...relative.split("/"), `${OPENSSL}${suffix}`))) return relative;
+    }
+  }
+  return null;
+}
+function toolchainRepair(prerequisite, instruction, dependencies) {
+  const candidate = gitNativeBinCandidate(dependencies);
+  return attendedRepair(prerequisite, candidate === null ? instruction
+    : `${instruction} A candidate to add is the ${candidate} directory inside your Git installation (a suggestion only: re-running the check in that terminal is its test).`);
+}
+
+function outsideEveryRepository(path) {
+  try {
+    let current = realpathSync(path);
+    for (;;) {
+      if (existsSync(join(current, ".git"))) return false;
+      const parent = dirname(current);
+      if (parent === current) return true;
+      current = parent;
+    }
+  } catch { return false; }
+}
+
+/** Steps (a) and (b): resolve `openssl` through the shared spawn helper, then an Ed25519 sign and verify round
+ * trip with a throwaway key in a fresh directory outside every repository, removed after a pass and after every
+ * failure. Touches no PO key: the throwaway key shows capability, not trust. */
+function probeSigningToolchain(dependencies) {
+  const noEd25519 = (detail) => readinessFinding("signing-toolchain", "attended", `openssl-no-ed25519: ${detail}`,
+    toolchainRepair("openssl-with-ed25519", "put an OpenSSL build with Ed25519 support earlier on the PATH of the terminal that signs, in that terminal's own shell, and re-run the readiness check there.", dependencies));
+  // R7-6-F3 (PO decision AE): the closed class for a probe that cannot run its round trip because of its
+  // OWN working environment -- no admissible working directory outside every repository, or a local I/O
+  // failure while preparing the throwaway material. The OpenSSL on the PATH is not at fault in either
+  // case, so it is never reported as openssl-no-ed25519 and never carries the replace-OpenSSL repair.
+  const environmentUnavailable = (detail) => readinessFinding("signing-toolchain", "attended", `probe-environment-unavailable: ${detail}`,
+    attendedRepair("probe-environment", "check that your home directory exists, is a directory outside every Git repository and can be read by your own OS user, and that the system temporary directory exists and is writable by you, then re-run the readiness check in that terminal. The working environment of the check itself is the problem, not your OpenSSL."));
+  // The probe child runs from the OS user's home directory and never falls back to the temporary
+  // directory (a world-writable location a planted file could occupy).
+  let cwd = null;
+  try { const value = realpathSync((dependencies.homedirFn ?? homedir)()); if (statSync(value).isDirectory() && outsideEveryRepository(value)) cwd = value; } catch { /* no admissible working directory */ }
+  if (cwd === null) return [environmentUnavailable("no working directory outside every repository was available for the probe")];
+  const options = { cwd, stdio: "pipe", encoding: "utf8", timeout: PROBE_TIMEOUT_MS, maxBuffer: 65_536 };
+  const resolved = spawnOpenssl(["version"], options, dependencies);
+  if (!resolved || (resolved.error && NOT_STARTED_CODES.has(resolved.error.code))) {
+    return [readinessFinding("signing-toolchain", "attended", "openssl-not-on-path: the name openssl is not found on the PATH of this terminal",
+      toolchainRepair("openssl-on-path", "add a directory holding an OpenSSL with Ed25519 support to the PATH of the terminal that signs, in that terminal's own shell, and re-run the readiness check there.", dependencies))];
+  }
+  if (resolved.error || resolved.status !== 0) return [noEd25519(`the openssl found on the PATH failed its version call: ${exitDetail(resolved)}`)];
+  const findings = [okFinding("signing-toolchain")];
+  let directory = null; let parent = null; let parentIdentity = null; let directoryIdentity = null;
+  const directorySnapshot = (value) => {
+    try {
+      const info=lstatSync(value);
+      if(!info.isDirectory() || info.isSymbolicLink() || realpathSync(value)!==value) return null;
+      return {dev:info.dev,ino:info.ino,mode:info.mode,uid:info.uid,gid:info.gid};
+    } catch { return null; }
+  };
+  const sameDirectory = (value, expected) => expected!==null && JSON.stringify(directorySnapshot(value))===JSON.stringify(expected);
+  // Parent membership timestamps may change when this operation creates its own child.
+  // Device/inode/mode/owner stay bound; every repository check remains live.
+  const workspaceCurrent = () => sameDirectory(parent,parentIdentity) && sameDirectory(directory,directoryIdentity)
+    && outsideEveryRepository(parent) && outsideEveryRepository(directory);
+  try {
+    let files;
+    // R7-6-F3 (PO decision AE): a LOCAL I/O failure while preparing the throwaway material (the directory
+    // for it, the key generation, the file writes) is the probe's own environment failing, not the
+    // OpenSSL on the PATH. Only this inner block maps to probe-environment-unavailable; every spawn
+    // below stays outside it, so a spawn that fails or throws is still the ed25519 class.
+    try {
+      const preferred = (dependencies.tmpdirFn ?? tmpdir)();
+      // Bounded fallback: only the already validated real home, never an arbitrary new root.
+      // This chooses the base before material I/O; a later I/O/toolchain failure is not retried.
+      const base = outsideEveryRepository(preferred) ? realpathSync(preferred) : cwd;
+      if (!outsideEveryRepository(base)) return [environmentUnavailable("no throwaway directory outside every repository was available for the round trip")];
+      parent=base; parentIdentity=directorySnapshot(parent);
+      if(parentIdentity===null) throw Object.assign(new Error("probe base is not a directory"),{code:"ENOTDIR"});
+      directory = mkdtempSync(join(base, "pipeline-sign-probe-"));
+      directoryIdentity=directorySnapshot(directory);
+      if(directoryIdentity===null) throw Object.assign(new Error("probe directory unavailable"),{code:"PROBE-CUSTODY"});
+      chmodSync(directory,0o700);
+      const hardened=directorySnapshot(directory);
+      if(hardened===null || hardened.dev!==directoryIdentity.dev || hardened.ino!==directoryIdentity.ino
+        || hardened.uid!==directoryIdentity.uid || hardened.gid!==directoryIdentity.gid
+        || (process.platform!=="win32" && (hardened.mode&0o777)!==0o700)) throw Object.assign(new Error("probe directory custody changed"),{code:"PROBE-CUSTODY"});
+      directoryIdentity=hardened;
+      if(!workspaceCurrent()) return [environmentUnavailable("probe directory custody changed before material creation")];
+      const { privateKey, publicKey } = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
+      files = { privateKey: join(directory, "probe-private.pem"), publicKey: join(directory, "probe-public.pem"), payload: join(directory, "probe-payload.txt"), signature: join(directory, "probe-signature.bin") };
+      if(!workspaceCurrent()) return [environmentUnavailable("probe directory custody changed before material writes")];
+      writeFileSync(files.privateKey, privateKey, { mode: 0o600 });
+      writeFileSync(files.publicKey, publicKey);
+      writeFileSync(files.payload, PROBE_PAYLOAD);
+    } catch (error) {
+      return [environmentUnavailable(`the throwaway material for the round trip could not be prepared (${error?.code ?? "error"})`)];
+    }
+    if(!workspaceCurrent()) return [environmentUnavailable("probe directory custody changed before the sign step")];
+    const signed = spawnOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", files.privateKey, "-in", files.payload, "-out", files.signature], options, dependencies);
+    if (signed?.error || signed?.status !== 0) return [noEd25519(`the Ed25519 round trip failed at the sign step: ${exitDetail(signed)}`)];
+    if(!workspaceCurrent()) return [environmentUnavailable("probe directory custody changed before the verify step")];
+    const verified = spawnOpenssl(["pkeyutl", "-verify", "-rawin", "-pubin", "-inkey", files.publicKey, "-in", files.payload, "-sigfile", files.signature], options, dependencies);
+    if (verified?.error || verified?.status !== 0) return [noEd25519(`the Ed25519 round trip failed at the verify step: ${exitDetail(verified)}`)];
+  } catch (error) {
+    return [noEd25519(`the Ed25519 round trip could not be prepared (${error?.code ?? "error"})`)];
+  } finally {
+    if (directory !== null) {
+      if(!sameDirectory(directory,directoryIdentity) || !sameDirectory(parent,parentIdentity)) return [environmentUnavailable("probe workspace identity changed; foreign entry preserved")];
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+  return [...findings, okFinding("signing-toolchain")];
+}
+
+/** Existence and readability of the key directory, then its PUBLIC key. Never opens the private key. */
+function inspectKeyDirectory(directory, dependencies) {
+  const state = (error, otherwise) => (UNREADABLE_CODES.has(error?.code) ? "unreadable" : otherwise);
+  let info;
+  try { info = statSync(directory); } catch (error) { return { state: state(error, "missing"), publicKey: null }; }
+  if (!info.isDirectory()) return { state: "missing", publicKey: null };
+  try { readdirSync(directory); } catch (error) { return { state: state(error, "missing"), publicKey: null }; }
+  let publicKey;
+  try { publicKey = String((dependencies.readFile ?? readFileSync)(join(directory, "po-public.pem"), "utf8")); }
+  catch (error) { return { state: state(error, "readable"), publicKey: null, keyReference: null }; }
+  return { state: "readable", publicKey, keyReference: declaredKeyReference(directory, publicKey, dependencies) };
+}
+
+/** R7-6-F3 (PO decision AD): the key reference the directory's own public trust-policy.json declares for the
+ * public key found there. It counts only if that record names THIS key: a publicKeySha256, when the record
+ * carries one, must equal the digest of po-public.pem, so a record describing another key can never lend its
+ * reference to this one. Public data only; null when the record is missing, unreadable or does not apply. */
+function declaredKeyReference(directory, publicKey, dependencies) {
+  try {
+    const record = JSON.parse(String((dependencies.readFile ?? readFileSync)(join(directory, "trust-policy.json"), "utf8")));
+    if (record === null || typeof record !== "object" || !text(record.keyReference)) return null;
+    if (record.publicKeySha256 !== undefined && record.publicKeySha256 !== createHash("sha256").update(publicKey).digest("hex")) return null;
+    return record.keyReference;
+  } catch { return null; }
+}
+
+/** Step (c): the directory resolves to an existing readable directory, and the key found there -- its key
+ * reference AND the digest of its public key, as ONE pair -- equals one committed trust anchor (decision AD:
+ * any-of on the pair, never a digest matched here and a reference matched there). Reads the public key, the
+ * directory's public trust-policy.json and the anchor set only; the private key is never opened. */
+function probeKeyDirectory({ repository, inspection, legacy, dependencies }) {
+  if (inspection.state === "missing") {
+    return { anchorCount: 0, findings: [readinessFinding("po-key-directory", "repairable", "key-directory-missing: the stored PO key directory value names no directory", keyDirectorySetAction())] };
+  }
+  if (inspection.state === "unreadable") {
+    return { anchorCount: 0, findings: [readinessFinding("po-key-directory", "attended", "key-directory-unreadable: the PO key directory cannot be read by this OS user",
+      attendedRepair("po-key-directory-readable", "make the PO key directory readable to your own OS user, then re-run the readiness check."))] };
+  }
+  let anchors = [];
+  try {
+    const policy = readCriticalHumanProofPolicy(repository);
+    if (policy?.ok) anchors = Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0 ? policy.trustAnchors : (policy.trustAnchor ? [policy.trustAnchor] : []);
+  } catch { anchors = []; }
+  const findings = [okFinding("po-key-directory", legacy ? "ok (resolved from the legacy per-repository value)" : "ok")];
+  const digest = inspection.publicKey === null ? null : createHash("sha256").update(inspection.publicKey).digest("hex");
+  const keyReference = inspection.keyReference ?? null;
+  if (digest !== null && keyReference !== null && anchors.some((anchor) => anchor?.keyReference === keyReference && anchor?.publicKeySha256 === digest)) {
+    findings.push(okFinding("trust-anchor-match"));
+  } else {
+    const detail = digest === null ? "no public key was found in the PO key directory"
+      : anchors.length === 0 ? "no trust anchor is committed for this repository"
+        : keyReference === null ? "the PO key directory declares no key reference for the public key found there, so it cannot match a committed trust anchor as a pair"
+          : `the key reference and public key found there match none of the ${anchors.length} committed trust anchors as one pair`;
+    findings.push(readinessFinding("trust-anchor-match", "attended", `key-anchor-mismatch: ${detail}`,
+      attendedRepair("po-key-anchored", "point poKeyDirectory at the directory that holds the anchored key, or perform the one-time key setup (setup) in your own terminal.")));
+  }
+  return { anchorCount: anchors.length, findings };
+}
+
+/** The whole probe, steps (a) to (c), without throwing: for a read-only readiness-check command. */
+export function probeSigningReadiness({ repository, directory, legacy = false, dependencies = {} } = {}) {
+  const keyDirectory = probeKeyDirectory({ repository, inspection: inspectKeyDirectory(directory, dependencies), legacy, dependencies });
+  const findings = [...probeSigningToolchain(dependencies), ...keyDirectory.findings];
+  return { ok: findings.every((entry) => entry.status === "ok"), mutation: false, findings };
+}
+
+/** `sign-intent`'s own defence-in-depth run, before the first prompt and before any process receives a key
+ * path. A declared anchor that the key does not match ends it at once, without reading anything private. With
+ * no committed anchor at all (R7-6g(i), F5) step (c) cannot pass either, so the toolchain probe's findings
+ * and step (c)'s are reported together, still before the terminal precondition: the private key is never
+ * read -- not even its armor -- without a committed anchor to hold it against. */
+function assertSigningReadyBeforePrompt({ repository, inspection, legacy, keys, dependencies }) {
+  const keyDirectory = probeKeyDirectory({ repository, inspection, legacy, dependencies });
+  const keyDirectoryReady = keyDirectory.findings.every((entry) => entry.status === "ok");
+  if (!keyDirectoryReady && keyDirectory.anchorCount > 0) throw readinessFailure(keyDirectory.findings);
+  if (!keyDirectoryReady) throw readinessFailure([...probeSigningToolchain(dependencies), ...keyDirectory.findings]);
+  // TR-S1 (Ruling 78): the encrypted-key gate. Placed after the anchor check above (the private key is
+  // never opened without a committed anchor to hold it against) and before the attended-terminal
+  // check and the first toolchain spawn (no process of any kind runs for an unprotected key).
+  assertPoPrivateKeyProtected(keys.privateKey, dependencies);
+  assertAttendedTerminalWhenPassphraseKey(keys, dependencies);
+  const findings = [...probeSigningToolchain(dependencies), ...keyDirectory.findings];
+  if (findings.some((entry) => entry.status !== "ok")) throw readinessFailure(findings);
+}
+
+function assertAttendedTerminalWhenPassphraseKey(keys, dependencies) {
+  if (isPrivateKeyPassphraseProtected(keys.privateKey, dependencies) && !isAttendedTerminal(dependencies)) {
+    fail(
+      "sign-intent needs an attended terminal to complete: this process could not open a controlling " +
+      `terminal (${controllingTtyPath(dependencies)}) for OpenSSL's own interactive prompt to run on ` +
+      "(pipeline.signing-requires-attended-terminal). Run the identical command in a terminal window " +
+      "you can type into directly.",
+    );
+  }
+}
+
+function failParse(args) {
+  const error = new Error(args.error);
+  if (args.finding) { error.code = args.code; error.finding = args.finding; error.findings = [args.finding]; }
+  throw error;
+}
+
+/**
+ * NVA-BL-74 (backlog/items/2026-08-07-human-authorization-prompts-ignore-the-
+ * configured-language-profile.md): the token a human types is deliberately NOT
+ * translated. It stays this one stable English constant in every language --
+ * greppable, documentable (docs/po-human-approval.md), and impossible to drift
+ * between prompt and documentation. A localised token would be a SECOND accepted
+ * input on a signing gate for no security benefit; the localised prompt text
+ * below therefore quotes this exact word verbatim rather than translating it.
+ */
+const CONFIRMATION_TOKEN = "approve";
+
+/**
+ * The FRAME of the confirmation prompt -- header, consequence sentence and typed-
+ * token instruction -- per human-facing language. Only these three lines are
+ * translated: the summary lines between them are caller-supplied DATA (digests,
+ * candidate identifiers, and, for `sign-intent`, lines read verbatim out of a
+ * recorded request by describeGuardMaintenanceWindowRequest), never prose this
+ * function owns.
+ *
+ * This table's OWN keys are the recognised-language set. That is the point: a
+ * value that is absent, unreadable, or simply has no entry here resolves to
+ * `DEFAULT_HUMAN_FACING_LANGUAGE` through one branch, so a locale lookup can
+ * never fail open into "no prompt at all". `de`/`en` are exactly the values the
+ * continuity contract admits (lib/continuity-state.mjs HUMAN_FACING_LANGUAGES,
+ * scripts/continuity-state.schema.json's runtime.humanFacingLanguage enum);
+ * adding a language here is the only change a further translation needs.
+ */
+const DEFAULT_HUMAN_FACING_LANGUAGE = "en";
+const CONFIRMATION_PROMPT_FRAME = Object.freeze({
+  en: Object.freeze({
+    header: "PO APPROVAL CONFIRMATION -- read before you enter your passphrase:",
+    consequence: "This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.",
+    instruction: `Type exactly "${CONFIRMATION_TOKEN}" to continue; anything else cancels: `,
+  }),
+  de: Object.freeze({
+    header: "PO-FREIGABE BESTÄTIGEN -- bitte lesen, bevor Sie Ihre Passphrase eingeben:",
+    consequence: "Damit signiert OpenSSL den oben genannten Digest mit Ihrem privaten Schlüssel; einmal signiert, lässt sich das nicht mehr rückgängig machen.",
+    instruction: `Tippen Sie exakt "${CONFIRMATION_TOKEN}" (genau dieses englische Wort) zum Fortfahren; jede andere Eingabe bricht ab: `,
+  }),
+});
+
+/**
+ * Resolve the human-facing language for the prompt above from the same value the
+ * rest of the session uses: `continuity.runtime.humanFacingLanguage` in this
+ * repository's project-state artifact, located through the shared authority
+ * resolver (lib/project-authority.mjs) rather than a fourth hardcoded state path.
+ *
+ * Never throws and never returns a language the table above has no entry for: a
+ * missing checkout, an absent/malformed/unreadable state file, a state file with
+ * no continuity block, and an unrecognised value all yield English. The gate must
+ * degrade to a fully-formed English prompt, never to a missing one.
+ *
+ * `dependencies.resolveHumanFacingLanguageFn` is the injectable seam. It is
+ * deliberately its own named seam rather than a reuse of `dependencies.readFile`/
+ * `readFileSyncFn`: those are already overridden by existing tests to serve PEM
+ * and key-directory fixtures, and routing this read through them would silently
+ * feed the resolver the wrong payload -- which, because every failure here falls
+ * back to English, would look exactly like a passing test.
+ */
+function resolveHumanFacingLanguage(repository, dependencies = {}) {
+  const known = (value) => (typeof value === "string" && Object.hasOwn(CONFIRMATION_PROMPT_FRAME, value) ? value : DEFAULT_HUMAN_FACING_LANGUAGE);
+  if (typeof dependencies.resolveHumanFacingLanguageFn === "function") {
+    try { return known(dependencies.resolveHumanFacingLanguageFn(repository)); }
+    catch { return DEFAULT_HUMAN_FACING_LANGUAGE; }
+  }
+  try {
+    const artifact = resolveAuthorityArtifactPath("state", { rootDir: repository });
+    if (!artifact.exists) return DEFAULT_HUMAN_FACING_LANGUAGE;
+    const state = JSON.parse(readFileSync(artifact.path, "utf8"));
+    return known(state?.continuity?.runtime?.humanFacingLanguage);
+  } catch { return DEFAULT_HUMAN_FACING_LANGUAGE; }
+}
+
+/**
+ * Reads one line of plain-text confirmation from the real controlling
+ * terminal. Synchronous by design: this file already blocks on `spawnSync`
+ * for the OpenSSL passphrase prompt, and a human confirmation gate that must
+ * complete before that prompt has to block the same way, not hand control to
+ * an async callback the rest of this CLI does not have.
+ */
+function defaultReadConfirmation(prompt) {
+  process.stdout.write(prompt);
+  const buffer = Buffer.alloc(1); const bytes = [];
+  for (;;) {
+    let read;
+    try { read = readSync(0, buffer, 0, 1, null); }
+    catch (error) { if (error?.code === "EAGAIN") continue; if (error?.code === "EOF") break; throw error; }
+    if (read === 0 || buffer[0] === 10) break;
+    bytes.push(buffer[0]);
+  }
+  // Shared with `lib/chat-gate-ceremony.mjs`'s `readAttendedLine()`, imported
+  // rather than repeated: the comment there records why a legacy Windows
+  // console's non-UTF-8 bytes must still decode to what the human typed, and
+  // two copies of that reasoning would drift.
+  return decodeTypedLine(bytes);
+}
+
+/**
+ * The deliberate, plain-language gate the PO requires before any passphrase
+ * prompt: a human must read what is being authorized and its consequence,
+ * then type the exact confirmation token. Anything else cancels, and the
+ * caller must never reach the OpenSSL sign step or write any artifact.
+ *
+ * NVA-BL-74: `language` selects the prompt FRAME only (see
+ * CONFIRMATION_PROMPT_FRAME). The acceptance test itself is untouched and stays
+ * language-independent -- one comparison against one English constant, so no
+ * language variant can widen, weaken or reorder what counts as consent. An
+ * unknown or omitted `language` renders the English frame.
+ */
+/**
+ * The disclosure half of the frame above (header, the caller-supplied summary
+ * lines, the consequence sentence) shared by `requireExplicitConfirmation` and
+ * `printDisclosureOnly` below -- factored out so the two can never drift apart:
+ * both must show the human the identical "what is being signed" content, and
+ * only the confirming variant appends the typed-token instruction on top.
+ */
+function composeDisclosureLines(summaryLines, language = DEFAULT_HUMAN_FACING_LANGUAGE) {
+  const frame = CONFIRMATION_PROMPT_FRAME[language] ?? CONFIRMATION_PROMPT_FRAME[DEFAULT_HUMAN_FACING_LANGUAGE];
+  return [frame.header, ...summaryLines.map((line) => `  ${line}`), frame.consequence];
+}
+
+function requireExplicitConfirmation(summaryLines, dependencies, language = DEFAULT_HUMAN_FACING_LANGUAGE) {
+  const frame = CONFIRMATION_PROMPT_FRAME[language] ?? CONFIRMATION_PROMPT_FRAME[DEFAULT_HUMAN_FACING_LANGUAGE];
+  const prompt = [...composeDisclosureLines(summaryLines, language), frame.instruction].join("\n");
+  const read = dependencies.readConfirmation ?? defaultReadConfirmation;
+  if (read(prompt) !== CONFIRMATION_TOKEN) fail("approval cancelled: explicit confirmation was not given");
+}
+
+/**
+ * NVA-SIGNONCE-1: the disclosure alone, printed with no token read from stdin --
+ * used only when the private key about to sign is passphrase-protected (see the
+ * call site in the `sign-intent` branch), where entering that passphrase next at
+ * the OpenSSL prompt is already the deliberate human act; a second typed token
+ * first would only train the human to type past it without reading. Same frame,
+ * same disclosure content as `requireExplicitConfirmation` (header, the
+ * caller-supplied summary lines, the consequence sentence) via the shared
+ * `composeDisclosureLines`; the one thing this omits is the instruction line
+ * asking for a typed token, because nothing here is being typed.
+ */
+function printDisclosureOnly(summaryLines, language = DEFAULT_HUMAN_FACING_LANGUAGE) {
+  process.stdout.write(`${composeDisclosureLines(summaryLines, language).join("\n")}\n`);
+}
+
+/**
+ * NVA-SIGNONCE-1: whether the private key at `pemPath` needs a passphrase,
+ * decided by reading the key's own PEM armor -- never a flag, a config value, an
+ * environment variable, or a question to the human. `setup`'s only key-generation
+ * path (`openssl genpkey -algorithm ED25519 -aes-256-cbc`, this file's `setup`
+ * branch) always emits PKCS#8 "ENCRYPTED PRIVATE KEY" armor for a
+ * passphrase-protected key and plain "PRIVATE KEY" armor otherwise; no other PEM
+ * shape reaches this command. A key that cannot be read returns `false`, which
+ * routes the caller to the stricter, confirmation-required path -- unreadable
+ * key material never widens what gets skipped.
+ */
+function isPrivateKeyPassphraseProtected(pemPath, dependencies) {
+  const read = dependencies.readFile ?? readFileSync;
+  let pem;
+  try { pem = read(pemPath, "utf8"); } catch { return false; }
+  return classifyPoPrivateKeyArmor(pem) === "encrypted";
+}
+
+/**
+ * TR-S1 (Rulings 75, 78, 83, 91): the armor class of a PO private key, decided by its own PEM
+ * header and nothing else. Only the PKCS#8 armors are classified: "BEGIN PRIVATE KEY" is
+ * "unencrypted" (checked FIRST, so a file that carries both armors is refused), "BEGIN ENCRYPTED
+ * PRIVATE KEY" is "encrypted", and anything else is "other" -- passed through untouched, so a
+ * non-PEM or traditional-armor file keeps the outcome it had before this gate existed (Ruling 113
+ * keeps those armors out of scope).
+ */
+function classifyPoPrivateKeyArmor(content) {
+  const pem = String(content);
+  if (pem.includes("-----BEGIN PRIVATE KEY-----")) return "unencrypted";
+  if (pem.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----")) return "encrypted";
+  return "other";
+}
+
+/** The typed refusal of the encrypted-key gate. Shaped like readinessFailure: `code: cause; repair: ...`,
+ * with error.code, one attended finding and its repair. The cause never carries key bytes or a path. */
+function poKeyGateFailure(code, cause) {
+  const repair = code === "PO-KEY-UNENCRYPTED"
+    ? "in your own terminal, re-encrypt the same key in place: run openssl pkcs8 -topk8 -v2 aes-256-cbc -in \"<key>\" -out \"<key>.encrypted\" (it asks you for the new passphrase), replace the original with the .encrypted file (mv on POSIX, move /Y on Windows), then re-run; the keypair is unchanged, so po-public.pem, trust-policy.json and the committed trust anchors stay valid."
+    : "make the key a regular file this operating-system user can read, then re-run.";
+  const finding = readinessFinding("po-key-passphrase-protected", "attended", cause, attendedRepair("po-key-passphrase-protected", repair));
+  const error = new Error(`${code}: ${cause}; repair: ${repair}`);
+  error.code = code; error.finding = finding; error.findings = [finding];
+  return error;
+}
+
+/** One read of the PO private key through the injected seam; any failure is PO-KEY-UNREADABLE (errno only). */
+function readPoPrivateKeyOrRefuse(read, pemPath, ...encoding) {
+  try { return read(pemPath, ...encoding); } catch (caught) {
+    throw poKeyGateFailure("PO-KEY-UNREADABLE", `the PO private key could not be read (${typeof caught?.code === "string" ? caught.code : "read-failed"})`);
+  }
+}
+
+function refuseUnencryptedPoPrivateKey(content) {
+  if (classifyPoPrivateKeyArmor(content) === "unencrypted") {
+    throw poKeyGateFailure("PO-KEY-UNENCRYPTED", "the PO private key is not passphrase-protected (unencrypted PKCS#8 armor), so signing with it would need no passphrase");
+  }
+}
+
+/** The gate for a key already registered at `pemPath`: unreadable or unencrypted ends the verb before any prompt or spawn. */
+function assertPoPrivateKeyProtected(pemPath, dependencies) {
+  refuseUnencryptedPoPrivateKey(readPoPrivateKeyOrRefuse(dependencies.readFile ?? readFileSync, pemPath, "utf8"));
+}
+
+/**
+ * Names the flag that made a critical request unacceptable instead of only
+ * stating that it is, and normalizes `--expires-at` rather than rejecting a
+ * perfectly valid timestamp that just is not already in one exact byte shape
+ * (GF-080 Gap B). The action object this builds is validated downstream by
+ * `actionValid()`/`iso()` in critical-action-approval-request.mjs, which
+ * requires the exact `Date#toISOString()` round trip before it will compute
+ * a digest at all -- so *some* canonical string is genuinely required before
+ * the digest is bound, but the human should never need to know or produce
+ * that exact shape by hand. A real operator round trip was lost to exactly
+ * this: an `--expires-at` of `2026-08-07T12:00:00Z` parses fine, is obviously
+ * an ISO-8601 timestamp, and was still rejected outright because it was not
+ * already the exact round-trip form. The fix normalizes any timestamp
+ * `Date.parse` accepts into that canonical form and rewrites `args.expiresAt`
+ * in place *before* it is used anywhere downstream (the request written to
+ * disk, and the digest computed from it) -- so a caller reading
+ * `args.expiresAt` after this function returns `null` always sees the
+ * canonical value, never the human's original spelling.
+ */
+function criticalRequestFieldError(args) {
+  if (!text(args.plan)) return "critical approval request is invalid: --plan is required and must be a repository-relative path";
+  if (!text(args.spec)) return "critical approval request is invalid: --spec is required and must be a repository-relative path";
+  // ADR-0064 Decision 4: with --subject supplied, resolveSubjectPreimage() (below) has
+  // already derived args.subjectSha256 from it before this runs, so the general shape
+  // check is unconditional here -- only WHERE the digest came from differs by caller.
+  if (!SHA.test(args.subjectSha256 ?? "")) return "critical approval request is invalid: --subject-sha256 must be exactly 64 lowercase hexadecimal characters, or supply --subject <repo-relative-path> to derive it";
+  if (!text(args.expiresAt)) return "critical approval request is invalid: --expires-at is required";
+  const expiresAtMs = Date.parse(args.expiresAt);
+  if (!Number.isFinite(expiresAtMs)) return `critical approval request is invalid: --expires-at is not a parsable timestamp: ${JSON.stringify(args.expiresAt)}`;
+  args.expiresAt = new Date(expiresAtMs).toISOString();
+  return null;
+}
+
+/**
+ * ADR-0064 Decision 4: the one additive, kind-agnostic input. When --subject is
+ * supplied, its bytes -- read through the same `readPublicRepositoryFile` primitive
+ * --plan/--spec already use -- are the JSON preimage `criticalActionSubjectSha256` is
+ * computed over. The digest is REBUILT from that preimage and the observed candidate,
+ * never trusted from a caller-supplied --subject-sha256: a --subject-sha256 supplied
+ * alongside --subject must agree with the rebuilt digest or the request is refused.
+ * Kind-agnostic because `criticalActionSubjectSha256` itself is: this never inspects
+ * the preimage's own shape, so it works unchanged for `push`/`deploy`/`publication`
+ * subjects too, not only for `release-preflight`.
+ *
+ * Mutates `args.subjectSha256` in place, mirroring `criticalRequestFieldError`'s own
+ * existing `--expires-at` normalization -- so every downstream reader of `args` sees
+ * the one derived value, never the caller's omitted one.
+ */
+function resolveSubjectPreimage({ args, repository, candidate }) {
+  if (!text(args.subject)) return null;
+  let bytes;
+  try { bytes = readPublicRepositoryFile(repository, args.subject); }
+  catch { fail("critical approval request is invalid: --subject could not be read as a repository-relative file"); }
+  let preimage;
+  try { preimage = JSON.parse(bytes.toString("utf8")); }
+  catch { fail("critical approval request is invalid: --subject must be valid JSON"); }
+  if (args.kind === "interruption-promotion") {
+    preimage = validInterruptionPromotionSubject(preimage)
+      ? preimage
+      : interruptionPromotionSubjectFromBaseline(preimage, bytes);
+    if (!preimage) fail("critical approval request is invalid: --subject must be the eligible interruption baseline or its exact promotion subject");
+  }
+  let computed;
+  try { computed = criticalActionSubjectSha256({ kind: args.kind, candidate, subject: preimage }); }
+  catch { fail("critical approval request is invalid: --subject could not be hashed for this --kind"); }
+  if (text(args.subjectSha256) && args.subjectSha256 !== computed) {
+    fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from --subject (expected ${computed})`);
+  }
+  args.subjectSha256 = computed;
+  return preimage;
+}
+
+/**
+ * The one construction of a critical request, shared by the agent-facing
+ * `prepare-critical` and the human-facing `authorize-critical`. Deliberately a
+ * single call site of `createCriticalActionApprovalRequest`: a second way of
+ * building the intent digest would be a second definition of the binding, and
+ * it would agree right up until the moment it did not.
+ *
+ * Returns `subjectPreimage` alongside `request` (null unless --subject was supplied)
+ * so a caller that wants to *show* the human what they are approving -- only
+ * `authorize-critical` does -- has it, without re-reading or re-parsing the file.
+ */
+function criticalApprovalRequest({ args, repository, featureId, dependencies }) {
+  const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
+  const subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
+  if (args.kind === "interruption-promotion" && subjectPreimage === null) {
+    fail("critical approval request is invalid: interruption-promotion requires the current baseline through --subject");
+  }
+  const invalid = criticalRequestFieldError(args);
+  if (invalid) fail(invalid);
+  const request = createCriticalActionApprovalRequest({
+    candidate,
+    featureId,
+    planBytes: readPublicRepositoryFile(repository, args.plan),
+    specBytes: readPublicRepositoryFile(repository, args.spec),
+    action: { kind: args.kind, subjectSha256: args.subjectSha256, expiresAt: args.expiresAt },
+  });
+  return { request, subjectPreimage };
+}
+
+/**
+ * ADR-0061 Decision 4 requires the command's own output to state what is being
+ * approved; a bare digest is adequate for `push` only because
+ * `docs/push-release-flow.md:103-110` documents that shape out of band (ADR-0064
+ * Decision 4). For `release-preflight` it is not, so this decodes the subject
+ * preimage (when --subject supplied one) and always states the kind-specific scope
+ * -- true of the KIND itself, not of any one preimage, so it is shown even when no
+ * preimage was supplied (a bare --subject-sha256 invocation still needs to hear it).
+ */
+function releasePreflightConfirmationLines(kind, subjectPreimage) {
+  if (kind !== "release-preflight") return [];
+  const decoded = subjectPreimage !== null && typeof subjectPreimage === "object" && !Array.isArray(subjectPreimage)
+    ? [
+      `release version: ${subjectPreimage.version}`,
+      `base commit: ${subjectPreimage.base?.commit}`,
+      `lifecycle feature id: ${subjectPreimage.lifecycle?.featureId}`,
+      `lifecycle manifest path: ${subjectPreimage.lifecycle?.manifestPath}`,
+      `lifecycle manifest sha256: ${subjectPreimage.lifecycle?.manifestSha256}`,
+      `retention policy sha256: ${subjectPreimage.retentionPolicySha256}`,
+    ]
+    : [];
+  return [
+    ...decoded,
+    "this consents that a release attempt for the candidate above may be prepared and taken to the independently operated final gates; it is not a release, not a publication authorization, and not a pass of any of those gates.",
+  ];
+}
+
+function validInterruptionPromotionSubject(value) {
+  const own = (object, keys) => object !== null && typeof object === "object" && !Array.isArray(object)
+    && Object.keys(object).length === keys.length && keys.every((key) => Object.hasOwn(object, key));
+  const sha = (entry) => typeof entry === "string" && /^[a-f0-9]{64}$/u.test(entry);
+  const windowPart = (entry) => own(entry, ["value", "status"])
+    && entry.status === "measured" && typeof entry.value === "string"
+    && Number.isFinite(Date.parse(entry.value)) && new Date(entry.value).toISOString() === entry.value;
+  return own(value, ["baselineSha256", "registrySha256", "window", "coverage", "scope", "limitations"])
+    && sha(value.baselineSha256) && sha(value.registrySha256)
+    && own(value.window, ["start", "end"]) && windowPart(value.window.start) && windowPart(value.window.end)
+    && Date.parse(value.window.start.value) <= Date.parse(value.window.end.value)
+    && own(value.coverage, ["receipts", "followup"])
+    && value.coverage.receipts === "measured" && value.coverage.followup === "measured"
+    && own(value.scope, ["featureId", "packageId", "dispatchId"])
+    && Object.values(value.scope).every((entry) => entry === null)
+    && Array.isArray(value.limitations) && value.limitations.every((entry) => typeof entry === "string");
+}
+
+function interruptionPromotionSubjectFromBaseline(value, baselineBytes) {
+  const own = (object, keys) => object !== null && typeof object === "object" && !Array.isArray(object)
+    && Object.keys(object).length === keys.length && keys.every((key) => Object.hasOwn(object, key));
+  const sha = (entry) => typeof entry === "string" && /^[a-f0-9]{64}$/u.test(entry);
+  const validTime = (entry) => typeof entry === "string" && Number.isFinite(Date.parse(entry))
+    && new Date(entry).toISOString() === entry;
+  if (!own(value, ["requestedWindow", "window", "coverage", "registrySha256", "scope", "limitations", "generatedAt"])
+    || !sha(value.registrySha256) || !validTime(value.generatedAt)
+    || !own(value.window, ["start", "end"])
+    || !own(value.window.start, ["value", "status"]) || !own(value.window.end, ["value", "status"])
+    || !new Set(["measured", "unknown"]).has(value.window.start.status)
+    || !new Set(["measured", "unknown"]).has(value.window.end.status)
+    || (value.window.start.value !== null && !validTime(value.window.start.value))
+    || (value.window.end.value !== null && !validTime(value.window.end.value))
+    || (value.requestedWindow !== null && (!own(value.requestedWindow, ["start", "end"])
+      || !own(value.requestedWindow.start, ["value", "status"]) || !own(value.requestedWindow.end, ["value", "status"])))
+    || value.coverage === null || typeof value.coverage !== "object" || Array.isArray(value.coverage)
+    || !own(value.scope, ["featureId", "packageId", "dispatchId"])
+    || Object.values(value.scope).some((entry) => entry !== null && (typeof entry !== "string" || entry.trim() === ""))
+    || !Array.isArray(value.limitations) || value.limitations.some((entry) => typeof entry !== "string")) return null;
+  const subject = {
+    baselineSha256: createHash("sha256").update(baselineBytes).digest("hex"),
+    registrySha256: value.registrySha256,
+    window: structuredClone(value.window),
+    coverage: structuredClone(value.coverage),
+    scope: structuredClone(value.scope),
+    limitations: structuredClone(value.limitations),
+  };
+  return validInterruptionPromotionSubject(subject) ? subject : null;
+}
+
+function interruptionPromotionConfirmationLines(kind, subjectPreimage) {
+  if (kind !== "interruption-promotion") return [];
+  if (subjectPreimage === null || typeof subjectPreimage !== "object" || Array.isArray(subjectPreimage)) {
+    return ["promotion subject: unavailable; refuse approval"];
+  }
+  return [
+    `baseline sha256: ${subjectPreimage.baselineSha256}`,
+    `registry sha256: ${subjectPreimage.registrySha256}`,
+    `measurement window: ${JSON.stringify(subjectPreimage.window)}`,
+    `coverage: ${JSON.stringify(subjectPreimage.coverage)}`,
+    `scope: ${JSON.stringify(subjectPreimage.scope)}`,
+    `limitations: ${JSON.stringify(subjectPreimage.limitations)}`,
+    "this signs only the displayed measured baseline subject; changing the baseline bytes invalidates this approval.",
+  ];
+}
+
+/**
+ * GF-105: the human's one `authorize-critical` command for a push
+ * (`references/push-approval.md`, "The human's one command (current shape)")
+ * had NO code-level construction at all before this -- that reference stated
+ * plainly "The agent constructs the command ... and hands it over", meaning
+ * every occurrence of this command was hand-formatted prose. That is exactly
+ * the class of bug GF-094 already found and fixed for the unrelated
+ * host-boundary retry route in codex-pretool-guard.mjs (Codex's own
+ * re-quoting and line-wrapping of a multi-word, non-ASCII value corrupting a
+ * human's real terminal) -- and it is if anything MORE consequential here: a
+ * signing ceremony, not a kickoff retry.
+ *
+ * This is a caller of `boundedCopySafeCommand()` (lib/copy-safe-command.mjs,
+ * NVA-W12-COPYSAFE), never a re-implementation of it: that shared renderer
+ * already turns an `{ executable, argv }` pair into the exact, correctly-quoted
+ * shell line (the same `shellWord()` quoting used for every other onboarding
+ * action this plugin renders, already proven to single-quote a value
+ * containing spaces or non-ASCII characters correctly) AND the bounded,
+ * multi-platform (posix/powershell/cmd) copy rendering, in one call -- the
+ * bounded-chunking algorithm keeps its one definition in
+ * project-onboarding-v3.mjs; this function never duplicates it.
+ *
+ * `--kind` is always `"push"`: this helper is specific to the push-approval
+ * ceremony (`references/push-approval.md`'s worked example), not a general
+ * `authorize-critical` renderer for `deploy`/`publication`.
+ *
+ * `launcher` defaults to this script's OWN resolved absolute path
+ * (`fileURLToPath(import.meta.url)`) so a caller can never relay a wrong or
+ * stale script location -- the one part of this command a hand-formatting
+ * caller could get wrong that has nothing to do with the ceremony's actual
+ * parameters. Every other value is relayed exactly as given: this function
+ * renders, it does not re-validate (`criticalRequestFieldError` and the
+ * `featureId`/`kind` checks in `runHumanApproval` above already own that).
+ */
+export function authorizeCriticalPushCommand({
+  repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt,
+  launcher = fileURLToPath(import.meta.url),
+} = {}) {
+  for (const [name, value] of Object.entries({ launcher, repoRoot, featureId, plan, spec, subjectSha256, expiresAt })) {
+    if (typeof value !== "string" || value.length === 0) throw new TypeError(`authorizeCriticalPushCommand requires a non-empty ${name}`);
+  }
+  if (directory !== null && (typeof directory !== "string" || directory.length === 0)) {
+    throw new TypeError("authorizeCriticalPushCommand requires directory to be null or a non-empty string");
+  }
+  const argv = [
+    launcher, "authorize-critical",
+    "--repo-root", repoRoot,
+  ];
+  if (directory !== null) argv.push("--directory", directory);
+  argv.push(
+    "--feature-id", featureId,
+    "--plan", plan,
+    "--spec", spec,
+    "--kind", "push",
+    "--subject-sha256", subjectSha256,
+    "--expires-at", expiresAt,
+  );
+  return boundedCopySafeCommand({ executable: "node", argv });
+}
+
+export const PO_HUMAN_APPROVAL_SETUP_BOUNDARY = Object.freeze({
+  executionBoundary: "attended-external-terminal",
+  invocation: "user-copy-only",
+  codexToolCallPermitted: false,
+});
+
+/**
+ * Closed, copy-safe producer for first-machine PO key setup. This only renders
+ * the existing `setup` command; `runHumanApproval` remains the sole authority
+ * that validates and performs the operation.
+ */
+export function poHumanApprovalSetupCommand({
+  repoRoot, directory, humanName = null, keyReference = null,
+  existingKey = null, launcher = fileURLToPath(import.meta.url),
+} = {}) {
+  for (const [name, value] of Object.entries({ launcher, repoRoot, directory })) {
+    if (typeof value !== "string" || value.length === 0) throw new TypeError(`poHumanApprovalSetupCommand requires a non-empty ${name}`);
+  }
+  for (const [name, value] of Object.entries({ humanName, keyReference, existingKey })) {
+    if (value !== null && (typeof value !== "string" || value.length === 0)) throw new TypeError(`poHumanApprovalSetupCommand requires ${name} to be null or a non-empty string`);
+  }
+  const argv = [launcher, "setup", "--repo-root", repoRoot, "--directory", directory];
+  if (humanName !== null) argv.push("--human-name", humanName);
+  if (keyReference !== null) argv.push("--key-reference", keyReference);
+  if (existingKey !== null) argv.push("--existing-key", existingKey);
+  return boundedCopySafeCommand({ executable: "node", argv });
+}
+
+/** Independent, path-redacted readback for the setup producer. */
+export function readPoHumanApprovalAuthority({ repoRoot, directory } = {}) {
+  try {
+    const repository = realpathSync(resolve(repoRoot));
+    const external = externalDirectory(repository, resolve(directory), { create: false, source: "terminal action" });
+    const privateKey = artifactPath(external, "po-private.pem");
+    const publicKey = artifactPath(external, "po-public.pem");
+    const authorityPath = artifactPath(external, "trust-policy.json");
+    if (![privateKey, publicKey, authorityPath].every((path) => existsSync(path))) throw new Error("authority material incomplete");
+    const publicKeyPem = readFileSync(publicKey, "utf8");
+    const authority = JSON.parse(readFileSync(authorityPath, "utf8"));
+    if (!own(authority, ["keyReference", "publicKeySha256", "humanName"])
+      || !text(authority.humanName)
+      || authority.publicKeySha256 !== publicKeyPolicy(publicKeyPem, authority.keyReference).publicKeySha256) {
+      throw new Error("authority mismatch");
+    }
+    return {
+      status: "verified",
+      schema: "pipeline.po-human-authority-readback.v1",
+      code: "PO-HUMAN-AUTHORITY-READY",
+      digest: createHash("sha256").update(JSON.stringify(authority)).digest("hex"),
+    };
+  } catch {
+    return { status: "failed", schema: "pipeline.po-human-authority-readback.v1", code: "PO-HUMAN-AUTHORITY-UNAVAILABLE" };
+  }
+}
+
+/**
+ * NVA-W5-TTYSIGN (backlog/items/2026-08-29-signing-fails-without-a-tty-and-the-
+ * error-reads-as-a-wrong-passphrase.md): OpenSSL needs a controlling terminal to
+ * run its own interactive prompt during signing. Without one it fails with noise
+ * that a human reads as a rejected key rather than as "no terminal was attached" --
+ * a real ceremony failure observed live.
+ *
+ * NVA-CF-MINORPUSH-RETRY: `process.stdin.isTTY` answers a DIFFERENT question --
+ * whether THIS process's stdin descriptor is a terminal -- and is `false` for a
+ * redirected/piped stdin even while a real controlling terminal is attached and
+ * usable. OpenSSL's own interactive prompt does not read this process's stdin at
+ * all; it opens the controlling terminal directly (`/dev/tty` on POSIX), so that
+ * is the condition this function has to probe. `dependencies.isTTY` remains the
+ * injectable seam for tests (a boolean or a zero-arg function) and, when supplied,
+ * is honoured exactly as before -- unchanged for every existing caller. With
+ * neither supplied, this opens the controlling terminal itself
+ * (`dependencies.openControllingTty`, default: `openSync("/dev/tty", "r+")` on
+ * POSIX, `openSync("\\\\.\\CONIN$", "r+")` on native Windows -- backlog:
+ * 2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback.md;
+ * `dependencies.platform` overrides `process.platform` for tests) and asks
+ * `dependencies.isatty` (default: `node:tty`'s `isatty`) whether the
+ * resulting descriptor is a real terminal, closing it again immediately either
+ * way. Failing to open it (ENXIO/ENOENT/ENODEV -- no controlling terminal at
+ * all, e.g. a daemon, CI runner, or fully detached session) means false, not a
+ * thrown error.
+ */
+function controllingTtyPath(dependencies = {}) {
+  const platform = dependencies.platform ?? process.platform;
+  return platform === "win32" ? "\\\\.\\CONIN$" : "/dev/tty";
+}
+function isAttendedTerminal(dependencies = {}) {
+  if (typeof dependencies.isTTY === "function") return Boolean(dependencies.isTTY());
+  if (typeof dependencies.isTTY === "boolean") return dependencies.isTTY;
+  const openControllingTty = dependencies.openControllingTty ?? (() => openSync(controllingTtyPath(dependencies), "r+"));
+  const checkIsatty = dependencies.isatty ?? nodeIsatty;
+  let fd = null;
+  try {
+    fd = openControllingTty();
+    return Boolean(checkIsatty(fd));
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) {
+      try { closeSync(fd); } catch { /* already gone; nothing left to release */ }
+    }
+  }
+}
+
+/**
+ * The single signing step: hand the digest to the external OpenSSL prompt and
+ * record the resulting detached proof. No signer of this program's own, no key
+ * material read into this process, and the temporary intent/signature files are
+ * removed on every path.
+ */
+function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies, beforePrivateKey, beforePublish }) {
+  beforePrivateKey?.();
+  // TR-S1 (Ruling 78), defence in depth: the gate ran earlier in the verb, but a typed confirmation or a
+  // passphrase decision can sit between that check and this spawn, so the armor is checked once more
+  // immediately before the intent file is written and OpenSSL receives the key path.
+  assertPoPrivateKeyProtected(keys.privateKey, dependencies);
+  // pipeline.signing-requires-attended-terminal: fail closed BEFORE ever writing the
+  // intent file or spawning OpenSSL when the key about to sign will make OpenSSL run
+  // its own interactive prompt (NVA-SIGNONCE-1: exactly the passphrase-protected
+  // case) and this process has no controlling terminal to run that prompt on. An
+  // unprotected key never prompts, so it never needed a terminal and this check
+  // stays byte-for-byte inert for it -- unaffected, not merely unlikely to fire.
+  // Deliberately silent on what OpenSSL would have prompted for -- the point of this
+  // check is that the human never sees OpenSSL's own noise, which is what reads as a
+  // rejected key on a correct entry.
+  assertAttendedTerminalWhenPassphraseKey(keys, dependencies);
+  io.write(artifacts.intent, intentSha256, { mode: 0o600 });
+  // The signing spawn runs from the PO key directory (it already receives the key path there), never
+  // from the process's inherited working directory, which may be a repository.
+  try { runOpenssl(["pkeyutl", "-sign", "-rawin", "-inkey", keys.privateKey, "-in", artifacts.intent, "-out", artifacts.signature], dirname(keys.privateKey), dependencies); }
+  finally { rmSync(artifacts.intent, { force: true }); }
+  try {
+    const authority = json(keys.authority); const publicKey = io.read(keys.publicKey, "utf8");
+    // NVA-SIGDISCLOSE-1 Finding 3/4: two different questions, two different messages
+    // (mirrors the FIXTURE-2 split runHumanApproval's own "setup" branch already
+    // performs, below) -- is this the right key (identity: accept BOTH the pre-humanName
+    // legacy shape and the named shape, so a merely-missing humanName can never masquerade
+    // as a key mismatch), and separately, does this record simply predate --human-name
+    // (fixable by `setup --human-name`, not a key problem at all -- see GF-112).
+    const legacyShape = own(authority, ["keyReference", "publicKeySha256"]);
+    const namedShape = own(authority, ["keyReference", "publicKeySha256", "humanName"]);
+    if ((!legacyShape && !namedShape) || !text(authority.keyReference)
+      || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) {
+      fail("external trust policy does not match the local public key");
+    }
+    if (!namedShape || !text(authority.humanName)) {
+      fail('local PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
+    }
+    const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(io.read(artifacts.signature)).toString("base64") };
+    beforePublish?.();
+    io.write(artifacts.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
+    // SETUP-1: recorded on EVERY approval, independent of whether the project's trust
+    // policy restricts which key may sign -- "not restricted" must never become "not
+    // recorded". This is public data, same as `proof`, and shares its artifact lifecycle.
+    const signer = {
+      schema: "pipeline.po-approval-signer.v1", intentSha256,
+      keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256, humanName: authority.humanName,
+    };
+    io.write(artifacts.signer, `${JSON.stringify(signer, null, 2)}\n`, { mode: 0o600 });
+    return { proof, signer };
+  } finally { rmSync(artifacts.signature, { force: true }); }
+}
+
+let portableCriticExportProvider=null;
+let historicalFreshReviewProvider=null;
+
+function loadCriticSigningProvider(args) {
+  if(args.command!=="sign-intent" || !text(args.request) || !args.request.startsWith("scratch/")) return null;
+  let schema;
+  try {
+    const repository=realpathSync(resolve(args.repoRoot));
+    if(repository!==resolve(args.repoRoot)) return null;
+    const request=readDesignSigningFile(repository,args.request,{request:true,maxBytes:SIGNING_REVIEW_MAX_BYTES});
+    schema=JSON.parse(request.bytes.toString("utf8"))?.schema;
+  } catch { return null; }
+  // This physical public-request lookup selects an import only. The original
+  // signing body independently rereads and validates every request and authority.
+  if(schema==="pipeline.portable-critic-export-request.v1") {
+    return import("../lib/portable-critic-export.mjs").then(provider=>{
+      if(provider.PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA!==schema
+        || typeof provider.validatePortableCriticExportRequest!=="function") fail("PO-CRITIC-SIGN-PROVIDER-UNAVAILABLE");
+      portableCriticExportProvider=provider;
+    });
+  }
+  if(schema==="pipeline.historical-fresh-review-request.v1") {
+    return import("../lib/historical-fresh-review-admission.mjs").then(provider=>{
+      if(provider.HISTORICAL_FRESH_REVIEW_REQUEST_SCHEMA!==schema
+        || typeof provider.describeHistoricalFreshReviewApprovalRequest!=="function") fail("PO-CRITIC-SIGN-PROVIDER-UNAVAILABLE");
+      historicalFreshReviewProvider=provider;
+    });
+  }
+  return null;
+}
+
+export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
+  // R7-6-T11: not a ceremony command, so it never reaches parseHumanArgs (no --repo-root, no signing).
+  if (argv[0] === SET_PO_KEY_DIRECTORY_COMMAND) return runSetPoKeyDirectory(argv, dependencies);
+  const args =parseHumanArgs(argv, dependencies); if (args.error) failParse(args);
+  // Fail closed rather than fall through: the fork-disposition commands need an
+  // async fork inspection this synchronous entry point cannot perform, and they
+  // were rejected here (as unknown commands) before they existed.
+  if (FORK_DISPOSITION_COMMANDS.has(args.command)) fail("fork-disposition commands run through runForkDispositionApproval");
+  const provider=loadCriticSigningProvider(args);
+  // Only Critic requests are async, and loading finishes before the synchronous
+  // Source-owned ceremony starts; its real terminal/release protocol is unchanged.
+  return provider===null ? executeHumanApproval(args, dependencies)
+    : provider.then(()=>executeHumanApproval(args, dependencies));
+}
+
+/**
+ * Everything the command above does once its argv is parsed and accepted.
+ *
+ * Split out, and deliberately NOT exported, for exactly one reason:
+ * `runForkDispositionApproval` must still reach the single existing signing
+ * branch, and it can no longer do so by synthesizing the argv `approve-critical
+ * --kind governance-fork-disposition` — `parseHumanArgs` now refuses that, and
+ * must keep refusing it for every argv an operator can type. The alternatives
+ * were a second OpenSSL/confirmation path (two definitions of the ceremony) or
+ * an exported opt-out on the parser (the escape route again, one argument
+ * away). This split adds neither: every caller outside this module still enters
+ * through `runHumanApproval` and its parser.
+ */
+const poCeremonyOperations = new WeakMap();
+export function isOwnedPoHumanApprovalCeremonyOperation(handle,{repository}={}) {
+  const data=handle&&poCeremonyOperations.get(handle);
+  if(!data)return false;
+  try{return canonicalProofJson(data.repository)===canonicalProofJson(repository)
+    &&canonicalProofJson(inspectSignedDescriptorCustodyRepository(data.repository.primaryRoot))===canonicalProofJson(repository);}catch{return false;}
+}
+export function observePoHumanApprovalCeremonyOperation(handle) {
+  const data=handle&&poCeremonyOperations.get(handle);
+  if(!data||!isOwnedPoHumanApprovalCeremonyOperation(handle,{repository:data.repository}))fail("PO ceremony operation unavailable");
+  return Object.freeze({entry:"po-human-approval",inputSha256:data.inputSha256});
+}
+export function executeOwnedPoHumanApprovalCeremonyOperation(handle) {
+  const data=handle&&poCeremonyOperations.get(handle);
+  if(!data||data.executed||!isOwnedPoHumanApprovalCeremonyOperation(handle,{repository:data.repository}))fail("PO ceremony operation unavailable or replayed");
+  data.executed=true;
+  return executeHumanApprovalCore(data.args,data.dependencies);
+}
+function executeHumanApproval(args, dependencies = {}) {
+  // Preparations/readbacks create no human ceremony; -all delegates to its
+  // original individually parsed children, preserving one signing body.
+  if(!new Set(["setup","approve","approve-critical","authorize-critical","sign-intent"]).has(args.command)) {
+    return executeHumanApprovalCore(args,dependencies);
+  }
+  const repository=inspectSignedDescriptorCustodyRepository(resolve(args.repoRoot));
+  const handle=Object.freeze({});
+  poCeremonyOperations.set(handle,{repository,args,dependencies,executed:false,
+    inputSha256:createHash("sha256").update(canonicalProofJson({repository,command:args.command,args})).digest("hex")});
+  try{return runOwnedPoHumanApprovalCeremony({repository,sourceOperationHandle:handle});}
+  finally{poCeremonyOperations.delete(handle);}
+}
+
+function executeHumanApprovalCore(args, dependencies = {}) {
+  if (args.command.endsWith("-all")) {
+    const action = args.command.slice(0, -4);
+    const results = ["cyb-4", "cyb-5"].map((featureId) => runHumanApproval([
+      action,
+      "--repo-root", args.repoRoot,
+      "--directory", args.directory,
+      "--feature-id", featureId,
+    ], dependencies));
+    const candidates = results.map((result) => result.candidate ?? result.value?.candidate).filter(Boolean);
+    if (candidates.some((candidate) => candidate.commit !== candidates[0]?.commit || candidate.tree !== candidates[0]?.tree)) {
+      fail("all PO approval artifacts must bind the same candidate");
+    }
+    return {
+      ok: true,
+      code: `PO-HUMAN-${action.toUpperCase()}-ALL-READY`,
+      candidate: candidates[0] ?? null,
+      results,
+    };
+  }
+  const repository = resolve(args.repoRoot);
+  // R7-6-F (Spec 22.6, step (c)): for sign-intent the key directory is inspected BEFORE anything else
+  // looks inside it, so a value that names no directory or an unreadable directory ends as a typed
+  // result rather than as a generic refusal. Existence, readability and the PUBLIC key only.
+  let keyInspection = null;
+  if (args.command === "sign-intent") {
+    keyInspection = inspectKeyDirectory(resolve(args.directory), dependencies);
+    if (keyInspection.state === "missing" || keyInspection.state === "unreadable") {
+      throw readinessFailure(probeKeyDirectory({ repository, inspection: keyInspection, legacy: args.legacy === true, dependencies }).findings);
+    }
+  }
+  // NVA-BL-74: resolved once, before any branch, and passed to every
+  // requireExplicitConfirmation() call below -- a read-only, never-throwing lookup
+  // (English on any failure), so it cannot change which error a command reports or
+  // in what order.
+  const humanFacingLanguage = resolveHumanFacingLanguage(repository, dependencies);
+  // PO-KEYDIR-01: resolved once and reused by both fixes below -- fix (A)'s setup
+  // auto-persist target and fix (B)'s filename fingerprint segment.
+  const gitCommonDir = resolveGitCommonDir(repository, dependencies);
+  const directory = externalDirectory(repository, resolve(args.directory), {
+    create: args.command === "setup" || args.command === "prepare" || args.command === "prepare-critical" || args.command === "authorize-critical",
+    source: directorySourceLabel(args.directorySource),
+  });
+  const critical = args.command.endsWith("-critical");
+  if (critical && (args.command === "prepare-critical" || args.command === "authorize-critical") && !text(args.featureId)) fail("critical approval requires a feature id");
+  const featureId = args.featureId ?? "cyb-4";
+  if (!/^[a-z][a-z0-9-]{0,63}$/u.test(featureId)) fail("feature id is invalid");
+  const featureSuffix = critical ? `-critical-${args.kind}` : (featureId === "cyb-4" ? "" : `-${featureId}`);
+  // PO-KEYDIR-01(B) (backlog/items/2026-08-11-shared-external-po-signing-directory-
+  // lets-an-unrelated-project-overwrite-a-proof.md): every per-transaction artifact
+  // filename below carries this repository-fingerprint segment as an ADDITION to the
+  // suffix shape above, never a replacement of it -- two different repositories
+  // sharing one external directory can no longer collide. Reuses
+  // derivePoGateRepositoryFingerprint() exactly as it already exists
+  // (lib/po-gate-authority.mjs), never a second fingerprint scheme; only its first 12
+  // hex characters are used -- the full 64-char digest would make every filename
+  // unwieldy for no added disambiguation value here.
+  const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: gitCommonDir ?? repository, primaryRoot: repository }).slice(0, 12);
+  const suffix = `-${repositoryFingerprint}${featureSuffix}`;
+  const paths = {
+    request: artifactPath(directory, `request${suffix}.json`),
+    privateKey: artifactPath(directory, "po-private.pem"),
+    publicKey: artifactPath(directory, "po-public.pem"),
+    authority: artifactPath(directory, "trust-policy.json"),
+    proof: artifactPath(directory, `proof${suffix}.json`),
+    signature: artifactPath(directory, `signature${suffix}.bin`),
+    intent: artifactPath(directory, `intent${suffix}.txt`),
+    // SETUP-1: a companion record of WHO signed -- kept separate from `proof` itself,
+    // whose exact shape (PO_APPROVAL_PROOF_SCHEMA) is a contract shared by every verifier
+    // (threat-model, HGO, GMW, critical-action); adding a field there would make every
+    // proof this command produces unverifiable everywhere else.
+    signer: artifactPath(directory, `signer${suffix}.json`),
+  };
+  const write = dependencies.writeFile ?? writeFileSync; const read = dependencies.readFile ?? readFileSync; const exists = dependencies.exists ?? existsSync;
+  if (args.command === "setup") {
+    const present = { privateKey: exists(paths.privateKey), publicKey: exists(paths.publicKey), authority: exists(paths.authority) };
+    // NVA-CF-KEYBOOTSTRAP (backlog: pipeline.onboarding-has-no-happy-path-for-an-
+    // existing-signing-key.md): a third setup route alongside "generate a brand-new
+    // key" (below) and "reuse/recover key material already sitting at this exact
+    // --directory" (present.privateKey/publicKey above) -- register an
+    // ALREADY-EXISTING key file that lives somewhere else entirely (not yet known to
+    // this machine's --directory at all) as this machine's trust anchor, in one call,
+    // with no separate manual repair step. Checked FIRST, before any of the
+    // present-material branches below, and refuses outright the moment ANY key
+    // material already sits at this --directory: --existing-key imports into a
+    // BRAND-NEW directory only, exactly like fresh generation just below it never
+    // overwrites partial material either.
+    if (text(args.existingKey)) {
+      if (present.privateKey || present.publicKey || present.authority) {
+        fail("--existing-key only registers a key into a directory that has none yet; this --directory already carries key material -- pass a fresh --directory, or omit --existing-key to reuse/recover what is already here.");
+      }
+      if (!exists(args.existingKey)) {
+        fail(`--existing-key path does not exist: ${args.existingKey}`);
+      }
+      // TR-S1 (Rulings 75, 78, 91): the candidate key is read ONCE, and the bytes classified here are
+      // exactly the bytes copied below. An unreadable or unencrypted key is refused before the copy,
+      // the OpenSSL derivation and the authority record, so nothing is registered.
+      const importedKeyBytes = readPoPrivateKeyOrRefuse(read, args.existingKey);
+      refuseUnencryptedPoPrivateKey(importedKeyBytes);
+      if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
+      // Copy the private key bytes verbatim into the machine-plane directory (same
+      // final location fresh generation writes to) rather than leaving the original
+      // path as the source of truth -- every other command in this file (sign-intent,
+      // authorize-critical, ...) reads the key from `paths.privateKey` unconditionally,
+      // so a key that stayed only at its original path would silently stop working the
+      // moment that path moved or was cleaned up.
+      //
+      // TR-S1-F4: the copy is made only AFTER the key has been derived and validated from the
+      // original path, so a refused setup never leaves a private-key copy behind; any later failure
+      // removes every file this branch wrote (the directory held none, checked above).
+      try {
+        // Derive (and thereby VALIDATE -- an unparsable or corrupt key fails this
+        // command() call, exactly like every other openssl step in this file) the public
+        // key, mirroring the fresh-generation branch's own genpkey+pkey pair below.
+        runOpenssl(["pkey", "-in", args.existingKey, "-pubout", "-out", paths.publicKey], directory, dependencies);
+        write(paths.privateKey, importedKeyBytes, { mode: 0o600 });
+        const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
+        write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
+        persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
+        return {
+          ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, imported: true,
+          paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority },
+        };
+      } catch (error) {
+        for (const partial of [paths.privateKey, paths.publicKey, paths.authority]) rmSync(partial, { force: true });
+        throw error;
+      }
+    }
+    if (present.privateKey && present.publicKey && !present.authority) {
+      // No authority record exists yet -- there is nothing to read a name from, so this
+      // is exactly the same requirement fresh generation has below (FIXTURE-2).
+      if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
+      // TR-S1 (Ruling 78): recovering the key already sitting here registers it as the authority, so an
+      // unreadable or unencrypted key is refused before the authority record is built or written.
+      assertPoPrivateKeyProtected(paths.privateKey, dependencies);
+      const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
+      write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
+      persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
+      // NVA-CLI-FEEDBACK-1: state where the key material and authority record
+      // actually live -- an operator/agent that needs to hand a generated file
+      // to another process must not have to already know the fixed path
+      // convention (backlog/items/2026-08-09-critical-push-signing-ceremony-
+      // gives-no-path-feedback.md).
+      return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: true, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
+    }
+    if (present.privateKey && present.publicKey && present.authority) {
+      const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
+      // Two different questions, two different messages (FIXTURE-2): is this the right
+      // key (identity -- checked against BOTH the pre-humanName and the named shape), and
+      // separately, does this record simply predate --human-name (fixable by re-running
+      // setup, not a mismatch).
+      const legacyShape = own(authority, ["keyReference", "publicKeySha256"]);
+      const namedShape = own(authority, ["keyReference", "publicKeySha256", "humanName"]);
+      if ((!legacyShape && !namedShape) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) {
+        fail("existing trust policy does not match the local public key");
+      }
+      if (!namedShape || !text(authority.humanName)) {
+        if (!text(args.humanName)) {
+          fail('existing PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
+        }
+        if (args.keyReferenceSupplied && args.keyReference !== authority.keyReference) {
+          fail("a PO authority record already exists under a different name/key-reference than supplied; changing an established identity is not something setup does silently -- rerun without --human-name/--key-reference to keep the existing record, or remove the existing authority files first if a deliberate rebind is intended.");
+        }
+        const upgraded = localAuthority(publicKey, authority.keyReference, args.humanName);
+        write(paths.authority, `${JSON.stringify(upgraded, null, 2)}\n`, { mode: 0o600 });
+        persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
+        // NVA-CLI-FEEDBACK-1: see the recovery branch above for rationale.
+        return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority: upgraded, recovered: true, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
+      }
+      // GF-104: a named record already exists. Explicit --human-name/--key-reference
+      // values that differ from it are a deliberate identity change this command does
+      // not make silently -- fail loudly instead of quietly keeping the old values and
+      // reporting the unqualified success this used to return. Values the caller never
+      // supplied (including keyReference's own default) are never compared: an
+      // unqualified `setup` re-run against an existing record stays idempotent, exactly
+      // as before.
+      const humanNameMismatch = text(args.humanName) && args.humanName !== authority.humanName;
+      const keyReferenceMismatch = args.keyReferenceSupplied && args.keyReference !== authority.keyReference;
+      if (humanNameMismatch || keyReferenceMismatch) {
+        fail("a PO authority record already exists under a different name/key-reference than supplied; changing an established identity is not something setup does silently -- rerun without --human-name/--key-reference to keep the existing record, or remove the existing authority files first if a deliberate rebind is intended.");
+      }
+      persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
+      // NVA-CLI-FEEDBACK-1: idempotent re-run -- nothing new was written this call,
+      // but the operator/agent still needs to know where the existing key material
+      // and authority record live, so the paths are reported here too.
+      return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
+    }
+    if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
+    if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
+    runOpenssl(["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], directory, dependencies);
+    runOpenssl(["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], directory, dependencies);
+    const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
+    // Privacy-hygiene nudge (H-AC-11 O-4): fires only on this fresh-key-creation
+    // branch and only when the operator chose a non-default --key-reference; the
+    // GMW/human-ledger design cannot fully decouple this key reference from the
+    // portable record, so a value that uniquely identifies the operator as a
+    // natural person is a real, proven privacy concern here. Advisory only; it
+    // never blocks, fails, or alters the returned result object.
+    if (args.keyReference !== "local-po-key") {
+      process.stdout.write(`NOTE: --key-reference "${args.keyReference}" may uniquely identify you as a natural person; consider a less individually-attributable value (H-AC-11 O-4).\n`);
+    }
+    persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
+    return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
+  }
+  if (args.command === "authorize-critical") {
+    // Fail closed on missing key material before anything is written or observed:
+    // there is no point preparing a request this terminal could not sign.
+    if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before authorize-critical");
+    // TR-S1 (Ruling 78): refuse an unreadable or unencrypted key before the request is built or written.
+    assertPoPrivateKeyProtected(paths.privateKey, dependencies);
+    const { request, subjectPreimage } = criticalApprovalRequest({ args, repository, featureId, dependencies });
+    // Written before the prompt, and only ever the request built above: any file
+    // already sitting at this path is overwritten, never read, so a stale request
+    // has no path to a signature.
+    write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+    const intentSha256 = request.approvalIntent.sha256;
+    requireExplicitConfirmation([
+      `action kind: ${request.action.kind}`,
+      `candidate commit: ${request.candidate.commit}`,
+      `candidate tree: ${request.candidate.tree}`,
+      `action subject sha256: ${request.action.subjectSha256} (the exact destination/subject this approval is bound to)`,
+      `action expires at: ${request.action.expiresAt}`,
+      `feature id: ${featureId}`,
+      `approval intent sha256: ${intentSha256}`,
+      ...releasePreflightConfirmationLines(request.action.kind, subjectPreimage),
+      ...interruptionPromotionConfirmationLines(request.action.kind, subjectPreimage),
+      "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
+    ], dependencies, humanFacingLanguage);
+    const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
+    // The human terminal owns durable external artifacts. For pushes, the next
+    // agent-side `approve-push` consumes a repository-local mirror instead, so
+    // its rendered command cannot disclose this host's private key location.
+    const resultPaths = args.kind === "push"
+      ? mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, paths, { write, read })
+      : { request: paths.request, proof: paths.proof, signer: paths.signer };
+    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: resultPaths };
+  }
+  if (args.command === "prepare" || args.command === "prepare-critical") {
+    if (critical) {
+      const { request } = criticalApprovalRequest({ args, repository, featureId, dependencies });
+      write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+      // NVA-CLI-FEEDBACK-1: state the path this call just wrote.
+      return { ok: true, code: "PO-HUMAN-CRITICAL-REQUEST-READY", candidate: request.candidate, intentSha256: request.approvalIntent.sha256, action: request.action, paths: { request: paths.request } };
+    }
+    const result = runApprovalRequest(["prepare", "--repo-root", repository, "--feature-id", featureId, "--plan", args.plan ?? "specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md", "--spec", args.spec ?? "specs/2026-07-24-sprint-cyborg-epic/spec.md", "--model", args.model ?? `specs/${featureId}/threat-model.json`]);
+    write(paths.request, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
+    // NVA-CLI-FEEDBACK-1: state the path this call just wrote.
+    return { ok: true, code: "PO-HUMAN-REQUEST-READY", candidate: result.value.candidate, intentSha256: result.value.approvalIntent.sha256, paths: { request: paths.request } };
+  }
+  if (args.command === "sign-intent") {
+    if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before sign-intent");
+    // NVA-SWEEP-F2 (backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-
+    // after-the-po-signs.md, Triage confirmation 2026-08-18, direction b): `--request`
+    // reads the digest directly out of a JSON file the PO already has local filesystem
+    // access to -- this repository's own `scratch/` tree -- instead of requiring the
+    // agent to relay a bare `--intent-sha256` string another way. `parseHumanArgs`
+    // already guarantees exactly one of `--intent-sha256`/`--request` was supplied.
+    // Everything below (disclosure, confirmation, signing) is unchanged and driven by
+    // the SAME `intentSha256` local either way -- `--request` only changes where that
+    // value comes from and, further below, adds a second write target for the result.
+    const progress = dependencies.stderrWriteFn ?? (value => process.stderr.write(value));
+    progress("Preparing signing request...\n");
+    assertSigningReadyBeforePrompt({ repository, inspection: keyInspection, legacy: args.legacy === true, keys: paths, dependencies });
+    let scratchProofPath = null; let scratchSignerPath = null; let scratchRequestRecord = null; let scratchRequestSha256 = null;
+    let portableRequestPath = null; let designSigningObservation = null;
+    if (text(args.request)) {
+      const requestPath = resolve(repository, args.request);
+      // NVA-SWEEP-F2f-REWORK (Critic finding 1): canonicalize both the repository root
+      // and the request path with realpathSync BEFORE computing repoScratchRelativePath,
+      // mirroring externalDirectory()'s own pattern -- so a symlink planted AT the
+      // --request path itself, pointing outside scratch/, is caught by the scratch-
+      // membership check below instead of silently followed. A request path that does
+      // not exist yet cannot be canonicalized; that is the ordinary "not written yet"
+      // case, not a security failure, so it falls through to the pre-existing "--request
+      // could not be read" message rather than a raw exception.
+      let canonicalRepository; let canonicalRequestPath;
+      try { canonicalRepository = realpathSync(repository); } catch { fail("--request could not be read"); }
+      try { canonicalRequestPath = realpathSync(requestPath); } catch { fail("--request could not be read"); }
+      const scratchRel = repoScratchRelativePath(canonicalRepository, canonicalRequestPath);
+      if (scratchRel === null) fail("--request must be a path inside this repository's own scratch/ directory");
+      portableRequestPath = canonicalRequestPath;
+      let raw;
+      const designRequestName = /^scratch\/design-approval-request-[a-f0-9]{64}\.json$/u.test(scratchRel);
+      try { raw = designRequestName ? readDesignSigningFile(canonicalRepository, scratchRel, { request: true }).bytes.toString("utf8") : read(canonicalRequestPath, "utf8"); } catch { fail("--request could not be read"); }
+      let record;
+      try { record = JSON.parse(raw); } catch { fail("--request must contain valid JSON"); }
+      if (record?.schema === DESIGN_APPROVAL_REQUEST_SCHEMA || designRequestName) {
+        designSigningObservation = observeDesignApprovalSigningRequest(record, record?.approvalIntent?.sha256, repository);
+        if (designSigningObservation === null || requestPath !== canonicalRequestPath || resolve(canonicalRepository, designSigningObservation.requestPath) !== canonicalRequestPath) fail("DAB-SIGN-REQUEST-INVALID: the design approval request does not bind its actual current sources, receipts, candidate and exact intent");
+        args.intentSha256 = record.approvalIntent.sha256;
+      } else if (record?.schema === SIGNED_QUALITY_PACKAGE_SCHEMA) {
+        if (requestPath !== canonicalRequestPath || !physicalQualityPackageFile(canonicalRequestPath, canonicalRepository, 16 * 1024 * 1024)) fail("QUALITY-PACKAGE-SIGN-REQUEST-CUSTODY: the package request must be an actual canonical single-link in-repository file");
+        if (!SHA.test(record.intentSha256 ?? "")) fail("QUALITY-PACKAGE-SIGN-REQUEST-DIGEST: the package request must carry its exact intent digest");
+        args.intentSha256 = record.intentSha256;
+      } else if (record?.schema === DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA) {
+        // The canonical closed DWP request has four keys; its digest belongs
+        // to approvalIntent. Never add a top-level alias or fall through to a
+        // generic digest when the nested transport is malformed. The unchanged
+        // default package validator below still rebinds every source before
+        // disclosure, human confirmation, key access and signing.
+        if (!SHA.test(record.approvalIntent?.sha256 ?? "")) fail("--request design-workflow JSON must carry approvalIntent.sha256 (64 lowercase hexadecimal characters)");
+        args.intentSha256 = record.approvalIntent.sha256;
+      } else if (record?.schema === ADOPTION_APPROVAL_REQUEST_SCHEMA) {
+        // ADOPT-SIGN-F: an adoption request carries its digest at intent.sha256 (no top-level
+        // intentSha256 alias exists). Whether that digest binds the subject is judged below, by
+        // describeAdoptionApprovalRequest(), before any confirmation or signing.
+        if (!SHA.test(record.intent?.sha256 ?? "")) fail("--request adoption JSON must carry intent.sha256 (64 lowercase hexadecimal characters)");
+        args.intentSha256 = record.intent.sha256;
+      } else {
+        if (!SHA.test(record?.intentSha256 ?? "")) fail("--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)");
+        args.intentSha256 = record.intentSha256;
+      }
+      scratchRequestRecord = record; scratchRequestSha256 = designSigningHash(Buffer.from(raw, "utf8"));
+      scratchProofPath = scratchSiblingPath(canonicalRequestPath, "proof");
+      scratchSignerPath = scratchSiblingPath(canonicalRequestPath, "signer");
+      if (scratchProofPath === null || scratchSignerPath === null) {
+        fail('--request file name must contain "request" so sibling proof/signer paths can be derived (e.g. reconcile-request-<id>.json)');
+      }
+    }
+    const intentSha256 = args.intentSha256;
+    const revalidateDesignSigning = designSigningObservation === null ? undefined : () => {
+      const current = observeDesignApprovalSigningRequest(scratchRequestRecord, intentSha256, repository);
+      if (current === null || current.snapshotSha256 !== designSigningObservation.snapshotSha256) fail("DAB-SIGN-REQUEST-DRIFT: request, source, receipt, candidate, mode or public policy changed during signing");
+    };
+    // The human is not asked to authorize a bare digest (ADR-0061 Decision 4): the
+    // request recorded behind it is resolved and its own recorded reason, scope and
+    // expiry are shown. Everything displayed is READ from that record and bounded by
+    // it (see describeGuardMaintenanceWindowRequest); nothing here composes a guess
+    // about what the action "probably" is. When no record resolves — a digest prepared
+    // by another mechanism, in another repository, or a record that no longer
+    // re-derives to this digest — the command says exactly that and shows nothing else.
+    // The signature covers the digest either way; the summary is disclosure, never
+    // authority.
+    //
+    // NVA-SIGENTRY-1: GMW is tried first -- the pre-existing, cheaper, common-case
+    // resolver -- and an HGO signature-mode selection is tried only when GMW itself
+    // does not resolve, closing the same blind-signature gap for the HGO ceremony
+    // specifically (backlog/items/2026-08-08-the-signing-ceremony-is-designed-for-the-
+    // verifier-not-the-signer.md finding 7). Both resolvers share the identical
+    // never-fabricate contract, so trying a second one after the first fails closed
+    // only WIDENS what can be disclosed, never what gets signed; when both fail closed
+    // the honest fallback below is unchanged.
+    // Validate the actual signing prerequisites before any disclosure resolver work.
+    // Request validation and the attended-terminal precondition remain unchanged.
+    const describeGmw = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
+    const describeHgo = dependencies.describeHgoIntentRecord ?? describeHumanGuardOverrideSelection;
+    let record = null, portableAgyAuthorship = null, portableCriticExport = null;
+    const requestSchema = scratchRequestRecord?.schema;
+    let invalidRequest = null;
+    switch (requestSchema) {
+      case "pipeline.human-guard-override-signature-digest.v1":
+        record = describeHumanGuardOverrideSignatureRequest(scratchRequestRecord, {rootDir: repository, pluginRoot: PLUGIN_ROOT, scriptPath: SCRIPT});
+        invalidRequest = "HGO-SIGN-REQUEST-INVALID: the exact original indexed request, plan, selection and intent must validate before signing"; break;
+      case SIGNED_QUALITY_PACKAGE_SCHEMA:
+        record = describeSignedQualityPackageIntent(scratchRequestRecord, intentSha256);
+        invalidRequest = "QUALITY-PACKAGE-SIGN-REQUEST-INVALID: exact package digest, changed paths and bounded disclosure must validate before signing"; break;
+      case DESIGN_APPROVAL_REQUEST_SCHEMA:
+        record = designSigningObservation?.description ?? null;
+        invalidRequest = "DAB-SIGN-REQUEST-INVALID: the actual design request does not bind its current intent"; break;
+      case BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA:
+        record = describeBootstrapAcknowledgementRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the bootstrap acknowledgement request does not bind its exact action and intent digest"; break;
+      case PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA:
+        record = portableAgyAuthorship = describePortableAgyAuthorshipRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the portable Agy authorship request does not bind its exact subject and intent digest"; break;
+      case "pipeline.portable-critic-export-request.v1":
+        record = portableCriticExport = describePortableCriticExportRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the portable Critic export request does not bind its exact subject and intent digest"; break;
+      case "pipeline.organization-architecture-config-request.v1":
+        record = describeArchitectureInheritedSourcesRequest(scratchRequestRecord, intentSha256, repository);
+        invalidRequest = "the inherited architecture-source request does not bind its exact registry and intent digest"; break;
+      case MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA:
+        record = describeModelFamilyApprovalRequest(scratchRequestRecord, { rootDir: repository });
+        invalidRequest = "the model-family request does not bind the current candidate, exact v1 predecessor, complete mapping, and adapter-contract bytes"; break;
+      case ADOPTION_APPROVAL_REQUEST_SCHEMA:
+        record = describeAdoptionApprovalRequest(scratchRequestRecord, intentSha256);
+        invalidRequest = "the adoption approval request does not bind its exact subject and intent digest"; break;
+      case "pipeline.historical-fresh-review-request.v1":
+        record = historicalFreshReviewProvider?.describeHistoricalFreshReviewApprovalRequest(scratchRequestRecord, intentSha256, repository) ?? null;
+        invalidRequest = "historical fresh-review request does not bind the actual immutable inventory, exact current target and preparation-only purpose"; break;
+      case DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA:
+        fail("PO-HUMAN-REQUEST-RETIRED: use the current source-owned design approval request"); break;
+      default:
+        if (scratchRequestRecord !== null) record = { resolved: false, code: "PO-HUMAN-REQUEST-UNSUPPORTED", lines: [] };
+        else {
+          record = describeGmw({ rootDir: repository, intentSha256 });
+          if (!record.resolved) record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });
+        }
+    }
+    if (invalidRequest !== null && (record === null || record.resolved !== true)) fail(invalidRequest);
+    if (portableAgyAuthorship !== null) {
+      const checkPortable = dependencies.checkPortableAgyAuthorshipRequest
+        ?? checkPortableAgyAuthorshipRequestOnHost;
+      if (checkPortable({ repository, requestPath: portableRequestPath,
+        taskId: scratchRequestRecord.subject.taskId, intentSha256 }) !== true) {
+        fail("the portable Agy authorship request is not bound to a current local host and Critic PASS");
+      }
+    }
+    if (portableCriticExport !== null) {
+      const checkPortable = dependencies.checkPortableCriticExportRequest
+        ?? checkPortableCriticExportRequestOnHost;
+      if (checkPortable({ repository, requestPath: portableRequestPath,
+        packetId: scratchRequestRecord.subject.producer.packetId,
+        intentSha256 }) !== true) {
+        fail("the portable Critic export request is not bound to a current consumed private Critic review");
+      }
+    }
+    const materialArtifact = scratchRequestRecord !== null && record.resolved === true
+      ? publishSigningReviewMaterial(repository, portableRequestPath, scratchRequestSha256, intentSha256, record)
+      : record.materialArtifact ?? null;
+    const revalidateSigningDisclosure = () => {
+      revalidateDesignSigning?.();
+      if (requestSchema === "pipeline.human-guard-override-signature-digest.v1") {
+        const current = describeHumanGuardOverrideSignatureRequest(scratchRequestRecord, {rootDir: repository, pluginRoot: PLUGIN_ROOT, scriptPath: SCRIPT});
+        if (current === null || canonicalJson(current.requestBinding) !== canonicalJson(record.requestBinding)
+          || canonicalJson(current.materialArtifact) !== canonicalJson(record.materialArtifact)) fail("HGO-SIGN-REQUEST-DRIFT: the original indexed binding or physical plan changed during signing");
+      }
+      if (scratchRequestRecord !== null && record.resolved === true) {
+        const requestRelative = repoScratchRelativePath(repository, portableRequestPath);
+        if (readDesignSigningFile(repository, requestRelative, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES }).sha256 !== scratchRequestSha256
+          || readDesignSigningFile(repository, materialArtifact.path, { request: true, maxBytes: SIGNING_REVIEW_MAX_BYTES }).sha256 !== materialArtifact.sha256) fail("PO-SIGN-REVIEW-DRIFT");
+      }
+    };
+    const disclosureLines = compactSigningDisclosure({ intentSha256, record, materialArtifact });
+    // NVA-SIGNONCE-1: one human decision, not two. When the private key about to
+    // sign is passphrase-protected, entering that passphrase at the OpenSSL
+    // prompt below IS the deliberate human act, so the typed confirmation this
+    // command otherwise requires is skipped -- but the disclosure itself (what is
+    // being signed, and the recorded reason/scope/expiry when known) is composed
+    // and printed either way, unconditionally, before OpenSSL ever runs. For a
+    // key with no passphrase this stays byte-for-byte what it was before: the
+    // confirmation remains the only human gate in that case, and removing it too
+    // would leave none.
+    revalidateSigningDisclosure();
+    if (isPrivateKeyPassphraseProtected(paths.privateKey, dependencies)) {
+      printDisclosureOnly(disclosureLines, humanFacingLanguage);
+    } else {
+      requireExplicitConfirmation(disclosureLines, dependencies, humanFacingLanguage);
+    }
+    // A shared external key directory is normal: it must never make one
+    // ceremony overwrite the proof returned by an earlier ceremony.  The
+    // digest is already the signed identity, so use it in every authoritative
+    // artifact name.  `intent` and `signature` remain short-lived, whereas
+    // proof and signer are durable, independently consumable records.
+    const manual = {
+      intent: artifactPath(directory, `intent-${intentSha256}.txt`),
+      signature: artifactPath(directory, `signature-${intentSha256}.bin`),
+      proof: artifactPath(directory, `proof-${intentSha256}.json`),
+      signer: artifactPath(directory, `signer-${intentSha256}.json`),
+    };
+    const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: manual, io: { write, read }, dependencies, beforePrivateKey: revalidateSigningDisclosure, beforePublish: revalidateSigningDisclosure });
+    revalidateSigningDisclosure();
+    // NVA-SWEEP-F2: this is the "write the proof" half -- the durable proof written to
+    // the external `--directory` above is UNCHANGED (still the artifact every other
+    // verifier reads), and this is an ADDITIONAL mirror into the same repo-root
+    // scratch/ location `--request` was read from, so the requesting agent session
+    // finds the proof waiting in its OWN root on its next turn with no PO-run `cp`
+    // step in between.
+    if (scratchProofPath !== null) {
+      // NVA-SWEEP-F2f-REWORK (Critic finding 1): the same symlink/hardlink/regular-file
+      // hardening artifactPath() applies to every OTHER write target of this command,
+      // applied here immediately before each scratch/ mirror write -- refuses rather than
+      // following a symlink or overwriting a hardlinked file planted at either derived path.
+      assertUnlinkedRegularFileOrAbsent(scratchProofPath, "scratch mirror artifacts must be unlinked regular files inside this repository's own scratch/ directory");
+      write(scratchProofPath, `${JSON.stringify(signed.proof, null, 2)}\n`, { mode: 0o600 });
+      assertUnlinkedRegularFileOrAbsent(scratchSignerPath, "scratch mirror artifacts must be unlinked regular files inside this repository's own scratch/ directory");
+      write(scratchSignerPath, `${JSON.stringify(signed.signer, null, 2)}\n`, { mode: 0o600 });
+    }
+    // NVA-CLI-FEEDBACK-1: state the paths this call just wrote -- the external
+    // intent-specific proof/signer (durable, read by every verifier) and, when --request
+    // was used, the additional repo-scratch mirror. The pre-existing top-level
+    // scratchProofPath/scratchSignerPath fields are kept unchanged for callers
+    // that already read them; `paths` is purely additive.
+    return {
+      ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256, signer: signed.signer,
+      paths: {
+        proof: manual.proof,
+        signer: manual.signer,
+        ...(scratchProofPath !== null ? { scratchProofPath, scratchSignerPath } : {}),
+      },
+      ...(scratchProofPath !== null ? { scratchProofPath, scratchSignerPath } : {}),
+    };
+  }
+  if (!exists(paths.request) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup and prepare before approving");
+  const request = approvalRequestFromExternalJson(json(paths.request));
+  const intentSha256 = request?.approvalIntent?.sha256;
+  if (!SHA.test(intentSha256 ?? "")) fail("request has no valid approval intent");
+  if (args.command === "approve" || args.command === "approve-critical") {
+    if (!exists(paths.privateKey)) fail("private key is unavailable");
+    // TR-S1 (Ruling 78): refuse an unreadable or unencrypted key before the confirmation prompt.
+    assertPoPrivateKeyProtected(paths.privateKey, dependencies);
+    const kind = critical ? request?.action?.kind : request?.approvalIntent?.value?.kind;
+    const summary = [`kind: ${kind}`, `intent sha256: ${intentSha256}`, `candidate commit: ${request?.candidate?.commit}`];
+    if (critical) {
+      summary.push(`action subject sha256: ${request?.action?.subjectSha256}`);
+      summary.push(`action expires at: ${request?.action?.expiresAt}`);
+    }
+    requireExplicitConfirmation(summary, dependencies, humanFacingLanguage);
+    const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
+    // NVA-CLI-FEEDBACK-1: state the paths this call just wrote (proof/signer
+    // survive; intent/signature are removed by signIntentIntoProof).
+    return { ok: true, code: "PO-HUMAN-PROOF-READY", intentSha256, signer: signed.signer, paths: { proof: paths.proof, signer: paths.signer } };
+  }
+  if (!exists(paths.proof)) fail("run approve before verify");
+  const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
+  if (request?.candidate?.commit !== candidate.commit || request?.candidate?.tree !== candidate.tree) fail("proof request is not bound to the current clean candidate");
+  // The shared trustPolicy contract (verifyPoApprovalProof et al.) checks an EXACT
+  // {keyReference, publicKeySha256} shape; the LOCAL authority record additionally
+  // carries `humanName` (SETUP-1). Only the two key-identity fields travel into
+  // verification -- the same split signIntentIntoProof already keeps between the local
+  // authority record and the shared proof/trustPolicy contract.
+  const localAuthorityRecord = json(paths.authority);
+  const trustPolicy = { keyReference: localAuthorityRecord.keyReference, publicKeySha256: localAuthorityRecord.publicKeySha256 };
+  const verified = critical
+    ? verifyCriticalActionApprovalRequest({ request, trustPolicy, proof: json(paths.proof), expectedCandidate: candidate, expectedAction: request.action })
+    : verifyThreatModelApprovalRequest({ request, trustPolicy, proof: json(paths.proof) });
+  return { ok: true, value: verified };
+}
+
+/**
+ * The subject of a fork disposition, rebuilt from the fork that ACTUALLY
+ * exists right now — never from anything the operator typed. The only caller
+ * inputs are the three coordinates that locate the fork; the conflicting
+ * entries' content digests, the derived candidate and the signed digest all
+ * come from `inspectForkedGovernanceStream` and
+ * `governanceForkDispositionApprovalSubject`, i.e. from the exact two exports
+ * the store itself uses at verification time. Recomputing either here would be
+ * a second definition of the binding, which is the duplication class this
+ * neighbourhood has already paid for once.
+ */
+async function forkDispositionSubject(args, repository, sequence) {
+  const inspection = await inspectForkedGovernanceStream({
+    repositoryRoot: repository,
+    repositoryFingerprint: args.repositoryFingerprint,
+    streamId: args.streamId,
+  });
+  const fork = inspection.forks.find((entry) => entry.sequence === sequence);
+  if (!fork) fail(`stream ${args.streamId} has no forked position at sequence ${sequence}`);
+  const subject = governanceForkDispositionApprovalSubject({
+    repositoryFingerprint: inspection.repositoryFingerprint,
+    streamId: args.streamId,
+    sequence,
+    forkedEventDigests: fork.entries.map((entry) => entry.eventDigest),
+  });
+  return { ...subject, acknowledgedEventIds: fork.entries.map((entry) => entry.eventId) };
+}
+
+/**
+ * The fork-disposition half of the ceremony (ADR-0072), split from
+ * `runHumanApproval` because inspecting the fork is asynchronous and because
+ * nothing about the `push`/`deploy`/`publication` branches may change to
+ * accommodate it.
+ *
+ * `prepare-fork-disposition` is agent work and writes only public bytes;
+ * `approve-fork-disposition` re-checks the prepared request against the fork
+ * as it stands NOW and then hands the signing itself to the untouched
+ * `approve-critical` branch, so there is exactly one OpenSSL/confirmation path
+ * in this file; `verify-fork-disposition` is public readback that predicts the
+ * store's own decision by rebuilding the subject the same way and verifying
+ * against the SAME anchor the store will use — the repository's declared
+ * `project/critical-human-proof.json` trustAnchor, never the external
+ * directory's `trust-policy.json`, which is the signer's own claim about its
+ * own key.
+ */
+export async function runForkDispositionApproval(argv = process.argv.slice(2), dependencies = {}) {
+  const args = parseHumanArgs(argv, dependencies); if (args.error) failParse(args);
+  if (!FORK_DISPOSITION_COMMANDS.has(args.command)) fail(USAGE);
+  const repository = resolve(args.repoRoot);
+  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "prepare-fork-disposition" });
+  // PO-KEYDIR-01(B): every per-transaction artifact filename this command writes must
+  // carry the same repository-fingerprint segment executeHumanApproval() computes for
+  // the SAME repoRoot/directory/kind -- approve-fork-disposition delegates signing into
+  // that shared function (below), which independently derives this exact fingerprint
+  // for the paths it looks up; a mismatch here means prepare/verify write and read one
+  // filename while approve looks for another, silently reporting "run setup and prepare
+  // before approving" even though prepare just ran.
+  const gitCommonDir = resolveGitCommonDir(repository, dependencies);
+  const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: gitCommonDir ?? repository, primaryRoot: repository }).slice(0, 12);
+  const suffix = `-${repositoryFingerprint}-critical-${GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind}`;
+  const paths = {
+    request: artifactPath(directory, `request${suffix}.json`),
+    authority: artifactPath(directory, "trust-policy.json"),
+    proof: artifactPath(directory, `proof${suffix}.json`),
+  };
+  const write = dependencies.writeFile ?? writeFileSync; const exists = dependencies.exists ?? existsSync;
+  const sequence = Number(args.sequence);
+  const subject = await forkDispositionSubject(args, repository, sequence);
+  if (args.command === "prepare-fork-disposition") {
+    const request = createCriticalActionApprovalRequest({
+      candidate: subject.candidate,
+      featureId: GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId,
+      // The fixed LABEL bytes, never a repository file: a disposition is a
+      // store-level governance act with no sprint plan/spec of its own, and the
+      // signer must be able to rebuild these offline with no repository I/O.
+      planBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.planLabel, "utf8"),
+      specBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.specLabel, "utf8"),
+      action: { kind: GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind, subjectSha256: subject.subjectSha256, expiresAt: args.expiresAt },
+    });
+    write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+    return {
+      ok: true,
+      code: "PO-HUMAN-FORK-DISPOSITION-REQUEST-READY",
+      candidate: request.candidate,
+      subjectSha256: subject.subjectSha256,
+      intentSha256: request.approvalIntent.sha256,
+      action: request.action,
+      forkedEventDigests: [...subject.subject.forkedEventDigests],
+      acknowledgedEventIds: [...subject.acknowledgedEventIds],
+    };
+  }
+  if (!exists(paths.request)) fail("run prepare-fork-disposition first");
+  const request = json(paths.request);
+  if (request?.action?.kind !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind || request?.action?.subjectSha256 !== subject.subjectSha256) {
+    fail("the prepared request does not bind the conflicting entries that exist at this sequence now; prepare it again");
+  }
+  // F2 fix (Critic round 3): pin the same three authority fields
+  // `verify-fork-disposition` checks further below, but HERE, before
+  // `approve-fork-disposition` delegates into a real OpenSSL signing
+  // operation. Without this, a prepared request with correct
+  // `action.kind`/`action.subjectSha256` but a tampered `approvalIntent.value`
+  // field would still reach signing -- wasting a real signature on a request
+  // that the store's own write-time check (`authorizeForkDisposition`) would
+  // later refuse to persist anyway, since it pins these same fields.
+  {
+    const pinnedIntent = request?.approvalIntent?.value;
+    if (pinnedIntent?.featureId !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId
+      || pinnedIntent?.planSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.planSha256
+      || pinnedIntent?.specSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.specSha256) {
+      fail("the prepared request was not issued for the fork-disposition authority");
+    }
+  }
+  if (args.command === "approve-fork-disposition") {
+    // Deliberately the EXISTING critical signing branch, unchanged: same
+    // confirmation gate, same OpenSSL invocation, same artifact names, same
+    // proof shape. Entered with the parsed form of the `approve-critical`
+    // invocation this used to spell as argv, because that argv is now correctly
+    // refused: `--kind governance-fork-disposition` on the `-critical` trio was
+    // itself an escape route (an unverifiable request written over this
+    // command's own artifact). The values below are the ones that argv produced.
+    return executeHumanApproval({
+      command: "approve-critical",
+      keyReference: args.keyReference,
+      repoRoot: args.repoRoot,
+      directory: args.directory,
+      kind: GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind,
+    }, dependencies);
+  }
+  if (!exists(paths.authority) || !exists(paths.proof)) fail("run approve-fork-disposition before verifying");
+  const policy = readCriticalHumanProofPolicy(repository);
+  if (!policy.ok) fail("project/critical-human-proof.json declares no usable trustAnchor, so the store can verify no external approval");
+  // RW1-TRUSTANCHOR: this used to read the legacy SINGULAR `policy.trustAnchor` field
+  // only, which is permanently `null` once `critical-human-proof.json` carries the v3
+  // `trustAnchors` SET (critical-human-proof-policy.mjs) -- every v3 policy made this
+  // command fail closed regardless of what it actually declares. Mirrors the resolution
+  // `guard-maintenance-window.mjs` (NVA-GMWFIX-1/2) established for this exact class of
+  // ceremony: a NON-EMPTY v3 set wins; an absent OR EMPTY v3 set falls through to the
+  // legacy singular field; and, unlike the general "any well-formed key may sign"
+  // default posture `trustAnchorsFor`/push/deploy/release-preflight use for an absent
+  // set, fork-disposition deliberately does NOT adopt that posture here -- "the
+  // fork-disposition commands refuse every self-minting shortcut"
+  // (po-human-approval.test.mjs) requires an undeclared key to stay unverifiable, since
+  // this ceremony resolves conflicting governance-ledger content and must never become
+  // self-serviceable by an agent holding no PO key at all. `governance-event-store.mjs`'s
+  // `authorizeForkDisposition` -- the store's own write-time check this command predicts
+  // (see this function's doc comment) -- carries the identical fix for the identical
+  // reason.
+  const anchors = Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0
+    ? policy.trustAnchors
+    : (policy.trustAnchor !== null ? [policy.trustAnchor] : []);
+  if (anchors.length === 0) fail("project/critical-human-proof.json declares no usable trustAnchor, so the store can verify no external approval");
+  const intent = request?.approvalIntent?.value;
+  if (intent?.featureId !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId
+    || intent?.planSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.planSha256
+    || intent?.specSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.specSha256) {
+    fail("the prepared request was not issued for the fork-disposition authority");
+  }
+  const proof = json(paths.proof);
+  let verified;
+  for (const trustPolicy of anchors) {
+    verified = verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: subject.candidate, expectedAction: request.action });
+    if (verified.verified || verified.code !== "CRITICAL-ACTION-EXTERNAL-AUTHORITY-REQUIRED") break;
+  }
+  if (!verified.verified) fail(`the fork disposition approval does not verify (${verified.code}${verified.cause ? `; ${verified.cause}` : ""})`);
+  return {
+    ok: true,
+    code: "PO-HUMAN-FORK-DISPOSITION-VERIFIED",
+    value: verified,
+    subjectSha256: subject.subjectSha256,
+    acknowledgedEventIds: [...subject.acknowledgedEventIds],
+    approval: { mode: "signature", request, proof },
+  };
+}
+
+if (isDirectInvocation(import.meta.url)) {
+  const argv = process.argv.slice(2);
+  try {
+    const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : await runHumanApproval(argv);
+    process.stdout.write(formatHumanApprovalCliResult(result));
+  } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
+}

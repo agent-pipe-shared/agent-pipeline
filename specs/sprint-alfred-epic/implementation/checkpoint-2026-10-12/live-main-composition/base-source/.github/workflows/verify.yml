@@ -1,0 +1,133 @@
+name: verify
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      live_certification:
+        description: Run the separately authorized pinned live-runner lane
+        required: false
+        default: false
+        type: boolean
+      live_certification_required:
+        description: Treat typed live-runner unavailability as blocking
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  greenfield-platform-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        node:
+          - '22'
+          - '24'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Physical scratch boundary
+        run: node --test plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs
+      - name: Passive host read boundary
+        run: node --test plugins/pipeline-core/lib/passive-read-policy.test.mjs
+      - name: Runner read guard boundary
+        run: node --test --test-name-pattern="external reports stay readable|greenfield passive PowerShell" plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+      - name: Existing signing key reuse
+        run: node --test --test-name-pattern="signature anchor reuses a key" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+      - name: Language transaction and attended anchor recovery
+        run: node --test plugins/pipeline-core/lib/onboarding-initial-answers-transaction.test.mjs plugins/pipeline-core/scripts/bootstrap-trust-recovery.test.mjs
+      - name: Consumer pre-push installation
+        run: node --test --test-name-pattern="onboarding pre-push offer executes" plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
+      - name: Native runner activation
+        run: node --test --test-name-pattern="actual inactive/declined scope" plugins/pipeline-core/scripts/antigravity-topology-integration.test.mjs
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+      - name: Offline CI boundary conformance
+        run: node plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs && node plugins/pipeline-core/scripts/live-runner-certification.test.mjs
+      - name: Typed Git topology preflight
+        env:
+          PIPELINE_SECURITY_REVIEWER_ID: ${{ vars.PIPELINE_SECURITY_REVIEWER_ID }}
+          PIPELINE_CANDIDATE_BASE: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
+        run: node plugins/pipeline-core/scripts/verify-topology-preflight.mjs
+      - name: Offline security-evidence conformance
+        run: node --import ./harness/scripts/network-lockdown.mjs --test plugins/pipeline-core/lib/security-evidence-evaluator.test.mjs
+      - name: AI-assisted-development conformance
+        run: node --test plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs
+      - name: Finding lifecycle conformance
+        run: node --test plugins/pipeline-core/lib/finding-lifecycle.test.mjs
+      - name: Product-security readiness conformance
+        run: node --test plugins/pipeline-core/lib/security-readiness.test.mjs
+      - name: Runner-free offline Core Verify
+        env:
+          PIPELINE_LIVE_CERTIFICATION: disabled
+          PIPELINE_VERIFY_MODE: ${{ github.event_name == 'push' && 'push' || 'candidate' }}
+          PIPELINE_VERIFY_BASE: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
+        # `openssl` and `uname` are in this allowlist because the product genuinely requires them, not to
+        # make a suite go green: po-human-approval.mjs shells out to it for the entire
+        # signature-mode key chain (`genpkey -algorithm ED25519 -aes-256-cbc`,
+        # `pkey -pubout`, `pkeyutl -sign -rawin`). Measured 2026-09-01 against run
+        # 33471808564: with only node/git/bash/sh, trust-anchor-bootstrap-circularity-repro
+        # and onboarding-init fail; adding this one symlink turns both green locally under
+        # an otherwise identical synthetic PATH. "Runner-free" therefore means free of
+        # runner-provided tooling, never free of the base system crypto binary this
+        # repository's own signing path depends on. Semgrep's local X.509 initialization invokes
+        # `uname -s` even with metrics disabled and an offline repository-owned ruleset.
+        run: core_path="${RUNNER_TEMP}/pipeline-core-path" && mkdir -p "${core_path}" && ln -s "$(command -v node)" "${core_path}/node" && ln -s "$(command -v git)" "${core_path}/git" && ln -s "$(command -v bash)" "${core_path}/bash" && ln -s "$(command -v sh)" "${core_path}/sh" && ln -s "$(command -v openssl)" "${core_path}/openssl" && ln -s "$(command -v uname)" "${core_path}/uname" && PATH="${core_path}" "${core_path}/node" harness/scripts/verify.mjs --mode "${PIPELINE_VERIFY_MODE}" --base "${PIPELINE_VERIFY_BASE}"
+      - name: Surface failing suite diagnostics
+        if: failure()
+        # A reporter, never a gate (NVA-B-CIDIAG): reads evidence/verify-latest.json
+        # plus the private journal run directory the prior step just wrote. It prints
+        # only inventory-bound suite/status attribution and a digest reference to private
+        # evidence; raw log text and unclassified values are explicitly withheld. Always
+        # exits 0 -- deliberately no `continue-on-error`, since there is nothing here that
+        # can fail the job.
+        run: node harness/scripts/print-verify-failures.mjs
+
+  live-certification:
+    if: github.event_name == 'workflow_dispatch' && inputs.live_certification
+    runs-on: ubuntu-latest
+    environment: live-runner-certification
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+      - name: Typed Git topology preflight
+        env:
+          PIPELINE_SECURITY_REVIEWER_ID: ${{ vars.PIPELINE_SECURITY_REVIEWER_ID }}
+          PIPELINE_CANDIDATE_BASE: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
+        run: node plugins/pipeline-core/scripts/verify-topology-preflight.mjs
+      - name: Pinned live-runner certification
+        env:
+          PIPELINE_LIVE_CERTIFICATION_AUTHORITY: ${{ vars.PIPELINE_LIVE_CERTIFICATION_AUTHORITY }}
+        run: node plugins/pipeline-core/scripts/live-runner-certification.mjs --candidate "${GITHUB_SHA}" --policy "${{ inputs.live_certification_required && 'blocking' || 'advisory' }}"

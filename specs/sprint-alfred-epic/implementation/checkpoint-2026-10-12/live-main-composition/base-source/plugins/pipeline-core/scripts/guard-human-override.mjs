@@ -1,0 +1,604 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+import { readFileSync } from "node:fs";
+import { dirname, posix as posixPath, resolve, win32 as win32Path } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  authorizeHumanGuardOverride,
+  authorizeHumanGuardOverrideBySignature,
+  buildHumanGuardOverrideSignatureIntent,
+  concurrentWorktreeAdvisory,
+  HGO_SIGNATURE_REASON,
+  humanGuardAuditLockRecoveryLine,
+  HumanGuardOverrideError,
+  observeHumanGuardOverrideGovernanceConsumption,
+  planHumanGuardOverride,
+  prepareHumanGuardOverrideAuthorization,
+  prepareHumanGuardOverrideForSignature,
+  repairHumanGuardOverrideAudit,
+  refreezeHumanGuardOverridePlan,
+  verifyHumanGuardOverrideAudit,
+} from "../lib/human-guard-override.mjs";
+import {
+  buildGovernanceHgoConsumptionAction,
+  buildGovernanceHgoConsumptionRetry,
+  preflightGovernanceActionOutput,
+  writeGovernanceHgoConsumptionAction,
+} from "../lib/governance-hgo-consumption-action.mjs";
+// `render-copy-safe` remains a backward-compatible view of the same shared
+// renderer now used in the default hook hand-off.
+import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
+import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+
+const SCRIPT = fileURLToPath(import.meta.url);
+const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
+// Sibling script, resolved the same PLUGIN_ROOT/SCRIPT way as every other
+// self-referencing path in this file -- design doc §3.3's own instruction: the
+// `po-human-approval.mjs` path IS knowable to this CLI (only the PO's own
+// external material directory and proof file are not).
+const PO_HUMAN_APPROVAL_SCRIPT = resolve(dirname(SCRIPT), "po-human-approval.mjs");
+const SHA256 = /^[a-f0-9]{64}$/u;
+
+function usage() {
+  return [
+    "Usage:",
+    "  guard-human-override.mjs plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs prepare-authorization --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs emit-signature-digest --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs prepare-for-signature --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs refreeze-plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs authorize --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --selection-sha256 <64hex> --reason <text> --reason-sha256 <64hex> [--author-source-root <absolute-root>] --activate",
+    "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs render-copy-safe --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs verify-audit --repo <absolute-root>",
+    "  guard-human-override.mjs publish-consumption-action --repo <absolute-root> --plan-sha256 <64hex> --event-out <repo-relative-path>",
+    "  guard-human-override.mjs repair-audit --repo <absolute-root> --preimage-sha256 <64hex> --activate",
+  ].join("\n");
+}
+
+/**
+ * ADR-0059 Decision 1: `path` must be supplied OUTSIDE the repository -- genuinely
+ * external, human-produced material -- mirroring guard-maintenance-window.mjs's own
+ * `externalJson()` discipline for `--proof`. This CLI contains no signer and accepts
+ * no private-key material; a proof is either genuine (produced by an external signing
+ * step) or it fails verification, never fabricated here.
+ *
+ * WHY THE SEPARATOR IS NOT HARD-CODED. The previous test was
+ * `source === root || source.startsWith(`${root}/`)`, which is inert on win32:
+ * `resolve()` returns backslash-separated paths there, so only exact equality with the
+ * root was ever caught and any in-repository path -- including an agent-writable one --
+ * was accepted as "external". ADR-0051/ADR-0057 make native Windows a hard
+ * implementation obligation, so a POSIX-only separator here is a defect, not a nuance.
+ * `relative()` is the separator-correct test on both flavours and additionally folds
+ * case on win32, where `C:\Repo` and `c:\repo` are the same directory and a
+ * `startsWith` comparison is bypassable by retyping the drive letter. Same shape as
+ * lib/human-guard-override.mjs's `safePath()`, which already normalizes this way.
+ *
+ * `platform` is injected rather than read from `process.platform` so the win32
+ * behaviour is provable on either host, exactly as the sibling guard suites drive
+ * their own `{ platform: "win32" }` option.
+ */
+function externalJson(repoRoot, path, platform = process.platform) {
+  const api = platform === "win32" ? win32Path : posixPath;
+  const root = api.resolve(repoRoot);
+  const source = api.resolve(path);
+  // NVA-HGOFIX-2: api.relative() already returns the platform-correct separator (win32Path
+  // returns backslashes there, posixPath never does), so this rewrite is only needed to
+  // normalize the win32 answer -- applying it unconditionally on POSIX could turn a legal
+  // in-repository component name that merely CONTAINS a backslash into an apparent `../`
+  // escape, misreading an in-repository proof file as external.
+  const relRaw = api.relative(root, source);
+  const rel = platform === "win32" ? relRaw.split("\\").join("/") : relRaw;
+  const outside = rel === ".." || rel.startsWith("../") || api.isAbsolute(rel);
+  if (!outside) throw new Error("--proof must be supplied outside the repository");
+  return JSON.parse(readFileSync(source, "utf8"));
+}
+
+function flags(argv) {
+  const result = {};
+  for (let index = 0; index < argv.length; index += 2) {
+    const key = argv[index];
+    if (!key?.startsWith("--") || index + 1 >= argv.length || Object.hasOwn(result, key.slice(2))) return null;
+    result[key.slice(2)] = argv[index + 1];
+  }
+  return result;
+}
+
+function exactFlagSet(value, required, optional = []) {
+  if (!value || !required.every((key) => Object.hasOwn(value, key))) return false;
+  const allowed = new Set([...required, ...optional]);
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function copySafeActionText(label, action, placeholderValues = [], variableBindings = undefined) {
+  const placeholders = new Set(placeholderValues);
+  return renderHumanCopySafeCommand({
+    label,
+    executable: action.executable,
+    argv: action.argv.map((value) => placeholders.has(value) ? placeholder(value) : value),
+    variableBindings,
+  }).text;
+}
+
+// Spec 22.7 / R7-7c: the ceremony start blocks only on the readiness findings it needs.
+const READINESS_GATING_FINDING_IDS = Object.freeze(["signing-toolchain", "po-key-directory", "trust-anchor-match"]);
+const READINESS_UNAVAILABLE = Object.freeze({ ok: false, code: "ENVIRONMENT-READINESS-UNAVAILABLE", findings: Object.freeze([]) });
+
+/** One human-readable string for a finding's repair: an attended prerequisite's summary, or the argv of an agent action. */
+function readinessRepairText(repair) {
+  if (typeof repair === "string") return repair.length > 0 ? repair : null;
+  if (repair === null || typeof repair !== "object" || Array.isArray(repair)) return null;
+  if (typeof repair.summary === "string" && repair.summary.length > 0) return repair.summary;
+  if (typeof repair.prerequisite === "string" && repair.prerequisite.length > 0) return repair.prerequisite;
+  if (typeof repair.executable === "string" && repair.executable.length > 0 && Array.isArray(repair.argv)) {
+    return [repair.executable, ...repair.argv.filter((arg) => typeof arg === "string")].join(" ");
+  }
+  return null;
+}
+
+/** Which of the findings this ceremony needs are missing or not ok, and the repairs those findings carry. */
+function ceremonyReadinessBlock(report) {
+  const findings = report !== null && typeof report === "object" && Array.isArray(report.findings) ? report.findings : [];
+  const blockedBy = [];
+  const repairs = [];
+  for (const id of READINESS_GATING_FINDING_IDS) {
+    const matches = findings.filter((finding) => finding !== null && typeof finding === "object" && finding.findingId === id);
+    if (matches.length > 0 && matches.every((finding) => finding.status === "ok")) continue;
+    blockedBy.push(id);
+    for (const finding of matches) {
+      const text = readinessRepairText(finding.repair);
+      if (text !== null) repairs.push(text);
+    }
+  }
+  return { blockedBy, repairs };
+}
+
+/** The process-entry observation of the environment readiness report for one repository; never throws. */
+async function observeEnvironmentReadiness(rest) {
+  try {
+    const parsed = flags(rest);
+    if (!parsed || typeof parsed.repo !== "string") return READINESS_UNAVAILABLE;
+    const { runEnvironmentReadinessReport } = await import("./toolchain-preflight.mjs");
+    const report = await runEnvironmentReadinessReport({ rootDir: parsed.repo });
+    return report !== null && typeof report === "object" && Array.isArray(report.findings) ? report : READINESS_UNAVAILABLE;
+  } catch {
+    return READINESS_UNAVAILABLE;
+  }
+}
+
+/**
+ * Backward-compatible `render-copy-safe` entry point. Default hook denials now
+ * use the same shared argv-native renderer directly; this read-only command
+ * remains available to consumers that already call it explicitly.
+ */
+export function main(argv = process.argv.slice(2), io = {}, options = {}) {
+  const write = io.write ?? process.stdout.write.bind(process.stdout);
+  const writeError = io.writeError ?? process.stderr.write.bind(process.stderr);
+  const platform = options.platform ?? process.platform;
+  const governanceHgo = {
+    observe: observeHumanGuardOverrideGovernanceConsumption,
+    preflight: preflightGovernanceActionOutput,
+    build: buildGovernanceHgoConsumptionAction,
+    write: writeGovernanceHgoConsumptionAction,
+    retry: buildGovernanceHgoConsumptionRetry,
+    ...(options.governanceHgo ?? {}),
+  };
+  const [command, ...rest] = argv;
+  try {
+    if (command === "verify-audit") {
+      const parsed = flags(rest);
+      if (!parsed || Object.keys(parsed).length !== 1 || typeof parsed.repo !== "string") throw new Error(usage());
+      write(`${JSON.stringify(verifyHumanGuardOverrideAudit({ rootDir: parsed.repo }))}\n`);
+      return 0;
+    }
+    if (command === "publish-consumption-action") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "plan-sha256", "event-out"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["plan-sha256"] ?? "")
+        || typeof parsed["event-out"] !== "string") throw new Error(usage());
+      let event;
+      try {
+        governanceHgo.preflight({ rootDir: parsed.repo, eventOutPath: parsed["event-out"] });
+        const source = governanceHgo.observe({ rootDir: parsed.repo, planSha256: parsed["plan-sha256"] });
+        event = governanceHgo.build({ source });
+      } catch (error) {
+        writeError(`${JSON.stringify({
+          schema: "pipeline.hgo-governance-consumption-action-result.v1",
+          status: "refused",
+          code: error?.code ?? "HGO-GOVERNANCE-ACTION-PREFLIGHT",
+        })}\n`);
+        return 2;
+      }
+      try {
+        const published = governanceHgo.write({ rootDir: parsed.repo, eventOutPath: parsed["event-out"], event });
+        write(`${JSON.stringify({
+          schema: "pipeline.hgo-governance-consumption-action-result.v1",
+          status: "completed",
+          eventOutPath: parsed["event-out"],
+          event: published.event,
+        })}\n`);
+        return 0;
+      } catch (error) {
+        writeError(`${JSON.stringify({
+          schema: "pipeline.hgo-governance-consumption-action-result.v1",
+          status: "source-complete/event-unavailable",
+          code: error?.code ?? "HGO-GOVERNANCE-ACTION-OUTPUT",
+          retry: governanceHgo.retry({ eventOutPath: parsed["event-out"], event }),
+        })}\n`);
+        return 2;
+      }
+    }
+    if (command === "repair-audit") {
+      if (rest.at(-1) !== "--activate") throw new Error(usage());
+      const parsed = flags(rest.slice(0, -1));
+      if (!exactFlagSet(parsed, ["repo", "preimage-sha256"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["preimage-sha256"] ?? "")) throw new Error(usage());
+      const dependencies = { writeFn: (text) => writeError(text), ...(options.dependencies ?? {}) };
+      write(`${JSON.stringify(repairHumanGuardOverrideAudit({
+        rootDir: parsed.repo,
+        expectedPreimageSha256: parsed["preimage-sha256"],
+        activate: true,
+        dependencies,
+      }))}\n`);
+      return 0;
+    }
+    if (command === "plan") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      const planned = planHumanGuardOverride({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        scriptPath: SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+      });
+      write(`${JSON.stringify(planned, null, 2)}\n`);
+      // NVA-CF-HGOCANDIDATEDRIFT: advisory-only, stderr, never folded into the plan's own
+      // JSON/hash shape above -- warn BEFORE a signature is requested, not only after a
+      // ceremony is discarded by HGO-CANDIDATE-DRIFT
+      // (backlog/items/2026-08-30-hgo-candidate-drift-invalidates-ceremony-on-any-
+      // concurrent-commit.md). See the code comment at the HGO-CANDIDATE-DRIFT `fail()`
+      // call in lib/human-guard-override.mjs for why the binding stays whole-tree-strict.
+      const advisoryLines = [
+        "ADVISORY: this ceremony's signature will bind to the exact repository HEAD "
+          + `(${planned.repository.head ?? "unborn"}) and its whole-repository tree at plan `
+          + "time. ANY commit landing on HEAD before authorize-by-signature consumes the "
+          + "PO's signature -- including an unrelated, concurrent commit from another "
+          + "dispatch or session, not just your own -- invalidates it (HGO-CANDIDATE-DRIFT) "
+          + "and forces refreeze-plan plus a brand-new PO signature for the identical edit. "
+          + "Avoid committing, and avoid letting other concurrent work commit, while this "
+          + "ceremony is open; run prepare-for-signature/emit-signature-digest, get the "
+          + "signature, and authorize-by-signature as one uninterrupted sequence. See "
+          + "docs/push-release-flow.md.",
+      ];
+      const worktreeAdvisory = concurrentWorktreeAdvisory(parsed.repo);
+      if (worktreeAdvisory.checked && worktreeAdvisory.otherWorktrees > 0) {
+        advisoryLines.push(
+          `ADVISORY: ${worktreeAdvisory.otherWorktrees} other git worktree(s) are present `
+            + "under this repository's common git directory. If a dispatch or session is "
+            + "active in one of them, treat this ceremony as HIGH RISK for "
+            + "HGO-CANDIDATE-DRIFT. This is a partial signal only: it does not detect a "
+            + "concurrent commit landing directly into THIS (shared) checkout, with no "
+            + "separate worktree at all.",
+        );
+      }
+      writeError(`${advisoryLines.join("\n")}\n`);
+      return 0;
+    }
+    // Backward-compatible explicit renderer. The hooks now use the same shared
+    // renderer in their default denial, so this is an optional repeat of those
+    // already-safe blocks, never a prerequisite for obtaining copyable text.
+    // planHumanGuardOverride() is called first and its result otherwise discarded
+    // -- the same validated-request lookup `plan` itself performs, so a bogus or
+    // never-recorded digest is refused with the same HGO-* error every other
+    // subcommand gives one, rather than silently rendering a plausible-looking
+    // block for a request that was never denied.
+    //
+    // Deliberately PLAIN TEXT on stdout, not this CLI's usual JSON contract (every other
+    // subcommand's stdout is machine-parseable JSON): the entire point of this output is a
+    // directly copy-pasteable multi-shell block. JSON-escaping its embedded newlines would
+    // defeat the safety property it exists for -- a human running this straight in a
+    // terminal needs real line breaks, not literal "\n" text to unescape by hand first.
+    if (command === "render-copy-safe") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      const authorSourceRoot = parsed["author-source-root"] ?? null;
+      planHumanGuardOverride({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        scriptPath: SCRIPT,
+        authorSourceRoot,
+      });
+      let approval = { mode: "signature", scope: "default", source: "default" };
+      try { approval = readHumanApprovalMode(parsed.repo, { legacyKind: "push" }) ?? approval; } catch { /* fail closed */ }
+      const approvalMode = approval.mode;
+      const globalChat = approvalMode === "chat" && approval.scope === "global" && approval.source === USER_SOURCE_PATH;
+      // Same ceremonyCommand() construction the two hooks build for their default hand-off
+      // (script/repo pre-rendered via JSON.stringify()+placeholder(), request-sha256 through
+      // ordinary shellWord() quoting) -- see their own NVA-W12-COPYSAFE comments.
+      const ceremonyCommand = (label, subcommand, ...extraArgv) =>
+        renderHumanCopySafeCommand({
+          label,
+          executable: process.execPath,
+          argv: [
+            placeholder(JSON.stringify(SCRIPT)), subcommand, "--repo", placeholder(JSON.stringify(parsed.repo)),
+            "--request-sha256", parsed["request-sha256"], ...extraArgv,
+          ],
+        });
+      const planCommand = ceremonyCommand("plan", "plan");
+      const prepareAuthorizationChat = ceremonyCommand(
+        "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<human-reason>"'),
+      );
+      const authorizeChat = ceremonyCommand(
+        "authorize", "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+        "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
+      );
+      const prepareAuthorizationSignature = ceremonyCommand(
+        "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+      );
+      const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
+      const authorizeBySignature = ceremonyCommand(
+        "authorize-by-signature", "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+      );
+      const ceremonySteps = approvalMode === "chat"
+        ? [planCommand, prepareAuthorizationChat, authorizeChat]
+        : [planCommand, prepareAuthorizationSignature, emitSignatureDigest, authorizeBySignature];
+      write(`${globalChat ? "Committed global chat approval: chat-attributed-unattested; no terminal ceremony, key, or proof is required.\n\n" : ""}${ceremonySteps.map((step) => step.text).join("\n\n")}\n`);
+      return 0;
+    }
+    if (command === "prepare-authorization") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256", "plan-sha256", "reason"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")
+        || !SHA256.test(parsed["plan-sha256"] ?? "")
+        || typeof parsed.reason !== "string" || parsed.reason.trim() === "") throw new Error(usage());
+      write(`${JSON.stringify(prepareHumanGuardOverrideAuthorization({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        planSha256: parsed["plan-sha256"],
+        reason: parsed.reason,
+        scriptPath: SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+      }), null, 2)}\n`);
+      return 0;
+    }
+    // NVA-SIGENTRY-1: the one command ADR-0059's own Decision 1 promises but never
+    // shipped -- "inspect the prepared request's digest, sign it externally, hand back
+    // the proof" required reading library source and reconstructing the recipe by hand
+    // until now. Runs the exact same `plan` + `prepare-authorization` library calls
+    // above, unchanged, then derives the signable digest through the SAME shared helper
+    // `authorizeHumanGuardOverrideBySignature()` gates arming on
+    // (buildHumanGuardOverrideSignatureIntent()) -- so this prints provably the same
+    // value the verifier checks, never a second, independently-reconstructed one.
+    //
+    // NVA-SIGENTRY-2 F1: no `--reason` flag here at all, deliberately -- there used to be
+    // one, bound into the printed digest and validated only for non-emptiness. Any value
+    // other than the fixed `HGO_SIGNATURE_REASON` constant produced a well-formed, exit-0
+    // digest that `authorizeHumanGuardOverrideBySignature()` would never accept, because
+    // that verifier always signs against the FIXED constant internally (never a
+    // caller-supplied reason) -- see its own call to `prepareHumanGuardOverrideAuthorization()`
+    // a few lines below `reason: HGO_SIGNATURE_REASON` in the library. A caller-suppliable
+    // reason here was therefore never a real choice, only a way to get the digest wrong
+    // silently. Dropping the flag (rather than accepting it and rejecting non-canonical
+    // values) removes the whole caller-suppliable surface: there is no value left to get
+    // wrong, mirroring `authorizeHumanGuardOverrideBySignature()`'s own signature, which
+    // never took a `reason` parameter either.
+    if (command === "emit-signature-digest") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256", "plan-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")
+        || !SHA256.test(parsed["plan-sha256"] ?? "")) throw new Error(usage());
+      const authorSourceRoot = parsed["author-source-root"] ?? null;
+      const prepared = prepareHumanGuardOverrideAuthorization({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        planSha256: parsed["plan-sha256"],
+        reason: HGO_SIGNATURE_REASON,
+        scriptPath: SCRIPT,
+        authorSourceRoot,
+      });
+      const planned = planHumanGuardOverride({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        scriptPath: SCRIPT,
+        authorSourceRoot,
+      });
+      const intent = buildHumanGuardOverrideSignatureIntent({ prepared, planned });
+      write(`${JSON.stringify({
+        schema: "pipeline.human-guard-override-signature-digest.v1",
+        requestSha256: parsed["request-sha256"],
+        planSha256: parsed["plan-sha256"],
+        selectionSha256: prepared.selectionSha256,
+        intentSha256: intent.sha256,
+      }, null, 2)}\n`);
+      return 0;
+    }
+    // PHX merge: the Phoenix line's own two-step alternative to `emit-signature-digest`
+    // above -- `prepare-for-signature` collapses plan+prepare-authorization+digest into one
+    // call and additionally hands back ready-to-run next-step commands (sign-intent,
+    // authorize-by-signature); `refreeze-plan` re-derives a signable candidate bound to the
+    // current HEAD after an `HGO-CANDIDATE-DRIFT` refusal (see
+    // authorizeHumanGuardOverrideBySignature()'s own error text in the library, which
+    // already names both these commands as its documented recovery path). Kept alongside
+    // `emit-signature-digest`, not in place of it: the library already exposes both
+    // `prepareHumanGuardOverrideForSignature()` and `refreezeHumanGuardOverridePlan()`
+    // unconditionally, and `authorizeHumanGuardOverrideBySignature()`'s drift-recovery
+    // message already depends on `refreeze-plan` existing as a CLI command.
+    if (command === "prepare-for-signature") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      // Spec 22.7 / R7-7c: the environment readiness report is an optional seam (the process entry
+      // always supplies it). When present, a missing or non-ok finding this ceremony needs blocks
+      // BEFORE the library call, so no ceremony material is built and no window starts.
+      const hasReadiness = Object.hasOwn(options, "environmentReadiness");
+      const readiness = hasReadiness ? (options.environmentReadiness ?? READINESS_UNAVAILABLE) : null;
+      if (hasReadiness) {
+        const { blockedBy, repairs } = ceremonyReadinessBlock(readiness);
+        if (blockedBy.length > 0) {
+          write(`${JSON.stringify({ status: "blocked", blockedBy, repairs, environmentReadiness: readiness })}\n`);
+          writeError(`prepare-for-signature is blocked: ${blockedBy.join(", ")} not ready. Nothing was prepared and no window was started; apply the repairs listed in the output, then run it again.\n`);
+          return 2;
+        }
+      }
+      const prepared = prepareHumanGuardOverrideForSignature({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        scriptPath: SCRIPT,
+        humanApprovalScriptPath: PO_HUMAN_APPROVAL_SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+      });
+      const output = hasReadiness ? { ...prepared, environmentReadiness: readiness } : prepared;
+      const signIntent = copySafeActionText(
+        "sign-intent",
+        prepared.signIntentCommand,
+      );
+      const authorizeBySignature = copySafeActionText(
+        "authorize-by-signature",
+        prepared.authorizeBySignatureCommand,
+        ["<external-proof.json>"],
+      );
+      // With the report attached the document is one compact line (the shape the readiness
+      // report is carried in at every entry point); without it, the existing pretty form.
+      write(hasReadiness ? `${JSON.stringify(output)}\n` : `${JSON.stringify(output, null, 2)}\n`);
+      writeError(`${signIntent}\n\n${authorizeBySignature}\n`);
+      return 0;
+    }
+    if (command === "refreeze-plan") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      write(`${JSON.stringify(refreezeHumanGuardOverridePlan({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+      }), null, 2)}\n`);
+      return 0;
+    }
+    if (command === "authorize") {
+      if (rest.at(-1) !== "--activate") throw new Error(usage());
+      const parsed = flags(rest.slice(0, -1));
+      if (!exactFlagSet(parsed, [
+        "repo", "request-sha256", "plan-sha256", "selection-sha256", "reason", "reason-sha256",
+      ], ["author-source-root"]) || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")
+        || !SHA256.test(parsed["plan-sha256"] ?? "")
+        || !SHA256.test(parsed["selection-sha256"] ?? "")
+        || !SHA256.test(parsed["reason-sha256"] ?? "")
+        || typeof parsed.reason !== "string" || parsed.reason.trim() === "") throw new Error(usage());
+      // AGY-HGOFIX-2: authorizeHumanGuardOverride() now runs the same attended-terminal
+      // ceremony (lib/chat-gate-ceremony.mjs) pipeline-state.mjs's `approve-push` chat
+      // mode already uses, so this CLI must thread its own `dependencies` seam through
+      // (options.dependencies, the test-only injection point for isattyFn/readLineFn --
+      // a genuinely attended run relies on the real process.stdin.isTTY/readSync
+      // defaults instead). `writeFn` defaults to `writeError` (stderr), not the base
+      // `write`/stdout default `readAttendedLine()` would otherwise use: every other
+      // subcommand's stdout is a JSON contract (`write(JSON.stringify(...))`), so the
+      // human-facing confirmation prompt must never land on the same stream a caller
+      // parses as JSON.
+      const dependencies = { writeFn: (text) => writeError(text), ...(options.dependencies ?? {}) };
+      write(`${JSON.stringify(authorizeHumanGuardOverride({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        planSha256: parsed["plan-sha256"],
+        selectionSha256: parsed["selection-sha256"],
+        reason: parsed.reason,
+        reasonSha256: parsed["reason-sha256"],
+        activate: true,
+        scriptPath: SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+        dependencies,
+      }))}\n`);
+      return 0;
+    }
+    // ADR-0059 Decision 1 fixes the trust anchor at the project's own COMMITTED
+    // `project/critical-human-proof.json`, and calls this subcommand agent-safe because it
+    // "cannot succeed without a genuine signature it is structurally incapable of
+    // producing". A `--authority` flag contradicted exactly that: the only thing the
+    // caller could not fabricate was a signature under the committed key, and the flag let
+    // the caller replace the committed key with one it had just generated -- a full HGO
+    // bypass, not a partial one, which is the risk ADR-0059's own Consequences section
+    // names. It is therefore not accepted at all; `trustPolicy` is left unset so
+    // authorizeHumanGuardOverrideBySignature() resolves the committed anchor itself and
+    // fails closed (HGO-TRUST-ANCHOR-MISSING) when the project has none.
+    //
+    // Removed rather than "kept but required to match the committed anchor": a flag whose
+    // only admissible value is the value already used by default carries no capability,
+    // while keeping it would leave a caller-supplied-trust-anchor code path alive and would
+    // force guard-lifecycle-ready.mjs to admit a second arbitrary path word in a
+    // GUARD-LIFECYCLE-NOT-READY session. No in-tree caller supplied it (the sole one was a
+    // test asserting the defect). guard-maintenance-window.mjs's own `--authority` is
+    // untouched: it is pre-existing, scoped to one time-boxed window over an explicit rule
+    // set, and out of this change's scope.
+    if (command === "authorize-by-signature") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256", "plan-sha256", "proof"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")
+        || !SHA256.test(parsed["plan-sha256"] ?? "")
+        || typeof parsed.proof !== "string") throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      const proof = externalJson(parsed.repo, parsed.proof, platform);
+      write(`${JSON.stringify(authorizeHumanGuardOverrideBySignature({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        planSha256: parsed["plan-sha256"],
+        proof,
+        scriptPath: SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+      }))}\n`);
+      return 0;
+    }
+    throw new Error(usage());
+  } catch (error) {
+    const code = error instanceof HumanGuardOverrideError ? error.code : "HGO-USAGE";
+    // T90-F2 (Ruling 125): an ambiguous audit lock carries a typed recovery; print the same
+    // fixed line the shared route renderer prints, after the unchanged first line.
+    const recoveryLine = error instanceof HumanGuardOverrideError ? humanGuardAuditLockRecoveryLine(error) : null;
+    writeError(`${code}: ${error.message}\n${recoveryLine === null ? "" : `${recoveryLine}\n`}`);
+    return 2;
+  }
+}
+
+/** Process entry: `prepare-for-signature` carries the environment readiness report; every other command is unchanged. */
+async function runCli(argv = process.argv.slice(2)) {
+  const options = argv[0] === "prepare-for-signature"
+    ? { environmentReadiness: await observeEnvironmentReadiness(argv.slice(1)) }
+    : {};
+  return main(argv, {}, options);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === SCRIPT) {
+  runCli().then(
+    (code) => { process.exitCode = code; },
+    (error) => {
+      // Fail closed: nothing was prepared if the entry itself could not complete.
+      try { process.stderr.write(`HGO-USAGE: ${error?.message ?? "the command could not complete"}\n`); } catch { /* stderr unavailable */ }
+      process.exitCode = 2;
+    },
+  );
+}

@@ -1,0 +1,2322 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+/**
+ * Canonical pipeline-owned worktree placement plus session-owned temporary
+ * resource registration/cleanup. This module never discovers deletion targets
+ * from a prefix or glob: every destructive effect is driven by a mode-0600
+ * manifest entry whose physical identity and canary are revalidated first.
+ */
+
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir, uptime } from "node:os";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
+import { spawnSync } from "node:child_process";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "./successful-spawn.mjs";
+import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+
+export const WORKTREE_RECORD_SCHEMA = "pipeline.worktree-lifecycle.v1";
+export const CLEANUP_MANIFEST_SCHEMA = "pipeline.session-cleanup-manifest.v1";
+export const CLEANUP_RECEIPT_SCHEMA = "pipeline.session-cleanup-receipt.v1";
+export const HYGIENE_RECEIPT_SCHEMA = "pipeline.worktree-hygiene-receipt.v1";
+export const SESSION_DESCRIPTOR_SCHEMA = "pipeline.session-descriptor.v2";
+export const LEGACY_SESSION_DESCRIPTOR_SCHEMA = "pipeline.session-descriptor.v1";
+export const SESSION_OWNER_RUNTIME_SCHEMA = "pipeline.session-owner-runtime.v1";
+export const SESSION_OWNER_STATUS_SCHEMA = "pipeline.session-owner-status.v1";
+export const SESSION_RETIREMENT_STATUS_SCHEMA = "pipeline.session-retirement-status.v1";
+export const SESSION_EXTERNAL_RETIREMENT_STATUS_SCHEMA = "pipeline.session-external-retirement-status.v1";
+
+const SAFE_COMPONENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
+const SAFE_PURPOSE = /^[a-z0-9][a-z0-9-]{1,39}$/;
+const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const SHA256 = /^[0-9a-f]{64}$/;
+const TEMP_TYPES = new Set(["scratch-file", "scratch-directory", "disposable-worktree", "verify-run-directory"]);
+const TEMP_CLASSES = new Set(["scratch", "disposable-control", "generated-output", "verify-recovery"]);
+const CLEANUP_POLICIES = new Set(["unlink-file", "remove-directory", "remove-worktree"]);
+const PROTECTED_CONTENT_CLASSES = new Set(["spec", "prd", "state", "implementation", "unknown"]);
+// checkSessionHygiene's `current-worktree-dirty` reason exists for genuinely
+// foreign dirty state, not for the scaffolding the Pipeline's own onboarding
+// flow (project-onboarding-v3.mjs) generates on a project's normal, expected
+// first run. This allowlist is deliberately narrow and sourced from that
+// module's own known write targets -- `.claude/**` (freshBaselines(): settings
+// .json, pipeline.json, pipeline.yaml), `project/**` (NEUTRAL_CALIBRATION,
+// NEUTRAL_MANIFEST, CRITICAL_HUMAN_PROOF_POLICY_PATH, RESUME_HINT_PATH, all
+// from project-authority.mjs/critical-human-proof-policy.mjs), `specs/**`
+// (onboarding kickoff's own feature spec directories), and the portable
+// source file `pipeline.user.yaml` itself. `.codex/**` is deliberately
+// excluded: in a host-managed Codex project that tree is host-owned, not
+// onboarding-owned, so admitting it here would mask genuinely foreign dirty
+// state in exactly the scenario this defect was first observed in. When in
+// doubt a path stays OUT of this list -- still-flagging is the safe default.
+const ONBOARDING_GENERATED_EXACT_PATHS = new Set(["pipeline.user.yaml"]);
+const ONBOARDING_GENERATED_PREFIXES = [".claude/", "project/", "specs/"];
+const FIXED_GIT_CONFIG = [
+  "-c", `core.hooksPath=${GIT_NULL_DEVICE}`,
+  "-c", "commit.gpgSign=false",
+  "-c", "tag.gpgSign=false",
+  "-c", "core.fsmonitor=false",
+  "-c", "credential.helper=",
+];
+
+export class WorktreeLifecycleError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = "WorktreeLifecycleError";
+    this.code = code;
+  }
+}
+
+function fail(code, message) {
+  throw new WorktreeLifecycleError(code, message);
+}
+
+export function canonicalJson(value) {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+export function rawSha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function nowIso(now = new Date()) {
+  return now.toISOString();
+}
+
+function gitEnvironment(env = process.env) {
+  const allowed = [
+    "PATH", "SystemRoot", "SYSTEMROOT", "WINDIR", "TMP", "TEMP", "TMPDIR",
+    "LANG", "LC_ALL", "LC_CTYPE",
+  ];
+  const result = {};
+  for (const key of allowed) if (typeof env[key] === "string") result[key] = env[key];
+  result.GIT_CONFIG_NOSYSTEM = "1";
+  result.GIT_CONFIG_GLOBAL = GIT_NULL_DEVICE;
+  result.GIT_TERMINAL_PROMPT = "0";
+  result.GIT_ASKPASS = process.platform === "win32" ? "" : "/bin/false";
+  result.GIT_PAGER = "cat";
+  result.GIT_EDITOR = "true";
+  result.GIT_SEQUENCE_EDITOR = "true";
+  result.LC_ALL = "C";
+  return result;
+}
+
+export function runGit(cwd, args, options = {}) {
+  const spawn = options.spawn ?? spawnSync;
+  const result = spawn("git", [...FIXED_GIT_CONFIG, ...args], {
+    cwd,
+    env: gitEnvironment(options.env),
+    encoding: options.encoding ?? "utf8",
+    maxBuffer: options.maxBuffer ?? 16 * 1024 * 1024,
+    shell: false,
+    // Forwarded so `discoverRepository(...)` callers (PHX-2, external-push-ledger.mjs's two
+    // integration points) can bound their git spawns -- undefined/absent stays a no-op, so no
+    // existing caller that never passed a timeout changes behavior (spawnSync's own default).
+    ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
+  });
+  if (isSuccessfulSpawn(result)) return result;
+  // `symbolic-ref -q HEAD` is the sole caller that expects a nonzero typed
+  // outcome: status 1 means detached HEAD. Keep that protocol narrow rather
+  // than turning every numeric Git failure into a successful observation.
+  if (options.allowNonzero && hasExpectedSpawnStatus(result, [0, 1])) return result;
+  if (result?.error) fail("WT-GIT-SPAWN", `git could not start: ${result.error.message}`);
+  const detail = String(result.stderr || result.stdout || "").trim().slice(0, 500);
+  fail("WT-GIT-FAILED", `git ${args[0] || "command"} failed (${result.status})${detail ? `: ${detail}` : ""}`);
+}
+
+function gitText(cwd, args, options = {}) {
+  return String(runGit(cwd, args, options).stdout).trim();
+}
+
+function ensureSafeId(value, label) {
+  if (typeof value !== "string" || !SAFE_ID.test(value)) fail("WT-INVALID-ID", `${label} is not a safe identifier`);
+  return value;
+}
+
+function safeBranchSegments(branchOrRef) {
+  if (typeof branchOrRef !== "string") fail("WT-INVALID-BRANCH", "branch must be a string");
+  const branch = branchOrRef.startsWith("refs/heads/") ? branchOrRef.slice("refs/heads/".length) : branchOrRef;
+  if (!branch || branch.length > 240 || branch.includes("\\") || branch.includes("\0")) {
+    fail("WT-INVALID-BRANCH", "branch is not a bounded slash-separated name");
+  }
+  const segments = branch.split("/");
+  if (segments.some((segment) => !SAFE_COMPONENT.test(segment)
+    || segment === "." || segment === ".." || segment.endsWith(".") || segment.endsWith(".lock")
+    || segment.includes("..") || segment.includes("@{"))) {
+    fail("WT-INVALID-BRANCH", "branch contains an unsafe path component");
+  }
+  return { branch, fullRef: `refs/heads/${branch}`, segments };
+}
+
+function ensureSafePurpose(purpose) {
+  if (typeof purpose !== "string" || !SAFE_PURPOSE.test(purpose)) {
+    fail("WT-INVALID-PURPOSE", "detached purpose must be a lowercase safe label");
+  }
+  return purpose;
+}
+
+function isInside(root, target) {
+  const rel = relative(root, target);
+  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+}
+
+function assertExistingDirectoryPhysical(path, label) {
+  const entry = lstatSync(path);
+  if (entry.isSymbolicLink() || !entry.isDirectory()) fail("WT-PATH-TYPE", `${label} must be a non-symlink directory`);
+  const physical = realpathSync(path);
+  if (physical !== resolve(path)) fail("WT-PATH-ALIAS", `${label} must be addressed by its physical path`);
+  return physical;
+}
+
+function assertNoSymlinkComponents(rootPhysical, target) {
+  if (!isInside(rootPhysical, target) || target === rootPhysical) fail("WT-OUTSIDE-PRIMARY", "target is outside the physical primary root");
+  const rel = relative(rootPhysical, target);
+  let cursor = rootPhysical;
+  for (const segment of rel.split(sep)) {
+    cursor = join(cursor, segment);
+    if (!existsSync(cursor)) continue;
+    if (lstatSync(cursor).isSymbolicLink()) fail("WT-SYMLINK-PARENT", "target crosses a symlink component");
+  }
+}
+
+function assertNoCaseFoldCollision(rootPhysical, target) {
+  const rel = relative(rootPhysical, target);
+  let cursor = rootPhysical;
+  for (const segment of rel.split(sep)) {
+    if (!existsSync(cursor)) return;
+    const matches = readdirSync(cursor).filter((name) => name.toLocaleLowerCase("en-US") === segment.toLocaleLowerCase("en-US"));
+    if (matches.some((name) => name !== segment)) fail("WT-CASE-COLLISION", "target has a case-fold path collision");
+    cursor = join(cursor, segment);
+  }
+}
+
+function makeParentsPhysical(rootPhysical, parent) {
+  if (!isInside(rootPhysical, parent)) fail("WT-OUTSIDE-PRIMARY", "parent is outside the primary root");
+  const rel = relative(rootPhysical, parent);
+  let cursor = rootPhysical;
+  for (const segment of rel.split(sep).filter(Boolean)) {
+    assertNoCaseFoldCollision(rootPhysical, join(cursor, segment));
+    cursor = join(cursor, segment);
+    if (!existsSync(cursor)) mkdirSync(cursor, { mode: 0o700 });
+    if (lstatSync(cursor).isSymbolicLink() || !lstatSync(cursor).isDirectory()) {
+      fail("WT-SYMLINK-PARENT", "target parent is not a physical directory");
+    }
+  }
+}
+
+export function parseWorktreePorcelain(raw) {
+  const records = [];
+  let current = null;
+  for (const field of String(raw).split("\0")) {
+    if (field === "") {
+      if (current) records.push(current);
+      current = null;
+      continue;
+    }
+    const split = field.indexOf(" ");
+    const key = split === -1 ? field : field.slice(0, split);
+    const value = split === -1 ? true : field.slice(split + 1);
+    if (key === "worktree") {
+      if (current) records.push(current);
+      current = { path: value };
+    } else {
+      if (!current) fail("WT-WORKTREE-LIST", "worktree porcelain contains a field before worktree");
+      current[key] = value;
+    }
+  }
+  if (current) records.push(current);
+  return records;
+}
+
+export function discoverRepository(startPath, options = {}) {
+  const start = assertExistingDirectoryPhysical(startPath, "repository path");
+  const commonRaw = gitText(start, ["rev-parse", "--path-format=absolute", "--git-common-dir"], options);
+  const commonDir = realpathSync(commonRaw);
+  if (basename(commonDir) !== ".git") fail("WT-GIT-COMMON-DIR", "primary checkout must have a physical .git common directory");
+  const primaryRoot = assertExistingDirectoryPhysical(dirname(commonDir), "primary checkout");
+  // Git for Windows emits forward slashes in porcelain even when Node's
+  // resolved/physical paths use backslashes. Canonicalize every row at this
+  // boundary so all consumers compare paths in the host's native form.
+  const records = parseWorktreePorcelain(runGit(start, ["worktree", "list", "--porcelain", "-z"], options).stdout)
+    .map((entry) => {
+      const nativePath = resolve(entry.path);
+      return { ...entry, path: existsSync(nativePath) ? realpathSync(nativePath) : nativePath };
+    });
+  const primaryRecord = records.find((entry) => {
+    try { return realpathSync(entry.path) === primaryRoot; } catch { return false; }
+  });
+  if (!primaryRecord) fail("WT-PRIMARY-MISSING", "Git did not report the physical primary checkout");
+  return {
+    start,
+    primaryRoot,
+    commonDir,
+    objectFormat: gitText(start, ["rev-parse", "--show-object-format"], options),
+    worktrees: records,
+  };
+}
+
+export function canonicalBranchTarget(primaryRoot, branchOrRef) {
+  const root = assertExistingDirectoryPhysical(primaryRoot, "primary checkout");
+  const parsed = safeBranchSegments(branchOrRef);
+  const target = resolve(root, "branch", ...parsed.segments);
+  assertNoSymlinkComponents(root, target);
+  assertNoCaseFoldCollision(root, target);
+  return { ...parsed, target };
+}
+
+export function canonicalDetachedTarget(primaryRoot, purpose, oid) {
+  const root = assertExistingDirectoryPhysical(primaryRoot, "primary checkout");
+  const label = ensureSafePurpose(purpose);
+  if (!OID.test(oid)) fail("WT-INVALID-OID", "detached worktree requires a full lowercase commit OID");
+  const target = resolve(root, "branch", "detached", `${label}-${oid.slice(0, 12)}`);
+  assertNoSymlinkComponents(root, target);
+  assertNoCaseFoldCollision(root, target);
+  return { purpose: label, oid, target };
+}
+
+/**
+ * Directory durability is a hard POSIX flush but is not portably available on
+ * native Windows, where opening or fsync-ing a directory handle raises
+ * EPERM/EINVAL. The regular-file flush that precedes every call is the hard
+ * durability guarantee; parent-directory durability is therefore best-effort on
+ * Windows, and its typed-unavailable outcome is not a failure.
+ */
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
+
+function fsyncDirectory(path) {
+  let fd;
+  try {
+    fd = openSync(path, "r");
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
+  try {
+    fsyncSync(fd);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Every component from `existing` (the nearest already-existing ancestor,
+ * captured BEFORE the caller's mkdirSync) down through `parent` is covered,
+ * whether or not this call created it. A directory this call created is
+ * hardened outright, the same discipline as private-boundary.mjs's directory
+ * chain. `existing` itself is never assumed to be ours -- it is assessed
+ * first -- but unlike the earlier assess-only discipline it is now
+ * auto-remediated (hardened) rather than left to fail closed forever when
+ * found insecure: hardening only ever tightens an ACL to owner-only, never
+ * loosens access or touches contents, so uniform remediation carries no
+ * credential-exposure asymmetry between a transient and a long-lived
+ * directory (2026-08-18 Triage decision on the pipeline.windows-acl-hardening
+ * backlog item). This also closes the item's ancestor-skip gap: `existing` is
+ * now assessed/remediated unconditionally, not only when `created.length` is
+ * zero -- previously an insecure `existing` was never even looked at once a
+ * new directory was created below it. `code` is the caller's own error code.
+ */
+export function assureWindowsLocalDirectories(existing, parent, code, {
+  harden = hardenWindowsPrivateDirectory,
+  assess = assessWindowsPrivatePath,
+} = {}) {
+  const created = [];
+  for (let cursor = resolve(parent); cursor !== existing; cursor = dirname(cursor)) created.push(cursor);
+  created.reverse();
+  for (const directory of created) {
+    if (harden(directory).status !== "secure") fail(code, "local state directory Windows assurance is unavailable or insecure");
+  }
+  if (assess(existing).status !== "secure" && harden(existing).status !== "secure") {
+    fail(code, "local state directory Windows assurance is unavailable or insecure");
+  }
+}
+
+function writeAtomic(path, bytes, mode = 0o600, { windowsAssurance = true } = {}) {
+  const parent = dirname(path);
+  let existing = parent;
+  while (!existsSync(existing)) existing = dirname(existing);
+  if (realpathSync(existing) !== resolve(existing)) fail("WT-LOCAL-SYMLINK", "local state path crosses a symlink");
+  const existingBeforeCreate = resolve(existing);
+  mkdirSync(parent, { recursive: true, mode: 0o700 });
+  if (lstatSync(parent).isSymbolicLink() || realpathSync(parent) !== resolve(parent)) {
+    fail("WT-LOCAL-SYMLINK", "local state directory crosses a symlink");
+  }
+  if (process.platform === "win32" && windowsAssurance) assureWindowsLocalDirectories(existingBeforeCreate, parent, "WT-LOCAL-WINDOWS-ASSURANCE");
+  const temporary = join(parent, `.${basename(path)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
+  const fd = openSync(temporary, "wx", mode);
+  try {
+    try {
+      writeFileSync(fd, bytes);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(temporary, path);
+    fsyncDirectory(parent);
+  } catch (error) {
+    try { unlinkSync(temporary); } catch {}
+    throw error;
+  }
+}
+
+export function ensurePrimaryBranchExclude(repository) {
+  const repo = typeof repository === "string" ? discoverRepository(repository) : repository;
+  if (realpathSync(join(repo.primaryRoot, ".git")) !== repo.commonDir) {
+    fail("WT-PRIMARY-GITDIR", "primary .git directory does not equal the Git common directory");
+  }
+  const info = join(repo.commonDir, "info");
+  if (!existsSync(info)) mkdirSync(info, { mode: 0o700 });
+  if (lstatSync(info).isSymbolicLink() || !lstatSync(info).isDirectory()) fail("WT-EXCLUDE-SYMLINK", "Git info directory is not physical");
+  const exclude = join(info, "exclude");
+  if (existsSync(exclude) && lstatSync(exclude).isSymbolicLink()) fail("WT-EXCLUDE-SYMLINK", "Git exclude file is a symlink");
+  const before = existsSync(exclude) ? readFileSync(exclude, "utf8") : "";
+  const lines = before.split(/\r?\n/).filter((line, index, all) => !(line === "" && index === all.length - 1));
+  const next = [...lines.filter((line) => line !== "/branch/"), "/branch/"];
+  const rendered = `${next.join("\n")}\n`;
+  // .git/info is Git's own conventional directory, not Pipeline private state; it
+  // is never hardened as owned and must not be held to the private-state DACL bar.
+  if (rendered !== before) writeAtomic(exclude, rendered, 0o600, { windowsAssurance: false });
+  return { path: exclude, changed: rendered !== before, digest: rawSha256(rendered) };
+}
+
+function localRoot(commonDir) {
+  return join(commonDir, "agent-pipeline");
+}
+
+function worktreeRecordPath(repo, target) {
+  const id = rawSha256(Buffer.from(target)).slice(0, 32);
+  return join(localRoot(repo.commonDir), "worktrees", `${id}.json`);
+}
+
+function fileIdentity(path) {
+  const stat = lstatSync(path);
+  return {
+    dev: String(stat.dev),
+    ino: String(stat.ino),
+    mode: stat.mode,
+    kind: stat.isDirectory() ? "directory" : stat.isFile() ? "file" : "other",
+  };
+}
+
+function sameIdentity(left, right) {
+  return left && right && left.dev === right.dev && left.ino === right.ino
+    && left.mode === right.mode && left.kind === right.kind;
+}
+
+function publishWorktreeRecord(repo, record) {
+  const path = worktreeRecordPath(repo, record.physicalPath);
+  writeAtomic(path, canonicalJson(record));
+  return { path, record };
+}
+
+function readWorktreeRecords(repo) {
+  const dir = join(localRoot(repo.commonDir), "worktrees");
+  if (!existsSync(dir)) return [];
+  if (lstatSync(dir).isSymbolicLink() || !lstatSync(dir).isDirectory()) fail("WT-REGISTRY-TYPE", "worktree registry is not a physical directory");
+  return readdirSync(dir).filter((name) => /^[0-9a-f]{32}\.json$/.test(name)).map((name) => {
+    const path = join(dir, name);
+    const stat = lstatSync(path);
+    const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+    const windowsInsecure = process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dir).status !== "secure");
+    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation || windowsInsecure) {
+      fail("WT-REGISTRY-TYPE", "worktree record is not a private single-link regular file");
+    }
+    const record = JSON.parse(readFileSync(path, "utf8"));
+    if (record.schema !== WORKTREE_RECORD_SCHEMA) fail("WT-REGISTRY-SCHEMA", "worktree record schema is invalid");
+    return { path, record };
+  });
+}
+
+function resolveCommit(repo, value, options = {}) {
+  const oid = gitText(repo.primaryRoot, ["rev-parse", "--verify", `${value}^{commit}`], options);
+  if (!OID.test(oid)) fail("WT-INVALID-OID", "Git returned a noncanonical commit OID");
+  return oid;
+}
+
+function verifyReadyWorktree(repo, target, expected) {
+  const physical = assertExistingDirectoryPhysical(target, "created worktree");
+  if (physical !== target) fail("WT-PATH-ALIAS", "created worktree path changed physically");
+  const oid = gitText(target, ["rev-parse", "HEAD"]);
+  if (oid !== expected.oid) fail("WT-OID-MISMATCH", "created worktree has the wrong commit");
+  const branch = gitText(target, ["symbolic-ref", "-q", "HEAD"], { allowNonzero: true });
+  if ((expected.ref ?? "") !== branch) fail("WT-REF-MISMATCH", "created worktree has the wrong branch state");
+  const common = realpathSync(gitText(target, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
+  if (common !== repo.commonDir) fail("WT-COMMON-DIR-MISMATCH", "created worktree has a different Git common directory");
+  return { physical, oid, ref: branch || null, identity: fileIdentity(physical) };
+}
+
+function newWorktreeRecord(repo, fields, now) {
+  return {
+    schema: WORKTREE_RECORD_SCHEMA,
+    revision: 0,
+    status: "creating",
+    lifecycle: fields.lifecycle,
+    physicalPath: fields.physicalPath,
+    primaryRoot: repo.primaryRoot,
+    commonDir: repo.commonDir,
+    ref: fields.ref ?? null,
+    oid: fields.oid,
+    purpose: fields.purpose ?? null,
+    sessionId: fields.sessionId ?? null,
+    sourcePath: fields.sourcePath ?? null,
+    identity: null,
+    createdAt: nowIso(now),
+    updatedAt: nowIso(now),
+    reason: null,
+  };
+}
+
+function failWorktreeRecord(repo, record, error, now) {
+  const blocked = {
+    ...record,
+    revision: record.revision + 1,
+    status: "blocked",
+    updatedAt: nowIso(now),
+    reason: error instanceof WorktreeLifecycleError ? error.code : "WT-INTERNAL",
+  };
+  try { publishWorktreeRecord(repo, blocked); } catch { /* preserve the primary failure */ }
+}
+
+export function createBranchWorktree(startPath, branchOrRef, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const mapping = canonicalBranchTarget(repo.primaryRoot, branchOrRef);
+  if (existsSync(mapping.target)) fail("WT-TARGET-EXISTS", "canonical branch target already exists");
+  runGit(repo.primaryRoot, ["check-ref-format", "--branch", mapping.branch], options);
+  runGit(repo.primaryRoot, ["show-ref", "--verify", mapping.fullRef], options);
+  const oid = resolveCommit(repo, mapping.fullRef, options);
+  makeParentsPhysical(repo.primaryRoot, dirname(mapping.target));
+  ensurePrimaryBranchExclude(repo);
+  const record = newWorktreeRecord(repo, {
+    lifecycle: "persistent-branch",
+    physicalPath: mapping.target,
+    ref: mapping.fullRef,
+    oid,
+  }, options.now);
+  publishWorktreeRecord(repo, record);
+  try {
+    // `git worktree add <path> refs/heads/x` may treat the fully qualified ref as
+    // a detached commit-ish. The already check-ref-format/show-ref-validated
+    // short branch name is required here so Git attaches HEAD to that branch.
+    runGit(repo.primaryRoot, ["worktree", "add", mapping.target, mapping.branch], options);
+    const verified = verifyReadyWorktree(repo, mapping.target, { oid, ref: mapping.fullRef });
+    const ready = { ...record, revision: 1, status: "ready", identity: verified.identity, updatedAt: nowIso(options.now) };
+    publishWorktreeRecord(repo, ready);
+    return ready;
+  } catch (error) {
+    failWorktreeRecord(repo, record, error, options.now);
+    throw error;
+  }
+}
+
+function ownerDigest(ownerNonce) {
+  if (typeof ownerNonce !== "string" || ownerNonce.length < 16 || ownerNonce.length > 256) {
+    fail("WT-OWNER-NONCE", "owner nonce must contain 16..256 characters");
+  }
+  return rawSha256(Buffer.from(ownerNonce));
+}
+
+function linuxProcessStartTicks(stat) {
+  if (typeof stat !== "string" || !/^\d+ \(/u.test(stat)) return null;
+  const closing = stat.lastIndexOf(")");
+  if (closing < 0 || stat[closing + 1] !== " ") return null;
+  const fields = stat.slice(closing + 2).trim().split(/\s+/u);
+  return fields.length >= 20 && /^\d+$/u.test(fields[19] ?? "") ? fields[19] : null;
+}
+
+function localProcessStartIdentity(pid, platform = process.platform) {
+  if (!Number.isSafeInteger(pid) || pid < 1 || platform !== "linux") return null;
+  try {
+    return linuxProcessStartTicks(readFileSync(`/proc/${pid}/stat`, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+// CSW-F (Ruling 117/157): spawn-free "probably live" evidence on native Windows, where there is no /proc.
+// A win32 owner is recorded as its pid plus the host BOOT MINUTE (`now - os.uptime()`, floored to the
+// minute: the Ruling 111 encoding the audit-lock owner already uses), stored in the same `processStartId`
+// slot as the Linux start ticks so the closed descriptor shape (and every validator and fixture) is
+// unchanged. A boot minute is not a process start time: a pid REUSED within one boot is
+// indistinguishable, so the result is advisory ("probable"), never proof. The estimate wobbles by about a
+// second between two reads, so a value near a minute edge can floor to adjacent minutes; adjacent minutes
+// therefore count as the same boot. A reboot moves the boot time by at least the previous uptime.
+// Seams (all optional): `options.platform` (default process.platform), `options.nowMs` (default
+// Date.now()) and `options.uptimeSeconds` (default os.uptime()).
+const WIN32_BOOT_MINUTE_TOLERANCE = 1;
+
+function win32BootMinute(options = {}) {
+  const nowMs = options.nowMs ?? Date.now();
+  const uptimeSeconds = options.uptimeSeconds ?? uptime();
+  if (!Number.isFinite(nowMs) || !Number.isFinite(uptimeSeconds) || uptimeSeconds < 0) return null;
+  const minute = Math.floor((nowMs - uptimeSeconds * 1000) / 60000);
+  return Number.isSafeInteger(minute) && minute > 0 ? String(minute) : null;
+}
+
+function processExists(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The advisory leg of `inspectSessionOwnerRuntime`, reached only when no process start identity is
+ * available (every non-Linux host). It answers "live" (with `probable: true`) or "reused" ONLY for a
+ * caller that opted in with `options.probableLiveness === true` on win32; every other caller keeps the
+ * typed "unavailable" it always had, so retirement and orphan-archive decisions are never driven by a
+ * probable status.
+ */
+function probableOwnerStatus(base, ownerRuntime, platform, options) {
+  if (options?.probableLiveness !== true || platform !== "win32") return { ...base, status: "unavailable" };
+  const current = win32BootMinute(options);
+  if (current === null) return { ...base, status: "unavailable" };
+  const sameBoot = Math.abs(Number(ownerRuntime.processStartId) - Number(current)) <= WIN32_BOOT_MINUTE_TOLERANCE;
+  return sameBoot ? { ...base, status: "live", probable: true } : { ...base, status: "reused" };
+}
+
+function localProcessOwnerRuntime(pid = process.pid, options = {}) {
+  const platform = options.platform ?? process.platform;
+  let processStartId = localProcessStartIdentity(pid, platform);
+  if (processStartId === null && platform === "win32" && Number.isSafeInteger(pid) && pid >= 1 && processExists(pid)) {
+    processStartId = win32BootMinute(options);
+  }
+  return processStartId === null ? null : {
+    schema: SESSION_OWNER_RUNTIME_SCHEMA,
+    pid,
+    processStartId,
+  };
+}
+
+function validOwnerRuntime(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === 3
+    && value.schema === SESSION_OWNER_RUNTIME_SCHEMA
+    && Number.isSafeInteger(value.pid) && value.pid > 0
+    && typeof value.processStartId === "string" && /^\d+$/u.test(value.processStartId);
+}
+
+function sessionDescriptorPath(repo, sessionId) {
+  ensureSafeId(sessionId, "session ID");
+  return join(localRoot(repo.commonDir), "session-descriptors", "active", `${sessionId}.json`);
+}
+
+function assertPrivateRegularFile(path, code, label) {
+  const stat = lstatSync(path);
+  // POSIX mode bits express owner-only exclusivity directly; native Windows has no
+  // such mode semantics (mode is a synthetic constant), so the equivalent assurance
+  // there is the shared owner-DACL check on both the file and its parent directory.
+  const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+  const windowsInsecure = process.platform === "win32"
+    && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure");
+  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation || windowsInsecure) {
+    fail(code, `${label} is not a private single-link regular file`);
+  }
+}
+
+/**
+ * Deterministic-test seam (FLAPW): `options.descriptorStageHook(stage, path)` runs at exact points of
+ * the list-then-load sequence ("listed", "before-check", "before-read") so a test can retire a
+ * descriptor at the precise instant a concurrent owner would. Production callers pass no hook.
+ */
+function descriptorStage(options, stage, path) {
+  if (typeof options?.descriptorStageHook === "function") options.descriptorStageHook(stage, path);
+}
+
+function validSessionDescriptor(value, repo, sessionId) {
+  const common = value !== null && typeof value === "object" && !Array.isArray(value)
+    && value.sessionId === sessionId
+    && value.primaryRoot === repo.primaryRoot
+    && value.commonDir === repo.commonDir
+    && typeof value.createdAt === "string"
+    && typeof value.ownerNonce === "string"
+    && value.ownerNonceSha256 === ownerDigest(value.ownerNonce);
+  if (!common) return false;
+  if (value.schema === LEGACY_SESSION_DESCRIPTOR_SCHEMA) return Object.keys(value).length === 7;
+  return value.schema === SESSION_DESCRIPTOR_SCHEMA
+    && Object.keys(value).length === 8
+    && (value.ownerRuntime === null || validOwnerRuntime(value.ownerRuntime));
+}
+
+/** Create the local, non-committed capability used by all session cleanup calls. */
+export function startSessionDescriptor(startPath, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const sessionId = options.sessionId ?? `session-${randomBytes(12).toString("hex")}`;
+  ensureSafeId(sessionId, "session ID");
+  const path = sessionDescriptorPath(repo, sessionId);
+  if (existsSync(path)) fail("WT-SESSION-EXISTS", "session descriptor already exists");
+  const ownerNonce = options.ownerNonce ?? randomBytes(32).toString("base64url");
+  const descriptor = {
+    schema: SESSION_DESCRIPTOR_SCHEMA,
+    sessionId,
+    primaryRoot: repo.primaryRoot,
+    commonDir: repo.commonDir,
+    createdAt: nowIso(options.now),
+    ownerNonce,
+    ownerNonceSha256: ownerDigest(ownerNonce),
+    ownerRuntime: localProcessOwnerRuntime(options.ownerPid ?? process.pid, options),
+  };
+  assertOwnedDescriptorLifetimeCapacity();
+  writeAtomic(path, canonicalJson(descriptor));
+  retainSourceCreatedDescriptorOwner(repo, path, descriptor);
+  return {
+    repo,
+    path,
+    sessionId,
+    ownerNonce,
+    descriptorSha256: rawSha256(readFileSync(path)),
+  };
+}
+
+/** Load a descriptor only from this repository's private Git-common-dir namespace. */
+export function loadSessionDescriptor(startPath, sessionId, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  ensureSafeId(sessionId, "session ID");
+  const path = sessionDescriptorPath(repo, sessionId);
+  const missing = () => fail("WT-SESSION-MISSING", "session descriptor is missing");
+  if (!existsSync(path)) missing();
+  // A published descriptor is immutable (the writer publishes it by an atomic rename), but its owner
+  // may retire it at ANY instant. Every step below can then fail only because the name is gone: that
+  // is re-observed AFTER the failing step and reported as "missing", never as "malformed" or "not a
+  // private single-link regular file". A descriptor that is still present keeps its fail-closed
+  // verdict unchanged. The bytes are read once, so the parse and the digest describe the same file.
+  descriptorStage(options, "before-check", path);
+  try {
+    assertPrivateRegularFile(path, "WT-SESSION-DESCRIPTOR", "session descriptor");
+  } catch (error) {
+    if (!existsSync(path)) missing();
+    throw error;
+  }
+  descriptorStage(options, "before-read", path);
+  let bytes;
+  try { bytes = readFileSync(path); } catch {
+    if (!existsSync(path)) missing();
+    fail("WT-SESSION-DESCRIPTOR", "session descriptor is unreadable");
+  }
+  let descriptor;
+  try { descriptor = JSON.parse(bytes.toString("utf8")); } catch { fail("WT-SESSION-DESCRIPTOR", "session descriptor is malformed"); }
+  if (!validSessionDescriptor(descriptor, repo, sessionId)) fail("WT-SESSION-BINDING", "session descriptor binding is invalid");
+  const descriptorSha256 = rawSha256(bytes);
+  if (options.expectedDescriptorSha256 !== undefined) {
+    if (typeof options.expectedDescriptorSha256 !== "string" || !SHA256.test(options.expectedDescriptorSha256)
+      || !timingSafeEqual(Buffer.from(descriptorSha256), Buffer.from(options.expectedDescriptorSha256))) {
+      fail("WT-SESSION-DIGEST", "session descriptor digest does not match the persisted handle");
+    }
+  }
+  return {
+    repo,
+    path,
+    sessionId,
+    ownerNonce: descriptor.ownerNonce,
+    descriptorSha256,
+    descriptorSchema: descriptor.schema,
+    ownerRuntime: descriptor.schema === SESSION_DESCRIPTOR_SCHEMA ? structuredClone(descriptor.ownerRuntime) : null,
+  };
+}
+
+/**
+ * Read the local liveness evidence of one descriptor without exposing its
+ * nonce, process coordinates, or any runner conversation data. Legacy v1
+ * descriptors deliberately remain unobserved rather than being guessed stale.
+ */
+export function inspectSessionOwnerRuntime(startPath, sessionId, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const base = {
+    schema: SESSION_OWNER_STATUS_SCHEMA,
+    sessionId: loaded.sessionId,
+    descriptorSha256: loaded.descriptorSha256,
+  };
+  if (loaded.descriptorSchema === LEGACY_SESSION_DESCRIPTOR_SCHEMA) {
+    return { ...base, status: "unobserved" };
+  }
+  if (loaded.ownerRuntime === null) return { ...base, status: "unavailable" };
+  let alive = true;
+  try { process.kill(loaded.ownerRuntime.pid, 0); } catch (error) {
+    if (error?.code === "ESRCH") alive = false;
+    else return { ...base, status: "unavailable" };
+  }
+  if (!alive) return { ...base, status: "not-live" };
+  const platform = options.platform ?? process.platform;
+  const observedStartId = localProcessStartIdentity(loaded.ownerRuntime.pid, platform);
+  if (observedStartId === null) return probableOwnerStatus(base, loaded.ownerRuntime, platform, options);
+  return {
+    ...base,
+    status: observedStartId === loaded.ownerRuntime.processStartId ? "live" : "reused",
+  };
+}
+
+/**
+ * Determine whether an exact unbound descriptor may enter the explicit Human
+ * recovery path. This exposes no nonce or process coordinate. A live or
+ * unobservable V2 owner and every active cleanup manifest remain blocking;
+ * legacy V1 descriptors are deliberately classified as Human-only
+ * `unobserved` rather than guessed dead.
+ */
+export function inspectSessionRetirement(startPath, sessionId, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const owner = inspectSessionOwnerRuntime(startPath, sessionId, {
+    ...options,
+    expectedDescriptorSha256: loaded.descriptorSha256,
+  });
+  const base = {
+    schema: SESSION_RETIREMENT_STATUS_SCHEMA,
+    sessionId: loaded.sessionId,
+    descriptorSha256: loaded.descriptorSha256,
+    ownerStatus: owner.status,
+  };
+  if (existsSync(cleanupManifestPath(loaded.repo, loaded.sessionId))) {
+    return { ...base, status: "cleanup-required" };
+  }
+  if (owner.status === "live") return { ...base, status: "owner-live" };
+  if (owner.status === "unavailable") return { ...base, status: "owner-unavailable" };
+  return { ...base, status: "retirable" };
+}
+
+function externalRetirementEligibility(repo, manifest) {
+  const detachedRoot = resolve(repo.primaryRoot, "branch", "detached");
+  if (manifest.resources.length === 0) return { ok: false, reason: "empty-manifest" };
+  for (const resource of manifest.resources) {
+    // This is deliberately narrower than normal cleanup.  The PO may attest
+    // an already archived, missing *disposable control* worktree, never a
+    // scratch/output path or a resource that could be the only copy.
+    if (resource.type !== "disposable-worktree"
+      || resource.contentClass !== "disposable-control"
+      || resource.soleCopy !== false
+      || resource.cleanupPolicy !== "remove-worktree"
+      || !new Set(["ready", "sealed"]).has(resource.status)
+      || resource.allowedRoot !== detachedRoot
+      || !isInside(detachedRoot, resource.physicalPath)
+      || resource.physicalPath === detachedRoot
+      || existsSync(resource.physicalPath)) {
+      return { ok: false, reason: "resource-not-externally-retirable" };
+    }
+  }
+  return { ok: true };
+}
+
+/**
+ * Read-only proof for the exceptional case where an operator archived
+ * registered disposable worktrees outside the repository before the normal
+ * session owner could drain them.  It never treats a missing path as ordinary
+ * cleanup: callers must surface and bind this exact proof to an explicit PO
+ * recovery action.
+ */
+export function inspectExternallyArchivedSession(startPath, sessionId, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const owner = inspectSessionOwnerRuntime(startPath, loaded.sessionId, {
+    ...options,
+    expectedDescriptorSha256: loaded.descriptorSha256,
+  });
+  const base = {
+    schema: SESSION_EXTERNAL_RETIREMENT_STATUS_SCHEMA,
+    sessionId: loaded.sessionId,
+    descriptorSha256: loaded.descriptorSha256,
+    ownerStatus: owner.status,
+  };
+  if (new Set(["live", "unavailable"]).has(owner.status)) return { ...base, status: "owner-active" };
+  if (!existsSync(cleanupManifestPath(loaded.repo, loaded.sessionId))) return { ...base, status: "manifest-absent" };
+  const manifest = loadManifest(loaded.repo, loaded.sessionId, loaded.ownerNonce);
+  const eligibility = externalRetirementEligibility(loaded.repo, manifest.manifest);
+  if (!eligibility.ok) return { ...base, status: "not-eligible", reason: eligibility.reason };
+  return {
+    ...base,
+    status: "ready",
+    manifestSha256: rawSha256(readFileSync(manifest.path)),
+    resources: manifest.manifest.resources.map((resource) => ({
+      resourceId: resource.resourceId,
+      type: resource.type,
+      classification: resource.contentClass,
+    })),
+  };
+}
+
+/**
+ * Retire only the manifest whose missing resources were already externally
+ * archived.  This does not delete a filesystem target; the receipt says so in
+ * every outcome code and remains a normal completed closure for the exact
+ * descriptor lifecycle.
+ */
+export function retireExternallyArchivedSession(startPath, fields, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, fields.sessionId, {
+    ...options,
+    expectedDescriptorSha256: fields.descriptorSha256 ?? options.expectedDescriptorSha256,
+  });
+  if (loaded.ownerNonce !== fields.ownerNonce) fail("WT-SESSION-OWNER", "session descriptor owner does not match");
+  const releaseLock = acquireManifestLock(loaded.repo, loaded.sessionId, loaded.ownerNonce);
+  try {
+    const manifest = loadManifest(loaded.repo, loaded.sessionId, loaded.ownerNonce);
+    const observedManifestSha256 = rawSha256(readFileSync(manifest.path));
+    if (observedManifestSha256 !== fields.expectedManifestSha256) {
+      fail("WT-EXTERNAL-RETIREMENT-PLAN", "external retirement manifest changed since planning");
+    }
+    const eligibility = externalRetirementEligibility(loaded.repo, manifest.manifest);
+    if (!eligibility.ok) fail("WT-EXTERNAL-RETIREMENT-PLAN", "external retirement eligibility changed since planning");
+    const receipt = sanitizedCleanupReceipt(loaded.sessionId, manifest.manifest.resources.map((resource) => ({
+      ...resource,
+      status: "removed",
+      reason: "WT-EXTERNALLY-ARCHIVED",
+    })), "complete", options.now);
+    const receiptPath = cleanupReceiptPath(loaded.repo, loaded.sessionId);
+    if (existsSync(receiptPath)) fail("WT-SESSION-CLOSED", "a completed cleanup receipt already closes this session ID");
+    writeAtomic(receiptPath, canonicalJson(receipt));
+    unlinkSync(manifest.path);
+    fsyncDirectory(dirname(manifest.path));
+    return { receipt, receiptPath };
+  } finally {
+    releaseLock();
+  }
+}
+
+/**
+ * Enumerate only validated active descriptor handles. This never returns the
+ * owner nonce and deliberately fails on an unexpected directory entry rather
+ * than guessing whether it is safe to ignore.
+ */
+export function listActiveSessionDescriptors(startPath, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const directory = join(localRoot(repo.commonDir), "session-descriptors", "active");
+  if (!existsSync(directory)) return [];
+  const info = lstatSync(directory);
+  if (info.isSymbolicLink() || !info.isDirectory()) {
+    fail("WT-SESSION-DESCRIPTOR-DIRECTORY", "session descriptor directory is unsafe");
+  }
+  const entries = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => !(entry.isFile() && !entry.isSymbolicLink() && entry.name.startsWith(".") && entry.name.endsWith(".tmp")))
+    .sort((left, right) => left.name.localeCompare(right.name, "en"));
+  return entries.flatMap((entry) => {
+    if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".json")) {
+      fail("WT-SESSION-DESCRIPTOR-DIRECTORY", "session descriptor directory contains an unexpected entry");
+    }
+    const sessionId = entry.name.slice(0, -".json".length);
+    ensureSafeId(sessionId, "session ID");
+    descriptorStage(options, "listed", join(directory, entry.name));
+    const loaded = loadListedSessionDescriptor(repo.primaryRoot, sessionId, options);
+    // Retired by its owner between the directory read and this load: absent, not an error.
+    if (loaded === null) return [];
+    return [{
+      sessionId: loaded.sessionId,
+      descriptorSha256: loaded.descriptorSha256,
+    }];
+  });
+}
+
+/**
+ * List-all paths ONLY (never a load of one specific, required descriptor): a descriptor whose name
+ * vanished between being listed and being loaded was retired by its owner, so it is absent. Every
+ * other failure -- malformed, multi-linked, binding or digest mismatch -- still throws.
+ */
+function loadListedSessionDescriptor(startPath, sessionId, options) {
+  try {
+    return loadSessionDescriptor(startPath, sessionId, options);
+  } catch (error) {
+    if (error instanceof WorktreeLifecycleError && error.code === "WT-SESSION-MISSING") return null;
+    throw error;
+  }
+}
+
+/**
+ * Read-only (ALFRED-RDY-20261005): split the active descriptors into the requesting session's OWN
+ * descriptor(s) and FOREIGN ones. A descriptor is the requester's own only when its owner nonce
+ * equals `requesterOwnerNonce` (PIPELINE_SESSION_OWNER_NONCE); with no nonce nothing is the
+ * requester's own -- the same rule the zero-authority archive tier applies. Exposes no nonce.
+ * Any unreadable or invalid descriptor throws its loader's typed code, so a caller fails closed.
+ */
+export function classifyActiveSessionDescriptors(startPath, options = {}) {
+  const { requesterOwnerNonce, ...loadOptions } = options;
+  const hasNonce = typeof requesterOwnerNonce === "string" && requesterOwnerNonce !== "";
+  const own = [];
+  const foreign = [];
+  for (const entry of listActiveSessionDescriptors(startPath, loadOptions)) {
+    const loaded = loadListedSessionDescriptor(startPath, entry.sessionId, {
+      ...loadOptions,
+      expectedDescriptorSha256: entry.descriptorSha256,
+    });
+    if (loaded === null) continue;
+    const isOwn = hasNonce && timingSafeEqual(
+      Buffer.from(rawSha256(Buffer.from(requesterOwnerNonce))),
+      Buffer.from(rawSha256(Buffer.from(loaded.ownerNonce))),
+    );
+    (isOwn ? own : foreign).push({ sessionId: entry.sessionId, descriptorSha256: entry.descriptorSha256 });
+  }
+  return { own, foreign };
+}
+
+/** Remove a descriptor only after the exact holder has finished cleanup. */
+export function retireSessionDescriptor(startPath, fields, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, fields.sessionId, {
+    ...options,
+    expectedDescriptorSha256: fields.descriptorSha256 ?? options.expectedDescriptorSha256,
+  });
+  if (loaded.ownerNonce !== fields.ownerNonce) fail("WT-SESSION-OWNER", "session descriptor owner does not match");
+  if (existsSync(cleanupManifestPath(loaded.repo, fields.sessionId))) {
+    fail("WT-SESSION-ACTIVE", "session descriptor cannot retire while cleanup manifest is active");
+  }
+  const releaseOwnedLock = existsSync(cleanupReceiptPath(loaded.repo, loaded.sessionId))
+    ? acquireManifestLock(loaded.repo, loaded.sessionId, loaded.ownerNonce, { noReclamation: true })
+    : null;
+  try {
+    const current = loadSessionDescriptor(startPath, loaded.sessionId, { ...options, expectedDescriptorSha256: loaded.descriptorSha256 });
+    if (current.ownerNonce !== loaded.ownerNonce || existsSync(cleanupManifestPath(loaded.repo, loaded.sessionId)))
+      fail("WT-SESSION-ACTIVE", "session descriptor retirement source changed");
+    const ownedClosure = releaseOwnedLock ? prepareOwnedDescriptorClosure(current) : null;
+    unlinkSync(current.path);
+    fsyncDirectory(dirname(current.path));
+    publishOwnedDescriptorClosure(current, ownedClosure);
+    return { sessionId: current.sessionId, descriptorSha256: current.descriptorSha256 };
+  } finally { if (releaseOwnedLock) releaseOwnedLock(); }
+}
+
+export const ORPHAN_ARCHIVE_AUDIT_SCHEMA = "pipeline.session-orphan-archive-audit.v1";
+export const ORPHAN_ARCHIVE_STATUS_SCHEMA = "pipeline.session-orphan-archive-status.v1";
+export const ORPHAN_ARCHIVE_RESULT_SCHEMA = "pipeline.session-orphan-archive-result.v1";
+
+// Zero-authority archive tier (PO decision 2026-10-04): only a descriptor whose
+// owner can never be observed is eligible. `not-live` is deliberately absent --
+// an observable dead owner keeps the existing retirement route.
+const ORPHAN_ARCHIVE_OWNER_STATUSES = new Set(["unavailable", "unobserved"]);
+const ORPHAN_ARCHIVE_BY = /^[A-Za-z0-9][A-Za-z0-9 ._@:-]{0,79}$/u;
+const ORPHAN_ARCHIVE_AUDIT_KEYS = ["archivedAt", "by", "descriptorSha256", "ownerStatus", "reason", "schema", "sessionId"];
+const SIGNED_ROUTE_HINT = "use the signed custody recovery route (PO signature, Spec 20.2) for a descriptor with an observable owner, a cleanup manifest, registered resources or any other authority";
+
+function orphanArchivePaths(repo, sessionId, descriptorSha256) {
+  const directory = join(localRoot(repo.commonDir), "session-descriptors");
+  return {
+    directory,
+    target: join(directory, "archived", `${sessionId}.${descriptorSha256}.json`),
+    audit: join(directory, "orphan-archive-audit.jsonl"),
+  };
+}
+
+/** Strictly parse the append-only archive audit log; any malformed record fails closed. */
+function parseOrphanArchiveAudit(path) {
+  if (!existsSync(path)) return [];
+  const info = lstatSync(path);
+  if (info.isSymbolicLink() || !info.isFile()) fail("WT-ORPHAN-ARCHIVE-AUDIT", "orphan archive audit log is not a regular file");
+  const entries = [];
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (line === "") continue;
+    let entry;
+    try { entry = JSON.parse(line); } catch { fail("WT-ORPHAN-ARCHIVE-AUDIT", "orphan archive audit log contains a malformed record"); }
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)
+      || JSON.stringify(Object.keys(entry).sort()) !== JSON.stringify(ORPHAN_ARCHIVE_AUDIT_KEYS)
+      || entry.schema !== ORPHAN_ARCHIVE_AUDIT_SCHEMA
+      || typeof entry.sessionId !== "string" || !SAFE_ID.test(entry.sessionId)
+      || typeof entry.descriptorSha256 !== "string" || !SHA256.test(entry.descriptorSha256)
+      || !ORPHAN_ARCHIVE_OWNER_STATUSES.has(entry.ownerStatus)
+      || typeof entry.by !== "string" || typeof entry.reason !== "string"
+      || typeof entry.archivedAt !== "string" || Number.isNaN(Date.parse(entry.archivedAt))) {
+      fail("WT-ORPHAN-ARCHIVE-AUDIT", "orphan archive audit log contains a record outside the closed schema");
+    }
+    entries.push(entry);
+  }
+  return entries;
+}
+
+export function readOrphanArchiveAudit(startPath, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  return parseOrphanArchiveAudit(orphanArchivePaths(repo, "audit-read", "0".repeat(64)).audit);
+}
+
+/** Exclusive, atomic publish: the target either appears complete or not at all; never overwrites. */
+function publishExclusiveFile(path, bytes, mode = 0o600) {
+  const parent = dirname(path);
+  let existing = parent;
+  while (!existsSync(existing)) existing = dirname(existing);
+  if (realpathSync(existing) !== resolve(existing)) fail("WT-LOCAL-SYMLINK", "local state path crosses a symlink");
+  const existingBeforeCreate = resolve(existing);
+  mkdirSync(parent, { recursive: true, mode: 0o700 });
+  if (lstatSync(parent).isSymbolicLink() || realpathSync(parent) !== resolve(parent)) {
+    fail("WT-LOCAL-SYMLINK", "local state directory crosses a symlink");
+  }
+  if (process.platform === "win32") assureWindowsLocalDirectories(existingBeforeCreate, parent, "WT-LOCAL-WINDOWS-ASSURANCE");
+  const temporary = join(parent, `.${basename(path)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
+  const fd = openSync(temporary, "wx", mode);
+  try {
+    try {
+      writeFileSync(fd, bytes);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    try {
+      linkSync(temporary, path);
+    } catch (error) {
+      if (error?.code === "EEXIST") fail("WT-ORPHAN-ARCHIVE-TARGET-EXISTS", "orphan archive target already exists and was not overwritten");
+      throw error;
+    }
+  } finally {
+    try { unlinkSync(temporary); } catch {}
+  }
+  fsyncDirectory(parent);
+}
+
+function appendOrphanArchiveAudit(path, entry) {
+  const fd = openSync(path, "a", 0o600);
+  try {
+    writeFileSync(fd, `${JSON.stringify(entry)}\n`);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  fsyncDirectory(dirname(path));
+}
+
+/**
+ * Read-only eligibility of one exact descriptor for the zero-authority ARCHIVE
+ * tier. Returns `{status: "eligible"}` or `{status: "refused", code, reason}`;
+ * an unreadable, symlinked or hardlinked descriptor and a digest mismatch throw
+ * (the descriptor loader's own typed codes).
+ */
+export function inspectOrphanArchiveEligibility(startPath, sessionId, options = {}) {
+  const { requesterOwnerNonce, requesterSessionId, ...loadOptions } = options;
+  const loaded = loadSessionDescriptor(startPath, sessionId, loadOptions);
+  const owner = inspectSessionOwnerRuntime(startPath, sessionId, {
+    ...loadOptions,
+    expectedDescriptorSha256: loaded.descriptorSha256,
+  });
+  const base = {
+    schema: ORPHAN_ARCHIVE_STATUS_SCHEMA,
+    sessionId: loaded.sessionId,
+    descriptorSha256: loaded.descriptorSha256,
+    ownerStatus: owner.status,
+  };
+  const refuse = (code, reason) => ({ ...base, status: "refused", code, reason: `${reason}; ${SIGNED_ROUTE_HINT}` });
+  if (!ORPHAN_ARCHIVE_OWNER_STATUSES.has(owner.status)) {
+    return refuse("WT-ORPHAN-ARCHIVE-OWNER-OBSERVABLE", `descriptor owner is observable (${owner.status})`);
+  }
+  if (existsSync(cleanupManifestPath(loaded.repo, sessionId))) {
+    return refuse("WT-ORPHAN-ARCHIVE-AUTHORITY", "descriptor has a cleanup manifest (registered resources or temporary intents)");
+  }
+  const ownNonce = typeof requesterOwnerNonce === "string" && requesterOwnerNonce !== ""
+    && timingSafeEqual(
+      Buffer.from(rawSha256(Buffer.from(requesterOwnerNonce))),
+      Buffer.from(rawSha256(Buffer.from(loaded.ownerNonce))),
+    );
+  if (ownNonce || requesterSessionId === sessionId) {
+    return refuse("WT-ORPHAN-ARCHIVE-OWN-SESSION", "descriptor belongs to the requesting session");
+  }
+  const paths = orphanArchivePaths(loaded.repo, sessionId, loaded.descriptorSha256);
+  let resume = false;
+  if (existsSync(paths.target)) {
+    const targetInfo = lstatSync(paths.target);
+    const audited = parseOrphanArchiveAudit(paths.audit)
+      .some((entry) => entry.sessionId === sessionId && entry.descriptorSha256 === loaded.descriptorSha256);
+    if (targetInfo.isSymbolicLink() || !targetInfo.isFile() || !audited
+      || rawSha256(readFileSync(paths.target)) !== loaded.descriptorSha256) {
+      return refuse("WT-ORPHAN-ARCHIVE-TARGET-EXISTS", "an archive target already exists and is not the audited copy of this exact descriptor");
+    }
+    resume = true;
+  }
+  // PO decision 2026-10-04: the zero-authority archive is offered only while no
+  // cleanup manifest is active for ANY session in the repository. Checked last so
+  // the per-descriptor refusals above keep their own typed codes.
+  if (repositoryHasActiveCleanupManifest(loaded.repo)) {
+    return refuse("WT-ORPHAN-ARCHIVE-AUTHORITY", "a cleanup manifest is active for a session in this repository");
+  }
+  return { ...base, status: "eligible", resume };
+}
+
+/**
+ * Archive (never delete) an orphaned zero-authority session descriptor without
+ * a PO signature: exclusive-create `archived/<id>.<sha256>.json`, prove the
+ * readback equals the original bytes, append one schema-closed audit record,
+ * then remove the active name. Eligibility, the digest and the absence of any
+ * manifest are re-proven immediately before the active name is removed.
+ */
+export function archiveOrphanSessionDescriptor(startPath, fields, options = {}) {
+  const { sessionId, expectedDescriptorSha256, by, reason } = fields ?? {};
+  ensureSafeId(sessionId, "session ID");
+  if (typeof expectedDescriptorSha256 !== "string" || !SHA256.test(expectedDescriptorSha256)) {
+    fail("WT-ORPHAN-ARCHIVE-ARGUMENT", "an exact expected descriptor sha256 is required");
+  }
+  if (typeof by !== "string" || !ORPHAN_ARCHIVE_BY.test(by)) {
+    fail("WT-ORPHAN-ARCHIVE-ARGUMENT", "--by must name the operator (1..80 plain characters, no placeholder)");
+  }
+  if (typeof reason !== "string" || reason.trim() === "" || reason.length > 500
+    || /[\u0000-\u001f\u007f]/u.test(reason) || /^<[^>]*>$/u.test(reason.trim())) {
+    fail("WT-ORPHAN-ARCHIVE-ARGUMENT", "--reason must be a single-line explanation (1..500 characters, no placeholder)");
+  }
+  const repo = discoverRepository(startPath, options);
+  const activePath = sessionDescriptorPath(repo, sessionId);
+  const paths = orphanArchivePaths(repo, sessionId, expectedDescriptorSha256);
+  const requester = { requesterOwnerNonce: fields.requesterOwnerNonce, requesterSessionId: fields.requesterSessionId };
+  if (!existsSync(activePath)) {
+    const audited = parseOrphanArchiveAudit(paths.audit)
+      .find((entry) => entry.sessionId === sessionId && entry.descriptorSha256 === expectedDescriptorSha256);
+    if (audited !== undefined && existsSync(paths.target) && lstatSync(paths.target).isFile()
+      && rawSha256(readFileSync(paths.target)) === expectedDescriptorSha256) {
+      return {
+        schema: ORPHAN_ARCHIVE_RESULT_SCHEMA,
+        status: "already-archived",
+        sessionId,
+        descriptorSha256: expectedDescriptorSha256,
+        ownerStatus: audited.ownerStatus,
+        archivePath: paths.target,
+        mutated: false,
+      };
+    }
+    fail("WT-SESSION-MISSING", "session descriptor is missing and no audited archive exists for the exact digest");
+  }
+  const verdict = inspectOrphanArchiveEligibility(startPath, sessionId, {
+    ...options,
+    ...requester,
+    expectedDescriptorSha256,
+  });
+  if (verdict.status !== "eligible") fail(verdict.code, verdict.reason);
+  const bytes = readFileSync(activePath);
+  if (rawSha256(bytes) !== expectedDescriptorSha256) fail("WT-SESSION-DIGEST", "session descriptor digest changed before archiving");
+  if (!verdict.resume) {
+    publishExclusiveFile(paths.target, bytes);
+    const published = lstatSync(paths.target);
+    if (published.isSymbolicLink() || !published.isFile() || published.nlink !== 1
+      || !readFileSync(paths.target).equals(bytes)) {
+      fail("WT-ORPHAN-ARCHIVE-READBACK", "archived descriptor readback does not equal the original bytes");
+    }
+  }
+  // TOCTOU: the active descriptor must still be the exact planned bytes with no manifest.
+  loadSessionDescriptor(startPath, sessionId, { ...options, expectedDescriptorSha256 });
+  if (existsSync(cleanupManifestPath(repo, sessionId)) || repositoryHasActiveCleanupManifest(repo)) {
+    fail("WT-ORPHAN-ARCHIVE-AUTHORITY", `a cleanup manifest appeared before archiving; ${SIGNED_ROUTE_HINT}`);
+  }
+  if (!verdict.resume) {
+    const entry = {
+      schema: ORPHAN_ARCHIVE_AUDIT_SCHEMA,
+      sessionId,
+      descriptorSha256: expectedDescriptorSha256,
+      ownerStatus: verdict.ownerStatus,
+      by,
+      reason,
+      archivedAt: nowIso(options.now),
+    };
+    appendOrphanArchiveAudit(paths.audit, entry);
+    const last = parseOrphanArchiveAudit(paths.audit).at(-1);
+    if (JSON.stringify(last) !== JSON.stringify(entry)) {
+      fail("WT-ORPHAN-ARCHIVE-READBACK", "archive audit record readback does not equal the appended record");
+    }
+  }
+  unlinkSync(activePath);
+  fsyncDirectory(dirname(activePath));
+  return {
+    schema: ORPHAN_ARCHIVE_RESULT_SCHEMA,
+    status: "archived",
+    sessionId,
+    descriptorSha256: expectedDescriptorSha256,
+    ownerStatus: verdict.ownerStatus,
+    archivePath: paths.target,
+    resumed: verdict.resume === true,
+    mutated: true,
+  };
+}
+
+function cleanupManifestPath(repo, sessionId) {
+  ensureSafeId(sessionId, "session ID");
+  return join(localRoot(repo.commonDir), "session-cleanup", "active", `${sessionId}.json`);
+}
+
+/**
+ * True when ANY cleanup manifest (or its writer lock / in-flight temp file) is
+ * present for ANY session in this repository. Conservative by design (PO
+ * decision 2026-10-04): the zero-authority orphan archive is offered only when
+ * no cleanup authority is active repository-wide, and an unreadable or
+ * unexpected directory fails closed as "active".
+ */
+function repositoryHasActiveCleanupManifest(repo) {
+  const directory = join(localRoot(repo.commonDir), "session-cleanup", "active");
+  if (!existsSync(directory)) return false;
+  try {
+    const info = lstatSync(directory);
+    if (info.isSymbolicLink() || !info.isDirectory()) return true;
+    return readdirSync(directory).length > 0;
+  } catch {
+    return true;
+  }
+}
+
+function cleanupReceiptPath(repo, sessionId) {
+  ensureSafeId(sessionId, "session ID");
+  return join(localRoot(repo.commonDir), "session-cleanup", "receipts", `${sessionId}.json`);
+}
+
+/** Read only the closure state needed by a private, session-bound receipt owner. */
+export function inspectSessionClosure(startPath, sessionId, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  ensureSafeId(sessionId, "session ID");
+  const descriptor = sessionDescriptorPath(repo, sessionId);
+  if (existsSync(descriptor)) {
+    loadSessionDescriptor(startPath, sessionId, {
+      ...options,
+      expectedDescriptorSha256: options.expectedDescriptorSha256,
+    });
+    return { status: "active", closedAt: null };
+  }
+  const receiptPath = cleanupReceiptPath(repo, sessionId);
+  if (!existsSync(receiptPath)) return { status: "unknown", closedAt: null };
+  assertPrivateRegularFile(receiptPath, "WT-SESSION-CLOSURE", "session cleanup receipt");
+  const receiptBytes = readFileSync(receiptPath);
+  let receipt;
+  try { receipt = JSON.parse(receiptBytes.toString("utf8")); } catch { fail("WT-SESSION-CLOSURE", "session cleanup receipt is malformed"); }
+  const expectedKeys = ["schema", "sessionSha256", "status", "counts", "outcomes", "completedAt"];
+  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)
+    || JSON.stringify(Object.keys(receipt).sort()) !== JSON.stringify(expectedKeys.sort())
+    || receipt.schema !== CLEANUP_RECEIPT_SCHEMA
+    || receipt.sessionSha256 !== rawSha256(Buffer.from(sessionId))
+    || receipt.status !== "complete"
+    || typeof receipt.completedAt !== "string"
+    || Number.isNaN(Date.parse(receipt.completedAt))) {
+    fail("WT-SESSION-CLOSURE", "session cleanup receipt is not a completed closure record");
+  }
+  return { status: "closed", closedAt: receipt.completedAt, receiptSha256: rawSha256(receiptBytes) };
+}
+
+function processIdentityAlive(pid, startId) {
+  if (!Number.isSafeInteger(pid) || pid < 1 || typeof startId !== "string") return true;
+  try {
+    process.kill(pid, 0);
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    return true;
+  }
+  try {
+    return processStartIdentity(pid) === startId;
+  } catch {
+    // Unavailable Linux identity is not evidence that an owner is dead.
+    return true;
+  }
+}
+
+function validateVerifyRunLock(resource, { requireClosed = false } = {}) {
+  const run = lstatSync(resource.physicalPath);
+  const posixModeViolation = process.platform !== "win32" && ((run.mode & 0o077) !== 0
+    || (typeof process.getuid === "function" && run.uid !== process.getuid()));
+  const windowsInsecure = process.platform === "win32" && assessWindowsPrivatePath(resource.physicalPath).status !== "secure";
+  if (!run.isDirectory() || run.isSymbolicLink() || realpathSync(resource.physicalPath) !== resolve(resource.physicalPath)
+    || posixModeViolation || windowsInsecure) fail("WT-VERIFY-RUN-PRIVATE", "Verify run directory is not physical and owner-private");
+  const lockPath = join(resource.physicalPath, "run.lock");
+  if (!existsSync(lockPath)) fail("WT-VERIFY-RUN-LOCK", "Verify run lock is absent");
+  assertPrivateRegularFile(lockPath, "WT-VERIFY-RUN-LOCK", "Verify run lock");
+  let lock;
+  try { lock = JSON.parse(readFileSync(lockPath, "utf8")); } catch { fail("WT-VERIFY-RUN-LOCK", "Verify run lock is malformed"); }
+  const keys = ["schema", "runId", "pid", "processStartId", "owner", "status", "closedAt"];
+  if (!lock || typeof lock !== "object" || Array.isArray(lock)
+    || JSON.stringify(Object.keys(lock).sort()) !== JSON.stringify([...keys].sort())
+    || lock.schema !== "pipeline.verify-run-lock.v1" || lock.runId !== basename(resource.physicalPath)
+    || !Number.isSafeInteger(lock.pid) || lock.pid < 1 || typeof lock.processStartId !== "string"
+    || !/^(?:\d+|pid-\d+)$/u.test(lock.processStartId) || lock.owner !== "current-os-user"
+    || !new Set(["active", "closed"]).has(lock.status)
+    || (lock.status === "active" ? lock.closedAt !== null
+      : typeof lock.closedAt !== "string" || Number.isNaN(Date.parse(lock.closedAt)))) {
+    fail("WT-VERIFY-RUN-LOCK", "Verify run lock binding is invalid");
+  }
+  if (lock.status === "active" && processIdentityAlive(lock.pid, lock.processStartId)) {
+    fail("WT-VERIFY-RUN-ACTIVE", "Verify run still has a live exact writer");
+  }
+  if (requireClosed && lock.status !== "closed") fail("WT-VERIFY-RUN-INCOMPLETE", "Verify run is not terminally closed");
+  return lock;
+}
+
+function acquireManifestLock(repo, sessionId, nonce, { noReclamation = false } = {}) {
+  const manifestPath = cleanupManifestPath(repo, sessionId);
+  const lockPath = `${manifestPath}.lock`;
+  if (noReclamation && existsSync(lockPath)) fail("SDC-LOCK-HELD", "preexisting manifest lock cannot be reclaimed by custody");
+  const expectedOwner = ownerDigest(nonce);
+  const lockParent = dirname(lockPath);
+  let existingLockAncestor = lockParent;
+  while (!existsSync(existingLockAncestor)) existingLockAncestor = dirname(existingLockAncestor);
+  const existingLockAncestorBeforeCreate = resolve(existingLockAncestor);
+  mkdirSync(lockParent, { recursive: true, mode: 0o700 });
+  if (realpathSync(lockParent) !== resolve(lockParent)) fail("WT-LOCAL-SYMLINK", "cleanup lock directory crosses a symlink");
+  if (process.platform === "win32") assureWindowsLocalDirectories(existingLockAncestorBeforeCreate, lockParent, "WT-MANIFEST-LOCK");
+  if (existsSync(lockPath)) {
+    if (noReclamation) fail("SDC-LOCK-HELD", "custody never reclaims a preexisting lock");
+    const stat = lstatSync(lockPath);
+    const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+    const windowsInsecure = process.platform === "win32" && assessWindowsPrivatePath(lockPath).status !== "secure";
+    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation || windowsInsecure) {
+      fail("WT-MANIFEST-LOCK", "cleanup writer lock is not a private regular file");
+    }
+    let stale;
+    try { stale = JSON.parse(readFileSync(lockPath, "utf8")); } catch { fail("WT-MANIFEST-LOCK", "cleanup writer lock is malformed"); }
+    if (stale.schema !== "pipeline.session-cleanup-lock.v1" || stale.sessionId !== sessionId
+      || stale.ownerNonceSha256 !== expectedOwner || processIdentityAlive(stale.pid, stale.processStartId)) {
+      fail("WT-MANIFEST-LOCK", "cleanup manifest has a live, foreign or untrusted writer lock");
+    }
+    unlinkSync(lockPath);
+    fsyncDirectory(dirname(lockPath));
+  }
+  const lock = {
+    schema: "pipeline.session-cleanup-lock.v1",
+    sessionId,
+    ownerNonceSha256: expectedOwner,
+    pid: process.pid,
+    processStartId: processStartIdentity(process.pid),
+  };
+  const bytes = canonicalJson(lock);
+  const fd = openSync(lockPath, "wx", 0o600);
+  try {
+    writeFileSync(fd, bytes);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  fsyncDirectory(dirname(lockPath));
+  const custodyLockIdentity = noReclamation ? lstatSync(lockPath) : null;
+  return () => {
+    if (custodyLockIdentity) {
+      assertPrivateRegularFile(lockPath, "SDC-LOCK-HELD", "custody manifest lock");
+      const observed = lstatSync(lockPath);
+      if (observed.dev !== custodyLockIdentity.dev || observed.ino !== custodyLockIdentity.ino || observed.mode !== custodyLockIdentity.mode || observed.nlink !== custodyLockIdentity.nlink) fail("SDC-LOCK-HELD", "custody lock identity changed");
+    }
+    if (!existsSync(lockPath) || rawSha256(readFileSync(lockPath)) !== rawSha256(bytes)) {
+      fail("WT-MANIFEST-LOCK", "cleanup writer lock ownership changed");
+    }
+    unlinkSync(lockPath);
+    fsyncDirectory(dirname(lockPath));
+  };
+}
+
+function newManifest(repo, sessionId, nonce, now) {
+  return {
+    schema: CLEANUP_MANIFEST_SCHEMA,
+    revision: 0,
+    sessionId,
+    ownerNonceSha256: ownerDigest(nonce),
+    primaryRoot: repo.primaryRoot,
+    commonDir: repo.commonDir,
+    createdAt: nowIso(now),
+    updatedAt: nowIso(now),
+    resources: [],
+  };
+}
+
+function loadManifest(repo, sessionId, nonce, { create = false, now } = {}) {
+  const path = cleanupManifestPath(repo, sessionId);
+  if (!existsSync(path)) {
+    if (!create) fail("WT-MANIFEST-MISSING", "session cleanup manifest is missing");
+    return { path, manifest: newManifest(repo, sessionId, nonce, now) };
+  }
+  const stat = lstatSync(path);
+  const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+  const windowsInsecure = process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure");
+  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation || windowsInsecure) {
+    fail("WT-MANIFEST-TYPE", "cleanup manifest is not a private single-link regular file");
+  }
+  const manifest = JSON.parse(readFileSync(path, "utf8"));
+  if (manifest.schema !== CLEANUP_MANIFEST_SCHEMA || manifest.sessionId !== sessionId
+    || manifest.ownerNonceSha256 !== ownerDigest(nonce)
+    || manifest.primaryRoot !== repo.primaryRoot || manifest.commonDir !== repo.commonDir
+    || !Array.isArray(manifest.resources)) {
+    fail("WT-MANIFEST-BINDING", "cleanup manifest binding is invalid");
+  }
+  return { path, manifest };
+}
+
+function writeManifest(path, manifest, now) {
+  const next = { ...manifest, revision: manifest.revision + 1, updatedAt: nowIso(now) };
+  writeAtomic(path, canonicalJson(next));
+  return next;
+}
+
+function ensureVerifyRunsRoot(repo) {
+  const root = resolve(localRoot(repo.commonDir), "verify", "runs");
+  let cursor = repo.commonDir;
+  for (const segment of relative(repo.commonDir, root).split(sep).filter(Boolean)) {
+    cursor = join(cursor, segment);
+    if (!existsSync(cursor)) mkdirSync(cursor, { mode: 0o700 });
+    const info = lstatSync(cursor);
+    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(cursor) !== resolve(cursor)) {
+      fail("WT-VERIFY-ROOT", "Verify run root contains a non-physical directory");
+    }
+    if (process.platform === "win32") {
+      if (assessWindowsPrivatePath(cursor).status !== "secure") {
+        const hardened = hardenWindowsPrivateDirectory(cursor);
+        if (hardened.status !== "secure") fail("WT-VERIFY-ROOT", "Verify run root is not owner-private");
+      }
+    } else if ((info.mode & 0o077) !== 0 || (typeof process.getuid === "function" && info.uid !== process.getuid())) {
+      fail("WT-VERIFY-ROOT", "Verify run root is not owner-private");
+    }
+  }
+  return root;
+}
+
+function allowedRootFor(repo, type, path) {
+  const physicalTmp = realpathSync(tmpdir());
+  const detached = resolve(repo.primaryRoot, "branch", "detached");
+  const absolute = resolve(path);
+  if (type === "verify-run-directory") {
+    const verifyRuns = ensureVerifyRunsRoot(repo);
+    if (!isInside(verifyRuns, absolute) || absolute === verifyRuns) {
+      fail("WT-VERIFY-ROOT", "Verify run is outside the private Git-common-dir run root");
+    }
+    return verifyRuns;
+  }
+  if (type === "disposable-worktree") {
+    if (!isInside(detached, absolute) || absolute === detached) fail("WT-TEMP-ROOT", "disposable worktree is outside branch/detached");
+    return detached;
+  }
+  if (!isInside(physicalTmp, absolute) || absolute === physicalTmp) fail("WT-TEMP-ROOT", "scratch resource is outside the physical temporary root");
+  return physicalTmp;
+}
+
+function assertTemporaryClassification(resource) {
+  if (!TEMP_TYPES.has(resource.type)) fail("WT-TEMP-TYPE", "temporary resource type is unsupported");
+  if (!TEMP_CLASSES.has(resource.contentClass) || PROTECTED_CONTENT_CLASSES.has(resource.contentClass)) {
+    fail("WT-TEMP-CONTENT", "Specs, PRDs, state and implementation work cannot be temporary resources");
+  }
+  if (resource.soleCopy !== false) fail("WT-TEMP-SOLE-COPY", "temporary resources must explicitly declare soleCopy:false");
+  if (!CLEANUP_POLICIES.has(resource.cleanupPolicy)) fail("WT-TEMP-POLICY", "cleanup policy is unsupported");
+  const expectedPolicy = resource.type === "scratch-file" ? "unlink-file"
+    : new Set(["scratch-directory", "verify-run-directory"]).has(resource.type) ? "remove-directory" : "remove-worktree";
+  if (resource.cleanupPolicy !== expectedPolicy) fail("WT-TEMP-POLICY", "cleanup policy does not match resource type");
+}
+
+export function registerTemporaryIntent(startPath, fields, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const sessionId = ensureSafeId(fields.sessionId, "session ID");
+  const resourceId = ensureSafeId(fields.resourceId, "resource ID");
+  assertTemporaryClassification(fields);
+  const releaseLock = acquireManifestLock(repo, sessionId, fields.ownerNonce);
+  try {
+  if (existsSync(cleanupReceiptPath(repo, sessionId))) {
+    fail("WT-SESSION-CLOSED", "a completed cleanup receipt already closes this session ID");
+  }
+  const path = resolve(fields.path);
+  const allowedRoot = allowedRootFor(repo, fields.type, path);
+  if (!isInside(allowedRoot, path) || path === allowedRoot) fail("WT-TEMP-ROOT", "temporary path is not a child of its allowed root");
+  const loaded = loadManifest(repo, sessionId, fields.ownerNonce, { create: true, now: options.now });
+  if (loaded.manifest.resources.some((entry) => entry.resourceId === resourceId || entry.physicalPath === path)) {
+    fail("WT-TEMP-DUPLICATE", "temporary resource is already registered");
+  }
+  const resource = {
+    resourceId,
+    type: fields.type,
+    contentClass: fields.contentClass,
+    soleCopy: false,
+    cleanupPolicy: fields.cleanupPolicy,
+    physicalPath: path,
+    allowedRoot,
+    status: "creating",
+    creationIdentity: {
+      pid: process.pid,
+      processStartId: processStartIdentity(process.pid),
+    },
+    objectIdentity: null,
+    canary: null,
+    sealedTreeSha256: null,
+    createdAt: nowIso(options.now),
+  };
+  const manifest = writeManifest(loaded.path, { ...loaded.manifest, resources: [...loaded.manifest.resources, resource] }, options.now);
+  return { repo, path: loaded.path, manifest, resource };
+  } finally {
+    releaseLock();
+  }
+}
+
+function readCanary(resource, canaryRelative) {
+  if (resource.type === "scratch-file") {
+    if (canaryRelative !== null && canaryRelative !== undefined && canaryRelative !== "") fail("WT-CANARY-PATH", "file canary must be the file itself");
+    return { relativePath: null, sha256: rawSha256(readFileSync(resource.physicalPath)) };
+  }
+  if (typeof canaryRelative !== "string" || !canaryRelative || isAbsolute(canaryRelative)
+    || canaryRelative.split(/[\\/]/).some((part) => !part || part === "." || part === "..")) {
+    fail("WT-CANARY-PATH", "directory canary must be a safe relative file path");
+  }
+  const candidate = resolve(resource.physicalPath, canaryRelative);
+  if (!isInside(resource.physicalPath, candidate) || !existsSync(candidate)) fail("WT-CANARY-MISSING", "registered canary is missing");
+  const stat = lstatSync(candidate);
+  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1) fail("WT-CANARY-TYPE", "registered canary must be a single-link regular file");
+  return { relativePath: canaryRelative.split(sep).join("/"), sha256: rawSha256(readFileSync(candidate)) };
+}
+
+function treeFingerprint(root) {
+  const entries = [];
+  function visit(current, prefix) {
+    for (const name of readdirSync(current).sort()) {
+      const path = join(current, name);
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink()) fail("WT-TEMP-SYMLINK", "temporary directory contains a symlink");
+      const rel = prefix ? `${prefix}/${name}` : name;
+      if (stat.isDirectory()) {
+        entries.push([rel, "directory", stat.mode]);
+        visit(path, rel);
+      } else if (stat.isFile()) {
+        if (stat.nlink !== 1) fail("WT-TEMP-HARDLINK", "temporary directory contains a hard-linked file");
+        entries.push([rel, "file", stat.mode, rawSha256(readFileSync(path))]);
+      } else {
+        fail("WT-TEMP-TYPE", "temporary directory contains an unsupported object");
+      }
+    }
+  }
+  visit(root, "");
+  return rawSha256(Buffer.from(canonicalJson(entries)));
+}
+
+function resourceFingerprint(resource) {
+  if (resource.type === "scratch-file") return rawSha256(readFileSync(resource.physicalPath));
+  if (resource.type === "scratch-directory") return treeFingerprint(resource.physicalPath);
+  return null;
+}
+
+export function finalizeTemporaryResource(startPath, fields, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const releaseLock = acquireManifestLock(repo, fields.sessionId, fields.ownerNonce);
+  try {
+  const loaded = loadManifest(repo, fields.sessionId, fields.ownerNonce);
+  const index = loaded.manifest.resources.findIndex((entry) => entry.resourceId === fields.resourceId);
+  if (index < 0) fail("WT-TEMP-MISSING", "temporary resource intent is missing");
+  const resource = loaded.manifest.resources[index];
+  if (resource.status !== "creating") fail("WT-TEMP-PHASE", "temporary resource is not awaiting finalization");
+  const physical = assertExistingDirectoryOrFile(resource.physicalPath, resource.type);
+  if (physical !== resource.physicalPath) fail("WT-PATH-ALIAS", "temporary resource moved through an alias");
+  if (!isInside(realpathSync(resource.allowedRoot), physical)) fail("WT-TEMP-ROOT", "temporary resource escaped its allowed root");
+  const canary = readCanary(resource, fields.canaryRelative ?? (resource.type === "disposable-worktree" ? ".git" : null));
+  const ready = {
+    ...resource,
+    status: "ready",
+    objectIdentity: fileIdentity(resource.physicalPath),
+    canary,
+    sealedTreeSha256: resourceFingerprint(resource),
+  };
+  const resources = [...loaded.manifest.resources];
+  resources[index] = ready;
+  const manifest = writeManifest(loaded.path, { ...loaded.manifest, resources }, options.now);
+  return { repo, path: loaded.path, manifest, resource: ready };
+  } finally {
+    releaseLock();
+  }
+}
+
+function assertExistingDirectoryOrFile(path, type) {
+  if (!existsSync(path)) fail("WT-TEMP-MISSING", "temporary resource does not exist");
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink()) fail("WT-TEMP-SYMLINK", "temporary resource is a symlink");
+  const expectedDirectory = type !== "scratch-file";
+  if (expectedDirectory !== stat.isDirectory() || (!expectedDirectory && !stat.isFile())) {
+    fail("WT-TEMP-TYPE", "temporary resource has the wrong physical type");
+  }
+  if (!expectedDirectory && stat.nlink !== 1) fail("WT-TEMP-HARDLINK", "temporary file must have exactly one hard link");
+  return realpathSync(path);
+}
+
+export function sealTemporaryResource(startPath, fields, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const releaseLock = acquireManifestLock(repo, fields.sessionId, fields.ownerNonce);
+  try {
+  const loaded = loadManifest(repo, fields.sessionId, fields.ownerNonce);
+  const index = loaded.manifest.resources.findIndex((entry) => entry.resourceId === fields.resourceId);
+  if (index < 0) fail("WT-TEMP-MISSING", "temporary resource is not registered");
+  const resource = loaded.manifest.resources[index];
+  if (!new Set(["ready", "sealed"]).has(resource.status)) fail("WT-TEMP-PHASE", "temporary resource cannot be sealed in its current phase");
+  const refreshScratch = options.refreshScratch === true;
+  if (refreshScratch && (resource.status !== "sealed" || resource.type !== "scratch-directory")) {
+    fail("WT-TEMP-PHASE", "only a sealed scratch directory may refresh its tree seal");
+  }
+  validateResourcePhysical(repo, resource, { requireCleanWorktree: false, allowScratchTreeRefresh: refreshScratch });
+  const sealed = { ...resource, status: "sealed", sealedTreeSha256: resourceFingerprint(resource) };
+  const resources = [...loaded.manifest.resources];
+  resources[index] = sealed;
+  const manifest = writeManifest(loaded.path, { ...loaded.manifest, resources }, options.now);
+  return { repo, path: loaded.path, manifest, resource: sealed };
+  } finally {
+    releaseLock();
+  }
+}
+
+/** Read back one sealed temporary resource before granting it to a host. */
+export function inspectTemporaryResource(startPath, fields, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const releaseLock = acquireManifestLock(repo, fields.sessionId, fields.ownerNonce);
+  try {
+    const loaded = loadManifest(repo, fields.sessionId, fields.ownerNonce);
+    const resource = loaded.manifest.resources.find((entry) => entry.resourceId === fields.resourceId);
+    if (!resource) fail("WT-TEMP-MISSING", "temporary resource is not registered");
+    if (resource.status !== "sealed") fail("WT-TEMP-PHASE", "temporary resource is not sealed for host use");
+    validateResourcePhysical(repo, resource, { requireCleanWorktree: false });
+    return { repo, path: loaded.path, resource: structuredClone(resource) };
+  } finally {
+    releaseLock();
+  }
+}
+
+export function createDetachedWorktree(startPath, purpose, oidish, fields = {}, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const oid = resolveCommit(repo, oidish, options);
+  const mapping = canonicalDetachedTarget(repo.primaryRoot, purpose, oid);
+  if (existsSync(mapping.target)) fail("WT-TARGET-EXISTS", "canonical detached target already exists");
+  const sessionId = ensureSafeId(fields.sessionId, "session ID");
+  const ownerNonce = fields.ownerNonce;
+  makeParentsPhysical(repo.primaryRoot, dirname(mapping.target));
+  ensurePrimaryBranchExclude(repo);
+  const record = newWorktreeRecord(repo, {
+    lifecycle: "detached-operational",
+    physicalPath: mapping.target,
+    oid,
+    purpose: mapping.purpose,
+    sessionId,
+  }, options.now);
+  publishWorktreeRecord(repo, record);
+  registerTemporaryIntent(repo.primaryRoot, {
+    sessionId,
+    ownerNonce,
+    resourceId: fields.resourceId ?? `detached-${mapping.purpose}-${oid.slice(0, 12)}`,
+    type: "disposable-worktree",
+    contentClass: "disposable-control",
+    soleCopy: false,
+    cleanupPolicy: "remove-worktree",
+    path: mapping.target,
+  }, options);
+  try {
+    runGit(repo.primaryRoot, ["worktree", "add", "--detach", mapping.target, oid], options);
+    const verified = verifyReadyWorktree(repo, mapping.target, { oid, ref: null });
+    const ready = { ...record, revision: 1, status: "ready", identity: verified.identity, updatedAt: nowIso(options.now) };
+    publishWorktreeRecord(repo, ready);
+    finalizeTemporaryResource(repo.primaryRoot, {
+      sessionId,
+      ownerNonce,
+      resourceId: fields.resourceId ?? `detached-${mapping.purpose}-${oid.slice(0, 12)}`,
+      canaryRelative: ".git",
+    }, options);
+    return ready;
+  } catch (error) {
+    failWorktreeRecord(repo, record, error, options.now);
+    throw error;
+  }
+}
+
+function processStartIdentity(pid) {
+  if (process.platform !== "linux") return `pid-${pid}`;
+  let observed = null;
+  try { observed = linuxProcessStartTicks(readFileSync(`/proc/${pid}/stat`, "utf8")); }
+  catch { /* the required creation identity remains unavailable */ }
+  if (observed === null) fail("WT-PROCESS-IDENTITY-UNAVAILABLE", "Linux process start identity is unavailable");
+  return observed;
+}
+
+function validateResourcePhysical(repo, resource, { requireCleanWorktree = true, allowScratchTreeRefresh = false } = {}) {
+  const physical = assertExistingDirectoryOrFile(resource.physicalPath, resource.type);
+  if (physical !== resource.physicalPath || !isInside(realpathSync(resource.allowedRoot), physical)) {
+    fail("WT-RESOURCE-ALIAS", "registered resource path no longer resolves exactly inside its allowed root");
+  }
+  if (!sameIdentity(resource.objectIdentity, fileIdentity(physical))) fail("WT-RESOURCE-IDENTITY", "registered resource identity changed");
+  const canary = readCanary(resource, resource.canary.relativePath);
+  if (canary.sha256 !== resource.canary.sha256) fail("WT-CANARY-DRIFT", "registered resource canary changed");
+  if (resource.type === "scratch-directory" && !allowScratchTreeRefresh && resourceFingerprint(resource) !== resource.sealedTreeSha256) {
+    fail("WT-RESOURCE-DRIFT", "registered scratch directory changed after sealing");
+  }
+  if (resource.type === "scratch-file" && resourceFingerprint(resource) !== resource.sealedTreeSha256) {
+    fail("WT-RESOURCE-DRIFT", "registered scratch file changed after sealing");
+  }
+  if (resource.type === "verify-run-directory") validateVerifyRunLock(resource, { requireClosed: true });
+  if (resource.type === "disposable-worktree") {
+    const common = realpathSync(gitText(resource.physicalPath, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
+    if (common !== repo.commonDir) fail("WT-COMMON-DIR-MISMATCH", "registered worktree changed repositories");
+    if (requireCleanWorktree) {
+      const dirty = runGit(resource.physicalPath, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]).stdout;
+      const ignored = runGit(resource.physicalPath, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]).stdout;
+      if (String(dirty).length > 0 || String(ignored).length > 0) fail("WT-WORKTREE-DIRTY", "registered worktree contains dirty, untracked or ignored data");
+    }
+  }
+  return physical;
+}
+
+function classifyCleanupFailure(error) {
+  return error instanceof WorktreeLifecycleError ? error.code : "WT-INTERNAL";
+}
+
+function sanitizedCleanupReceipt(sessionId, resources, status, now) {
+  const outcomes = resources.map((resource) => ({
+    resourceId: resource.resourceId,
+    type: resource.type,
+    classification: resource.contentClass,
+    status: resource.status === "removed" ? "removed" : resource.status === "retained" ? "retained" : "blocked",
+    code: resource.reason ?? (resource.status === "removed" ? "removed" : resource.status === "retained" ? "WT-VERIFY-RUN-RETAINED" : "WT-CLEANUP-INCOMPLETE"),
+  }));
+  const retained = outcomes.filter((entry) => entry.status === "retained").length;
+  return {
+    schema: CLEANUP_RECEIPT_SCHEMA,
+    sessionSha256: rawSha256(Buffer.from(sessionId)),
+    status,
+    counts: {
+      registered: outcomes.length,
+      removed: outcomes.filter((entry) => entry.status === "removed").length,
+      blocked: outcomes.filter((entry) => entry.status === "blocked").length,
+      ...(retained === 0 ? {} : { retained }),
+    },
+    outcomes,
+    completedAt: nowIso(now),
+  };
+}
+
+function removeRegisteredResource(repo, resource) {
+  if (resource.type === "disposable-worktree") {
+    runGit(repo.primaryRoot, ["worktree", "remove", resource.physicalPath]);
+    if (existsSync(resource.physicalPath)) fail("WT-CLEANUP-FAILED", "Git retained the disposable worktree path");
+    const registered = readWorktreeRecords(repo).find(({ record }) => record.physicalPath === resource.physicalPath);
+    if (registered) publishWorktreeRecord(repo, {
+      ...registered.record,
+      revision: registered.record.revision + 1,
+      status: "removed",
+      identity: null,
+      updatedAt: nowIso(),
+      reason: null,
+    });
+  } else if (resource.type === "scratch-file") {
+    unlinkSync(resource.physicalPath);
+  } else {
+    rmSync(resource.physicalPath, { recursive: true, force: false });
+  }
+}
+
+export function cleanupSession(startPath, fields, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const releaseLock = acquireManifestLock(repo, fields.sessionId, fields.ownerNonce);
+  try {
+  const ownedCleanupPreimage = observeOwnedSessionCleanupPreimage(repo, fields);
+  if (options.allowAbsent === true && !existsSync(cleanupManifestPath(repo, fields.sessionId))) {
+    const receipt = sanitizedCleanupReceipt(fields.sessionId, [], "complete", options.now);
+    const receiptPath = cleanupReceiptPath(repo, fields.sessionId);
+    if (existsSync(receiptPath)) fail("WT-SESSION-CLOSED", "a completed cleanup receipt already closes this session ID");
+    writeAtomic(receiptPath, canonicalJson(receipt));
+    recordOwnedSessionCleanupCompletion(repo, fields, receiptPath, ownedCleanupPreimage);
+    return { ok: true, receipt, receiptPath };
+  }
+  const loaded = loadManifest(repo, fields.sessionId, fields.ownerNonce);
+  const retainCompletedVerifyRun = options.retainCompletedVerifyRun === true;
+  if (retainCompletedVerifyRun && (loaded.manifest.resources.length !== 1
+    || loaded.manifest.resources[0].type !== "verify-run-directory"
+    || !["ready", "sealed"].includes(loaded.manifest.resources[0].status))) {
+    fail("WT-VERIFY-RUN-RETAIN-INELIGIBLE", "only one finalized verify-run directory may be retained while closing a session");
+  }
+  const preflight = [];
+  for (const resource of loaded.manifest.resources) {
+    if (resource.status === "removed") continue;
+    if (resource.status === "cleanup-intent" && !existsSync(resource.physicalPath)) continue;
+    if (resource.status === "creating") {
+      // Intent is durable before physical scratch creation. A crash before or
+      // during that materialization is still safe to drain by exact manifest
+      // identity; no canary/tree claim exists at this phase.
+      if (!existsSync(resource.physicalPath)) continue;
+      try {
+        const physical = assertExistingDirectoryOrFile(resource.physicalPath, resource.type);
+        if (physical !== resource.physicalPath || !isInside(realpathSync(resource.allowedRoot), physical)) {
+          fail("WT-RESOURCE-ALIAS", "creating resource path no longer resolves exactly inside its allowed root");
+        }
+        if (resource.type === "verify-run-directory") validateVerifyRunLock(resource);
+      } catch (error) {
+        preflight.push({ resourceId: resource.resourceId, code: classifyCleanupFailure(error) });
+      }
+      continue;
+    }
+    try {
+      if (!new Set(["ready", "sealed", "cleanup-intent"]).has(resource.status)) fail("WT-TEMP-PHASE", "temporary resource is not cleanup-ready");
+      validateResourcePhysical(repo, resource);
+    } catch (error) {
+      preflight.push({ resourceId: resource.resourceId, code: classifyCleanupFailure(error) });
+    }
+  }
+  if (preflight.length > 0) {
+    const resources = loaded.manifest.resources.map((resource) => {
+      const blocked = preflight.find((entry) => entry.resourceId === resource.resourceId);
+      return blocked ? { ...resource, reason: blocked.code } : resource;
+    });
+    return { ok: false, receipt: sanitizedCleanupReceipt(fields.sessionId, resources, "blocked", options.now), manifestPath: loaded.path };
+  }
+
+  let manifest = loaded.manifest;
+  const inject = (step) => { if (options.faultInjector) options.faultInjector(step); };
+  for (let index = 0; index < manifest.resources.length; index += 1) {
+    let resource = manifest.resources[index];
+    if (resource.status === "removed") continue;
+    if (retainCompletedVerifyRun && resource.type === "verify-run-directory") {
+      const resources = [...manifest.resources];
+      resources[index] = { ...resource, status: "retained", reason: "WT-VERIFY-RUN-RETAINED", objectIdentity: null };
+      manifest = writeManifest(loaded.path, { ...manifest, resources }, options.now);
+      inject(`resource-retained:${resource.resourceId}`);
+      continue;
+    }
+    if (resource.status !== "cleanup-intent") {
+      const resources = [...manifest.resources];
+      resource = { ...resource, status: "cleanup-intent", reason: null };
+      resources[index] = resource;
+      manifest = writeManifest(loaded.path, { ...manifest, resources }, options.now);
+      inject(`cleanup-intent:${resource.resourceId}`);
+    }
+    if (existsSync(resource.physicalPath)) removeRegisteredResource(repo, resource);
+    inject(`resource-removed:${resource.resourceId}`);
+    const resources = [...manifest.resources];
+    resources[index] = { ...resource, status: "removed", reason: null, objectIdentity: null };
+    manifest = writeManifest(loaded.path, { ...manifest, resources }, options.now);
+    inject(`resource-recorded:${resource.resourceId}`);
+  }
+
+  const receipt = sanitizedCleanupReceipt(fields.sessionId, manifest.resources, "complete", options.now);
+  const receiptPath = cleanupReceiptPath(repo, fields.sessionId);
+  writeAtomic(receiptPath, canonicalJson(receipt));
+  unlinkSync(loaded.path);
+  fsyncDirectory(dirname(loaded.path));
+  recordOwnedSessionCleanupCompletion(repo, fields, receiptPath, ownedCleanupPreimage);
+  return { ok: true, receipt, receiptPath };
+  } finally {
+    releaseLock();
+  }
+}
+
+/**
+ * Close the owning session for one completed Verify journal while retaining the
+ * immutable journal directory for receipt reuse and failure diagnostics.
+ */
+export function releaseCompletedVerifyRunSession(startPath, fields, options = {}) {
+  return cleanupSession(startPath, fields, { ...options, retainCompletedVerifyRun: true });
+}
+
+export function classifyCanonicalWorktree(repo, record) {
+  let physical;
+  try { physical = realpathSync(record.path); } catch { fail("WT-WORKTREE-MISSING", "registered Git worktree path is missing"); }
+  if (physical === repo.primaryRoot) return { lifecycle: "primary", canonical: true };
+  if (!isInside(repo.primaryRoot, physical)) return { lifecycle: "external", canonical: false };
+  if (record.branch) {
+    const expected = canonicalBranchTarget(repo.primaryRoot, record.branch).target;
+    return { lifecycle: "persistent-branch", canonical: physical === expected, expected };
+  }
+  const detachedRoot = resolve(repo.primaryRoot, "branch", "detached");
+  const name = basename(physical);
+  return {
+    lifecycle: "detached-operational",
+    canonical: isInside(detachedRoot, physical) && physical !== detachedRoot && /^[a-z0-9][a-z0-9-]{1,39}-[0-9a-f]{12}$/.test(name),
+  };
+}
+
+// Parses `git status --porcelain=v1 -z` output into the list of paths it
+// names. Each ordinary record is `XY PATH\0`; a rename/copy record (status
+// letter R or C in either column) additionally carries `ORIG_PATH\0` right
+// after it -- both paths are returned so a rename touching a foreign path is
+// never hidden behind an onboarding-generated new name (or vice versa).
+export function parseStatusPorcelainPaths(raw) {
+  const tokens = String(raw ?? "").split("\0");
+  const paths = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token === "") continue;
+    const statusCode = token.slice(0, 2);
+    paths.push(token.slice(3));
+    if ((statusCode[0] === "R" || statusCode[0] === "C") && tokens[index + 1] !== "" && tokens[index + 1] !== undefined) {
+      index += 1;
+      paths.push(tokens[index]);
+    }
+  }
+  return paths;
+}
+
+// True only for a path the Pipeline's own onboarding flow is known to
+// generate -- see ONBOARDING_GENERATED_EXACT_PATHS/_PREFIXES above for the
+// sourced allowlist and why it stops where it does.
+function isOnboardingGeneratedPath(path) {
+  if (ONBOARDING_GENERATED_EXACT_PATHS.has(path)) return true;
+  return ONBOARDING_GENERATED_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
+export function checkSessionHygiene(startPath, fields, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const reasons = [];
+  const status = runGit(repo.start, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]).stdout;
+  const dirtyPaths = parseStatusPorcelainPaths(status);
+  if (dirtyPaths.some((path) => !isOnboardingGeneratedPath(path))) reasons.push("current-worktree-dirty");
+  if (existsSync(cleanupManifestPath(repo, fields.sessionId))) reasons.push("session-manifest-not-drained");
+  const records = readWorktreeRecords(repo);
+  if (records.some(({ record }) => record.sessionId === fields.sessionId && record.status === "ready" && record.lifecycle === "detached-operational")) {
+    reasons.push("owned-temporary-worktree-remains");
+  }
+  // A stale Git registration remains a hygiene failure, but must not hide
+  // the owning session\'s independently observed manifest and residue counts.
+  const canonical = [];
+  let missingWorktrees = 0;
+  for (const record of repo.worktrees) {
+    try {
+      canonical.push(classifyCanonicalWorktree(repo, record));
+    } catch (error) {
+      if (!(error instanceof WorktreeLifecycleError) || error.code !== "WT-WORKTREE-MISSING") throw error;
+      missingWorktrees += 1;
+    }
+  }
+  if (missingWorktrees > 0) reasons.push("missing-worktree");
+  if (canonical.some((entry) => !entry.canonical)) reasons.push("noncanonical-worktree");
+  const receipt = {
+    schema: HYGIENE_RECEIPT_SCHEMA,
+    sessionSha256: rawSha256(Buffer.from(fields.sessionId)),
+    ok: reasons.length === 0,
+    counts: {
+      linkedWorktrees: repo.worktrees.length,
+      ...(missingWorktrees === 0 ? {} : { missingWorktrees }),
+      noncanonicalWorktrees: canonical.filter((entry) => !entry.canonical).length,
+      activeSessionManifests: existsSync(cleanupManifestPath(repo, fields.sessionId)) ? 1 : 0,
+      ownedTemporaryResidue: records.filter(({ record }) => record.sessionId === fields.sessionId && record.status === "ready").length,
+    },
+    reasons,
+    checkedAt: nowIso(options.now),
+  };
+  return receipt;
+}
+
+function assertCleanWorktree(path) {
+  const dirty = runGit(path, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]).stdout;
+  const ignored = runGit(path, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]).stdout;
+  if (String(dirty).length > 0 || String(ignored).length > 0) fail("WT-WORKTREE-DIRTY", "source worktree is dirty, untracked or ignored");
+}
+
+export function migrateBranchWorktree(startPath, sourcePath, branchOrRef, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const source = assertExistingDirectoryPhysical(sourcePath, "migration source");
+  if (source === repo.primaryRoot) fail("WT-MIGRATE-PRIMARY", "primary checkout cannot be migrated");
+  const sourceCommon = realpathSync(gitText(source, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
+  if (sourceCommon !== repo.commonDir) fail("WT-COMMON-DIR-MISMATCH", "migration source belongs to a different repository");
+  assertCleanWorktree(source);
+  const mapping = canonicalBranchTarget(repo.primaryRoot, branchOrRef);
+  if (existsSync(mapping.target)) fail("WT-TARGET-EXISTS", "canonical migration target already exists");
+  const sourceRef = gitText(source, ["symbolic-ref", "-q", "HEAD"], { allowNonzero: true });
+  if (sourceRef !== mapping.fullRef) fail("WT-REF-MISMATCH", "migration source has the wrong branch");
+  const oid = resolveCommit(repo, mapping.fullRef, options);
+  if (gitText(source, ["rev-parse", "HEAD"]) !== oid) fail("WT-OID-MISMATCH", "migration source does not match branch OID");
+  makeParentsPhysical(repo.primaryRoot, dirname(mapping.target));
+  ensurePrimaryBranchExclude(repo);
+  const record = newWorktreeRecord(repo, {
+    lifecycle: "persistent-branch",
+    physicalPath: mapping.target,
+    ref: mapping.fullRef,
+    oid,
+    sourcePath: source,
+  }, options.now);
+  publishWorktreeRecord(repo, { ...record, status: "migrating" });
+  const inject = (step) => { if (options.faultInjector) options.faultInjector(step); };
+  try {
+    runGit(repo.primaryRoot, ["worktree", "add", "--detach", mapping.target, oid], options);
+    inject("target-created");
+    verifyReadyWorktree(repo, mapping.target, { oid, ref: null });
+    inject("target-verified");
+    assertCleanWorktree(source);
+    runGit(repo.primaryRoot, ["worktree", "remove", source], options);
+    inject("source-removed");
+    runGit(mapping.target, ["switch", mapping.branch], options);
+    inject("branch-attached");
+    const verified = verifyReadyWorktree(repo, mapping.target, { oid, ref: mapping.fullRef });
+    const ready = { ...record, revision: 1, status: "ready", sourcePath: null, identity: verified.identity, updatedAt: nowIso(options.now) };
+    publishWorktreeRecord(repo, ready);
+    return ready;
+  } catch (error) {
+    failWorktreeRecord(repo, { ...record, status: "migrating" }, error, options.now);
+    throw error;
+  }
+}
+
+
+/** Read-only descriptor custody observation; raw bytes/nonces stay internal. */
+export function inspectSignedDescriptorCustodyInputs(startPath, sessionId, { archivedDescriptorSha256 = null } = {}) {
+  const repo = discoverRepository(startPath);
+  ensureSafeId(sessionId, "session ID");
+  const path = sessionDescriptorPath(repo, sessionId);
+  let source = path;
+  if (!existsSync(path) && archivedDescriptorSha256 !== null) {
+    if (!SHA256.test(archivedDescriptorSha256)) fail("SDC-SHAPE", "invalid archive digest");
+    source = join(localRoot(repo.commonDir), "session-descriptors", "signed-custody", "archived", `${sessionId}.${archivedDescriptorSha256}.json`);
+  }
+  assertNoSymlinkComponents(repo.commonDir, source);
+  assertPrivateRegularFile(source, "SDC-PRIVATE-PATH", "custody descriptor");
+  const bytes = readFileSync(source);
+  if (bytes.length > 256 * 1024) fail("SDC-SHAPE", "descriptor exceeds bounded custody input");
+  const value = JSON.parse(bytes);
+  if (!validSessionDescriptor(value, repo, sessionId)) fail("SDC-DESCRIPTOR-UNAVAILABLE", "invalid descriptor binding");
+  const target = file => {
+    assertNoSymlinkComponents(repo.commonDir, file);
+    assertPrivateRegularFile(file, "SDC-PRIVATE-PATH", "custody input");
+    const before = lstatSync(file), raw = readFileSync(file), after = lstatSync(file);
+    if (before.dev !== after.dev || before.ino !== after.ino || before.mode !== after.mode || before.nlink !== after.nlink || rawSha256(raw) !== rawSha256(readFileSync(file))) fail("SDC-DESCRIPTOR-CAS", "custody observation changed");
+    return { raw, target: { path: `.git/${relative(repo.commonDir, file).split(sep).join("/")}`, schema: JSON.parse(raw).schema, sha256: rawSha256(raw), size: raw.length,
+      identity: { dev: String(after.dev), ino: String(after.ino), mode: after.mode, nlink: after.nlink } } };
+  };
+  const descriptor = target(source);
+  if (rawSha256(descriptor.raw) !== rawSha256(bytes)) fail("SDC-DESCRIPTOR-CAS", "descriptor changed between validation and capture");
+  // Archive readback preserves the original signed active path, not an alternate target.
+  descriptor.target.path = `.git/${relative(repo.commonDir, path).split(sep).join("/")}`;
+  const manifestPath = cleanupManifestPath(repo, sessionId);
+  let manifest = { state: "absent", path: `.git/${relative(repo.commonDir, manifestPath).split(sep).join("/")}` };
+  if (existsSync(manifestPath)) {
+    const checked = loadManifest(repo, sessionId, value.ownerNonce);
+    if (!Number.isSafeInteger(checked.manifest.revision) || checked.manifest.revision < 0) fail("SDC-MANIFEST-UNAVAILABLE", "invalid manifest revision");
+    const observed = target(manifestPath);
+    manifest = { state: "present", target: observed.target, revision: checked.manifest.revision };
+  }
+  const lockPath = `${manifestPath}.lock`;
+  assertNoSymlinkComponents(repo.commonDir, lockPath);
+  const manifestLock = existsSync(lockPath)
+    ? { status: "held", path: `.git/${relative(repo.commonDir, lockPath).split(sep).join("/")}`, sha256: null }
+    : { status: "absent", path: `.git/${relative(repo.commonDir, lockPath).split(sep).join("/")}` };
+  return { repository: { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir,
+    candidate: { commit: gitText(repo.primaryRoot, ["rev-parse", "HEAD"]), tree: gitText(repo.primaryRoot, ["rev-parse", "HEAD^{tree}"]) } },
+    sessionId, ownerNonce: value.ownerNonce, descriptor: descriptor.target, bytes: descriptor.raw, manifest, manifestLock,
+    activePath: path, activePresent: existsSync(path), ownerRuntime: value.ownerRuntime ?? null };
+}
+
+export function inspectSignedDescriptorCustodyRepository(startPath) {
+  const repo = discoverRepository(startPath);
+  return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir,
+    candidate: { commit: gitText(repo.primaryRoot, ["rev-parse", "HEAD"]), tree: gitText(repo.primaryRoot, ["rev-parse", "HEAD^{tree}"]) } };
+}
+
+/** The exact registration lock namespace, with preexisting locks never reclaimed. */
+export function withSignedDescriptorCustodyManifestLock(startPath, sessionId, operation, { archivedDescriptorSha256 = null } = {}) {
+  const loaded = inspectSignedDescriptorCustodyInputs(startPath, sessionId, { archivedDescriptorSha256 });
+  const release = acquireManifestLock(discoverRepository(startPath), sessionId, loaded.ownerNonce, { noReclamation: true });
+  try { return operation(); } finally { release(); }
+}
+
+// A physical archive is not a current invocation credential. Only an actual
+// owner retirement in this module creates a current-process closure brand.
+const ownedDescriptorClosures = new Map();
+const OWNED_DESCRIPTOR_CLOSURE_SCHEMA = 'pipeline.owned-descriptor-closure.v1';
+function ownedClosureKey(repository,target) {
+  return rawSha256(Buffer.from(JSON.stringify({primaryRoot:repository.primaryRoot,
+    commonDir:repository.commonDir,sessionId:target.sessionId,descriptorSha256:target.descriptorSha256,
+    ownerNonceSha256:target.ownerNonceSha256})));
+}
+function ownedClosureRead(repo,path) {
+  assertNoSymlinkComponents(repo.commonDir,path);
+  assertPrivateRegularFile(path,'WT-OWNED-CLOSURE','owned descriptor closure source');
+  const before=lstatSync(path),bytes=readFileSync(path),after=lstatSync(path);
+  if(before.dev!==after.dev||before.ino!==after.ino||before.mode!==after.mode
+      ||before.nlink!==after.nlink||bytes.length!==after.size
+      ||rawSha256(bytes)!==rawSha256(readFileSync(path)))
+    fail('WT-OWNED-CLOSURE-CAS','owned closure source changed');
+  return {bytes,ref:{path:`.git/${relative(repo.commonDir,path).split(sep).join('/')}`,
+    sha256:rawSha256(bytes),size:bytes.length}};
+}
+function ownedClosureReceipt(repo,sessionId) {
+  const path=cleanupReceiptPath(repo,sessionId);
+  if(!existsSync(path))return null;
+  const read=ownedClosureRead(repo,path),value=JSON.parse(read.bytes.toString('utf8'));
+  if(!value||typeof value!=='object'||Array.isArray(value)
+      ||JSON.stringify(Object.keys(value).sort())!==JSON.stringify(['schema','sessionSha256','status','counts','outcomes','completedAt'].sort())
+      ||value.schema!==CLEANUP_RECEIPT_SCHEMA||value.sessionSha256!==rawSha256(Buffer.from(sessionId))
+      ||value.status!=='complete'||typeof value.completedAt!=='string'||Number.isNaN(Date.parse(value.completedAt)))
+    fail('WT-OWNED-CLOSURE','owner cleanup receipt is not complete');
+  return {...read,value,path};
+}
+function prepareOwnedDescriptorClosure(loaded) {
+  const receipt=ownedClosureReceipt(loaded.repo,loaded.sessionId);
+  if(receipt===null)return null; // Preserve legacy retirement; it cannot mint an owned closure.
+  const witnessRepository=inspectSignedDescriptorCustodyRepository(loaded.repo.primaryRoot);
+  const witnessTarget={sessionId:loaded.sessionId,descriptorSha256:loaded.descriptorSha256,ownerNonceSha256:ownerDigest(loaded.ownerNonce)};
+  const owner=sourceCreatedDescriptorOwners.get(ownedClosureKey(witnessRepository,witnessTarget));
+  const witness=ownedSessionCleanupWitnesses.get(ownedClosureKey(witnessRepository,witnessTarget));
+  if(!owner||!witness)return null; // Ordinary legacy retirement preserves its original API; no closure brand.
+  if(JSON.stringify(witness.repository)!==JSON.stringify(witnessRepository)
+      ||witness.descriptorRef.sha256!==loaded.descriptorSha256
+      ||JSON.stringify(witness.closureRef)!==JSON.stringify(receipt.ref))
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE','actual owning cleanup completion witness unavailable');
+  const original=ownedClosureRead(loaded.repo,loaded.path);
+  if(original.ref.sha256!==loaded.descriptorSha256)
+    fail('WT-OWNED-CLOSURE-CAS','owner descriptor changed before archival');
+  const descriptor=JSON.parse(original.bytes.toString('utf8'));
+  if(!validSessionDescriptor(descriptor,loaded.repo,loaded.sessionId)||descriptor.ownerNonce!==loaded.ownerNonce)
+    fail('WT-OWNED-CLOSURE','owner descriptor provenance changed');
+  const repository=inspectSignedDescriptorCustodyRepository(loaded.repo.primaryRoot);
+  const target={sessionId:loaded.sessionId,descriptorSha256:loaded.descriptorSha256,
+    ownerNonceSha256:ownerDigest(loaded.ownerNonce)};
+  const directory=join(localRoot(loaded.repo.commonDir),'session-descriptors','owned-retirement');
+  const stem=`${target.sessionId}.${target.descriptorSha256}`;
+  const archivePath=join(directory,`${stem}.descriptor.json`),proofPath=join(directory,`${stem}.proof.json`);
+  // Exclusive publication never overwrites interrupted or historical archives.
+  publishExclusiveFile(archivePath,original.bytes);
+  const archive=ownedClosureRead(loaded.repo,archivePath);
+  const proof={schema:OWNED_DESCRIPTOR_CLOSURE_SCHEMA,repository,target,
+    descriptorRef:original.ref,archiveRef:archive.ref,closureRef:receipt.ref,
+    closureCompletedAt:receipt.value.completedAt};
+  publishExclusiveFile(proofPath,Buffer.from(JSON.stringify(proof,null,2)+'\n'));
+  const proofRead=ownedClosureRead(loaded.repo,proofPath);
+  const current=ownedClosureRead(loaded.repo,loaded.path);
+  const currentReceipt=ownedClosureRead(loaded.repo,receipt.path);
+  if(current.ref.sha256!==original.ref.sha256||currentReceipt.ref.sha256!==receipt.ref.sha256
+      ||JSON.stringify(inspectSignedDescriptorCustodyRepository(loaded.repo.primaryRoot))!==JSON.stringify(repository)
+      ||existsSync(cleanupManifestPath(loaded.repo,loaded.sessionId)))
+    fail('WT-OWNED-CLOSURE-CAS','owner retirement preimage changed after archival');
+  return {repo:loaded.repo,repository,target,descriptorRef:original.ref,archivePath,archiveRef:archive.ref,
+    proofPath,proofRef:proofRead.ref,closurePath:receipt.path,closureRef:receipt.ref};
+}
+function publishOwnedDescriptorClosure(loaded,prepared) {
+  if(prepared===null)return;
+  if(existsSync(loaded.path)||inspectSessionClosure(loaded.repo.primaryRoot,loaded.sessionId).status!=='closed')
+    fail('WT-OWNED-CLOSURE-CAS','owner retirement did not reach completed physical closure');
+  ownedDescriptorClosures.set(ownedClosureKey(prepared.repository,prepared.target),prepared);
+}
+export function inspectOwnedSessionDescriptorClosure({repository,target}) {
+  try {
+    if(!target||JSON.stringify(Object.keys(target).sort())!==JSON.stringify(['sessionId','descriptorSha256','ownerNonceSha256'].sort()))
+      fail('WT-OWNED-CLOSURE','invalid closure target');
+    ensureSafeId(target.sessionId,'session ID');
+    if(!SHA256.test(target.descriptorSha256)||!SHA256.test(target.ownerNonceSha256))
+      fail('WT-OWNED-CLOSURE','invalid closure target digest');
+    const actual=inspectSignedDescriptorCustodyRepository(repository.primaryRoot);
+    if(JSON.stringify(actual)!==JSON.stringify(repository))fail('WT-OWNED-CLOSURE-CAS','closure candidate changed');
+    const prepared=ownedDescriptorClosures.get(ownedClosureKey(actual,target));
+    if(!prepared||JSON.stringify(prepared.repository)!==JSON.stringify(actual))
+      fail('WT-OWNED-CLOSURE','no source-owned retirement brand');
+    const archive=ownedClosureRead(prepared.repo,prepared.archivePath);
+    const proof=ownedClosureRead(prepared.repo,prepared.proofPath);
+    const receipt=ownedClosureReceipt(prepared.repo,target.sessionId);
+    if(!receipt||JSON.stringify(archive.ref)!==JSON.stringify(prepared.archiveRef)
+        ||JSON.stringify(proof.ref)!==JSON.stringify(prepared.proofRef)
+        ||JSON.stringify(receipt.ref)!==JSON.stringify(prepared.closureRef)
+        ||existsSync(sessionDescriptorPath(prepared.repo,target.sessionId))
+        ||existsSync(cleanupManifestPath(prepared.repo,target.sessionId)))
+      fail('WT-OWNED-CLOSURE-CAS','owner closure physical prefix changed');
+    const descriptor=JSON.parse(archive.bytes.toString('utf8'));
+    if(!validSessionDescriptor(descriptor,prepared.repo,target.sessionId)
+        ||rawSha256(archive.bytes)!==target.descriptorSha256
+        ||ownerDigest(descriptor.ownerNonce)!==target.ownerNonceSha256)
+      fail('WT-OWNED-CLOSURE-CAS','owner closure archive binding changed');
+    return Object.freeze({status:'closed',target:Object.freeze({...target}),
+      descriptorRef:Object.freeze({...prepared.descriptorRef}),archiveRef:Object.freeze({...prepared.archiveRef}),
+      proofRef:Object.freeze({...prepared.proofRef}),closureRef:Object.freeze({...prepared.closureRef}),
+      repository:Object.freeze({...actual,candidate:Object.freeze({...actual.candidate})}),assurance:'physical-owner-retirement'});
+  } catch(error) { return Object.freeze({status:'unavailable',code:error.code??'WT-OWNED-CLOSURE',reason:'owned-retirement-readback-unavailable'}); }
+}
+export function withOwnedSessionDescriptorClosureLock({repository,target},callback) {
+  if(typeof callback!=='function'||inspectOwnedSessionDescriptorClosure({repository,target}).status!=='closed')
+    fail('WT-OWNED-CLOSURE','unavailable source-owned closure');
+  const prepared=ownedDescriptorClosures.get(ownedClosureKey(repository,target));
+  const descriptor=JSON.parse(ownedClosureRead(prepared.repo,prepared.archivePath).bytes.toString('utf8'));
+  const release=acquireManifestLock(prepared.repo,target.sessionId,descriptor.ownerNonce,{noReclamation:true});
+  try {
+    if(inspectOwnedSessionDescriptorClosure({repository,target}).status!=='closed')
+      fail('WT-OWNED-CLOSURE-CAS','owned closure changed under manifest lock');
+    const result=callback();
+    if(result&&typeof result.then==='function')fail('WT-OWNED-CLOSURE','asynchronous closure lock callback');
+    return result;
+  } finally { release(); }
+}
+
+// Read-only preimage and private completion witness around the unchanged owner
+// cleanup writer. Historical or caller-authored receipt JSON cannot create it.
+const ownedSessionCleanupWitnesses = new Map();
+function observeOwnedSessionCleanupPreimage(repo,fields) {
+  try {
+    const loaded=loadSessionDescriptor(repo.primaryRoot,fields.sessionId);
+    if(loaded.ownerNonce!==fields.ownerNonce)return null;
+    const target={sessionId:loaded.sessionId,descriptorSha256:loaded.descriptorSha256,ownerNonceSha256:ownerDigest(loaded.ownerNonce)};
+    const owner=sourceCreatedDescriptorOwners.get(ownedClosureKey(repo,target));
+    if(!owner||owner.ownerNonce!==loaded.ownerNonce
+        ||JSON.stringify(owner.ownerRuntime)!==JSON.stringify(localProcessOwnerRuntime()))return null;
+    const original=ownedClosureRead(repo,loaded.path);
+    return {repository:inspectSignedDescriptorCustodyRepository(repo.primaryRoot),
+      target:{sessionId:fields.sessionId,descriptorSha256:loaded.descriptorSha256,
+        ownerNonceSha256:ownerDigest(loaded.ownerNonce)},descriptorRef:original.ref};
+  } catch { return null; }
+}
+function recordOwnedSessionCleanupCompletion(repo,fields,receiptPath,preimage) {
+  if(preimage===null)return; // No current original descriptor, no closure authority.
+  try {
+    const loaded=loadSessionDescriptor(repo.primaryRoot,fields.sessionId,{expectedDescriptorSha256:preimage.target.descriptorSha256});
+    const receipt=ownedClosureReceipt(repo,fields.sessionId);
+    const repository=inspectSignedDescriptorCustodyRepository(repo.primaryRoot);
+    if(loaded.ownerNonce!==fields.ownerNonce||!receipt||receipt.path!==receiptPath
+        ||existsSync(cleanupManifestPath(repo,fields.sessionId))
+        ||JSON.stringify(repository)!==JSON.stringify(preimage.repository))return;
+    ownedSessionCleanupWitnesses.set(ownedClosureKey(repository,preimage.target),
+      {repository,target:preimage.target,descriptorRef:preimage.descriptorRef,closureRef:receipt.ref});
+  } catch { /* Cleanup result is preserved; retirement will refuse missing provenance. */ }
+}
+
+// These capabilities exist only after this module's actual creation and
+// cleanup/retirement effects. Neither archived JSON nor a caller's tuple mints
+// an owning handle. There is deliberately no cross-process reconstruction.
+const sourceCreatedDescriptorOwners = new Map();
+const sourceCreatedDescriptorOwnerHandles = new WeakMap();
+const sourceCreatedDescriptorClosureHandles = new WeakMap();
+const OWNED_DESCRIPTOR_LIFETIME_LIMIT = 4096;
+
+function assertOwnedDescriptorLifetimeCapacity() {
+  if (sourceCreatedDescriptorOwners.size >= OWNED_DESCRIPTOR_LIFETIME_LIMIT)
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE', 'source-owned descriptor lifetime bound');
+}
+
+function retainSourceCreatedDescriptorOwner(repo, path, descriptor) {
+  const bytes = readFileSync(path);
+  const target = Object.freeze({sessionId:descriptor.sessionId,
+    descriptorSha256:rawSha256(bytes),ownerNonceSha256:ownerDigest(descriptor.ownerNonce)});
+  const key = ownedClosureKey(repo,target);
+  if (sourceCreatedDescriptorOwners.has(key))
+    fail('WT-OWNED-CLOSURE-CAS', 'source-created owner already retained');
+  const handle = Object.freeze({});
+  const value = {handle,target,primaryRoot:repo.primaryRoot,commonDir:repo.commonDir,
+    ownerNonce:descriptor.ownerNonce,ownerRuntime:descriptor.ownerRuntime,closureHandle:null};
+  sourceCreatedDescriptorOwnerHandles.set(handle,value);
+  sourceCreatedDescriptorOwners.set(key,value);
+}
+
+export function observeOwnedSessionDescriptorOwnerHandle({repository,target}) {
+  const actual = inspectSignedDescriptorCustodyRepository(repository?.primaryRoot);
+  if (JSON.stringify(actual) !== JSON.stringify(repository))
+    fail('WT-OWNED-CLOSURE-CAS', 'owner candidate changed');
+  const owner = sourceCreatedDescriptorOwners.get(ownedClosureKey(actual,target));
+  if (!owner || JSON.stringify(owner.target) !== JSON.stringify(target)
+      || JSON.stringify(owner.ownerRuntime) !== JSON.stringify(localProcessOwnerRuntime()))
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE', 'actual source-created owner capability unavailable');
+  return owner.handle;
+}
+
+export function observeOwnedSessionDescriptorClosureHandle({repository,target,ownerHandle}) {
+  const owner = sourceCreatedDescriptorOwnerHandles.get(ownerHandle);
+  if (!owner || JSON.stringify(owner.target) !== JSON.stringify(target)
+      || owner.primaryRoot !== repository?.primaryRoot || owner.commonDir !== repository?.commonDir)
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE', 'actual source-created owner capability required');
+  const observed = inspectOwnedSessionDescriptorClosure({repository,target});
+  if (observed.status !== 'closed')
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE', 'actual owning cleanup and retirement required');
+  if (!owner.closureHandle) {
+    const handle = Object.freeze({});
+    sourceCreatedDescriptorClosureHandles.set(handle,{owner,repository:structuredClone(repository),target:structuredClone(target)});
+    owner.closureHandle=handle;
+  }
+  return owner.closureHandle;
+}
+
+export function inspectOwnedSessionDescriptorClosureHandle(closureHandle,{repository,target}) {
+  const value=sourceCreatedDescriptorClosureHandles.get(closureHandle);
+  if (!value || JSON.stringify(value.repository)!==JSON.stringify(repository)
+      || JSON.stringify(value.target)!==JSON.stringify(target))
+    fail('WT-OWNED-CLOSURE-UNAVAILABLE','unowned descriptor closure handle');
+  const observed=inspectOwnedSessionDescriptorClosure({repository,target});
+  if (observed.status!=='closed')
+    fail('WT-OWNED-CLOSURE-CAS','owning descriptor closure changed');
+  return observed;
+}

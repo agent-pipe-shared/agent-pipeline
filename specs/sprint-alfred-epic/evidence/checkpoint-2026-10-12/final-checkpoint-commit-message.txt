@@ -1,0 +1,10 @@
+docs(alfred): finalize portable WIP checkpoint for Claude transfer
+
+Record the signed 317-file Main checkpoint, exact packaging readbacks and
+portable continuation instructions. Keep the 48 later proposals inert and
+all review, native-evidence and acceptance holds explicit. Preserve the
+public request, signing evidence and proof outside temporary scratch.
+
+Dispatch: stage-0 (elephant)
+AI-Assisted: true
+Checkpoint-Intent: Transfer Alfred WIP code, prepared proposals and public evidence for cross-PC Claude continuation.

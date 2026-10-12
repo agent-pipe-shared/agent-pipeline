@@ -1,0 +1,543 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * Installs a repository-local `commit-msg` backstop for GIT-03. The hook reads
+ * Git's finished message file and delegates all policy decisions to the pure
+ * `finishedCommitMessageFindings()` API. Installation is explicit and never a
+ * side effect of importing this module.
+ *
+ * The installed shim, implementation and marker have their own namespace. A
+ * pre-existing hook, an incomplete managed installation, unreadable state, or
+ * content changed after installation is never overwritten or removed.
+ */
+import { execFileSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmdirSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
+import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admission.mjs";
+import { ensureHardenedPrivateDirectory } from "../lib/hardened-private-directory.mjs";
+function decorateInstalledImpl(content, pluginLibDir, deadline) {
+  const matched = String(pluginLibDir).replaceAll("\\", "/").match(/^(.*\/agent-pipeline\/commit-msg-hook\/runtime-([a-f0-9]{64}))\/lib$/);
+  if (!matched) return content;
+  const runtimeSnapshot = {root:matched[1],manifestSha256:matched[2]};
+  verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256,deadline});
+  if (content.split("async function main() {").length !== 2) throw Error("GHA-RENDER-ANCHOR");
+  return content.replace("async function main() {", "async function main() {\n  const governanceRoot = await projectRoot();\n  if (!governanceRoot) throw Error(\"GHA-ROOT\");\n  if (!await admitPipelineScope(governanceRoot)) return;") + renderGitHookSnapshotAdmission(runtimeSnapshot);
+}
+
+
+export const INSTALLER_VERSION = "2";
+export const MARKER_SCHEMA = "pipeline.commit-msg-hook-install.v1";
+export const DECLINE_MARKER_SCHEMA = "pipeline.commit-msg-hook-decline.v1";
+
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const DEFAULT_PLUGIN_LIB_DIR = join(PLUGIN_ROOT, "lib");
+
+function sha256(text) {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+function resolveGitPaths(rootDir) {
+  const run = (args) => execFileSync("git", args, {
+    cwd: rootDir,
+    encoding: "utf8",
+    timeout: 10_000,
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+  try {
+    return {
+      commonDir: run(["rev-parse", "--path-format=absolute", "--git-common-dir"]),
+      hookPath: run(["rev-parse", "--path-format=absolute", "--git-path", "hooks/commit-msg"]),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function stateDir(commonDir) {
+  return join(commonDir, "agent-pipeline", "commit-msg-hook");
+}
+function markerPath(commonDir) {
+  return join(stateDir(commonDir), "install-marker.json");
+}
+function implPath(commonDir) {
+  return join(stateDir(commonDir), "impl.mjs");
+}
+function declineMarkerPath(commonDir) {
+  return join(stateDir(commonDir), "decline-marker.json");
+}
+
+function readDeclineMarker(commonDir) {
+  const path = declineMarkerPath(commonDir);
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    if (parsed?.schema !== DECLINE_MARKER_SCHEMA || typeof parsed.declinedAt !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function readManagedMarker(commonDir) {
+  const path = markerPath(commonDir);
+  if (!existsSync(path)) return { status: "absent" };
+  try {
+    const marker = JSON.parse(readFileSync(path, "utf8"));
+    if (marker?.schema !== MARKER_SCHEMA || typeof marker.hookSha256 !== "string" || typeof marker.implSha256 !== "string") {
+      return { status: "invalid" };
+    }
+    return { status: "valid", marker };
+  } catch (error) {
+    return { status: "unreadable", detail: error?.message ?? "marker could not be read" };
+  }
+}
+
+function verifiedContent(path, expectedSha256) {
+  try {
+    const content = readFileSync(path, "utf8");
+    return sha256(content) === expectedSha256
+      ? { status: "verified", content }
+      : { status: "modified" };
+  } catch (error) {
+    return { status: "unreadable", detail: error?.message ?? "file could not be read" };
+  }
+}
+
+/** POSIX shell word encoded as one single-quoted literal. A literal apostrophe
+ * closes the quote, emits an apostrophe inside double quotes, then reopens it.
+ * `$()`, backticks, `$VAR`, whitespace and newlines remain literal bytes. */
+export function posixSingleQuote(value) {
+  return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
+}
+
+export function renderShim(installedImplPath) {
+  return [
+    "#!/bin/sh",
+    "# GENERATED by plugins/pipeline-core/scripts/commit-msg-hook-install.mjs -- do not hand-edit.",
+    "# Re-run the installer to update; use its --remove verb to uninstall safely.",
+    `exec node ${posixSingleQuote(installedImplPath)} "$@"`,
+    "",
+  ].join("\n");
+}
+
+export function renderImpl(pluginLibDir) {
+  const lib = JSON.stringify(pluginLibDir);
+  return `#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+// GENERATED by commit-msg-hook-install.mjs v${INSTALLER_VERSION}. Do not hand-edit.
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
+const PLUGIN_LIB_DIR = ${lib};
+
+function block(lines) {
+  console.error("BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.");
+  for (const line of lines) console.error(\`  - \${line}\`);
+  console.error("Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.");
+  process.exitCode = 1;
+}
+
+function warn(lines) {
+  for (const line of lines) console.error(\`WARN (agent-pipeline commit-msg): \${line}\`);
+}
+
+function projectRoot() {
+  try {
+    const gitDir = resolve(process.cwd());
+    const resolved = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: gitDir,
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    return resolved.status === 0 && resolved.stdout?.trim() ? resolve(resolved.stdout.trim()) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function main() {
+  const messagePath = process.argv[2];
+  if (!messagePath) {
+    block(["Git did not provide a commit-message path; policy evaluation cannot continue."]);
+    return;
+  }
+  let message;
+  try {
+    const info = statSync(messagePath);
+    if (!info.isFile() || info.size > 1024 * 1024) throw new TypeError("unbounded message");
+    message = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(messagePath));
+  } catch (error) {
+    block([\`GIT-03-UNREADABLE-MESSAGE-FILE: the commit-message file could not be read (\${error?.name ?? "Error"}); policy evaluation cannot continue.\`]);
+    return;
+  }
+  let inspectAdministrativeCommit;
+  let hasAdministrativeDispatch;
+  let finishedCommitMessageFindings;
+  let markerPolicyMode;
+  let parseIntegrationTrailerBlock;
+  let verifyQualityPackageIntegrationPreCommit;
+  let resolveProjectAuthorityPaths;
+  let NEUTRAL_GUARD_CONFIG;
+  let LEGACY_GUARD_CONFIG;
+  let evaluateStagedDevPlanPaths;
+  try {
+    ({ inspectAdministrativeCommit, hasAdministrativeDispatch } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "administrative-commit-policy.mjs")).href));
+    ({ finishedCommitMessageFindings, markerPolicyMode, parseIntegrationTrailerBlock } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "commit-message-policy.mjs")).href));
+    ({ verifyQualityPackageIntegrationPreCommit } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "signed-quality-package.mjs")).href));
+    ({ resolveProjectAuthorityPaths, NEUTRAL_GUARD_CONFIG, LEGACY_GUARD_CONFIG } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "project-authority.mjs")).href));
+    ({ evaluateStagedDevPlanPaths } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "guard-devplan-policy.mjs")).href));
+    if (typeof finishedCommitMessageFindings !== "function" || typeof markerPolicyMode !== "function" || typeof resolveProjectAuthorityPaths !== "function"
+      || typeof parseIntegrationTrailerBlock !== "function" || typeof verifyQualityPackageIntegrationPreCommit !== "function"
+      || typeof evaluateStagedDevPlanPaths !== "function") {
+      throw new TypeError("required policy authority is unavailable");
+    }
+  } catch (error) {
+    block([\`the installed commit-message policy could not be loaded (\${error?.name ?? "Error"}); policy evaluation cannot continue.\`]);
+    return;
+  }
+  const root = await projectRoot();
+  if (!root) {
+    block(["the repository root could not be resolved; policy evaluation cannot continue."]);
+    return;
+  }
+  let stagedListing;
+  try {
+    stagedListing = spawnSync("git", ["diff", "--cached", "--name-only", "-z", "--no-renames"], {
+      cwd: root,
+      timeout: 10_000,
+      maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
+    });
+  } catch (error) {
+    block(["staged lifecycle paths could not be enumerated (" + (error?.name ?? "Error") + "); commit policy cannot continue."]);
+    return;
+  }
+  if (stagedListing.error || stagedListing.status !== 0 || !Buffer.isBuffer(stagedListing.stdout)) {
+    block(["staged lifecycle paths could not be enumerated (" + (stagedListing.error?.name ?? "GitError") + "); commit policy cannot continue."]);
+    return;
+  }
+  let stagedPaths;
+  try {
+    const encodedPaths = new TextDecoder("utf-8", { fatal: true }).decode(stagedListing.stdout);
+    if (encodedPaths && !encodedPaths.endsWith("\0")) throw new TypeError("unterminated Git path list");
+    stagedPaths = encodedPaths ? encodedPaths.slice(0, -1).split("\0") : [];
+    if (stagedPaths.some((path) => !path)) throw new TypeError("empty Git path");
+  } catch (error) {
+    block(["staged lifecycle paths were malformed (" + (error?.name ?? "Error") + "); commit policy cannot continue."]);
+    return;
+  }
+  const stagedContentByPath = {};
+  const baselineContentByPath = {};
+  const settingsPaths = stagedPaths.filter((path) => /^\\.claude\\/settings(?:\\.[^/]+)?\\.json$/u.test(path));
+  if (settingsPaths.length) {
+    const runGit = (args) => spawnSync("git", args, {
+      cwd: root, timeout: 10_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true,
+    });
+    try {
+      // Pin the base commit before reading any blobs; a worktree file is never a base.
+      const head = runGit(["rev-parse", "--verify", "--quiet", "HEAD"]);
+      if (head.error || !Buffer.isBuffer(head.stdout)) throw new Error("base enumeration failed");
+      const base = new TextDecoder("utf-8", {fatal:true}).decode(head.stdout).trim();
+      if (!((head.status === 0 && /^[a-f0-9]{40,64}$/u.test(base)) || (head.status === 1 && base === ""))) throw new Error("base identity unavailable");
+      const changes = runGit(["diff", "--cached", "--name-status", "-z", "--no-renames"]);
+      if (changes.error || changes.status !== 0 || !Buffer.isBuffer(changes.stdout)) throw new Error("staged statuses unavailable");
+      const encoded = new TextDecoder("utf-8", {fatal:true}).decode(changes.stdout);
+      if (encoded && !encoded.endsWith("\\0")) throw new Error("unterminated status list");
+      const rows = encoded ? encoded.slice(0,-1).split("\\0") : [];
+      if (rows.length % 2 !== 0) throw new Error("malformed status list");
+      const statusByPath = new Map();
+      for (let index=0;index<rows.length;index+=2) {
+        if (!/^[AMDT]$/u.test(rows[index]) || !rows[index+1] || statusByPath.has(rows[index+1])) throw new Error("ambiguous staged status");
+        statusByPath.set(rows[index+1],rows[index]);
+      }
+      const readBlob = (spec) => {
+        const result = runGit(["show",spec]);
+        if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout) || result.stdout.length > 1024*1024) throw new Error("settings blob unavailable");
+        return new TextDecoder("utf-8",{fatal:true}).decode(result.stdout);
+      };
+      for (const path of settingsPaths) {
+        const status = statusByPath.get(path);
+        if (!status) throw new Error("staged path changed during observation");
+        if (!base && status !== "A") throw new Error("unborn base has a non-added settings path");
+        // A/D come from Git's base/index comparison, never from a failed blob read.
+        baselineContentByPath[path] = status === "A" ? null : readBlob(base+":"+path);
+        stagedContentByPath[path] = status === "D" ? null : readBlob(":0:"+path);
+      }
+      const finalHead = runGit(["rev-parse","--verify","--quiet","HEAD"]);
+      if (finalHead.error || finalHead.status !== head.status || !Buffer.isBuffer(finalHead.stdout)
+        || !finalHead.stdout.equals(head.stdout)) throw new Error("base changed during settings observation");
+    } catch (error) {
+      block(["the exact base/index hook settings could not be read ("+(error?.name??"Error")+"); commit policy cannot continue."]);
+      return;
+    }
+  }
+  let stagedLifecycle;
+  try {
+    stagedLifecycle = evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths, stagedContentByPath, baselineContentByPath });
+  } catch (error) {
+    block(["staged lifecycle policy could not produce a verdict (" + (error?.name ?? "Error") + "); commit policy cannot continue."]);
+    return;
+  }
+  if (!stagedLifecycle || stagedLifecycle.ok !== true || stagedLifecycle.code !== "PIPELINE-STAGED-LIFECYCLE-ALLOW") {
+    const findings = Array.isArray(stagedLifecycle?.findings) && stagedLifecycle.findings.length
+      ? stagedLifecycle.findings.map((finding) => String(finding?.code ?? stagedLifecycle?.code ?? "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE") + (finding?.path ? " (" + finding.path + ")" : ""))
+      : [stagedLifecycle?.code ?? "PIPELINE-STAGED-LIFECYCLE-UNAVAILABLE"];
+    block(["staged lifecycle policy denied or could not verify this commit: " + findings.join(", ") + "."]);
+    return;
+  }
+  let projectConfig = null;
+  try {
+    const authority = resolveProjectAuthorityPaths({ rootDir: root });
+    const guardConfig = authority.status === "ready"
+      ? authority.guardConfig
+      : (existsSync(join(root, NEUTRAL_GUARD_CONFIG)) ? NEUTRAL_GUARD_CONFIG : LEGACY_GUARD_CONFIG);
+    try { projectConfig = JSON.parse(readFileSync(join(root, guardConfig), "utf8")); } catch { projectConfig = null; }
+  } catch {
+    projectConfig = null;
+  }
+  const mode = markerPolicyMode(projectConfig);
+  let result;
+  try {
+    const integration = parseIntegrationTrailerBlock(message);
+    let integrationAdmission = null;
+    if (integration.ok) {
+      const verified = verifyQualityPackageIntegrationPreCommit({ repoRoot: root, intentSha256: integration.intentSha256 });
+      if (verified.ok && verified.code === "QUALITY-PACKAGE-INTEGRATION-PRECOMMIT-VERIFIED") {
+        integrationAdmission = {
+          schema: "pipeline.signed-quality-package-integration-evidence.v1",
+          intentSha256: integration.intentSha256,
+          messageSha256: createHash("sha256").update(message.replace(/\\r\\n/gu, "\\n"), "utf8").digest("hex"),
+          phase: "precommit", code: verified.code,
+        };
+      }
+    }
+    // This hook is the Git boundary that remains in force when an agent hides
+    // git commit behind a shell script. Git does not expose a trustworthy
+    // human-typed-this bit, so a Pipeline-managed repository uses its
+    // configured blocking policy for every finished commit message. The off
+    // mode remains the explicit migration escape; warn still reports but does
+    // not reject. Restricting this to already-signalled trailers left a shell
+    // script able to create an unprovenanced commit.
+    result = finishedCommitMessageFindings(message, {
+      requireMarker: mode !== "off",
+      requireDispatch: mode !== "off",
+      integrationAdmission,
+      administrativeAdmission: hasAdministrativeDispatch(message) ? inspectAdministrativeCommit({repoRoot:root,message}) : null,
+    });
+    if (!result || !Array.isArray(result.findings)) throw new TypeError("policy returned an invalid verdict");
+  } catch (error) {
+    block([\`the commit-message policy could not produce a verdict (\${error?.name ?? "Error"}); policy evaluation cannot continue.\`]);
+    return;
+  }
+  const provenanceCodes = new Set([
+    "GIT-03-MARKER-MISSING", "GIT-03-MARKER-AMBIGUOUS",
+    "GIT-03-DISPATCH-MISSING", "GIT-03-DISPATCH-AMBIGUOUS", "GIT-03-DISPATCH-MALFORMED",
+  ]);
+  const correlation = result.findings.filter((finding) => !provenanceCodes.has(finding.code));
+  const provenance = result.findings.filter((finding) => provenanceCodes.has(finding.code));
+  if (correlation.length > 0 || (mode === "blocking" && provenance.length > 0)) {
+    block([...correlation, ...(mode === "blocking" ? provenance : [])].map((finding) => \`\${finding.code}: \${finding.detail}\`));
+  }
+  if (mode === "warn" && provenance.length > 0) {
+    warn([\`incomplete provenance (\${provenance.map((finding) => finding.code).join(", ")}); commitTrailerPolicy is warn.\`]);
+  }
+}
+
+main().catch((error) => {
+  block([\`the commit-msg hook faulted before producing a verdict (\${error?.name ?? "Error"}).\`]);
+});
+`;
+}
+
+function inspectManagedInstall(commonDir, hookPath) {
+  const markerResult = readManagedMarker(commonDir);
+  if (markerResult.status === "invalid" || markerResult.status === "unreadable") {
+    return { status: "unreadable-managed-state", hookPath, detail: markerResult.detail };
+  }
+  const impl = implPath(commonDir);
+  if (markerResult.status === "absent") {
+    if (existsSync(hookPath)) return { status: "foreign-hook-present", hookPath };
+    if (existsSync(impl)) return { status: "orphan-managed-file", hookPath, implPath: impl };
+    return { status: "absent", hookPath, implPath: impl };
+  }
+  const hook = verifiedContent(hookPath, markerResult.marker.hookSha256);
+  const implementation = verifiedContent(impl, markerResult.marker.implSha256);
+  if (hook.status !== "verified" || implementation.status !== "verified") {
+    return {
+      status: "modified-or-unreadable-managed-install",
+      hookPath,
+      implPath: impl,
+      hookStatus: hook.status,
+      implStatus: implementation.status,
+    };
+  }
+  return { status: "verified", hookPath, implPath: impl, marker: markerResult.marker };
+}
+
+export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, inspectSource } = {}) {
+  const paths = resolveGitPaths(rootDir);
+  if (!paths) return { status: "repository-unresolved" };
+  const inspected = inspectManagedInstall(paths.commonDir, paths.hookPath);
+  if (inspected.status === "absent") {
+    const decline = readDeclineMarker(paths.commonDir);
+    if (decline) return { status: "declined", ...paths, pluginLibDir, declinedAt: decline.declinedAt };
+    return { status: "ready", ...paths, pluginLibDir };
+  }
+  if (inspected.status === "verified") {
+    // HOOKREFRESH-S1: same currentness reading as pre-push (lib/hook-currentness.mjs). Detection
+    // only: `current` / `updateRequired` are reported, nothing is written and the marker is unchanged.
+    return {
+      status: "ready-to-upgrade",
+      ...paths,
+      pluginLibDir,
+      // `inspectSource` is optional (HOOKREFRESH-S1c): a caller planning several hooks passes one shared inspector.
+      ...assessHookCurrentness({ recordedPluginLibDir: inspected.marker.pluginLibDir, pluginLibDir, inspectSource }),
+    };
+  }
+  return inspected;
+}
+// ESM hoists this import; it sits beside its only use so the change stays one local edit.
+import { assessHookCurrentness } from "../lib/hook-currentness.mjs";
+
+/** Records a reversible local decision not to install this optional hook.  The
+ * marker never wins over an actual hook: `planInstall` inspects the hook first,
+ * so a later managed or foreign hook remains visible and is never overwritten. */
+export function planDecline({ rootDir } = {}) {
+  const paths = resolveGitPaths(rootDir);
+  if (!paths) return { status: "repository-unresolved" };
+  return { status: "ready", commonDir: paths.commonDir };
+}
+
+export function applyDecline({ rootDir } = {}) {
+  const plan = planDecline({ rootDir });
+  if (plan.status !== "ready") return plan;
+  const marker = { schema: DECLINE_MARKER_SCHEMA, declinedAt: new Date().toISOString() };
+  ensureHardenedPrivateDirectory(plan.commonDir, stateDir(plan.commonDir));
+  atomicWrite(declineMarkerPath(plan.commonDir), `${JSON.stringify(marker, null, 2)}\n`, 0o600);
+  return { status: "declined", declinedAt: marker.declinedAt };
+}
+
+function atomicWrite(path, content, mode) {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.tmp-${process.pid}-${randomBytes(6).toString("hex")}`;
+  try {
+    writeFileSync(temporary, content, { encoding: "utf8", mode });
+    chmodSync(temporary, mode);
+    renameSync(temporary, path);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+
+export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, onProgress, timeBudgetMs } = {}) {
+  const plan = planInstall({ rootDir, pluginLibDir });
+  if (![
+    "ready",
+    "ready-to-upgrade",
+    // A decline is a reversible local preference, not a permanent refusal.
+    "declined",
+  ].includes(plan.status)) {
+    return { ...plan, status: plan.status === "foreign-hook-present" ? "refused-foreign-hook" : `refused-${plan.status}` };
+  }
+  const impl = implPath(plan.commonDir);
+  const snapshotState = join(plan.commonDir, "agent-pipeline", "commit-msg-hook");
+  ensureHardenedPrivateDirectory(plan.commonDir, snapshotState);
+  const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState, onProgress, timeBudgetMs });
+  pluginLibDir = join(runtimeSnapshot.root, "lib");
+  const shimContent = renderShim(impl);
+  const implContent = decorateInstalledImpl(renderImpl(pluginLibDir), pluginLibDir, runtimeSnapshot.deadline);
+  atomicWrite(impl, implContent, 0o600);
+  atomicWrite(plan.hookPath, shimContent, 0o755);
+  const marker = {
+    schema: MARKER_SCHEMA,
+    installerVersion: INSTALLER_VERSION,
+    installedAt: new Date().toISOString(),
+    hookPath: plan.hookPath,
+    implPath: impl,
+    pluginLibDir,
+    hookSha256: sha256(shimContent),
+    implSha256: sha256(implContent),
+  };
+  atomicWrite(markerPath(plan.commonDir), `${JSON.stringify(marker, null, 2)}\n`, 0o600);
+  return {
+    status: plan.status === "ready-to-upgrade" ? "upgraded" : "installed",
+    hookPath: plan.hookPath,
+    implPath: impl,
+    markerPath: markerPath(plan.commonDir),
+  };
+}
+
+export function planRemoval({ rootDir } = {}) {
+  const paths = resolveGitPaths(rootDir);
+  if (!paths) return { status: "repository-unresolved" };
+  const inspected = inspectManagedInstall(paths.commonDir, paths.hookPath);
+  if (inspected.status === "absent") return { status: "nothing-to-remove", hookPath: paths.hookPath };
+  if (inspected.status === "verified") return { status: "ready", ...paths, implPath: inspected.implPath };
+  return inspected;
+}
+
+export function applyRemoval({ rootDir } = {}) {
+  const plan = planRemoval({ rootDir });
+  if (plan.status !== "ready") {
+    return { ...plan, status: plan.status.startsWith("refused-") ? plan.status : `refused-${plan.status}` };
+  }
+  unlinkSync(plan.hookPath);
+  unlinkSync(plan.implPath);
+  unlinkSync(markerPath(plan.commonDir));
+  try { rmdirSync(stateDir(plan.commonDir)); } catch { /* retain nonempty shared state */ }
+  return { status: "removed", hookPath: plan.hookPath };
+}
+
+if (isDirectInvocation(import.meta.url)) {
+  const [verb] = process.argv.slice(2);
+  const rootDir = process.cwd();
+  // Keep the thrown error's OWN typed refusal code (PB-WINDOWS-ASSURANCE, ...): a typed code is a
+  // hyphenated upper-case identifier, which cannot carry a path or message text. Only an error with
+  // no typed code (a plain Error, or a bare errno such as EACCES) falls back. Mirrors pre-push.
+  const installOrRefusal = () => {
+    try {
+      return applyInstall({ rootDir, onProgress: ({ phase, completed, total }) => {
+        console.error(`[pipeline-core] hook snapshot ${phase} ${completed}/${total}`);
+      } });
+    } catch (error) {
+      const code = typeof error?.code === "string" && error.code.length <= 64 && /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/.test(error.code)
+        ? error.code : "COMMITMSG-INSTALL-UNAVAILABLE";
+      return { status: "refused", code };
+    }
+  };
+  const result = verb === "--install"
+    ? installOrRefusal()
+    : verb === "--remove"
+      ? applyRemoval({ rootDir })
+      : verb === "--plan-install"
+        ? planInstall({ rootDir })
+    : verb === "--plan-remove"
+      ? planRemoval({ rootDir })
+      : verb === "--decline"
+        ? applyDecline({ rootDir })
+      : null;
+  if (!result) {
+    console.error("usage: commit-msg-hook-install.mjs --plan-install|--install|--plan-remove|--remove|--decline");
+    process.exit(2);
+  }
+  console.log(JSON.stringify(result, null, 2));
+  if ((verb === "--install" && !["installed", "upgraded"].includes(result.status)) || (verb === "--remove" && result.status !== "removed") || (verb === "--decline" && result.status !== "declined")) process.exitCode = 1;
+}

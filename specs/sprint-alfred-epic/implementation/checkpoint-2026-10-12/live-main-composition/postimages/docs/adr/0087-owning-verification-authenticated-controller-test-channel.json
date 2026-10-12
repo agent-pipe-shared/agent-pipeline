@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "ADR-0087",
+  "title": "Owning verification through an authenticated controller test channel",
+  "status": "accepted",
+  "digest": "ba2021d83e5221085bff47da1a4beda8bd955511b63880d559e4f90f5e7afb27",
+  "scope": "global",
+  "date": "2026-10-11"
+}

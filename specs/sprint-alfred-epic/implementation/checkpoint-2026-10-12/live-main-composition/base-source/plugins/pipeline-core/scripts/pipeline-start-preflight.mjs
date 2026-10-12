@@ -1,0 +1,2104 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+/** Report loaded distribution identity and restart-handoff presence without secrets. */
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync, lstatSync, opendirSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+import { observeArchitectureAdoptionOrientation } from "../lib/architecture-adoption-orientation.mjs";
+import { inspectArchitectureDecisionContinuity } from "../lib/architecture-decision-continuity.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+// NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
+// runnable.md): the same typed readiness check the readiness guard itself uses
+// (guard-lifecycle-ready.mjs), reused here read-only to decide whether THIS bootstrap's
+// `nextAction` should point a not-yet-onboarded project at the guided driver instead of the
+// bare `inspect` -- never to re-implement or duplicate that guard's own logic.
+import {
+  ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
+} from "../lib/project-onboarding-ready-gate.mjs";
+import {
+  observeCodexPublicCoreIdentity,
+  observePublicCoreIdentity,
+  observeRunnerPublicCoreIdentity,
+  snapshotPhysicalPluginRoot,
+} from "../lib/public-core-observation.mjs";
+import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
+import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedTopology } from "../lib/antigravity-topology-refresh-host.mjs";
+import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
+import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
+import {
+  evaluateSelfApplicationAttestation,
+  pluginRootHasSelfApplicationGit,
+} from "../lib/self-application-attestation-gate.mjs";
+import {
+  bindScratchDescriptor,
+  retireOrphanScratchDescriptors,
+  retireOrphanWorktreeDirectories,
+  retireRegisteredWorktrees,
+} from "../lib/session-cleanup-recovery.mjs";
+import {
+  inspectSessionOwnerRuntime,
+  listActiveSessionDescriptors,
+} from "../lib/worktree-lifecycle.mjs";
+import { planInstall } from "./pre-push-hook-install.mjs";
+import { applyMandatoryHookGate, assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
+import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
+import {
+  DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
+  INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER,
+  resolveAntigravityRegistryInstalledRoot,
+  resolveClaudeRegistryBinding,
+  resolveCodexRegistrySource,
+  installedPluginAttestationSetupCommand,
+  verifyLocalDevelopmentInstalledPluginReceipt,
+} from "./installed-plugin-attestation-host.mjs";
+
+function collectRelativeFiles(rootDir, subdirs = ["agents", "skills", "templates"]) {
+  const files = [];
+  for (const subdir of subdirs) {
+    const dir = resolve(rootDir, subdir);
+    if (!existsSync(dir)) continue;
+    const walk = (current, rel) => {
+      let entries;
+      try {
+        entries = readdirSync(current, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
+        const full = resolve(current, entry.name);
+        if (entry.isDirectory()) {
+          walk(full, entryRel);
+        } else if (entry.isFile()) {
+          files.push(`${subdir}/${entryRel}`);
+        }
+      }
+    };
+    walk(dir, "");
+  }
+  return files;
+}
+
+export function observeDutyNotRuntimeLive({ checkoutPluginRoot, installedPluginRoot, read = readFileSync }) {
+  if (!checkoutPluginRoot || !installedPluginRoot) {
+    return { status: "not-applicable" };
+  }
+  try {
+    if (realpathSync(resolve(checkoutPluginRoot)) === realpathSync(resolve(installedPluginRoot))) {
+      return { status: "in-force" };
+    }
+  } catch {
+    if (resolve(checkoutPluginRoot) === resolve(installedPluginRoot)) {
+      return { status: "in-force" };
+    }
+  }
+  if (!existsSync(checkoutPluginRoot) || !existsSync(installedPluginRoot)) {
+    return { status: "not-applicable" };
+  }
+  const checkoutFiles = collectRelativeFiles(checkoutPluginRoot);
+  const installedFiles = collectRelativeFiles(installedPluginRoot);
+  const allFiles = [...new Set([...checkoutFiles, ...installedFiles])].sort();
+  const differingFiles = [];
+  for (const file of allFiles) {
+    const checkoutPath = resolve(checkoutPluginRoot, file);
+    const installedPath = resolve(installedPluginRoot, file);
+    if (!existsSync(checkoutPath) || !existsSync(installedPath)) {
+      differingFiles.push(file);
+      continue;
+    }
+    try {
+      const b1 = read(checkoutPath);
+      const b2 = read(installedPath);
+      if (Buffer.compare(Buffer.from(b1), Buffer.from(b2)) !== 0) {
+        differingFiles.push(file);
+      }
+    } catch {
+      differingFiles.push(file);
+    }
+  }
+  if (differingFiles.length > 0) {
+    return { status: "differing", diagnostic: "DUTY-NOT-RUNTIME-LIVE", differingFiles };
+  }
+  return { status: "in-force" };
+}
+
+export const SCHEMA = "pipeline.start-preflight.v1";
+/**
+ * What `status` ranges over -- declared, not implied (SETUPSTATUS-1). This preflight resolves
+ * the loaded plugin distribution's identity and nothing else: it never reads
+ * `pipeline.user.yaml`, so `ready` is never a statement that project setup is complete. A
+ * greenfield session read it as one, next to the SessionStart setup-check reporting the file
+ * missing, and had no basis to choose. Naming the scope makes the two statements reconcilable
+ * by construction; `setup-check.mjs`'s `reconcileSetupObservation` refuses an undeclared one.
+ */
+export const STATUS_SCOPE = "plugin-distribution-identity-and-mandatory-local-hooks";
+export const CONCURRENT_SESSION_WARNING_SCHEMA = "pipeline.concurrent-session-warning.v1";
+const PLUGIN_ID = "pipeline-core@agent-pipeline";
+const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
+const NORMAL_BOOTSTRAP_CHECKS = Object.freeze([
+  "lifecycle",
+  "authority",
+  "calibration",
+  "handover",
+  "verify",
+  "continuation",
+  "architecture",
+]);
+
+export function normalBootstrapPayloadReceipt(payload) {
+  const measurement = measureBootstrapPayload(payload, {
+    mode: "normal",
+    runner: "runner-neutral",
+  });
+  return {
+    schema: "pipeline.bootstrap-payload-receipt.v1",
+    mode: "normal",
+    retainedChecks: NORMAL_BOOTSTRAP_CHECKS,
+    originalMeasurement: measurement,
+    emittedMeasurement: measurement,
+    overBudget: !measurement.withinBudget,
+    truncated: false,
+  };
+}
+
+function readInstalledPluginList(runner) {
+  const executable = runner === "claude" ? "claude" : runner === "antigravity" ? "agy" : "codex";
+  const result = spawnSync(executable, ["plugin", "list", "--json"], {
+    encoding: "utf8",
+    shell: false,
+    timeout: 5_000,
+    maxBuffer: 1024 * 1024,
+    windowsHide: true,
+  });
+  if (result.status !== 0 || typeof result.stdout !== "string") return null;
+  return result.stdout;
+}
+
+/** Reads the host's own `~/.claude/plugins/known_marketplaces.json` (Claude-only registry). */
+function readClaudeKnownMarketplaces() {
+  return readFileSync(resolve(homedir(), ".claude", "plugins", "known_marketplaces.json"), "utf8");
+}
+
+/**
+ * Codex's `plugin list --json` entry carries its own `source`/`marketplaceSource`
+ * fields (unlike Claude's, which has no such fields and needs the host's separate
+ * `known_marketplaces.json` registry instead -- see `claudeLocalDevelopmentAttested`),
+ * so attestation here is a pure function of the candidate entry itself: both its
+ * `marketplaceSource` and `source` report "local", and the entry's own installed
+ * path resolves under that exact local marketplace root. Extracted so the
+ * precedence check below can attest a LOCAL candidate before a match is chosen.
+ */
+function codexExactLocalSource(entry) {
+  return entry?.marketplaceSource?.sourceType === "local"
+    && typeof entry.marketplaceSource.source === "string"
+    && isAbsolute(entry.marketplaceSource.source)
+    && resolve(entry.marketplaceSource.source) === entry.marketplaceSource.source
+    && entry?.source?.source === "local"
+    && typeof entry.source.path === "string"
+    && isAbsolute(entry.source.path)
+    && resolve(entry.source.path) === entry.source.path
+    && resolve(entry.marketplaceSource.source, "plugins", "pipeline-core") === entry.source.path;
+}
+
+/**
+ * NVA-PLUGIN-PRECEDENCE: the Codex mirror of the Claude precedence rule
+ * (`claudeAttestedLocalWinsOverOfficial`'s comment carries the full reasoning --
+ * an attested local-development install is an explicit, machine-local act of
+ * intent that outranks a released install of the SAME repository). Same shape,
+ * same restriction -- exactly one eligible local entry, exactly one eligible
+ * official entry, and the local entry itself attested -- only the attestation
+ * SOURCE differs (the entry's own fields here, the host registry there), because
+ * that is the only place the two runners' `plugin list --json` payloads diverge.
+ * It does NOT collapse two entries of the SAME class: those stay ambiguous via
+ * the check that follows, unchanged.
+ */
+function codexAttestedLocalWinsOverOfficial(localMatches, officialMatches) {
+  return localMatches.length === 1
+    && officialMatches.length === 1
+    && codexExactLocalSource(localMatches[0]);
+}
+
+function installedPipelineIdentityCodex(payload) {
+  if (!Array.isArray(payload?.installed)) return null;
+  const eligible = (entry) =>
+    [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(entry?.pluginId)
+    && entry?.name === "pipeline-core"
+    && entry?.marketplaceName === entry.pluginId.slice("pipeline-core@".length)
+    && entry?.installed === true
+    && entry?.enabled === true
+    && typeof entry?.version === "string"
+    && entry.version.trim() !== "";
+  const localMatches = payload.installed.filter((entry) =>
+    eligible(entry) && entry.pluginId === LOCAL_PLUGIN_ID);
+  const officialMatches = payload.installed.filter((entry) =>
+    eligible(entry) && entry.pluginId === PLUGIN_ID);
+  if (codexAttestedLocalWinsOverOfficial(localMatches, officialMatches)) {
+    return { version: localMatches[0].version, source: "local-development" };
+  }
+  if (localMatches.length + officialMatches.length > 1) {
+    return { version: null, source: "unknown", ambiguous: true };
+  }
+  if (localMatches.length + officialMatches.length !== 1) return null;
+  const matches = localMatches.length === 1 ? localMatches : officialMatches;
+  const entry = matches[0];
+  const exactLocalSource = codexExactLocalSource(entry);
+  if (entry.pluginId === LOCAL_PLUGIN_ID && !exactLocalSource) return null;
+  let source = "unknown";
+  if (entry?.marketplaceSource?.sourceType === "git") {
+    source = "remote";
+  } else if (exactLocalSource) {
+    source = "local-development";
+  }
+  return { version: entry.version, source };
+}
+
+/**
+ * The registered marketplace name is the substring of `id`/`pluginId` after
+ * the `@` -- the same convention both runners use (`pipeline-core@<name>`).
+ */
+function claudeMarketplaceName(id) {
+  const at = id.indexOf("@");
+  return at === -1 ? "" : id.slice(at + 1);
+}
+
+/**
+ * Claude's `plugin list --json` carries no source/marketplaceSource fields
+ * (unlike Codex), so a `local-development` claim can only be attested via
+ * the host's own `known_marketplaces.json` registry: the marketplace this
+ * id was installed from must be a `directory` source with an absolute,
+ * normalized path. `projectPath` on the list entry is NOT usable for this --
+ * it was measured to be populated identically for a github-sourced install.
+ */
+function claudeLocalDevelopmentAttested(entry, knownMarketplaces) {
+  let registry;
+  try {
+    registry = JSON.parse(knownMarketplaces());
+  } catch {
+    return false;
+  }
+  if (registry === null || typeof registry !== "object" || Array.isArray(registry)) return false;
+  const source = registry[claudeMarketplaceName(entry.id)]?.source;
+  return source?.source === "directory"
+    && typeof source.path === "string"
+    && isAbsolute(source.path)
+    && resolve(source.path) === source.path;
+}
+
+/**
+ * PO decision 2026-08-11 (backlog/items/2026-08-11-preflight-user-and-matching-
+ * project-scope-still-collide-as-ambiguous.md, option 2): a repo-committed
+ * `scope: "project"` registration is a team decision and beats a machine-wide
+ * `user`/`local`/absent-scope default for the SAME id -- it must shadow those
+ * entries rather than merely coexist and trip ambiguity. Within one id-class's
+ * already cwd-filtered eligible entries, if any `scope: "project"` entries are
+ * present, they alone determine that id-class's count; non-project entries for
+ * the same id are dropped from consideration. This is never a hardcoded
+ * "collapse to 1": two or more genuinely eligible project-scope entries for the
+ * SAME id (a real registry duplicate) still count as ambiguous. Only when NO
+ * project-scope entry is eligible for an id-class does the prior unconditional
+ * behavior (every eligible entry counts) remain unchanged.
+ */
+function shadowProjectScope(entries) {
+  const projectEntries = entries.filter((entry) => entry.scope === "project");
+  return projectEntries.length > 0 ? projectEntries : entries;
+}
+
+/**
+ * NVA-PLUGIN-PRECEDENCE (2026-08-16): the repository declares THAT it is governed;
+ * the machine decides WHICH build provides it. An attested local-development
+ * install (`claudeLocalDevelopmentAttested`) is an explicit, machine-local act of
+ * intent -- someone built and registered this exact plugin tree on THIS machine --
+ * and that act of intent outranks a released install of the SAME repository, so
+ * the pair resolves rather than failing closed. This deliberately does NOT
+ * extend to: an UNATTESTED local id (no proven intent, so the unconditional
+ * ambiguity/fallthrough below still applies to it exactly as before this change),
+ * or two entries of the SAME class (two eligible local entries, or two eligible
+ * official entries, are a genuine registry duplicate, not an expression of
+ * intent, and still fail closed as ambiguous via the check that follows).
+ */
+function claudeAttestedLocalWinsOverOfficial(localMatches, officialMatches, knownMarketplaces) {
+  return localMatches.length === 1
+    && officialMatches.length === 1
+    && claudeLocalDevelopmentAttested(localMatches[0], knownMarketplaces);
+}
+
+function installedPipelineIdentityClaude(payload, knownMarketplaces, cwd) {
+  if (!Array.isArray(payload)) return null;
+  const eligible = (entry) =>
+    [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(entry?.id)
+    && entry?.enabled === true
+    && typeof entry?.version === "string"
+    && entry.version.trim() !== ""
+    // A "project"-scope entry can only ever conflict with THIS session when it belongs to
+    // the running project -- an enabled project-scope entry for an unrelated project on the
+    // same host must never count toward this session's ambiguity check. Every other scope
+    // ("user", "local", or the field absent) keeps its unconditional eligibility unchanged.
+    && (entry?.scope !== "project"
+      || (typeof entry?.projectPath === "string" && resolve(entry.projectPath) === resolve(cwd)));
+  const localMatches = shadowProjectScope(payload.filter((entry) => eligible(entry) && entry.id === LOCAL_PLUGIN_ID));
+  const officialMatches = shadowProjectScope(payload.filter((entry) => eligible(entry) && entry.id === PLUGIN_ID));
+  if (claudeAttestedLocalWinsOverOfficial(localMatches, officialMatches, knownMarketplaces)) {
+    return { version: localMatches[0].version, source: "local-development" };
+  }
+  if (localMatches.length + officialMatches.length > 1) {
+    return { version: null, source: "unknown", ambiguous: true };
+  }
+  if (localMatches.length + officialMatches.length !== 1) return null;
+  const matches = localMatches.length === 1 ? localMatches : officialMatches;
+  const entry = matches[0];
+  const isLocalId = entry.id === LOCAL_PLUGIN_ID;
+  const attestedLocal = isLocalId && claudeLocalDevelopmentAttested(entry, knownMarketplaces);
+  if (isLocalId && !attestedLocal) return null;
+  return { version: entry.version, source: attestedLocal ? "local-development" : "unknown" };
+}
+
+export function installedPipelineIdentity(
+  pluginList = () => readInstalledPluginList("codex"),
+  runner = "codex",
+  knownMarketplaces = readClaudeKnownMarketplaces,
+  cwd = process.cwd(),
+) {
+  let payload;
+  try {
+    payload = JSON.parse(pluginList());
+  } catch {
+    return null;
+  }
+  return runner === "claude"
+    ? installedPipelineIdentityClaude(payload, knownMarketplaces, cwd)
+    : installedPipelineIdentityCodex(payload);
+}
+
+export function installedPipelineVersion(pluginList = () => readInstalledPluginList("codex"), runner = "codex") {
+  return installedPipelineIdentity(pluginList, runner)?.version ?? null;
+}
+
+/**
+ * The ONE place this file resolves "what version is this loaded plugin
+ * distribution" -- reads the plugin's own manifest file directly
+ * (`.claude-plugin/plugin.json` for Claude, `plugin.json` for Antigravity,
+ * and `.codex-plugin/plugin.json` for Codex).
+ * `observePipelineStartPreflight` uses this for its own `version` field below;
+ * `antigravity-start-hint.mjs` imports it directly for the SAME resolution
+ * rather than re-deriving a second one (NVA-ARMEDPROOF-1) -- a lock's
+ * recorded version must trace to this exact function, or a drift between two
+ * independently-written manifest readers could silently un-bind the proof
+ * from the build it is supposed to name.
+ */
+export function resolvePluginManifestVersion(pluginRoot, runner, read = readFileSync) {
+  const manifestRelativePath = runner === "claude"
+    ? ".claude-plugin/plugin.json"
+    : runner === "antigravity"
+      ? "plugin.json"
+      : ".codex-plugin/plugin.json";
+  try {
+    const manifest = JSON.parse(read(resolve(pluginRoot, manifestRelativePath), "utf8"));
+    return typeof manifest?.version === "string" && manifest.version.trim() !== "" ? manifest.version : null;
+  } catch {
+    return null;
+  }
+}
+
+export const ANTIGRAVITY_HARD_ENFORCEMENT_SCHEMA = "pipeline.antigravity-hard-enforcement-observation.v1";
+// NVA-ARMEDPROOF-1: the fail-closed status `observePipelineStartPreflight` reports
+// (instead of "ready") when the runner is Antigravity and the hard-enforcement
+// layer was not observed this session -- see the `status` computation there.
+export const ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS = "antigravity-hard-enforcement-not-observed";
+// 30 minutes: generous enough to absorb a slow session start (network calls, a
+// subagent dispatch chain, IDE/daemon warm-up) between the hook's own write and
+// this preflight running, while still being short enough that a lock left over
+// from an earlier, genuinely different session -- hours or days old -- reads as
+// stale rather than as evidence about the CURRENT one. See
+// observeAntigravityHardEnforcement's own doc comment for why a window is the
+// accepted substitute for an exact session match here.
+export const ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS = 30 * 60 * 1000;
+const ANTIGRAVITY_HARD_ENFORCEMENT_WARNING =
+  "pipeline-core: the Antigravity hard-enforcement layer (PreToolUse guard union) appears NOT " +
+  "to have fired this session -- no freshly written session bootstrap lock was found under " +
+  ".git/agent-pipeline/run/. This usually means the Antigravity CLI daemon could not resolve " +
+  "`node` on its $PATH, so no hook process ever started this session. See GEMINI.md's " +
+  "Prerequisites section for the known cause and workaround. This is observability only: it " +
+  "does not and cannot make the enforcement layer fire.";
+
+/**
+ * Detects -- never fixes -- whether `antigravity-start-hint.mjs` (the
+ * Antigravity `PreInvocation` hard-enforcement hook) fired at least once this
+ * session, by looking for a freshly written session bootstrap lock under
+ * `.git/agent-pipeline/run/session-<id>/requires-bootstrap.lock` -- the exact
+ * literal path that hook writes inside its try block on every successful
+ * firing (see its own source; `antigravity-pretool-guard.mjs`'s mandatory-
+ * bootstrap hard block reads the identical path). backlog item
+ * 2026-08-23-antigravity-hard-enforcement-layer-has-two-fail-open-paths.md,
+ * "Candidate future direction": if the Antigravity daemon can never resolve
+ * `node` on its `$PATH`, no hook process starts at all, so nothing inside a
+ * hook can ever detect the gap -- this check runs from the bootstrap path
+ * instead, which still executes even when every hook is inert.
+ *
+ * ANTIGRAVITY ONLY, BY DESIGN: the daemon/node-PATH fail-open this observes
+ * is specific to that runner's background-daemon architecture (GEMINI.md
+ * Prerequisites). Claude and Codex have no such daemon and no such gap --
+ * the caller must gate the call itself on `runner === "antigravity"` rather
+ * than relying on this function to no-op for other runners, so a Claude/Codex
+ * bootstrap never even reaches this code path.
+ *
+ * SESSION IDENTITY GAP (deliberate, disclosed -- see
+ * `runBootstrapScratchLifecycle`'s own doc comment above for the identical
+ * limitation in a sibling mechanism): this preflight has no session id of its
+ * own. A plain CLI bootstrap invocation reads no hook stdin, which is the only
+ * place a session id is ever delivered here, so reliably matching "this exact
+ * session's" lock file is not constructible from this call site. The accepted,
+ * disclosed substitute is a freshness-window heuristic scanning EVERY
+ * `session-<id>/requires-bootstrap.lock` under the run directory and taking the
+ * single freshest mtime: within `freshWindowMs` of `now` counts as observed;
+ * older (or absent entirely) reads exactly like "never fired," because a stale
+ * lock from a different, already-ended session is not evidence about this one.
+ *
+ * FAIL-OPEN, NEVER THROWS: a detector ABOUT enforcement inertness that itself
+ * crashes bootstrap would be strictly worse than the silent gap it exists to
+ * surface. Every filesystem read here is wrapped so any unexpected failure
+ * (run directory absent, unreadable, a raced/partial entry, a permissions
+ * error) folds into "not observed" -- the same outcome a genuine absence
+ * produces -- rather than propagating.
+ *
+ * VERSION BINDING (NVA-ARMEDPROOF-1): freshness alone is not proof. A lock
+ * left behind by a plugin build that was since uninstalled or upgraded would
+ * otherwise keep vouching for guards that are no longer installed -- the
+ * proof must be bound to the exact build it proves, not merely to a recent
+ * point in time. Every candidate lock's own recorded `version` must equal
+ * `currentVersion` (the caller's already-resolved build version -- see
+ * `resolvePluginManifestVersion`, reused here rather than re-derived) or it
+ * is treated exactly like an absent lock: it never contributes to
+ * `freshestAgeMs`, and the scan continues to other session entries. A lock
+ * with no version field at all (written by a pre-binding build) or
+ * unparseable content matches nothing, by the same rule. This is an
+ * ADDITIONAL necessary condition alongside the freshness window above,
+ * never a replacement for it.
+ *
+ * FAIL-OPEN SCOPE IS UNCHANGED BY THE ABOVE: "never throws" describes this
+ * function's own robustness only. What changed with version binding is the
+ * CONSEQUENCE a caller attaches to `observed: false`
+ * (`observePipelineStartPreflight`'s `status` computation is now fail-closed
+ * for it) -- the observer itself still folds every failure (a bad read, a
+ * malformed lock, an absent or mismatched version) into the same
+ * `observed: false` it already produced for "never fired at all".
+ */
+export function observeAntigravityHardEnforcement({
+  rootDir = process.cwd(),
+  now = Date.now(),
+  freshWindowMs = ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS,
+  readdir = boundedAntigravityRunEntries,
+  stat = lstatSync,
+  read = readFileSync,
+  currentVersion = null,
+} = {}) {
+  let freshestAgeMs = null;
+  const mismatchedVersions = new Set();
+  try {
+    const runDir = resolve(rootDir, ".git", "agent-pipeline", "run");
+    const entries = readdir(runDir, { withFileTypes: true });
+    if (entries.length > 256) throw new Error("AGY-LOCK-SCAN-BOUND");
+    for (const entry of entries) {
+      if (!entry?.isDirectory?.() || !entry.name.startsWith("session-")) continue;
+      try {
+        const lockPath = resolve(runDir, entry.name, "requires-bootstrap.lock");
+        const info = stat(lockPath);
+        if (!info.isFile()) continue;
+        const ageMs = now - info.mtimeMs;
+        // A future mtime (clock skew, a corrupted filesystem) is never trusted
+        // as evidence of freshness -- treated the same as no usable entry.
+        if (ageMs < 0) continue;
+        // Version binding: an entry whose lock does not name the CURRENT
+        // build is skipped exactly like an absent lock (see doc comment
+        // above) -- never counted towards `freshestAgeMs`.
+        const recordedVersion = readAntigravityLockVersion(read, lockPath);
+        if (recordedVersion !== currentVersion || typeof currentVersion !== "string" || currentVersion.trim() === "") {
+          if (ageMs <= freshWindowMs && recordedVersion !== null && recordedVersion !== currentVersion && mismatchedVersions.size < 8) mismatchedVersions.add(recordedVersion);
+          continue;
+        }
+        if (freshestAgeMs === null || ageMs < freshestAgeMs) freshestAgeMs = ageMs;
+      } catch {
+        continue; // this one entry raced away or is unreadable; keep scanning the rest
+      }
+    }
+  } catch {
+    freshestAgeMs = null; // run directory absent, unreadable, or any other scan failure
+  }
+  const observed = freshestAgeMs !== null && freshestAgeMs <= freshWindowMs;
+  return {
+    schema: ANTIGRAVITY_HARD_ENFORCEMENT_SCHEMA,
+    observed,
+    freshWindowMs,
+    warning: observed ? null : ANTIGRAVITY_HARD_ENFORCEMENT_WARNING,
+    ...(!observed && mismatchedVersions.size > 0 ? { reason: "antigravity-lock-version-mismatch", currentVersion, recordedVersions: [...mismatchedVersions].sort(), evidenceClass: "mutable-lock-metadata" } : {}),
+  };
+}
+
+function boundedAntigravityRunEntries(path) {
+  const dir = opendirSync(path), entries = [];
+  try { let entry; while ((entry = dir.readSync()) !== null) { if (entries.length >= 256) throw new Error("AGY-LOCK-SCAN-BOUND"); entries.push(entry); } return entries; }
+  finally { dir.closeSync(); }
+}
+function readAntigravityLockVersion(read, path) {
+  try {
+    const parsed = read === readFileSync ? readAntigravityPhysicalJson(path).value : JSON.parse(read(path, "utf8"));
+    return typeof parsed?.version === "string" && /^[A-Za-z0-9.+_-]{1,128}$/.test(parsed.version) ? parsed.version : null;
+  } catch { return null; }
+}
+
+/**
+ * A lock's recorded version must equal `currentVersion` exactly. Fail-closed
+ * throughout: a mismatch, a missing version field, unparseable content, or a
+ * `currentVersion` that is itself not a real non-empty string (the caller
+ * could not resolve its own build's version, so there is nothing to bind a
+ * lock to) all resolve to "does not match" -- never to "matches", and never
+ * by throwing.
+ */
+function lockVersionMatches(read, lockPath, currentVersion) {
+  if (typeof currentVersion !== "string" || currentVersion.trim() === "") return false;
+  try {
+    const parsed = JSON.parse(read(lockPath, "utf8"));
+    const recordedVersion = parsed?.version;
+    return typeof recordedVersion === "string" && recordedVersion.trim() !== "" && recordedVersion === currentVersion;
+  } catch {
+    return false; // older-build plain-text body, or any unreadable/malformed content
+  }
+}
+
+export const PRE_PUSH_HOOK_OBSERVATION_SCHEMA = "pipeline.pre-push-hook-observation.v1";
+/**
+ * NVA-PREPUSHVISIBLE-1 (2026-08-27, corrects NVA-PREPUSHOBSERVE-1's original design): the
+ * `pre-push` git hook is an OFFER, not a requirement -- the PO decided it is opt-in and
+ * escapable by design. A live bootstrap against a real repository under the ORIGINAL
+ * (pre-correction) design reported the session non-ready and unworkable purely because the
+ * hook was not installed, which was wrong. No state `observePrePushHookInstallation` returns
+ * (absent, declined, present-but-not-ours-or-modified, installed-but-stale, or
+ * installed-and-current) gates
+ * readiness any more -- every one of them is carried in the result purely as an advisory
+ * observation. The `PRE_PUSH_HOOK_NOT_INSTALLED_STATUS` constant this comment used to
+ * document was removed along with the branch that produced it (see the `status` computation
+ * in `observePipelineStartPreflight`) rather than left exported-but-unreachable dead code --
+ * nothing in this codebase still imports or checks for that status string.
+ */
+
+// This installer script's own absolute, on-disk location -- resolved once, from THIS exact
+// plugin copy, never a repo-relative guess (DoD (c)). pre-push-hook-install.mjs is a fixed
+// sibling of this file (both live directly under plugins/pipeline-core/scripts/).
+const PRE_PUSH_HOOK_INSTALLER_SCRIPT_PATH = fileURLToPath(new URL("./pre-push-hook-install.mjs", import.meta.url));
+const PRE_PUSH_HOOK_PLUGIN_LIB_DIR = fileURLToPath(new URL("../lib", import.meta.url));
+
+/** The exact command a human or agent runs to install the hook -- the installer's own
+ * documented `--install` verb (pre-push-hook-install.mjs's CLI surface), resolved against the
+ * repository actually being inspected. Never a hand-written shell line. */
+function prePushHookInstallCommand(rootDir) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [PRE_PUSH_HOOK_INSTALLER_SCRIPT_PATH, "--install"],
+    cwd: resolve(rootDir),
+    mutation: true,
+    requiresConfirmation: false,
+  };
+}
+
+/**
+ * Detects -- never fixes, never installs -- whether `pre-push-hook-install.mjs`'s generated
+ * `pre-push` git hook is installed for `rootDir`'s repository and still matches what that
+ * installer's own marker recorded, using ONLY that installer's existing read-only
+ * `planInstall` surface (never a second, duplicated read of the hook/marker files itself).
+ *
+ * STATES `planInstall` ACTUALLY DISTINGUISHES, and how they map here (DoD (a) "state in your
+ * report which states you found and which you surfaced"):
+ *   - "ready-to-upgrade" (hook present, belongs to this installer, its content sha256 still
+ *     matches the marker's recorded hash) -> "installed-and-current".
+ *   - "ready" (no hook file exists at all yet) -> "absent".
+ *   - "declined" (a human declined the onboarding offer and no hook was ever installed since
+ *     -- pre-push-hook-install.mjs's own decline marker) -> "declined", carrying `declinedAt`
+ *     so a session can see the choice was made and when. NVA-PREPUSHVISIBLE-1: a decline is
+ *     an ANSWERED question, not an open defect -- it never gates readiness, exactly like
+ *     every other state this function returns (see `observePipelineStartPreflight`'s `status`
+ *     computation). `planInstall` checks hook-presence before the decline marker, so this
+ *     branch is only ever reached when no hook is actually on disk -- an install after a
+ *     decline is not a permanent refusal (pre-push-hook-install.mjs's own contract) and
+ *     reports "installed-and-current" via the branch above, exactly like any other install.
+ *   - "foreign-hook-present" (a hook exists but there is no marker for it, the marker is
+ *     unreadable/unparseable, or the hook's content no longer matches the marker's recorded
+ *     hash) -> "present-but-not-ours-or-modified". `readMarker` (pre-push-hook-install.mjs)
+ *     already folds an unreadable marker AND a malformed marker into "no marker" -- both
+ *     degenerate inputs surface through this exact same branch, not a separate one.
+ *   - "repository-unresolved" (no git directory resolvable at all, e.g. `rootDir` is not a
+ *     git repository) -> "repository-unresolved", surfaced here as ITS OWN state rather than
+ *     folded into "absent": no repository exists to hold a hook, so nothing about push
+ *     enforcement was actually determined (unlike "absent", which IS a determination).
+ *
+ * NEVER GATES READINESS (NVA-PREPUSHVISIBLE-1): the hook is an offer, not a requirement --
+ * every state this function returns is carried by `observePipelineStartPreflight` as a purely
+ * advisory observation and never changes `status`/exit code. See that function's own wiring
+ * comment.
+ *
+ * NEVER THROWS: an unexpected exception from `planInstallFn` (never observed from the real,
+ * documented-read-only `planInstall`, but guarded here anyway) folds into
+ * "repository-unresolved" -- the same "nothing was determined" outcome a genuine absence of a
+ * repository already produces, never a crash. NEVER MUTATES OR INSTALLS ANYTHING: this
+ * function only reads, via `planInstall`'s own read-only surface.
+ */
+export function observePrePushHookInstallation({
+  rootDir = process.cwd(),
+  pluginLibDir = PRE_PUSH_HOOK_PLUGIN_LIB_DIR,
+  planInstallFn = planInstall,
+} = {}) {
+  let plan;
+  try {
+    plan = planInstallFn({ rootDir, pluginLibDir });
+  } catch {
+    plan = null;
+  }
+  if (!plan || plan.status === "repository-unresolved") {
+    return { schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA, state: "repository-unresolved", installed: false, installCommand: null };
+  }
+  if (plan.status === "ready-to-upgrade" && plan.current === true) {
+    return { schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA, state: "installed-and-current", installed: true, installCommand: null };
+  }
+  if (plan.status === "ready-to-upgrade") {
+    return {
+      schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
+      state: "installed-but-stale",
+      installed: false,
+      detail: "the pipeline-owned hook is intact but bound to an older plugin distribution; run the installer update",
+      installCommand: prePushHookInstallCommand(rootDir),
+    };
+  }
+  if (plan.status === "foreign-hook-present") {
+    return {
+      schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
+      state: "present-but-not-ours-or-modified",
+      installed: false,
+      detail: plan.detail ?? null,
+      installCommand: prePushHookInstallCommand(rootDir),
+    };
+  }
+  if (plan.status === "declined") {
+    return {
+      schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
+      state: "declined",
+      installed: false,
+      declinedAt: plan.declinedAt,
+      installCommand: prePushHookInstallCommand(rootDir),
+    };
+  }
+  // plan.status === "ready": the hook path does not exist yet.
+  return {
+    schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
+    state: "absent",
+    installed: false,
+    installCommand: prePushHookInstallCommand(rootDir),
+  };
+}
+
+export const PRE_PUSH_HOOK_UNSEEN_REMOTE_PUSH_SCHEMA = "pipeline.pre-push-hook-unseen-remote-push.v1";
+
+/**
+ * NVA-PREPUSHVISIBLE-1 (c): a push the installed hook never evaluated becomes visible by
+ * comparing the current branch's remote-tracking ref (`@{u}`) against the hook's own durable
+ * per-push record (`<git-common-dir>/agent-pipeline/pre-push-hook/log.jsonl`, appended by
+ * every push the INSTALLED hook actually evaluates -- see pre-push-hook-install.mjs's
+ * `renderImpl`/`recordLog`). A remote-tracking ref whose commit has no matching `commit`
+ * field anywhere in that log is what a push the hook never saw looks like from here.
+ *
+ * CAREFUL AND HONEST BY DESIGN, NOT ACCUSATORY: the exact same absence is produced by (1) a
+ * human operator's `git push --no-verify`, (2) a perfectly legitimate push made from another
+ * clone or another machine that never had this hook installed, and (3) any push made before
+ * this hook was ever installed here at all. This function reports what it observed --
+ * "unseen" -- never what someone did; the caller/report layer is responsible for keeping that
+ * distinction in its own wording (see this task's briefing).
+ *
+ * NEVER GATES READINESS: like every other pre-push-hook observation (NVA-PREPUSHVISIBLE-1),
+ * this is evidence for a human, not a gate -- `observePipelineStartPreflight` carries it in
+ * the result and never lets it change `status` or the exit code.
+ *
+ * "NOT-CHECKED" IS THE FAIL-OPEN DEFAULT for every case this function cannot positively
+ * resolve: no remote-tracking ref configured for the current branch (never on a branch, no
+ * upstream set), no git-common-dir resolvable at all, or no log file present yet (a
+ * repository that never had the hook installed has nothing to compare against). None of these
+ * are reported as "unseen" -- a repository with no log at all must never be reported as if
+ * every one of its pushes bypassed something that was never there to bypass in the first
+ * place. A malformed individual log LINE is skipped and never invalidates the rest of the
+ * log, mirroring `parseRefUpdates`'s own "ignored, never fabricated" discipline.
+ *
+ * NEVER THROWS, NEVER MUTATES: every git/file operation is wrapped; any unexpected failure
+ * folds into "not-checked", the same outcome a genuine absence already produces.
+ */
+export function observeUnseenPushToRemote({ rootDir = process.cwd() } = {}) {
+  const notChecked = { schema: PRE_PUSH_HOOK_UNSEEN_REMOTE_PUSH_SCHEMA, state: "not-checked" };
+  try {
+    const run = (args) => {
+      const result = spawnSync("git", args, { cwd: rootDir, encoding: "utf8", timeout: 10000 });
+      return result.status === 0 && typeof result.stdout === "string" ? result.stdout.trim() : null;
+    };
+    const commonDir = run(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    if (!commonDir) return notChecked;
+    const upstream = run(["rev-parse", "--symbolic-full-name", "@{u}"]);
+    if (!upstream) return notChecked; // no branch, or no upstream configured
+    const remoteCommit = run(["rev-parse", "@{u}"]);
+    if (!remoteCommit) return notChecked;
+    const logPath = resolve(commonDir, "agent-pipeline", "pre-push-hook", "log.jsonl");
+    let raw;
+    try {
+      raw = readFileSync(logPath, "utf8");
+    } catch {
+      return notChecked; // no log at all -- nothing to compare against, never "unseen"
+    }
+    const seenCommits = new Set();
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const entry = JSON.parse(trimmed);
+        if (typeof entry?.commit === "string" && entry.commit !== "") seenCommits.add(entry.commit);
+      } catch {
+        continue; // one malformed line never invalidates the rest of the log
+      }
+    }
+    return {
+      schema: PRE_PUSH_HOOK_UNSEEN_REMOTE_PUSH_SCHEMA,
+      state: seenCommits.has(remoteCommit) ? "seen" : "unseen",
+      remoteRef: upstream,
+      commit: remoteCommit,
+    };
+  } catch {
+    return notChecked;
+  }
+}
+
+/**
+ * Return only the selected host route after a WSL preflight. Control identity
+ * selection occurs in the authorized host helper immediately before it starts
+ * the fixed Git child; a sandbox preflight must not claim host availability.
+ *
+ * Restored from 75b8361^1.  The projection below is the pre-merge allowlist,
+ * extended by PHX-WP-PX0AC08 to admit `rulesetSource` now that
+ * `observePipelineStartPreflight` actually populates it: previously the field
+ * was always `undefined` here (never built at all), so it was a no-op inside
+ * `JSON.stringify` regardless of whether it was listed; it is now a real
+ * closed `pipeline.ruleset-source.v1` observation (or `null` when no loaded
+ * distribution was resolved) and is bound like every other field on this
+ * allowlist. The merged-base `bootstrapPayload` remains excluded from the
+ * binding, unchanged.
+ */
+export function freshnessHostActionForPreflight(preflight) {
+  if (!preflight || typeof preflight !== "object"
+    || preflight.schema !== SCHEMA
+    || preflight.status !== "ready"
+    || preflight.executionBoundary !== "host-authorized-wsl") return null;
+  // Bind the host freshness adapter to this exact preflight projection.  The
+  // digest is opaque to callers, so it does not disclose the physical plugin
+  // root or the normalized source observation carried by the preflight.
+  const bound = {
+    schema: preflight.schema,
+    status: preflight.status,
+    version: preflight.version,
+    installedVersion: preflight.installedVersion,
+    installedSource: preflight.installedSource,
+    rulesetSource: preflight.rulesetSource,
+    executionBoundary: preflight.executionBoundary,
+    pluginRoot: preflight.pluginRoot,
+    nextAction: preflight.nextAction,
+  };
+  return Object.freeze({
+    executionBoundary: "host-authorized-wsl",
+    boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
+    preflightSha256: createHash("sha256").update(JSON.stringify(bound)).digest("hex"),
+  });
+}
+
+/**
+ * Best-effort, read-only scan for another LIVE session already registered
+ * under the SAME physical repository root as `startPath` -- the cheap,
+ * PO-requested mitigation for A-AC-01's ordering-ambiguity risk, which only
+ * matters when two agent sessions genuinely operate concurrently in the same
+ * local checkout (a different branch/worktree/clone resolves to a different
+ * physical repository root and is out of scope here, already handled
+ * elsewhere). This never fails/blocks bootstrap: every uncertain outcome --
+ * no repository at `startPath`, no descriptors registered, a malformed
+ * descriptor, any read error -- degrades to `null`, never a thrown error and
+ * never a false positive.
+ *
+ * Only a REAL, currently-running owner process (`inspectSessionOwnerRuntime`
+ * status "live") on a session other than `currentSessionId` counts. A
+ * stale/orphaned descriptor ("not-live"/"reused") or an inconclusive read
+ * ("unavailable"/"unobserved") is never treated as a positive warning --
+ * exactly the false-positive class the PO explicitly does not want (a stale
+ * descriptor or a human reading in a second terminal must never warn).
+ *
+ * The returned object exposes nothing beyond what `inspectSessionOwnerRuntime`
+ * already exposes for that other session (sessionId, descriptorSha256,
+ * status) -- no nonce, no PID, no process-start identity, no conversation
+ * data (see that function's own docstring for the same guarantee).
+ */
+export function observeConcurrentSessionWarning({
+  startPath,
+  currentSessionId = null,
+  listDescriptors = listActiveSessionDescriptors,
+  inspectOwner = inspectSessionOwnerRuntime,
+} = {}) {
+  let descriptors;
+  try {
+    descriptors = listDescriptors(startPath);
+  } catch {
+    return null;
+  }
+  for (const descriptor of descriptors) {
+    if (descriptor.sessionId === currentSessionId) continue;
+    let owner;
+    try {
+      // `probableLiveness` opts this ADVISORY caller into the spawn-free native-Windows check (pid exists +
+      // same host boot minute); no other caller of inspectSessionOwnerRuntime opts in.
+      owner = inspectOwner(startPath, descriptor.sessionId, {
+        expectedDescriptorSha256: descriptor.descriptorSha256,
+        probableLiveness: true,
+      });
+    } catch {
+      continue;
+    }
+    if (owner.status === "live") {
+      return {
+        schema: CONCURRENT_SESSION_WARNING_SCHEMA,
+        sessionId: owner.sessionId,
+        descriptorSha256: owner.descriptorSha256,
+        status: owner.status,
+        // Only the probable (no process start identity) case carries these two keys, so the Linux
+        // warning keeps its exact four-key shape. A reused pid within one boot cannot be ruled out.
+        ...(owner.probable === true
+          ? { probable: true, message: "another session in this repository is probably live: its owner process exists and the host has not rebooted since it registered (advisory; a reused process id within one boot cannot be ruled out)" }
+          : {}),
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * The ONE shared "which runner is executing THIS process" resolution --
+ * `scripts/project-onboarding-v3.mjs` imports this rather than carrying a second
+ * copy of the same expression (backlog: a-po-ceremony-in-the-po-s-own-terminal-
+ * resolves-the-wrong-runner.md). Deliberately distinct from "which runner is
+ * this project for" (the `runner` parameter validated throughout
+ * lib/project-onboarding-v3.mjs) -- see that module's own
+ * OnboardingRunnerRequiredError comment for why an environment read was tried
+ * and reverted INSIDE that library; this is the legitimate CLI/session entry
+ * boundary that comment itself names.
+ *
+ * Three POSITIVE session signals, not two-plus-an-else-branch: CLAUDECODE=1 is
+ * Claude Code's own marker; ANTIGRAVITY_AGENT=1 / AI_AGENT=antigravity is
+ * Antigravity's; CODEX_SESSION_ID / CODEX_THREAD_ID (the same pair
+ * native-hook-failure-memory.mjs and codex-onboarding-launch.mjs already treat
+ * as Codex's own session identity) is now Codex's. Only when NONE of the three
+ * fire is this genuinely a signal-less shell -- most concretely a PO's own
+ * attended terminal, which is no runner at all and must never be guessed at by
+ * elimination. In exactly that state, and only then, `rootDir`/`read` (when
+ * supplied) are consulted for the project's OWN declared `runners.default` --
+ * never overriding an actual runner's positive signal, which would otherwise
+ * silently move a real Codex session onto the wrong lane in a dual-runner
+ * repository whose default is Claude. Falls back to "codex" (the historical
+ * default) when the repository declares nothing, or when no `rootDir`/`read`
+ * was supplied at all -- which is the deliberate choice this file's own
+ * preflight call below makes: `observePipelineStartPreflight` never reads
+ * `pipeline.user.yaml` (see its STATUS_SCOPE comment / SETUPSTATUS-1), so its
+ * own no-signal state stays exactly as it was before this change.
+ */
+export function resolveActiveRunner({ env = process.env, rootDir = null, read = readFileSync } = {}) {
+  if (env.CLAUDECODE === "1") return "claude";
+  if (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") return "antigravity";
+  const hasCodexSessionSignal = ["CODEX_SESSION_ID", "CODEX_THREAD_ID"]
+    .some((key) => typeof env[key] === "string" && env[key] !== "");
+  if (hasCodexSessionSignal) return "codex";
+  if (rootDir) {
+    try {
+      const parsed = parseYaml(read(resolve(rootDir, "pipeline.user.yaml"), "utf8"));
+      if (typeof parsed?.runners?.default === "string" && parsed.runners.default !== "") {
+        return parsed.runners.default;
+      }
+    } catch { /* absent/unreadable/unparseable source: fall through to the historical default */ }
+  }
+  return "codex";
+}
+
+function observedCodexPluginIdentity(observation, plugin) {
+  return observation?.schema === "pipeline.public-core-observation.v1"
+    && observation.status === "ready"
+    && observation.plugin?.name === plugin.name
+    && observation.plugin?.version === plugin.version;
+}
+
+function publicReasonCodes(observation) {
+  return Array.isArray(observation?.reasonCodes)
+    ? observation.reasonCodes.filter((code) => typeof code === "string" && /^[A-Z0-9-]{3,80}$/.test(code))
+    : [];
+}
+
+function snapshotReasonCode(error, fallback) {
+  const code = error && typeof error === "object" ? error.code : null;
+  return typeof code === "string" && /^SNT-A2-[A-Z0-9-]{3,80}$/u.test(code) ? code : fallback;
+}
+
+/**
+ * Codex loads a cache copy but its local marketplace registry selects the
+ * physical source directory. For a local-development installation, that
+ * explicit registry selection is the operator authority equivalent to a
+ * Claude/Antigravity direct directory root. It is admitted only when two
+ * complete, non-symlink physical snapshots are byte-identical and their
+ * Codex manifest declares the selected identity. No Git checkout is inferred
+ * and no source path is taken from a consumer project.
+ */
+export function observeCodexRegistryContentBinding({
+  registrySourcePluginRoot,
+  installedPluginRoot,
+  plugin,
+  snapshot = snapshotPhysicalPluginRoot,
+} = {}) {
+  if (typeof registrySourcePluginRoot !== "string" || typeof installedPluginRoot !== "string"
+    || !plugin || plugin.name !== "pipeline-core" || typeof plugin.version !== "string") {
+    return { status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"] };
+  }
+  try {
+    const source = snapshot(registrySourcePluginRoot, { rootCode: "SNT-A2-SOURCE-ROOT-UNSAFE" });
+    const installed = source.root === installedPluginRoot
+      ? source
+      : snapshot(installedPluginRoot, { rootCode: "SNT-A2-INSTALLED-ROOT-UNSAFE" });
+    const sourceManifest = source.files.find((entry) => entry.path === ".codex-plugin/plugin.json");
+    const installedManifest = installed.files.find((entry) => entry.path === ".codex-plugin/plugin.json");
+    if (!sourceManifest || !installedManifest || sourceManifest.sha256 !== installedManifest.sha256
+      || source.contentSha256 !== installed.contentSha256
+      || typeof source.contentSha256 !== "string" || !/^[0-9a-f]{64}$/u.test(source.contentSha256)) {
+      return { status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-CONTENT-MISMATCH"] };
+    }
+    const manifest = JSON.parse(Buffer.from(sourceManifest.bytes).toString("utf8"));
+    if (manifest?.name !== plugin.name || manifest?.version !== plugin.version) {
+      return { status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-MANIFEST-MISMATCH"] };
+    }
+    return { status: "ready", reasonCodes: [], contentSha256: source.contentSha256 };
+  } catch (error) {
+    return { status: "unavailable", reasonCodes: [snapshotReasonCode(error, "IPA-HOST-REGISTRY-CONTENT-UNAVAILABLE")] };
+  }
+}
+
+/**
+ * The Codex registry selects the marketplace copy. A gitless copy needs a
+ * separate, clean Git checkout that observes byte-identically against it;
+ * otherwise preflight must not emit a writer argv that will fail readback.
+ */
+export function resolveCodexAttestationSourceForPreflight({
+  cwd,
+  registrySourcePluginRoot,
+  plugin,
+  // Match the writer's own runner-neutral observation exactly.  The Codex
+  // host-specific observer additionally requires an App-Server binding that
+  // a PO's host-postinstall command never has, and would make a valid action
+  // fail before it is even rendered.
+  observe = (input) => observeRunnerPublicCoreIdentity("codex", input),
+} = {}) {
+  if (typeof cwd !== "string" || typeof registrySourcePluginRoot !== "string"
+    || !plugin || typeof plugin.name !== "string" || typeof plugin.version !== "string") {
+    return { status: "unavailable", reasonCodes: ["IPA-HOST-SOURCE-UNAVAILABLE"] };
+  }
+  let registryObservation = null;
+  try {
+    registryObservation = observe({ sourcePluginRoot: registrySourcePluginRoot, installedPluginRoot: registrySourcePluginRoot });
+  } catch { /* observer faults remain a closed, typed unavailable result */ }
+  if (observedCodexPluginIdentity(registryObservation, plugin)) {
+    return { status: "registry-source", sourcePluginRoot: null, reasonCodes: [] };
+  }
+
+  const checkoutPluginRoot = resolve(cwd, "plugins", "pipeline-core");
+  let checkoutObservation = null;
+  try {
+    checkoutObservation = observe({ sourcePluginRoot: checkoutPluginRoot, installedPluginRoot: registrySourcePluginRoot });
+  } catch { /* observer faults remain a closed, typed unavailable result */ }
+  if (observedCodexPluginIdentity(checkoutObservation, plugin)) {
+    return { status: "checkout-source", sourcePluginRoot: checkoutPluginRoot, reasonCodes: [] };
+  }
+  return {
+    status: "unavailable",
+    reasonCodes: [...new Set([
+      "IPA-HOST-SOURCE-MISMATCH",
+      ...publicReasonCodes(checkoutObservation),
+      ...publicReasonCodes(registryObservation),
+    ])],
+  };
+}
+
+export function observePipelineStartPreflight({
+  env = process.env,
+  pluginList,
+  read = readFileSync,
+  scriptUrl = import.meta.url,
+  cwd = process.cwd(),
+  observeGovernanceScopeFn = observeGovernanceScope,
+  knownMarketplaces = readClaudeKnownMarketplaces,
+  observeAntigravityHardEnforcementFn = observeAntigravityHardEnforcement,
+  observeAntigravityLoadedTopologyFn = observeAntigravityLoadedTopology,
+  antigravityConfigRoot = resolve(homedir(), ".gemini"),
+  observePrePushHookInstallationFn = observePrePushHookInstallation,
+  observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
+  requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
+  observeArchitectureAdoptionOrientationFn = observeArchitectureAdoptionOrientation,
+  inspectEffectiveArchitectureDecisionsFn = inspectArchitectureDecisionContinuity,
+  checkCloneProvisioningFn = checkCloneProvisioning,
+  verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
+  resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
+  antigravityPluginRegistries = () => [
+    resolve(cwd, ".agents", "plugins.json"),
+    resolve(homedir(), ".gemini", "config", "plugins.json"),
+  ].flatMap((path) => { try { return [read(path, "utf8")]; } catch { return []; } }),
+  observe,
+  // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
+  // descriptor (if any) is "this" call's own, so it is excluded from the
+  // concurrent-session scan below. Undefined/null for every production
+  // caller today (ordinary bootstrap does not yet register a descriptor of
+  // its own -- see the module-level open-follow-up note at the bottom of
+  // this file); callers that DO register one may pass its sessionId here.
+  currentSessionId = null,
+  // HOOKREFRESH (Rulings 67, 70): the declared session role. Only "goldfish" and "critic" are
+  // exempt from refresh enforcement; an absent or unrecognised value is the Elephant (strict default).
+  role = "elephant",
+  // HOOKREFRESH (Ruling 69): optional model-role readback seam. When it is a function the preflight
+  // calls it once and carries the outcome as `modelRoleBootstrap`; a thenable result makes the return
+  // value a Promise of the envelope. Without the seam the return value stays a plain object.
+  runModelRoleBootstrapFn,
+} = {}) {
+  // Repository enrollment precedes distribution/onboarding/housekeeping work.
+  // An installed runner plugin or unrelated AGENTS.md does not opt this root in.
+  let governanceScope;
+  try { governanceScope = observeGovernanceScopeFn({ rootDir: cwd }); }
+  catch { governanceScope = null; }
+  const validScope = governanceScope?.schema === "pipeline.governance-scope.v1"
+    && Object.keys(governanceScope).sort().join("\0") === ["schema", "state", "root", "scopeKey", "repositoryKind", "provenance", "diagnostics", "requiresEnforcement", "hintAllowed"].sort().join("\0")
+    && (governanceScope.root === null || typeof governanceScope.root === "string" && isAbsolute(governanceScope.root) && resolve(governanceScope.root) === governanceScope.root)
+    && ["active", "inactive", "declined", "unverifiable-active"].includes(governanceScope.state)
+    && governanceScope.requiresEnforcement === ["active", "unverifiable-active"].includes(governanceScope.state)
+    && governanceScope.hintAllowed === (governanceScope.state === "inactive" && governanceScope.root !== null);
+  if (!validScope || governanceScope.state !== "active") {
+    const state = validScope ? governanceScope.state : "unverifiable-active";
+    return {
+      schema: SCHEMA, statusScope: "pipeline-governance-activation",
+      status: state === "inactive" ? "pipeline-governance-inactive" : state === "declined" ? "pipeline-governance-declined" : "pipeline-governance-unverifiable",
+      governanceScope: validScope ? governanceScope : null,
+      pipelineWorkPerformed: false,
+      nextAction: state === "inactive" && governanceScope.hintAllowed
+        ? {
+            kind: "command",
+            executable: process.execPath,
+            argv: [resolve(dirname(fileURLToPath(scriptUrl)), "onboarding-init.mjs"), "--root", resolve(cwd), "--runner", resolveActiveRunner({ env, read })],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary: "host",
+            expected: { schema: "pipeline.onboarding-init.v1" },
+            guidance: "Ask once whether the project should use Agent-Pipeline. Run this read-only onboarding entry only after affirmative consent; it collects the remaining answers before any mutation.",
+          }
+        : null,
+    };
+  }
+  const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
+  // CLAUDECODE is set by every Claude Code session (main and subagent); its
+  // absence keeps the historical Codex-CLI default. This is the one place a
+  // session's own runner identity enters the onboarding chain -- without it,
+  // a Claude session silently inherits Codex-only gates (App-Server health,
+  // native runtime readback) that RUNNERS_WITHOUT_APP_SERVER/
+  // RUNNERS_WITHOUT_NATIVE_READBACK exist specifically to exempt it from.
+  // Resolved BEFORE the reads below: both the source-manifest read and the
+  // installed-plugin-list read must resolve through this same runner
+  // identity, so each runner reads and reports its own distribution only.
+  const runner = resolveActiveRunner({ env, read });
+  const version = resolvePluginManifestVersion(pluginRoot, runner, read);
+  const resolvedPluginList = pluginList ?? (() => readInstalledPluginList(runner));
+  let pluginListSnapshot = null;
+  try { pluginListSnapshot = resolvedPluginList(); } catch { /* unavailable registry stays null */ }
+  const installedIdentity = installedPipelineIdentity(() => pluginListSnapshot, runner, knownMarketplaces, cwd);
+  const installedVersion = installedIdentity?.version ?? null;
+  const selfApplicationGit = pluginRootHasSelfApplicationGit(pluginRoot);
+  const claudeRegistryBinding = version && runner === "claude" && installedIdentity?.source === "local-development"
+    ? resolveClaudeRegistryBinding({
+        plugin: { name: "pipeline-core", version }, installedPluginRoot: pluginRoot,
+        readPluginList: () => pluginListSnapshot, readKnownMarketplaces: knownMarketplaces,
+      })
+    : null;
+  // A Claude directory marketplace can load its plugin *from that exact
+  // registered directory* rather than from a copied cache. The registry
+  // binding resolves both sides through realpath and rejects symlinks before
+  // it reaches this comparison, so equality here is a narrow physical-root
+  // proof, not a trust claim about a separately copied marketplace tree.
+  // Only this topology skips the receipt: every distinct cache/copy remains
+  // subject to the existing external source-to-copy attestation below.
+  const claudeDirectDirectory = runner === "claude"
+    && claudeRegistryBinding !== null
+    && claudeRegistryBinding.installedPluginRoot === claudeRegistryBinding.marketplacePluginRoot;
+  const registrySourcePluginRoot = version && installedIdentity?.source === "local-development"
+    ? runner === "codex"
+      ? resolveCodexRegistrySource({ plugin: { name: "pipeline-core", version }, readPluginList: () => pluginListSnapshot })
+      : null
+    : null;
+  const codexRegistryContentBinding = version && runner === "codex" && registrySourcePluginRoot !== null
+    ? observeCodexRegistryContentBinding({
+        registrySourcePluginRoot,
+        installedPluginRoot: pluginRoot,
+        plugin: { name: "pipeline-core", version },
+      })
+    : null;
+  const antigravityTopology = version && runner === "antigravity"
+    ? observeAntigravityLoadedTopologyFn({ loadedPluginRoot: pluginRoot, configRoot: antigravityConfigRoot, workspaceRoot: cwd })
+    : null;
+  const registryInstalledPluginRoot = version && runner === "antigravity" && !pluginRootHasSelfApplicationGit(pluginRoot)
+    ? antigravityTopology?.status === "current" && antigravityTopology.loadedPluginRoot === pluginRoot ? pluginRoot : null
+    : null;
+  const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
+    && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
+  const token = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TOKEN")
+    && String(env.PIPELINE_CODEX_ONBOARDING_TOKEN) !== "";
+  const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
+    .some((value) => typeof value === "string" && value.trim() !== "");
+  // PX0-AC-13 / design §B.2(a): "host-authorized-wsl" is a Codex-specific,
+  // App-Server-attested control-channel boundary. Claude Code under WSL has
+  // no such mechanism (`hostControlBinding`/`observeCodexAppServer` are
+  // Codex-only), so this must also gate on `runner`, not WSL presence alone.
+  const executionBoundary = wsl && runner === "codex" ? "host-authorized-wsl" : "default";
+  // Captures the exact origin/content observation `evaluateSelfApplicationAttestation`
+  // (unmodified, imported read-only) resolves and calls internally, without a
+  // second, independent invocation of the real observer: `observe` (below) is
+  // an already-existing extension point of that function -- production code
+  // never supplies one and always falls through to its own runner-based
+  // default, so this wrapper reproduces that exact default-selection
+  // (`observe ?? (runner === "codex" ? observeCodexPublicCoreIdentity :
+  // observePublicCoreIdentity)`) itself, then forwards unmodified to it and
+  // records the return value as a side effect. `evaluateSelfApplicationAttestation`
+  // therefore receives a non-nullish `observe` on every call and always takes
+  // that branch of its own `observe ?? (...)` selection -- functionally
+  // identical to what it would have selected itself, so its pass/fail
+  // semantics (`attestationFailed`) are unchanged; only the discarded
+  // internal `normalized`/`observation` data is now additionally retained
+  // here for `rulesetSource`. `capturedObservation` stays `null` exactly when
+  // the function's own gate (`version && pluginRootHasSelfApplicationGit`)
+  // never attempted an observation at all.
+  let capturedObservation = null;
+  const resolvedObserveForAttestation = observe
+    ?? (runner === "codex" ? observeCodexPublicCoreIdentity : observePublicCoreIdentity);
+  const captureObserve = (...args) => {
+    capturedObservation = resolvedObserveForAttestation(...args);
+    return capturedObservation;
+  };
+  const attestationFailed = evaluateSelfApplicationAttestation({
+    pluginRoot, runner, version, observe: captureObserve,
+  }).failed;
+  // Gitless copied local-development installs require the external receipt
+  // produced by the host install/update coordinator after copy + readback.
+  // A runner's exact, non-symlinked registry root is different: it is the
+  // operator-selected direct development root, not a separate cache/copy, so
+  // it needs no invented source locator or receipt. Bootstrap only consumes
+  // a receipt for the distinct-copy topology; it never writes authority.
+  const localInstalledCopy = version && !selfApplicationGit && (
+    runner === "codex" && installedIdentity?.source === "local-development" && codexRegistryContentBinding?.status !== "ready"
+    || runner === "claude" && installedIdentity?.source === "local-development" && !claudeDirectDirectory
+    || runner === "antigravity" && (registryInstalledPluginRoot === null || antigravityTopology?.loadedKind === "managed-copy")
+  );
+  const rawInstalledPluginAttestation = localInstalledCopy
+    ? runner === "codex" && registrySourcePluginRoot === null
+      ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-SOURCE-UNAVAILABLE"] }
+      : runner === "claude" && claudeRegistryBinding === null
+        ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"] }
+      : runner === "antigravity" && registryInstalledPluginRoot === null
+        ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"] }
+      : verifyLocalInstalledPluginReceiptFn({
+        provider: runner,
+        plugin: { name: "pipeline-core", version },
+        installedPluginRoot: pluginRoot,
+        ...(["antigravity", "claude"].includes(runner)
+          ? { registryInstalledPluginRoot: runner === "claude" ? claudeRegistryBinding.installedPluginRoot : registryInstalledPluginRoot }
+          : { registrySourcePluginRoot }),
+        protectedPaths: INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[runner] ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
+      }, runner === "antigravity" ? { antigravityConfigRoot, antigravityWorkspaceRoot: cwd } : {})
+    : { schema: "pipeline.installed-plugin-attestation-bootstrap.v1", status: "not-required", reasonCodes: [] };
+  const codexAttestationSource = rawInstalledPluginAttestation.status === "unavailable"
+    && runner === "codex" && registrySourcePluginRoot !== null
+    ? resolveCodexAttestationSourceFn({
+        cwd,
+        registrySourcePluginRoot,
+        plugin: { name: "pipeline-core", version },
+      })
+    : null;
+  const installedPluginAttestationBase = codexAttestationSource?.status === "unavailable"
+    ? {
+        ...rawInstalledPluginAttestation,
+        reasonCodes: [...new Set([
+          ...(rawInstalledPluginAttestation.reasonCodes ?? []),
+          ...codexAttestationSource.reasonCodes,
+        ])],
+      }
+    : rawInstalledPluginAttestation;
+  const antigravityAttestationSource = runner === "antigravity"
+    && antigravityTopology?.status === "current"
+    && typeof antigravityTopology.sourcePluginRoot === "string"
+    && pluginRootHasSelfApplicationGit(antigravityTopology.sourcePluginRoot)
+    ? antigravityTopology.sourcePluginRoot : null;
+  const installedPluginAttestationCommand = installedPluginAttestationBase.status === "unavailable"
+    && runner === "codex" && codexAttestationSource !== null
+    && codexAttestationSource.status !== "unavailable"
+    ? installedPluginAttestationSetupCommand({
+        provider: "codex", version,
+        ...(codexAttestationSource?.sourcePluginRoot === null ? {} : { sourcePluginRoot: codexAttestationSource?.sourcePluginRoot }),
+        installedPluginRoot: pluginRoot,
+        launcher: resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
+      })
+    : installedPluginAttestationBase.status === "unavailable" && antigravityAttestationSource !== null
+      ? installedPluginAttestationSetupCommand({
+          provider: "antigravity", version,
+          sourcePluginRoot: antigravityAttestationSource,
+          installedPluginRoot: pluginRoot,
+          launcher: resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
+        })
+      : null;
+  const installedPluginAttestation = installedPluginAttestationCommand !== null
+    ? {
+        ...installedPluginAttestationBase,
+        setupAction: {
+          schema: "pipeline.installed-plugin-attestation-setup-action.v1",
+          kind: "host-postinstall",
+          executable: installedPluginAttestationCommand.executable,
+          argv: installedPluginAttestationCommand.argv,
+          mutation: true,
+          requiresPoApproval: false,
+          executionBoundary: "host",
+          expected: { schema: "pipeline.installed-plugin-attestation-host-result.v1", status: "written" },
+        },
+        terminalTemplate: {
+          templateId: "installed-plugin-attestation-setup",
+          builderId: "installed-plugin-attestation-setup",
+          revision: 1,
+          values: { provider: runner, version, installedPluginRoot: pluginRoot },
+        },
+      }
+    : installedPluginAttestationBase;
+  const installedPluginAttestationFailed = installedPluginAttestation.status !== "not-required"
+    && installedPluginAttestation.status !== "verified";
+  // NVA-ARMEDPROOF-1: computed once, here, so both the `status` decision
+  // below and the `antigravityHardEnforcement` field on the result (see the
+  // `result` object further down) reuse the SAME observation -- never
+  // invoked twice, and never invoked at all for a non-Antigravity runner
+  // (observeAntigravityHardEnforcement's own "ANTIGRAVITY ONLY, BY DESIGN"
+  // doc comment; proven by the "never invokes the Antigravity detector"
+  // tests).
+  const antigravityHardEnforcement = runner === "antigravity"
+    ? observeAntigravityHardEnforcementFn({ rootDir: cwd, currentVersion: version })
+    : null;
+  // NVA-PREPUSHVISIBLE-1 (corrects NVA-PREPUSHOBSERVE-1): NOT runner-gated -- git hooks fire
+  // in every runner alike -- so both of these are always computed. NEITHER ever gates
+  // `status` below: the hook is an offer, not a requirement (see PRE_PUSH_HOOK_OBSERVATION_
+  // SCHEMA's own doc comment above for the live-bootstrap incident that corrected this). Both
+  // stay purely advisory fields on the result.
+  const prePushHookObservation = observePrePushHookInstallationFn({ rootDir: cwd });
+  const unseenRemotePush = observeUnseenPushToRemoteFn({ rootDir: cwd });
+  const status = !version
+    ? "plugin-identity-unavailable"
+    : runner === "antigravity" && antigravityTopology?.status !== "current"
+      ? "antigravity-topology-refresh-required"
+    : installedPluginAttestationFailed
+      ? "plugin-attestation-required"
+      : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
+        ? "plugin-refresh-required"
+      // Fail-closed (NVA-ARMEDPROOF-1): a session whose Antigravity hard-
+      // enforcement layer did not fire this session must never report
+      // "ready" -- a plausible but actually-unenforced session is strictly
+      // worse than one that visibly refuses to call itself ready. Checked
+      // LAST, after the pre-existing non-ready reasons above, so a result
+      // that is already non-ready for one of THOSE reasons keeps naming its
+      // own reason rather than being masked by this one.
+      : runner === "antigravity" && antigravityHardEnforcement.observed !== true
+        ? ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS
+        : "ready";
+  // PX0-AC-08: one closed runner-neutral source observation per bootstrap
+  // resolution. Only built when a loaded distribution was actually resolved
+  // (`version` truthy) -- the acceptance clause itself is conditioned on
+  // that ("WHEN bootstrap resolves a loaded Pipeline distribution"), and the
+  // schema has no "unavailable" variant for `selectedPlugin` the way it does
+  // for the identity fields, so a valid observation cannot be constructed
+  // without a real version string in the first place.
+  let rulesetSource = null;
+  if (version) {
+    // Fixed mapping (briefing PHX-WP-PX0AC08, not a design choice made here):
+    // self-application git checkout present -> "self-application"; else an
+    // attested local-development registry match -> "local-development"; else
+    // an ordinary remote/marketplace registry match -> "marketplace-public";
+    // else (no attested installed identity at all) -> "unavailable". This
+    // repo has no private-marketplace distinction today, so that class is
+    // never selected here.
+    const sourceClass = selfApplicationGit
+      ? "self-application"
+      : installedIdentity?.source === "local-development"
+        ? "local-development"
+        : installedIdentity?.source === "remote"
+          ? "marketplace-public"
+          : "unavailable";
+    // The strongest available identity: the real content hash the
+    // self-application attestation already derived above, when it derived
+    // one; honestly `unavailable` for every other topology (no fabricated
+    // git/content hash is invented for a marketplace-installed or
+    // local-development copy -- see the linked backlog item for the
+    // out-of-scope question of whether those topologies should eventually
+    // get a stronger mechanism).
+    const installedReceiptIdentity = installedPluginAttestation.status === "verified"
+      ? installedPluginAttestation.request.installedContentSha256
+      : null;
+    const registryContentIdentity = runner === "codex"
+      && installedIdentity?.source === "local-development"
+      && codexRegistryContentBinding?.status === "ready"
+      ? codexRegistryContentBinding.contentSha256
+      : null;
+    const identityAvailable = selfApplicationGit && capturedObservation?.status === "ready"
+      || installedReceiptIdentity !== null
+      || registryContentIdentity !== null;
+    const loadedIdentity = identityAvailable
+      ? { status: "available", algorithm: "content-sha256", value: installedReceiptIdentity ?? registryContentIdentity ?? capturedObservation.plugin.contentSha256 }
+      : { status: "unavailable" };
+    const installedIdentityForSource = identityAvailable
+      ? { status: "available", algorithm: "content-sha256", value: installedReceiptIdentity ?? registryContentIdentity ?? capturedObservation.plugin.contentSha256 }
+      : { status: "unavailable" };
+    // selectedPlugin.id: reuses the self-application observation's own
+    // resolved plugin name when one was actually derived (the same value
+    // that internal computation itself uses for this field); otherwise
+    // falls back to whichever of the two matching constants this module
+    // already uses internally for installed-registry eligibility, chosen by
+    // the same `local-development` vs. everything-else split as `source.class`.
+    const selectedPluginId = identityAvailable
+      ? installedReceiptIdentity !== null || registryContentIdentity !== null
+        ? LOCAL_PLUGIN_ID
+        : capturedObservation.plugin.name
+      : installedIdentity?.source === "local-development"
+        ? LOCAL_PLUGIN_ID
+        : PLUGIN_ID;
+    rulesetSource = {
+      schema: RULESET_SOURCE_SCHEMA,
+      runner,
+      selectedPlugin: { id: selectedPluginId, version },
+      source: { class: sourceClass },
+      loadedIdentity,
+      installedIdentity: installedIdentityForSource,
+    };
+  }
+  // PHX-WP-AAC01-MULTISESSION: informational only. Computed unconditionally
+  // (observeConcurrentSessionWarning never throws) and never influences
+  // `status`/`nextAction`/any other field above -- see that function's own
+  // docstring for the exact false-positive-avoidance contract.
+  const candidateCheckoutRoot = resolve(cwd, "plugins", "pipeline-core");
+  const checkoutPluginRoot = pluginRootHasSelfApplicationGit(pluginRoot)
+    ? pluginRoot
+    : existsSync(candidateCheckoutRoot)
+      ? candidateCheckoutRoot
+      : null;
+  let candidateInstalledRoot = null;
+  if (!pluginRootHasSelfApplicationGit(pluginRoot)) {
+    candidateInstalledRoot = pluginRoot;
+  } else if (runner === "claude") {
+    candidateInstalledRoot = claudeRegistryBinding?.installedPluginRoot ?? null;
+    if (!candidateInstalledRoot && Array.isArray(pluginListSnapshot)) {
+      const entry = pluginListSnapshot.find((e) => [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(e?.id));
+      candidateInstalledRoot = entry?.installPath ?? entry?.installedPath ?? null;
+    }
+  } else if (runner === "codex") {
+    candidateInstalledRoot = registrySourcePluginRoot ?? null;
+    if (!candidateInstalledRoot && Array.isArray(pluginListSnapshot?.installed)) {
+      const entry = pluginListSnapshot.installed.find((e) => [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(e?.pluginId));
+      candidateInstalledRoot = entry?.source?.path ?? null;
+    }
+  } else if (runner === "antigravity") {
+    candidateInstalledRoot = registryInstalledPluginRoot ?? null;
+  }
+  const installedPluginRoot = candidateInstalledRoot ? resolve(candidateInstalledRoot) : null;
+  const dutyNotRuntimeLive = observeDutyNotRuntimeLive({ checkoutPluginRoot, installedPluginRoot, read });
+  const concurrentSessionWarning = observeConcurrentSessionWarning({ startPath: cwd, currentSessionId });
+  // Check project readiness for both executable bootstrap states. A plugin
+  // refresh is advisory, so it must not hide the project's onboarding action.
+  // This is exactly the branch that used to
+  // unconditionally name the bare `inspect`, for a project that had not yet been
+  // asked whether IT is ready. A project that already IS onboarding-ready keeps this
+  // unchanged (falls through to the pre-existing `inspect` action below); only a
+  // project this readily-observable check can affirmatively place at a non-ready
+  // status gets pointed at the driver instead. Anything this check cannot cleanly
+  // decide (an unresolvable root, a malformed observation, an invalid runner) falls
+  // back to the pre-existing behaviour rather than guessing -- the same
+  // fail-toward-the-status-quo posture every sibling observation in this file takes.
+  let projectOnboardingNotReady = false;
+  // FLAPP1-R1: `bootstrap` is the preflight's default question, but it is not the one the
+  // lifecycle guard asks: guard-lifecycle-ready evaluates `intent: "session"` on every governed
+  // call, and the two intents differ (a bare cleanup residue is invisible to `bootstrap` and
+  // blocking for `session`). A project that is bootstrap-ready but not session-ready would
+  // otherwise get the plain ready action below while the guard stands at `partial`. So once
+  // the bootstrap probe has succeeded, ask the session question too; anything other than a
+  // clean answer -- a PORG-NOT-READY denial or the probe itself failing -- counts as "not
+  // session-ready" (fail closed: unknown readiness is never reported as the plain ready path),
+  // and the action below becomes the read-only `inspect --intent session`, which re-asks the
+  // same question and surfaces the typed way forward (or the real error) to the agent.
+  let sessionReadinessNotReady = false;
+  if (status === "ready" || status === "plugin-refresh-required") {
+    let bootstrapProbeReady = false;
+    try {
+      requireProjectOnboardingReadyFn({ rootDir: cwd, intent: "bootstrap", runner });
+      bootstrapProbeReady = true;
+    } catch (error) {
+      projectOnboardingNotReady = error instanceof ProjectOnboardingReadyError
+        && error.code === "PORG-NOT-READY";
+    }
+    // Only the `ready` status names the inspect action this probe re-targets; the
+    // plugin-refresh advisory is unchanged, so do not spend a second inspection there.
+    if (bootstrapProbeReady && status === "ready") {
+      try {
+        requireProjectOnboardingReadyFn({ rootDir: cwd, intent: "session", runner });
+      } catch {
+        sessionReadinessNotReady = true;
+      }
+    }
+  }
+  // Bootstrap may never make architecture adoption a precondition: the PO must
+  // first be able to see and choose the proposal.  This compact readback is
+  // nonetheless part of every runner's normal entry envelope, so a missing
+  // physical map is neither hidden behind an AGENTS.md pointer nor left to an
+  // optional prose instruction.  The implementation transition remains the
+  // later authority boundary enforced by guard-lifecycle-ready.
+  let architectureOrientation;
+  try {
+    architectureOrientation = observeArchitectureAdoptionOrientationFn({ rootDir: cwd });
+  } catch {
+    architectureOrientation = {
+      schema: "pipeline.architecture-adoption-orientation.v1",
+      status: "unavailable",
+      root: resolve(cwd),
+      adoption: { state: "adoption-required", scope: null, decisionRef: null, coverageClass: "unavailable", confidence: "estimated" },
+      physicalMap: { greenfieldScaffold: false, status: "not-classified" },
+      guidance: "Architecture orientation could not be observed. Do not claim an architecture map is present; retry the read-only orientation before implementation.",
+    };
+  }
+  // A recorded disposition is durable across ordinary commits, but it does
+  // not manufacture a physical navigation map. Offer the same read-only,
+  // map-first proposal when that artifact is absent; do not ask for a new
+  // adoption decision merely because the map still needs materializing.
+  const architectureOrientationAction = architectureOrientation.status === "adoption-required"
+    || (architectureOrientation.status === "decision-recorded"
+      && architectureOrientation.physicalMap?.status === "missing")
+    ? {
+        kind: "command",
+        executable: "node",
+        argv: [resolve(pluginRoot, "scripts/architecture-adoption.mjs"), "propose", "--root", resolve(cwd), "--json"],
+        mutation: false,
+        requiresConfirmation: false,
+        executionBoundary,
+        expected: { schema: "pipeline.adoption-proposal.v1" },
+      }
+    : architectureOrientation.status === "design-pending"
+      ? {
+          kind: "advisory",
+          executable: null,
+          argv: [],
+          mutation: false,
+          requiresConfirmation: false,
+          executionBoundary,
+          expected: { schema: "pipeline.architecture-adoption-orientation.v1", status: "design-pending" },
+        }
+      : null;
+  // The project-wide decision digest is a compact, runner-neutral re-entry
+  // observation. It does not guess the task's module applicability or turn an
+  // unresolved ADR estate into implementation authority. Every runner sees
+  // the same source projection without making bootstrap a new hard gate.
+  let effectiveDecisions;
+  try {
+    const projection = inspectEffectiveArchitectureDecisionsFn({ rootDir: resolve(cwd), area: "project" });
+    const localCodes = {
+      ready: "ARCH-DECISION-EFFECTIVE-READY",
+      advisory: "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
+      blocked: "ARCH-DECISION-EFFECTIVE-UNRESOLVED",
+    };
+    const combinedCodes = {
+      ready: "ARCH-CONTINUITY-READY",
+      advisory: "ARCH-CONTINUITY-ADVISORY",
+    };
+    const knownCode = projection?.schema === "pipeline.architecture-decision-continuity.v1"
+      ? (projection.status === "blocked" ? typeof projection.code === "string"
+        && projection.code.startsWith("ARCH-CONTINUITY-") : projection.code === combinedCodes[projection.status])
+      : projection?.schema === "pipeline.architecture-effective-decisions.v1"
+        && projection.code === localCodes[projection.status];
+    if (!knownCode
+      || projection.area !== "project"
+      || !["ready", "advisory", "blocked"].includes(projection.status)
+      || !Array.isArray(projection.decisions) || !Array.isArray(projection.findings)
+      || (projection.status === "blocked" ? projection.projectionSha256 !== null
+        : !/^[a-f0-9]{64}$/u.test(projection.projectionSha256 ?? ""))) {
+      throw new Error("invalid-decision-projection");
+    }
+    effectiveDecisions = {
+      schema: "pipeline.architecture-decision-bootstrap-observation.v1",
+      area: "project",
+      status: projection.status,
+      code: projection.code,
+      projectionSha256: projection.projectionSha256,
+      decisionCount: Array.isArray(projection.decisions) ? projection.decisions.length : 0,
+      findingCount: projection.findings.length,
+      taskScopeResolved: false,
+    };
+  } catch {
+    effectiveDecisions = {
+      schema: "pipeline.architecture-decision-bootstrap-observation.v1",
+      area: "project",
+      status: "unavailable",
+      code: "ARCH-DECISION-BOOTSTRAP-OBSERVATION-UNAVAILABLE",
+      projectionSha256: null,
+      decisionCount: 0,
+      findingCount: 0,
+      taskScopeResolved: false,
+    };
+  }
+  const cloneProvisioning = checkCloneProvisioningFn(cwd);
+  const mandatoryHookReadiness = assessMandatoryHookReadiness(cloneProvisioning);
+  const hookRefresh = planMandatoryHookRefresh({
+    role,
+    baseStatus: status,
+    gatedStatus: applyMandatoryHookGate(status, mandatoryHookReadiness),
+    cloneProvisioning,
+    mandatoryHookReadiness,
+    pluginRoot,
+    cwd,
+    executionBoundary,
+  });
+  const resultStatus = hookRefresh.status;
+  const refreshAction = hookRefresh.action;
+  const result = {
+    schema: SCHEMA,
+    status: resultStatus,
+    statusScope: STATUS_SCOPE,
+    version,
+    installedVersion,
+    installedSource: installedIdentity?.source ?? "unknown",
+    installedPluginAttestation,
+    executionBoundary,
+    pluginRoot,
+    rulesetSource,
+    handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
+    concurrentSessionWarning,
+    architectureOrientation: {
+      ...architectureOrientation,
+      nextAction: architectureOrientationAction,
+    },
+    effectiveDecisions,
+    ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
+    nextAction: resultStatus === "hook-provisioning-required"
+      ? {
+          kind: "command",
+          executable: process.execPath,
+          argv: [resolve(pluginRoot, "scripts/clone-hook-readiness.mjs"), "--root", resolve(cwd), "--apply"],
+          mutation: true,
+          requiresConfirmation: true,
+          executionBoundary,
+          expected: { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" },
+        }
+      : resultStatus === "hook-refresh-required"
+      ? refreshAction
+      // A blocked mandatory-hook state (foreign owner, decline, unsupported) carries no action. A stale hook
+      // next to a missing one is no longer blocked (Ruling 84 F1): it is provisioning-required first, then refresh.
+      // The arm stays, as an explicit null, so a blocked state cannot fall through to the onboarding action below.
+      : resultStatus === "hook-provisioning-blocked"
+      ? null
+      : resultStatus === "antigravity-topology-refresh-required"
+      ? { kind: "command", executable: "node", argv: [resolve(antigravityTopology?.sourcePluginRoot ?? pluginRoot, "install-agy.mjs")], mutation: true, requiresConfirmation: true, executionBoundary: "host", expected: { schema: "pipeline.antigravity-refresh-result.v1", status: "refreshed" } }
+      : status === "plugin-attestation-required"
+      ? installedPluginAttestation.setupAction ?? null
+      : status === "ready" || status === "plugin-refresh-required" && projectOnboardingNotReady
+      ? projectOnboardingNotReady
+        // NVA-K-DRIVERREACH: point discovery at the guided driver -- the one place this
+        // skill already instructs an agent to execute the returned action verbatim, so
+        // it is where an agent actually learns the driver exists and must be run.
+        ? {
+            kind: "command",
+            executable: "node",
+            argv: [
+              resolve(pluginRoot, "scripts/onboarding-init.mjs"),
+              "--root",
+              resolve(cwd),
+              "--runner",
+              runner,
+            ],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary,
+            expected: {
+              schema: "pipeline.onboarding-init.v1",
+            },
+          }
+        : {
+            kind: "command",
+            executable: "node",
+            argv: [
+              resolve(pluginRoot, "scripts/project-onboarding-v3.mjs"),
+              "inspect",
+              "--root",
+              resolve(cwd),
+              "--intent",
+              sessionReadinessNotReady ? "session" : "bootstrap",
+              "--runner",
+              runner,
+            ],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary,
+            expected: {
+              schema: "pipeline.project-onboarding.v4",
+            },
+          }
+      // "plugin-refresh-required" is a soft/advisory status, not a hard block
+      // (design §A.5, correcting the prior nextAction: null defect -- that left
+      // this branch with nothing to execute and no printable confirmation).
+      // Nothing executes; the advisory is carried forward through bootstrap.
+      : status === "plugin-refresh-required"
+        ? {
+            kind: "advisory",
+            executable: null,
+            argv: [],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary,
+            expected: {
+              schema: "pipeline.plugin-refresh-advisory.v1",
+            },
+          }
+        : null,
+    // Antigravity-only, and gated at the CALL itself (not merely at the field):
+    // for Claude/Codex, observeAntigravityHardEnforcementFn is never invoked and
+    // this key is absent from the envelope entirely, keeping their output
+    // byte-identical to before this addition. Reuses the SAME observation the
+    // `status` computation above already made -- see the comment there.
+    ...(runner === "antigravity" ? { antigravityHardEnforcement, antigravityTopology } : {}),
+    // Present for every runner alike (unlike the Antigravity field above) whenever the
+    // observation actually determined something -- omitted only for "repository-unresolved"
+    // so the envelope's key set stays exactly what it was before this addition for every
+    // pre-existing caller whose `cwd` never resolves to a real repository (several of this
+    // file's own pre-existing tests use exactly that fixture shape).
+    ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHook: prePushHookObservation } : {}),
+    // NVA-PREPUSHVISIBLE-1 (c): SAME omission condition as `prePushHook` immediately above,
+    // deliberately reusing `prePushHookObservation`'s already-computed state rather than a
+    // second one of `unseenRemotePush`'s own -- both observations resolve the identical
+    // rootDir/cwd via `git rev-parse`, so an unresolvable repository folds both of them the
+    // same way, and this keeps the envelope's key set unchanged for every pre-existing caller
+    // whose `cwd` never resolves to a real repository (several of this file's own pre-existing
+    // tests use exactly that fixture shape). "not-checked" for an otherwise-resolvable
+    // repository (no upstream configured, or no log yet) stays fully visible -- it is itself
+    // an informative outcome, unlike the unresolvable-repository case this omits. Purely
+    // advisory either way: see `observeUnseenPushToRemote`'s own doc comment -- never gates
+    // `status` or the exit code.
+    ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHookUnseenRemotePush: unseenRemotePush } : {}),
+  };
+  const envelope = {
+    ...result,
+    cloneProvisioning,
+    mandatoryHookReadiness,
+    // This measures the exact normal-bootstrap envelope emitted before the
+    // self-describing receipt. The receipt is retained in the same typed
+    // preflight readback; no cached or static skill-size surrogate is used.
+    bootstrapPayload: normalBootstrapPayloadReceipt(result),
+  };
+  // HOOKREFRESH (Ruling 69): the model-role readback is attached AFTER the payload measurement above,
+  // so the measured budget is unchanged. Without the seam the plain envelope is returned, byte-identical
+  // to before, which keeps every synchronous caller and the pinned key set unchanged.
+  if (typeof runModelRoleBootstrapFn !== "function") return envelope;
+  return attachModelRoleBootstrap(envelope, runModelRoleBootstrapFn, { rootDir: resolve(cwd), runner, env, readOnly: true });
+}
+
+/**
+ * HOOKREFRESH (Rulings 67 and 70): turn a stale mandatory hook into an enforced, typed refresh. It applies
+ * only to an Elephant session (every role except "goldfish" and "critic") whose base status is already
+ * `ready` -- the same precondition as `applyMandatoryHookGate`. Exactly one shape qualifies: a ready mandatory-hook
+ * report with stale hooks (status becomes `hook-refresh-required`, which the exit-code allowlist does not
+ * list, so it exits non-zero). A stale hook next to a missing one is NOT a second shape (Ruling 84 F1): that mix
+ * is `provisioning-required` first (the coordinator installs the missing hook), and only the ready state it
+ * leaves behind is refreshed. The advisory pre-push hook never changes the status; it is only listed in
+ * `refreshes` when it is stale beside a mandatory one. Anything else is returned unchanged.
+ */
+function planMandatoryHookRefresh({ role, baseStatus, gatedStatus, cloneProvisioning, mandatoryHookReadiness, pluginRoot, cwd, executionBoundary }) {
+  const unchanged = { status: gatedStatus, action: null };
+  if (role === "goldfish" || role === "critic" || baseStatus !== "ready") return unchanged;
+  const staleReady = mandatoryHookReadiness?.status === "ready"
+    && Array.isArray(mandatoryHookReadiness.refreshAvailable)
+    && mandatoryHookReadiness.refreshAvailable.length > 0;
+  if (!staleReady) return unchanged;
+  const refreshes = (Array.isArray(cloneProvisioning?.checks) ? cloneProvisioning.checks : [])
+    .filter((entry) => entry?.status === "refresh" && typeof entry.id === "string" && entry.id.endsWith("-hook"))
+    .map((entry) => entry.id)
+    .sort();
+  return {
+    status: "hook-refresh-required",
+    action: {
+      kind: "command",
+      executable: process.execPath,
+      argv: [resolve(pluginRoot, "scripts/refresh-mandatory-hooks.mjs"), "--root", resolve(cwd)],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary,
+      expected: { schema: "pipeline.mandatory-hook-refresh.v1", status: "ready" },
+      refreshes,
+    },
+  };
+}
+
+const MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE = "MODEL-ROLE-BOOTSTRAP-UNAVAILABLE";
+
+/** The statuses the readback field carries as their own (Ruling 84 F4). A pending human confirmation or a
+ * pending admission is not an outage, so it is reported as itself; everything else folds to `unavailable`. */
+const MODEL_ROLE_BOOTSTRAP_PASSTHROUGH_STATUSES = new Set(["ready", "confirmation-required", "admission-pending"]);
+
+/** The readback field: only the bootstrap's own `status` and `code`, folded to a closed shape. */
+function modelRoleBootstrapField(value) {
+  return {
+    status: MODEL_ROLE_BOOTSTRAP_PASSTHROUGH_STATUSES.has(value?.status) ? value.status : "unavailable",
+    code: typeof value?.code === "string" ? value.code : MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE,
+  };
+}
+
+/**
+ * Conditional thenable (Ruling 69): a plain bootstrap value attaches synchronously; a thenable makes the
+ * return a Promise of the same envelope. A throw or a rejection becomes a present `unavailable` field --
+ * never an absent one, and never a change of the envelope's own status.
+ */
+function attachModelRoleBootstrap(envelope, runModelRoleBootstrapFn, args) {
+  const attach = (value) => ({ ...envelope, modelRoleBootstrap: modelRoleBootstrapField(value) });
+  let value;
+  try { value = runModelRoleBootstrapFn(args); }
+  catch { return attach(null); }
+  if (value !== null && typeof value === "object" && typeof value.then === "function") {
+    return value.then(attach, () => attach(null));
+  }
+  return attach(value);
+}
+
+// PHX-WP-AAC01-MULTISESSION -- OPEN FOLLOW-UP, documented honestly rather
+// than silently left unaddressed: this file only reads already-registered
+// session descriptors (`observeConcurrentSessionWarning`, above); it does
+// NOT register one of its own for an ordinary Elephant/Claude/Codex
+// bootstrap. `startSessionDescriptor` today has exactly one caller in the
+// whole codebase (`codex-onboarding-capabilities.mjs`'s narrow onboarding
+// capability probe, which registers and immediately retires within the same
+// call -- it never leaves a lasting descriptor). Registering one here would
+// require a real end-of-session retirement hook to avoid leaking an orphan
+// descriptor per bootstrap; this preflight library file, invoked once at
+// the START of bootstrap, has no such hook reachable from itself alone, and
+// none was invented under time pressure (see this task's dispatch report).
+// Net effect today: the warning field is real, wired, and exercised
+// end-to-end by this task's own tests (which register descriptors directly
+// via `startSessionDescriptor`), but stays structurally dormant in ordinary
+// production use until a follow-up task adds (a) descriptor registration at
+// a real bootstrap entry point and (b) its matching retirement at a real
+// session-end hook.
+
+export function pipelineStartPreflightExitCode(result) {
+  // ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS is deliberately absent from this
+  // allowlist (NVA-ARMEDPROOF-1, fail-closed by omission): it falls through to the same
+  // blocking exit code "plugin-identity-unavailable" already gets, with no separate case
+  // needed here. The pre-push hook's own observation used to have an analogous non-ready
+  // status here (NVA-PREPUSHOBSERVE-1's PRE_PUSH_HOOK_NOT_INSTALLED_STATUS); that status was
+  // removed entirely, not merely omitted from this allowlist -- the hook is an offer, not a
+  // requirement, and none of its states can produce a non-"ready" status any more
+  // (NVA-PREPUSHVISIBLE-1; see PRE_PUSH_HOOK_OBSERVATION_SCHEMA's own doc comment above).
+  return ["ready", "plugin-refresh-required", "pipeline-governance-inactive", "pipeline-governance-declined"].includes(result?.status) ? 0 : 2;
+}
+
+export const SCRATCH_LIFECYCLE_SCHEMA = "pipeline.bootstrap-scratch-lifecycle.v1";
+
+/**
+ * The scratch-descriptor lifecycle's two BOOTSTRAP events, in the order the backlog item
+ * (2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-calls-it.md) requires after
+ * the PO's correction: sweep the PREVIOUS session's orphans first, then bind this session's
+ * own directory. Neither event is the close — a close is the least reliable moment to
+ * schedule cleanup, because the sessions whose scratch directories most need collecting are
+ * exactly the ones that ended abruptly and never reached one. Correctness therefore comes
+ * from the sweep alone, and `releaseScratchDescriptor` stays a fast path nothing depends on.
+ *
+ * The sweep is descriptor-bound, never a wholesale clear: `retireOrphanScratchDescriptors`
+ * removes only the exact directory a verified-dead session's own descriptor claims, re-reading
+ * and re-validating each descriptor immediately before deleting. A bootstrap runs against a
+ * tree whose other contents it did not create, so that binding matters more here, not less.
+ *
+ * FAIL-OPEN, ALWAYS. This is housekeeping attached to the bootstrap, never a gate on it: any
+ * fault is recorded as a typed code and the bootstrap continues. Faults carry the library's
+ * own `WT-*` codes only — never a message or a path, which is what would leak a machine-local
+ * directory layout into a bootstrap log.
+ *
+ * SESSION IDENTITY: binding needs a stable per-session id and the preflight has no session
+ * identity of its own (it reads no hook stdin, where `session_id` is delivered). A caller
+ * that knows its own id supplies it via `PIPELINE_SCRATCH_SESSION_ID`; without one this
+ * reports `unbound-no-session-identity` and performs the sweep only. Inventing an id per
+ * invocation is deliberately NOT done — it would mint a fresh descriptor on every bootstrap
+ * that no later sweep could ever match to a dead process, which is the unbounded growth this
+ * whole mechanism exists to stop.
+ *
+ * NO PRE-EXISTING scratch/, NO SWEEP. Both `retireOrphanScratchDescriptors` and
+ * `bindScratchDescriptor` resolve their scratch root via `physicalScratchRoot`, which
+ * `mkdirSync`s `scratch/` unconditionally — including in a project where it never existed. A
+ * consumer project's `.gitignore` predating onboarding does not ignore `scratch/`, so that
+ * unconditional create dirties the tree on the very first bootstrap and can trip
+ * `security-scan.mjs`'s dirty-tree refusal. Nothing can be bound to sweep if `scratch/` never
+ * existed, so checking existence FIRST and skipping the whole lifecycle when it is absent loses
+ * nothing: it only reaches (2) whether `rootDir` itself resolves at all, which the existing
+ * fail-open path below still handles unchanged.
+ */
+export function runBootstrapScratchLifecycle({
+  rootDir = process.cwd(),
+  env = process.env,
+  deps = {},
+} = {}) {
+  if (existsSync(rootDir) && !existsSync(resolve(rootDir, "scratch"))) {
+    return {
+      schema: SCRATCH_LIFECYCLE_SCHEMA,
+      sweep: null,
+      binding: { status: "skipped-no-scratch-directory" },
+      faults: [],
+    };
+  }
+  const faults = [];
+  const faultCode = (error) => String(error?.code ?? "unknown");
+  let sweep = null;
+  try {
+    const retired = retireOrphanScratchDescriptors({ rootDir, deps });
+    sweep = { retiredCount: retired.retiredCount, retainedCount: retired.retained.length };
+  } catch (error) {
+    faults.push(`sweep:${faultCode(error)}`);
+  }
+  const sessionId = typeof env.PIPELINE_SCRATCH_SESSION_ID === "string" && env.PIPELINE_SCRATCH_SESSION_ID !== ""
+    ? env.PIPELINE_SCRATCH_SESSION_ID
+    : null;
+  let binding = { status: "unbound-no-session-identity" };
+  if (sessionId !== null) {
+    try {
+      const bound = bindScratchDescriptor({ rootDir, sessionId, deps });
+      binding = { status: bound.status, scratchRelativePath: bound.scratchRelativePath };
+    } catch (error) {
+      binding = { status: "unavailable" };
+      faults.push(`bind:${faultCode(error)}`);
+    }
+  }
+  return { schema: SCRATCH_LIFECYCLE_SCHEMA, sweep, binding, faults };
+}
+
+export const WORKTREE_SWEEP_SCHEMA = "pipeline.bootstrap-worktree-sweep.v1";
+
+/**
+ * A SEPARATE bootstrap event from `runBootstrapScratchLifecycle` above -- deliberately not
+ * folded into that function or its `pipeline.bootstrap-scratch-lifecycle.v1` schema, so that
+ * function's own pinned wiring tests (`pipeline-start-scratch-lifecycle.test.mjs`, asserting
+ * exact `faults`/`sweep` shapes for the scratch-only lifecycle) stay unaffected by this
+ * addition. Backlog: 2026-08-27-stale-worktree-directories-accumulate-with-no-sweep.md, whose
+ * own Proposal names `retireOrphanScratchDescriptors`'s "sweep orphans on a later bootstrap"
+ * shape as exactly what `.claude/worktrees/` needs -- this reuses that shape via the sibling
+ * `retireOrphanWorktreeDirectories`, not a second, differently-designed sweeper.
+ *
+ * FAIL-OPEN, ALWAYS, identically to the scratch sweep: any fault is recorded as a typed code
+ * and bootstrap continues. `retireOrphanWorktreeDirectories` never removes a directory git
+ * still knows about (`git worktree list`) regardless of age, and never removes a directory
+ * that does not carry a genuine worktree checkout's own `.git` pointer file -- see that
+ * function's own doc comment in session-cleanup-recovery.mjs for the full safety predicate.
+ *
+ * NVA-B-WTLIVE-2 (PO decision, backlog: pipeline.a-registered-but-abandoned-worktree-is-never-
+ * retired): also wires `retireRegisteredWorktrees` -- the REGISTERED-worktree half of the sweep,
+ * a T1-reviewed prior attempt (`bb8347e4`) was reverted (`d818dcf1`) because it could retire ANY
+ * registered worktree repository-wide, unattended, including one a human created elsewhere. This
+ * wiring requests `restrictToPipelineOwnedPaths: true`, so the UNATTENDED sweep only ever retires
+ * a registered worktree under a path the Pipeline itself provisions (".claude/worktrees/" or
+ * "branch/") -- never elsewhere. The broader, repository-wide, deliberately-invoked API
+ * (`retireRegisteredWorktrees` called directly, without the restriction) keeps its own
+ * already-reviewed default behavior unchanged (`c352528f`) -- this wiring only ever passes the
+ * additive, opt-in restriction, never removes it as a default.
+ *
+ * Both sweeps run inside the SAME try/catch, exactly as the single orphan-only sweep did before:
+ * a fault in either one fails the WHOLE housekeeping event closed (`sweep`/`registeredWorktreeSweep`
+ * both null, one typed fault code) rather than reporting a partial result -- this is the same
+ * atomic-event posture the function already had, not a new design choice, and it keeps every
+ * existing caller's fault-handling assumptions intact.
+ */
+export function runBootstrapWorktreeSweep({ rootDir = process.cwd(), deps = {} } = {}) {
+  const faultCode = (error) => String(error?.code ?? "unknown");
+  try {
+    const retired = retireOrphanWorktreeDirectories({ rootDir, deps });
+    const retiredRegistered = retireRegisteredWorktrees({ rootDir, deps, restrictToPipelineOwnedPaths: true });
+    return {
+      schema: WORKTREE_SWEEP_SCHEMA,
+      sweep: { retiredCount: retired.retiredCount, retainedCount: retired.retained.length },
+      registeredWorktreeSweep: {
+        status: retiredRegistered.status,
+        retiredCount: retiredRegistered.retiredCount,
+        retainedCount: retiredRegistered.retained.length,
+      },
+      faults: [],
+    };
+  } catch (error) {
+    return {
+      schema: WORKTREE_SWEEP_SCHEMA,
+      sweep: null,
+      registeredWorktreeSweep: null,
+      faults: [`sweep:${faultCode(error)}`],
+    };
+  }
+}
+
+/**
+ * Spec 22.7 / R7-7c: the environment readiness report is carried beside the typed preflight
+ * envelope as a top-level key of the one compact stdout line, NOT as a field of
+ * `observePipelineStartPreflight`'s result (that key set and its measured payload budget are
+ * pinned). Read-only and never decides the exit code; a failure to produce it is reported as
+ * a typed unavailable marker instead of being swallowed.
+ */
+async function observeEnvironmentReadiness() {
+  try {
+    const { runEnvironmentReadinessReport } = await import("./toolchain-preflight.mjs");
+    const report = await runEnvironmentReadinessReport({ rootDir: process.cwd() });
+    if (report !== null && typeof report === "object" && Array.isArray(report.findings)) return report;
+  } catch {
+    // Reported below as the typed unavailable marker.
+  }
+  return { ok: false, code: "ENVIRONMENT-READINESS-UNAVAILABLE", findings: [] };
+}
+
+/**
+ * Ruling 57 (AM-W): the agy start hint is read-only, never throws and never changes readiness.
+ * `observeAgyStartHint` is async, and `observePipelineStartPreflight` is synchronous and its key
+ * set is pinned, so the hint is observed by the async process entry and carried as a separate
+ * top-level `agyStartHint` field beside the envelope (like `environmentReadiness`). Returns the
+ * hint only for a governed workspace whose agy-loaded plugin is not current; otherwise null
+ * (ungoverned, loaded-and-current, or any failure) and no field is written.
+ */
+export async function observeAgyStartHintField({
+  observeHint = (args) => observeAgyStartHint(args),
+  cwd = process.cwd(),
+  configRoot = resolve(homedir(), ".gemini"),
+  loadedPluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
+} = {}) {
+  try {
+    const hint = await observeHint({ workspaceRoot: cwd, configRoot, loadedPluginRoot });
+    if (hint?.governed !== true || hint.loaded?.status === "current") return null;
+    return hint;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Synchronous, exactly as before the readiness report existed: it returns the exit code and,
+ * called with no options, writes the same one compact line. `environmentReadiness` is an
+ * optional seam the async process entry (`runEntry`, below) fills; an exported function must
+ * not become async to carry an observation only the process entry needs.
+ */
+export function main(options = {}) {
+  const environmentReadiness = options?.environmentReadiness;
+  const agyStartHint = options?.agyStartHint;
+  // HOOKREFRESH (Rulings 67, 69, 70): both are optional plain values from the async process entry. With
+  // neither set this is exactly the zero-argument call it always was, and `main` stays synchronous
+  // because a plain-value seam attaches synchronously.
+  const role = options?.role;
+  const modelRoleBootstrap = options?.modelRoleBootstrap;
+  const result = observePipelineStartPreflight({
+    ...(role === undefined ? {} : { role }),
+    ...(modelRoleBootstrap === undefined ? {} : { runModelRoleBootstrapFn: () => modelRoleBootstrap }),
+  });
+  const envelope = {
+    ...result,
+    ...(environmentReadiness === undefined ? {} : { environmentReadiness }),
+    ...(agyStartHint === undefined || agyStartHint === null ? {} : { agyStartHint }),
+  };
+  process.stdout.write(`${JSON.stringify(envelope)}\n`);
+  if (result.statusScope === "pipeline-governance-activation") return pipelineStartPreflightExitCode(result);
+  // Antigravity-only: the structured field above already carries this, but a
+  // human watching the terminal reads stderr, not a JSON blob -- so the same
+  // non-blocking warning is also printed here in plain text. Absent entirely
+  // for Claude/Codex (the field itself is absent for them) and absent when
+  // the hard-enforcement layer WAS observed this session (nothing to warn
+  // about).
+  if (result.antigravityHardEnforcement && result.antigravityHardEnforcement.observed === false) {
+    try {
+      process.stderr.write(`${result.antigravityHardEnforcement.warning}\n`);
+    } catch {
+      // stderr unavailable; the JSON field on stdout still carries the warning.
+    }
+  }
+  // Deliberately on stderr and deliberately NOT a field of the typed preflight result:
+  // stdout is a parsed `pipeline.start-preflight.v1` envelope under a measured payload
+  // budget, so the housekeeping receipt travels beside it rather than inside it.
+  try {
+    process.stderr.write(`${JSON.stringify(runBootstrapScratchLifecycle())}\n`);
+  } catch {
+    // Housekeeping never decides a bootstrap's exit code.
+  }
+  // A second, independent housekeeping event (see runBootstrapWorktreeSweep's own doc
+  // comment for why this is deliberately not folded into the scratch lifecycle above).
+  // Wrapped the same way: never allowed to affect this function's return value.
+  try {
+    process.stderr.write(`${JSON.stringify(runBootstrapWorktreeSweep())}\n`);
+  } catch {
+    // Housekeeping never decides a bootstrap's exit code.
+  }
+  return pipelineStartPreflightExitCode(result);
+}
+
+/** Process entry only (not exported): observe the readiness report, then hand it to the synchronous `main`. */
+async function runEntry(argv = process.argv.slice(2)) {
+  const environmentReadiness = await observeEnvironmentReadiness();
+  const agyStartHint = await observeAgyStartHintField();
+  const role = parseRoleArgument(argv);
+  const modelRoleBootstrap = await observeModelRoleBootstrapReadback();
+  return main({
+    environmentReadiness,
+    agyStartHint,
+    ...(role === undefined ? {} : { role }),
+    ...(modelRoleBootstrap === undefined ? {} : { modelRoleBootstrap }),
+  });
+}
+
+/**
+ * `--role <elephant|goldfish|critic>` (Ruling 70 R1). Deliberately lenient: an absent flag, a missing or
+ * unknown value, or any other token yields `undefined`, which the preflight reads as the Elephant. It never
+ * throws -- a throw here would turn the receipt command the guard prescribes into a failed bootstrap.
+ */
+function parseRoleArgument(argv) {
+  const index = Array.isArray(argv) ? argv.indexOf("--role") : -1;
+  const value = index >= 0 ? argv[index + 1] : undefined;
+  return value === "elephant" || value === "goldfish" || value === "critic" ? value : undefined;
+}
+
+/**
+ * The real model-role bootstrap readback for the process entry (Ruling 70 R3): a dynamic import, because
+ * `model-role-bootstrap.mjs` statically imports this module. Runs only in an active governed repository,
+ * with no confirmation callback, so it can only read back. Returns `undefined` when governance is not
+ * active (no readback expected) and an `unavailable` marker when the bootstrap cannot run or throws.
+ */
+async function observeModelRoleBootstrapReadback() {
+  try {
+    if (observeGovernanceScope({ rootDir: process.cwd() })?.state !== "active") return undefined;
+    const { runModelRoleBootstrap } = await import("./model-role-bootstrap.mjs");
+    return await runModelRoleBootstrap({
+      rootDir: process.cwd(),
+      runner: resolveActiveRunner({ env: process.env, read: readFileSync }),
+      env: process.env,
+      readOnly: true,
+    });
+  } catch {
+    return { ok: false, code: MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE, status: "unavailable" };
+  }
+}
+
+if (isDirectInvocation(import.meta.url)) {
+  runEntry().then(
+    (code) => { process.exitCode = code; },
+    (error) => {
+      // Fail closed: an entry that could not complete is a non-zero exit, never a silent success.
+      try { process.stderr.write(`PIPELINE-START-PREFLIGHT-FAILED: ${error?.code ?? error?.name ?? "error"}\n`); } catch { /* stderr unavailable */ }
+      process.exitCode = 1;
+    },
+  );
+}

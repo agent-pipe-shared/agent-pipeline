@@ -1,0 +1,1694 @@
+{
+  "schema": "alfred.live-main-strict-check.v2",
+  "status": "ACTUAL GIT STRICT CHECK PASSED",
+  "baseCommit": "8d87a95bcb04a9edfad3998fd34ed7d827039156",
+  "patchSha256": "d90afca9d927b127d225f506d7f15ff62463d9098d9ccbcebcdf6cc4a15fd2ea",
+  "argv": [
+    "apply",
+    "--check",
+    "--whitespace=error",
+    "-"
+  ],
+  "cwd": "owned-external-base-source",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "stdout": "",
+  "stderr": "",
+  "fixture": {
+    "logicalPath": "owned-external-base-source",
+    "gitInitialized": false,
+    "ancestorGitPresent": false,
+    "repositoryProbeExit": 128,
+    "repositoryProbeStdout": "",
+    "baseRows": [
+      {
+        "path": ".github/workflows/verify.yml",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "275b8c07b4655c793ddfeebc8569bda7bc10f2b17d33f8c088cebbaec9cae989",
+        "mode": 420
+      },
+      {
+        "path": "PIPELINE_FLOW.de.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "dc98c7416893321e6ef07f98398a476994bd672c9179b0f4030290734fb86d42",
+        "mode": 420
+      },
+      {
+        "path": "PIPELINE_FLOW.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a5dea7a0d12464a65355bd69029416e59db5bb8df39e0689e23360905aee7682",
+        "mode": 420
+      },
+      {
+        "path": "README.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "515e9e20c19a4fa3d901439dec2be1f30699a13cd33ff87550d5e764081b93dd",
+        "mode": 420
+      },
+      {
+        "path": "architecture/map/harness.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "0395313492a87366912318206f95f1e169ae471048d211a005adf4a39f606bac",
+        "mode": 420
+      },
+      {
+        "path": "architecture/map/pipeline-core.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "8d036fe8d64812cd600c0e58a51fb617f330f55dc91b43b03ff2aaaff4b6b8d8",
+        "mode": 420
+      },
+      {
+        "path": "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.md",
+        "status": "ABSENT"
+      },
+      {
+        "path": "docs/adr/0087-owning-verification-authenticated-controller-test-channel.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md",
+        "status": "ABSENT"
+      },
+      {
+        "path": "docs/adr/draft-item-owned-egm-retained-quality-gates.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "docs/adr/draft-item-owned-egm-retained-quality-gates.md",
+        "status": "ABSENT"
+      },
+      {
+        "path": "docs/cost-and-measurement.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e100a04e64e99db2d2dd2c4ce948bc7d20c7f9e647513567328f582fdad53dc7",
+        "mode": 420
+      },
+      {
+        "path": "docs/operating-model.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d31e3fa85a6967e4b9703cc5abbd090de40944a99de62684dfa0036917fc959b",
+        "mode": 420
+      },
+      {
+        "path": "docs/parallel-work.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "01989da7a7227468eac94c4fd598b0635a9f52ca0c4607abb6015bef7f1ae795",
+        "mode": 420
+      },
+      {
+        "path": "docs/product-capability-inventory.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "74b492fc2ece86df06b7a445079b31169c67cb212a99057880b6e35dd2281b3e",
+        "mode": 420
+      },
+      {
+        "path": "docs/usage.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "07fd8ce7b7b49fd21e4c7bc602201c3de06187a7c8f4b10f834846fb2cc96762",
+        "mode": 420
+      },
+      {
+        "path": "governance/observation-doc-governance.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "23bec3bf912551449c6b7e8282e6aa977b90566352cc655a678a331d4f5d7e73",
+        "mode": 420
+      },
+      {
+        "path": "guardrails/quality-gates.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "c393edf8d2c55313bc3926357f5be3bacaed3974c5c0e3be63f3e7d7f993abdf",
+        "mode": 420
+      },
+      {
+        "path": "harness/checklists/critic-review.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "2f2c1602156d915c0681ddc67e3e7c72f800239bd427cb3db063e901da4ee1b0",
+        "mode": 420
+      },
+      {
+        "path": "harness/checklists/goldfish-dispatch.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "da889f08b748f14ad50973919898d94cbb46ad5549e7f8087476811065876726",
+        "mode": 420
+      },
+      {
+        "path": "harness/config/verify-case-completion-augmentations.v1.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "2b912d11fbe26fe70bcd8f38857c5ba48e318421b29a8a4ae6d878a9e13965b7",
+        "mode": 420
+      },
+      {
+        "path": "harness/config/verify-case-completion.v1.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "17580cb73e2dfbab9fe4a38081eeb144ed728eff5f67a0f414e0ee777ec0abd6",
+        "mode": 420
+      },
+      {
+        "path": "harness/reader-review-protocol.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b9bd4e731787ff89bbb231886fe58d1890b114299f1d10b77f8ae9585c91b532",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/architecture-entry-required-source.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "harness/scripts/attended-recovery.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "96bf50b94aaaf2109868e0c669a9af0166ce5d2c38d612a6856931870afce1ab",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/check-doc-reader-binding.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "06e94c49f04ff3592fa8d5853016735f5b4fbb2b8d7c3f65bb36e1be27df5f16",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/check-observation-governance.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "ea282c7f0a0021d0a6173fc4e4ffa093333d4252ebe2163d0970df001a06ee03",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "harness/scripts/check-verify-case-completion.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "c30416b8aa9cf0e05467c6c7dab9f75c5158670b0a9ae9abad7fcc3925e77b5d",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/check-verify-case-completion.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "527f785c819a42ba38f3db08571bc5dfac19893f0002ba8f16006fae66d35aeb",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/check-verify-suite-registration.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "09efd30c36657e0df244ed354501f3abf7857b6fe4105a490a39033c347c1b90",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/doc-reader-course-budget.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "harness/scripts/doc-reader-terminal-binding.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "cb85ff87606d9f5854cad63848c4947d44adf90f25d1456a205c700d8eee1998",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/generate-agent-obligations.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a974f4b08a105fcc13d0e9c1b6764369a2df727d56b40f7127b4b202c3a76314",
+        "mode": 420
+      },
+      {
+        "path": "harness/scripts/plan-reopen-current-action.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "harness/scripts/shell-grammar-capability-placement.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/.claude-plugin/plugin.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "32581a7baccaffab1504cc4a39fa780a54ea3aa861919a2131360720d682a4e5",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/.codex-plugin/plugin.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "8940b40c42d09961fb9a021dd0b00445017caf5067306300b327b1895c1fa34a",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/agents/critic.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "59c6a1ead83b0b570956920d74a6a078c94dd3602a5beff152726779a974710b",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/config/interruption-registry.v1.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/docs/adr/draft-item-owned-egm-retained-quality-gates.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/docs/adr/draft-item-owned-egm-retained-quality-gates.md",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/docs/operating-model.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d31e3fa85a6967e4b9703cc5abbd090de40944a99de62684dfa0036917fc959b",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/guardrails/git.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a206eaef7c4f79e6081899cfefa78bfd4b28837b5d874884d10850aa0e475ff1",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/guardrails/quality-gates.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "c393edf8d2c55313bc3926357f5be3bacaed3974c5c0e3be63f3e7d7f993abdf",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "21e57eb1ae84767887569e96963836e353f141dff7e0dcba09a9f3a4cf90fe00",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "2daf949f896b7f44bfec74c55ca334a742df3594ef2c5619ca54d1ad0e556cbf",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-hooks.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "dcc23075e81a254603c9b7ab96bc6e2bc046830532b1cc0535934e6af67aa010",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "9d1ea7d2b3e644622a8761d88e79c313267f6e942c613353d062a2461f1abc91",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a956864a3a4550d51f20fbb177c15247fda975b44e2860c350e75374a51d882f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "7a5097c3e978558accdd299ba1e48efe433c9dcdfde9da0a7e4ff67b3261480d",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "9065bd23680a799b2430fd29ca6e0276b43d515b28494ac1aa26cd90e1fea120",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "360a645e4b77f32bd18971d8a94463a02cd49536e12f966bd4d03cb5018f7a33",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "afef271c5b8c2a644045ed78fcf0f55d03519f666f7545ea89fe7326350a4de9",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-git.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a57566f883aa48dd4566e6ea377f14cef4c45e92e0b95a41c08770571e4b863e",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "9686bbec296411e480a72bc4f0ae49600e452b413370f88ecc8319b3b5dfee49",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/hooks.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "65dec57031b859906087bcd0669390c2d1eb0a9409ae6a93890eab32950f983d",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "97eab37a9dc859183df98f703060469c9271c94406c125ec4063b42a9670bb03",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/post-compact-reground.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "c62b3f71a2c154488a32b2b763c2a012f0cc43f17cf4ca3a1699406c7288637c",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/install-agy.inline-candidate.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/install-agy.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "c91fd55dade9dfbb75257f13b4df6c432fc5895b1cd22b7f21b98f26a478923c",
+        "mode": 493
+      },
+      {
+        "path": "plugins/pipeline-core/lib/administrative-commit-policy.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/administrative-commit-policy.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/afk-ledger.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "258abe7f1d920426b358c1572609bfd61a58ddd45d67d4ac04380f6aeeef06ad",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "7ce18941bf4d96c6f04349f00bd46c20414a367a9efea8755d979ab7760f09bf",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agent-model-registry.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "ccf974295061eb40ad2fc23b0c0d04adfccdb5310c9cdd60ff2f1f9b36f80e3a",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agy-host-commit-admission.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "6b77eb864615b8ffd4996e008cb9e0847acfe5a1516cb082be1cf9796ceb02ea",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "440d180c700bcb4c299ca13a00906d732018a0f4ee8049f862578f6805d2f218",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "2880f2d57a8621876156f143bc34ac00c137ebb01e1b703b41365b453b1f1ef6",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agy-item-delivery.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agy-item-delivery.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agy-session-authority.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "f93f53aed13588b52814d3b374b2e94f0668097a8c808ee1298ced353c9745c5",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b1b17fc00d86df857ecf70f82ef485a73414a330117e6d3cbcf830242c04a7eb",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "5e4549cd81bc654d7257040bd045cc30ffc95ecf10f258a05851b171e6c54cdb",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/architecture-design.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "63f85a3eb953d16342df0efa6171491ea1a801ba554ae992dd2212605bca0532",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "616059c54e33adc7ef56f6c95dbbc8f9c46afdbb64ee0e271c60ad6e7f18b3ff",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "1e57ea83138686779172a9e34feb643af8e35e4a1be855edff23aee94ab8cffa",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/architecture-prospective-materialization.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "22e23a1099f2344f8d16b0cc06ffda461e7aee9becfb07b09be4067e60ffff57",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "6a2c33073813368eff1bf4a28d8d41a5a74d8c92c09e2f92721bc760be1fbce0",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "2997328b06173126f0e8a51d1df831cece1d2dcabdee52832948482666d600c7",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-host-process-exec-worker.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "da64eddced054475606fdf98ae36513c856723e1a0e404c8e1e4de399f07e7b0",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "202572a093803bb0b0376377c63e61a08d2dfe6cb453c38ffa10da1c3c284632",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-host-process-launcher.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "34e4c85b3ffb3243d77ea643cc76f75d33b77f809b7852e82b0d44749b644f4f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "8023c0405eb2dbd42ae80cd6a5d47c9c6c42122afadd4f5888c0ad5dde54a9ee",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a2bddc0027cd30f0ed9f55460bce46b2306ff03b6ed9d677f85ad02c4cca8d56",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "4624d591383a8435621d69adafa96be97a436cca513bb4ac94ebdb6db29d1b00",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/commit-message-policy.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "25ce22101bd584f957723b7b4096f797652ee5e518673e257ba5454ed9fe3008",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/consumer-verify.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "590e02cdca84869e7c658fca13514024dae7a2819882afbfa6a7b1679e6b387f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "0bc159856bb1001e0a1dd011075c629705d3d54377418f90a7f7afcd36a28bb6",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "5f172295792c7b3b3c3406e419b6851a07576e6cd776e4de554867a0d6cdedb9",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "21b7d9f6875cd0e90d281a8abe52c7824b2c09c6bbe8d03a12b779cb9dab99a3",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "586be2bdd47da335416e707357e27cd63a7f189661014aa7b834c21a92bdf461",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "64cd5dbc6d62b875f11a6576d1ef91f5265ad0731f61f436d44588d44c2e6f57",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/darwin-requester-integration.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "8514119600f4ad7da165335d5be27df8c56de97fcc4dafaf28e529f9876d7e52",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/design-decision-bindings.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/doc-reader-course.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/doc-reader-default-observers.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/doc-reader-plan-scope.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "0130bcd6c1645273c6a31eb6e1894b6c6dc9ba83f51383836749f4f2980c7a34",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "f93fae9e9638a148110e87f987c7e812c269f3f05744c0a55c7adbd72d1a4a4a",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "953d2da8b2ab2117041a293dd5048455c7ac17feba1d6b785803f9765eee9227",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/constants.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "052998e5dcad8161628dd8a4435d89149eb4e183ea8a0aecacc38c89629f05b6",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/gate-strength-lane.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a19f5cf1f73ea2511e379cdecd926780130a50b732e701dac95ffede1ad04ad2",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e9cc3e9f59985057b00d9abc6295f41361dcbc95b9d0feff53fbfe59837002e8",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "49d3ab05d33e1e4c4440f945234ae70c575b52c543e597dd16fee38be0e931af",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "34aa1bd5a1bd1ed6509cb383c423a05bdd382ce429bb16753a5a01bae9b0e362",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/interruption-promotion.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/interruption-receipt-store.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "f2916158bc27a30038db0e7a6ccf09edba729bf8cb4f1641f36dccb25291e2fd",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "016f17e4e793f620176a25608a44ebfa003b3aae591ada2d77bcd65feac2e29a",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e74c95581f117d03f06b233bae0a8a83bb822ef7726134ba620a30c46dfba8e8",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "0f30c44188cd76c864f785b0fe915089c2ee9b94092886f02a0e4e9dc1bf0393",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/model-family-authority.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a26ec5d3c3785b8bd32dd50197236e9106124956dd062cca2eb3d4e3dad29518",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "0e5bd3554720a34c96f8a49f8ebe1962776cb448b06b54d4719ca7703ce80bec",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/model-family-invocation.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d4d398eb2303b51d791d710dda7d1448787296d9bb32e49b6d048b7d9cfd35d2",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "78e2ef73537498b459d9a77acb1b9bf8e9e515a21c5ed580429e0592837d8853",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "8880e1b725f9c83276394637d1f673c10ef36a777c78374ac3ed006955af4ab9",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a3d3d0083ef6d1c4be5db4a0bfc112c12e381f4ba1f87b397a10eacd86331001",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "5706e798616ae3909846d190c586cc85b601b38161226e42935bf48e09a36ba0",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-goldfish-host-observation.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d9d2e535d56de5cbe370f792a815317b556ef2cf380dd1f92c53e5b5395ab613",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "bb6b2eaa460ca09f6fbfbd9821780d2871e0868c6e26802d00ee8add59c7c613",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b1eb62d7f167995744d843557df7cf9471a7e719a4252b7561d94e15f4c0dcef",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "1d0e3e3ee27a413787b4a1c4c940f2ba56367dc85a18af94a9704ad895dad808",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native/darwin-requester-observer.c",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/observation-doc-classification.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/onboarding-argv-shapes.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "494955d7dd939f732bffa3b1d5686a16f1b0d4de6371c110e24d8031644a56ff",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/owned-continuity-verification.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "63ecfa14f1c5ea02214c9a79a619066853d7e5ace22c6ed3cb3541e74b0af2de",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "8af97f8b6026234575184c8ebfcebc2c1594a6944b3fef37cca98147e86bbd0f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/protected-test-paths.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "395fdc0846d1f97dee68a71030d672b4fb482234e4fac0eb5ea80bac4c56152d",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/report-source-readers.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/review-economy.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "0820196d0427988d12932a855a4afb168271a26efb9b7f971d98d8e3d98820b4",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/review-economy.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b6a3c16652152c5105f971d63c875669d7a5ed624d917bd9f8dd368fe528238a",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "da4528ec81d39052484ffecf8434369dd192e0cecfa7b580bd632e858fbc46ea",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "1b36005298a13b0eb78b5602572f26ffa09ddd67d6cb96a7648df579d6ba232f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/scratch-package-staging.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/scratch-retention.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "01baa676983f1a93e617cb2f3e334af0cddbc8b386ade534f9e5b7f7e43f9601",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-authority-observers.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b6918047beb20748a58b0625efdb2135fe0a5063e96f39ba85d7518805dadf00",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-power.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "c26890face66f58b93d378979d2bf3f547f4d39abc1e1837c8f95c07e74ffec2",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/slice-queue.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "54769d92730856c467daaf6ea3df0bddd7e9c7fed39a5e1c4c4fd40bb65e8146",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/slice-queue.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "44cc0c03db29046d41b077da8ddf64a07cfb8f8ca7304fa5619b6c67b69d9d91",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/staged-observation-doc-classification.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/verify-owning-controller-route.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/verify-run-record.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "52b724b613b1a4584dc771dec89d54529a0b57f1626b7e9dc941cb89078e52fb",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/verify-suite-registration.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "32593ce27aa0d5feb7f2d92a31ed91075ee47d41d4e52ad05f08b13905276fed",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/windows-native-process-observer.ps1",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/windows-owned-authority-native.ps1",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/windows-process-identity.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/windows-requester-runtime.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a02336e0483d0590d625be7a8030ba8734d5ab6e4c5817df90db6268e4d21640",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/plugin.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "748dea42c7a9711e3dea3787352a1d87afb3b3ff04ebac50fedd8fb97d558af6",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/reader-inputs/manifest.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/reader-inputs/observation-doc-governance.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/reader-inputs/product-capability-inventory.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/reader-inputs/reader-review-protocol.md",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/roles/critic.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "ca1adea71c3fba9185336409d57c69e13526f59893be2a920806d0eb60783cc0",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/roles/elephant.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "95aebbf70ee386c076efde60745702e011e9eed6e0a4212973e7b54212c85e8e",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/roles/goldfish.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "02ab6b5f2bdeb25c5a7f4da2b2473586201664a84eb36bac3d45ba44f43242c9",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/agy-host-observed-finalize.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e1ff6e9ad8d4e13048c7396f763431a5f903e5e38425ba6a740f3521d4c1be41",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b44f0c1f6114f664e3033981dfafd8c6391f10a65cfff0d2441d54e86184a33e",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/check-backlog-state.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "5043d0bbd47fcd4f0edcf264d04c938b6f99568e328b5f2af1e142e08050ee9e",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "549e26230caf3a5a76f9560c87ead0d3bca2f5724de2ab9000a2c6db2e7caadf",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "67f273adc53fdbe1c0383ad960bfe53636faf36e2f0955a23194bae9ea94a8b4",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "32bb3728ffb6423b317efc1edd0a68f7730e38d4abc060e8c43e40833dd7eb77",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "1082c2318149ed50b7a5210b7ea1fbef1401157b712cb3fa7368f23e10b903a4",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e19f4dbea32d4c9d65ad7f855248b5fbf036088b70ebd5bc1bdfab1620dd5faa",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a6152f4313e1e72da519f135107faf7af5dc9e8e82b4caae9356f27a41306502",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "fdbfa4b7f734e338c2487cabaff71f5deab01239b232e3c8a5b1b95597490ebc",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "87ab6f1c47f529191929b341f24d82cc50994132fc07ad7a75d2d0b067eb8368",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/doc-reader-course.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "f9515393c5db4e1370e1998eaf65211b4aeda1af8c1a761e157b5ff45a0ef65e",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/existing-public-anchor-fixtures/cases.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/existing-public-anchor.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "bdd0b171eb02375893b7f2c0416ef8824086bcc219bc91627cc10081bfd7be82",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/guard-human-override.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "7d1f0a0b87840c279e155bc83bdecf12275d2f5b2ea53c7ec900b128d00f31e5",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d6495ab13e2d3d87c60fca73cb30cc112fb0ec2dea399e5a1ebd0ce31c8cea24",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/interruption-promotion.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "91e36ae14666db1a6aca9c9ebf4372c7b6605efafbc85a8232c3fdf25f7cbe15",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/onboarding-init.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "95334f693f879d43c18903aa57f79c89bc9b8ad6e21ab1fe2ca8755d52752c40",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/osv-deadline-disconnect-controls.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/osv-guard-refusal-controls.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/osv-owned-file-controls.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/osv-suite-source-controls.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/owned-continuity-verification.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/owning-verification-controller.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/phoenix-authority-revision.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "edb5a5855b6275b81ee7438d32a00feb57d238a1d10be229aa4ec84bae8a37de",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "6a89acd711265e7b86e38cfcca84accf811fabbc154ff63f85bd1a0cf568c65b",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "107766ea18455f8a37084c8684b446bc4b77a91436f3b16277aa57d12ce02cc5",
+        "mode": 493
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "3ee290571522bff299675250e376322115bd4e4a81cbe5f7cc7af75862439755",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "7a705a110535a937e552caa3f34485959046f242cf0884ce830d874446db4200",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "392ffb2abc3bf68318bf85c36d95978c51d983684cc6ea5c89bf5a56418c6a00",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/quality-package-materializer.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "0fbe60e5c85644f1ae2725fe5394195cfa8f51cdbe766df1c420414781b716c7",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/report-interruptions.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e5c519414b8716c853b7e29bf60f9b280f95c214efb2f7eed84a3ef433431bde",
+        "mode": 493
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/review-attempt.schema.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b5307cfd7194538b0a3e14e20b8efff595e6b958364754878a7272f4cb60818b",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/rigor-floor.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "2962994fec8c556a180edccdaef141a78d8d779b8107ebcb1fc3b716d3c15269",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "fcce222b8ef54cc8f64f18f6bb9e105e84df9b471ea6c7adae0a8176996ac0c6",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/scratch-sweep.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "5a7507fb85b9dc7f17640eb1ac7347a4b9938dec08e9d9e1a712d68abd2e0a4f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "9d60fdcbb310d533248741a581945fddcc7fc54d275e97c8f263af4858001159",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "6d3c4b8a0f1d58c04174f3a46b8b12b6486eb466ae198e50c88318f0fca3517d",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/session-cleanup.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "1084009c790f7c8f0884f3cd6c0ec5a7303aabde478340dd112f45fa916ada36",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "cd5ed934902daa3668ccab9791ee905afd826e80ebd876fa465c3e8f050965b7",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/session-power-controller.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "8d8175ff63b032d032bb157e71d3fa676a4df43e132febe8489390005f737569",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/session-power.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "15f2f882a1433e96f559e73e0f75124f1dd40e0217578f696187546ecbb5dbc2",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/base-p16.fixture.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/presentation-cases.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method-cases.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method.fixture.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/staged-p16.fixture.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/state-owner.fixture.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority-cases.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority.fixture.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-cases.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-physical-method-cases.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/typed-hgo-cases.mjs",
+        "status": "ABSENT"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/slice-queue.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "51a8a7b197ff67282ed8306ff0bdbe129d8a4ce95099df9d9dde6e3c777acdc1",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d06b295a1991269c2e8ae883172f67860ce7c4163bd7151f87dc1d63b9b2d2c8",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "a0269e2af2323f408973f15f9a8015eeba41e32d56625ef7d3bda342ea0e9381",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "b18d0ca8ff65ef413ee002497b8c504e0e6d679426b48d5031219df28941fc62",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/verify-journal.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "db2097a83fda0858d6c9b6f4bacb16569e25a3dcbe19c9a620f8914ef340c010",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "70fdbefcad9f87a6f08569c1d6c92bee8aefd421490013e3d584d6c6896f6ad1",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/skills/architecture-decision/SKILL.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "6351ccaa587149b8b57da89a393f695fe6345976ebc9e6109a2749e611d1caaf",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "82299c1ae805bc890e47b750c88369593a1aad6e4f7a03c68f808ffc3b9f4316",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "7286eccd7712e6023cc252766a0b5c1e6f2f4db77c77903af4b4d582f7c31066",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "89f73f21e99f43bc524b065815f713f5e2f29b3e7c97e7103f78aeac459bf5d9",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "4403bca7526862f0a4937e4f718f6d2637d04eac7d525f2406ed43081d6fd39d",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/skills/reader-review/SKILL.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "e78fb1b08df9e7e6755d9dccfae7a3f726c11c09bd54f35a253252acba9ece54",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/templates/prompts/agent-obligations.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "991ed5b11d79d1e3a095bed1c4414724fed03478e5d2254e9be6c112e15bac8f",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d463b1b92fb7329b3515e47640b2e8e85f85f866c126c137cc716702d1af7f3e",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/templates/prompts/elephant-kickoff.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "fd4f882fd473690441f887e20b0989575b7b978220e4baa7dbb992e8321db1e5",
+        "mode": 420
+      },
+      {
+        "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "095f1c24ef174a404984dcfefcc27bcd41d995e4017e2758546f5623e3f2d213",
+        "mode": 420
+      },
+      {
+        "path": "policies/model-policy.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "7b5f84273a14e190b0c3f26878a3dcc831dab65d2066ef050b98bc4eb4d4fe6d",
+        "mode": 420
+      },
+      {
+        "path": "roles/critic.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "ca1adea71c3fba9185336409d57c69e13526f59893be2a920806d0eb60783cc0",
+        "mode": 420
+      },
+      {
+        "path": "roles/elephant.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "95aebbf70ee386c076efde60745702e011e9eed6e0a4212973e7b54212c85e8e",
+        "mode": 420
+      },
+      {
+        "path": "roles/goldfish.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "02ab6b5f2bdeb25c5a7f4da2b2473586201664a84eb36bac3d45ba44f43242c9",
+        "mode": 420
+      },
+      {
+        "path": "schemas/pipeline.rigor-journal-entry.v1.json",
+        "status": "ABSENT"
+      },
+      {
+        "path": "templates/prompts/agent-obligations.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "991ed5b11d79d1e3a095bed1c4414724fed03478e5d2254e9be6c112e15bac8f",
+        "mode": 420
+      },
+      {
+        "path": "templates/prompts/critic-review.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "d463b1b92fb7329b3515e47640b2e8e85f85f866c126c137cc716702d1af7f3e",
+        "mode": 420
+      },
+      {
+        "path": "templates/prompts/elephant-kickoff.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "fd4f882fd473690441f887e20b0989575b7b978220e4baa7dbb992e8321db1e5",
+        "mode": 420
+      },
+      {
+        "path": "templates/prompts/goldfish-task.md",
+        "status": "base-byte-mode-CAS-matched",
+        "sha256": "095f1c24ef174a404984dcfefcc27bcd41d995e4017e2758546f5623e3f2d213",
+        "mode": 420
+      }
+    ],
+    "privateHostPathPublished": false
+  },
+  "actualGitParsedTargetCount": 317,
+  "expectedTargetCount": 317,
+  "fullTargetSetMatched": true,
+  "numstatExitCode": 0,
+  "patchApplied": false,
+  "indexWritten": false,
+  "sourceModified": false,
+  "sourcePostimageReadbacks": 317
+}

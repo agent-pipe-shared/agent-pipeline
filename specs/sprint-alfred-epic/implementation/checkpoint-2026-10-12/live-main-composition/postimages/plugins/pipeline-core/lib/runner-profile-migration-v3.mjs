@@ -1,0 +1,1295 @@
+// SPDX-License-Identifier: SUL-1.0
+
+/**
+ * One-way v0/v1/v2 -> v3 runner-profile migration.
+ *
+ * The public plan contains digests only.  Target bytes stay in a WeakMap and
+ * can be applied only by passing the unchanged in-process plan together with
+ * an explicit activation flag.  All runtime projections are renamed before
+ * pipeline.user.yaml, and every handled failure restores every preimage.
+ */
+import { createHash, randomUUID } from "node:crypto";
+import {
+  accessSync,
+  closeSync,
+  constants,
+  existsSync,
+  fsyncSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  renameSync,
+  rmdirSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  hasCodexRuntimeControlMount,
+  readCodexHostRepositoryInitAdmission,
+} from "./codex-host-layout.mjs";
+// One seed for both manifest tiers.  This is an intentional import cycle
+// (project-onboarding-v3.mjs imports this module); every use is lazy.
+import { freshCalibrationBytes, freshManifestBytes, freshSettingsJsonBytes } from "./project-onboarding-v3.mjs";
+import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./runner-profile-migration-v2.mjs";
+import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
+import { CORE_OWNED_V3_SURFACES, RUNNER_PROFILES_V3_REGISTRY_SHA256, loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import {
+  codexCustomAgentSeed,
+  loadRuntimeProjectionV3OwnedKeys,
+  planRuntimeProjectionV3,
+} from "./runtime-projection-v3.mjs";
+import {
+  attestRecoveryPreviewDelivery,
+  createRecoveryPreviewInvocation,
+} from "./recovery-preview-attestation.mjs";
+import { parseYaml } from "./yaml-lite.mjs";
+
+const SOURCE_FILE = "pipeline.user.yaml";
+const AUTHORITY_LOCK_FILE = ".agent-pipeline/core.lock.json";
+const TXN_DIR = ".pipeline-runner-profile-migration-v3";
+const LOCK_DIR = ".pipeline-runner-profile-migration-v3.lock";
+const JOURNAL_FILE = "journal.json";
+const JOURNAL_SCHEMA = "pipeline.runner-profile-migration-journal.v3";
+const PLAN_SCHEMA = "pipeline.runner-profile-migration-plan.v3";
+const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
+const INSPECT_SCHEMA = "pipeline.runner-profile-migration-inspect.v3";
+const RECOVERY_PLAN_SCHEMA = "pipeline.runner-profile-migration-recovery-plan.v3";
+const RECOVERY_AUTHORIZATION_SCHEMA = "pipeline.runner-profile-migration-recovery-authorization.v3";
+const PREWRITE_PREVIEW_SCHEMA = "pipeline.runner-profile-migration-prewrite-preview.v3";
+const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
+const SHA256 = /^[0-9a-f]{64}$/u;
+// Exact predecessor of the additive 0.7 pure-read duty. This is not a generic
+// "older version" bypass: only its complete Core-owned route and export
+// preimage may advance through the explicit migration transaction.
+const READ_DUTY_PREDECESSOR_REGISTRY_SHA256 = "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5";
+const OID = /^[0-9a-f]{40}$/u;
+const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
+const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
+const AUTHENTICATED_PLANS = new WeakMap();
+const AUTHENTICATED_RECOVERY_PLANS = new WeakMap();
+const AUTHENTICATED_RECOVERY_AUTHORIZATIONS = new WeakMap();
+const LEGACY_CLASSIFIER_BASELINES = Object.freeze({
+  ".claude/settings.json": "{}\n",
+  ".claude/pipeline.json": "{}\n",
+  ".claude/pipeline.yaml": "modelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
+  ".codex/config.toml": "# classifier baseline\n",
+  ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+  ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
+  ".codex/agents/consult-advisor.toml": "",
+});
+// These seeds exist only in authenticated legacy -> V3 planning memory. They
+// contain the minimum syntax required by the byte-preserving renderer and are
+// never written before the V3-owned values replace them. The settings target
+// is preserve-only for existing bytes; when it is absent, the resolver below
+// obtains the fresh onboarding permission seed from its single owner.
+const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
+  // Legacy consumer onboarding supports a project with no generated runtime
+  // projections. These are renderer inputs only: planning keeps them in
+  // memory, reports absent preimages, and the existing activation transaction
+  // is the sole writer. Do not reuse the Slim Overlay calibration here; a
+  // legacy project must derive its public runtime projection from its source.
+  ".claude/settings.json": "{}\n",
+  ".claude/pipeline.json": "{}\n",
+  // The runtime manifest seed is deliberately ABSENT here: it is not this
+  // dictionary's to restate. `.claude/pipeline.yaml` is a preserve-only
+  // target for the YAML renderer (replaceClaudeTarget() in
+  // runtime-projection-v3.mjs owns only modelRouting/criticExport/
+  // session.keep_awake/language.human_facing; its `gates:` chapter is never
+  // computed -- whatever the baseline seed carries for `gates:` is exactly
+  // what a freshly materialized project keeps). A second, gates-less literal
+  // here previously let a legacy migration with no prior `.claude/pipeline.yaml`
+  // (an intentionally supported "cold" first materialization, see the comment
+  // above) write a manifest with NO gates chapter at all -- unlike the
+  // host-managed-Codex branch below, that write is never filtered out, so it
+  // reaches disk (backlog/items/2026-08-08-two-manifest-literals-still-bypass-
+  // the-single-seed-owner.md, wave-2 investigation, 2026-08-18). resolveLegacyRuntimeSeed()
+  // below routes this one key through freshManifestBytes() instead, the same
+  // single owner slimRuntimeSeed() already uses for slim V3 initialization.
+  ".codex/config.toml": "",
+  ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+  ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
+  ".codex/agents/consult-advisor.toml": "",
+});
+// Single owner for `.claude/pipeline.yaml` across every branch of
+// runtimeBaselines() that can seed it for an absent target -- the legacy
+// (v0/v1/v2) branch and the host-managed-Codex branch both resolve through
+// this function instead of restating the manifest bytes a second time. See
+// the comment on LEGACY_V3_RUNTIME_SEEDS above for why a second literal here
+// was unsafe (backlog/items/2026-08-08-two-manifest-literals-still-bypass-
+// the-single-seed-owner.md).
+function resolveLegacyRuntimeSeed(relative) {
+  if (relative === ".claude/pipeline.yaml") return freshManifestBytes();
+  if (relative === ".claude/settings.json") return freshSettingsJsonBytes();
+  return LEGACY_V3_RUNTIME_SEEDS[relative];
+}
+// A slim private overlay can carry the complete, already-valid V3 source while
+// deliberately omitting every ignored runtime projection. These in-memory
+// baselines contain only the syntax needed by the byte-preserving renderer.
+// They are opt-in at planning, are never used for a present target, and the
+// resulting authenticated plan still records every seeded preimage as absent.
+const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
+  ".claude/settings.json": "{}\n",
+  // A private overlay is itself a governed project.  Seed the complete
+  // portable calibration so a freshly activated overlay satisfies the same
+  // F4 bootstrap contract on every machine.  The V3 renderer owns only
+  // humanRoles.po.displayLabel and preserves these calibration keys on later
+  // refreshes.
+  // This literal is correct ONLY for a private overlay activating itself --
+  // see the `overlayCalibration` parameter below. An ordinary consumer
+  // project's slim runtime initialization must never receive this; it gets
+  // freshCalibrationBytes() (project-onboarding-v3.mjs) instead, resolved by
+  // slimRuntimeSeed() the same way the manifest seed is resolved just below.
+  ".claude/pipeline.json": `${JSON.stringify({
+    project: "agent-pipeline-private-overlay",
+    verify: "git diff --check HEAD",
+    handover: "docs/state.md",
+    autonomy: "gated",
+    branchModel: "feature-branch",
+    worktree: "optional",
+    stakes: "private-overlay",
+    constraints: ["Public Core owns the runtime projection; private overlay policy may add constraints."],
+  }, null, 2)}\n`,
+  // The runtime manifest seed is deliberately ABSENT here: it is not this
+  // module's to restate.  A freshly onboarded project seeds its neutral-tier
+  // `project/pipeline.yaml` from freshManifestBytes(), and a second literal
+  // here made the legacy compatibility tier disagree with it the moment the
+  // gate chapter was added to the neutral seed alone -- which is how a kickoff
+  // receipt came to bind a manifest without a `gates` chapter while the
+  // validator read one with it.  slimRuntimeSeed() resolves it from that one
+  // owner instead.
+  ".codex/config.toml": "",
+  ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+  ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
+  ".codex/agents/consult-advisor.toml": "",
+});
+// Resolved per use, never at module evaluation: project-onboarding-v3.mjs
+// imports this module, so the import cycle leaves its module-level bindings
+// uninitialized while this module's body runs.  By the time a slim V3
+// initialization needs a baseline, both modules are fully evaluated.
+//
+// Fresh runtime initialization holds no PO profile -- the migration API takes
+// none, and the kickoff binds the profile only at promotion, after this call
+// site -- so the profile-neutral default is the correct seed here.
+//
+// `overlayCalibration` separates the two SLIM_V3_RUNTIME_SEEDS callers by
+// INTENT, not by which operation happens to be running: a private overlay
+// activating itself (private-overlay-activation.mjs, the sole unconditional
+// `initializeMissingRuntimeForSlimV3: true` caller left after this fix) is the
+// only caller that may bind `.claude/pipeline.json` to the overlay's own
+// calibration. Defaulting it to `true` preserves that caller's behaviour
+// unchanged; every other slim V3 caller (an ordinary consumer project's
+// runtime initialization -- project-onboarding-v3.mjs) passes `false`
+// explicitly and gets the honest, unconfigured consumer placeholder instead.
+function slimRuntimeSeed(relative, { overlayCalibration = true, rootDir, deps } = {}) {
+  if (relative === ".claude/pipeline.yaml") return freshManifestBytes();
+  if (relative === ".claude/pipeline.json" && !overlayCalibration) {
+    // Ordinary consumer initialization retains the already selected neutral
+    // calibration, including intentional aliases and unowned fields.
+    const neutral = assertNoSymlink(rootDir, "project/pipeline.json", deps);
+    if (deps.existsSync(neutral)) {
+      const info = deps.lstatSync(neutral);
+      if (!info.isFile() || info.isSymbolicLink() || info.size > 1024 * 1024) throw new Error("neutral calibration is not a bounded regular file");
+      const bytes = deps.readFileSync(neutral);
+      if (!Buffer.isBuffer(bytes) || !Buffer.from(bytes.toString("utf8"), "utf8").equals(bytes)) throw new Error("neutral calibration is not UTF8");
+      return bytes.toString("utf8");
+    }
+    return freshCalibrationBytes({ rootDir, deps });
+  }
+  if (relative === ".claude/settings.json" && !overlayCalibration) return freshSettingsJsonBytes();
+  return SLIM_V3_RUNTIME_SEEDS[relative];
+}
+// Direction 2 of backlog/items/2026-08-08-two-manifest-literals-still-bypass-
+// the-single-seed-owner.md asked whether "what does a fresh project get"
+// (SLIM_V3_RUNTIME_SEEDS / slimRuntimeSeed() above) and "what does an
+// existing project's absent target get repaired to" (LEGACY_V3_RUNTIME_SEEDS
+// / resolveLegacyRuntimeSeed() above) should collapse into one seed table,
+// now that both already resolve `.claude/pipeline.yaml` from the same single
+// owner, freshManifestBytes(). Investigated for this fix and NOT unified,
+// because the divergence that is left is meaningful, not accidental
+// duplication: slimRuntimeSeed() answers a fresh-initialization question
+// that has no legacy-repair analogue -- "is THIS caller the private overlay
+// activating itself" (the `overlayCalibration` parameter, see the comment
+// above this function) -- and returns the overlay's own committed
+// calibration literal for that one caller (private-overlay-activation.mjs)
+// or freshCalibrationBytes() for every other slim caller. A legacy v0/v1/v2
+// source or a host-managed-Codex v3 project is, by definition, never a
+// private overlay activating itself: it is an EXISTING consumer project
+// whose absent target is being repaired, not a project choosing its own
+// calibration identity at first materialization. resolveLegacyRuntimeSeed()
+// therefore has nothing to branch on for `.claude/pipeline.json` and
+// correctly falls back to the flat `"{}\n"` placeholder LEGACY_V3_RUNTIME_
+// SEEDS carries for every legacy/repair caller alike. The two seed tables
+// also fire under different trigger conditions (sourceKind alone selects
+// the legacy/host-managed-Codex branch in runtimeBaselines(); the slim
+// branch additionally requires the caller's explicit
+// `initializeMissingRuntimeForSlimV3` opt-in). Folding both tables into one
+// function would mean plumbing the overlay-activation distinction into code
+// paths where it is meaningless (legacy/repair) or silently dropping it --
+// exactly the "one function answering both questions" shape the item warned
+// would make a future literal feel unsafe to remove. So the two concepts
+// stay separate tables on purpose; only the sub-question they actually share
+// -- which `gates` chapter `.claude/pipeline.yaml` gets -- is unified, and it
+// already is, through freshManifestBytes() in both resolveLegacyRuntimeSeed()
+// and slimRuntimeSeed().
+
+class IntentionalMigrationInterruption extends Error {
+  constructor(target) { super(`intentional interruption after ${target}`); this.name = "IntentionalMigrationInterruption"; }
+}
+
+function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
+function clone(value) { return JSON.parse(JSON.stringify(value)); }
+function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function stable(value) {
+  if (Array.isArray(value)) return value.map(stable);
+  if (isObject(value)) return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+  return value;
+}
+function same(left, right) { return JSON.stringify(stable(left)) === JSON.stringify(stable(right)); }
+function diagnostic(path, code, message, repair) { return { path, code, message, repair }; }
+function permissionFailure(error) { return ["EACCES", "EPERM", "EROFS"].includes(error?.code); }
+function result(status, diagnostics = [], extra = {}) {
+  return { schema: PLAN_SCHEMA, status, source: SOURCE_FILE, diagnostics, requiresExplicitActivation: true, ...extra };
+}
+function dependencies(overrides = {}) {
+  return {
+    accessSync, closeSync, constants, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync,
+    readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, rmSync, unlinkSync,
+    writeFileSync, process: globalThis.process, ...overrides,
+  };
+}
+
+function exactObject(value, keys) {
+  return isObject(value) && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
+}
+function validAuthorityLockBytes(bytes) {
+  let lock;
+  try { lock = JSON.parse(bytes); } catch { return false; }
+  if (!exactObject(lock, ["$schema", "source", "plugin"])
+    || lock.$schema !== "pipeline.core-lock.v1"
+    || !exactObject(lock.source, ["repository", "branch", "commit", "tree"])
+    || !exactObject(lock.plugin, ["name", "version", "manifest_sha256"])) return false;
+  if (typeof lock.source.repository !== "string" || typeof lock.source.branch !== "string"
+    || !OID.test(lock.source.commit) || !OID.test(lock.source.tree)
+    || !PLUGIN_NAME.test(lock.plugin.name) || !PLUGIN_VERSION.test(lock.plugin.version)
+    || !SHA256.test(lock.plugin.manifest_sha256)) return false;
+  try {
+    const repository = new URL(lock.source.repository);
+    return repository.protocol === "https:" && repository.username === "" && repository.password === "" && repository.search === "" && repository.hash === "";
+  } catch { return false; }
+}
+
+function safeRoot(rootDir, deps) {
+  if (typeof rootDir !== "string" || rootDir.length === 0) throw new Error("root must be a non-empty path");
+  const requested = resolve(rootDir);
+  const info = deps.lstatSync(requested);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("root must be a real project directory");
+  return deps.realpathSync(requested);
+}
+function safePath(root, relative) {
+  if (typeof relative !== "string" || !SAFE_RELATIVE.test(relative)) throw new Error("unsafe project-relative path");
+  const target = resolve(root, relative);
+  if (target !== root && !target.startsWith(`${root}${sep}`)) throw new Error("project path escapes selected root");
+  return target;
+}
+function assertNoSymlink(root, relative, deps) {
+  const target = safePath(root, relative);
+  let cursor = root;
+  for (const component of relative.split("/")) {
+    cursor = join(cursor, component);
+    try {
+      const info = deps.lstatSync(cursor);
+      if (info.isSymbolicLink()) throw new Error(`project path contains a symbolic link: ${relative}`);
+      if (cursor !== target && !info.isDirectory()) throw new Error(`project path has a non-directory parent: ${relative}`);
+    } catch (error) {
+      if (error?.code === "ENOENT") return target;
+      throw error;
+    }
+  }
+  return target;
+}
+function sourceInfo(root, deps) {
+  const path = assertNoSymlink(root, SOURCE_FILE, deps);
+  const info = deps.lstatSync(path);
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error("pipeline.user.yaml must be a regular project-local file");
+  return { path, bytes: deps.readFileSync(path, "utf8") };
+}
+function digestPath(path, deps) {
+  if (!deps.existsSync(path)) return { status: "absent", sha256: null, byteLength: 0 };
+  const info = deps.lstatSync(path);
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error("target is not a regular file");
+  const bytes = deps.readFileSync(path, "utf8");
+  return { status: "present", sha256: sha256(bytes), byteLength: Buffer.byteLength(bytes, "utf8") };
+}
+
+function runtimePaths() {
+  const manifest = loadRuntimeProjectionV3OwnedKeys();
+  if (!isObject(manifest) || !Array.isArray(manifest.targets) || manifest.targets.length === 0) throw new Error("V3 runtime ownership manifest is unavailable");
+  const paths = manifest.targets.map((target) => target?.path);
+  if (paths.some((path) => typeof path !== "string" || !SAFE_RELATIVE.test(path)) || new Set(paths).size !== paths.length) throw new Error("V3 runtime ownership manifest has unsafe or duplicate targets");
+  return paths;
+}
+function neutralAuthorityMirrorPaths() {
+  const mirrors = loadRuntimeProjectionV3OwnedKeys().neutralAuthorityMirrors;
+  if (mirrors !== undefined && !Array.isArray(mirrors)) throw new Error("V3 neutral authority mirror manifest is invalid");
+  const paths = (mirrors ?? []).map((mirror) => mirror?.path);
+  if (paths.some((path) => typeof path !== "string" || !SAFE_RELATIVE.test(path)) || new Set(paths).size !== paths.length) throw new Error("V3 neutral authority mirror manifest has unsafe or duplicate paths");
+  if (paths.some((path) => runtimePaths().includes(path))) throw new Error("V3 neutral authority mirror manifest overlaps runtime ownership");
+  return paths;
+}
+function hasDurableHostInitAdmission(root, deps) {
+  try {
+    try {
+      deps.lstatSync(join(root, ".codex"));
+      return false;
+    } catch (error) {
+      if (error?.code !== "ENOENT") return false;
+    }
+    return readCodexHostRepositoryInitAdmission(root, {
+      lstat: deps.lstatSync,
+      readFile: deps.readFileSync,
+      platform: deps.process?.platform,
+    }) !== null;
+  } catch {
+    return false;
+  }
+}
+function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForSlimV3 = false, overlayCalibration = true, enabledRunners = [] } = {}) {
+  const legacy = ["v0", "v1", "v2"].includes(sourceKind);
+  const initializeSlimV3 = ["v3", "v3-refresh"].includes(sourceKind)
+    && initializeMissingRuntimeForSlimV3 === true;
+  const hostManagedCodex = ["v3", "v3-refresh"].includes(sourceKind)
+    && (
+      hasCodexRuntimeControlMount(root, {
+        access: deps.accessSync,
+        fsConstants: deps.constants,
+        lstat: deps.lstatSync,
+        readdir: deps.readdirSync,
+      })
+      || hasDurableHostInitAdmission(root, deps)
+    );
+  const baselines = {};
+  const seeded = new Set();
+  for (const relative of runtimePaths()) {
+    const target = assertNoSymlink(root, relative, deps);
+    if (!deps.existsSync(target)) {
+      const seed = legacy
+        ? resolveLegacyRuntimeSeed(relative)
+        : initializeSlimV3 ? slimRuntimeSeed(relative, { overlayCalibration, rootDir: root, deps })
+          // Disabled native Codex targets are renderer inputs only. They are
+          // neither required on disk nor published into a non-Codex project.
+          : !enabledRunners.includes("codex") && relative.startsWith(".codex/")
+            ? slimRuntimeSeed(relative, { overlayCalibration, rootDir: root, deps })
+          // A reserved Codex mount supplies `.codex` at runtime.  Missing
+          // Claude compatibility projections are renderer baselines only in
+          // this mode; they must not make a freshly project-seeded root
+          // invalid or become implicit portable output.
+          : hostManagedCodex ? resolveLegacyRuntimeSeed(relative)
+            : undefined;
+      if (typeof seed !== "string") throw new Error(`declared runtime baseline is missing: ${relative}`);
+      baselines[relative] = { status: "present", bytes: seed };
+      seeded.add(relative);
+      continue;
+    }
+    const info = deps.lstatSync(target);
+    if (!info.isFile() || info.isSymbolicLink()) throw new Error(`declared runtime baseline is not a regular file: ${relative}`);
+    baselines[relative] = { status: "present", bytes: deps.readFileSync(target, "utf8") };
+  }
+  // `project/*` is not a runtime target creator: it is an existing-only
+  // neutral authority mirror.  Still supply a present mirror to the same
+  // authenticated plan that updates its legacy runtime source, so its owned
+  // keys receive the transaction's preimage, changed-since-plan and rollback
+  // protections.  An absent mirror intentionally contributes no baseline --
+  // runtime-projection-v3 then emits no target and no project authority is
+  // created by this migration.
+  for (const relative of neutralAuthorityMirrorPaths()) {
+    const target = assertNoSymlink(root, relative, deps);
+    if (!deps.existsSync(target)) continue;
+    const info = deps.lstatSync(target);
+    if (!info.isFile() || info.isSymbolicLink()) throw new Error(`declared neutral authority mirror is not a regular file: ${relative}`);
+    baselines[relative] = { status: "present", bytes: deps.readFileSync(target, "utf8") };
+  }
+  return { baselines, seeded, hostManagedCodex };
+}
+
+function renderScalar(value) {
+  if (typeof value === "string") return JSON.stringify(value).replace(/</gu, "\\u003c").replace(/>/gu, "\\u003e");
+  if (typeof value === "boolean" || Number.isInteger(value)) return String(value);
+  if (value === null) return "null";
+  throw new Error("unsupported YAML scalar");
+}
+function renderYaml(value, indent = "") {
+  if (Array.isArray(value)) return value.map((item) => (isObject(item) || Array.isArray(item))
+    ? `${indent}-\n${renderYaml(item, `${indent}  `)}`
+    : `${indent}- ${renderScalar(item)}\n`).join("");
+  return Object.keys(value).sort().map((key) => {
+    const renderedKey = /^[A-Za-z][A-Za-z0-9_-]*$/u.test(key) ? key : renderScalar(key);
+    const item = value[key];
+    return isObject(item) || Array.isArray(item)
+      ? `${indent}${renderedKey}:\n${renderYaml(item, `${indent}  `)}`
+      : `${indent}${renderedKey}: ${renderScalar(item)}\n`;
+  }).join("");
+}
+
+function v3IntentFromV2(v2) {
+  const registry = loadRunnerProfilesV3Registry();
+  return {
+    schema: "pipeline.user.v3",
+    core_registry_sha256: RUNNER_PROFILES_V3_REGISTRY_SHA256,
+    language: clone(v2.language),
+    agent_runtime: v2.agent_runtime,
+    runners: clone(v2.runners),
+    routing: { profiles: clone(registry.profiles), duties: clone(registry.duties) },
+    usage: clone(v2.usage),
+    autonomy: clone(v2.autonomy),
+    gates: clone(v2.gates),
+    critic_export: clone(registry.criticExportPolicy),
+    roles: { po: { display_label: "Human" } },
+    session: { keep_awake: true },
+    advisor_export: { consent: "approved" },
+  };
+}
+
+// Recovers a V3 source that has fallen behind the current Public-Core
+// registry -- as opposed to one that is genuinely invalid -- by refreshing
+// every Core-owned surface named in CORE_OWNED_V3_SURFACES (runner-profiles-
+// v3.mjs, next to the registry it describes). Each surface is refreshed
+// wholesale, never merged field-by-field: a closed Public-Core authority can
+// only be replaced as one whole registered value, the same way a routing
+// entry always was. Nothing outside that table is ever read, written, or
+// compared here -- a future Core-owned surface needs exactly one new table
+// entry, never a new branch in this function.
+function refreshKnownV3RegistryDelta(parsed) {
+  const registry = loadRunnerProfilesV3Registry();
+  // A present binding from an unknown Core registry is not an old project
+  // default we may overwrite. In particular, an older installed plugin must
+  // never rewrite a newer project's model routes during bootstrap.
+  const previousBinding = parsed.core_registry_sha256;
+  const boundToKnownPredecessor = previousBinding === READ_DUTY_PREDECESSOR_REGISTRY_SHA256;
+  if (Object.hasOwn(parsed, "core_registry_sha256")
+    && previousBinding !== RUNNER_PROFILES_V3_REGISTRY_SHA256) {
+    if (!boundToKnownPredecessor || !Object.hasOwn(registry.duties, "read")) return null;
+    const oldDuties = clone(registry.duties);
+    delete oldDuties.read;
+    if (!same(parsed.routing, { profiles: registry.profiles, duties: oldDuties })
+      || !same(parsed.critic_export, registry.criticExportPolicy)) return null;
+  }
+  const candidate = clone(parsed);
+  const compatibilityDeltas = [];
+  if (boundToKnownPredecessor) {
+    candidate.core_registry_sha256 = RUNNER_PROFILES_V3_REGISTRY_SHA256;
+    compatibilityDeltas.push({ name: "known-v3-read-duty-registry-upgrade",
+      path: "core_registry_sha256", from: previousBinding,
+      to: RUNNER_PROFILES_V3_REGISTRY_SHA256 });
+  }
+
+  for (const surface of CORE_OWNED_V3_SURFACES) {
+    const present = Object.hasOwn(parsed, surface.path);
+    const refreshedValue = surface.registryValue(registry);
+    if (present && same(parsed[surface.path], refreshedValue)) continue;
+    candidate[surface.path] = refreshedValue;
+    const delta = present ? surface.staleDelta : surface.absentDelta;
+    compatibilityDeltas.push({ name: delta.name, path: surface.path, from: delta.from, to: delta.to });
+  }
+
+  if (compatibilityDeltas.length === 0) return null;
+  const validation = validatePipelineUserV3(candidate, { source: SOURCE_FILE });
+  if (!validation.ok) return null;
+  return {
+    intent: candidate,
+    compatibilityDeltas,
+  };
+}
+
+/**
+ * Reuse the already hardened legacy classifier without exposing its private
+ * staged bytes: migrate an isolated ephemeral copy to v2, read the validated
+ * result, then remove the copy.  The selected project remains read-only.
+ */
+function legacyToV2(sourceBytes, deps) {
+  const scratch = deps.mkdtempSync(join(tmpdir(), "pipeline-v3-classify-"));
+  try {
+    for (const relative of runtimePaths()) {
+      const target = join(scratch, relative);
+      deps.mkdirSync(dirname(target), { recursive: true });
+      const baseline = LEGACY_CLASSIFIER_BASELINES[relative];
+      if (typeof baseline !== "string") throw new Error(`legacy classifier has no safe baseline for ${relative}`);
+      deps.writeFileSync(target, baseline, "utf8");
+    }
+    deps.writeFileSync(join(scratch, SOURCE_FILE), sourceBytes, "utf8");
+    const plan = planRunnerProfileMigrationV2({ rootDir: scratch });
+    if (!['ready', 'noop'].includes(plan.status)) return { diagnostics: plan.diagnostics ?? [] };
+    const applied = applyRunnerProfileMigrationV2(plan, { rootDir: scratch, activate: true });
+    if (!['applied', 'noop'].includes(applied.status)) return { diagnostics: applied.diagnostics ?? [] };
+    const parsed = parseYaml(deps.readFileSync(join(scratch, SOURCE_FILE), "utf8"));
+    const validation = validatePipelineUserV2(parsed, { source: SOURCE_FILE });
+    return validation.ok ? { intent: parsed } : { diagnostics: validation.errors };
+  } finally {
+    deps.rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+function classify(root, deps) {
+  const source = sourceInfo(root, deps);
+  let parsed;
+  try { parsed = parseYaml(source.bytes); } catch { return { source, diagnostics: [diagnostic("$", "yaml_parse", "pipeline.user.yaml is not valid yaml-lite input", "repair the source YAML")] }; }
+  if (!isObject(parsed)) return { source, diagnostics: [diagnostic("$", "invalid_source", "source root must be an object", "restore one accepted source shape")] };
+  if (parsed.schema === "pipeline.user.v3") {
+    const validation = validatePipelineUserV3(parsed, { source: SOURCE_FILE });
+    if (validation.ok) return { source, kind: "v3", intent: clone(parsed), compatibilityDeltas: [] };
+    const refresh = refreshKnownV3RegistryDelta(parsed);
+    return refresh
+      ? { source, kind: "v3-refresh", ...refresh }
+      : { source, diagnostics: validation.errors };
+  }
+  if (parsed.schema === "pipeline.user.v2") {
+    const validation = validatePipelineUserV2(parsed, { source: SOURCE_FILE });
+    if (!validation.ok) return { source, diagnostics: validation.errors };
+    return {
+      source, kind: "v2", intent: v3IntentFromV2(parsed),
+      compatibilityDeltas: [{ name: "runner-neutral-advisory-v3", path: "routing", oldProfile: "design", newProfile: "epic", advisory: "duty-authority" }],
+    };
+  }
+  const legacy = legacyToV2(source.bytes, deps);
+  if (!legacy.intent) return { source, diagnostics: legacy.diagnostics ?? [diagnostic("$", "legacy_conversion", "legacy source cannot be converted", "repair the accepted v0/v1 source")] };
+  return {
+    source, kind: parsed.schema === "pipeline.user.v1" ? "v1" : "v0", intent: v3IntentFromV2(legacy.intent),
+    compatibilityDeltas: [{ name: "runner-neutral-advisory-v3", path: "routing", oldProfile: "design", newProfile: "epic", advisory: "duty-authority" }],
+  };
+}
+
+export function inspectRunnerProfileMigrationV3({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+  const deps = dependencies(overrides);
+  let root;
+  try { root = safeRoot(rootDir, deps); } catch (error) {
+    return { schema: INSPECT_SCHEMA, status: "invalid-root", diagnostics: [diagnostic("$.root", "unsafe_root", error.message, "supply one real project directory")] };
+  }
+  try { requireNoPendingTransaction(root, deps); } catch (error) {
+    return { schema: INSPECT_SCHEMA, status: "recovery-required", root, diagnostics: [diagnostic("$.transaction", "recovery_failed", error.message, "repair the V3 journal before retrying")] };
+  }
+  try {
+    const classified = classify(root, deps);
+    if (!classified.intent) return { schema: INSPECT_SCHEMA, status: "invalid-source", root, source: SOURCE_FILE, diagnostics: classified.diagnostics };
+    return { schema: INSPECT_SCHEMA, status: "ready", root, source: SOURCE_FILE, sourceSha256: sha256(classified.source.bytes), sourceKind: classified.kind, compatibilityDeltas: classified.compatibilityDeltas, diagnostics: [] };
+  } catch (error) {
+    return { schema: INSPECT_SCHEMA, status: "invalid-source", root, source: SOURCE_FILE, diagnostics: [diagnostic("$", "source_unreadable", error.message, "supply a readable project-local source")] };
+  }
+}
+
+function publicSignature(value) {
+  const ancestors = new WeakSet();
+  function encode(item) {
+    if (item === null) return ["null"];
+    if (["string", "boolean", "number", "undefined"].includes(typeof item)) return [typeof item, item];
+    if (typeof item !== "object" || ancestors.has(item)) throw new Error("plan public data is not acyclic plain data");
+    const prototype = Object.getPrototypeOf(item);
+    if (prototype !== Object.prototype && prototype !== Array.prototype) throw new Error("plan public data has an unsupported prototype");
+    if (Object.getOwnPropertySymbols(item).length > 0) throw new Error("plan public data has unsupported symbol properties");
+    ancestors.add(item);
+    const properties = Object.getOwnPropertyNames(item).sort().map((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(item, key);
+      if (!descriptor || !("value" in descriptor)) throw new Error("plan public data has an accessor property");
+      return [key, descriptor.enumerable, descriptor.configurable, descriptor.writable, encode(descriptor.value)];
+    });
+    ancestors.delete(item);
+    return [Array.isArray(item) ? "array" : "object", properties];
+  }
+  return JSON.stringify(encode(value));
+}
+function remember(publicPlan, targets) {
+  AUTHENTICATED_PLANS.set(publicPlan, { signature: publicSignature(publicPlan), root: publicPlan.root, sourceSha256: publicPlan.sourceSha256, status: publicPlan.status, changes: clone(publicPlan.changes), targets: clone(targets) });
+  return publicPlan;
+}
+function authenticated(plan) {
+  if (!isObject(plan)) return null;
+  const state = AUTHENTICATED_PLANS.get(plan);
+  if (!state) return null;
+  try { return publicSignature(plan) === state.signature ? state : null; } catch { return null; }
+}
+function preWriteMetadata(target) {
+  if (target.kind === "source") {
+    return {
+      dataClass: "portable-project-intent",
+      logicalTargetRoot: "project-root",
+      trackingStatus: "repository-policy-dependent",
+      ownerMode: "source-authority",
+    };
+  }
+  if (target.kind === "authority-lock") {
+    return {
+      dataClass: "public-core-authority-lock",
+      logicalTargetRoot: ".agent-pipeline",
+      trackingStatus: "repository-policy-dependent",
+      ownerMode: "authority-update-only",
+    };
+  }
+  const manifest = loadRuntimeProjectionV3OwnedKeys();
+  const manifestTarget = manifest.targets.find((entry) => entry.path === target.path);
+  if (manifestTarget) {
+    return {
+      dataClass: "project-runtime-projection",
+      logicalTargetRoot: target.path.startsWith(".claude/") ? ".claude" : ".codex",
+      trackingStatus: "repository-policy-dependent",
+      ownerMode: manifestTarget.ownedKeys.length === 0 ? "preserve-only" : "owned-keys-preserve-unowned",
+    };
+  }
+  const mirrorTarget = manifest.neutralAuthorityMirrors?.find((entry) => entry.path === target.path);
+  if (mirrorTarget) {
+    return {
+      dataClass: "project-runtime-projection",
+      logicalTargetRoot: "project",
+      trackingStatus: "repository-policy-dependent",
+      ownerMode: "owned-keys-preserve-unowned",
+    };
+  }
+  throw new Error(`V3 pre-write metadata has no declared runtime target: ${target.path}`);
+}
+function publicTarget(target) {
+  return {
+    path: target.path,
+    kind: target.kind,
+    preWrite: preWriteMetadata(target),
+    before: target.before,
+    after: target.after,
+    changed: target.before.sha256 !== target.after.sha256,
+  };
+}
+
+export function planRunnerProfileMigrationV3({
+  rootDir = process.cwd(),
+  deps: overrides = {},
+  initializeMissingRuntimeForSlimV3 = false,
+  authorityLockBytes = undefined,
+  // Defaults `true` for backward compatibility with every caller left
+  // unchanged by this parameter's introduction (private-overlay-activation.mjs
+  // and the CLI/tests that pre-date it) -- all of them ARE a private overlay
+  // activating itself. A caller seeding an ordinary consumer project's runtime
+  // (project-onboarding-v3.mjs) MUST pass `false` explicitly; see
+  // slimRuntimeSeed() in this module for what each value seeds.
+  overlayCalibration = true,
+} = {}) {
+  const deps = dependencies(overrides);
+  let root;
+  try { root = safeRoot(rootDir, deps); } catch (error) { return result("invalid-root", [diagnostic("$.root", "unsafe_root", error.message, "supply one real project directory")], { targets: [], changes: [] }); }
+  try { requireNoPendingTransaction(root, deps); }
+  catch (error) { return result("recovery-required", [diagnostic("$.transaction", "recovery_failed", error.message, "deliver an authenticated recovery preview before retrying")], { root, targets: [], changes: [] }); }
+  let classified;
+  try { classified = classify(root, deps); } catch (error) { return result("invalid-source", [diagnostic("$", "source_parse", error.message, "repair pipeline.user.yaml")], { root, targets: [], changes: [] }); }
+  if (!classified.intent) return result("invalid-source", classified.diagnostics, { root, targets: [], changes: [] });
+  const validation = validatePipelineUserV3(classified.intent, { source: SOURCE_FILE });
+  if (!validation.ok) return result("invalid-intent", validation.errors, { root, sourceKind: classified.kind, targets: [], changes: [] });
+  let projection; let seeded; let hostManagedCodex;
+  try {
+    const runtime = runtimeBaselines(root, deps, classified.kind, { initializeMissingRuntimeForSlimV3, overlayCalibration, enabledRunners: classified.intent.runners.enabled });
+    seeded = runtime.seeded;
+    hostManagedCodex = runtime.hostManagedCodex;
+    projection = planRuntimeProjectionV3(classified.intent, { source: SOURCE_FILE, baselines: runtime.baselines });
+  } catch (error) {
+    return result("invalid-baseline", [diagnostic("$.runtime", "baseline_read", error.message, "repair declared V3 runtime targets")], { root, sourceKind: classified.kind, targets: [], changes: [] });
+  }
+  if (projection.status !== "ready") return result(projection.status, projection.diagnostics ?? [], { root, sourceKind: classified.kind, targets: [], changes: [], decisionConflicts: projection.decisionConflicts });
+  if (authorityLockBytes !== undefined && (typeof authorityLockBytes !== "string" || !validAuthorityLockBytes(authorityLockBytes))) {
+    return result("invalid-authority-lock", [diagnostic("$.authorityLock", "invalid_authority_lock", "authority lock update is not one accepted core.lock.json", "supply one rendered core.lock.json from the authenticated authority update")], { root, sourceKind: classified.kind, targets: [], changes: [] });
+  }
+  const renderedSource = classified.kind === "v3" ? classified.source.bytes : renderYaml(classified.intent);
+  // The neutral/Claude authority targets remain the portable project
+  // projection. Native Codex agent targets belong only to projects that
+  // explicitly enable Codex. A fresh Claude or Antigravity project must not
+  // acquire a Codex restart barrier or a missing-Codex-target diagnostic.
+  const codexEnabled = classified.intent.runners.enabled.includes("codex");
+  const projectedTargets = projection.targets.filter((target) =>
+    (!hostManagedCodex || !target.path.startsWith(".claude/"))
+    && (codexEnabled || !target.path.startsWith(".codex/")));
+  const internal = projectedTargets.map((target) => ({
+    path: target.path,
+    kind: "runtime",
+    bytes: target.after.bytes,
+    before: seeded.has(target.path)
+      ? { status: "absent", sha256: null, byteLength: 0 }
+      : target.before,
+    after: { status: target.after.status, sha256: target.after.sha256, byteLength: target.after.byteLength },
+  })).sort((left, right) => left.path.localeCompare(right.path));
+  if (authorityLockBytes !== undefined) {
+    const lockPath = assertNoSymlink(root, AUTHORITY_LOCK_FILE, deps);
+    const before = digestPath(lockPath, deps);
+    if (before.status !== "present") {
+      return result("invalid-authority-lock", [diagnostic("$.authorityLock", "authority_lock_missing", "private overlay authority lock is missing", "restore .agent-pipeline/core.lock.json before the authority update")], { root, sourceKind: classified.kind, targets: [], changes: [] });
+    }
+    internal.push({
+      path: AUTHORITY_LOCK_FILE,
+      kind: "authority-lock",
+      bytes: authorityLockBytes,
+      before,
+      after: { status: "present", sha256: sha256(authorityLockBytes), byteLength: Buffer.byteLength(authorityLockBytes, "utf8") },
+    });
+  }
+  internal.push({ path: SOURCE_FILE, kind: "source", bytes: renderedSource, before: { status: "present", sha256: sha256(classified.source.bytes), byteLength: Buffer.byteLength(classified.source.bytes, "utf8") }, after: { status: "present", sha256: sha256(renderedSource), byteLength: Buffer.byteLength(renderedSource, "utf8") } });
+  const targets = internal.map(publicTarget);
+  const changes = targets.filter((target) => target.changed);
+  return remember(result(changes.length === 0 ? "noop" : "ready", [], {
+    root, sourceKind: classified.kind, sourceSha256: sha256(classified.source.bytes), intentSha256: sha256(JSON.stringify(stable(classified.intent))), compatibilityDeltas: classified.compatibilityDeltas, decisionConflicts: projection.decisionConflicts ?? [], runtimeMode: hostManagedCodex ? "host-managed-codex" : "standard", targets, changes,
+    activation: { required: changes.length > 0, command: "apply --activate", sourceCommittedLast: true },
+    nextAction: changes.length > 0 ? {
+      kind: "command",
+      executable: "node",
+      argv: [MIGRATION_SCRIPT, "apply", "--root", root, "--activate"],
+      mutation: true,
+      requiresConfirmation: false,
+      expected: {
+        schema: PLAN_SCHEMA,
+        statuses: ["applied", "noop"],
+      },
+    } : null,
+  }), internal);
+}
+
+/**
+ * Render the canonical V3 manifest from the authenticated source and slim
+ * runtime seeds. This is deliberately read-only and is used by recovery when
+ * the manifest target alone is absent.
+ */
+export function renderCanonicalV3Manifest({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+  const plan = planRunnerProfileMigrationV3({ rootDir, deps: overrides, initializeMissingRuntimeForSlimV3: true });
+  if (plan.status === "noop") {
+    try {
+      const path = join(realpathSync(rootDir), ".claude/pipeline.yaml");
+      const bytes = readFileSync(path, "utf8");
+      return { status: "ready", bytes, sha256: sha256(bytes), byteLength: Buffer.byteLength(bytes, "utf8") };
+    } catch (error) { return { status: "invalid-baseline", diagnostics: [{ path: "$.targets", code: "manifest_render_missing", message: error.message, repair: "repair the complete V3 runtime projection" }] }; }
+  }
+  if (plan.status !== "ready") return { status: plan.status, diagnostics: plan.diagnostics ?? [] };
+  const authenticatedPlan = authenticated(plan);
+  const target = authenticatedPlan?.targets?.find((entry) => entry.path === ".claude/pipeline.yaml");
+  if (!target || typeof target.bytes !== "string") return { status: "invalid-baseline", diagnostics: [{ path: "$.targets", code: "manifest_render_missing", message: "canonical V3 manifest projection is unavailable", repair: "repair the complete V3 runtime projection" }] };
+  return { status: "ready", bytes: target.bytes, sha256: target.after.sha256, byteLength: target.after.byteLength };
+}
+
+// "r+", not "r": a Windows handle opened read-only has no write-back to flush, so
+// fsync fails closed with EPERM even though this handle only syncs bytes this
+// process just wrote. "r+" is correct and portable; behaves like "r" on POSIX.
+function fsyncFile(path, deps) { const fd = deps.openSync(path, "r+"); try { deps.fsyncSync(fd); } finally { deps.closeSync(fd); } }
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
+function fsyncDirectory(path, deps) {
+  let fd;
+  try {
+    fd = deps.openSync(path, "r");
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
+  try {
+    deps.fsyncSync(fd);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  } finally {
+    deps.closeSync(fd);
+  }
+}
+function writeDurable(path, bytes, deps) { deps.writeFileSync(path, bytes, { encoding: "utf8", mode: 0o600 }); fsyncFile(path, deps); }
+function transactionPaths(root) { const transaction = safePath(root, TXN_DIR); return { transaction, lock: safePath(root, LOCK_DIR), journal: join(transaction, JOURNAL_FILE) }; }
+function remove(path, deps) { if (deps.existsSync(path)) deps.rmSync(path, { recursive: true, force: true }); }
+function isDead(pid, deps) { if (!Number.isInteger(pid) || pid <= 1) return false; try { deps.process.kill(pid, 0); return false; } catch (error) { return error?.code === "ESRCH"; } }
+function acquireLock(root, deps) {
+  assertNoSymlink(root, LOCK_DIR, deps);
+  const { lock } = transactionPaths(root);
+  try { deps.mkdirSync(lock, { mode: 0o700 }); } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    let owner; try { owner = JSON.parse(deps.readFileSync(join(lock, "owner.json"), "utf8")); } catch { throw new Error("V3 migration lock has no valid owner"); }
+    if (!isDead(owner?.pid, deps)) throw new Error("V3 migration lock is held by a live or unverifiable owner");
+    remove(lock, deps); deps.mkdirSync(lock, { mode: 0o700 });
+  }
+  writeDurable(join(lock, "owner.json"), `${JSON.stringify({ schema: JOURNAL_SCHEMA, pid: deps.process.pid })}\n`, deps);
+  fsyncDirectory(lock, deps);
+  return lock;
+}
+function releaseLock(lock, deps) { remove(lock, deps); }
+function durableJournal(root, record, deps) { const { transaction, journal } = transactionPaths(root); writeDurable(journal, `${JSON.stringify(record)}\n`, deps); fsyncDirectory(transaction, deps); }
+function missingTargetDirectories(root, targets, deps) {
+  const missing = new Set();
+  for (const target of targets) {
+    const parent = dirname(target.path);
+    if (parent === ".") continue;
+    let relative = "";
+    for (const component of parent.split("/")) {
+      relative = relative ? `${relative}/${component}` : component;
+      const path = assertNoSymlink(root, relative, deps);
+      if (!deps.existsSync(path)) { missing.add(relative); continue; }
+      const info = deps.lstatSync(path);
+      if (!info.isDirectory() || info.isSymbolicLink()) throw new Error(`target parent is not a real directory: ${relative}`);
+    }
+  }
+  return [...missing].sort((left, right) => left.split("/").length - right.split("/").length || left.localeCompare(right));
+}
+function validateDirectoryBoundary(directories, targets) {
+  if (!Array.isArray(directories)) throw new Error("V3 transaction has no directory boundary");
+  const allowed = new Set(targets.flatMap((target) => {
+    const parts = dirname(target.path).split("/");
+    if (parts.length === 1 && parts[0] === ".") return [];
+    return parts.map((_, index) => parts.slice(0, index + 1).join("/"));
+  }));
+  let previousDepth = 0;
+  const seen = new Set();
+  for (const entry of directories) {
+    const depth = typeof entry?.path === "string" ? entry.path.split("/").length : 0;
+    if (!isObject(entry) || !SAFE_RELATIVE.test(entry.path) || !allowed.has(entry.path) || seen.has(entry.path)
+      || !["pending", "created"].includes(entry.state) || depth < previousDepth) {
+      throw new Error("V3 transaction has an invalid directory boundary");
+    }
+    seen.add(entry.path); previousDepth = depth;
+  }
+}
+function validateTargetBoundary(entries) {
+  // A host-managed-Codex plan filters `.claude/` paths out of its runtime
+  // targets before authentication (planRunnerProfileMigrationV3's
+  // `projectedTargets`, same predicate) because that tier is host-owned, not
+  // migration-owned, on that branch. This validator is the untrusted-input
+  // boundary for both `prepare()` and journal recovery, so it does not trust
+  // an externally supplied mode flag: it accepts only an exact match against
+  // one of the two canonical, freshly recomputed runtime target lists -- the
+  // full runtime-ownership set, or that same set with every `.claude/` path
+  // removed. Present declared neutral mirrors are an existing-only extension
+  // of either list: they are admitted only by their frozen manifest path and
+  // only with a present preimage, so this boundary cannot create authority.
+  const full = runtimePaths().sort((a, b) => a.localeCompare(b));
+  const hostManagedCodex = full.filter((path) => !path.startsWith(".claude/"));
+  const nonCodex = full.filter((path) => !path.startsWith(".codex/"));
+  const mirrorPaths = new Set(neutralAuthorityMirrorPaths());
+  const hasAuthorityLock = entries?.at(-2)?.path === AUTHORITY_LOCK_FILE && entries?.at(-2)?.kind === "authority-lock";
+  if (!Array.isArray(entries)) throw new Error("V3 transaction has an incomplete target boundary");
+  if (entries.at(-1)?.path !== SOURCE_FILE || entries.at(-1)?.kind !== "source") throw new Error("V3 transaction does not commit source last");
+  const runtime = entries.slice(0, hasAuthorityLock ? -2 : -1);
+  if (runtime.some((entry) => entry.kind !== "runtime")) throw new Error("V3 transaction differs from the owned runtime boundary");
+  const paths = runtime.map((entry) => entry.path);
+  if (new Set(paths).size !== paths.length) throw new Error("V3 transaction differs from the owned runtime boundary");
+  const corePaths = paths.filter((path) => full.includes(path));
+  const expectedCore = corePaths.length === full.length && full.every((path) => corePaths.includes(path)) ? full
+    : corePaths.length === hostManagedCodex.length && hostManagedCodex.every((path) => corePaths.includes(path)) ? hostManagedCodex
+      : corePaths.length === nonCodex.length && nonCodex.every((path) => corePaths.includes(path)) ? nonCodex
+      : null;
+  if (!expectedCore) throw new Error("V3 transaction has an incomplete target boundary");
+  const mirrors = runtime.filter((entry) => mirrorPaths.has(entry.path));
+  if (paths.length !== corePaths.length + mirrors.length
+    || mirrors.some((entry) => entry.before?.status !== "present")) {
+    throw new Error("V3 transaction differs from the owned runtime boundary");
+  }
+  const expected = [...expectedCore, ...mirrors.map((entry) => entry.path)].sort((left, right) => left.localeCompare(right));
+  if (paths.length !== expected.length || paths.some((path, index) => path !== expected[index])) throw new Error("V3 transaction differs from the owned runtime boundary");
+}
+function imageMatches(actual, expected) {
+  return isObject(expected) && actual.status === expected.status && actual.sha256 === expected.sha256 && actual.byteLength === expected.byteLength;
+}
+function validImage(image) {
+  return isObject(image)
+    && image.status === "present"
+    && /^[a-f0-9]{64}$/u.test(image.sha256)
+    && Number.isInteger(image.byteLength)
+    && image.byteLength >= 0;
+}
+/** Validate every untrusted journal proof before recovery can write a target. */
+function validateJournal(root, record, deps) {
+  assertNoSymlink(root, TXN_DIR, deps);
+  if (!isObject(record) || record.schema !== JOURNAL_SCHEMA || !["prepared", "applying", "rolling-back", "rolled-back", "complete"].includes(record.state)) throw new Error("V3 transaction journal is corrupt");
+  validateTargetBoundary(record.targets);
+  validateDirectoryBoundary(record.directories, record.targets);
+  const { transaction } = transactionPaths(root);
+  for (const entry of record.directories) {
+    const path = assertNoSymlink(root, entry.path, deps);
+    if (!deps.existsSync(path)) {
+      if (entry.state === "created") throw new Error(`V3 journal directory disappeared: ${entry.path}`);
+      continue;
+    }
+    const info = deps.lstatSync(path);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error(`V3 journal directory is not real: ${entry.path}`);
+  }
+  for (const [index, entry] of record.targets.entries()) {
+    if (!isObject(entry) || !["unchanged", "staged", "committing", "renamed"].includes(entry.state) || !validImage(entry.after)) throw new Error(`V3 journal target ${index} has incomplete staged proof`);
+    if (!isObject(entry.before) || !["present", "absent"].includes(entry.before.status)) throw new Error(`V3 journal target ${index} has incomplete preimage proof`);
+    if (entry.before.status === "present" && !validImage(entry.before)) throw new Error(`V3 journal target ${index} has invalid preimage digest`);
+    if (entry.before.status === "absent" && (entry.before.sha256 !== null || entry.before.byteLength !== 0)) throw new Error(`V3 journal target ${index} has invalid absent preimage`);
+    if (entry.state === "unchanged") {
+      if (entry.stage !== null || entry.backup !== null || entry.displaced !== null || !same(entry.before, entry.after)) throw new Error(`V3 journal target ${index} has invalid unchanged proof`);
+      const target = assertNoSymlink(root, entry.path, deps);
+      if (!imageMatches(digestPath(target, deps), entry.before)) throw new Error(`V3 journal target ${index} changed despite an unchanged proof`);
+      continue;
+    }
+    if (!/^stage-[0-9]{3}$/u.test(entry.stage)
+      || (entry.backup !== null && !/^preimage-[0-9]{3}$/u.test(entry.backup))
+      || (entry.displaced !== null && !/^displaced-[0-9]{3}$/u.test(entry.displaced))) throw new Error(`V3 journal target ${index} has unsafe proof filenames`);
+    if ((entry.before.status === "present") !== (entry.backup !== null)) throw new Error(`V3 journal target ${index} has inconsistent backup authority`);
+    if ((entry.before.status === "present") !== (entry.displaced !== null)) throw new Error(`V3 journal target ${index} has inconsistent displacement authority`);
+    const target = assertNoSymlink(root, entry.path, deps);
+    const actual = digestPath(target, deps);
+    const isBefore = imageMatches(actual, entry.before);
+    const isAfter = imageMatches(actual, entry.after);
+    const stage = join(transaction, entry.stage);
+    if (!deps.existsSync(stage)) throw new Error(`V3 journal target ${index} lost its staged proof`);
+    const stageInfo = deps.lstatSync(stage);
+    if (!stageInfo.isFile() || stageInfo.isSymbolicLink() || !imageMatches(digestPath(stage, deps), entry.after)) throw new Error(`V3 journal target ${index} has corrupt staged proof`);
+    if (entry.before.status === "present") {
+      const backup = join(transaction, entry.backup);
+      const info = deps.lstatSync(backup);
+      if (!info.isFile() || info.isSymbolicLink() || sha256(deps.readFileSync(backup, "utf8")) !== entry.before.sha256) throw new Error(`V3 journal target ${index} has corrupt preimage proof`);
+      const displaced = join(transaction, entry.displaced);
+      if (deps.existsSync(displaced) && !imageMatches(digestPath(displaced, deps), entry.before)) throw new Error(`V3 journal target ${index} has corrupt displaced preimage`);
+    }
+    const displacedPresent = entry.displaced !== null && deps.existsSync(join(transaction, entry.displaced));
+    const acceptedCommitGap = entry.state === "committing" && entry.before.status === "present" && displacedPresent && actual.status === "absent";
+    if (!isBefore && !isAfter && !acceptedCommitGap) throw new Error(`V3 journal target ${index} matches neither recorded image`);
+    if (entry.state === "staged" && displacedPresent) throw new Error(`V3 journal target ${index} displaced before commit authority`);
+    if (entry.state === "renamed" && entry.before.status === "present" && !displacedPresent) throw new Error(`V3 journal target ${index} lost its displaced preimage`);
+  }
+}
+function prepare(root, targets, deps) {
+  validateTargetBoundary(targets);
+  const directories = missingTargetDirectories(root, targets, deps);
+  const { transaction } = transactionPaths(root);
+  if (deps.existsSync(transaction)) throw new Error("V3 transaction directory already exists");
+  deps.mkdirSync(transaction, { mode: 0o700 }); fsyncDirectory(root, deps);
+  const entries = [];
+  try {
+    for (const [index, target] of targets.entries()) {
+      const path = assertNoSymlink(root, target.path, deps);
+      const actual = digestPath(path, deps);
+      if (!same(actual, target.before)) throw new Error(`target changed since planning: ${target.path}`);
+      if (same(target.before, target.after)) {
+        entries.push({ path: target.path, kind: target.kind, before: actual, stage: null, backup: null, displaced: null, after: target.after, state: "unchanged" });
+        continue;
+      }
+      const stage = `stage-${String(index).padStart(3, "0")}`;
+      const backup = `preimage-${String(index).padStart(3, "0")}`;
+      const displaced = `displaced-${String(index).padStart(3, "0")}`;
+      writeDurable(join(transaction, stage), target.bytes, deps);
+      if (actual.status === "present") writeDurable(join(transaction, backup), deps.readFileSync(path, "utf8"), deps);
+      entries.push({ path: target.path, kind: target.kind, before: actual, stage, backup: actual.status === "present" ? backup : null, displaced: actual.status === "present" ? displaced : null, after: target.after, state: "staged" });
+    }
+    fsyncDirectory(transaction, deps);
+    const record = { schema: JOURNAL_SCHEMA, state: "prepared", directories: directories.map((path) => ({ path, state: "pending" })), targets: entries };
+    durableJournal(root, record, deps);
+    return record;
+  } catch (error) {
+    if (!deps.existsSync(join(transaction, JOURNAL_FILE))) { remove(transaction, deps); fsyncDirectory(root, deps); }
+    throw error;
+  }
+}
+function linkProofToAbsentTarget(proof, target, expected, deps) {
+  deps.linkSync(proof, target);
+  fsyncFile(target, deps); fsyncDirectory(dirname(target), deps);
+  if (!imageMatches(digestPath(target, deps), expected)) throw new Error("exclusive proof restore produced the wrong image");
+  deps.unlinkSync(proof); fsyncDirectory(dirname(proof), deps);
+}
+function quarantineTarget(target, transaction, entry, expected, deps) {
+  const quarantine = join(transaction, `rollback-${sha256(entry.path).slice(0, 16)}`);
+  if (deps.existsSync(quarantine)) throw new Error(`rollback quarantine already exists: ${entry.path}`);
+  deps.renameSync(target, quarantine); fsyncDirectory(dirname(target), deps); fsyncDirectory(transaction, deps);
+  const captured = digestPath(quarantine, deps);
+  if (!imageMatches(captured, expected)) {
+    // The target changed after the last observation. Put those external bytes
+    // back with an exclusive link and retain no second mutable hard link.
+    linkProofToAbsentTarget(quarantine, target, captured, deps);
+    throw new Error(`target changed during rollback: ${entry.path}`);
+  }
+  return quarantine;
+}
+function restore(root, record, deps) {
+  record.state = "rolling-back"; durableJournal(root, record, deps);
+  const { transaction } = transactionPaths(root);
+  for (const entry of record.targets) {
+    if (["unchanged", "staged"].includes(entry.state)) continue;
+    const target = assertNoSymlink(root, entry.path, deps);
+    const actual = digestPath(target, deps);
+    if (imageMatches(actual, entry.before)) { entry.state = "staged"; durableJournal(root, record, deps); continue; }
+    if (entry.before.status === "absent") {
+      if (actual.status === "absent") { entry.state = "staged"; durableJournal(root, record, deps); continue; }
+      if (!imageMatches(actual, entry.after)) throw new Error(`external target cannot be removed during rollback: ${entry.path}`);
+      const quarantine = quarantineTarget(target, transaction, entry, entry.after, deps);
+      deps.unlinkSync(quarantine); fsyncDirectory(transaction, deps);
+      entry.state = "staged"; durableJournal(root, record, deps);
+      continue;
+    }
+    const displaced = join(transaction, entry.displaced);
+    if (!deps.existsSync(displaced) || !imageMatches(digestPath(displaced, deps), entry.before)) throw new Error(`displaced preimage is unavailable: ${entry.path}`);
+    if (actual.status === "present") {
+      if (!imageMatches(actual, entry.after)) throw new Error(`external target cannot be overwritten during rollback: ${entry.path}`);
+      const quarantine = quarantineTarget(target, transaction, entry, entry.after, deps);
+      deps.unlinkSync(quarantine); fsyncDirectory(transaction, deps);
+    }
+    linkProofToAbsentTarget(displaced, target, entry.before, deps);
+    entry.state = "staged"; durableJournal(root, record, deps);
+  }
+  for (const entry of [...record.directories].reverse()) {
+    // A pending directory may have appeared concurrently after prepare. Only
+    // the journal's created state is authority to remove a directory.
+    if (entry.state !== "created") continue;
+    const path = assertNoSymlink(root, entry.path, deps);
+    if (!deps.existsSync(path)) continue;
+    const info = deps.lstatSync(path);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error(`created directory cannot be restored: ${entry.path}`);
+    deps.rmdirSync(path);
+    fsyncDirectory(dirname(path), deps);
+  }
+  record.state = "rolled-back"; durableJournal(root, record, deps); remove(transaction, deps); fsyncDirectory(root, deps);
+}
+function recoverRecord(root, record, deps) {
+  const { transaction } = transactionPaths(root);
+  if (record.state === "complete" || record.state === "rolled-back") {
+    remove(transaction, deps); fsyncDirectory(root, deps); return { status: "cleanup" };
+  }
+  restore(root, record, deps); return { status: "recovered" };
+}
+function requireNoPendingTransaction(root, deps, { allowLock = false } = {}) {
+  const { journal, transaction, lock } = transactionPaths(root);
+  assertNoSymlink(root, TXN_DIR, deps);
+  assertNoSymlink(root, LOCK_DIR, deps);
+  if (deps.existsSync(journal)) throw new Error("V3 pending recovery requires an authenticated pre-write preview");
+  if (!allowLock && deps.existsSync(lock)) throw new Error("V3 migration lock exists without a recovery journal");
+  if (deps.existsSync(transaction)) throw new Error("V3 transaction directory exists without a recovery journal");
+}
+function recoveryResult(status, diagnostics = [], extra = {}) {
+  return { schema: RECOVERY_PLAN_SCHEMA, status, diagnostics, requiresExplicitActivation: true, ...extra };
+}
+function rememberRecovery(publicPlan, root, journalSha256, record) {
+  AUTHENTICATED_RECOVERY_PLANS.set(publicPlan, {
+    signature: publicSignature(publicPlan), root, journalSha256, record: clone(record), status: publicPlan.status,
+  });
+  return publicPlan;
+}
+function authenticatedRecovery(plan) {
+  if (!isObject(plan)) return null;
+  const state = AUTHENTICATED_RECOVERY_PLANS.get(plan);
+  if (!state) return null;
+  try { return publicSignature(plan) === state.signature ? state : null; } catch { return null; }
+}
+export function planPendingTransactionRecoveryV3({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+  const deps = dependencies(overrides);
+  let root;
+  try { root = safeRoot(rootDir, deps); } catch (error) {
+    return recoveryResult("invalid-root", [diagnostic("$.root", "unsafe_root", error.message, "supply one real project directory")], { directories: [], targets: [] });
+  }
+  const { journal, transaction, lock } = transactionPaths(root);
+  try {
+    assertNoSymlink(root, TXN_DIR, deps);
+    assertNoSymlink(root, LOCK_DIR, deps);
+    if (!deps.existsSync(journal)) {
+      if (deps.existsSync(lock)) throw new Error("V3 migration lock exists without a recovery journal");
+      if (deps.existsSync(transaction)) throw new Error("V3 transaction directory exists without a recovery journal");
+      return recoveryResult("none", [], { directories: [], targets: [] });
+    }
+    const journalBytes = deps.readFileSync(journal, "utf8");
+    const record = JSON.parse(journalBytes);
+    validateJournal(root, record, deps);
+    const cleanupOnly = ["complete", "rolled-back"].includes(record.state);
+    const targets = record.targets.map((entry) => ({
+      path: entry.path,
+      kind: entry.kind,
+      preWrite: preWriteMetadata(entry),
+      journalState: entry.state,
+      current: digestPath(assertNoSymlink(root, entry.path, deps), deps),
+      restoreTo: entry.before,
+      action: !cleanupOnly && ["committing", "renamed"].includes(entry.state) ? "restore-recorded-preimage" : "retain-current-image",
+    }));
+    const directories = record.directories.map((entry) => ({
+      path: entry.path,
+      journalState: entry.state,
+      action: !cleanupOnly && entry.state === "created" ? "remove-if-empty-after-target-restore" : "retain",
+    }));
+    return rememberRecovery(recoveryResult("ready", [], {
+      transaction: {
+        journalSchema: record.schema,
+        journalState: record.state,
+        journalSha256: sha256(journalBytes),
+        cleanupAfterRecovery: true,
+      },
+      directories,
+      targets,
+    }), root, sha256(journalBytes), record);
+  } catch (error) {
+    return recoveryResult("recovery-required", [diagnostic("$.transaction", "recovery_plan_failed", error.message, "repair the V3 journal before retrying")], { directories: [], targets: [] });
+  }
+}
+function recoveryPreWritePreview(plan) {
+  return {
+    schema: PREWRITE_PREVIEW_SCHEMA,
+    status: "pre-write-preview",
+    operation: "recovery",
+    recovery: plan.transaction,
+    activation: { requested: true, restoresRecordedPreimages: true },
+    directories: plan.directories,
+    targets: plan.targets,
+  };
+}
+export function authorizePendingTransactionRecoveryV3(plan, { deliverPreview } = {}) {
+  const state = authenticatedRecovery(plan);
+  if (!state || state.status !== "ready") return recoveryResult("invalid-plan", [diagnostic("$", "invalid_plan", "recovery authorization accepts only an unchanged in-process V3 recovery plan", "plan recovery again")]);
+  if (typeof deliverPreview !== "function") return recoveryResult("preview-required", [diagnostic("$.preWritePreview", "preview_required", "recovery requires caller-delivered pre-write preview acknowledgement", "deliver the complete recovery preview and return its exact acknowledgement")]);
+  const preview = recoveryPreWritePreview(plan);
+  const previewSha256 = sha256(JSON.stringify(stable(preview)));
+  // The invocation identity must be fresh per authorization attempt, not a
+  // function of journal state: a deterministic id lets a caller replay a
+  // cached acknowledgement from an earlier delivery for the same unchanged
+  // journal and earn an unauthorized "authorized". The random nonce makes a
+  // stale acknowledgement fail RP-INVOCATION-MISMATCH; the journal-digest
+  // prefix is retained only for correlation. Both parts stay inside SAFE_ID's
+  // 100-character bound with room for caller-side `ack-`/`cli-` prefixes.
+  const invocation = createRecoveryPreviewInvocation({
+    invocationId: `recovery-${state.journalSha256.slice(0, 32)}-${randomUUID()}`,
+    previewDigest: previewSha256,
+  });
+  const delivery = attestRecoveryPreviewDelivery({
+    invocation,
+    callback: (binding) => deliverPreview(clone(preview), binding),
+  });
+  if (!delivery.ok) {
+    return recoveryResult("preview-failed", [diagnostic(
+      "$.preWritePreview",
+      delivery.code.toLowerCase(),
+      "pre-write preview channel failed before recovery",
+      "deliver the complete preview and return a matching acknowledgement before recovery",
+    )]);
+  }
+  if (authenticatedRecovery(plan) !== state) return recoveryResult("invalid-plan", [diagnostic("$", "invalid_plan", "recovery plan changed during preview delivery", "plan recovery again")]);
+  const authorization = {
+    schema: RECOVERY_AUTHORIZATION_SCHEMA,
+    status: "authorized",
+    journalSha256: state.journalSha256,
+    previewSha256,
+  };
+  AUTHENTICATED_RECOVERY_AUTHORIZATIONS.set(authorization, {
+    signature: publicSignature(authorization), plan, recoveryState: state,
+  });
+  return authorization;
+}
+export function applyPendingTransactionRecoveryV3(plan, { rootDir = process.cwd(), authorization, deps: overrides = {} } = {}) {
+  const state = authenticatedRecovery(plan);
+  const authorizationState = isObject(authorization) ? AUTHENTICATED_RECOVERY_AUTHORIZATIONS.get(authorization) : null;
+  if (!state || state.status !== "ready") return recoveryResult("invalid-plan", [diagnostic("$", "invalid_plan", "recovery accepts only an unchanged in-process V3 recovery plan", "plan recovery again")]);
+  if (!authorizationState) return recoveryResult("authorization-required", [diagnostic("$.authorization", "authorization_required", "recovery requires a closed preview authorization", "deliver the recovery preview and pass its exact authorization")]);
+  AUTHENTICATED_RECOVERY_AUTHORIZATIONS.delete(authorization);
+  try {
+    if (publicSignature(authorization) !== authorizationState.signature
+      || authorizationState.plan !== plan
+      || authorizationState.recoveryState !== state) {
+      return recoveryResult("invalid-authorization", [diagnostic("$.authorization", "invalid_authorization", "recovery authorization does not match this authenticated plan", "deliver a fresh preview for this exact recovery plan")]);
+    }
+  } catch {
+    return recoveryResult("invalid-authorization", [diagnostic("$.authorization", "invalid_authorization", "recovery authorization is malformed", "deliver a fresh preview for this exact recovery plan")]);
+  }
+  const deps = dependencies(overrides);
+  let root; let held;
+  try {
+    root = safeRoot(rootDir, deps);
+    if (root !== state.root) throw new Error("recovery root differs from the authenticated V3 recovery plan root");
+    held = acquireLock(root, deps);
+    const { journal } = transactionPaths(root);
+    if (!deps.existsSync(journal)) throw new Error("recovery journal disappeared after preview");
+    const journalBytes = deps.readFileSync(journal, "utf8");
+    if (sha256(journalBytes) !== state.journalSha256) throw new Error("recovery journal changed after preview");
+    if (authenticatedRecovery(plan) !== state) throw new Error("public recovery plan changed since authentication");
+    const record = JSON.parse(journalBytes);
+    validateJournal(root, record, deps);
+    if (!same(record, state.record)) throw new Error("recovery record differs from the authenticated preview");
+    const recovered = recoverRecord(root, record, deps);
+    return recoveryResult(recovered.status, [], { recoveredTargets: plan.targets.map((target) => ({ path: target.path, action: target.action })) });
+  } catch (error) {
+    return recoveryResult("recovery-failed", [diagnostic("$.transaction", "recovery_failed", error.message, "repair project state and plan recovery again")]);
+  } finally { if (held) releaseLock(held, deps); }
+}
+function commitTarget(root, record, entry, deps) {
+  const { transaction } = transactionPaths(root);
+  const target = assertNoSymlink(root, entry.path, deps);
+  if (!imageMatches(digestPath(target, deps), entry.before)) throw new Error(`target changed after preparation: ${entry.path}`);
+  entry.state = "committing"; durableJournal(root, record, deps);
+  if (entry.before.status === "present") {
+    const displaced = join(transaction, entry.displaced);
+    if (deps.existsSync(displaced)) throw new Error(`displaced target already exists: ${entry.path}`);
+    deps.renameSync(target, displaced); fsyncDirectory(dirname(target), deps); fsyncDirectory(transaction, deps);
+    const captured = digestPath(displaced, deps);
+    if (!imageMatches(captured, entry.before)) {
+      linkProofToAbsentTarget(displaced, target, captured, deps);
+      entry.state = "staged"; durableJournal(root, record, deps);
+      throw new Error(`target changed at commit boundary: ${entry.path}`);
+    }
+  }
+  try {
+    deps.linkSync(join(transaction, entry.stage), target);
+  } catch (error) {
+    if (entry.before.status === "absent") {
+      // Exclusive link failure means this transaction never touched the path.
+      entry.state = "staged"; durableJournal(root, record, deps);
+    } else if (!deps.existsSync(target)) {
+      linkProofToAbsentTarget(join(transaction, entry.displaced), target, entry.before, deps);
+      entry.state = "staged"; durableJournal(root, record, deps);
+    }
+    throw error;
+  }
+  fsyncFile(target, deps); fsyncDirectory(dirname(target), deps);
+  if (!imageMatches(digestPath(target, deps), entry.after)) throw new Error(`target changed while committing: ${entry.path}`);
+  entry.state = "renamed"; durableJournal(root, record, deps);
+}
+function applyTransaction(root, record, deps) {
+  const { transaction } = transactionPaths(root);
+  record.state = "applying"; durableJournal(root, record, deps);
+  for (const entry of record.directories) {
+    const path = assertNoSymlink(root, entry.path, deps);
+    if (deps.existsSync(path)) throw new Error(`target parent appeared since planning: ${entry.path}`);
+    deps.mkdirSync(path, { mode: 0o700 }); fsyncDirectory(dirname(path), deps);
+    entry.state = "created"; durableJournal(root, record, deps);
+  }
+  for (const [index, entry] of record.targets.entries()) {
+    if (entry.state === "unchanged") continue;
+    if (typeof deps.beforeCommit === "function") deps.beforeCommit({ index, target: entry.path, journal: clone(record) });
+    commitTarget(root, record, entry, deps);
+    if (typeof deps.interruptAfterRename === "function" && deps.interruptAfterRename({ index, target: entry.path, journal: clone(record) })) throw new IntentionalMigrationInterruption(entry.path);
+  }
+  record.state = "complete"; durableJournal(root, record, deps); remove(transaction, deps); fsyncDirectory(root, deps);
+}
+
+export function applyRunnerProfileMigrationV3(plan, { rootDir = plan?.root ?? process.cwd(), activate = false, deps: overrides = {}, interruptAfterRename } = {}) {
+  const state = authenticated(plan);
+  if (!state || !["ready", "noop"].includes(state.status)) return result("invalid-plan", [diagnostic("$", "invalid_plan", "apply accepts only an unchanged in-process V3 plan", "run plan again")]);
+  if (!activate) return result("activation-required", [diagnostic("$.activate", "activation_required", "apply requires explicit activation", "review the plan and pass --activate")]);
+  const deps = dependencies({ ...overrides, ...(interruptAfterRename ? { interruptAfterRename } : {}) });
+  let root; let lock;
+  try {
+    root = safeRoot(rootDir, deps);
+    if (root !== state.root) throw new Error("apply root differs from the authenticated V3 plan root");
+    requireNoPendingTransaction(root, deps);
+    lock = acquireLock(root, deps);
+    requireNoPendingTransaction(root, deps, { allowLock: true });
+    if (sha256(sourceInfo(root, deps).bytes) !== state.sourceSha256) throw new Error("source changed since planning");
+    if (authenticated(plan) !== state) throw new Error("public plan changed since authentication");
+    validateTargetBoundary(state.targets);
+    for (const target of state.targets) {
+      const actual = digestPath(assertNoSymlink(root, target.path, deps), deps);
+      if (!same(actual, target.before)) throw new Error(`target changed since planning: ${target.path}`);
+    }
+    if (state.status === "noop") return result("noop", [], { changes: [] });
+    const record = prepare(root, state.targets, deps);
+    try { applyTransaction(root, record, deps); return result("applied", [], { changes: state.changes, sourceCommittedLast: true }); }
+    catch (error) {
+      if (error instanceof IntentionalMigrationInterruption) return result("interrupted", [diagnostic("$.transaction", "intentional_interruption", error.message, "run inspect, plan, or apply again to recover recorded preimages")]);
+      try { restore(root, record, deps); }
+      catch (rollbackError) { return result("rollback-failed", [diagnostic("$.transaction", "rollback_failed", rollbackError.message, "recover the validated V3 transaction manually")]); }
+      return result(
+        "rolled-back",
+        [diagnostic("$.transaction", permissionFailure(error) ? "runtime_target_read_only" : "apply_failed", error.message, "repair and plan again")],
+        permissionFailure(error) ? { failureClass: "runtime-target-read-only" } : {},
+      );
+    }
+  } catch (error) { return result("apply-failed", [diagnostic("$.transaction", "apply_failed", error.message, "repair project state and plan again")]); }
+  finally { if (lock) releaseLock(lock, deps); }
+}

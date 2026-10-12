@@ -1,0 +1,7 @@
+{
+  "schema": "pipeline.po-approval-proof.v1",
+  "intentSha256": "ee0b27b272019a22e935c85ccc4efebb713f2577fe6245ead641d3e6f36d1aae",
+  "keyReference": "local-po-key",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
+  "signatureBase64": "h0BGt0DzG5se4jc6SQugXGR/tuXgYtHj2i8UNu3fB87w09RpSYGufmIw1yw63TPLTRAhp8zEq4489L1jbnKVCw=="
+}

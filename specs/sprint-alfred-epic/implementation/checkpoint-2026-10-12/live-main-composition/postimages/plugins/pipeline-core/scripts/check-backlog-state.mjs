@@ -1,0 +1,1353 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+/**
+ * Fail-closed backlog authority check and deterministic projection writer.
+ *
+ * Default mode only detects schema, transition, closure-evidence, and
+ * projection drift.  `--write` is the explicit, local writer used after a
+ * deliberate item transition; it never changes Markdown items or the ledger.
+ */
+import { existsSync, lstatSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+
+import {
+  BACKLOG_FINDING_SEVERITY,
+  INDEX_SCHEMA,
+  ITEM_HASH_AMENDMENT_KIND,
+  ITEM_HASH_AMENDMENT_TARGETS,
+  isPoAcceptedLostReconciliationEvent,
+  ITEM_SCHEMA,
+  PRE_PUBLIC_CORE_REACHABILITY_KIND,
+  PRE_PUBLIC_CORE_REACHABILITY_TARGETS,
+  SENTINEL_RECOVERY_CATALOG_SCHEMA,
+  TRANSITION_SCHEMA,
+  TRANSITION_V2_SCHEMA,
+  canonicalJson,
+  classifyBacklogFindings,
+  itemPreTriageContent,
+  parseBacklogItem,
+  parseTransitionLedger,
+  planBacklogEvidenceAmendment,
+  planBacklogItemHashRescopeAmendment,
+  planBacklogReachabilityRepair,
+  planBacklogTransition,
+  planElephantAfkLedgerRepair,
+  planItemHashAmendment,
+  planManagedOnboardingLedgerRepair,
+  planPrePublicCoreReachabilityRepair,
+  projectBacklog,
+  renderBacklogItem,
+  resolveItemHashAmendmentOverlay,
+  transitionHash,
+  validateProjectClosureReadback,
+  validateSentinelRecoveryCatalog,
+  validateTransitionLedger,
+} from "../lib/backlog-state.mjs";
+import { validateBacklogDeliveryIntent } from "../lib/backlog-delivery-reconciliation.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
+const ITEMS_DIR = "backlog/items";
+const LEDGER_PATH = "backlog/transitions.ndjson";
+const STATUS_PATH = "backlog/STATUS.md";
+const INDEX_PATH = "backlog/index.json";
+const TRANSACTION_PATH = "backlog/.state-transaction.json";
+const SENTINEL_RECOVERY_CATALOG_PATH = "backlog/sentinel-recovery-catalog.json";
+// backlog/transitions-phoenix-history.ndjson is an immutable archived copy of
+// the Phoenix branch's ledger tail (sequences 145-525), preserved verbatim by
+// the Nova/Phoenix merge (commit c181817f) so those entries' original hashes
+// stay readable. It is NOT active state: nothing projects it, and it is never
+// appended to. This pin -- the file's exact SHA-256 at merge time -- is the
+// mechanical check that closes "what stops a real secret from being added to
+// this file later" for the two .gitleaks.toml rule exemptions scoped to this
+// path: any byte change at all, a genuine edit or a forged appended entry
+// alike, fails this check before the exemption could ever cover new content.
+// See backlog/README.md for the declaration this pin backs.
+const PHOENIX_HISTORY_PATH = "backlog/transitions-phoenix-history.ndjson";
+const PHOENIX_HISTORY_SHA256 = "a8e5859467aab1d6a72cacc351114ff1f3625660ecaf4d9d2b569abd4c6582c7";
+const SHA256 = /^[a-f0-9]{64}$/u;
+const OID = /^[a-f0-9]{40}$/u;
+const LICENSE_SURFACES = ["LICENSE", "LICENSE-DOCS", "NOTICE", "CONTRIBUTING.md", "README.md", "docs/licensing.md", "third-party-licenses.json"];
+const SCHEMAS = Object.freeze([
+  ["backlog/schemas/item.schema.json", ITEM_SCHEMA],
+  ["backlog/schemas/transition.schema.json", TRANSITION_SCHEMA],
+  ["backlog/schemas/index.schema.json", INDEX_SCHEMA],
+  ["backlog/schemas/sentinel-recovery.schema.json", SENTINEL_RECOVERY_CATALOG_SCHEMA],
+]);
+
+function exactObject(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).sort().join("\n") === [...keys].sort().join("\n");
+}
+
+function sha256Canonical(value) {
+  return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+function validGateProjection(value, channel, candidate, surfaceSetSha256) {
+  if (!exactObject(value, ["schema", "channel", "candidate", "surfaceSetSha256", "commandSha256", "gateCommitmentSha256", "result", "projectionSha256"])) return false;
+  const payload = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "projectionSha256"));
+  return value.schema === "pipeline.snt1-license-gate-projection.v1" && value.channel === channel
+    && exactObject(value.candidate, ["commit", "tree"]) && value.candidate.commit === candidate.commit && value.candidate.tree === candidate.tree
+    && exactObject(value.result, ["exitCode", "status"]) && value.result.status === "passed" && value.result.exitCode === 0
+    && value.surfaceSetSha256 === surfaceSetSha256
+    && [value.commandSha256, value.gateCommitmentSha256, value.projectionSha256].every((entry) => SHA256.test(entry ?? ""))
+    && value.projectionSha256 === sha256Canonical(payload);
+}
+
+function validReadySnt1Result(value) {
+  if (!exactObject(value, ["schema", "licensingDisposition", "privacyDisposition", "candidates", "gates", "surfaces", "resultSha256"]) || value.schema !== "pipeline.snt1-result.v1") return false;
+  const dispositionKeys = ["reviewer", "reviewedAt", "status", "dispositionSha256"];
+  if (![value.licensingDisposition, value.privacyDisposition].every((entry) => exactObject(entry, dispositionKeys) && entry.status === "approved" && typeof entry.reviewer === "string" && entry.reviewer.length > 0 && /^\d{4}-\d{2}-\d{2}$/u.test(entry.reviewedAt) && SHA256.test(entry.dispositionSha256))) return false;
+  if (!exactObject(value.candidates, ["private", "neutral-public"]) || !exactObject(value.gates, ["private", "neutral-public"])) return false;
+  for (const channel of ["private", "neutral-public"]) if (!exactObject(value.candidates[channel], ["commit", "tree"]) || !OID.test(value.candidates[channel].commit) || !OID.test(value.candidates[channel].tree)) return false;
+  if (!Array.isArray(value.surfaces) || value.surfaces.length !== LICENSE_SURFACES.length || !value.surfaces.every((entry, index) => exactObject(entry, ["path", "sha256"]) && entry.path === LICENSE_SURFACES[index] && SHA256.test(entry.sha256))) return false;
+  const surfaceSetSha256 = sha256Canonical(value.surfaces);
+  if (!["private", "neutral-public"].every((channel) => validGateProjection(value.gates[channel], channel, value.candidates[channel], surfaceSetSha256))) return false;
+  const payload = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "resultSha256"));
+  return SHA256.test(value.resultSha256) && value.resultSha256 === sha256Canonical(payload);
+}
+
+function readText(path, findings, label) {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    findings.push(`${label} is missing or unreadable`);
+    return null;
+  }
+}
+
+function regularFile(root, repoPath) {
+  if (typeof repoPath !== "string") return false;
+  const full = resolve(root, repoPath);
+  if (relative(root, full).startsWith("..")) return false;
+  try {
+    return !lstatSync(full).isSymbolicLink() && statSync(full).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** Repository-relative, forward-slashed form of `repoPath`, as `git ls-files` prints it. */
+function normalizeRepoPath(root, repoPath) {
+  return relative(root, resolve(root, repoPath)).split(sep).join("/");
+}
+
+/**
+ * Which of `repoPaths` Git has in its index, in ONE invocation.
+ *
+ * Three-valued on purpose. `git ls-files` cannot answer at all outside a work
+ * tree or without a git binary, and a project that keeps a backlog without Git
+ * must not be told its closure citations are broken — it is the question that is
+ * unavailable there, not the answer that is "no". Only `known` may produce a
+ * finding; `indeterminate` produces none.
+ */
+function trackedPaths(root, repoPaths) {
+  const paths = [...new Set(repoPaths.filter((value) => typeof value === "string" && value.trim() !== ""))];
+  if (paths.length === 0) return { state: "known", tracked: new Set() };
+  const probe = spawnSync("git", ["ls-files", "-z", "--", ...paths], { cwd: root, encoding: "utf8" });
+  if (!isSuccessfulSpawn(probe)) return { state: "indeterminate", tracked: new Set() };
+  return { state: "known", tracked: new Set(probe.stdout.split("\0").filter((entry) => entry !== "")) };
+}
+
+/**
+ * `absent` | `untracked` | `tracked` | `indeterminate` for one repository path.
+ *
+ * A closure citation that exists only in the working tree is the failure this
+ * distinguishes from a missing file: the local run is green, and every other
+ * checkout has a closed item whose cited evidence cannot be read. Presence was
+ * never the property the contract needed.
+ */
+export function repositoryTrackingState(root, repoPath) {
+  if (!regularFile(root, repoPath)) return "absent";
+  const probe = trackedPaths(root, [repoPath]);
+  if (probe.state !== "known") return "indeterminate";
+  return probe.tracked.has(normalizeRepoPath(root, repoPath)) ? "tracked" : "untracked";
+}
+
+/** The one sentence that both tells the reader what broke and how to clear it. */
+export function untrackedEvidenceFinding(label, repoPath) {
+  return `${label}: closure_evidence ${repoPath} exists but is not tracked by Git — the citation resolves only in this working tree; stage it (git add ${repoPath}) so every checkout can read it`;
+}
+
+function authorityApproval() { return { ok: true, code: "AUTHORITY:VALID" }; }
+
+function gitFileBytes(root, commit, repoPath) {
+  const result = spawnSync("git", ["show", `${commit}:${repoPath}`], { cwd: root, encoding: null });
+  return isSuccessfulSpawn(result) && Buffer.isBuffer(result.stdout) ? result.stdout : null;
+}
+
+/**
+ * v2 ordinary transitions point at their immutable delivery intent.  The
+ * checker revalidates that intent and its exact authority receipt on every
+ * read; a bare v2 event can therefore never become self-authorizing.
+ */
+function authorizeCanonicalOrdinaryEvidence(root, { event, evidence }) {
+  if (evidence?.kind !== "backlog-delivery-intent" || !regularFile(root, evidence.reference)) return null;
+  let intent;
+  try { intent = JSON.parse(readFileSync(join(root, evidence.reference), "utf8")); } catch { return null; }
+  if (!validateBacklogDeliveryIntent(intent).ok) return null;
+  const expected = intent.operation === "initialize" ? [null, "open"]
+    : intent.operation === "assign" ? ["open", "in_progress"] : null;
+  if (!expected || event.id !== intent.item.id || event.from !== expected[0] || event.to !== expected[1]) return null;
+  const authority = intent.authority;
+  if (!regularFile(root, authority.receiptPath)) return null;
+  let receiptBytes;
+  let receipt;
+  try { receiptBytes = readFileSync(join(root, authority.receiptPath)); receipt = JSON.parse(receiptBytes); } catch { return null; }
+  if (createHash("sha256").update(receiptBytes).digest("hex") !== authority.receiptSha256) return null;
+  const receiptKeys = ["schema", "decisionId", "status", "authorizedBy", "operation", "item", "candidate", "recordSha256"];
+  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)
+    || Object.keys(receipt).sort().join("\n") !== receiptKeys.sort().join("\n")
+    || receipt.schema !== "pipeline.backlog-delivery-authority.v1" || receipt.status !== "approved"
+    || receipt.decisionId !== authority.decisionId || receipt.operation !== intent.operation
+    || typeof receipt.authorizedBy !== "string" || receipt.authorizedBy.length === 0
+    || !receipt.item || Object.keys(receipt.item).sort().join("\n") !== ["id", "path"].join("\n") || receipt.item.id !== intent.item.id || receipt.item.path !== intent.item.path
+    || !(receipt.candidate === null || (receipt.candidate && Object.keys(receipt.candidate).sort().join("\n") === ["commit", "tree"].join("\n")))
+    || JSON.stringify(receipt.candidate) !== JSON.stringify(intent.candidate)
+    || !/^[a-f0-9]{64}$/u.test(receipt.recordSha256 ?? "")) return null;
+  const receiptRecord = { ...receipt }; delete receiptRecord.recordSha256;
+  if (createHash("sha256").update(canonicalJson(receiptRecord)).digest("hex") !== receipt.recordSha256) return null;
+  if ((intent.operation === "initialize" && authority.kind !== "backlog-intake")
+    || (intent.operation === "assign" && authority.kind !== "implementation-activation")) return null;
+  if (evidence.commit !== intent.candidate?.commit) {
+    // A rebase may preserve an already approved delivery intent while dropping
+    // its old candidate object.  The replacement evidence commit is accepted
+    // only when it contains the exact current intent and PO receipt bytes.
+    // This is deliberately a byte-for-byte continuity proof, not a broad
+    // historical-commit waiver.
+    const intentBytes = readFileSync(join(root, evidence.reference));
+    const rebasedIntentBytes = gitFileBytes(root, evidence.commit, evidence.reference);
+    const rebasedReceiptBytes = gitFileBytes(root, evidence.commit, authority.receiptPath);
+    if (!rebasedIntentBytes || !rebasedReceiptBytes
+      || Buffer.compare(rebasedIntentBytes, intentBytes) !== 0
+      || Buffer.compare(rebasedReceiptBytes, receiptBytes) !== 0) return null;
+  }
+  return authorityApproval();
+}
+
+/**
+ * A repair disposition is both the amendment's immutable reference and its
+ * typed PO authority.  It deliberately enumerates every repaired historical
+ * event rather than allowing a broad repair grant.
+ */
+function authorizeCanonicalEvidenceAmendment({ evidence, dispositionBytes, dispositionSha256 }) {
+  let disposition;
+  try { disposition = JSON.parse(Buffer.from(dispositionBytes).toString("utf8")); } catch { return null; }
+  const keys = ["schema", "decisionId", "status", "authorizedBy", "candidate", "amendments", "recordSha256"];
+  if (!disposition || typeof disposition !== "object" || Array.isArray(disposition)
+    || Object.keys(disposition).sort().join("\n") !== keys.sort().join("\n")
+    || disposition.schema !== "pipeline.backlog-evidence-repair-disposition.v1"
+    || disposition.status !== "approved" || typeof disposition.decisionId !== "string" || disposition.decisionId.length === 0
+    || typeof disposition.authorizedBy !== "string" || disposition.authorizedBy.length === 0
+    || !disposition.candidate || Object.keys(disposition.candidate).sort().join("\n") !== ["commit", "tree"].join("\n")
+    || disposition.candidate.commit !== evidence.replacementCommit || !/^[a-f0-9]{40}$/u.test(disposition.candidate.tree ?? "")
+    || !Array.isArray(disposition.amendments)
+    || !/^[a-f0-9]{64}$/u.test(disposition.recordSha256 ?? "")) return null;
+  const record = { ...disposition }; delete record.recordSha256;
+  if (createHash("sha256").update(canonicalJson(record)).digest("hex") !== disposition.recordSha256) return null;
+  if (dispositionSha256 !== evidence.dispositionSha256) return null;
+  const amendmentKeys = ["targetSequence", "targetEntryHash", "targetCommit", "replacementCommit", "idempotencyKey"];
+  const match = disposition.amendments.find((entry) => entry && typeof entry === "object" && !Array.isArray(entry)
+    && Object.keys(entry).sort().join("\n") === amendmentKeys.sort().join("\n") && entry.targetSequence === evidence.targetSequence
+    && entry.targetEntryHash === evidence.targetEntryHash && entry.targetCommit === evidence.targetCommit
+    && entry.replacementCommit === evidence.replacementCommit && entry.idempotencyKey === evidence.idempotencyKey);
+  return match ? authorityApproval() : null;
+}
+
+function projectReadbackFindings(root, item) {
+  const { metadata } = item;
+  if (metadata.owner !== metadata.closure_repository) {
+    return [`${item.path}: project closure_repository must match the configured item project binding`];
+  }
+  const receiptPath = metadata.closure_readback;
+  if (!regularFile(root, receiptPath)) return [`${item.path}: closure_readback is missing or not a regular repository file`];
+  let receipt;
+  try {
+    receipt = JSON.parse(readFileSync(join(root, receiptPath), "utf8"));
+  } catch {
+    return [`${item.path}: closure_readback must be valid JSON`];
+  }
+  return validateProjectClosureReadback(receipt, {
+    repository: metadata.closure_repository,
+    configuredRepository: metadata.owner,
+    commit: metadata.closure_commit,
+  }).map((error) => `${item.path}: closure_readback ${error}`);
+}
+
+function localCommitExists(root, oid) {
+  const result = spawnSync("git", ["cat-file", "-e", `${oid}^{commit}`], { cwd: root, stdio: "ignore" });
+  return isSuccessfulSpawn(result);
+}
+
+/**
+ * 38 ledger events (sequences 1-38, dated 2026-07-19 through 2026-07-22: the
+ * original 2026-07-20 canonical-ledger migration plus its immediate
+ * Sentinel-recovery, PO-license-disposition, close-retro, scope-extension,
+ * and Windows-containment follow-on events) cite evidence commits that do
+ * not exist as reachable objects in this repository — almost certainly lost
+ * in the sanctioned 2026-08-01 history rewrite.
+ *
+ * NVA-LEDGER-B (2026-08-16) changed what this table DOES: `evidence.commit is
+ * not a reachable local Git commit` is now classified DRIFT (never blocking)
+ * for every ledger event, known or not — see BACKLOG_FINDING_SEVERITY and
+ * classifyBacklogFindings in ../lib/backlog-state.mjs, which decide pass/fail
+ * on their own. This table's only remaining job is to LABEL a drift finding
+ * as belonging to this previously-diagnosed historical batch (`knownHistoricalBatch:
+ * true` on the returned drift entry) versus a brand-new unreachable commit
+ * nobody has triaged yet (`false`). It no longer decides the exit code.
+ *
+ * NOTE: the source backlog item's own original diagnosis claimed a single
+ * evidence.commit shared by all 38 events. Reading the ledger directly (this
+ * file's own contract, not that item's prose) shows the real composition is
+ * eight distinct (commit, actor, evidence.kind) triples:
+ *   - sequences 1-12:  933e1a8d... / backlog-migration        / baseline-migration
+ *   - sequences 13-14: 8720bf3f... / sentinel-implementation  / license-boundary-recovery
+ *   - sequence 15:     a798db6d... / po                       / po-license-disposition
+ *   - sequence 16:     cb821946... / close-retro              / close-retro
+ *   - sequences 17-31: 6df2e8a0... / sentinel-recovery        / sentinel-backlog-recovery
+ *   - sequences 32-36: a09b69b1... / sentinel-scope-extension / sentinel-scope-extension
+ *   - sequence 37:     e21933be... / pipeline                 / sentinel-windows-containment
+ *   - sequence 38:     e21933be... / pipeline                 / sentinel-windows-containment-closure
+ * (the last two share one commit under two different kinds — direct proof
+ * the label below keys on the full triple, never the commit alone).
+ * NVA-BLDRIFT-01 (2026-08-12) pinned only the first triple and explicitly
+ * scoped the remaining seven out as future work; NVA-BLDRIFT-02 (2026-08-16)
+ * closed that scope and corrected the source item's own Description/Proposal
+ * to match this composition.
+ *
+ * This is deliberately NOT a blanket label for any `evidence.kind`, actor, or
+ * commit value alone: only an event whose commit/actor/kind ALL match one of
+ * these eight exact triples is labelled known. A future event citing any
+ * other unreachable commit is still DRIFT (per the table above) but is
+ * labelled unknown, i.e. worth fresh triage.
+ *
+ * QG-06 disclosure (guardrails/quality-gates.md): owner is the PO (2026-08-12
+ * decision on the source item, reaffirmed by NVA-BLDRIFT-02 on 2026-08-16 and
+ * by NVA-LEDGER-B on 2026-08-16, which is the change that stopped this table
+ * from deciding blocking/non-blocking). Permanent, no expiry: the cited
+ * commit objects were lost in the 2026-08-01 history rewrite, and the
+ * ledger's append-only design forbids ever repointing sequences 1-38 at a
+ * different evidence.commit — there is no future event at which this label
+ * could be retired.
+ */
+const KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS = Object.freeze([
+  { commit: "933e1a8d17d6c7bed040d13f8fccca2511fff9dc", actor: "backlog-migration", kind: "baseline-migration" },
+  { commit: "8720bf3f6abfd79bbe6f42d8ff7b54211645c378", actor: "sentinel-implementation", kind: "license-boundary-recovery" },
+  { commit: "a798db6d45f2fc113f66d01400d7ea70fcef9427", actor: "po", kind: "po-license-disposition" },
+  { commit: "cb8219464937cfc4cb7ff50e2bf5579bfa78f6b5", actor: "close-retro", kind: "close-retro" },
+  { commit: "6df2e8a068cba1e6de5410ea5fe23d2c2ca72e59", actor: "sentinel-recovery", kind: "sentinel-backlog-recovery" },
+  { commit: "a09b69b11d636f424fafb98aeae948f282bb7338", actor: "sentinel-scope-extension", kind: "sentinel-scope-extension" },
+  { commit: "e21933be86bea8735de7e407f94cff48cffd7bd8", actor: "pipeline", kind: "sentinel-windows-containment" },
+  { commit: "e21933be86bea8735de7e407f94cff48cffd7bd8", actor: "pipeline", kind: "sentinel-windows-containment-closure" },
+  { commit: "2b9f9adf8db832ba47e5a5a34736020dd78b27d0", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "2b9f9adf8db832ba47e5a5a34736020dd78b27d0", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+  { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
+]);
+const UNREACHABLE_COMMIT_FINDING = /^ledger event (\d+): evidence\.commit is not a reachable local Git commit$/u;
+const INVALID_COMMIT_FORMAT_FINDING = /^ledger event (\d+): evidence\.commit must be a full lowercase Git commit OID$/u;
+const CLOSURE_COMMIT_DRIFT_FINDING = /^items: (.+) closure_commit must equal its final ledger evidence\.commit$/u;
+const ACCEPTED_LEDGER_EVENT_403_REASON = "accepted-ledger-event-403-abbreviated-oid";
+const ACCEPTED_LOST_RECONCILIATION_BATCH_REASON = "accepted-po-2026-09-15-lost-reconciliation-batch";
+const ACCEPTED_LEDGER_EVENT_403 = Object.freeze({
+  sequence: 403,
+  id: "pipeline.codex-read-only-steps-escalate-individually-instead-of-once",
+  from: "in_progress",
+  to: "closed",
+  at: "2026-08-11",
+  actor: "backlog-reconciliation",
+  entryHash: "cebb80de1690b19e03b5a5fb196e1ba6cab8328cb07c859e67b6a3851a7a8861",
+  previousHash: "2cf371ccf4aca78f1a9257c4259c3943fdc04f4c1b46bcc170e2db2eaf25cc3f",
+  evidenceCommit: "181b7730",
+  evidenceKind: "item-file-reconciliation",
+  evidenceReference: "backlog/items/2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md",
+});
+
+/**
+ * Label (never filter) exactly the "unreachable evidence.commit" DRIFT
+ * findings produced for the known 2026-07-19..2026-07-22 historical batch.
+ * Severity itself is already decided by classifyBacklogFindings; this only
+ * says whether a given drift finding is a member of the previously-diagnosed
+ * batch. Never keyed off the finding text alone — each candidate finding is
+ * re-checked against the actual event data (commit, actor, evidence.kind)
+ * before it is labelled known, so an unrelated unreachable evidence commit
+ * (any other value, or a known commit under a different actor/kind) is
+ * labelled unknown and still worth fresh triage.
+ */
+function isKnownHistoricalUnreachableFinding(finding, events) {
+  const match = UNREACHABLE_COMMIT_FINDING.exec(finding);
+  if (!match) return false;
+  const event = events[Number(match[1]) - 1];
+  return KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS.some((known) => event?.actor === known.actor
+    && event?.evidence?.kind === known.kind
+    && event?.evidence?.commit === known.commit);
+}
+
+function isAcceptedLostReconciliationFinding(finding, events) {
+  const match = UNREACHABLE_COMMIT_FINDING.exec(finding);
+  if (!match) return false;
+  const physicalIndex = Number(match[1]) - 1;
+  return isPoAcceptedLostReconciliationEvent(events[physicalIndex], physicalIndex);
+}
+
+function isAcceptedLedgerEvent403(event, physicalIndex) {
+  const accepted = ACCEPTED_LEDGER_EVENT_403;
+  return physicalIndex === accepted.sequence - 1
+    && event?.sequence === accepted.sequence
+    && event?.id === accepted.id
+    && event?.from === accepted.from
+    && event?.to === accepted.to
+    && event?.at === accepted.at
+    && event?.actor === accepted.actor
+    && event?.entryHash === accepted.entryHash
+    && event?.previousHash === accepted.previousHash
+    && event?.evidence?.commit === accepted.evidenceCommit
+    && event?.evidence?.kind === accepted.evidenceKind
+    && event?.evidence?.reference === accepted.evidenceReference;
+}
+
+/**
+ * Return the recorded acceptance reason for the two DRIFT findings caused by
+ * the immutable abbreviated OID at ledger event 403. The match binds the
+ * physical position, sequence, transition identity, chain hashes, and
+ * evidence tuple. A similar future short OID therefore remains unaccepted.
+ */
+export function knownAcceptedBacklogDrift(finding, events) {
+  const ledgerMatch = INVALID_COMMIT_FORMAT_FINDING.exec(finding);
+  if (ledgerMatch) {
+    const physicalIndex = Number(ledgerMatch[1]) - 1;
+    return isAcceptedLedgerEvent403(events[physicalIndex], physicalIndex)
+      ? ACCEPTED_LEDGER_EVENT_403_REASON
+      : null;
+  }
+
+  const closureMatch = CLOSURE_COMMIT_DRIFT_FINDING.exec(finding);
+  if (closureMatch?.[1] !== ACCEPTED_LEDGER_EVENT_403.id) return null;
+  const finalPhysicalIndex = events.findLastIndex((event) => event?.id === closureMatch[1]
+    && event?.evidence?.kind !== "reachability-amendment"
+    && event?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND);
+  return isAcceptedLedgerEvent403(events[finalPhysicalIndex], finalPhysicalIndex)
+    ? ACCEPTED_LEDGER_EVENT_403_REASON
+    : null;
+}
+
+export function reachabilityAmendmentFindings(root, event) {
+  const findings = [];
+  const label = `ledger event ${event.sequence}`;
+  const reference = event?.evidence?.reference;
+  if (!regularFile(root, reference)) return [`${label}: reachability amendment reference is missing`];
+  const blob = spawnSync("git", ["rev-parse", `${event.evidence.commit}:${reference}`], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const blobOid = String(blob.stdout ?? "").trim();
+  if (!isSuccessfulSpawn(blob) || blobOid !== event.evidence.referenceBlobOid) {
+    findings.push(`${label}: referenceBlobOid does not bind the reachable commit projection`);
+  }
+  const historical = spawnSync("git", ["show", `${event.evidence.commit}:${reference}`], {
+    cwd: root,
+    encoding: null,
+  });
+  const historicalSha = isSuccessfulSpawn(historical)
+    ? createHash("sha256").update(historical.stdout).digest("hex")
+    : null;
+  // The amendment binds the exact historical projection at evidence.commit.
+  // Current item bytes are deliberately not part of that historical binding:
+  // they may legitimately evolve, including in a later ledger recovery.
+  if (historicalSha !== event.evidence.referenceSha256) {
+    findings.push(`${label}: referenceSha256 does not bind the exact retained projection`);
+  }
+  return findings;
+}
+
+/**
+ * An item-hash-amendment's claimed commit must actually contain content
+ * hashing to the claimed itemSha256 -- provenance for the corrected binding,
+ * independent of whether current item bytes still match it (that live check
+ * happens separately, every run, in loadBacklogState).
+ */
+export function itemHashAmendmentFindings(root, event) {
+  const label = `ledger event ${event.sequence}`;
+  const reference = event?.evidence?.reference;
+  if (!regularFile(root, reference)) return [`${label}: item hash amendment reference is missing`];
+  const historical = spawnSync("git", ["show", `${event.evidence.commit}:${reference}`], {
+    cwd: root,
+    encoding: null,
+  });
+  const historicalSha = isSuccessfulSpawn(historical)
+    ? createHash("sha256").update(historical.stdout).digest("hex")
+    : null;
+  if (historicalSha !== event.evidence.itemSha256) {
+    return [`${label}: itemSha256 does not bind the claimed amendment commit`];
+  }
+  return [];
+}
+
+function atomicWrite(path, content) {
+  const temporary = `${path}.tmp-${process.pid}`;
+  writeFileSync(temporary, content, { flag: "wx" });
+  renameSync(temporary, path);
+}
+
+function transactionPreimage(root, path) {
+  const target = join(root, path);
+  return existsSync(target) ? readFileSync(target, "utf8") : null;
+}
+
+/** Persist an approved batch through one durable, recoverable preimage journal. */
+export function writeBacklogTransaction(root = DEFAULT_ROOT, targets, { atomicWrite: replace = atomicWrite } = {}) {
+  if (!Array.isArray(targets) || targets.length === 0
+    || targets.some((target) => !target || !validTransactionPath(target.path) || typeof target.after !== "string")
+    || new Set(targets.map((target) => target.path)).size !== targets.length) {
+    return { ok: false, recovered: false, findings: ["backlog transaction targets are invalid"] };
+  }
+  const journalPath = join(root, TRANSACTION_PATH);
+  const journal = {
+    schema: "pipeline.backlog-transaction.v1",
+    files: targets.map((target) => ({ path: target.path, before: transactionPreimage(root, target.path) })),
+  };
+  try {
+    writeFileSync(journalPath, `${JSON.stringify(journal)}\n`, { flag: "wx" });
+    for (const target of targets) replace(join(root, target.path), target.after);
+    unlinkSync(journalPath);
+    return { ok: true, recovered: false, findings: [] };
+  } catch (error) {
+    const recovery = recoverBacklogTransaction(root);
+    return {
+      ok: false,
+      recovered: recovery.recovered,
+      findings: [`backlog transaction write failed: ${error.message}`, ...recovery.findings],
+    };
+  }
+}
+
+function validTransactionPath(path) {
+  return path === LEDGER_PATH || path === STATUS_PATH || path === INDEX_PATH
+    || /^backlog\/items\/[A-Za-z0-9._-]+\.md$/u.test(path);
+}
+
+/** Restore the pre-transition snapshot after a crash or a failed multi-file write. */
+export function recoverBacklogTransaction(root = DEFAULT_ROOT) {
+  const journalPath = join(root, TRANSACTION_PATH);
+  if (!existsSync(journalPath)) return { ok: true, recovered: false, findings: [] };
+  let journal;
+  try {
+    journal = JSON.parse(readFileSync(journalPath, "utf8"));
+  } catch {
+    return { ok: false, recovered: false, findings: [`${TRANSACTION_PATH} is unreadable or invalid JSON`] };
+  }
+  if (journal?.schema !== "pipeline.backlog-transaction.v1" || !Array.isArray(journal.files)
+    || journal.files.length === 0 || journal.files.some((entry) => !entry || !validTransactionPath(entry.path) || !(typeof entry.before === "string" || entry.before === null))) {
+    return { ok: false, recovered: false, findings: [`${TRANSACTION_PATH} has an invalid recovery shape`] };
+  }
+  try {
+    for (const entry of journal.files) {
+      const target = join(root, entry.path);
+      if (entry.before === null) {
+        if (existsSync(target)) unlinkSync(target);
+      } else {
+        atomicWrite(target, entry.before);
+      }
+    }
+    unlinkSync(journalPath);
+    return { ok: true, recovered: true, findings: [] };
+  } catch (error) {
+    return { ok: false, recovered: false, findings: [`${TRANSACTION_PATH} recovery failed: ${error.message}`] };
+  }
+}
+
+/**
+ * Validate that the archived Phoenix ledger tail has not moved a single byte
+ * since the merge. This is a byte-identity pin, not a chain re-validation: a
+ * hash-chain check alone would still accept a new, syntactically valid,
+ * chain-consistent entry appended after the preserved tail -- which is
+ * exactly the vector the .gitleaks.toml exemption on this path needs closed.
+ * Any drift here is INTEGRITY (unclassified by classifyBacklogFindings,
+ * which defaults unrecognised findings to blocking).
+ *
+ * Presence-gated like SENTINEL_RECOVERY_CATALOG_PATH above: a repo root that
+ * never has this file (every `check-backlog-state.test.mjs` fixture -- it
+ * builds a minimal synthetic `backlog/` and does not mirror this archival
+ * path) is not asserted against it. The real project root always has it, so
+ * this still fails closed there.
+ */
+function checkPhoenixHistoryImmutable(root, findings) {
+  const repoPath = PHOENIX_HISTORY_PATH;
+  const path = join(root, repoPath);
+  if (!existsSync(path)) return;
+  const actual = createHash("sha256").update(readFileSync(path)).digest("hex");
+  if (actual !== PHOENIX_HISTORY_SHA256) {
+    findings.push(`${repoPath}: bytes changed since the Nova/Phoenix merge (expected sha256 ${PHOENIX_HISTORY_SHA256}, got ${actual}); this file is an immutable archived copy and must never be edited or appended to`);
+  }
+}
+
+function checkSchemas(root, findings) {
+  for (const [repoPath, expectedId] of SCHEMAS) {
+    if (repoPath === "backlog/schemas/sentinel-recovery.schema.json" && !existsSync(join(root, SENTINEL_RECOVERY_CATALOG_PATH))) continue;
+    const text = readText(join(root, repoPath), findings, repoPath);
+    if (text === null) continue;
+    try {
+      const schema = JSON.parse(text);
+      if (schema?.$id !== expectedId) findings.push(`${repoPath} must declare $id ${expectedId}`);
+    } catch {
+      findings.push(`${repoPath} is not valid JSON`);
+    }
+  }
+}
+
+/** Build the validated data plus projections without writing anything. */
+export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, authorizeAmendment = null, authorizeOrdinaryEvidence = null, ignoreTransaction = false } = {}) {
+  const findings = [];
+  if (!ignoreTransaction && existsSync(join(root, TRANSACTION_PATH))) findings.push(`${TRANSACTION_PATH} requires recovery before backlog state can be trusted`);
+  if (existsSync(join(root, SENTINEL_RECOVERY_CATALOG_PATH))) {
+    const catalogText = readText(join(root, SENTINEL_RECOVERY_CATALOG_PATH), findings, SENTINEL_RECOVERY_CATALOG_PATH);
+    if (catalogText !== null) {
+      try {
+        findings.push(...validateSentinelRecoveryCatalog(JSON.parse(catalogText)).map((finding) => `${SENTINEL_RECOVERY_CATALOG_PATH}: ${finding}`));
+      } catch {
+        findings.push(`${SENTINEL_RECOVERY_CATALOG_PATH} is not valid JSON`);
+      }
+    }
+  }
+
+  let itemNames = [];
+  try {
+    itemNames = readdirSync(join(root, ITEMS_DIR), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && entry.name !== "TEMPLATE.md")
+      .map((entry) => entry.name)
+      .sort((left, right) => left.localeCompare(right));
+  } catch {
+    findings.push(`${ITEMS_DIR} is missing or unreadable`);
+  }
+  if (itemNames.length === 0) findings.push(`${ITEMS_DIR} must contain at least one current item`);
+
+  const items = [];
+  const itemBytes = new Map();
+  for (const name of itemNames) {
+    const repoPath = `${ITEMS_DIR}/${name}`;
+    const text = readText(join(root, repoPath), findings, repoPath);
+    if (text === null) continue;
+    const parsed = parseBacklogItem(text, { path: repoPath });
+    findings.push(...parsed.errors);
+    // Keep invalid records out of downstream projections and ledger joins. The
+    // parser has already recorded their exact findings; attempting to sort or
+    // project an item without a canonical id would otherwise throw and hide the
+    // fail-closed backlog diagnosis behind a TypeError.
+    if (parsed.item && parsed.ok) items.push(parsed.item);
+    if (parsed.item && parsed.ok) itemBytes.set(parsed.item.metadata.id, text);
+  }
+
+  const ledgerText = readText(join(root, LEDGER_PATH), findings, LEDGER_PATH);
+  const ledger = parseTransitionLedger(ledgerText ?? "", { path: LEDGER_PATH });
+  findings.push(...ledger.errors);
+  checkSchemas(root, findings);
+  checkPhoenixHistoryImmutable(root, findings);
+  if (ledger.events.some((event) => event?.schema === TRANSITION_V2_SCHEMA)) {
+    const repoPath = "backlog/schemas/transition-v2.schema.json";
+    const text = readText(join(root, repoPath), findings, repoPath);
+    if (text !== null) {
+      try {
+        if (JSON.parse(text)?.$id !== TRANSITION_V2_SCHEMA) findings.push(`${repoPath} must declare $id ${TRANSITION_V2_SCHEMA}`);
+      } catch { findings.push(`${repoPath} is not valid JSON`); }
+    }
+  }
+  const commitExists = checkCommit ? (oid) => localCommitExists(root, oid) : null;
+  const readDispositionBytes = (repoPath) => {
+    if (!regularFile(root, repoPath)) return null;
+    try { return readFileSync(join(root, repoPath)); } catch { return null; }
+  };
+  findings.push(...validateTransitionLedger(ledger.events, items, {
+    commitExists,
+    readDispositionBytes,
+    authorizeAmendment: authorizeAmendment ?? authorizeCanonicalEvidenceAmendment,
+    authorizeOrdinaryEvidence: authorizeOrdinaryEvidence ?? ((input) => authorizeCanonicalOrdinaryEvidence(root, input)),
+  }));
+  // A valid, registry-authorized item-hash-amendment event supersedes only
+  // the RECORDED itemSha256 a genesis event is compared against; it never
+  // skips the comparison itself. Current item bytes must still hash to
+  // exactly one value -- the amendment's, when present and valid, otherwise
+  // the genesis event's own -- so a later, undetected content drift past the
+  // amendment still fails this check (PHX-WP-LEDGER-AMENDMENT-KIND).
+  const itemHashOverlay = resolveItemHashAmendmentOverlay(ledger.events);
+  for (const event of ledger.events) {
+    if (event?.id === "pipeline.managed-onboarding-success-contract" && event?.evidence?.kind === "missing-initial-ledger-repair") {
+      const bytes = itemBytes.get(event.id);
+      const rescope = [...ledger.events].reverse().find((candidate) => candidate?.evidence?.kind === "item-hash-rescope-amendment" && candidate.id === event.id && candidate.evidence.amendsSequence === event.sequence);
+      const expectedItemSha256 = itemHashOverlay.get(event.sequence) ?? event.evidence.itemSha256;
+      if (rescope) {
+        const preTriage = typeof bytes === "string" ? itemPreTriageContent(bytes) : null;
+        if (preTriage === null || rescope.evidence.itemSha256 !== createHash("sha256").update(preTriage).digest("hex")) findings.push(`ledger event ${event.sequence}: item-hash-rescope-amendment itemSha256 does not bind the current item's pre-Triage bytes`);
+      } else if (typeof bytes !== "string" || expectedItemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
+    }
+    if (event?.evidence?.kind === "reachability-amendment" || event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND) {
+      findings.push(...reachabilityAmendmentFindings(root, event));
+    }
+    if (event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND) {
+      findings.push(...itemHashAmendmentFindings(root, event));
+    }
+  }
+
+  // ONE ls-files call covers every closed item's citation: this loop is the standing
+  // sweep for untracked closure evidence, not a check of the item being written now.
+  const closedEvidence = trackedPaths(root, items.filter((item) => item.metadata.status === "closed").map((item) => item.metadata.closure_evidence));
+  for (const item of items) {
+    const metadata = item.metadata;
+    if (metadata.status === "closed" && !regularFile(root, metadata.closure_evidence)) {
+      findings.push(`${item.path}: closure_evidence is missing or not a regular repository file`);
+    } else if (metadata.status === "closed" && closedEvidence.state === "known" && !closedEvidence.tracked.has(normalizeRepoPath(root, metadata.closure_evidence))) {
+      findings.push(untrackedEvidenceFinding(item.path, metadata.closure_evidence));
+    }
+    if (metadata.status === "closed" && (metadata.owner.startsWith("project:") || metadata.closure_repository?.startsWith("project:"))) {
+      findings.push(...projectReadbackFindings(root, item));
+    }
+  }
+
+  // The gate rejects bad WRITES, not the past: a finding about an already-
+  // appended, unfixable-by-construction ledger event is DRIFT (reported,
+  // never blocking); only classifyBacklogFindings decides which finding that
+  // is. `findings`/`ok` below therefore reflect BLOCKING (integrity) findings
+  // only — drift is a separate, still-visible field, never silently dropped.
+  const classified = classifyBacklogFindings(findings, { events: ledger.events });
+  const blockingFindings = classified
+    .filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.INTEGRITY)
+    .map((entry) => entry.finding);
+  const driftFindings = classified
+    .filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.DRIFT)
+    .map((entry) => {
+      const knownHistoricalBatch = isKnownHistoricalUnreachableFinding(entry.finding, ledger.events);
+      const poAcceptedLostReconciliationBatch = isAcceptedLostReconciliationFinding(entry.finding, ledger.events);
+      return {
+        finding: entry.finding,
+        knownHistoricalBatch,
+        acceptedReason: knownHistoricalBatch
+          ? "accepted-2026-07-19-through-2026-07-22-unreachable-commit-batch"
+          : poAcceptedLostReconciliationBatch
+            ? ACCEPTED_LOST_RECONCILIATION_BATCH_REASON
+          : knownAcceptedBacklogDrift(entry.finding, ledger.events),
+      };
+    });
+  const projection = blockingFindings.length === 0 ? projectBacklog(items, ledger.events) : null;
+  return { ok: blockingFindings.length === 0, findings: blockingFindings, drift: driftFindings, items, events: ledger.events, projection };
+}
+
+/** Detect checked-in generated projection drift. */
+export function checkBacklogState(root = DEFAULT_ROOT, options = {}) {
+  const loaded = loadBacklogState(root, options);
+  const findings = [...loaded.findings];
+  if (loaded.projection) {
+    for (const [repoPath, expected] of [[STATUS_PATH, loaded.projection.statusText], [INDEX_PATH, loaded.projection.indexText]]) {
+      const actual = readText(join(root, repoPath), findings, repoPath);
+      if (actual !== null && actual !== expected) findings.push(`${repoPath} projection drift; regenerate with check-backlog-state --write`);
+    }
+  }
+  return { ...loaded, ok: findings.length === 0, findings };
+}
+
+/** The sole projection writer; it refuses to write from invalid source data. */
+export function writeBacklogProjections(root = DEFAULT_ROOT, options = {}) {
+  const loaded = loadBacklogState(root, options);
+  if (!loaded.ok) return { ...loaded, wrote: false };
+  writeFileSync(join(root, STATUS_PATH), loaded.projection.statusText);
+  writeFileSync(join(root, INDEX_PATH), loaded.projection.indexText);
+  return { ...loaded, wrote: true };
+}
+
+function recoveryItem(entry, catalog) {
+  return {
+    path: `backlog/items/2026-07-19-${entry.id.slice("pipeline.".length)}.md`,
+    metadata: {
+      schema: ITEM_SCHEMA,
+      id: entry.id,
+      type: entry.type,
+      owner: "pipeline",
+      status: entry.status,
+      created: catalog.recoveredAt,
+      source: catalog.source,
+      tracking: "Sentinel recovery baseline; no completion claim.",
+    },
+    body: `\n# ${entry.id}\n\nThis public baseline record was recovered from the Sentinel PRD. It records scope and status only; it does not claim implementation, verification, or closure.\n`,
+  };
+}
+
+function recoveryEvent(entry, catalog, sequence, previousHash, commit, reference) {
+  const event = {
+    schema: TRANSITION_SCHEMA,
+    sequence,
+    id: entry.id,
+    from: null,
+    to: entry.status,
+    at: catalog.recoveredAt,
+    actor: "sentinel-recovery",
+    reason: "Record the public Sentinel baseline status; no implementation, verification, or closure is claimed.",
+    evidence: { kind: "sentinel-backlog-recovery", commit, reference },
+    previousHash,
+    entryHash: "",
+  };
+  event.entryHash = transitionHash(event);
+  return event;
+}
+
+/** Plan the Sentinel baseline import without changing the working tree. */
+export function planSentinelBacklogRecovery(root = DEFAULT_ROOT, { catalogPath = SENTINEL_RECOVERY_CATALOG_PATH, evidenceCommit = null, checkCommit = true } = {}) {
+  const current = checkBacklogState(root, { checkCommit });
+  if (!current.ok) return { ...current, wrote: false, targets: [] };
+  const findings = [];
+  const catalogText = readText(join(root, catalogPath), findings, catalogPath);
+  let catalog = null;
+  if (catalogText !== null) {
+    try {
+      catalog = JSON.parse(catalogText);
+      findings.push(...validateSentinelRecoveryCatalog(catalog).map((finding) => `${catalogPath}: ${finding}`));
+    } catch {
+      findings.push(`${catalogPath} is not valid JSON`);
+    }
+  }
+  const commit = evidenceCommit ?? (() => {
+    const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+    return isSuccessfulSpawn(result) ? result.stdout.trim() : null;
+  })();
+  if (typeof commit !== "string" || !/^[a-f0-9]{40}$/u.test(commit) || (checkCommit && !localCommitExists(root, commit))) findings.push("Sentinel recovery requires a reachable local evidence commit");
+  if (catalog) {
+    const currentIds = new Set(current.items.map((item) => item.metadata.id));
+    for (const entry of catalog.items) if (currentIds.has(entry.id)) findings.push(`${catalogPath}: id already exists in the current backlog: ${entry.id}`);
+  }
+  if (findings.length > 0 || !catalog) return { ...current, ok: false, findings, wrote: false, targets: [] };
+
+  const additions = catalog.items.map((entry) => recoveryItem(entry, catalog));
+  const nextItems = [...current.items, ...additions];
+  const events = [...current.events];
+  let previousHash = events.length === 0 ? null : events.at(-1).entryHash;
+  for (const entry of catalog.items) {
+    const event = recoveryEvent(entry, catalog, events.length + 1, previousHash, commit, catalogPath);
+    events.push(event);
+    previousHash = event.entryHash;
+  }
+  findings.push(...validateTransitionLedger(events, nextItems, { commitExists: checkCommit ? (oid) => localCommitExists(root, oid) : null }));
+  const projection = findings.length === 0 ? projectBacklog(nextItems, events) : null;
+  if (!projection) return { ...current, ok: false, findings, wrote: false, targets: [] };
+  const targets = [
+    ...additions.map((entry) => ({ path: entry.path, after: renderBacklogItem(entry) })),
+    { path: LEDGER_PATH, after: `${events.map((event) => JSON.stringify(event)).join("\n")}\n` },
+    { path: STATUS_PATH, after: projection.statusText },
+    { path: INDEX_PATH, after: projection.indexText },
+  ];
+  return { ...current, ok: true, findings: [], catalog, items: nextItems, events, projection, targets, wrote: false };
+}
+
+/** Apply the Sentinel baseline import only after an explicit caller decision. */
+export function applySentinelBacklogRecovery(root = DEFAULT_ROOT, options = {}) {
+  const planned = planSentinelBacklogRecovery(root, options);
+  if (!planned.ok) return { ...planned, wrote: false };
+  const transaction = writeBacklogTransaction(root, planned.targets, options);
+  return transaction.ok
+    ? { ...planned, ok: true, findings: [], wrote: true }
+    : { ...planned, ok: false, findings: transaction.findings, wrote: false };
+}
+
+const SENTINEL_WINDOWS_SCOPE_SOURCE = "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md";
+const SENTINEL_WINDOWS_SCOPE_DATE = "2026-07-22";
+const SENTINEL_WINDOWS_SCOPE_IDS = Object.freeze([
+  "pipeline.windows-runtime-baseline-containment",
+  "pipeline.windows-directory-durability",
+  "pipeline.windows-private-state-assurance",
+  "pipeline.windows-verify-reproducibility",
+  "pipeline.windows-trusted-tool-resolution",
+]);
+
+function validateSentinelScopeExtension(input) {
+  const errors = [];
+  if (!input || typeof input !== "object" || Array.isArray(input)) return ["scope extension must be an object"];
+  const expected = ["schema", "source", "admittedAt", "items"].sort();
+  const actual = Object.keys(input).sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) errors.push("scope extension has unsupported or missing fields");
+  if (input.schema !== "pipeline.sentinel-scope-extension.v1") errors.push("scope extension schema is invalid");
+  if (input.source !== SENTINEL_WINDOWS_SCOPE_SOURCE) errors.push("scope extension source must equal the PO-approved Windows scope authority");
+  if (input.admittedAt !== SENTINEL_WINDOWS_SCOPE_DATE) errors.push("scope extension admittedAt must equal the PO-approved Windows scope date");
+  const items = Array.isArray(input.items) ? input.items : [];
+  if (items.length !== SENTINEL_WINDOWS_SCOPE_IDS.length) errors.push("scope extension items must be the exact PO-approved Windows set");
+  const ids = new Set();
+  for (const entry of items) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) || Object.keys(entry).sort().join(",") !== "id,status,type") {
+      errors.push("scope extension item has unsupported or missing fields");
+      continue;
+    }
+    if (!SENTINEL_WINDOWS_SCOPE_IDS.includes(entry.id)) errors.push("scope extension item id is not PO-approved");
+    if (entry.status !== "open") errors.push("scope extension item must initialize exactly open");
+    if (entry.type !== "defect") errors.push("scope extension item type must equal defect");
+    if (ids.has(entry.id)) errors.push(`scope extension duplicates id ${entry.id}`);
+    ids.add(entry.id);
+  }
+  if (items.map((entry) => entry?.id).join("\n") !== SENTINEL_WINDOWS_SCOPE_IDS.join("\n")) errors.push("scope extension item order must equal the PO-approved Windows scope");
+  return errors;
+}
+
+function scopeExtensionItem(entry, input) {
+  return {
+    path: `backlog/items/${input.admittedAt}-${entry.id.slice("pipeline.".length)}.md`,
+    metadata: {
+      schema: ITEM_SCHEMA,
+      id: entry.id,
+      type: entry.type,
+      owner: "pipeline",
+      status: entry.status,
+      created: input.admittedAt,
+      source: input.source,
+      tracking: "PO-approved Sentinel scope extension; no implementation or closure claim.",
+    },
+    body: `\n# ${entry.id}\n\nThis public record admits a PO-approved Sentinel scope extension. It records scope and status only; it does not claim implementation, verification, or closure.\n`,
+  };
+}
+
+/** Plan an explicit, append-only Sentinel scope extension without changing the working tree. */
+export function planSentinelScopeExtension(root = DEFAULT_ROOT, input, { evidenceCommit = null, checkCommit = true } = {}) {
+  const current = checkBacklogState(root, { checkCommit });
+  const findings = [...current.findings, ...validateSentinelScopeExtension(input)];
+  const commit = evidenceCommit ?? (() => {
+    const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+    return isSuccessfulSpawn(result) ? result.stdout.trim() : null;
+  })();
+  if (typeof commit !== "string" || !/^[a-f0-9]{40}$/.test(commit) || (checkCommit && !localCommitExists(root, commit))) findings.push("Sentinel scope extension requires a reachable local evidence commit");
+  const currentIds = new Set(current.items.map((item) => item.metadata.id));
+  const extensionItems = Array.isArray(input?.items) ? input.items : [];
+  for (const entry of extensionItems) if (entry && typeof entry === "object" && currentIds.has(entry.id)) findings.push(`scope extension id already exists in the current backlog: ${entry.id}`);
+  if (findings.length > 0) return { ...current, ok: false, findings, wrote: false, targets: [] };
+  const additions = extensionItems.map((entry) => scopeExtensionItem(entry, input));
+  const items = [...current.items, ...additions];
+  const events = [...current.events];
+  let previousHash = events.at(-1)?.entryHash ?? null;
+  for (const entry of extensionItems) {
+    const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: entry.id, from: null, to: entry.status, at: input.admittedAt, actor: "sentinel-scope-extension", reason: "Record the PO-approved Sentinel scope extension; no implementation or closure is claimed.", evidence: { kind: "sentinel-scope-extension", commit, reference: input.source }, previousHash, entryHash: "" };
+    event.entryHash = transitionHash(event);
+    events.push(event);
+    previousHash = event.entryHash;
+  }
+  findings.push(...validateTransitionLedger(events, items, { commitExists: checkCommit ? (oid) => localCommitExists(root, oid) : null }));
+  const projection = findings.length === 0 ? projectBacklog(items, events) : null;
+  if (!projection) return { ...current, ok: false, findings, wrote: false, targets: [] };
+  const targets = [...additions.map((item) => ({ path: item.path, after: renderBacklogItem(item) })), { path: LEDGER_PATH, after: `${events.map((event) => JSON.stringify(event)).join("\n")}\n` }, { path: STATUS_PATH, after: projection.statusText }, { path: INDEX_PATH, after: projection.indexText }];
+  return { ...current, ok: true, findings: [], items, events, projection, targets, wrote: false };
+}
+
+/** Apply one explicit Sentinel scope extension through the same recoverable transaction writer. */
+export function applySentinelScopeExtension(root = DEFAULT_ROOT, input, options = {}) {
+  const planned = planSentinelScopeExtension(root, input, options);
+  if (!planned.ok) return { ...planned, wrote: false };
+  const transaction = writeBacklogTransaction(root, planned.targets, options);
+  return transaction.ok ? { ...planned, ok: true, findings: [], wrote: true } : { ...planned, ok: false, findings: transaction.findings, wrote: false };
+}
+
+/**
+ * Sanctioned status writer. It prepares all four derived files first, stores a
+ * durable preimage journal, atomically replaces each individual file, and
+ * removes the journal only after the full set is present. A later recovery
+ * deterministically restores the complete pre-transition state.
+ */
+export function applyBacklogTransition(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  if (!current.ok) return { ...current, wrote: false, transition: null };
+  const planned = planBacklogTransition(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const closing = planned.items.find((item) => item.metadata.id === input.id)?.metadata;
+  if (closing?.status === "closed") {
+    if (closing.closure_repository === "self" && !localCommitExists(root, closing.closure_commit)) {
+      return { ...current, ok: false, findings: [`${input.id}: closure_commit is not a reachable local Git commit`], wrote: false, transition: null };
+    }
+    const tracking = repositoryTrackingState(root, closing.closure_evidence);
+    if (tracking === "absent") {
+      return { ...current, ok: false, findings: [`${input.id}: closure_evidence is missing or not a regular repository file`], wrote: false, transition: null };
+    }
+    if (tracking === "untracked") {
+      return { ...current, ok: false, findings: [untrackedEvidenceFinding(input.id, closing.closure_evidence)], wrote: false, transition: null };
+    }
+    if (closing.closure_repository.startsWith("project:")) {
+      const readbackFindings = projectReadbackFindings(root, { path: input.id, metadata: closing });
+      if (readbackFindings.length > 0) return { ...current, ok: false, findings: readbackFindings, wrote: false, transition: null };
+    }
+  }
+  const changed = planned.items.find((item) => item.metadata.id === input.id);
+  const targets = [
+    { path: changed.path, after: renderBacklogItem(changed) },
+    { path: LEDGER_PATH, after: `${planned.events.map((event) => JSON.stringify(event)).join("\n")}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const journalPath = join(root, TRANSACTION_PATH);
+  const journal = {
+    schema: "pipeline.backlog-transaction.v1",
+    files: targets.map((target) => ({ path: target.path, before: readFileSync(join(root, target.path), "utf8") })),
+  };
+  try {
+    writeFileSync(journalPath, `${JSON.stringify(journal)}\n`, { flag: "wx" });
+    for (const target of targets) atomicWrite(join(root, target.path), target.after);
+    unlinkSync(journalPath);
+    return { ...current, ok: true, findings: [], wrote: true, transition: planned.event };
+  } catch (error) {
+    const recovery = recoverBacklogTransaction(root);
+    return {
+      ...current,
+      ok: false,
+      findings: [`backlog transition write failed: ${error.message}`, ...recovery.findings],
+      wrote: false,
+      transition: null,
+    };
+  }
+}
+
+/** Append one strictly bound evidence amendment to an already-closed item. */
+export function applyBacklogEvidenceAmendment(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  if (!current.ok) return { ...current, wrote: false, transition: null };
+  const planned = planBacklogEvidenceAmendment(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const changed = planned.items.find((entry) => entry.metadata.id === input.id);
+  if (options.checkCommit !== false && !localCommitExists(root, changed.metadata.closure_commit)) return { ...current, ok: false, findings: [`${input.id}: amendment closure_commit is not a reachable local Git commit`], wrote: false, transition: null };
+  const amendmentTracking = repositoryTrackingState(root, changed.metadata.closure_evidence);
+  if (amendmentTracking === "absent") return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence is missing or not a regular repository file`], wrote: false, transition: null };
+  if (amendmentTracking === "untracked") return { ...current, ok: false, findings: [untrackedEvidenceFinding(`${input.id}: amendment`, changed.metadata.closure_evidence)], wrote: false, transition: null };
+  let resultRecord;
+  try { resultRecord = JSON.parse(readFileSync(join(root, changed.metadata.closure_evidence), "utf8")); } catch { return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence is not valid JSON`], wrote: false, transition: null }; }
+  const resultBound = validReadySnt1Result(resultRecord)
+    && resultRecord.resultSha256 === input.evidence.resultSha256
+    && resultRecord?.gates?.private?.projectionSha256 === input.evidence.privateLicenseGateSha256
+    && resultRecord?.gates?.["neutral-public"]?.projectionSha256 === input.evidence.neutralPublicLicenseGateSha256;
+  if (!resultBound) return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence does not bind the exact ready Result and gate projections`], wrote: false, transition: null };
+  const targets = [
+    { path: changed.path, after: renderBacklogItem(changed) },
+    { path: LEDGER_PATH, after: `${planned.events.map((event) => JSON.stringify(event)).join("\n")}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/** Repair exactly one known missing initial AFK-item event through the common transaction journal. */
+export function applyElephantAfkLedgerRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFinding = "items: pipeline.elephant-direct-implementation-under-afk-authorization has no transition-ledger entry";
+  if (current.findings.length !== 1 || current.findings[0] !== expectedFinding) return { ...current, ok: false, findings: ["AFK ledger repair requires its single exact missing-event finding", ...current.findings], wrote: false, transition: null };
+  if (options.checkCommit !== false && !localCommitExists(root, input?.evidenceCommit)) return { ...current, ok: false, findings: ["AFK ledger repair evidence commit is not reachable"], wrote: false, transition: null };
+  const planned = planElephantAfkLedgerRepair(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const item = current.items.find((entry) => entry.metadata.id === input.id);
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    { path: item.path, after: readFileSync(join(root, item.path), "utf8") },
+    { path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/** Repair exactly the one missing 0.4.7 managed-onboarding initial event. */
+export function applyManagedOnboardingLedgerRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFinding = "items: pipeline.managed-onboarding-success-contract has no transition-ledger entry";
+  if (current.findings.length !== 1 || current.findings[0] !== expectedFinding) return { ...current, ok: false, findings: ["managed onboarding ledger repair requires its single exact missing-event finding", ...current.findings], wrote: false, transition: null };
+  if (options.checkCommit !== false && !localCommitExists(root, input?.evidenceCommit)) return { ...current, ok: false, findings: ["managed onboarding ledger repair evidence commit is not reachable"], wrote: false, transition: null };
+  const managedItem = current.items.find((entry) => entry.metadata.id === input?.id);
+  const managedBytes = managedItem ? readFileSync(join(root, managedItem.path)) : null;
+  if (!managedBytes || createHash("sha256").update(managedBytes).digest("hex") !== input?.itemSha256) return { ...current, ok: false, findings: ["managed onboarding ledger repair item bytes changed"], wrote: false, transition: null };
+  const planned = planManagedOnboardingLedgerRepair(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const item = current.items.find((entry) => entry.metadata.id === input.id);
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    { path: item.path, after: readFileSync(join(root, item.path), "utf8") },
+    { path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/**
+ * Append one item-hash-rescope-amendment; never touches the amended event or
+ * the item file. ADR-0068 D4's corrective use re-binds a stale pin after a
+ * merge moved the item's bytes -- exactly the condition that makes
+ * checkBacklogState itself report the pin as broken. The precondition below
+ * therefore tolerates ONLY the specific stale-pin finding THIS call's own
+ * amendsSequence/id would resolve (bound to a real target event, never a
+ * blanket `!current.ok` bypass); any other outstanding finding still blocks
+ * -- same discipline as applyItemHashAmendment above.
+ */
+export function applyBacklogItemHashRescopeAmendment(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  if (!current.ok) {
+    const target = Number.isSafeInteger(input?.amendsSequence)
+      ? current.events.find((event) => event?.sequence === input.amendsSequence && event?.id === input?.id && event?.evidence?.kind === "missing-initial-ledger-repair")
+      : undefined;
+    const expectedFindings = target
+      ? [
+          `ledger event ${input.amendsSequence}: itemSha256 does not bind the current item bytes`,
+          `ledger event ${input.amendsSequence}: item-hash-rescope-amendment itemSha256 does not bind the current item's pre-Triage bytes`,
+        ]
+      : [];
+    if (!target || current.findings.length !== 1 || !expectedFindings.includes(current.findings[0])) {
+      return { ...current, ok: false, findings: ["item hash rescope amendment requires its own target's exact stale-pin finding, with nothing else outstanding", ...current.findings], wrote: false, transition: null };
+    }
+  }
+  const planned = planBacklogItemHashRescopeAmendment(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const item = current.items.find((entry) => entry.metadata.id === input.id);
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    { path: item.path, after: readFileSync(join(root, item.path), "utf8") },
+    { path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/** Append only the two AC-047-99 reachability amendments and regenerate projections. */
+export function applyBacklogReachabilityRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFindings = [
+    "ledger event 39: evidence.commit is not a reachable local Git commit",
+    "ledger event 40: evidence.commit is not a reachable local Git commit",
+  ];
+  if (current.findings.join("\n") !== expectedFindings.join("\n")) {
+    return {
+      ...current,
+      ok: false,
+      findings: ["reachability repair requires exactly the canonical events 39/40 findings", ...current.findings],
+      wrote: false,
+      transitions: [],
+    };
+  }
+  if (options.checkCommit !== false && !localCommitExists(root, input?.commit)) {
+    return { ...current, ok: false, findings: ["reachability repair commit is not reachable"], wrote: false, transitions: [] };
+  }
+  const planned = planBacklogReachabilityRepair(current.items, current.events, input);
+  if (!planned.ok) {
+    return { ...current, ok: false, findings: planned.errors, wrote: false, transitions: [] };
+  }
+  for (const event of planned.appended) {
+    const referenceFindings = reachabilityAmendmentFindings(root, event);
+    if (referenceFindings.length > 0) {
+      return { ...current, ok: false, findings: referenceFindings, wrote: false, transitions: [] };
+    }
+  }
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    {
+      path: LEDGER_PATH,
+      after: `${ledgerBefore}${planned.appended.map((event) => JSON.stringify(event)).join("\n")}\n`,
+    },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok
+    ? { ...current, ok: true, findings: [], wrote: true, transitions: planned.appended }
+    : { ...current, ok: false, findings: transaction.findings, wrote: false, transitions: [] };
+}
+
+/**
+ * Append the 38 PHX-LEDGER-REACH pre-public-core reachability amendments and
+ * regenerate projections. Sibling to applyBacklogReachabilityRepair; it never
+ * touches that function or the events-39/40 mechanism it wraps.
+ */
+export function applyPrePublicCoreReachabilityRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFindings = Object.keys(PRE_PUBLIC_CORE_REACHABILITY_TARGETS)
+    .map(Number)
+    .sort((left, right) => left - right)
+    .map((sequence) => `ledger event ${sequence}: evidence.commit is not a reachable local Git commit`);
+  if (current.findings.join("\n") !== expectedFindings.join("\n")) {
+    return {
+      ...current,
+      ok: false,
+      findings: ["pre-public-core reachability repair requires exactly its authorized 38 currently failing events", ...current.findings],
+      wrote: false,
+      transitions: [],
+    };
+  }
+  if (options.checkCommit !== false && !localCommitExists(root, input?.commit)) {
+    return { ...current, ok: false, findings: ["pre-public-core reachability repair commit is not reachable"], wrote: false, transitions: [] };
+  }
+  const planned = planPrePublicCoreReachabilityRepair(current.items, current.events, input);
+  if (!planned.ok) {
+    return { ...current, ok: false, findings: planned.errors, wrote: false, transitions: [] };
+  }
+  for (const event of planned.appended) {
+    const referenceFindings = reachabilityAmendmentFindings(root, event);
+    if (referenceFindings.length > 0) {
+      return { ...current, ok: false, findings: referenceFindings, wrote: false, transitions: [] };
+    }
+  }
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    {
+      path: LEDGER_PATH,
+      after: `${ledgerBefore}${planned.appended.map((event) => JSON.stringify(event)).join("\n")}\n`,
+    },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok
+    ? { ...current, ok: true, findings: [], wrote: true, transitions: planned.appended }
+    : { ...current, ok: false, findings: transaction.findings, wrote: false, transitions: [] };
+}
+
+/**
+ * Repair exactly one authorized item-hash-amendment target (a genesis
+ * event's stale itemSha256 binding) through the common transaction journal.
+ *
+ * The precondition is scoped to the target, not to global repo cleanliness:
+ * it requires the target's own exact stale-binding finding to be the ONLY
+ * finding that mentions that target's ledger sequence, item id, or item
+ * reference, and refuses if the resulting plan introduces any new finding
+ * about that same target. Every sibling one-shot repair in this module
+ * instead requires the checker's ENTIRE finding set to be exactly one
+ * expected entry; on a live, continuously multi-dispatched shared ledger
+ * that stricter shape would make a narrowly authorized, independently
+ * verified repair hostage to unrelated, out-of-scope defects elsewhere in
+ * the backlog. Regenerating STATUS.md/index.json still requires the checker
+ * to be fully clean (matching loadBacklogState's own fail-closed contract
+ * for projections); when it is not, only the ledger event is written and
+ * the projections are left for a later, fully clean pass to regenerate
+ * (PHX-WP-LEDGER-AMENDMENT-KIND).
+ */
+export function applyItemHashAmendment(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const target = Number.isSafeInteger(input?.supersedesSequence) ? ITEM_HASH_AMENDMENT_TARGETS[input.supersedesSequence] : undefined;
+  const expectedFinding = target ? `ledger event ${input.supersedesSequence}: itemSha256 does not bind the current item bytes` : null;
+  const relatedToTarget = (finding) => target !== undefined
+    && (finding.startsWith(`ledger event ${input.supersedesSequence}:`) || finding.startsWith(`${target.reference}:`) || finding.includes(target.id));
+  const relatedFindings = current.findings.filter(relatedToTarget);
+  if (!expectedFinding || relatedFindings.length !== 1 || relatedFindings[0] !== expectedFinding) {
+    return { ...current, ok: false, findings: ["item hash amendment requires its target's exact stale-binding finding, with nothing else about that target unexpected", ...current.findings], wrote: false, transition: null };
+  }
+  if (options.checkCommit !== false && !localCommitExists(root, input?.commit)) {
+    return { ...current, ok: false, findings: ["item hash amendment commit is not reachable"], wrote: false, transition: null };
+  }
+  const planned = planItemHashAmendment(current.items, current.events, input);
+  if (!planned.event) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const newTargetFindings = planned.errors.filter((finding) => finding.startsWith(`ledger event ${planned.event.sequence}:`) || relatedToTarget(finding));
+  if (newTargetFindings.length > 0) {
+    return { ...current, ok: false, findings: ["item hash amendment plan introduced a new finding about its own target", ...newTargetFindings], wrote: false, transition: null };
+  }
+  const referenceFindings = itemHashAmendmentFindings(root, planned.event);
+  if (referenceFindings.length > 0) return { ...current, ok: false, findings: referenceFindings, wrote: false, transition: null };
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [{ path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` }];
+  if (planned.projection) {
+    targets.push({ path: STATUS_PATH, after: planned.projection.statusText });
+    targets.push({ path: INDEX_PATH, after: planned.projection.indexText });
+  }
+  const transaction = writeBacklogTransaction(root, targets, options);
+  if (!transaction.ok) return { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+  const remaining = current.findings.filter((finding) => finding !== expectedFinding);
+  return { ...current, ok: remaining.length === 0, findings: remaining, wrote: true, transition: planned.event };
+}
+
+/** Readonly first leg of GIT-09: only genuinely added open registrations.
+ * The source ledger and projections remain the exact committed baseline until
+ * the item commit supplies the real reconciliation evidence OID. No finding
+ * except each admitted new item's missing initial event is deferred.
+ */
+export function checkBacklogRegistrationCommit(root = DEFAULT_ROOT) {
+  try {
+    const git=(args)=>{const r=spawnSync("git",args,{cwd:root,timeout:10000,maxBuffer:16*1024*1024});if(!isSuccessfulSpawn(r)||!Buffer.isBuffer(r.stdout))throw new Error("Git unavailable");return new TextDecoder("utf-8",{fatal:true}).decode(r.stdout);};
+    const head=git(["rev-parse","--verify","HEAD"]).trim();
+    if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(head))throw new Error("HEAD unavailable");
+    const before=git(["ls-files","--stage","-z"]);
+    const listing=git(["diff","--cached","--name-status","--no-renames","-z"]);
+    if(!listing.endsWith("\0"))throw new Error("empty stage");
+    const fields=listing.slice(0,-1).split("\0");
+    if(fields.length%2)throw new Error("malformed status list");
+    const candidates=[];
+    for(let i=0;i<fields.length;i+=2){
+      const status=fields[i],path=fields[i+1];
+      if(status==="A" && /^backlog\/items\/[^/]+\.md$/u.test(path) && path!=="backlog/items/TEMPLATE.md") candidates.push(path);
+      else if(!/^[AMD]$/u.test(status) || !/^specs\/(?:[A-Za-z0-9._-]+\/)+(?:prd|spec|design|sdp|plan|acceptance|readiness)(?:_[A-Za-z0-9._-]+)?\.md$/u.test(path) || path.split("/").includes("evidence")) throw new Error("not an open-registration commit");
+    }
+    if(!candidates.length || new Set(candidates).size!==candidates.length)throw new Error("no unique registrations");
+    const current=loadBacklogState(root);
+    const pending=[];
+    for(const path of candidates){
+      const mode=git(["ls-files","--stage","-z","--",path]);
+      if(!/^100644 [a-f0-9]+ 0\t/u.test(mode)||mode.split("\0").filter(Boolean).length!==1)throw new Error("unsafe index entry");
+      const bytes=git(["show",":0:"+path]);
+      if(bytes!==readFileSync(join(root,path),"utf8") || !regularFile(root,path))throw new Error("item index/worktree mismatch");
+      const parsed=parseBacklogItem(bytes,{path});
+      if(!parsed.ok || parsed.item.metadata.status!=="open" || Object.keys(parsed.item.metadata).some((key)=>key.startsWith("closure_")) || current.events.some((event)=>event.id===parsed.item.metadata.id))throw new Error("not a new schema-valid open item");
+      pending.push({path,id:parsed.item.metadata.id,sha256:createHash("sha256").update(bytes).digest("hex")});
+    }
+    // The baseline must still be ordinary strict state. Existing item/schema,
+    // source-ledger and generated-projection bytes cannot change in this leg.
+    const baseline=git(["ls-tree","-r","--name-only","-z",head,"--","backlog/items/","backlog/schemas/",LEDGER_PATH,STATUS_PATH,INDEX_PATH]).split("\0").filter(Boolean);
+    for(const path of baseline){if(!regularFile(root,path)||git(["show",head+":"+path])!==readFileSync(join(root,path),"utf8"))throw new Error("baseline changed");}
+    const deferred=new Set(pending.map((item)=>`items: ${item.id} has no transition-ledger entry`));
+    const findings=current.findings.filter((finding)=>!deferred.has(finding));
+    if(pending.some((item)=>!current.findings.includes(`items: ${item.id} has no transition-ledger entry`)))throw new Error("missing exact registration finding");
+    const ids=new Set(pending.map((item)=>item.id));
+    const projection=projectBacklog(current.items.filter((item)=>!ids.has(item.metadata.id)),current.events);
+    if(readFileSync(join(root,STATUS_PATH),"utf8")!==projection.statusText || readFileSync(join(root,INDEX_PATH),"utf8")!==projection.indexText)findings.push("committed baseline projection drift");
+    if(before!==git(["ls-files","--stage","-z"]) || head!==git(["rev-parse","--verify","HEAD"]).trim())throw new Error("Git input drift");
+    return {...current,ok:findings.length===0,findings,projection:null,pendingRegistration:pending,registrationCommitOnly:true};
+  } catch {return {ok:false,findings:["open-registration precheck requires exact new open items, unchanged committed baseline, and stable genuine Git index"],drift:[],pendingRegistration:[],registrationCommitOnly:true};}
+}
+
+function cli() {
+  const args = process.argv.slice(2);
+  const write = args.includes("--write");
+  const registrationCommit = args.length === 1 && args[0] === "--registration-commit";
+  const unsupported = args.filter((arg) => arg !== "--write" && arg !== "--registration-commit");
+  if (unsupported.length > 0 || (args.includes("--registration-commit") && !registrationCommit)) {
+    console.error(`Usage: node plugins/pipeline-core/scripts/check-backlog-state.mjs [--write | --registration-commit]`);
+    process.exit(2);
+  }
+  const result = registrationCommit ? checkBacklogRegistrationCommit() : write ? writeBacklogProjections() : checkBacklogState();
+  // Drift is reported unconditionally — whether the run is otherwise green or
+  // not — so it is never silently swallowed just because it does not block.
+  for (const entry of result.drift ?? []) {
+    const disposition = entry.knownHistoricalBatch
+      ? "known accepted 2026-07-19..2026-07-22 historical batch"
+      : entry.acceptedReason === ACCEPTED_LEDGER_EVENT_403_REASON
+        ? "known accepted ledger event 403 abbreviated OID"
+        : entry.acceptedReason === ACCEPTED_LOST_RECONCILIATION_BATCH_REASON
+          ? "PO accepted 2026-09-15 lost reconciliation batch"
+        : null;
+    console.error(`DRIFT backlog state: ${entry.finding}${disposition ? ` (${disposition})` : ""}`);
+  }
+  if (!result.ok) {
+    for (const finding of result.findings) console.error(`FAIL backlog state: ${finding}`);
+    process.exit(2);
+  }
+  if (registrationCommit) { console.log("Open-registration commit inputs valid; initial ledger entries remain pending until the item commit and official reconciliation."); return; }
+  console.log(write
+    ? "Backlog state valid; deterministic STATUS.md and index.json regenerated."
+    : "Backlog state, transition ledger, closure evidence, and generated projections are valid.");
+}
+
+if (isDirectInvocation(import.meta.url)) cli();
