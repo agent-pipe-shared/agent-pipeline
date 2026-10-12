@@ -1,0 +1,32 @@
+{
+  "schema":"alfred.model-supported-protocol.actual-focused-proof.v1",
+  "status":"qualified-focused-three",
+  "cases":[
+    {"id":"I08T001","disposition":"pass","scope":"Two genuine successive pointer writes, actual signed authority marker successor, immutable prior generation/receipt, own live identity and Source reference refresh, foreign/released physical history"},
+    {"id":"I08T002","disposition":"pass","scope":"Both actual generation and receipt byte faults rejected through genuine Source refusal protocol; fault retained, no new publication, owning rows/history restored and conserved"},
+    {"id":"I08T010-LOST-PIN-CONTROL","disposition":"pass","scope":"Partial original I08T010: lost own retained lifetime pin refuses and remaining target/history stays conserved; independent foreign live owner remains pending"}
+  ],
+  "completion":{"status":"complete","declaredCount":3,"disposedCount":3,"counts":{"pass":3,"fail":0,"skip":0,"todo":0},"receipt":{"path":"public-completion.ndjson","sha256":"05004f67fca1c31208845ae29e4e4411cf2e483482ef1d9d25f2cedd56a7bbf5","bytes":955},"policySha256":"103bc06a4b7cc80f68252ce0b8a03f365dbf49ed80d8775c11cffa3caa68c350","caseSetSha256":"95a97140023d3b1951f1f2c3da1ffe75f211f784c2e52fdc1dc1311638c6a835","dispositionsSha256":"eb83e8dc1b2b3452d5945e90cd8617bcccf08b507266395f0f49912f48816930"},
+  "sourceBindings":{"modelFamilyHost":"25ba46d8f97425e0b7a20ac9406edc4bd972c78aa8ee57e73ba6c368c3aaeb83","domainOwner":"138784269c2c38a6ded176c3363c30a26635cfef56136dbef1414c8549dcdd4d","registry":"af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9"},
+  "independentAssertionsSha256":"2c550bbd45552d73a115be58d70dbba37877f2d7254ce75eba736b449970cb48",
+  "independentAssertionFreezeSha256":"78e52f2c815363d161347f574544a6a721ab681af02998b88ccca00c99782d53",
+  "qualificationFreezeSha256":"617ff6720736aea7f4e3d4c81070ee4219b5a2aac1f5ef9bafad548de488d0ed",
+  "actualPublicStdoutSha256":"8d9fe0a2ef6151851fad3d1597eb75a0fc72b51639880911ee5d0c54bfe53a00",
+  "childExit":0,
+  "signal":null,
+  "preparationErrors":0,
+  "spawnErrors":0,
+  "parserErrors":0,
+  "graphErrors":0,
+  "parentErrors":0,
+  "restoreErrors":0,
+  "publicResourceCount":1700,
+  "originalTwoSourceInodeModeBytesRestored":true,
+  "originalWithdrawnAssertionsUnrunPreserved":true,
+  "authorBusinessRuns":0,
+  "nativeAssurance":false,
+  "humanSignatureCertification":false,
+  "full26Closure":false,
+  "wholeBacklogItemClosure":false,
+  "privacy":"Sanitized case outcomes, public Source/test hashes and actual FD3 only; excludes fixture home/runtime/session/process/private key/environment contents."
+}

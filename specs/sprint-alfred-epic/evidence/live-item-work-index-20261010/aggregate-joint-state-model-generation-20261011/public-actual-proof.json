@@ -1,0 +1,241 @@
+{
+  "schema": "alfred.aggregate-joint.actual-public-proof.v1",
+  "status": "qualified-exact-twelve-case-combined-generation",
+  "privateReceiptSha256": "674ad5192e7df146e30675f11a2bee28bf48b7428b77b2845818584e75ccb3ab",
+  "qualificationFreezeSha256": "21a8911ca0f2678cfd7a21ffb525a1d51442e39f53fdc2cf73ddf9fb0db88523",
+  "caseIds": [
+    "AGD002",
+    "EFC001",
+    "EFC002",
+    "EFC003",
+    "EFC004",
+    "EFC005",
+    "EFC006",
+    "EFC007",
+    "EFC008",
+    "FULLSTATE006",
+    "I08T010",
+    "I08T011"
+  ],
+  "counts": {
+    "pass": 12,
+    "fail": 0,
+    "skip": 0,
+    "unexecuted": 0
+  },
+  "results": [
+    {
+      "id": "state006",
+      "caseIds": [
+        "FULLSTATE006"
+      ],
+      "exitCode": 0,
+      "timeout": false,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "ef11f3f2b0f3c59516768d50dcf5af086d5f0b213d6f4c232ed757ef7498c6ab",
+        "caseSetSha256": "13b77d3d5c8423ca196f2cc90352b71627803e2e7ac062e6ef918a7c47b90fe8",
+        "dispositionsSha256": "3493a396e2c460d17f651656f17d6a3b9a6db2221046a8b8077e0945e17526ea",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionArtifact": {
+        "name": "state006-completion.ndjson",
+        "sha256": "192d334c72c326be7cb46f0667f62341f6f7fd243d5baf622afc838adf5029ee",
+        "bytes": 653
+      },
+      "policyArtifact": {
+        "name": "state006-policy.json",
+        "sha256": "7ca8322747f439316417dd72cdeb65c16e4683e9c9300a763a9f9ed7927a9731",
+        "bytes": 120
+      }
+    },
+    {
+      "id": "model010",
+      "caseIds": [
+        "I08T010"
+      ],
+      "exitCode": 0,
+      "timeout": false,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "2de2363606732a103f38e06f8a93275fabfafe13d1faff1c2b61bd2571618360",
+        "caseSetSha256": "eca4e83cedd9972fd29b3e11a35de89b8d85a3fb2697d5909ffacaaab5682456",
+        "dispositionsSha256": "d2a38c7e58bb65f6c262d834085f288234e14f2c9620df2c2c63f12f68c7c957",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionArtifact": {
+        "name": "model010-completion.ndjson",
+        "sha256": "135bad3127ba8d8a4a671218b1b1bca3633e4f8d32636938ec8bf6fc81948efc",
+        "bytes": 638
+      },
+      "policyArtifact": {
+        "name": "model010-policy.json",
+        "sha256": "88dcb7043ec1c963d7f47dc5a62acf21279d67ea1d8cd274be49528c898ebf32",
+        "bytes": 115
+      }
+    },
+    {
+      "id": "model011",
+      "caseIds": [
+        "I08T011"
+      ],
+      "exitCode": 0,
+      "timeout": false,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "dbd4a25fe77fc96f3a9c340cb38652ee4145ee33d2453ce91845618f66b217b0",
+        "caseSetSha256": "6ade307684b298d61501e91120959ec2dece0190e2bf99cf694c3f3ada69eeb2",
+        "dispositionsSha256": "4a479f7edcf8e700622efedfdd541c18907c63ccd54e416ecef8ad17c0d8ace7",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionArtifact": {
+        "name": "model011-completion.ndjson",
+        "sha256": "51cf88ca3afc591693f4d6c722d3ee3afd794d1867ff3e92200a30ddfc669fe6",
+        "bytes": 638
+      },
+      "policyArtifact": {
+        "name": "model011-policy.json",
+        "sha256": "88be3712d607ac2b6d818da048f0d3430e4b9651e02c152aa6bc026f72ae0e88",
+        "bytes": 115
+      }
+    },
+    {
+      "id": "efc8",
+      "caseIds": [
+        "EFC001",
+        "EFC002",
+        "EFC003",
+        "EFC004",
+        "EFC005",
+        "EFC006",
+        "EFC007",
+        "EFC008"
+      ],
+      "exitCode": 0,
+      "timeout": false,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "d574eacf31ac685340caa54168e2fe22a439b2f3c66cb2977b21e4a8d7ac75a5",
+        "caseSetSha256": "9d8255ffc545577f89e68f035b5e20d93a9122bad7ca8751adf8edb39d240c28",
+        "dispositionsSha256": "a66764ff135f49d07e16d2e116db1d240f7d3b2152c970ba1ac46324e03bcf26",
+        "declaredCount": 8,
+        "disposedCount": 8,
+        "counts": {
+          "pass": 8,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionArtifact": {
+        "name": "efc8-completion.ndjson",
+        "sha256": "3ecf70a46c7c82686e996a02db64cbd022f13ff46c54efd5ba957136d1d32da6",
+        "bytes": 1545
+      },
+      "policyArtifact": {
+        "name": "efc8-policy.json",
+        "sha256": "05ff00c9782f585096a3d63f14ad426f31dccafb43ee9589313d190877607afe",
+        "bytes": 212
+      }
+    },
+    {
+      "id": "agd002",
+      "caseIds": [
+        "AGD002"
+      ],
+      "exitCode": 0,
+      "timeout": false,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "026e74e8d726aa58a420eeddfac4fa71fada17a74d5086b7184a34a09c19676c",
+        "caseSetSha256": "4322b5386ed0b62e3310fd06494eb3419ea7ea965ce574e63ae377c7d655879d",
+        "dispositionsSha256": "1cdae579fb5abeb4c88dd0b44f72f482e863b814fa2bbd4b957523a528c50e4e",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionArtifact": {
+        "name": "agd002-completion.ndjson",
+        "sha256": "577a075a2aa10402bdb7bd3521e517e4ee440e06e51c46076f1a496df4751ac4",
+        "bytes": 635
+      },
+      "policyArtifact": {
+        "name": "agd002-policy.json",
+        "sha256": "b5b04c9beda85ab17e5c16fe81ffc01a1a7197ffd6116890f1e50db49b054a50",
+        "bytes": 114
+      }
+    }
+  ],
+  "sourceDigests": {
+    "Registry": "c99115b6ba480b727627dec585a4b5f69350dfdc0bd082b97bbbdb79dc4eb7ef",
+    "I03": "6a3387c51fcd20ad5cba3023014f0f9506c361fd6dad238dd1fcf7b00e99a123",
+    "State": "26c4737639e82b84e82de23c9eff4fe0b23bca97eafdfec84c1651ecba81e63d",
+    "AFKHost": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+    "AFKLedger": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+    "Domain": "74e0feb567ef0321a98f432054945942f963f810215b84d65c2c116b4b3764ea",
+    "Model": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f",
+    "StateFixture": "30a9145330b3a20ba598c768adab278dbf584edf6e03a448d8f82be58ed0e7c9",
+    "CalibrationHelper": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+    "HookInstaller": "99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4",
+    "plugins/pipeline-core/lib/architecture-effective-decisions.mjs": "f4c2c37135d225148cd79cbe61fce4d45480a60f133a6167ef51c8eb08290c5f",
+    "plugins/pipeline-core/lib/design-decision-bindings.mjs": "6a3167e0f23d7edcce10d4bc9d20df0ea823d845623f373514678b18ae87a8ac",
+    "plugins/pipeline-core/lib/architecture-design.mjs": "bb7c73a10080810fec955297232191334f1952266a789c3ec4eb0bd55aaf88ca",
+    "plugins/pipeline-core/lib/model-family-authority.mjs": "c35b26f0650f88fa07a56536632ea4464a5d68c10cac9071e85f19418c4680b2",
+    "plugins/pipeline-core/lib/model-family-host-store.mjs": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f"
+  },
+  "resourceCount": 1723,
+  "sourceConserved": true,
+  "resourcesConserved": true,
+  "directoryMembershipConserved": true,
+  "actualProductionParserSha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+  "recorderSha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+  "originalAssertionsUnchanged": true,
+  "scope": [
+    "original State006 approval/final canonical accepted-contract readback",
+    "original Model010 genuine foreign controlled process pre-reservation veto",
+    "original Model011 controlled transition observation/six original probes",
+    "original EFC001\u2013008 mechanics and original AGD002 unsigned presentation refusal; same combined generation"
+  ],
+  "limits": [
+    "EFC006 unknown historical-looking metadata negative only; authenticated inherited/adoption positive held",
+    "EFC007 retained-proof storage/ordinary descendant/tamper only; lawful-close/non-descendant positive held",
+    "AFK controls and new approval-ticket controls not qualified",
+    "no whole item/full26/candidate/native/Human acceptance or product integration asserted"
+  ],
+  "projection": "closed field minimization; exact original FD3 and policies; no raw output/private runtime/session/key data",
+  "nativeAssurance": false,
+  "humanApproval": false,
+  "wholeItemAccepted": false,
+  "productApplied": false
+}

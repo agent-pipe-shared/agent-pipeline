@@ -1,0 +1,58 @@
+{
+  "schema": "alfred.hgo-native-action-preparation-api.v1",
+  "parentSource": "legacy-origin:alfred-hgo-windows-process-start-identity-source-20261010/postimages/plugins/pipeline-core/lib/human-guard-override.mjs",
+  "parentSha256": "5a99c7352a618776fee8157c8d56943c9d5c45766d82c1071fc701b8826e5bc2",
+  "independentNormativeFreeze": "legacy-origin:alfred-hgo-native-action-preparation-independent-20261010/normative-freeze.json",
+  "independentNormativeSha256": "564ba6026bde31f212bd0a4a49a284ffe5e755a58a65170216acbbd843a8716e",
+  "publicAdmissionAPIs": "Existing recordHumanGuardDenial, planHumanGuardOverride, prepareHumanGuardOverrideAuthorization, prepareHumanGuardOverrideForSignature, buildHumanGuardOverrideSignatureIntent, authorizeHumanGuardOverrideBySignature and consumeHumanGuardOverride signatures are unchanged; genuine proof and session authority producers remain required.",
+  "nativeVersions": {
+    "request": "pipeline.human-guard-override-request.v4",
+    "plan": "pipeline.human-guard-override-plan.v4",
+    "capability": "pipeline.human-guard-override-capability.v4",
+    "field": "nativeTargets",
+    "binding": "pipeline.hgo-native-target-preimages.v1",
+    "selection": "New eligible in-root Edit/Write records only; current classifiers and denial restrictions unchanged. Existing v3 records, Bash, plugin install, cross-repository classes and apply_patch keep strict whole-repository admission.",
+    "targets": "Sorted unique exact eligible target set, maximum64. Every existing directory ancestor binds relative path/dev/ino/mode/uid without directory mtime; missing ancestor binds explicit absence. Existing target must be regular nonsymlink nlink1 and binds dev/ino/mode/uid/size/mtimeMs/ctimeMs/content SHA. Reads use O_NOFOLLOW where supported, full fstat and pathname stability, with an aggregate16MiB bound. Missing targets bind explicit absence.",
+    "firstPlan": "Reopen targets against recorded preimages before producing v4 plan.",
+    "arming": "Reopen exact targets; retain policy/plugin/physical fingerprint; require frozen HEAD/tree and lifecycle state at arming.",
+    "consumption": "Reclassify actual Edit/Write input, require exact eligible path set, reopen exact preimages, recheck state/policy/plugin/denials/input/expiry/authenticated audit/replay. v4 compares all repository fields except statusSha256, only after the target binding is verified. HEAD/tree are retained at consumption as well. Disjoint unrelated worktree status changes may pass; target changes cannot.",
+    "legacy": "Legacy request/plan/capability version readers and exact whole repository consumption remain; no migration or privilege upgrade. Legacy serial dependency remains disclosed. Windows identity and private HMAC/locks/CAS remain unchanged."
+  },
+  "newPublicIndexAPI": {
+    "name": "indexHumanGuardOverrideSelection",
+    "signature": "indexHumanGuardOverrideSelection({rootDir,pluginRoot,requestSha256,planSha256,authorSourceRoot=null,nowMs=Date.now(),spawn=spawnSync,scriptPath}={})",
+    "producer": "Reopens actual persisted plan/request, uses fixed HGO_SIGNATURE_REASON and existing genuine intent recipe, publishes digest-keyed nonauthority metadata in private plans/<intentSha256>.disclosure.json through existing sanctioned plan publication.",
+    "schema": "pipeline.hgo-disclosure-index.v1",
+    "keys": [
+      "schema",
+      "root",
+      "intentSha256",
+      "requestSha256",
+      "planSha256",
+      "selectionSha256",
+      "reasonSha256",
+      "authorSourceRoot",
+      "expiresAt"
+    ],
+    "return": "{schema:'pipeline.hgo-disclosure-index-result.v1',status:'indexed',intentSha256,requestSha256,planSha256}",
+    "integration": "prepareHumanGuardOverrideForSignature creates this index before returning signable material. Index carries no capability, signature, success flag or caller authority. Existing planning namespace inventory recognizes and validates exact index records without extending capability scopes."
+  },
+  "disclosure": {
+    "signature": "Existing describeHumanGuardOverrideSelection({rootDir,pluginRoot,intentSha256,scriptPath,spawn=spawnSync}={}) unchanged",
+    "lookup": "Exact digest-keyed index, one request and one persisted plan; bounded1MiB per record; no request enumeration, re-planning, preparation writes, plugin-tree traversal, private keys or full repository observation in resolver.",
+    "verification": "Closed index schema, root/filename/expiry binding, exact persisted plan digest and request digest/plan/request bindings; recompute fixed selection and actual pure intent, compare every indexed digest before any display.",
+    "unknown": "Unknown or historical unindexed digest returns typed unresolved without scan. Malformed/tampered index returns typed unresolved without raw parse details. Old authority records remain usable through their unchanged admission contracts.",
+    "display": "Existing bounded line/path/rationale budgets; redact recognizable secret/private-key/authentication material and absolute paths; no raw toolInput/private store/key paths."
+  },
+  "nativeEngineHeldDependency": {
+    "status": "Unavailable; no native engine producer or host-owned rehearsal receipt accepted by this Source slice.",
+    "proposedOwnership": "A future actual host-native adapter must own an opaque private execution handle created by the real engine invocation on an exclusive synthetic mirror of exact physical preimages. Engine identity, exact patch bytes, frozen HEAD/preimages, ordered hunks, complete exit/failure evidence, all postimage digests and cleanup CAS must be reopened by the producer, not caller PASS. Only the actual adapter can attest native completion; METHOD injection cannot mint it.",
+    "beforeActivation": "Review exact actual adapter/execution owner and import/resource closure before enabling a separately versioned apply_patch signing contract; fail closed without that producer. Do not claim in-memory replay or hypothetical native executable as native rehearsal.",
+    "unimplementedClauses": "Real native physical hunk-order rehearsal, signed rehearsal/preimage binding and native redemption rehearse/CAS; guard EOF and read-only git validation classification; po-human-approval quality-first resolver/readiness/sanctioned sweep remain separately owned."
+  },
+  "qualificationScope": "Genuine exclusive synthetic Git roots, actual public HGO request/plan/prepare/real memory Ed25519 proof/configured public trust/arm/consume APIs; controlled METHOD units only. No host native Windows/PO ceremony/business execution by Source author.",
+  "sourceEditsOutsideOwnedModule": 0,
+  "businessRuns": 0,
+  "nativeEvidence": false,
+  "wholeThreeItemAcceptance": false
+}

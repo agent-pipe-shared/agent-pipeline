@@ -1,0 +1,1640 @@
+{
+  "schema": "alfred.partial02.current-main-assessment.v1",
+  "role": "SourceProposal completion mapper; operational metadata only",
+  "scope": "Original fifteen assigned requirements; current Main content and retained evidence; no review session or business execution",
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "captureRef": {
+    "path": "legacy-origin:alfred-partial02-current-main-assessment-20261011/capture.json",
+    "sha256": "9c308f56512e6b08728c8e24af88079470692916d0daf43264b339d4c9c83f28",
+    "size": 747849,
+    "mode": 384,
+    "nlink": 1
+  },
+  "currentBinding": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/current150-group-binding.json",
+    "sha256": "ec2bbee42c66e57f300a722fb082e20f5f2cf36aa2e37d86226d7ac79ea0127b",
+    "size": 2995,
+    "mode": 420,
+    "nlink": 1
+  },
+  "extraSourceBindings": [
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "size": 3622,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "docs/operating-model.md",
+      "sha256": "aa98c8477636b590c29edf454ab03b3e29958a15918973089d3ebdeafe99618e",
+      "size": 64150,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+      "size": 4832,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+      "size": 32556,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/denial-route.mjs",
+      "sha256": "87b1fd7eab69fac513eb399b1371b36bbe05d9dba6ab3f2f1e89c3e82b33ff13",
+      "size": 20183,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "sha256": "49d3ab05d33e1e4c4440f945234ae70c575b52c543e597dd16fee38be0e931af",
+      "size": 35029,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "sha256": "c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed",
+      "size": 27574,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e",
+      "size": 65092,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+      "size": 796531,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "retainedProofBindings": [
+    {
+      "path": "legacy-origin:alfred-m2-m3-reporting-independent-20261010/qualification-manifest.json",
+      "sha256": "5b5db013bfd561f86e12d01de52e520df003846bf301f67bddc090beb9f351b7",
+      "size": 2041,
+      "mode": 420,
+      "nlink": 1,
+      "scope": "Retained item-scoped report-only 11-case qualification; no consuming-project observation authenticity or full criterion completion inferred."
+    },
+    {
+      "path": "legacy-origin:alfred-generator-gsc014-validated-public-intent-fixture-20261010/execution-terminal.json",
+      "sha256": "7a03f4e817f491ccb333ff83e901e16114f572d6f486e3834579bb2d28ab4dea",
+      "size": 975,
+      "mode": 384,
+      "nlink": 1,
+      "scope": "Actual original GSC21: 21 pass / 0 fail, frozen Source2147 generation. Current Main integration and native host budget remain separate."
+    },
+    {
+      "path": "legacy-origin:alfred-r01-content-integration-preparation-20261011/application-receipt.json",
+      "sha256": "27393b07dc08564a150b48b46b7309a9e1c3e1c9d46d78b5c24d553db07f86fe",
+      "size": 1050,
+      "mode": 384,
+      "nlink": 1,
+      "scope": "Actual 14 content publications; no functional test or installed/native qualification."
+    },
+    {
+      "path": "legacy-origin:alfred-r01-content-integration-preparation-20261011/post-readback-receipt.json",
+      "sha256": "9970deb1f358fc07888a6be52b7f6b62d6ce63748b09111180516a22e9a9bf70",
+      "size": 32242,
+      "mode": 384,
+      "nlink": 1,
+      "scope": "Actual 14 targets and 101 non-target dependencies conserved at readback; subsequent disjoint changes require their own receipts."
+    }
+  ],
+  "rows": [
+    {
+      "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+          "canonicalPath": "backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+          "sha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+          "bytes": 2524,
+          "parentSha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.1",
+            "lineStart": 17,
+            "lineEnd": 19
+          },
+          {
+            "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.2",
+            "lineStart": 21,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.3",
+            "lineStart": 24,
+            "lineEnd": 31
+          },
+          {
+            "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.4",
+            "lineStart": 33,
+            "lineEnd": 33
+          },
+          {
+            "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.5",
+            "lineStart": 35,
+            "lineEnd": 46
+          },
+          {
+            "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::48.1",
+            "lineStart": 50,
+            "lineEnd": 53
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+        "actualSha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+        "status": "exact"
+      },
+      "originalRemainder": "Assign and bind V9/V12 qualification, exact V10 source provenance, V13 snapshot/CAS diagnostic work, and native happy-path evidence as separate cells.",
+      "currentMain": [
+        {
+          "path": "docs/state.md",
+          "sha256": "99bd9bb2d0099bb9793430e5ded8fb285cf157cbd12cd750477a0d2943d505f1",
+          "bytes": 29921,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "consumer/native-hold",
+        "binding-only"
+      ],
+      "finding": "CLI answers-file intake is implemented with a bounded digest-aware reader. Language routing distinguishes unresolved intake from already answered intake. docs/state.md is an operational handover, not proof of a V13 runtime snapshot. V10 host briefing capture and native Windows full lifecycle/CAS evidence are not bound here.",
+      "anchors": [
+        "project-onboarding-v3.mjs CLI177-192,425-426",
+        "project-onboarding-v3.mjs library2739-2767,6788-6841",
+        "docs/state.md1-12,185"
+      ],
+      "next": "Bind each V9/V10/V12/V13 original clause to its actual producer and focused receipt; retain native Windows hold and two-approval scope.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": [
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+          "bytes": 423484,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+          "sha256": "c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc",
+          "bytes": 76269,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        }
+      ]
+    },
+    {
+      "id": "pipeline.codex-advisor-evidence-fails-after-host-update",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+          "canonicalPath": "backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+          "sha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+          "bytes": 1818,
+          "parentSha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-advisor-evidence-fails-after-host-update::22.1",
+            "lineStart": 24,
+            "lineEnd": 32
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+        "actualSha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+        "status": "exact"
+      },
+      "originalRemainder": {
+        "retainedOriginalOtherCriteria": "Deliver the bounded first-failing-subcheck diagnostic, then separately bind installed replay evidence.",
+        "correctedClause": "Existing focused proof and installed replay remain separately unbound; this correction does not claim runtime qualification or acceptance."
+      },
+      "currentMain": [],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "binding-only",
+        "consumer/native-hold"
+      ],
+      "finding": "The closed first-failing-subcheck diagnostic producer exists in Main and is wired by design-workflow-package-v2. The inherited undelivered-diagnostic remainder is stale. An actual updated-host consumer replay is not bound; reported historical executable-comparison pass counts are not promoted.",
+      "anchors": [
+        "codex-advisor-binding-diagnostic.mjs exported recorder/projector",
+        "design-workflow-package-v2.mjs10,23,43"
+      ],
+      "next": "Bind existing diagnostic Source and exact focused proof, then reproduce only an unresolved actual updated-host consumer path if required; do not duplicate the producer.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": [
+        {
+          "path": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+          "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+          "size": 3622,
+          "mode": 420,
+          "nlink": 1
+        }
+      ]
+    },
+    {
+      "id": "pipeline.codex-design-readiness-child-rejects-valid-review",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-codex-design-readiness-child-rejects-valid-review.md",
+          "canonicalPath": "backlog/items/2026-09-28-codex-design-readiness-child-rejects-valid-review.md",
+          "sha256": "bffd844c1ecc3ffcf63adc2c87932cfd29eb3f49ecc0f5b7ba7828e691a99b9a",
+          "bytes": 9277,
+          "parentSha256": "bffd844c1ecc3ffcf63adc2c87932cfd29eb3f49ecc0f5b7ba7828e691a99b9a",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-design-readiness-child-rejects-valid-review::15.1",
+            "lineStart": 17,
+            "lineEnd": 34
+          },
+          {
+            "id": "pipeline.codex-design-readiness-child-rejects-valid-review::43.1",
+            "lineStart": 45,
+            "lineEnd": 58
+          },
+          {
+            "id": "pipeline.codex-design-readiness-child-rejects-valid-review::60.1",
+            "lineStart": 62,
+            "lineEnd": 83
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "bffd844c1ecc3ffcf63adc2c87932cfd29eb3f49ecc0f5b7ba7828e691a99b9a",
+        "actualSha256": "bffd844c1ecc3ffcf63adc2c87932cfd29eb3f49ecc0f5b7ba7828e691a99b9a",
+        "status": "exact"
+      },
+      "originalRemainder": "Root host-route owner: first bind an actual supported selected-host invocation to the retained route. Only then diagnose unknown-action classification/schema/startup. Do not reintroduce ordinary readiness or copy credentials.",
+      "currentMain": [
+        {
+          "path": "docs/adr/0085-one-review-one-signature-design-approval.md",
+          "sha256": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa",
+          "bytes": 6091,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-isolated-structured-host.mjs",
+          "sha256": "975cdba90fb05a3c1626b4491d09717c51f1de9a4bd7dd95828acbc6383879d2",
+          "bytes": 32872,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-tool-free-design-readiness.mjs",
+          "sha256": "cb7a79164ab68a1b91e3352fc6a12372880617e7ff25b8b53c50a31dcdc85226",
+          "bytes": 16895,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "consumer/native-hold",
+        "binding-only"
+      ],
+      "finding": "ADR85 removes a separate ordinary readiness ceremony. Retained isolated-host code validates schema/source snapshots and deadlines. This assessment does not establish the full unknown-command/explicit-write/take classification contract on an authenticated native host.",
+      "anchors": [
+        "ADR0085 52-53,97",
+        "codex-isolated-structured-host.mjs79,106,194-200,324,334,357"
+      ],
+      "next": "Record ordinary-route retirement separately from retained host security clauses; bind exact native/consumer proof without restoring a mandatory readiness gate.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-codex-wsl-required-advisor-has-no-completable-route.md",
+          "canonicalPath": "backlog/items/2026-09-27-codex-wsl-required-advisor-has-no-completable-route.md",
+          "sha256": "502bebf32289bc2e6c1585a48f1981c52d809251fec995608397c9789e5f618f",
+          "bytes": 12968,
+          "parentSha256": "502bebf32289bc2e6c1585a48f1981c52d809251fec995608397c9789e5f618f",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::15.1",
+            "lineStart": 17,
+            "lineEnd": 25
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::40.1",
+            "lineStart": 42,
+            "lineEnd": 50
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::52.1",
+            "lineStart": 54,
+            "lineEnd": 64
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::68.1",
+            "lineStart": 70,
+            "lineEnd": 74
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::68.2",
+            "lineStart": 76,
+            "lineEnd": 82
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::68.3",
+            "lineStart": 84,
+            "lineEnd": 90
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::68.4",
+            "lineStart": 92,
+            "lineEnd": 97
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::68.5",
+            "lineStart": 99,
+            "lineEnd": 102
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::68.6",
+            "lineStart": 104,
+            "lineEnd": 112
+          },
+          {
+            "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route::68.7",
+            "lineStart": 114,
+            "lineEnd": 119
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "502bebf32289bc2e6c1585a48f1981c52d809251fec995608397c9789e5f618f",
+        "actualSha256": "502bebf32289bc2e6c1585a48f1981c52d809251fec995608397c9789e5f618f",
+        "status": "exact"
+      },
+      "originalRemainder": [
+        {
+          "gap": null,
+          "nextAction": "Do not restore retired mandatory Advisor. Retained ordinary on-demand store/v3 custody/live transaction consumer wiring remains substantive; native/export authority proof separate.",
+          "crosswalkAction": "Bind exact current source/case/actual receipt/integration from retained requirements and original mapper evidence"
+        },
+        "Do not restore retired mandatory Advisor. Retained ordinary on-demand store/v3 custody/live transaction consumer wiring remains substantive; native/export authority proof separate."
+      ],
+      "currentMain": [],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "consumer/native-hold",
+        "binding-only"
+      ],
+      "finding": "Current Operating Model requires model-free preflight and makes actual Advisor consultation on demand. Original synthetic preparation is not an actual on-demand host consultation. Source trace/proof is unbound in the assigned row, not evidence that implementation is absent.",
+      "anchors": [
+        "docs/operating-model.md135-148"
+      ],
+      "next": "Bind the real on-demand store/host/admission consumer and its honest unavailable route. Preserve export-denial boundaries; no mandatory consultation or alternate authority source.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": [
+        {
+          "path": "docs/operating-model.md",
+          "sha256": "aa98c8477636b590c29edf454ab03b3e29958a15918973089d3ebdeafe99618e",
+          "size": 64150,
+          "mode": 420,
+          "nlink": 1
+        }
+      ]
+    },
+    {
+      "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced.md",
+          "canonicalPath": "backlog/items/2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced.md",
+          "sha256": "9902bbf50e5adbf70a050b5a4ebc2fb995ae1095d87e469112dc12a6efa3e86f",
+          "bytes": 2775,
+          "parentSha256": "9902bbf50e5adbf70a050b5a4ebc2fb995ae1095d87e469112dc12a6efa3e86f",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced::15.1",
+            "lineStart": 17,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced::15.2",
+            "lineStart": 24,
+            "lineEnd": 30
+          },
+          {
+            "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced::15.3",
+            "lineStart": 32,
+            "lineEnd": 34
+          },
+          {
+            "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced::36.1",
+            "lineStart": 38,
+            "lineEnd": 46
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "9902bbf50e5adbf70a050b5a4ebc2fb995ae1095d87e469112dc12a6efa3e86f",
+        "actualSha256": "9902bbf50e5adbf70a050b5a4ebc2fb995ae1095d87e469112dc12a6efa3e86f",
+        "status": "exact"
+      },
+      "originalRemainder": "Root: review/run CCD8 once and integrate exact7fb603 Source if qualified, preserving historical4/3 readers. Source owner must retain the separately declared generic unregistered durable-course gap. Do not count CRT39 historical four-round proof as cap2 proof.",
+      "currentMain": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+          "bytes": 118731,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+          "sha256": "e36c1e06fbe8917e276420348ba0620f991fc2d5252f9db7a37599ae04d10c03",
+          "bytes": 28404,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "e36c1e06fbe8917e276420348ba0620f991fc2d5252f9db7a37599ae04d10c03",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+          "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+          "bytes": 49461,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+          "present": false,
+          "code": "ENOENT",
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-lifecycle.mjs",
+          "present": false,
+          "code": "ENOENT",
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+          "sha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+          "bytes": 46763,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+          "sha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d",
+          "bytes": 13893,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/review-economy.mjs",
+          "sha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9",
+          "bytes": 52643,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+          "sha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29",
+          "bytes": 30862,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+          "sha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+          "bytes": 57419,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+          "sha256": "c6bcf57a93093af9bdd0307ff9df91d71edaa9059d997bba8061ebf003022bc8",
+          "bytes": 34029,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "c6bcf57a93093af9bdd0307ff9df91d71edaa9059d997bba8061ebf003022bc8",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+          "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+          "bytes": 32208,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+          "selectedMatch": true
+        }
+      ],
+      "retainedProofs": [
+        {
+          "receipt": {
+            "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/runtime/execution.json",
+            "sha256": "a21ff73d3a2fc3cfa25c4688d6cda11499c79119bca00b7ef6c5515e9eaa304b",
+            "size": 2758,
+            "mode": 384,
+            "nlink": 1
+          },
+          "proofManifest": {
+            "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/manifest.json",
+            "sha256": "46b9aa0c15397d80834c507fa57180e6cd525373ac4271b819cce36028a099ba",
+            "size": 6139,
+            "mode": 420,
+            "nlink": 1
+          },
+          "caseIds": [
+            "CCD001",
+            "CCD002",
+            "CCD003",
+            "CCD004",
+            "CCD005",
+            "CCD006",
+            "CCD007",
+            "CCD008"
+          ],
+          "scope": "Controlled unchanged FeatureV2 one-full/one-diff eight-case protocol/API qualification. No generic Coordinator cap2, external Critic/native host or current whole-Main assurance.",
+          "parsedCounts": {
+            "pass": 8,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "SourceGenerationNotRebound": true
+        }
+      ],
+      "classes": [
+        "code-present",
+        "functional-producer-gap",
+        "consumer/native-hold"
+      ],
+      "finding": "Registered Critic course admission derives consumed history, caps dispatch at two reviews, and validates the actual correction range. Historical review limit four remains explicitly distinct. Generic unregistered/current-artifact batches still lack a durable source-owned course/history producer. Missing Main launch-observation/lifecycle leaves are integration facts, not invented new defects.",
+      "anchors": [
+        "review-economy.mjs32-44",
+        "critic-course-admission.mjs485-495",
+        "cap Source manifest7fb603"
+      ],
+      "next": "Root/OBL016 must bind the current registered cap2 Source to retained CCD8 generation, and separately own a durable generic course/history producer before claiming every batch is covered; no caller round counter or third review.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md",
+          "canonicalPath": "backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md",
+          "sha256": "1844826ef26e0e5e780846049d864f33adb7bd7ac0c8c296dd2ad6a5970d14e8",
+          "bytes": 2659,
+          "parentSha256": "1844826ef26e0e5e780846049d864f33adb7bd7ac0c8c296dd2ad6a5970d14e8",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.critic-scratch-name-randomness-has-no-admitted-command::15.1",
+            "lineStart": 17,
+            "lineEnd": 25
+          },
+          {
+            "id": "pipeline.critic-scratch-name-randomness-has-no-admitted-command::37.1",
+            "lineStart": 39,
+            "lineEnd": 43
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "1844826ef26e0e5e780846049d864f33adb7bd7ac0c8c296dd2ad6a5970d14e8",
+        "actualSha256": "1844826ef26e0e5e780846049d864f33adb7bd7ac0c8c296dd2ad6a5970d14e8",
+        "status": "exact"
+      },
+      "originalRemainder": "Critic transport owner: reconcile the exact documented creation shape with admitted grammar, or explicitly keep unavailable fallback. Independently qualify create/collision/append on actual host. Do not restore openssl/dev-urandom improvisation or broaden shell writes.",
+      "currentMain": [
+        {
+          "path": "plugins/pipeline-core/agents/critic.md",
+          "sha256": "849c8b5bfd9b1908839d2e22e3f56c71b9b91ca8e0aab2f03722f574b9d836cc",
+          "bytes": 16813,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "849c8b5bfd9b1908839d2e22e3f56c71b9b91ca8e0aab2f03722f574b9d836cc",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e",
+          "bytes": 65092,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+          "selectedMatch": false
+        },
+        {
+          "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+          "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+          "bytes": 44110,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+          "selectedMatch": true
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "consumer/native-hold",
+        "binding-only"
+      ],
+      "finding": "Current prompt removes random-name commands and uses exclusive deterministic suffix allocation. It describes bare mkdir while the agent Bash contract is read-only Git; the inspected chain grammar only admits mkdir -p. This does not prove standalone bare mkdir denial, but the exclusive notes-directory creation/admission seam is not established by these reads.",
+      "anchors": [
+        "critic-review.md358-378",
+        "agents/critic.md tools/comments",
+        "shell-grammar.mjs540-592"
+      ],
+      "next": "Bind a sanctioned source-owned exclusive directory/notes writer or explicit unavailable fallback and creation/collision evidence. Do not substitute mkdir -p or random shell commands.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.critic-scratch-notes-write-is-refused-again",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md",
+          "canonicalPath": "backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md",
+          "sha256": "1e05defaa8783e708372ed5c2bf39a80dd2e3677ee92c908b2a1db44794943e8",
+          "bytes": 2555,
+          "parentSha256": "1e05defaa8783e708372ed5c2bf39a80dd2e3677ee92c908b2a1db44794943e8",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.critic-scratch-notes-write-is-refused-again::15.1",
+            "lineStart": 17,
+            "lineEnd": 24
+          },
+          {
+            "id": "pipeline.critic-scratch-notes-write-is-refused-again::37.1",
+            "lineStart": 39,
+            "lineEnd": 42
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "1e05defaa8783e708372ed5c2bf39a80dd2e3677ee92c908b2a1db44794943e8",
+        "actualSha256": "1e05defaa8783e708372ed5c2bf39a80dd2e3677ee92c908b2a1db44794943e8",
+        "status": "exact"
+      },
+      "originalRemainder": "Critic guard owner: trace all physical/role checks for another critic-* directory, then independently confirm own create/append plus cross-directory refusal. If confirmed, bind caller ownership narrowly; preserve budget/physical predicates and existing case history.",
+      "currentMain": [
+        {
+          "path": "plugins/pipeline-core/agents/critic.md",
+          "sha256": "849c8b5bfd9b1908839d2e22e3f56c71b9b91ca8e0aab2f03722f574b9d836cc",
+          "bytes": 16813,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "849c8b5bfd9b1908839d2e22e3f56c71b9b91ca8e0aab2f03722f574b9d836cc",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+          "bytes": 118731,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+          "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+          "bytes": 44110,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+          "selectedMatch": true
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "functional-producer-gap",
+        "consumer/native-hold"
+      ],
+      "finding": "Current notes instructions use Write/Edit only. The budget guard notes predicate matches any critic-* notes path and has no agent/owned-directory input; that predicate alone does not establish per-dispatch ownership. Other layers were not proven to compensate, so no exploit or overall native grant is asserted.",
+      "anchors": [
+        "guard-dispatch-budget.mjs542-570,825-850",
+        "critic-review.md358-378"
+      ],
+      "next": "Root must join the actual source-owned dispatch notes directory in the writer admission and bind own-create/append versus another-directory refusal; preserve no Bash notes retry.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-cross-runner-chat-intake-reference-needs-host-capture.md",
+          "canonicalPath": "backlog/items/2026-09-29-cross-runner-chat-intake-reference-needs-host-capture.md",
+          "sha256": "3764e98348ae4ac91010b98c0eed66f81f9af7a0e7070ab02e7d615d643a47c4",
+          "bytes": 2492,
+          "parentSha256": "3764e98348ae4ac91010b98c0eed66f81f9af7a0e7070ab02e7d615d643a47c4",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.cross-runner-chat-intake-reference-needs-host-capture::20.1",
+            "lineStart": 22,
+            "lineEnd": 29
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "3764e98348ae4ac91010b98c0eed66f81f9af7a0e7070ab02e7d615d643a47c4",
+        "actualSha256": "3764e98348ae4ac91010b98c0eed66f81f9af7a0e7070ab02e7d615d643a47c4",
+        "status": "exact"
+      },
+      "originalRemainder": "Host-capture owner: supply a genuine scope/expiry/consent-bound host user-turn reference, or retain typed unavailable and explicit original-fidelity conflict. No transcript fallback/model re-emission/native capture claims.",
+      "currentMain": [
+        {
+          "path": "plugins/pipeline-core/lib/intake-material-reference.mjs",
+          "sha256": "510462c8413350a97fc602f2d0febb4f99b74b48751817cc7eb816583a89e956",
+          "bytes": 3119,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+          "bytes": 425437,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+          "selectedMatch": false
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "functional-producer-gap",
+        "consumer/native-hold"
+      ],
+      "finding": "File-based intake material references perform bounded physical/UTF8/digest validation. unavailableChatTurnReference explicitly emits INTAKE-CHAT-TURN-CAPTURE-UNAVAILABLE. No real cross-runner host user-turn capture issuer is present in this read surface; onboarding consumer source also differs from selected Source.",
+      "anchors": [
+        "intake-reference.mjs readIntakeMaterialReference/unavailableChatTurnReference"
+      ],
+      "next": "Assign the real host capture issuer with session/turn/scope/expiry/consent and exact bytes, then integrate its consumer. No model re-emission or synthetic native capture.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-declared-product-criteria-need-matching-acceptance-evidence.md",
+          "canonicalPath": "backlog/items/2026-10-09-declared-product-criteria-need-matching-acceptance-evidence.md",
+          "sha256": "f0f9ba2bf9b79d7e993cfbe37aaae326f1f6779df765f5fbd31792f09a448379",
+          "bytes": 4557,
+          "parentSha256": "f0f9ba2bf9b79d7e993cfbe37aaae326f1f6779df765f5fbd31792f09a448379",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence::29.1",
+            "lineStart": 31,
+            "lineEnd": 31
+          },
+          {
+            "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence::33.1",
+            "lineStart": 35,
+            "lineEnd": 40
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "f0f9ba2bf9b79d7e993cfbe37aaae326f1f6779df765f5fbd31792f09a448379",
+        "actualSha256": "6a8375093e2e86f022d1139d192d3045e792dafbed3b1476dd3493fb075b6183",
+        "status": "BODY-MISMATCH-NOT-REDEFINED"
+      },
+      "originalRemainder": [
+        {
+          "gap": "Registered P0 criteria/evidence readiness requirement; no current behavioral evidence asserted.",
+          "nextAction": "Retain completed M2-M3_11 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Report-only implementation/evidence association does not authenticate observations or introduce a completion gate; actual consuming project proof pending.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step.",
+          "crosswalkAction": "Resolve current-body binding first"
+        },
+        "Retain completed M2-M3_11 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Report-only implementation/evidence association does not authenticate observations or introduce a completion gate; actual consuming project proof pending.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step."
+      ],
+      "currentMain": [
+        {
+          "path": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+          "sha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b",
+          "bytes": 6735,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+          "sha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a",
+          "bytes": 6615,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/report-source-readers.mjs",
+          "sha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756",
+          "bytes": 7476,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+          "sha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6",
+          "bytes": 2612,
+          "mode": 493,
+          "nlink": 1,
+          "retainedSelectedSha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6",
+          "selectedMatch": true
+        }
+      ],
+      "retainedProofs": [
+        {
+          "reference": {
+            "name": "M2-M3_11",
+            "proof": {
+              "path": "legacy-origin:alfred-m2-m3-reporting-independent-20261010/qualification-manifest.json",
+              "sha256": "5b5db013bfd561f86e12d01de52e520df003846bf301f67bddc090beb9f351b7"
+            },
+            "pass": 11,
+            "caseEvidence": null,
+            "canonicalPaths": [
+              "plugins/pipeline-core/lib/report-source-readers.mjs",
+              "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+              "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+              "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs"
+            ],
+            "backlogIds": [
+              "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+              "pipeline.implementation-without-dispatch-escapes-review-coverage"
+            ],
+            "relatedCriteria": [
+              "AC-6",
+              "AC-7",
+              "AC-13",
+              "AC-14"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Report-only implementation/evidence association does not authenticate observations or introduce a completion gate; actual consuming project proof pending."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/report-source-readers.mjs",
+                "currentAuditSha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756"
+              },
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+                "currentAuditSha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b"
+              },
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+                "currentAuditSha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a"
+              },
+              {
+                "canonicalPath": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+                "currentAuditSha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6"
+              }
+            ],
+            "officialClosure": false
+          },
+          "claim": "Retained item-scoped reference; no new execution/parser/authenticity inference."
+        }
+      ],
+      "classes": [
+        "code-present",
+        "consumer/native-hold",
+        "binding-only"
+      ],
+      "finding": "Report-only criteria/evidence association code matches the retained focused source binding and has item-scoped eleven-case proof. Authentic project/browser/document observations and candidate-bound full criterion evidence remain separate. The body hash changed; assigned clauses are preserved without treating current line text as original bytes.",
+      "anchors": [
+        "report-source-readers.mjs",
+        "candidate-implementation-coverage-report.mjs",
+        "declared-criteria-evidence-report.mjs",
+        "acceptance-coverage-report.mjs"
+      ],
+      "next": "Bind actual consuming-project evidence classes and candidate scope to the original criterion; retain report-only behavior and resolve original-body provenance without canonical history edits.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.denial-names-a-diagnosis-it-refuses",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md",
+          "canonicalPath": "backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md",
+          "sha256": "733ee0fe268a4804d2b9606d1312ee98708d20c99085499871e20b6f34582c87",
+          "bytes": 1398,
+          "parentSha256": "733ee0fe268a4804d2b9606d1312ee98708d20c99085499871e20b6f34582c87",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.denial-names-a-diagnosis-it-refuses::15.1",
+            "lineStart": 17,
+            "lineEnd": 21
+          },
+          {
+            "id": "pipeline.denial-names-a-diagnosis-it-refuses::23.1",
+            "lineStart": 25,
+            "lineEnd": 27
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "733ee0fe268a4804d2b9606d1312ee98708d20c99085499871e20b6f34582c87",
+        "actualSha256": "733ee0fe268a4804d2b9606d1312ee98708d20c99085499871e20b6f34582c87",
+        "status": "exact"
+      },
+      "originalRemainder": [
+        {
+          "gap": "Do not grant arbitrary Node, all observed commands, or mutation from diagnostic permission",
+          "nextAction": "Integrate review of existing additive DLR recovery proposal and D2 renderer/docs; resolve DLR035 without broad parser relaxation; pin current approved/malformed state corridors",
+          "crosswalkAction": "Bind exact current source/case/actual receipt/integration from retained requirements and original mapper evidence"
+        },
+        "Integrate review of existing additive DLR recovery proposal and D2 renderer/docs; resolve DLR035 without broad parser relaxation; pin current approved/malformed state corridors"
+      ],
+      "currentMain": [],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "binding-only",
+        "consumer/native-hold"
+      ],
+      "finding": "Main guard delegates to actual evaluate/denial-route/sanctioned-args/command-catalogue modules. Typed recovery corridors exist, but the specific DLR035 emitted diagnosis plus matching admission and retained receipt are not bound. Neither whole fix nor whole missing implementation is inferred.",
+      "anchors": [
+        "guard-lifecycle-ready.mjs1-55",
+        "guard/evaluate.mjs222,372",
+        "guard/denial-route.mjs83-88,201",
+        "guard/sanctioned-args-scripts.mjs379-386"
+      ],
+      "next": "Bind the exact emitted command, state, admission corridor and focused DLR035 receipt; propose a Source change only if the current concrete emitter/admission mismatch persists.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+          "size": 4832,
+          "mode": 420,
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+          "size": 32556,
+          "mode": 420,
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/denial-route.mjs",
+          "sha256": "87b1fd7eab69fac513eb399b1371b36bbe05d9dba6ab3f2f1e89c3e82b33ff13",
+          "size": 20183,
+          "mode": 420,
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+          "sha256": "49d3ab05d33e1e4c4440f945234ae70c575b52c543e597dd16fee38be0e931af",
+          "size": 35029,
+          "mode": 420,
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+          "sha256": "c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed",
+          "size": 27574,
+          "mode": 420,
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e",
+          "size": 65092,
+          "mode": 420,
+          "nlink": 2
+        }
+      ]
+    },
+    {
+      "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md",
+          "canonicalPath": "backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md",
+          "sha256": "928968269e65b5757e369c457c1a93f2e2e678eacbd9d28d66a1bb4c28ed28e4",
+          "bytes": 2294,
+          "parentSha256": "928968269e65b5757e369c457c1a93f2e2e678eacbd9d28d66a1bb4c28ed28e4",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes::15.1",
+            "lineStart": 17,
+            "lineEnd": 18
+          },
+          {
+            "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes::15.2",
+            "lineStart": 20,
+            "lineEnd": 33
+          },
+          {
+            "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes::35.1",
+            "lineStart": 37,
+            "lineEnd": 40
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "928968269e65b5757e369c457c1a93f2e2e678eacbd9d28d66a1bb4c28ed28e4",
+        "actualSha256": "928968269e65b5757e369c457c1a93f2e2e678eacbd9d28d66a1bb4c28ed28e4",
+        "status": "exact"
+      },
+      "originalRemainder": [
+        {
+          "gap": "Several historical route/recovery failures; old v2 default authority superseded.",
+          "nextAction": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Several historical route/recovery failures; old v2 default authority superseded.. Preserve existing implementation; do not assume another source fix is needed.",
+          "crosswalkAction": "Bind exact current source/case/actual receipt/integration from retained requirements and original mapper evidence"
+        },
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Several historical route/recovery failures; old v2 default authority superseded.. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "currentMain": [
+        {
+          "path": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+          "sha256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+          "bytes": 75585,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+          "selectedMatch": true
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "binding-only",
+        "consumer/native-hold"
+      ],
+      "finding": "The old ordinary V2 package course is retired by ADR85. Current plan state code exists, while old preparation collisions and retained legacy repair/native Windows clauses are not newly qualified. Retirement does not erase historical original requirements.",
+      "anchors": [
+        "ADR0085",
+        "plan-spec-state-v2.mjs"
+      ],
+      "next": "Map original clauses to superseding ordinary route or retained legacy repair consumer, then bind focused evidence. Do not revive mandatory Advisor/exception/readiness steps.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.design-generator-repeats-large-source-material",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-design-generator-repeats-large-source-material.md",
+          "canonicalPath": "backlog/items/2026-09-27-design-generator-repeats-large-source-material.md",
+          "sha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+          "bytes": 4735,
+          "parentSha256": "e5d6187f5a32f11c8b8a84550771197daaf212449b47940945db45cc36a1deab",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-generator-repeats-large-source-material::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.design-generator-repeats-large-source-material::34.1",
+            "lineStart": 36,
+            "lineEnd": 42
+          },
+          {
+            "id": "pipeline.design-generator-repeats-large-source-material::44.1",
+            "lineStart": 46,
+            "lineEnd": 50
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+        "actualSha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+        "status": "exact"
+      },
+      "originalRemainder": "Generator/output qualification owner: bind identical-input before/after byte/coverage results to current summary route and actual host budget, while preserving full source availability. Do not infer token counts from characters or erase private original evidence.",
+      "currentMain": [
+        {
+          "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+          "bytes": 425437,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+          "selectedMatch": false
+        },
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+          "bytes": 423484,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+          "sha256": "c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc",
+          "bytes": 76269,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "consumer/native-hold",
+        "binding-only"
+      ],
+      "finding": "Current CLI emits compact plan metadata and an explicit verbose full-plan retrieval action. Actual GSC21 passes on frozen Source2147, not whole current Main or native-host budget. Main onboarding differs from selected source, so remaining compaction integration is distinct from a missing producer.",
+      "anchors": [
+        "project-onboarding-v3.mjs CLI750-783"
+      ],
+      "next": "Bind selected compaction implementation into current Main and retain original GSC21 scope; native context/budget comparison remains a separate consumer proof obligation.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.md",
+          "canonicalPath": "backlog/items/2026-10-07-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.md",
+          "sha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+          "bytes": 2193,
+          "parentSha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review::15.1",
+            "lineStart": 17,
+            "lineEnd": 20
+          },
+          {
+            "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review::15.2",
+            "lineStart": 22,
+            "lineEnd": 27
+          },
+          {
+            "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review::15.3",
+            "lineStart": 29,
+            "lineEnd": 31
+          },
+          {
+            "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review::33.1",
+            "lineStart": 35,
+            "lineEnd": 43
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+        "actualSha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+        "status": "exact"
+      },
+      "originalRemainder": "Ordinary design-flow qualification owner: map current driver one review/one signature receipt cases and cap2 successor integration. Preserve existing approvals and no extra export consent/native grant; source/docs alone are not whole acceptance.",
+      "currentMain": [
+        {
+          "path": "docs/adr/0085-one-review-one-signature-design-approval.md",
+          "sha256": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa",
+          "bytes": 6091,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+          "bytes": 706707,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+          "selectedMatch": false
+        },
+        {
+          "path": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+          "sha256": "3f6be98c495e7318523987632528584119d3b99b0ddf04a9f7942694a069fb3a",
+          "bytes": 4466,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "007e65c57b15a4216358371289158c16b5b7491396f81907c403678e94612bc8",
+          "selectedMatch": false
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "consumer/native-hold",
+        "binding-only"
+      ],
+      "finding": "ADR85 and current design-course guidance use one content review plus one correction delta, optional Advisor and one final design signature. Main rejects retired package input but an error string still advertises it. Current Audit State already corrects that message to review-receipt; this is protected-State integration hold, not new Source authoring.",
+      "anchors": [
+        "ADR0085",
+        "design-course.md5,20-25,33-37,47-57",
+        "Main pipeline-state.mjs10690-10698",
+        "current Audit pipeline-state.mjs10886-10894"
+      ],
+      "next": "Preserve current protected State ownership and integrate its corrected tuple through Root admission; bind actual new review/signature consumer proof without extra ceremonies.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": [
+        {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "sha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+          "size": 796531,
+          "mode": 420,
+          "nlink": 1
+        }
+      ]
+    },
+    {
+      "id": "pipeline.design-trailer-verifier-lost-after-closure",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md",
+          "canonicalPath": "backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md",
+          "sha256": "4c5ecfea1efcec86ad8bbad4dcb91b07408419d8d66edd1c1a5de2b0ee4f8204",
+          "bytes": 2049,
+          "parentSha256": "4c5ecfea1efcec86ad8bbad4dcb91b07408419d8d66edd1c1a5de2b0ee4f8204",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-trailer-verifier-lost-after-closure::15.1",
+            "lineStart": 17,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.design-trailer-verifier-lost-after-closure::15.2",
+            "lineStart": 24,
+            "lineEnd": 27
+          },
+          {
+            "id": "pipeline.design-trailer-verifier-lost-after-closure::15.3",
+            "lineStart": 29,
+            "lineEnd": 30
+          },
+          {
+            "id": "pipeline.design-trailer-verifier-lost-after-closure::32.1",
+            "lineStart": 34,
+            "lineEnd": 39
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "4c5ecfea1efcec86ad8bbad4dcb91b07408419d8d66edd1c1a5de2b0ee4f8204",
+        "actualSha256": "4c5ecfea1efcec86ad8bbad4dcb91b07408419d8d66edd1c1a5de2b0ee4f8204",
+        "status": "exact"
+      },
+      "originalRemainder": "Authorship owner: enumerate exact current emitters and either restore accepted narrow path or remove all obsolete promises with spec21.5 continuity. Separate read-only historical Git audit must locate original removal if still required; add only the original closed-item needle invariant, not new authority.",
+      "currentMain": [
+        {
+          "path": "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+          "sha256": "fdbfa4b7f734e338c2487cabaff71f5deab01239b232e3c8a5b1b95597490ebc",
+          "bytes": 46785,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+          "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+          "bytes": 44110,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+          "selectedMatch": true
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "binding-only",
+        "consumer/native-hold"
+      ],
+      "finding": "Current verifier has the stage-0 grammar; no retired elephant design exemption is restored. Original merge/removal governance disposition and regression needle provenance are not bound by this metadata assessment. Current prompt examples alone do not prove historical removal was sanctioned.",
+      "anchors": [
+        "verifier.mjs145 stage-0",
+        "current Critic prompt prospective budget"
+      ],
+      "next": "Bind exact ADR/PO disposition and retained merge-survival regression evidence for the original clause. Do not silently restore an exemption or invent replacement policy.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    },
+    {
+      "id": "pipeline.design-workflow-package-omits-contract",
+      "stage": 25,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-design-workflow-package-omits-contract.md",
+          "canonicalPath": "backlog/items/2026-09-28-design-workflow-package-omits-contract.md",
+          "sha256": "ccd389af04c143e239a3b529ac41e20dadb63f73fbf5f57a1e6ded666df44764",
+          "bytes": 4844,
+          "parentSha256": "ccd389af04c143e239a3b529ac41e20dadb63f73fbf5f57a1e6ded666df44764",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-workflow-package-omits-contract::15.1",
+            "lineStart": 17,
+            "lineEnd": 33
+          },
+          {
+            "id": "pipeline.design-workflow-package-omits-contract::43.1",
+            "lineStart": 45,
+            "lineEnd": 55
+          },
+          {
+            "id": "pipeline.design-workflow-package-omits-contract::57.1",
+            "lineStart": 59,
+            "lineEnd": 74
+          }
+        ]
+      },
+      "bodyBinding": {
+        "expectedSha256": "ccd389af04c143e239a3b529ac41e20dadb63f73fbf5f57a1e6ded666df44764",
+        "actualSha256": "ccd389af04c143e239a3b529ac41e20dadb63f73fbf5f57a1e6ded666df44764",
+        "status": "exact"
+      },
+      "originalRemainder": "Root original-scope owner: project individual clauses through ADR0085, preserving self-contained authoring/review and retained security clauses. Bind actual source/reader proofs per retained clause; keep native/full Verify/consumer ordering open without reinstating retired ceremonies.",
+      "currentMain": [
+        {
+          "path": "docs/adr/0085-one-review-one-signature-design-approval.md",
+          "sha256": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa",
+          "bytes": 6091,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-readiness-host-record.mjs",
+          "sha256": "6bb399298e4b81bb724e602286a79be85f78b873570e6a397201662fce9cfbde",
+          "bytes": 6744,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+          "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+          "bytes": 31644,
+          "mode": 420,
+          "nlink": 1,
+          "retainedSelectedSha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+          "selectedMatch": true
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+          "sha256": "c05a085035e9117c272ced4c0d615dc30de99838ae09ad2d6a268500aae43550",
+          "bytes": 49112,
+          "mode": 420,
+          "nlink": 2,
+          "retainedSelectedSha256": null,
+          "selectedMatch": null
+        }
+      ],
+      "retainedProofs": [],
+      "classes": [
+        "code-present",
+        "consumer/native-hold",
+        "binding-only"
+      ],
+      "finding": "V2 retained package/host record readers exist and validate source bindings; the ordinary package ceremony is retired. Original self-contained contract/security/fresh-review and evidence-before-output clauses still require an explicit disposition and retained consumer proof. Code presence is not semantic contract completeness.",
+      "anchors": [
+        "ADR0085",
+        "design-workflow-package-v2.mjs",
+        "codex-readiness-host-record.mjs",
+        "design-workflow-package.mjs"
+      ],
+      "next": "Bind the original five-source/self-contained security clauses and artifact ordering to the retained route or accepted successor; no duplicate mandatory Advisor/readiness ceremony.",
+      "nextOwner": "/root",
+      "wholeItemAccepted": false,
+      "stagePromoted": false,
+      "supplementalSourceBindings": []
+    }
+  ],
+  "limits": {
+    "MainWrites": 0,
+    "SourceChanges": 0,
+    "tests": 0,
+    "productImports": 0,
+    "Git": 0,
+    "nativeCertification": false,
+    "wholeItemStagePromotion": false
+  },
+  "privateSourceProposal": {
+    "status": "No postimage authored",
+    "reason": "The concrete stale State message is already corrected in current Source and integration-held. Shared Critic course/notes and host-capture gaps require original owning producers, not a generic bypass. No independently owned minimal leaf repair established."
+  },
+  "pendingExactProofBindings": [
+    "DLR035 emitted-command/admission actual receipt",
+    "Generic unregistered/current-artifact course/history producer and matching actual proof"
+  ],
+  "history": {
+    "initialMetadataCaptureStoppedOnBodyMismatch": true,
+    "bodyMismatchPreserved": true,
+    "originalBodyNotReconstructed": true
+  },
+  "detailedAssessment": {
+    "path": "assessment.json",
+    "sha256": "683acc2ed2f43ace30a65a6da6b463e1d093a49e94461949b0540fe73141248c"
+  },
+  "proofSupplement": {
+    "receipt": {
+      "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/runtime/execution.json",
+      "sha256": "a21ff73d3a2fc3cfa25c4688d6cda11499c79119bca00b7ef6c5515e9eaa304b",
+      "size": 2758,
+      "mode": 384,
+      "nlink": 1
+    },
+    "proofManifest": {
+      "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/manifest.json",
+      "sha256": "46b9aa0c15397d80834c507fa57180e6cd525373ac4271b819cce36028a099ba",
+      "size": 6139,
+      "mode": 420,
+      "nlink": 1
+    },
+    "caseIds": [
+      "CCD001",
+      "CCD002",
+      "CCD003",
+      "CCD004",
+      "CCD005",
+      "CCD006",
+      "CCD007",
+      "CCD008"
+    ],
+    "scope": "Controlled unchanged FeatureV2 one-full/one-diff eight-case protocol/API qualification. No generic Coordinator cap2, external Critic/native host or current whole-Main assurance.",
+    "parsedCounts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "SourceGenerationNotRebound": true
+  }
+}

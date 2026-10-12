@@ -1,0 +1,122 @@
+{
+  "schema": "alfred.reader-2plus1-combined14-method-scope.v1",
+  "counts": {
+    "pass": 14,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "semanticChildCount": 4,
+  "sourceCountPerQualification": 383,
+  "sourceAndFixtureConservedInBothQualifications": true,
+  "assurance": "controlled-method-unit-not-review-consumption",
+  "actualReaderReview": false,
+  "actualReaderConsumedCourse": false,
+  "nativeAssurance": false,
+  "wholeItemAcceptance": false,
+  "proofs": [
+    {
+      "manifestPath": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/manifest.json",
+      "manifestSha256": "6b7e63bac2031c6ad7832e7bcba6605793ff7afd600688e16c802dd7217d47fb",
+      "receiptSha256": "d521a5e86ee7486d4e4b9c1a9827d6cf6f13133fbab1d6e3c92a4083397c8aeb",
+      "originReceiptSha256": "8752a6148cc615949519feea9a1458c8c0fca4f9abde1566e14a326326afecee",
+      "counts": {
+        "pass": 13,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    },
+    {
+      "receiptPath": "positive-third-method-receipt.json",
+      "receiptSha256": "7dcbe4e84fac90664ac07862aae638abefbe8d720bf9bf927b0644f0f7773ef7",
+      "originReceiptSha256": "5470f723b6e164d743ef105c8fd1f23c12853e759d0b125b6da05d9b120777e4",
+      "counts": {
+        "pass": 1,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "caseAssociations": [
+    {
+      "id": "R2P001",
+      "name": "physical consumed failure survives restart and refuses a relabeled same-scope course"
+    },
+    {
+      "id": "RBC005",
+      "name": "durable B restart resumes original confirmed handle"
+    },
+    {
+      "id": "RBC007",
+      "name": "executed failure permanently consumes stage and refuses replacement pair"
+    },
+    {
+      "id": "RBC016",
+      "name": "missing or late third reason and corrections-only third refuse"
+    },
+    {
+      "id": "RBC017",
+      "name": "fourth pair or batch cannot reset using another course ID"
+    },
+    {
+      "id": "RBC018",
+      "name": "multiple correction commits append within one batch and preserve findings"
+    },
+    {
+      "id": "RC02C001",
+      "name": "two paired rounds close after final correction without a third reader"
+    },
+    {
+      "id": "RC02C002",
+      "name": "third complete paired round closes with digest-bound prelaunch escalation"
+    },
+    {
+      "id": "RC02C006",
+      "name": "third round without justification cannot close"
+    },
+    {
+      "id": "RC02C007",
+      "name": "justification first published after third reviewed state cannot close"
+    },
+    {
+      "id": "RC02C009",
+      "name": "four paired rounds are forbidden by the v2 record"
+    },
+    {
+      "id": "RC02C011",
+      "name": "round IDs and course ID relabeling cannot erase historical evidence"
+    },
+    {
+      "id": "RC01C001",
+      "name": "four real committed fixture rounds close after terminal correction without fifth reader"
+    },
+    {
+      "id": "RBC015",
+      "name": "justified complete third pair after second closed batch is available"
+    }
+  ],
+  "correctedIdMapping": [
+    {
+      "id": "RBC015",
+      "name": "justified complete third pair after second closed batch is available"
+    },
+    {
+      "id": "RBC016",
+      "name": "missing or late third reason and corrections-only third refuse"
+    },
+    {
+      "id": "RBC017",
+      "name": "fourth pair or batch cannot reset using another course ID"
+    },
+    {
+      "id": "RBC018",
+      "name": "multiple correction commits append within one batch and preserve findings"
+    }
+  ],
+  "standalonePositiveRBC015Executed": true,
+  "standalonePositiveQualificationPending": false,
+  "priorPublished13Preserved": true,
+  "scopeNote": "Four separate actual METHOD children total 14 PASS. Original published13 remains immutable with its historical pending flag; this append closes only standalone RBC015 and corrects combined scope. Historical v1 remains format compatibility, not new round-four launch authority."
+}

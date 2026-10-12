@@ -1,0 +1,30 @@
+{
+  "schema": "alfred.public.signing-temp-fallback-main.content.v1",
+  "rawReceiptSha256": "88f4156d23b4d6f9c3fd6921abbdbd400ca780ad569fadc234e012b6dc86a9f3",
+  "rawReceiptBytes": 1692,
+  "privateForensicsRetained": true,
+  "status": "applied",
+  "transferManifestSha256": "6537e9dcec4b6959891492f255ff1debc8389067e1fcba91866dd3ed14e09846",
+  "officialClassificationSha256": "85efbf1d16dd166ce66c55e1e23b02268523681c1b738c6636fd13c8ab381a01",
+  "officialClassification": "actual-official-noRule",
+  "sourceManifestSha256": "c0428d88b5c5f94a036b89590d63a4420b3baebfe56416545c4ebdcb5f75851d",
+  "target": {
+    "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+    "sha256": "7ded03ccd533e4330992531919c8a1d9ee87ff67170439cc92cb2168da23cd11",
+    "size": 194399,
+    "mode": 493,
+    "nlink": 1
+  },
+  "parentSha256": "3c635cd76c48da9e2706eb8000162405ce7fc1af2279b6d445c0d99c03192a40",
+  "nonTargetPeersConserved": true,
+  "semanticRuns": 0,
+  "qualifiedSourceProof": "signing-temp-fallback-seven-actual.json",
+  "limits": {
+    "receiptIsHistoricalContentReadback": true,
+    "receiptIsCurrentMainRequalification": false,
+    "contentIntegrationIsRuntimeAcceptance": false,
+    "nativeOpenSslQualified": false,
+    "humanSigningQualified": false,
+    "wholeItemClosed": false
+  }
+}

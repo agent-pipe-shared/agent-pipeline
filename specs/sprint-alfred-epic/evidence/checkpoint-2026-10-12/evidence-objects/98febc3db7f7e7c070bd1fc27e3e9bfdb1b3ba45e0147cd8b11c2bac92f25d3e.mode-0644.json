@@ -1,0 +1,25 @@
+{
+  "schema": "alfred.oa6.dependency-readiness-manifest.v1",
+  "status": "Root-fixed-physical-inspection-ready",
+  "files": [
+    {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/plan-intent.json",
+      "sha256": "e1c8b0a0a8a2b76b5d2c0dd666c58b659a97c90bee0223d0824fadcd180c9ed7"
+    },
+    {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/inspect-physical.mjs",
+      "sha256": "4875596527e6d388528c87dbd4c32c843d6d584cd951815b4d12f3d2b2e1020f"
+    },
+    {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/report.md",
+      "sha256": "9e2b1446b6061aff64c14bffdbfb660f37b31d1cc18b52b3b064204b4154c30c"
+    }
+  ],
+  "authorChecks": {
+    "syntaxExitCode": 0,
+    "productImports": 0,
+    "businessRuns": 0,
+    "productWrites": 0
+  },
+  "officialAcceptance": false
+}

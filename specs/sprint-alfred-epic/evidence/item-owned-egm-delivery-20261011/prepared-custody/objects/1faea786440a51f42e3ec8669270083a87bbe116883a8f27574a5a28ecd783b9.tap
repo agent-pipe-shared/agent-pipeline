@@ -1,0 +1,90 @@
+✖ actual Verify consumer diagnostic retains the cause, DrvFs limit and Linux-home workaround (1.324103ms)
+✖ real Linux private directories permit registration and keep record 0600 (0.577997ms)
+✖ real Linux permissive parent remains refused with cause and remedy; no record written (0.125509ms)
+✖ real Linux symlink parent remains unsafe without misleading filesystem hint (0.140309ms)
+✔ not-private failure keeps the outer code, preserves the cause and names the DrvFs hint (0.605547ms)
+✔ another inner failure keeps its cause and carries no hint (0.161489ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 2
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 209.970288
+
+✖ failing tests:
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:6:1
+✖ actual Verify consumer diagnostic retains the cause, DrvFs limit and Linux-home workaround (1.324103ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /clone the repository into the Linux home/. Input:
+  
+  'VERIFY-CLEANUP-REGISTRATION-REQUIRED (cause: VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE) HINT: this filesystem reports permissive modes for every path (a WSL /mnt/<drive> DrvFs checkout is the known case), so the private journal directory cannot be created here;'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:13:161)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'VERIFY-CLEANUP-REGISTRATION-REQUIRED (cause: VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE) HINT: this filesystem reports permissive modes for every path (a WSL /mnt/<drive> DrvFs checkout is the known case), so the private journal directory cannot be created here;',
+    expected: /clone the repository into the Linux home/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:18:1
+✖ real Linux private directories permit registration and keep record 0600 (0.577997ms)
+  Error: VERIFY-CLEANUP-REGISTRATION-REQUIRED (cause: VERIFY-RUN-RECORD-EXISTS:private-control)
+      at registerRunRecordOwner (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/snapshot/plugins/pipeline-core/scripts/verify-journal.mjs:260:11)
+      at register (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:17:46)
+      ... 6 lines matching cause stack trace ...
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    [cause]: Error: VERIFY-RUN-RECORD-EXISTS:private-control
+        at registerVerifyRunRecord (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/snapshot/plugins/pipeline-core/lib/verify-run-record.mjs:104:31)
+        at registerRunRecordOwner (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/snapshot/plugins/pipeline-core/scripts/verify-journal.mjs:250:15)
+        at register (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:17:46)
+        at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:19:80)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12)
+        at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:24:1
+✖ real Linux permissive parent remains refused with cause and remedy; no record written (0.125509ms)
+  Error: EEXIST: file already exists, mkdir '<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/fixtures/permissive/agent-pipeline'
+      at mkdirSync (node:fs:1350:26)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:25:69)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    errno: -17,
+    code: 'EEXIST',
+    syscall: 'mkdir',
+    path: '<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/fixtures/permissive/agent-pipeline'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:29:1
+✖ real Linux symlink parent remains unsafe without misleading filesystem hint (0.140309ms)
+  Error: EEXIST: file already exists, symlink '<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/fixtures/symlink-target' -> '<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/fixtures/symlink/agent-pipeline'
+      at symlinkSync (node:fs:1869:11)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/native-linux-controls.test.mjs:30:66)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    errno: -17,
+    code: 'EEXIST',
+    syscall: 'symlink',
+    path: '<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/fixtures/symlink-target',
+    dest: '<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/fixtures/symlink/agent-pipeline'
+  }

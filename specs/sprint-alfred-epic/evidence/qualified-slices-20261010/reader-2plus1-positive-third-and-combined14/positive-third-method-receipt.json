@@ -1,0 +1,53 @@
+{
+  "schema": "alfred.reader-2plus1-positive-third-public-method-receipt.v1",
+  "originReceiptSha256": "5470f723b6e164d743ef105c8fd1f23c12853e759d0b125b6da05d9b120777e4",
+  "status": "focused-method-qualified",
+  "actualCounts": {
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "semanticChildCount": 1,
+  "sourceCount": 383,
+  "sourceAndFixtureConserved": true,
+  "assurance": "controlled-method-unit-not-review-consumption",
+  "actualReaderReview": false,
+  "actualReaderConsumedCourse": false,
+  "nativeAssurance": false,
+  "wholeItemAcceptance": false,
+  "case": {
+    "id": "RBC015",
+    "name": "justified complete third pair after second closed batch is available"
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "3a049f729f8d1aada3651cd8f7a7d5f12dfd615d7ef60310d8fcb4380a70ad77",
+    "caseSetSha256": "4768a84747572f34d04d9e0f3194afe4f51dcc15a3c34667264d1bca7dcf6b78",
+    "dispositionsSha256": "0768583d92fff611202fede9e04c5de9b1f13f094281509d59dd6fd5c622e24c",
+    "declaredCount": 1,
+    "disposedCount": 1,
+    "counts": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "child": {
+    "status": 0,
+    "signal": null,
+    "timedOut": false,
+    "spawnError": null
+  },
+  "FD3": {
+    "path": "positive-third.completion.fd3.jsonl",
+    "sha256": "192ec6944819475b61c237190899f62f29547eeacb0499c5ff9b10d7cd77effb"
+  },
+  "policy": {
+    "path": "positive-third.policy.json",
+    "sha256": "52c39192d34c78ead891ef0a9ce55438e284ed9ba0cdb6c8c5297b3cb22c6495"
+  },
+  "scopeNote": "Actual unchanged standalone positive callback. Synthetic METHOD inputs establish no actual Reader review, consumed review course, native host proof or whole-item acceptance."
+}

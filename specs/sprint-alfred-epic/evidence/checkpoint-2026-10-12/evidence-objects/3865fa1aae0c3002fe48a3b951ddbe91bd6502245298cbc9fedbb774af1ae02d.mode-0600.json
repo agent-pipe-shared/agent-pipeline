@@ -1,0 +1,107 @@
+{
+  "schema": "alfred.scratch-custody-index-fix-original18-root-receipt.v1",
+  "status": "finite-18-case-scope-qualified",
+  "manifestSha256": "1cb49c657d743cf1bdfe45d92997a8562a8225c8317c75ed854d9ddd881c1b42",
+  "sourceRecordSha256": "508c0aba1fbe6e7833247e2de875433d9e535146b2c5b3a57cfd59a9df8a1e5f",
+  "integrationManifestSha256": "c684ce9ef4a11e416436e074f5360e51b342bcb4929b0fe871a334db47736e06",
+  "assertionFreezeSha256": "52290db7ac5bb1f43a093056dc2501d75e9272f1a73b2ddef0f37d23c2892399",
+  "productionParserSha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+  "correctionManifestSha256": "8d62368babf44e980b045525c4d172666cd3e0ae91d7c723d3c2eb04ff2f4d7b",
+  "correctedHelperSha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+  "historicalRun": {
+    "receiptPath": "legacy-origin:alfred-scratch-durability-direct-node-independent-20261010/root-receipt.json",
+    "receiptSha256": "851c071c5c769fd1a298e2f1da7b970d6a8fb95580a43298465290f0952d50ee",
+    "completionSha256": "786d5cc51daeaf8d96480fc10d518dd90cc3b8d9d3cf63017212fee1f48b2a59",
+    "recordedCounts": {
+      "pass": 14,
+      "fail": 4,
+      "skip": 0,
+      "todo": 0
+    },
+    "recordedFailedCaseIds": [
+      "SC-DUR03",
+      "SC-DUR04",
+      "SC-DUR07",
+      "SC-DUR14"
+    ],
+    "recordedFailureStatus": "missing-or-unreadable",
+    "provenance": "Root executed receipt and Source bound projection; not replayed or re-evaluated by infrastructure preparer"
+  },
+  "checks": [
+    {
+      "stage": "before",
+      "status": "matched",
+      "bindings": 88,
+      "graphFiles": 9,
+      "priorSourceBindings": 25,
+      "closedGraphs": 3
+    },
+    {
+      "stage": "after",
+      "status": "matched",
+      "bindings": 88,
+      "graphFiles": 9,
+      "priorSourceBindings": 25,
+      "closedGraphs": 3
+    }
+  ],
+  "exitCode": 0,
+  "signal": null,
+  "spawnError": false,
+  "outputOverflow": false,
+  "timedOut": false,
+  "parserStatus": "complete",
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "474b59062de958225b9d8a339e78e5ad03e16102589ce7091efe94b3a69953cf",
+    "caseSetSha256": "e5c617d8b3927f3ddb01959a8b7cb542e9380a658472019f1872d7cc2f3701dd",
+    "dispositionsSha256": "15e1d41bf47dc83d1408dfc5d8681fe584d1613308893896097ea1d113b40ba7",
+    "declaredCount": 18,
+    "disposedCount": 18,
+    "counts": {
+      "pass": 18,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "caseIds": [
+    "SC-DUR01",
+    "SC-DUR02",
+    "SC-DUR03",
+    "SC-DUR04",
+    "SC-DUR05",
+    "SC-DUR06",
+    "SC-DUR07",
+    "SC-DUR08",
+    "SC-DUR09",
+    "SC-DUR10",
+    "SC-DUR11",
+    "SC-DUR12",
+    "SC-DUR13",
+    "SC-DUR14",
+    "SC-DUR15",
+    "SC-DUR16",
+    "SC-DUR17",
+    "SC-DUR18"
+  ],
+  "maxCompletionBytes": 65536,
+  "completionSha256": "3a312bd4f5680e56bfd1b7ab15d3eefcff013fe014665491efbc5222f22a4fc1",
+  "nativeOrProviderProof": "not-established",
+  "installedReplay": "not-run",
+  "fullItemQualification": false,
+  "integrationScope": "frozen-parent WARN-only static invariants; current guard parent mismatch remains",
+  "environment": "inherited preserved with owned synthetic TMP/HOME/XDG/FD3; no owned preload",
+  "oldLauncherContract": "withdrawn-before-execution; Node --test transport risk observed in actual separate OA run",
+  "transport": "direct Node module; unchanged natural node:test callbacks and production recorder; no owned IPC adapter",
+  "execArgv": "inherited-preserved",
+  "limitations": [
+    "Static source integration qualification only; no hook execution or real push/close ritual.",
+    "Integration guard parent9686 differs from Root's current997c; frozen hunks are not current assembled-source qualification.",
+    "No concurrent filesystem race schedule, provider/native/installed qualification or real host/private-key/session reads.",
+    "NFC-non-ASCII path examples are typed malformed under the declared ASCII path grammar, not claimed duplicate-NFC classification.",
+    "Source author prepared infrastructure only; independently authored additional controls are a separate packet."
+  ],
+  "outputProjection": "static summary and actual production-parser attestation only"
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "alfred.literal-final-byte-binding-observation.v1",
+  "receipt": "scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/final-role-byte-receipt.json",
+  "receiptSha256": "7dabdbadf5470b1749263977c2db34156f1c1cec32e05f1efc3ebff5680ed6d8",
+  "candidate": "scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/source/scripts/pipeline-start-preflight.mjs",
+  "actualSha256": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2",
+  "recordedBefore": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5d3209991f2",
+  "recordedAfter": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5d3209991f2",
+  "beforeMatches": false,
+  "afterMatches": false,
+  "recordedPass": 1,
+  "recordedFail": 0,
+  "qualification": "Actual reported pass retained; exact candidate byte binding currently mismatched and held for owner metadata correction.",
+  "testsRun": 0
+}

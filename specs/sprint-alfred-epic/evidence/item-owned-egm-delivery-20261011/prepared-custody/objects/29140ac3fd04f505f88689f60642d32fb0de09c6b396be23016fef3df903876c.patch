@@ -1,0 +1,5 @@
+--- a/plugins/pipeline-core/lib/greenfield-public-comparison.mjs
++++ b/plugins/pipeline-core/lib/greenfield-public-comparison.mjs
+@@ -26,1 +26,1 @@
+-  if(!['docs/','evidence/','public/'].some(prefix=>path.startsWith(prefix)))throw Error('GPC-PUBLIC-SCOPE');
++  if(!['docs','evidence','public'].some(prefix=>path===prefix||path.startsWith(prefix+'/')))throw Error('GPC-PUBLIC-SCOPE');

@@ -1,0 +1,170 @@
+{
+  "schema": "alfred.p16.independent16.public-qualification-proof.v1",
+  "status": "qualified-portable-source-behavior",
+  "execution": {
+    "runs": 1,
+    "exitCode": 0,
+    "signal": null,
+    "error": null,
+    "parserError": null,
+    "conservationError": null,
+    "preparationFailures": [],
+    "allCasesReachedAssertionPhase": true
+  },
+  "completion": {
+    "status": "complete",
+    "declaredCount": 16,
+    "disposedCount": 16,
+    "counts": {
+      "pass": 16,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "policySha256": "d8cc8c52036fe9425ed8222a16d980207d5197bcad8bd2ffbe0b0928f2601bd7",
+    "caseSetSha256": "8cb16b8c207411c093409fffaeba660fe7068881b2da071473f9f6f809de6795",
+    "dispositionsSha256": "a86266e84c7b695e43cad170a080682d2b11d12fb1d1fc2cdfbdb6ca4278bc3f"
+  },
+  "bindings": {
+    "assertionsFreezeSha256": "67a44abe5d245d9c47b15868cdaceb63e5af1f4fc74035050011bb5639118d2b",
+    "qualificationFreezeSha256": "2296bee9f3e51fc2bc0e62854184bb5c5912732ac9bbcb0e2421eca42818273d",
+    "graphManifestSha256": "a4a2f4e25131a7832d50b45a3918adfda4ff2bdbcab8693b924450a79f16f482",
+    "graphFileCount": 369,
+    "assertionsSha256": "03b504aa56e150fc2093a0049fecbb72f691692cff9fcc8b1a7704fec7318f1a",
+    "fixtureSha256": "a1a57d2fe8796aebafd0e7dee7d053635978e2fce83a7a1eaf411a057e804bfa",
+    "launcherSha256": "692f717bd95c4aa967c6b2a73253ecf6986660638e99efa5930c16e264d6ea8c"
+  },
+  "qualifiedSources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sourcePath": "legacy-origin:alfred-obl047-state-authority-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "2a0b0b9bd2f16948758aebbb62c4079f283ba9767a32a8dc1c6eaa998672aa43",
+      "parentSha256": "0c52f8951b5ed1c71979d18d89ff470cd698431d68c18b1f4c1bd8dd0654ba81",
+      "sourceManifestSha256": "ac4dbd12129539a982bb278b5690153d464c3fb14de3a9a405fea4aed5d3c64c"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+      "sourcePath": "legacy-origin:alfred-claude-verify-configuration-route-source-successor-20261010/postimages/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+      "sha256": "354bd5fc754d08577d5a2a91b4b2ed1a9656484eabff77207d03a5017674f1d1",
+      "parentSha256": null,
+      "sourceManifestSha256": "774ebda4ccc5c0b937fdd97df20fd244999aee16621002a989c5a18c4afb6a5d"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "sourcePath": "legacy-origin:alfred-claude-verify-configuration-route-source-successor-20261010/postimages/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "sha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca",
+      "parentSha256": "7a705a110535a937e552caa3f34485959046f242cf0884ce830d874446db4200",
+      "sourceManifestSha256": "774ebda4ccc5c0b937fdd97df20fd244999aee16621002a989c5a18c4afb6a5d"
+    }
+  ],
+  "caseAssociations": [
+    {
+      "id": "VCR001",
+      "disposition": "pass",
+      "behavior": "Genuine approved implementing lifecycle with ignored, untracked, HEAD-absent private State; actual configure route and fresh installed hook permit ordinary paired configuration commit without changing State."
+    },
+    {
+      "id": "VCR002",
+      "disposition": "pass",
+      "behavior": "Unchanged predecessor hook refuses the same actual private-State paired configuration commit; HEAD and State remain unchanged."
+    },
+    {
+      "id": "VCR003",
+      "disposition": "pass",
+      "behavior": "Forged or missing retained approval proof refuses preparation without altering State or twins."
+    },
+    {
+      "id": "VCR004",
+      "disposition": "pass",
+      "behavior": "Supported configured chat approval remains eligible and commits through the ordinary fresh hook without a new signature requirement."
+    },
+    {
+      "id": "VCR005",
+      "disposition": "pass",
+      "behavior": "Opaque-handle provenance, real prepare/write/complete lifecycle, exact index inspection and consumed-handle refusal."
+    },
+    {
+      "id": "VCR006",
+      "disposition": "pass",
+      "behavior": "Actual HEAD drift invalidates the sealed transition."
+    },
+    {
+      "id": "VCR007",
+      "disposition": "pass",
+      "behavior": "Private State raw-byte or continuity-revision drift invalidates the transition."
+    },
+    {
+      "id": "VCR008",
+      "disposition": "pass",
+      "behavior": "Actual public approval trust-policy drift invalidates approval and transition."
+    },
+    {
+      "id": "VCR009",
+      "disposition": "pass",
+      "behavior": "One-twin staging and extra real staged paths refuse even when caller presents the expected twin list."
+    },
+    {
+      "id": "VCR010",
+      "disposition": "pass",
+      "behavior": "Changed command, extra configuration key or divergent twins refuse the exact transition."
+    },
+    {
+      "id": "VCR011",
+      "disposition": "pass",
+      "behavior": "Independent protected gate modifications refuse inspection and actual ordinary commit."
+    },
+    {
+      "id": "VCR012",
+      "disposition": "pass",
+      "behavior": "Actual twin hardlink or symlink, executable index mode and unsafe ready-record mode refuse."
+    },
+    {
+      "id": "VCR013",
+      "disposition": "pass",
+      "behavior": "Missing, partial, noncanonical or extra-key ready records cannot grant commit authority."
+    },
+    {
+      "id": "VCR014",
+      "disposition": "pass",
+      "behavior": "Partial twin publication retains the genuine held preparation and refuses completion or implicit reclaim."
+    },
+    {
+      "id": "VCR015",
+      "disposition": "pass",
+      "behavior": "Post-commit identical configuration replay performs no writes; a changed command cannot reuse the old seal."
+    },
+    {
+      "id": "VCR016",
+      "disposition": "pass",
+      "behavior": "Genuinely produced approved implementing State tracked in HEAD remains accepted by the separate legacy route."
+    }
+  ],
+  "publicReceipts": [
+    {
+      "path": "execution-terminal.json",
+      "sha256": "450766994f816e320fdf6a748547e2dad5158db996eee738edc69644439f6733"
+    },
+    {
+      "path": "qualification-output/stdout.txt",
+      "sha256": "18b6449771d6f4c97517ac9ec489131c0570ef3a6652724a6490d2ea87449209"
+    },
+    {
+      "path": "qualification-output/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "qualification-output/completion.ndjson",
+      "sha256": "6dedd9f33c76a374b9f77176385505b2476ce5fad59d388654d605a64246147a"
+    }
+  ],
+  "privacyReview": {
+    "reviewed": "This proof, terminal, completion stream and stdout contain case identifiers, public relative source paths, digests and result counts. Stderr is empty.",
+    "excluded": "Synthetic repository contents, private State, approval proof bodies, fixture call logs, signing keys and operational manifests are not approved for automatic public transfer."
+  },
+  "limits": [
+    "Method fixtures use actual source approval writers, committed synthetic public trust anchors and memory-only synthetic signing keys; this is not an attended human signature certificate.",
+    "The configure CLI handler and real installed ordinary Git hook are qualified for this bounded source graph; no native runtime or model claim is made.",
+    "No full Verify, Alfred acceptance-criterion closure, backlog-item closure or overall release certification is claimed.",
+    "No live canonical source, user repository, host configuration or original frozen assertion was modified during qualification."
+  ]
+}

@@ -1,0 +1,296 @@
+{
+  "schema": "alfred.passive-invalid-auxiliary.focused-public-proof.v1",
+  "status": "43 focused callbacks passed across two actual runs",
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+    "sha256": "702019771e8d6fba54238011a1fb0e61b3dfe71305b48a27738b5cd2119aa6fe",
+    "proposalManifestSha256": "727906d1f1bb5b91a6c0d315425b98b6be5b984cc95fead3f7d2d74df4f324b3"
+  },
+  "counts": {
+    "pass": 43,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "cases": [
+    {
+      "id": "PCF001",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF002",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF003",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF004",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF005",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF006",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF007",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF008",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF009",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF010",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF011",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF012",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF013",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF014",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF015",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF016",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF017",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF018",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF019",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF020",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF021",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF022",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF023",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF024",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF025",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF026",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF027",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF028",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF029",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF030",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF031",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF032",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF033",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF034",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF035",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "PCF036",
+      "disposition": "pass",
+      "origin": "official-PCF36-replay"
+    },
+    {
+      "id": "POLICY001",
+      "name": "recursive additional roots are exact physical boundaries and retain project key authority",
+      "disposition": "pass",
+      "origin": "retained-first-run-not-repeated"
+    },
+    {
+      "id": "POLICY002",
+      "name": "mixed exact-file and directory roots keep the transcript exact and memory recursively bounded",
+      "disposition": "pass",
+      "origin": "retained-first-run-not-repeated"
+    },
+    {
+      "id": "POLICY003",
+      "name": "an external user report remains readable while key material and aliases are excluded",
+      "disposition": "pass",
+      "origin": "retained-first-run-not-repeated"
+    },
+    {
+      "id": "PAI001",
+      "name": "PAI001 either unavailable auxiliary reader preserves exact own regular public file only",
+      "disposition": "pass",
+      "origin": "retained-first-run-not-repeated"
+    },
+    {
+      "id": "PAI002",
+      "name": "PAI002 unknown inventory never widens outside, missing, private or credential operands",
+      "disposition": "pass",
+      "origin": "retained-first-run-not-repeated"
+    },
+    {
+      "id": "PAI003",
+      "name": "PAI003 unavailable auxiliary inventory excludes aliases, hard links and directory expansion",
+      "disposition": "pass",
+      "origin": "retained-first-run-not-repeated"
+    },
+    {
+      "id": "PAI004",
+      "name": "PAI004 malformed valid inventory retains known credential roots and rejects external expansion",
+      "disposition": "pass",
+      "origin": "retained-first-run-not-repeated"
+    }
+  ],
+  "actualPCF36": {
+    "executionSha256": "04cbc1756195dd2c755f2685617c45b1670d68ab9e6944ecf13fb3a42b064069",
+    "stdoutSha256": "1004778b06db1189b95c2dcd4030ec787f7cc1faf0287909d260d6818d01b906",
+    "fd3Sha256": "ad930fabba893ad9565ead5147dd6788c7188d8836f6567eb6d09d4e8ee16945",
+    "completion": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "2c3339a1877018b8f49fd1d0b74750ccaa911e26a91c7e09b6f295e4a8b9b232",
+      "caseSetSha256": "ec1b9dd51fb3c84b527d5b22d896c87f4346009cc175297b9ec25ab60e1c98aa",
+      "dispositionsSha256": "b2d5dd18be10aa6c3e45da2d3cea2dbb8cf5ece01a288185a9df3291d3c57cd0",
+      "declaredCount": 36,
+      "disposedCount": 36,
+      "counts": {
+        "pass": 36,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    },
+    "sourceConserved": true
+  },
+  "retainedSeven": {
+    "validationSha256": "2c09207793b7b7440eb4ed01ad90e085122bc5a4eda037a721244d0cf963cc9a",
+    "stages": [
+      {
+        "name": "retained-policy3",
+        "counts": {
+          "tests": 3,
+          "pass": 3,
+          "fail": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "stdoutSha256": "fee679d46a765bec8429d1f9cadcc7c82fa36e6bede6c6bdefaa671f6960afe6",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "independent-boundary4",
+        "counts": {
+          "tests": 4,
+          "pass": 4,
+          "fail": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "stdoutSha256": "3b0012c7438bbb95b04cf2ecf5669e66d88ce0b33376c7e9b9a4a25aa7c3d885",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "repeated": false
+  },
+  "limits": [
+    "Unit reader seams represent configuration unavailability, not authenticated native authority",
+    "Not a single new 43-case execution; original seven are retained",
+    "No native Windows, installed host, full item acceptance or assembled Main qualification claim"
+  ],
+  "privateFixturePathsExcluded": true
+}

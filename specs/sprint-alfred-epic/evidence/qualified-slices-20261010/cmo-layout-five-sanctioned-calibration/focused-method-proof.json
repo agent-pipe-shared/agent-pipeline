@@ -1,0 +1,129 @@
+{
+  "schema": "alfred.cmol-five.focused-method-proof.v1",
+  "actualExecutionSha256": "91711c25ebe72549ff5519fefa8532492c27611028fb8f46093a80fb299caa64",
+  "actualExecutionFileSha256Only": true,
+  "graphSha256": "dd38c89d262a587d92ea978edf13e3871e65e4162e256c5b89cb349b87381397",
+  "sourceGraphConserved": 2169,
+  "sourcePosts": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/report-interruptions.mjs",
+      "parentSha256": "e5c519414b8716c853b7e29bf60f9b280f95c214efb2f7eed84a3ef433431bde",
+      "postSha256": "fdcc6fe6d707303fdc7a9758715248bad62ed2b4eb9879dfe901c37f4da931c4",
+      "bytes": 20168,
+      "mode": 493
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/interruption-receipt-store.mjs",
+      "parentSha256": "f2916158bc27a30038db0e7a6ccf09edba729bf8cb4f1641f36dccb25291e2fd",
+      "postSha256": "cd68275ea86691a68102691e2f919601e3f60b9df7b07e9647e50a03541df98f",
+      "bytes": 53102,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/check-vendored-template-sync.mjs",
+      "parentSha256": "38c3c7fd601122cff75ed25d6edd0e6ee3764f7d60a74672e891465fd20bfe36",
+      "postSha256": "b9dd50c6dba7be991d4d40eac48846ac94c1f39687ab2d07d257e02c613d4b43",
+      "bytes": 5117,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/config/interruption-registry.v1.json",
+      "parentSha256": null,
+      "postSha256": "a37b5ab200f0b88cae6e45adb8befa4e273a8949494197d2958d01df094e23e9",
+      "bytes": 2748,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/sync-interruption-registry-asset.mjs",
+      "parentSha256": null,
+      "postSha256": "7b583a8f1a9d842f71249bd30e3d55269822750e14473550ed51df65643f0e7c",
+      "bytes": 5382,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "parentSha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+      "postSha256": "e5f7d2de017b81eb15f807b2f252acfc47cbebd3342b1fb98c4b93903fcd55b8",
+      "bytes": 541929,
+      "mode": 420,
+      "authoredParentSha256": "4b3b800fc2bcc0d53c814515bb7670864748ad58398d966a67f9f49f84913101"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+      "parentSha256": "354bd5fc754d08577d5a2a91b4b2ed1a9656484eabff77207d03a5017674f1d1",
+      "postSha256": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+      "bytes": 16811,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "parentSha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+      "postSha256": "fc9b78249ca7b366af0cf27c966b7a0e2094cf99cd9ba19ff6b18b2c4e7c7c1d",
+      "bytes": 795463,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "parentSha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca",
+      "postSha256": "99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4",
+      "bytes": 59900,
+      "mode": 420
+    }
+  ],
+  "policyFileSha256": "b07e526da59942cab054b388190e779fad9ee7b935b9398b04b92ade05c988da",
+  "completionSha256": "d4903c36cc891c625f441729d3bd2d51f902e9dd9e3ddbf83c0b924ed808126a",
+  "completionBytes": 1170,
+  "productionParserAttestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "5143117485f3c008f83989e8ea6f2b76de4898932ff223498a9c042d927f56c9",
+    "caseSetSha256": "3a80474afa80f61d391f34c8e1ae9a67e98cc840a167d29d1aa805f41d8f61fb",
+    "dispositionsSha256": "ea67712af2210a28dcc8f05733e533147f89fe9f24d078e57e632b34a981e5f1",
+    "declaredCount": 5,
+    "disposedCount": 5,
+    "counts": {
+      "pass": 5,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "caseIds": [
+    "CMOL001",
+    "CMOL003",
+    "CMOL004",
+    "CMOL005",
+    "CMOL006"
+  ],
+  "counts": {
+    "pass": 5,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "actualInheritedHooksAndEnvironment": true,
+  "explicitOutputDescriptor": "3",
+  "originalCmo001Repeated": false,
+  "previousEmptyFd3Run": {
+    "executionSha256": "4ce90e7879a7682e9400e5f31a1e581a0db0dec72e306c52f6378e1513c6353e",
+    "qualifiedDispositions": 0,
+    "immutable": true
+  },
+  "sourceGeneration": "Standalone Source9 e5f/fc9/411/99 plus packaged policy Source5; latest cumulative AFK/State/onboarding tuple is not claimed by this proof.",
+  "heldCases": [
+    {
+      "id": "CMOL002",
+      "reason": "Authentic existing legacy-twin constructor not supplied."
+    }
+  ],
+  "scopeLimits": [
+    "No native or actual Human signing qualification.",
+    "No inherited historical adoption or lawful full close positive.",
+    "No automatic Main/Audit Source integration or official item closure.",
+    "No complete full State/I08 or whole-candidate acceptance."
+  ],
+  "native": false,
+  "actualHumanSigning": false,
+  "officialItemClosure": false,
+  "candidateIntegration": false
+}

@@ -1,0 +1,11 @@
+✔ RC15C004 HGO-SCAN controlled ordinary legacy-v3: authenticated stale matching record cannot shadow a current matching capability (491.395777ms)
+✔ RC15C005 HGO-SCAN controlled ordinary legacy-v3: stale-only candidates remain refused without capability consumption (143.414609ms)
+✔ RC15C006 HGO-SCAN controlled ordinary legacy-v3: corrupt authenticated audit still fails globally before later valid candidates (228.958845ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 867.573299

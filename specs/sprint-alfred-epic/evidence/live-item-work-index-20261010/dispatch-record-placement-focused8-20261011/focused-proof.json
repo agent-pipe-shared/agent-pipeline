@@ -1,0 +1,68 @@
+{
+  "schema": "alfred.dispatch-placement.public-focused-proof.v1",
+  "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+  "actualExecutionSha256": "75ad5a1304d020550d2feb2b09339d1e50aff10f67b0ced9741b79f91ec2acaf",
+  "qualificationManifestSha256": "212ef1bf19f4711e48a1e1954beb7ac15a816f398d2a49684e1e195920231ffc",
+  "assertionFreezeSha256": "37e1bb38828af2414ac583ee9f37ef58dae3d9c9ae03f2cf49a0bec02ced9571",
+  "normSha256": "bb6a211e89eb4de3f2eb47869229e054472507141e523f9dfd22ba05f4ae01a1",
+  "callbacksSha256": "e9e25ab0c318e9b3fc437f9aca734bfbbc95b60b77d28277c0f4dc6de6a33ccd",
+  "originalCallbacksSha256": "31ce9dec018435b9be4690bc2c7efe93de7bf9c7e759053d56999090a14b92d2",
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+    "parentSha256": "c90e1be45723b44bfe8fa7a0276004e93aea2b43172f806b39ee70d7bf1174b7",
+    "qualifiedPostSha256": "da07ae3df3663af4b8ec1a85189eb4f5ba3b7e5be4c8295862bfe0e42f40b9d3",
+    "exactSplices": 4
+  },
+  "completion": {
+    "sha256": "4b0df316cff3181b4ce2a9adcd8de53b2f94955290c37b9699ea6cbbca541048",
+    "bytes": 1545,
+    "caseIds": [
+      "DLP001",
+      "DLP002",
+      "DLP003",
+      "DLP004",
+      "DLP005",
+      "LDO003",
+      "LDO008",
+      "LDO010"
+    ],
+    "officialProductionAttestation": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "15fd5fa3c2a70ebbfc96fdef052d219ecd32b67dd9823cb2f8820c2b80f77900",
+      "caseSetSha256": "954df80bc07f2752a9a97bfa5626a5ac848028f90e726e9d8d250a6fcca82e97",
+      "dispositionsSha256": "869435f1e54bf0de9f7f6236e8b93bdc1c25891e876bc6dc046a1d924e5c9aef",
+      "declaredCount": 8,
+      "disposedCount": 8,
+      "counts": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  },
+  "actualChild": {
+    "status": 0,
+    "signal": null,
+    "errorCode": null
+  },
+  "sourceRestored": true,
+  "all609ResourcesConserved": true,
+  "errors": {
+    "completion": null,
+    "preparation": null,
+    "restoration": null,
+    "conservation": null
+  },
+  "priorLDO12ExecutionSha256": "c53b5997fadfe0c206f5923fef8177bce0ad2b4102db7234c3c762da6bbad670",
+  "limits": {
+    "methodOnly": true,
+    "nativeHostClaim": false,
+    "topLevelGovernedDirectWriteProven": false,
+    "wholeItemAcceptance": false,
+    "templateMirrorOrHistoricalMigrationProven": false,
+    "protectedIntegrationAuthorization": false,
+    "priorWholeLDO12Replayed": false
+  }
+}

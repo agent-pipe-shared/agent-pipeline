@@ -1,0 +1,8 @@
+chore(backlog): reconcile five pending Alfred registrations
+
+Record initial open events through the official reconciler after item commit
+5422e4b6e. The strict backlog checker passes; existing historical drift is
+retained. No completion or acceptance status is changed.
+
+Dispatch: administrative (elephant)
+AI-Assisted: true

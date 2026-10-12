@@ -1,0 +1,31 @@
+{
+  "schema": "alfred.role1.public-delta-manifest.v1",
+  "status": "Root-only-public-archive-preparation",
+  "files": [
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed26-role1-successor/remaining-delta.json",
+      "sha256": "c135a8e8aff07daece63cba6e8aca0a4eee26c8bd0edc3cebe10b1a68ee0ab9c"
+    },
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed26-role1-successor/public-proof.json",
+      "sha256": "e7b12cbcdef0dbab31080dda1c5685602841e5087ea974d7c110ecdec0516f63"
+    },
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed26-role1-successor/report.md",
+      "sha256": "19d32f1ff46ccaab11958e173b2c25294fa31241764d8421fbd3705a42e4445e"
+    }
+  ],
+  "actualIntegrationReceipt": {
+    "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/role1-atomic-preparation/apply-once/actual-receipt.json",
+    "sha256": "95ed87ec0c8fb925d8e7210c3d68ff303ce5104fbfd54a94c8e15263a0aca002"
+  },
+  "publicWhitelist": [
+    "remaining-delta.json",
+    "public-proof.json",
+    "report.md",
+    "manifest.json"
+  ],
+  "rawStreams": 0,
+  "privateMaterial": false,
+  "wholeItemAcceptance": false
+}

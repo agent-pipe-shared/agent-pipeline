@@ -1,0 +1,57 @@
+{
+  "schema": "alfred.focused-proof-archive-plan.v1",
+  "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-source164-readable-status-20261010",
+  "targets": [
+    ".",
+    "scratch/alfred-greenfield-agy-audit-20261009"
+  ],
+  "files": [
+    {
+      "path": "assembly164-public-proof.json",
+      "sha256": "f29aac6a9357de92c13a90d94c52d4a72fe01c8b00f7129e67e04765c2cebb29",
+      "bytes": 5751,
+      "mode": 420
+    },
+    {
+      "path": "verify-two-generations-public-proof.json",
+      "sha256": "bd57b14332a8cc56cc7d76b12a9b1197e88aba6aebe65d4c91be49f5394e72c4",
+      "bytes": 2900,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "55cc860287eeb1e2cdd65159197cae668ed45135a32690d719659dc35a046440",
+      "bytes": 1552,
+      "mode": 420
+    },
+    {
+      "path": "WORK-STATUS.snapshot.md",
+      "sha256": "29eebc62a56a27ef19c6e7de80e7d83f92cc13249dae779a24a75ed4c3304f47",
+      "bytes": 4947,
+      "mode": 420
+    },
+    {
+      "path": "handover.snapshot.md",
+      "sha256": "9d6a0a2f76d22206982f4d8ffb44868b737d684dce0953c48181e46150f811df",
+      "bytes": 24501,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "cfd47e6f6582682f221a3810849563f9f73be85ec0bdeebf5f866a6f78b069e0",
+      "bytes": 795,
+      "mode": 420
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "766436d8087bc7768eab88c72ba6f824b7afbd778a8f57342f70392ce4072089",
+      "bytes": 2376,
+      "mode": 420
+    }
+  ],
+  "noOverwrite": true,
+  "sourceInventoryGuard": {
+    "path": "scratch/alfred-current146-final-composition-update-20261010/actual-source-manifest.json",
+    "sha256": "aba63c5cac17b0f7c33557b7581d010f0e803454c45713879f9ecdf3ec8b967f"
+  }
+}

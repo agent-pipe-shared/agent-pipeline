@@ -1,0 +1,59 @@
+{
+  "schema": "pipeline.stage0-design-wording3.actual-public-proof.v1",
+  "status": "actual-content-integrated",
+  "scope": "Original EL-16 design-authoring exemption and implementation fast-path qualification wording only.",
+  "rows": [
+    {
+      "canonicalPath": "harness/scripts/generate-agent-obligations.mjs",
+      "parentSha256": "a974f4b08a105fcc13d0e9c1b6764369a2df727d56b40f7127b4b202c3a76314",
+      "postSha256": "db521480a1ca9b50191be3cfe6e68f1870e7f39b532851edefb32c9be45de02f",
+      "mode": 420,
+      "nlink": 1,
+      "selected164Member": false
+    },
+    {
+      "canonicalPath": "templates/prompts/agent-obligations.md",
+      "parentSha256": "991ed5b11d79d1e3a095bed1c4414724fed03478e5d2254e9be6c112e15bac8f",
+      "postSha256": "8991bcbe2aba3f3f4a49112ef203599aecfa0bcff971d47f3dd131e00f61336d",
+      "mode": 420,
+      "nlink": 1,
+      "selected164Member": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/templates/prompts/agent-obligations.md",
+      "parentSha256": "991ed5b11d79d1e3a095bed1c4414724fed03478e5d2254e9be6c112e15bac8f",
+      "postSha256": "8991bcbe2aba3f3f4a49112ef203599aecfa0bcff971d47f3dd131e00f61336d",
+      "mode": 420,
+      "nlink": 1,
+      "selected164Member": false
+    }
+  ],
+  "officialProtectionClassification": {
+    "basis": "Root reported actual standalone official classifier before application; raw classification stdout not archived in this packet.",
+    "status": "ready",
+    "dynamic": "available",
+    "diagnostics": [],
+    "allThreeRules": null,
+    "admissionGrantedByThisProof": false
+  },
+  "validation": {
+    "actualApplyReceiptSha256": "a0c706bc6b8ce32e24e24a0279b5a27daad2be201b45a0d15c7577d5268469f9",
+    "exactParentPostAndInverseBound": true,
+    "changedGeneratorLiteralMatchesMirrors": true,
+    "mirrorByteEquality": true,
+    "oldSharedInodesTruncated": false,
+    "rollbackCount": 0,
+    "cleanupErrorCount": 0,
+    "syntaxChecksPassed": 2,
+    "fullGeneratorExecution": "not run; no new run requested for low-impact wording",
+    "businessRuns": 0,
+    "nativeEvidence": false,
+    "wholeItemAccepted": false
+  },
+  "limits": [
+    "No verifier count/phase/parser/protected/signature gate changed.",
+    "EL-16 design authoring does not grant production implementation authority; all implementation fast-path criteria including at most two files remain.",
+    "Three paths outside original164 membership; selected coverage remains150/164 with retained14 pending.",
+    "Content integration is not assembled-candidate or installed/native qualification."
+  ]
+}

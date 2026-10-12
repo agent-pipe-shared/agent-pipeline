@@ -1,0 +1,353 @@
+{
+  "schema": "alfred.agy-stale-proof.source-proposal.v1",
+  "status": "SOURCE-ONLY; ROOT REVIEW AND QUALIFICATION REQUIRED",
+  "canonicalPath": "plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+  "actualMainParent": {
+    "path": "plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+    "sha256": "21e57eb1ae84767887569e96963836e353f141dff7e0dcba09a9f3a4cf90fe00",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "b4e166807f92aa56cdc4463001c01780d310f782deaf82ff4bc75682bd7dd82f",
+      "bytes": 6,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 2,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 1292,
+    "mtimeNs": "1791534747260743517",
+    "ctimeNs": "1791569417493339390"
+  },
+  "parentCopy": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/parents/plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+    "sha256": "21e57eb1ae84767887569e96963836e353f141dff7e0dcba09a9f3a4cf90fe00",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "f4ff37b84af56589486dd55f399d622d10e0a1f2d82ec3ad28c80388041347bb",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 1292,
+    "mtimeNs": "1791674958722884057",
+    "ctimeNs": "1791674958722884057"
+  },
+  "postimage": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/postimages/plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+    "sha256": "6bd1c422a401afc271cab5260e0b25294c52b0e580e45db2d9901e1b4cfe6519",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "0971da29f5dd52bd3039bba9afdd3f001a084eb414bbd132a539174307bd522a",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 2143,
+    "mtimeNs": "1791674958822881737",
+    "ctimeNs": "1791674958822881737"
+  },
+  "beforePostContract": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/before-post-contract.json",
+    "sha256": "51f0add00d45310914a4247fa510a19cf75774f76eb8e0b1ab3bc837d6f6a6df",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "7c15ef6ec91b1d2281d8a6d507fac473e82b6e35e3f7b9af9a1542e9e6ad4dd2",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 3497,
+    "mtimeNs": "1791674881552673586",
+    "ctimeNs": "1791674881552673586"
+  },
+  "forwardPatch": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/forward.patch",
+    "sha256": "4e8efccf9a77610d492d7608977ac96e51dc70e7660a9d1604e814f566748c0b",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "46bdae7410853f93b4aacadb8549d5136ce1efa33637b60ee27bbaa1d551dfb5",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 2417,
+    "mtimeNs": "1791675218684852335",
+    "ctimeNs": "1791675218684852335"
+  },
+  "inversePatch": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/inverse.patch",
+    "sha256": "d109fb1647833a7008ae39c58f9bdf860a6de7c054b2c4d08b1e5b208207107b",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "f1756273ceb308883177bf34595ef27faba79bc7c07cfb6d6daedc948382670e",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 2417,
+    "mtimeNs": "1791675218688605353",
+    "ctimeNs": "1791675218688605353"
+  },
+  "exactFullInverse": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/exact-transformation.json",
+    "sha256": "ca4e54e7e2c089cff275afe61a5f08376b43a6ce3709760dcdb44a3592797e2d",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "708d8d2197af61b0b9e1d08d791fbbd48eab2642bcac1cab007cb549706ffa1f",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 3940,
+    "mtimeNs": "1791675218689715137",
+    "ctimeNs": "1791675218689715137"
+  },
+  "caller": {
+    "path": "plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+    "sha256": "ed1bbbd39046057f54820f59759bb1620941ebd482dd899f717f61b864627147",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "94676488352b198f00c1df925308c40284684a1546a10c4539282227cb478208",
+      "bytes": 6,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 2,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 6728,
+    "mtimeNs": "1791023621216891924",
+    "ctimeNs": "1791569417493339390"
+  },
+  "observer": {
+    "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "fb9d38707ef1630e1d0ec7f042d4e0c42dc5e3e48290ab1cf9dac26ae827ea3c",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 115016,
+    "mtimeNs": "1791670784971196653",
+    "ctimeNs": "1791670784991196194"
+  },
+  "existingRegression": {
+    "path": "plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs",
+    "sha256": "4317ffd3a045e9d77bec54b5b52435f090238365933c6177573c1744e3c30a02",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "c7224e386ed4e639c37bdda8d09d3fb6dfe5906ceb12e8078aa0a58feff6b391",
+      "bytes": 6,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 2,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 7250,
+    "mtimeNs": "1791023621216910705",
+    "ctimeNs": "1791569417493339390"
+  },
+  "syntaxCheck": {
+    "command": "node --check legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/postimages/plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+    "exitCode": 0,
+    "productImported": false
+  },
+  "publicExportsUnchanged": [
+    "armAntigravityBootstrapSession"
+  ],
+  "semanticsNotExecuted": true,
+  "sourceApplied": false,
+  "nativeEvidence": false,
+  "wholeItemAcceptance": false,
+  "futureCases": [
+    "Genuine hook-authored same-build regular lock older than 30 minutes: repeat validated hook refreshes proof, observer can see freshness, consumed pending barrier remains absent.",
+    "Fresh same-build regular lock: original repeated-ready test retains identical mtime and no pending re-arm.",
+    "Future mtime and nonregular lock: remain unavailable/refused through the existing failure path, not freshness evidence.",
+    "Different build/malformed/missing lock: original new bootstrap barrier behavior remains."
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "schema": "alfred.local-stamp14-public-proof-manifest.v1",
+  "scope": "controlled-preparation-method-only",
+  "actualCounts": {
+    "pass": 14,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "sourceSha256": "b6f02c79d4d6314fa91ae721d2f0730d889989760ae45a95e70f1ca6a5b08165",
+  "originalFailurePreserved": true,
+  "sourceAndFixtureConserved": true,
+  "nativeAssurance": false,
+  "actualProductionStamp": false,
+  "actualReviewOrVerify": false,
+  "candidateReadiness": false,
+  "itemAcceptance": false,
+  "files": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/local-stamp-preparation14/method-receipt.json",
+      "sha256": "56b86f271c632d81c2b4d8d20888e963edd103666b3dd7c2d20d188a5515d59a",
+      "bytes": 4564,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/local-stamp-preparation14/qualification-scope.json",
+      "sha256": "6be83ef378daefe69a32ce966471ba0de2b1c9b87e568191728671a4e4983a9e",
+      "bytes": 3694,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/local-stamp-preparation14/completion.fd3.jsonl",
+      "sha256": "52a0eadea4aa2146d7cb4f98a1834b6828f60756a59600e2b25fc90d947df417",
+      "bytes": 2333,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/local-stamp-preparation14/completion.policy.json",
+      "sha256": "054d09a20f648818cedb8f0289b13864e7f2605cf0b608630399f0f0161a9c49",
+      "bytes": 296,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/local-stamp-preparation14/README.md",
+      "sha256": "6eaec298946d598b1676e2af092d592ac937962feafdbcea25e8f626fa49f64a",
+      "bytes": 1002,
+      "mode": 420,
+      "nlink": 1
+    }
+  ]
+}

@@ -1,0 +1,172 @@
+{
+  "schema": "alfred.afk-registry-plan-functional-manifest.v1",
+  "sourceFiles": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "parent": {
+        "path": "legacy-origin:alfred-approval-ticket-private-exercise-source-corrective-20261011/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "sha256": "5827757549f06da7c9f11f12fedf115479ee50cb5d2818a58460dfdeb4143da4",
+        "size": 137154,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "post": {
+        "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "sha256": "d30aaa52c97ac7f17c852a181572b773d952e2090fa5496afe4e609b86b5bea0",
+        "size": 137168,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "inverseExact": true,
+      "outsideDeclaredSplicesConserved": true,
+      "namedExportsConserved": true,
+      "literalImportsConserved": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "parent": {
+        "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "beea4f37baa9e8bc0210c3b66f02e2eb9935f1f63982d72ae2d9e25f04ba4d60",
+        "size": 807952,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "post": {
+        "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "c28fe82ee90f6b61632fede4cbda7e3248401225b8d2c594264d2d74226eff3a",
+        "size": 809796,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "inverseExact": true,
+      "outsideDeclaredSplicesConserved": true,
+      "namedExportsConserved": true,
+      "literalImportsConserved": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "parent": {
+        "path": "legacy-origin:alfred-approval-lock-witness-pre-gate-source-20261011/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "0609c893126b35df0a7a4b7bdb926ba15ab7e0ddf056b057ab9bbadecb9a297c",
+        "size": 616733,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "post": {
+        "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "dc31dfd69eec652e603a5a0654faa32f95dd48e4ebeba7eacaf3ef181a0d7b50",
+        "size": 616784,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "inverseExact": true,
+      "outsideDeclaredSplicesConserved": true,
+      "namedExportsConserved": true,
+      "literalImportsConserved": true
+    }
+  ],
+  "unchangedCustody": {
+    "path": "legacy-origin:alfred-afk-isolated-repository-custody-terminal-owner-first-successor-20261010/postimages/plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs",
+    "sha256": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c",
+    "size": 26882,
+    "mode": "0644",
+    "nlink": 1
+  },
+  "beforePostNorms": [
+    {
+      "path": "legacy-origin:alfred-afk-posthost-state-handoff-independent-20261010/registry-plan-repair-contract-20261011/contract.json",
+      "sha256": "5f330fa8a45c5f5a46de7225cc03ce43a534ad9d2e62c8124484c6229378a4e8",
+      "size": 4518,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-state-two-repair-qualification-20261010/actual443-diagnosis/lock-ticket-controls-qualification-preparation/source5-authenticated-catch-six-qualification-successor/lock-six-pass-proof-and-afk-join-contract/final-state-i03-afk-join-contract.json",
+      "sha256": "6d5a778803c784656d94ca71f41d7feb69b1db89c70a82af19b60718378855c7",
+      "size": 3194,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/build.py",
+      "sha256": "a08c769297e745aa3389e51140aaf18973cb0536277973f722512d2a8dc49246",
+      "size": 10061,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/freeze.py",
+      "sha256": "e6ab7ca41192bd385e918ddfba92af42c582d27407c76e63509a3ce49009bedc",
+      "size": 3143,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/prepared-manifest.json",
+      "sha256": "e0402ea99c7863fc4a28882d9638d39272321950dd27effe13f42bfcd9d62c73",
+      "size": 3896,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/exact-splices.json",
+      "sha256": "55519bda912adff4bfe06ecf9c936f227540ea215c4294fa172d19a079509cf2",
+      "size": 4185,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/forward.patch",
+      "sha256": "5c413f839947116e42aaa8f1dedf12755bf3052e5d34ae6709eb83a00cd92a56",
+      "size": 4817,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/inverse.patch",
+      "sha256": "a55b057f96321748dc18100d60e897323c16ead00a588063deb5dadca03757a8",
+      "size": 4817,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/api-contract.json",
+      "sha256": "12915277e3c200a80ebd11822e7350a38378c4fbb9bce50d95889546cfc0d837",
+      "size": 1987,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/report.md",
+      "sha256": "1a160505493f80e578dbf9931b6118c17f63e351c4a11b2d90376c475bb3f5fe",
+      "size": 1021,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/static-checks.json",
+      "sha256": "13d95c0f7e8f2df33fe1e0225c80c408c67027425d71a73b4da53840e3888ed6",
+      "size": 1198,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/source-freeze.json",
+      "sha256": "19da19bb969659c95d3f811fc42bef90fba086a96b4093e6bf59d7620e2a4383",
+      "size": 6184,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "priorLockSixAndTicketFivePreservedScopeOnly": true,
+  "originalAssertionsChanged": false,
+  "nextQualification": "Root one-use original AFR001 first; original six only after meaningful successful shared prerequisite.",
+  "whole26Qualified": false,
+  "wholeAfkQualified": false,
+  "nativeAssurance": false,
+  "qualificationPending": true,
+  "businessRuns": 0,
+  "sharedProductWrites": 0
+}

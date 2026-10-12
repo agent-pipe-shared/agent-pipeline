@@ -1,0 +1,5 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["RC15C004","RC15C005","RC15C006"],"caseCount":3,"caseSetSha256":"49f05455f46791b992ed7b55be60763b8c225face3281749d44ad6561c16676e"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RC15C004","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RC15C005","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RC15C006","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":3,"disposedCount":3,"caseIds":["RC15C004","RC15C005","RC15C006"],"caseSetSha256":"49f05455f46791b992ed7b55be60763b8c225face3281749d44ad6561c16676e","dispositionsSha256":"20f796d0fd120f75046364ac13c9ddae7f9db05eeeccf31adcd4506b9781b4c4","counts":{"pass":3,"fail":0,"skip":0,"todo":0}}

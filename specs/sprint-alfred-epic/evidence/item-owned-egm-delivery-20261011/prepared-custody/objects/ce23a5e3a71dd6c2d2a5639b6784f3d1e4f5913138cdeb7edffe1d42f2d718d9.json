@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.private-targeted-test-receipt-correction.v1",
+  "supersedesMetadataIn": "scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/final-role-byte-receipt.json",
+  "preservedOriginalReceiptSha256": "7dabdbadf5470b1749263977c2db34156f1c1cec32e05f1efc3ebff5680ed6d8",
+  "correctionProvenance": {
+    "reason": "The original receipt transcribed one character incorrectly in both candidate hash fields. This version records the exact pre-test and post-test hash outputs already observed in the completed tool calls.",
+    "originalIncorrectValue": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5d3209991f2",
+    "correctedObservedValue": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2",
+    "noRerun": true,
+    "noSourceModification": true
+  },
+  "candidateHashEvidence": {
+    "path": "scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/source/scripts/pipeline-start-preflight.mjs",
+    "rawToolHashBefore": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2",
+    "rawToolHashAfter": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2",
+    "rawToolOutputBefore": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2  scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/source/scripts/pipeline-start-preflight.mjs\n",
+    "rawToolOutputAfter": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2  scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/source/scripts/pipeline-start-preflight.mjs\n",
+    "provenance": "These exact lines were directly returned by the before-test and after-test sha256sum tool calls and remain available in this conversation context. They were observed independently of this correction; the current file was not used to reconstruct historical before-test evidence.",
+    "rawTranscriptLimit": "No separate raw tool transcript file was captured at execution time. The original result receipt remains unchanged; these observed result lines are preserved here as administrative correction evidence."
+  },
+  "testEvidence": {
+    "receipt": "scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/final-role-byte-receipt.json",
+    "result": "The authorized targeted role-housekeeping test completed with exit code 0 and reported 1 pass, 0 failures. This correction changes only the candidate hash transcription and does not alter that test result."
+  }
+}

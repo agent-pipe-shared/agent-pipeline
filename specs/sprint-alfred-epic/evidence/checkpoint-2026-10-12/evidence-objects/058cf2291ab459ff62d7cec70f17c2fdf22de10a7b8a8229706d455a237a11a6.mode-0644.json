@@ -1,0 +1,334 @@
+{
+  "schema": "alfred.critic.fixture-mode-replay.resource-freeze.v1",
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "parentGraphFreeze": {
+    "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/graph-freeze.json",
+    "sha256": "d932ec21b69a30a5f80b34d000ca898cc9b59266367e19e0dec995284eebcff9",
+    "bytes": 1918377,
+    "mode": 420,
+    "nlink": 1,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "a519cd7bf6efb8aa404c1531cccadcd99a6c804589b0027f731fbe615a14cb1b",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "resourceCount": 2152,
+  "directoryCount": 76,
+  "originalGraphObservationSha256": "17a76d860480c348669278603900b7ab5d2f8f8856de94ea22da14bb5eff3e7f",
+  "retainedInputObservationSha256": "4f3c61e13181affb73d6332973a17954f9d25cc7fcbe1b12b94b0e33c3e03a41",
+  "retainedOriginAndInputCount": 2162,
+  "activeOverlay": {
+    "canonicalPath": "plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+    "original": {
+      "path": "plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "origin": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/postimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "sha256": "0f3f01486109426fd101e5f510aeea4c03ffb9e1468899aca3b48094a74969db",
+      "bytes": 26326,
+      "mode": 420,
+      "nlink": 1,
+      "basis": "frozen-independent-assertion-or-mechanical-fixture",
+      "physicalIdentity": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "fbc59f20975dbb1ddb6a3ecdfad26e590b931f4d5936fab5765f41fcef4b97a1",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      }
+    },
+    "replacement": {
+      "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/fixture-successor/postimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "sha256": "ba04d16a6f2f24b9fa417ff2ebf7ee9a0dd69d295ff7bb6a4c687549e285c743",
+      "bytes": 26371,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "efe17dba32300f329f8f10d1e9930deaa3070b2f52db7de8b8354d31566304dd",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    "transport": "Root-only one existing fixture inode temporarily replaced in place; exact original bytes/inode/mode restored in finally. No forest copy."
+  },
+  "originalAssertions": {
+    "path": "plugins/pipeline-core/scripts/critic-one-plus-diff.independent.test.mjs",
+    "origin": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/postimages/plugins/pipeline-core/scripts/critic-one-plus-diff.independent.test.mjs",
+    "sha256": "e1c35eda591939424fb4b7c52025bab9c4db878ada82c029454db40c61d5d474",
+    "bytes": 12107,
+    "mode": 420,
+    "nlink": 1,
+    "basis": "frozen-independent-assertion-or-mechanical-fixture",
+    "physicalIdentity": {
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "195f8b2ec4fb6ba0e6a37290afe767c7ddc3d9c36ef8008232725f03adec0dc4",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    }
+  },
+  "controls": [
+    {
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/graph-freeze.json",
+      "sha256": "d932ec21b69a30a5f80b34d000ca898cc9b59266367e19e0dec995284eebcff9",
+      "bytes": 1918377,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "a519cd7bf6efb8aa404c1531cccadcd99a6c804589b0027f731fbe615a14cb1b",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/completion-policy.json",
+      "sha256": "efd5022de4d154f05121cfa3369aca4132db18b25782b520c3b0ae45c3965a79",
+      "bytes": 212,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "220a8381a6e9bdc13f69ca9f6ed43fd6c5ec0136c019ff9cd1d259ddb108dba9",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/run-mode-only-sha-once.mjs",
+      "sha256": "7a43fc6d6870593fd75f6887cc89abe0c0745c172574909798dc1bd4352ae8e4",
+      "bytes": 9250,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "2d886aad71b1756cb0d62025d54a9a84c5521a215cdf4a169f5f7ff7c81cb11f",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/ready-run-mode-only-sha-manifest.json",
+      "sha256": "40aa9d8f08182b21c7c64535fb2fa8128c08b7a587feb810028e09074caf6f57",
+      "bytes": 4737,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3a0c7c5dba9a2ef06531bb8a06b84e6b0f43d1a653e3e265c2dc4c8a3abc8f21",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/mode-only-sha-successor-20261010/launcher-freeze.json",
+      "sha256": "6bb39186464fbed900ec8f560a0dff8418a1ff3a28dc2787bcebeda6d1bd3178",
+      "bytes": 2996,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3fc84f5001461da63998ee62d0f885a2391f274f5be990cb842a32d597065e34",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/literal-import-closure.json",
+      "sha256": "b2f79929c6f300950a320d05dc5d8011778be0edcf8b25f9cd2de5fe87ff5196",
+      "bytes": 181618,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "6b1403fe2cb317300939875f1eb07721ce7f3def13ce9b5b87e84dbeece5401c",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/qualification-root-mode-only-sha-successor-20261010/execution.json",
+      "sha256": "532b81a6eb91aa48fac0a8022c7369425854ee46b75ef5a43bc71d092cc503c8",
+      "bytes": 2757,
+      "mode": 384,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "2bef2ee86aa0728e688451831f5431a38bdf67a324eae04460dfac378c3d5c59",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/qualification-root-mode-only-sha-successor-20261010/captures/stdout.private.log",
+      "sha256": "53ca5f2e4ab75418136655dbb733f8477d558802b2e791a74c07008e2b95bc1a",
+      "bytes": 15695,
+      "mode": 384,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c587fd0a338794521538e4801e92a5f0c7c084fea2f1126721e7a21a64282a39",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/fixture-successor/manifest.json",
+      "sha256": "f7cae3b49dcaf65bd462292947522d485075c90c14f5270e2865cace0d32c9ba",
+      "bytes": 4159,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "ce11be7fc43413ea9d4bccf20e576b2f09e37f61839da88088d6583f829d9a8a",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    {
+      "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/fixture-successor/postimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "sha256": "ba04d16a6f2f24b9fa417ff2ebf7ee9a0dd69d295ff7bb6a4c687549e285c743",
+      "bytes": 26371,
+      "mode": 420,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "efe17dba32300f329f8f10d1e9930deaa3070b2f52db7de8b8354d31566304dd",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    }
+  ],
+  "launcher": {
+    "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/run-once.mjs",
+    "sha256": "6c67a0697e37a5bc8e0104e7cbe2a23b51b4e9dc32a5c89a01031bcbc689db42",
+    "bytes": 10634,
+    "mode": 420,
+    "nlink": 1,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "e8dceaecf38b010ba2e2666c5cb81eb413351cbd317526d69cd8c62474d0944d",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "preparation": {
+    "path": "legacy-origin:alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/prepare-freeze.mjs",
+    "sha256": "09f6d446c62278f145054da0cc8d65281ab77100d5666bec51aa25167036c31b",
+    "bytes": 6763,
+    "mode": 420,
+    "nlink": 1,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "e94deb4d3f69a4748395cba02ccb7c8712050346cdb582943069789b1ae5484b",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "fullDeclaredInputsRead": true,
+  "allDeclaredByteAndPhysicalCasPassed": true,
+  "syntax": "SourceTextModule parse only",
+  "businessRuns": 0,
+  "productImports": 0,
+  "gitCommands": 0,
+  "nativeAssurance": false
+}

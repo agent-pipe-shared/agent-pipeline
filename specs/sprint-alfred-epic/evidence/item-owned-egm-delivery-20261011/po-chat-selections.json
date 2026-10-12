@@ -1,0 +1,52 @@
+{
+  "schema": "alfred.po-chat-selected-egm-direction.v1",
+  "status": "selected-direction-not-package-approval",
+  "source": "Actual user messages and question-tile replies in this root conversation",
+  "authorityLimits": [
+    "This records selections; it is not a signature, design approval receipt or effective accepted ADR.",
+    "No new request to adopt an already selected direction is required.",
+    "Exact aggregate approval and sanctioned materialization remain necessary where configured."
+  ],
+  "selections": [
+    {
+      "topic": "complete-item-ownership",
+      "kind": "verbatim-user-message-excerpt",
+      "text": "pro AC/Backlog items muss erst analys, dann Testfälle, dann Code dann testen und fixen von einem goldfish bearbeitet werden."
+    },
+    {
+      "topic": "elephant-targeted-checks",
+      "kind": "verbatim-user-message-excerpt",
+      "text": "Der gold Fisch macht die Einzeltests und der elephant macht nur am Ende die full verify strecken oder wenn er wegen Konflikten integrieren musste von Hand dann ggf Einzeltests"
+    },
+    {
+      "topic": "critic-budget",
+      "kind": "verbatim-question-tile-reply",
+      "questionReference": "call_T63zCm7KeDDFxo2TOg0xkUd6",
+      "text": "1 Vollreview + höchstens 3 Diffs"
+    },
+    {
+      "topic": "correction-owner",
+      "kind": "verbatim-question-tile-reply",
+      "questionReference": "call_21d3fa1c020b40e786fdded540960b42",
+      "text": "Ja: eigener Korrektur-Goldfish pro Batch (empfohlen)"
+    },
+    {
+      "topic": "runtime-and-consumer-scope",
+      "kind": "verbatim-user-message",
+      "text": "Jepp und das ganze in die durchsetzungsschicht für alle 3 runner, windows, Unix, macos und auch für user repos"
+    },
+    {
+      "topic": "formal-doc-contract-update",
+      "kind": "verbatim-user-message",
+      "text": "Ja das ist gut und ausreichend aber muss mE auch sprachlich formal sowohl in der user Doku wie auch den adrs korrigiert und dort vertraglich angepasst werden auf diese neue Aufgaben Teilung und die von dir gerade beschriebenen Logik"
+    }
+  ],
+  "proposedDecision": {
+    "record": "docs/adr/draft-item-owned-egm-retained-quality-gates.json",
+    "recordSha256": "adc2d840b5f50befc8221655f341f6285a7d9f24e089e099c92c7d889065b8d9",
+    "markdown": "docs/adr/draft-item-owned-egm-retained-quality-gates.md",
+    "markdownSha256": "385f657e2e33f7c71a8b4f5179e87184557b0e862445a647184de2a9e047e71f",
+    "status": "proposed",
+    "supersedes": "0005-quality-gates-dod"
+  }
+}

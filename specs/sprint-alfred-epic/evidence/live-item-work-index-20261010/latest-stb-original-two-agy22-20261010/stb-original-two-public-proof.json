@@ -1,0 +1,36 @@
+{
+  "schema": "alfred.sanitized-stb-original-two.v1",
+  "input": {
+    "path": "scratch/alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/source-bug-successor/mechanical-two-and-current-five-successor/original2/execution-terminal.json",
+    "sha256": "2be2e8dbc3f299953044e125d748be5f27d30763b4469deb2a43d93a4f998acf",
+    "bytes": 1322
+  },
+  "freezeSha256": "dd6b2ca7540962012f40e0a86f0b26fefadaf552e85fa47447bec05b2ed6613e",
+  "parentConserved": true,
+  "suites": [
+    {
+      "name": "original2",
+      "status": 0,
+      "signal": null,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "c49d1c1194d9bf0a7e7367434dd4ccc558095fc69cedbbd1b095f540da3a5d24",
+        "caseSetSha256": "b98f3bbc778310a56858a54cc778b94d11b694db7e1b0544659435c39bfe82ad",
+        "dispositionsSha256": "2dbb247a6dd4a43f4613eadb10115b7195bbe52fb30e59f1873d909ab55b43d1",
+        "declaredCount": 2,
+        "disposedCount": 2,
+        "counts": {
+          "pass": 2,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "parserError": null,
+      "completionSha256": "6101b8f0b546c6a43f095921a0ac971c77a9cc02bfa9b3fa9f2a1c088428ee19"
+    }
+  ],
+  "scope": "original STB004/005 only; earlier STB003/006 PASS separate retained runs; no full26 lifecycle proof",
+  "nativeAuthority": false
+}

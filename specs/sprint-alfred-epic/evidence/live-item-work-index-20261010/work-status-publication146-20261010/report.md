@@ -1,0 +1,1 @@
+Four reviewed current-view proposals; Source146 and accepted PO links rebased. All176 IDs/stages/body references preserved. Routing counts75/9/167 retained and source digest parity revalidated against146. Active task observations are separate from item assignments. Root-only publisher unexecuted; no Git/tests/source application/acceptance.

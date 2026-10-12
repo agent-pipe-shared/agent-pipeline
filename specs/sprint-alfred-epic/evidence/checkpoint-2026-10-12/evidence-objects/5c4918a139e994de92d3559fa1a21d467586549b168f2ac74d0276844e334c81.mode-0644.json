@@ -1,0 +1,39 @@
+{
+  "schema": "alfred.unknown02.staged-doc-classification-needed.v1",
+  "originalBody": {
+    "excluded": true,
+    "rawSha256": "465ecc634135d12354700029204ab630627ee2d353bc7408bab4b77424a4846d",
+    "bytes": 84,
+    "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+  },
+  "originalSha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+  "currentMainInstaller": {
+    "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+    "sha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca",
+    "lines": [
+      700,
+      853
+    ]
+  },
+  "existingChecker": {
+    "path": "harness/scripts/check-observation-governance.mjs",
+    "sha256": "ea282c7f0a0021d0a6173fc4e4ffa093333d4252ebe2163d0970df001a06ee03",
+    "export": "checkObservationGovernance(rootInput, options={})",
+    "knownOptions": [
+      "policyDocument",
+      "docsPaths",
+      "formDocument",
+      "chooserDocument"
+    ],
+    "limit": "Also reads required physical prose/forms; worktree checker alone cannot prove staged commit classification."
+  },
+  "proposedOwnedSourceContract": {
+    "predicate": "When the exact repository has observation-document policy, fail the commit if any staged docs inventory path lacks its actual staged policy classification.",
+    "source": "Use actual Git index enumeration and staged policy blob, not unstaged worktree inventory. Preserve full existing classification schema, uniqueness, audience/lifecycle/path checks; unavailable/malformed observations refuse.",
+    "applicability": "Self-repository observation policy only. Installed consumer with no such policy retains existing behavior; missing policy where required does not silently exempt.",
+    "integration": "Expose existing pure inventory validator from a shipped shared library, keep harness checker the consumer, add fixed staged precommit consumer to verified runtime snapshot resource closure; do not name source-only harness paths inside generic installed plugin.",
+    "conservation": "No Git config/hooks/signing/authority overrides. No automatic classification, private field export, generic runtime callback or new approval."
+  },
+  "status": "finite staged-index validator/snapshot seam needed; no Source posts or business proof",
+  "nextOwner": "Root assigns installer/shared-validator ownership after current snapshot/source-chain coordination"
+}

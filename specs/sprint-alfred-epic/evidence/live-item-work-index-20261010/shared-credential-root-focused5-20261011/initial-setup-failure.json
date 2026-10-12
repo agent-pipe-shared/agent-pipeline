@@ -1,0 +1,30 @@
+{
+  "schema": "alfred.shared-credential-focused.initial-setup-failure.v1",
+  "actualExecution": {
+    "path": "scratch/alfred-shared-credential-root-independent-qualification-20261011/runtime-regex-check-successor/execution.json",
+    "sha256": "f39c556420ab0ec27cc305deb73a507f305b235041e460ed1026e66102387dc5",
+    "bytes": 1793
+  },
+  "child": {
+    "status": 1,
+    "signal": null,
+    "errorCode": null
+  },
+  "completion": null,
+  "observedCallbacks": 0,
+  "completionBytes": 0,
+  "sourceConserved": true,
+  "cause": "Module-initializer realpath of a missing genuine codex-host-process-launcher.mjs asset. No policy or regex callback ran.",
+  "correction": "Finite genuine launcher plus exec-worker assets temporarily added by Root, then removed; unchanged callbacks use the existing direct Node announced-FD3 transport.",
+  "policyChangesForThisFailure": false,
+  "noPolicyFailureInferred": true,
+  "limits": {
+    "original43Replayed": false,
+    "nativeWindowsOrWSLClaim": false,
+    "globalHostEnforcementClaim": false,
+    "wholeItemAcceptance": false,
+    "MainIntegrationClaim": false,
+    "HumanApprovalOrSignature": false,
+    "otherLifecycleCoverage": false
+  }
+}

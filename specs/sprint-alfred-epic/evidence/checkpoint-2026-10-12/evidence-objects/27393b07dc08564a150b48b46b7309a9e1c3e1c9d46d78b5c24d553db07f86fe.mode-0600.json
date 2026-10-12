@@ -1,0 +1,26 @@
+{
+  "schema": "alfred.r01.content-application.v1",
+  "status": "applied",
+  "inspectionSha256": "0b88ea76da116592fce2d897afa5eadb7da7db60d47a37cfda909be618e442e0",
+  "published": [
+    "plugins/pipeline-core/skills/close-block/SKILL.md",
+    "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+    "plugins/pipeline-core/agents/critic.md",
+    "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+    "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+    "plugins/pipeline-core/scripts/rigor-floor.mjs",
+    "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+    "plugins/pipeline-core/skills/critic-review/SKILL.md",
+    "plugins/pipeline-core/templates/prompts/critic-review.md",
+    "templates/prompts/goldfish-task.md",
+    "architecture/map/harness.md",
+    "architecture/map/pipeline-core.md",
+    "schemas/pipeline.rigor-journal-entry.v1.json",
+    "templates/prompts/critic-review.md"
+  ],
+  "failure": null,
+  "atomicPerLeaf": true,
+  "wholeBatchAtomic": false,
+  "testsRun": 0,
+  "semanticClaims": false
+}

@@ -1,0 +1,123 @@
+{
+  "schema": "alfred.progress-method-evidence.v1",
+  "method": {
+    "labels": {
+      "25": "partial original functionality",
+      "50": "implemented content with unresolved qualification/essential consumer or original clause",
+      "75": "targeted original requirement qualification; not formal acceptance",
+      "100": "formal acceptance"
+    },
+    "unknown": "UNKNOWN retained unless original-requirement/Source/integration/proof join provides a basis. It contributes0 only to the conservative index; this is not evidence of0implementation.",
+    "weightedIndex": {
+      "formula": "(25*n25 +50*n50 +75*n75 +100*n100)/(174*100)*100",
+      "points": 5700,
+      "denominator": 17400,
+      "value": 32.76,
+      "unknownIncluded": 35
+    },
+    "knownOnlyAverage": {
+      "formula": "same points/(100*(174-UNKNOWN))*100",
+      "value": 41.01,
+      "knownItems": 139
+    },
+    "limits": [
+      "No calendar/time/effort/ETA completion estimate",
+      "Path transfers are not item completions",
+      "Formal accepted0 and original37AC4IR unchanged",
+      "Existing75 rows retained without new audit; no new75 promotion from mixed-generation proof",
+      "Root adopted five engineering-stage changes for progress tracking; all174 officialStatusOPEN retained; no formal PO acceptance",
+      "Publication status is separate from this adopted assessment and is recorded only in actual publisher receipt."
+    ]
+  },
+  "receipts": {
+    "advisorProof": {
+      "path": "scratch/alfred-advisor-ancestor-independent-qualification-20261011/execution.json",
+      "sha256": "da5be556f385a20d5662815567df0152228b05acaf01969aaa7f80c63242583a",
+      "bytes": 1554
+    },
+    "advisorMain": {
+      "path": "scratch/alfred-advisor-ancestor-identity-source-20261011/main-integration-preparation/atomic-one-successor/application-root/execution.json",
+      "sha256": "b042d302427d4871fe46abac19dc6c91808f27342433467aaeb0d4c6dea0443d",
+      "bytes": 4241
+    },
+    "oaMain": {
+      "path": "scratch/alfred-onboarding-trust-anchor-inline-guidance-source-20261011/main-integration-preparation/actual-composite-successor/application-root/execution.json",
+      "sha256": "7903bbf32b3c26e6a66dc92800a20006402caf7cc203deef2d5984e24e10cae4",
+      "bytes": 12181
+    },
+    "epa15": {
+      "path": "scratch/alfred-existing-public-anchor-qualification-preparation-20261011/execution.json",
+      "sha256": "06a4905f794a7ac972d3e2b6b54dd8d0069293dc43775cfeb91f97479f1c2005",
+      "bytes": 4570
+    },
+    "epa3": {
+      "path": "scratch/alfred-existing-public-anchor-qualification-preparation-20261011/focused-three-qualification-successor/execution.json",
+      "sha256": "28be7e6c6e09d04fa2ace18e7c488a26b677ca8e7a16dd7e24d459b907d9e787",
+      "bytes": 4076
+    },
+    "signingMain": {
+      "path": "scratch/alfred-signing-disclosure-dispatch-source-20261011/atomic-reserved-join-activation-preparation/actual-integration-receipt.json",
+      "sha256": "1ce0671acaad1589c4c31b70ccc9576f775c7663dc986f73d45eb2edbd39fc99",
+      "bytes": 2805
+    },
+    "signing14": {
+      "path": "scratch/alfred-signing-presentation-sweep-independent-qualification-preparation-20261011/qualification-output/execution.json",
+      "sha256": "363a3d5666a1b6960a23b30fb8ed61bfcfb576c2dc02ddd0941807f29594a806",
+      "bytes": 2770
+    },
+    "sda2": {
+      "path": "scratch/alfred-signing-current-hgo-focused-qualification-preparation-20261011/qualification-output/execution.json",
+      "sha256": "e163c702dab8366acc21fd5c66eeb55bfa64e16fa40b8f4c164b3ac84219ee99",
+      "bytes": 6611
+    },
+    "sdr2": {
+      "path": "scratch/alfred-signing-presentation-sweep-independent-qualification-preparation-20261011/owned-probe-readiness-two-successor/qualification-output/execution.json",
+      "sha256": "579b5a7cfbb98bc841c77c7dc8ac752b15698350d27616540d5027b31a4be9cc",
+      "bytes": 8483
+    },
+    "canonical17": {
+      "path": "scratch/alfred-signing-disclosure-verify-registration-source-20261011/ordinary-seventeen-transfer-preparation/activation-successor/application-once/receipt.json",
+      "sha256": "c117e6aade6f67aa13fa77ccce526ba5cd6337208d79fe9f1641a4de1341d344",
+      "bytes": 393214
+    },
+    "genericMain": {
+      "path": "scratch/alfred-generic-critic-existing-source-integration-20261011/ordinary-seven-content-successor/application-receipt.json",
+      "sha256": "ba1fd4528adc84489b5e1d7a1e5188313a890a08aee874cc44d2237fa01af749",
+      "bytes": 5709
+    },
+    "genericReadback": {
+      "path": "scratch/alfred-generic-critic-existing-source-integration-20261011/ordinary-seven-content-successor/post-readback-receipt.json",
+      "sha256": "f56d40df93cb957445b0fad4ba39adb42df4d0a1d44d447876b767c0b2a55e39",
+      "bytes": 2359
+    },
+    "genericProof": {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261011/generic-critic-content7/historical-qualification.json",
+      "sha256": "34f95953620097f60a51493098601f15fa93fa89fcedc13ac139447bc23c7447",
+      "bytes": 2883
+    },
+    "publicFocused": {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261011/oa4-signing4-focused-evidence.json",
+      "sha256": "74f88f75af7063a6567701b729f793fca78211f1fe9545468eaa7644c53a5fae",
+      "bytes": 9088
+    },
+    "adrPublished": {
+      "path": "scratch/alfred-two-chat-decisions-registration-preparation-20261011/publication-successor/publication-once/actual-receipt.json",
+      "sha256": "4915f90d658adda479fa73d6a4381b71e3a8cc1cde72f07634ebcdbf0f3375f2",
+      "bytes": 3192
+    }
+  },
+  "limits": {
+    "OA4Signing4Canonical17PathTransfers": 25,
+    "meaning": "files, not closed items",
+    "canonical19EPA15SemanticExecuted": false,
+    "protected14": "Prepared UNINSTALLED; exact final operation preparation remains Root-owned",
+    "formalPOAcceptance": false,
+    "finalCriticVerifyStampDone": false
+  },
+  "engineeringAdoption": {
+    "authority": "Root coordinator",
+    "basis": "Explicit Root review and approval of five engineering-stage changes for progress tracking only",
+    "formalPOAcceptance": false,
+    "publicationStatus": "Recorded only by actual publisher receipt; not asserted by this payload"
+  }
+}

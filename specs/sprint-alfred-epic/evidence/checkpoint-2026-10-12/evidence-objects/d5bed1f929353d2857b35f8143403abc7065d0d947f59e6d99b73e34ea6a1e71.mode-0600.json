@@ -1,0 +1,177 @@
+{
+  "schema": "alfred.m4.independent15.actual-qualification.v1",
+  "status": "QUALIFIED-15-OF-15-METHOD-ONLY",
+  "execution": {
+    "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/execution.json",
+    "sha256": "40151a9ce7e75c1b7721304ef776f1d3dfcecf639f114804117ab7775e81a790",
+    "bytes": 3067,
+    "mode": 384,
+    "nlink": 1
+  },
+  "freeze": {
+    "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/freeze.json",
+    "sha256": "68d025a1ee61049f6536f0a0963616d62634d4b53a4c87d683b2752622440703",
+    "bytes": 5635,
+    "mode": 384,
+    "nlink": 1
+  },
+  "graphManifest": {
+    "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/graph-manifest.json",
+    "sha256": "56d65b25af07cd11d59208d9fb2a40bc8bf20aeba62b37e9d2d8fe3097502430",
+    "bytes": 364807,
+    "mode": 384,
+    "nlink": 1
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "7cb5d9f16929648d49ab2461cb1020976476c04eaa1a269808ab7dfd77d3242e",
+    "caseSetSha256": "134f821e2a2abfa233d5e89ae0116c4cc874f167fa4a04d54e670bdfaac0a5b6",
+    "dispositionsSha256": "c3a88d46cdeb09e56699f99c6c8fb418377b218bc1f7ae4b0215ba744bc21b89",
+    "declaredCount": 15,
+    "disposedCount": 15,
+    "counts": {
+      "pass": 15,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "counts": {
+    "pass": 15,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0,
+    "runsInThisSuccessor": 1,
+    "originalLoadFailuresRetained": 1,
+    "fixturePreparationFailures": 0,
+    "sourceGraphFiles": 359
+  },
+  "files": [
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/execution.json",
+      "sha256": "40151a9ce7e75c1b7721304ef776f1d3dfcecf639f114804117ab7775e81a790",
+      "bytes": 3067,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/captures/stdout.txt",
+      "sha256": "af20d0bacd07733ed4645768ee89322e5b87fc4e2cab73badfb340d62e1ee42d",
+      "bytes": 1608,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/captures/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/captures/completion.jsonl",
+      "sha256": "12ca9159313565de6890ed66f917cd0c4fb843f87ff3968feef2a79277a23b51",
+      "bytes": 2464,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/completion-membership.json",
+      "sha256": "3fc2db5d5b5d76858cd95bea7cd553d0d4e4649898d0279d4306657c3a5c3210",
+      "bytes": 3842,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/source-conservation.json",
+      "sha256": "99a1757c2e769a7aaaa5a213f11d966dc2c45dea8ed7a10678f95da4511cea58",
+      "bytes": 3622,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/qualification-report.md",
+      "sha256": "d3305c3fe4ff81ff3ad64230582164d965745bf981ee3e7fc06d6897ede5af78",
+      "bytes": 3580,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/transfer-proposal.json",
+      "sha256": "187313361417e671a1a7d65245180bbec11cadc88270862b78a8312ac5e57fe8",
+      "bytes": 3884,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/close-qualification.mjs",
+      "sha256": "bbe9f9b154ed5e508cbd55008e4ab62cfa401d9e436a4ed6ea54a73c0c78f1e3",
+      "bytes": 9372,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "launchCustody": {
+    "reservation": {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/launch-reservation.json",
+      "sha256": "de9c3aa25dd1020cef0a8d4327b173e628065f30e0df4d9fb2cfd803d2a39edf",
+      "bytes": 283,
+      "mode": 384,
+      "nlink": 1
+    },
+    "rootAck": {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/root-ack.json",
+      "sha256": "17b2fc13d864dadf836f6fe726e31e14d137929dd52ad6da9bb04d1539d0d3e2",
+      "bytes": 153,
+      "mode": 420,
+      "nlink": 1
+    }
+  },
+  "originalFailureRetained": [
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/execution.json",
+      "sha256": "3a7ab27fad8392606f9d839ba24f8ec511adac923acd634151e78894e36d48dd",
+      "bytes": 1804,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/captures/stderr.txt",
+      "sha256": "04081e71fb06c2f0171d069fb8e144e109fab6428a08f43a9732964b9e1223b2",
+      "bytes": 1145,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/freeze.json",
+      "sha256": "17e76e6c364f8355f442dd0df302d4a16737b507b20271ab3a11e699b73da0fe",
+      "bytes": 4160,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/launch-reservation.json",
+      "sha256": "6d3039f792a405980a99f78186a594d58b9b0d7d7552af48688d1ecca176172c",
+      "bytes": 283,
+      "mode": 384,
+      "nlink": 1
+    }
+  ],
+  "sourceConservation": {
+    "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/source-conservation.json",
+    "sha256": "99a1757c2e769a7aaaa5a213f11d966dc2c45dea8ed7a10678f95da4511cea58",
+    "bytes": 3622,
+    "mode": 384,
+    "nlink": 1
+  },
+  "noRerun": true,
+  "noProductChanges": true,
+  "noOfficialClosures": true,
+  "limits": [
+    "synthetic in-memory signing authority and controlled real public writers/target only",
+    "no actual human, attended chat positive or native Windows proof",
+    "ordinary completion is unchanged; historical qualification remains unknown",
+    "no second run or self-repair after this reservation"
+  ]
+}

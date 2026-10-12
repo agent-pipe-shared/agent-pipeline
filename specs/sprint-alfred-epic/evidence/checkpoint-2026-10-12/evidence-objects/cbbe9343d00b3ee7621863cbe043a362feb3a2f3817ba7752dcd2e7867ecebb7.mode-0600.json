@@ -1,0 +1,2099 @@
+{
+  "schema": "alfred.r01.actual-post-readback.v1",
+  "applicationReceiptSha256": "27393b07dc08564a150b48b46b7309a9e1c3e1c9d46d78b5c24d553db07f86fe",
+  "applicationLedgerSha256": "983228582abda484f4e1b35459640b60cdddbb6759b77b484183f1b7d26d0121",
+  "inspectionSha256": "0b88ea76da116592fce2d897afa5eadb7da7db60d47a37cfda909be618e442e0",
+  "targets": [
+    {
+      "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+      "sha256": "e6101c86ceda0458930a7c27bf1a27212d12c67a138aa32854f4ff9012908333",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "fe00cfc0639035da573dfa010bffc321bb9b3d1b7667576e6fd9842779fa8473",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bb5d30d501a6149c9cb558bf3b5c74daa75a42d3c378afd5a46bc3394f5eb26f",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "plugins/pipeline-core/agents/critic.md",
+      "sha256": "849c8b5bfd9b1908839d2e22e3f56c71b9b91ca8e0aab2f03722f574b9d836cc",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "cb8cedf6891060d25a4af30a03a056f1ca179f538cffdea88ddf3828a49a6589",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+      "sha256": "3079d7df467553be6466068c1606f94297ce4d074bfdea309c0216cbec06d682",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "60f0f6fc85848992a743f85b8beee4944194483303839c833d3611895d2e2da4",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+      "sha256": "85905ace356bf3cf3c8a9ce1b4b4b8fb121bb02e2f03a2411f81e449da870a79",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c615c447887c3837f16576f223ec7a1fdb993c10a5cd9d535c2cd4365e0f8a9e",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/rigor-floor.mjs",
+      "sha256": "5e1e3d43ccc655d47e6a8f42d06b11dab9cd0c60e567d1063de3dde6bb6e375a",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "72f85ef94845c879c09fed7d6d1a7c8bee82b4b98aab0bc58efffc4077e8e366",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+      "sha256": "981f3e2ba9bbe0f7cbba35c6beacecca998abe2deabca1cdf424db91a397818d",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "d1cdbbf72f01f7e91c2ed776c903c8588244d652f50115e9e689901b057f97fd",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "sha256": "f5abdb6ea08d913c5f858fd4fa41ae6ab8b077d0cff13928fda2694833ffc5d1",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "7a44cd63abdb0cb29aaf5d9ee9c6fc506f9cd6c62d066b6631aab662c08af1bc",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "99899f7025ccc75f54209e52e66cd82ea5b4be482d035700ad5d0985d385bb7e",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "templates/prompts/goldfish-task.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "0b6676a2765a36a7a84294bd15cec6c938bae171ea7b9a9a9534b86d8dbbe613",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "architecture/map/harness.md",
+      "sha256": "152321fb726495702cd435ba87d477ee57d0f94d79f5d2fa6e89b5c2a08fb92b",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "416bb8e3574f74df8f25cefa798c5a9959888715eda8ebb88512949ecb3a8404",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "architecture/map/pipeline-core.md",
+      "sha256": "f59cff2d1a314db45384f52274703000e0ee5f9d6e2c0e4491cfe17cdaaa92a0",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "fbd71c0968f03ff589ca550e734f31c5033f1b4bd4ee07db53e47acc4ae40adf",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "schemas/pipeline.rigor-journal-entry.v1.json",
+      "sha256": "85905ace356bf3cf3c8a9ce1b4b4b8fb121bb02e2f03a2411f81e449da870a79",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "2aeb7f92dac099bc2c20dea27e7321e0a59e83ec6cc99f6c4060c5973a0b22e1",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    },
+    {
+      "path": "templates/prompts/critic-review.md",
+      "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "514372e791726d0d0793c2e6dd75c27364dd3e74837c4e6284f4634d7adf7254",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": 33188,
+      "nlink": 1,
+      "status": "selected-post-exact"
+    }
+  ],
+  "nonTargetDependencies": [
+    {
+      "path": "plugins/pipeline-core/lib/schema-lite.mjs",
+      "sha256": "2996e60c0be463987ececd89392f413fb870b533ad05a63f48fdebdf90cf5a2c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "db0e23ece6aa9427c706a31e71cf2e788fa3cd5a9b4ea1c7c03e030e8ab7507b",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.mjs",
+      "sha256": "5725cc46667927d4d8bb49b3fa0da7308e345a2e84381d3b1ddce0fba1eb17bf",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "6064ec98f0fb683331bbeab0a52bfb94a19a127260f9b15c6b8a5325f499b5f9",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-authority.mjs",
+      "sha256": "19eacbfa09a5b4aac039e8bdeeefc2e1d5dbcca918f63655e14dc5bbdbbbc602",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bea496edd63172ef26f119327eaf0f25bc3e5285e3d0fe95885225693e5631c0",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "sha256": "a02336e0483d0590d625be7a8030ba8734d5ab6e4c5817df90db6268e4d21640",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "576e82a8ded135eb5b738cca9f9fab61f1f4178c5fd16a98f86fb42b925d3496",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-private-state.mjs",
+      "sha256": "00a4ccdaec9b30abe2213fd93169aabf4cf8761c8025b1a3809a5a63db236b32",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "44dfba5e2e219aa4154767f17d2bd51b0130db85b8bed4563286b1d2730dfd31",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/successful-spawn.mjs",
+      "sha256": "55c4e49b46d1e9543bb068ca4d5a86070354f023a2522c5d1bc826fe7189387e",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "08daac3e08c5e6958505433be06005c24315b4a8e30bed4442422177eb89c58e",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/git-null-device.mjs",
+      "sha256": "89be7dc2c32544c5a1a0159de3515c25fc773d9a7d112689558f9e52dd1a65eb",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "37a26349accc15b47b0b54763e3206908bfb1080ffa0b0d17989c45651ce2568",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+      "sha256": "1e57ea83138686779172a9e34feb643af8e35e4a1be855edff23aee94ab8cffa",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3a452bed2e916e3ae7e6cf57122a64ce6b77b80b69d4d371b32395535e80bd5e",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+      "sha256": "35607b09f2acb7f3323bf2fa0eb0a2b287220ceef08a39dc61f515fb7b85ec72",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "21a03e877ce13311bb27eb6725cef1c5f801edd81a2d2a67906662538dad1d5d",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+      "sha256": "7d965c507df67f07f1916998fa9cd9a3f19bb166566f622db20aa8a23a252f85",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "1ac1b2e8c51d772bb739602792b9bf87a7e8c116924d680dd47b30e7c40b835c",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/module-inventory.mjs",
+      "sha256": "3953f8f07a308962db6e8f25c3379d858f184cd83bf6a85ff0708ee47a8a49a3",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "be7aa0986451c7f96aab21d7dac18bcbbdf9200d7b347f6f57219e28b352a010",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/yaml-lite.mjs",
+      "sha256": "38e88cc45cfea62fee2fdf5246a05f5519b8442245f1a8e4f695d6d09476b2a6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "de7d542b9bf9f726515deb17bb858b66c42ec3f6b972a9f7bea03f79504d6524",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+      "sha256": "f631a8a7056c029ccdaa3546d7406ff875c21a8ae858e356e8dc4c815ce3606b",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "b44046f3236a6c60761e0091e073b66fb413b9cfff8da13380a649bf4452d9ad",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-adoption-authority.mjs",
+      "sha256": "eb43c302e078d9b1e24b579b2859e86923b010110e41cf5b38f56b1f57098905",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "e3603b879f3c53314a33a01b7070bedadfc90deb4f56c7ce6c7a23264766e7d6",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/po-approval-proof.mjs",
+      "sha256": "df04c60c72f311387b2d2d02b5dad9c9c891dc94a92ef57e6a1e1fb255420ff4",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "03fc52f2125cd34ebec23808110d81bb7db76d11365d0adc265b370e86a8a2f9",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critical-human-proof-policy.mjs",
+      "sha256": "af32994b4894614ab6714dd3772f857a0c75a2441b5b52afe83580cc06bce15c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "e6bd802a559e20b8743be470f389a1b033c98ecb1b244a5b19539009ae355860",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
+      "sha256": "64cd5dbc6d62b875f11a6576d1ef91f5265ad0731f61f436d44588d44c2e6f57",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "49c59aebfa934704ca8f2ffeea708757d2700fe70542a4decc2d36d971f6576b",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
+      "sha256": "80630023a8f1da0a89a35f4a79a7836bd5533a0c049bdb33ec7594ee45dfd644",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "4f0438900f871966cf1871d053d36db5caf210954f17a6a3c7d2f01fec33f6f8",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/human-role-labels.mjs",
+      "sha256": "d11646434708392ec2d0501c4a9a6b1875d70c5f12029d75f360665be5b24dfe",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "76030b5a0580b4f23261d76f29d540237766d5310b33244db7f0402a47aaad2e",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "sha256": "d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "305ab17ece7ea9a5b163e0dc67096a52edda0334544bf8ca842a34b3e4871109",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+      "sha256": "bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "8a1689b06dd551b9b8034f53135f5bd2296b50881f1f09cb2b18554f6a1d7a3d",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "sha256": "43845ab88ba6c99fa2c075805e1e8dedd2a4169498e5ef2376d713d11275998a",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bb1e62e62ad10c3f14b9797fcba40f548c0a0813bb7feb0e9f92a6faeffe65f7",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
+      "sha256": "812f33572af19353ab7fbcb6ee3344536685736fecb2aa967a98a2dc12acd59f",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "16f18ab47b014c8ba7233cb0c42ae873ba9630cf7d24bb627511fe2a306e01d6",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/review-economy.mjs",
+      "sha256": "0820196d0427988d12932a855a4afb168271a26efb9b7f971d98d8e3d98820b4",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "a1cb0fadef8dd46df0776108e42014bd04af3e8fa991bad12eb29cb0323720f8",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-native-continuation.mjs",
+      "sha256": "90eae0d37836bc59534e9754b0ca5fac91ee8184fb044e55f47df22e79c54e29",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "eebbb7b32cff0dacd8089412af1c0f3adb3f25fb7c667f3e0a2f516cfdddd757",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-approval-binding.mjs",
+      "sha256": "c161e1d0d1423d3d757439a0b212c119f0af22220105081b47831ca17c297daf",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "846ab39e6e9c0a85f70f71e91b1c504562cb6182179426bb6fe5cd5d8b172fdb",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-consistency-check.mjs",
+      "sha256": "fef6007f58166a60e52d045e0d75b6d6a96c62f5840bf0e7c311e7a2b956f6b9",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "b8c626d44ebf755cb6ba36129b082028693976c1f6c9ccd878cc117b32a9cfeb",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/po-gate-authority.mjs",
+      "sha256": "e9c97d87d525d6141f99d623555e94a0ad7993f5d5ef14b8788a8e15b9eabd7c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "77b8465fbd365f4b0df3a15a993156f7c5254e08532459a1629b3587112d2b48",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/repository-path-identity.mjs",
+      "sha256": "347be5a17ccc79283dabf40aa5f8ce9acc4f53ff790a79a785d283ee85b90771",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "e6a9a3924e833e0e5a95d1831f0e991936cbafeef9bfaee98b81182f4e7d79af",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-receipt.mjs",
+      "sha256": "6c93e923bec8c32489bce0e07bdcd39d82401c0902732c17884c3d0cff4e12a0",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "8642ca92a4b34257d9c5c6e50c1b2bb29893465e9622604a055e08cbdb836c05",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+      "sha256": "c05a085035e9117c272ced4c0d615dc30de99838ae09ad2d6a268500aae43550",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "ccdf2d82ccaca6dcccac13dc65939616319e176421a36b4fea5e630f3c83b100",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "00f30608d80e900770318ea3aade4075cad50d0a6d558307688f7febd9d81fa8",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-event.mjs",
+      "sha256": "bacdef30154cb0c30561bd7e056503ec20f0af3a647f3036a91e58d684d5a06e",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "f1710af33187652711863343eda91e09a83af055d95fcae4b9e48104614b5ad8",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisor-course.mjs",
+      "sha256": "2890211399df37b35acbaf53c8dd255361413c626edafa104ea1bd62aaae1753",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "dd0d31997e79eac72e8f9e43288a3453d388e7452113839505eded3641da5eec",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "b7204ec2adec6b409a39a77ba155a2fd71be4e4edf93bb7a20ef72ae5f86a3c6",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-execution.mjs",
+      "sha256": "2b149823ccec9c8d42f383c916cb5cbc662279e02791a5fd74a6d7c22115900c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "7a865adbd2d7f27415cd65afb3a15e80a9e6be159a78ae6df0f4ac6966151db7",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs",
+      "sha256": "dcb780ca80725313668bc114e1cb5e44558c2fbba870fb0b29876b8b72b7827c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "560015e426bf62e9466a2783a7b313b497a9f38e88be504179f807e5f951d16e",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "sha256": "202572a093803bb0b0376377c63e61a08d2dfe6cb453c38ffa10da1c3c284632",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "f7a8a0e31e326418e95c37af7568e2c7d610f48bffeb346caa8d78735768539c",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
+      "sha256": "0c2d6c754d64e885a0f36765bccc7b4cb94a9415a5df88da502ac8f76e5fc595",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c8d30859f126e9ea734a139ac7f2a24aa674777f7e7ee1879bbd26d1009bdee3",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-isolated-structured-host.mjs",
+      "sha256": "975cdba90fb05a3c1626b4491d09717c51f1de9a4bd7dd95828acbc6383879d2",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "68fb989a23cd4438a923e0e13da4172e0923f87c1c64af81184d4c1acd85f0c6",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-readiness-finalization.mjs",
+      "sha256": "f2240bb58b94d0fd9b2d2b063ea9f2b44f9fa1c48c99d8804534fff5fffea007",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "6e0469957222da58a895a282dffd52a219545c6623dda345442972c1b3e87ede",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/advisory-receipt.mjs",
+      "sha256": "9034df7cb646da00efcb30c04b3f880e238124d78e2f9041c29d4884b904ebc7",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "1830259c238f6abcd3474fa9ef010b690f85ac4eb07a8f9ecdd89390bc0f76c2",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+      "sha256": "4ed5c3250eef668a06a384461ded32ab5f43882603a18b4e0f141f037eb18046",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "fe637ec3b321fde3f9d16f5d502321887581c8bdc77efd72d02a9fddf130bfcd",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/advisory-route-selection.mjs",
+      "sha256": "4842894c51247c03ca83d215953511346acf1f5945a0bf247b19548b313aa426",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "510c3389ae36add1167c2916287677b4665ccda877198bbbe294dbe347560c7f",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "562794b958085def59b8664be7eeb491e0e4c7191beebf729528612f963e8d92",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3e9f9f6f3866914eeaea781ec213031e3d11e036c1393b2d213d10cec19b0c00",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "sha256": "8023c0405eb2dbd42ae80cd6a5d47c9c6c42122afadd4f5888c0ad5dde54a9ee",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "523ec7f09ea0f43b1c6c959ceeff1a2e6a37ffe46e9c806f1aab84402b5dc176",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-output-custody.mjs",
+      "sha256": "b8ec08ff9b4cdb564dade0e6a95da4d640808f9e1007f96093d3a5fbae2460da",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "1e86b10aff1babf2decb2b1e6678eea81f60bcfae595affbfaeaf1723f6d1e65",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "83a2e667c534769e256e37e222cd94d581f1b5ba4690d9a68991757c1e543706",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-request.mjs",
+      "sha256": "0f551576f02cd49276194256477fcf97e76c5a7ec88a9270324e0ef3c0435129",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3226e66e04b8e7a1dc16aa97913ec17cad7c5ea66043810ae976f3d328851e55",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+      "sha256": "bba0c595424797c943edfeb022c8e7bdd3a7ee0c5c377d273832fb7f4da3a8c6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "7a1ef3481809719c79ad551a59f786c345ad0ef0658fa611cc1a57c71e4ee748",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-admission.mjs",
+      "sha256": "139e35badb7a9e5b6efdc8a9826f765c9fb142d9cb40fe0d4de338ee6ba2a2e4",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c08e2a1d1adbbffae376c71ef81ca4b74ba2768989332f05418fa0aa568b0d9f",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "cb4265dfdea1550831e4cd427307419c69bdb8436fe825e78ce86b309a3b1749",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/model-family-execution.mjs",
+      "sha256": "28eb58a88d1dd288bfa8575ca0b8159b13a8498149cccbe29a3112ce3ae48ee6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "e28d003c21a64feae737d122a1c939069c9249da5e93d698bb455faf40c69dc4",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisor-course-store.mjs",
+      "sha256": "8bcd4427bbe4737aa2e34950c1fbaf80e16321786946226d67467e20192a13a6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "4a22361bf5e2179af8dcde1aad3db557eb319a2c8e42b613ca5a79c33ede226c",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-initial-advisor-execution.mjs",
+      "sha256": "08d64b6c6e7e62fe24686521d91059d7150606cc9cea8b3ca9db6c41184e0955",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "9979fbfb9fdb1be4e7aa660d574117d36a87d9d2c48fb7db9ed6c856bcb37dd5",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/schemas/pipeline.design-workflow-package.v2.json",
+      "sha256": "412ac33b8bc7d1b774a8297bbed01a142555969e0cebd5a7df9e7ffaba7b402a",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "4c6739e2caaaf7b171db43aab5f78407b223696975dd8408dfb05e58394478b3",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+      "sha256": "a00e618bcc1774959cfe721236ce1fc89aee7ca12bd38fc8d7b1a37c5d6b0b8c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "0410043eea55757a8159e279bd9cce38a3265c34cb033ae29b0565b512c70220",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-readiness-hashes.mjs",
+      "sha256": "e960c151235e7a619cbcfda7f4ce6d61db71208659470b134de6e4ab5e2c2b2a",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "f595ba0110c4167e8731274491d4366cd92bc79c4b2a50e059a75054e8fd9900",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+      "sha256": "f8ac123be647522add8f51c0cc4ad1a0cf12968b26b009a00bce6089e5da3f61",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "5e720c69d5636c342e237a6fcf408c1773a3d5a5ab090c7358555e6f3c11e085",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-readiness-host-record.mjs",
+      "sha256": "6bb399298e4b81bb724e602286a79be85f78b873570e6a397201662fce9cfbde",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "e73b091d287992b896b3fcca961ce9ffb3b34a812f7c934aa6af77545fa72010",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-tool-free-design-readiness.mjs",
+      "sha256": "cb7a79164ab68a1b91e3352fc6a12372880617e7ff25b8b53c50a31dcdc85226",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "820842780cf0ce49879fa9dde2d1968d2ded45700c4c0773e21e161ce0fd5517",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-readiness-request.mjs",
+      "sha256": "cee1889d841864419c7e770c50d96857c84e0283f01736413a904f0815e54b59",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "1b24a95b09e98fa5d4eec9fcff6b9fad20fcdb4d896bee6412d1cd187ae00930",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/sandboxed-readonly-duty.mjs",
+      "sha256": "e93e5d7948c393ff1f3096a62921e0d148e5b5af47a114de18e1401899738624",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "8557be0dd8583434a7426292702ca7dc2634a5199f76737a1613e026b2db6786",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-sandbox-select.mjs",
+      "sha256": "66ebf99d6175006a7f0e01303944b3c48dbf7501ae3a146df78e147e669c9ed1",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "746aede261f345d583ca8c79cb4915829738fcafd246fe7f602a14f5adbe27f9",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/sandbox-failure.mjs",
+      "sha256": "b2b96a62094d07aaa0e16def952fe0c880d61e7efbcfd11752b323534f460b8a",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3dce20260234a8d16c6437ec10602cd0ac7510588c155f597b9defadf94589ea",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-route-v3.mjs",
+      "sha256": "836269446c3f535df8c8c51235b68f8977563fb3592b37a95a99860b9313d7ab",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "5a9180fb830707acab98d23795bb150da6b298cbfb33d95c08d0374892ee90a5",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs",
+      "sha256": "969c72de945fadf008d92c67da4a25396bccb8a476d03eb74d4e708bdaf18f0b",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "fc3a6f40e3255741890fe02052c076b0b7b90f622b55259a9c5a8c735f49383a",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/advisory-attempt-trail.mjs",
+      "sha256": "a2c086d561a401bd460daff40d5104ff518ff3bd7acb2b5213d457d8dd7ee36d",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "487fedbd12138cdc4106a2354922356b71c59ef77d01b0c1cbb4ac1c25b936e6",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+      "sha256": "49bcaff5030e06b88dbdff6b87772ce020c4489a8968b2b8a9b71ca06d5ae783",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "e3dd81d616bea3ae2a56179a2295db1a779d9bad9854e1f6ffc3e5a0dc809c65",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+      "sha256": "6bd26c6fcfa10d6cffe0705914cbfaca181ec8a0ed2bd0ef279498ff95a1b13e",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "fb9afb0b752d013f91e7bfa56c7aeba9f885663c2df1a377b36adb8cc417473d",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/manifest.mjs",
+      "sha256": "52fb04a9c5aa40c9e8f5ab5f8d2df2215f87f936c2657037d136d75252c9c642",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "dbdf029306c3704628bf4251de00e964025f454c5088304660303a700c220749",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/document-hooks.mjs",
+      "sha256": "36d24dc55eb0373ddd6770fb29b801414ad9358005b2a00d585e1b937bdbc0e6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bdb5ac814581a96eef036a9e012689d4540c84fb404fd02ae25953a11b05604c",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/rebase-authority.mjs",
+      "sha256": "fdc9281c3f27ef5a024d50c90404a038c2c42859fcf6105240afcc9a2c7db3cc",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "29e86d644809ea8895811dba5da43274388eafc184398a645e603a1131b6f9ca",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "ed9637d729c024291a16d5abad7e0da4f36ccd461657071859b0a4cde0f892fd",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "be8bfc977a0017888c6d112b5b769c58d6e3ea2e2402301fdd915680d8639b06",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+      "sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "a31c937011de35c00160e4b939f67a111035a58116126d23979704b96dab48c1",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/machine-plane.mjs",
+      "sha256": "ae74bdf6e2eea0333143aee45e77d1dee91243f1cf15bf23b3405f48e34baafb",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bcebeb9f1d6bda5878b492abf32d61d855f781264d5528c281785916ec76772a",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/po-key-directory.mjs",
+      "sha256": "b39de8210ffb790f364cd34d763aa85d12a0114b0ce7f74e1b34835eb34c6658",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "a92a37dba385e003d4a86dd3332c0c8144ac1b9064b3bc99e505c190c121ab77",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-test-paths.mjs",
+      "sha256": "7e6c14b4188d8c54d291be4e331cff489d7c4de63d5d73bb20afa8011333b262",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bf7d4687e972927a5a9fdf942b89861be6080ec5817512da7441b53d0e1b0adb",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/physical-scratch-boundary.mjs",
+      "sha256": "d3cbcbfa3dfffcc0fe9961d888042e6c258d148dde5be55e95b2671b49873f40",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "d789c9ef5a3f79452ad059e9b1e428953e041e6f72e12c55d4ff3039a93cf375",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisory-transaction.mjs",
+      "sha256": "b6fc6bfc813cfb24b4df53b3ff40812c137f0c511e61cf9f83f93746bc6446a7",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "562aed7394fcdd1c221bb331caeed0421b06ae1b2593639c945e48f249c858dd",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisory-enforcement.mjs",
+      "sha256": "bb1c34dc7d0ec16e1cec29ab55cd401ba0050fc02403f913a737ecf95cb087dd",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "89186265c2c0fc256603f6c73f67b8c500c09ae6ca0ad8f9ef2f1e7246bb7a07",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisory-admission.mjs",
+      "sha256": "26704762087404a84d80aceb8e0949398e9ac2411e91dca195efd70946ff2fa3",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "e9f52b666ba1561f5ac91ee302f81f175aab041400baf9ffff2b4f4473f05b55",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisory-final-approval.mjs",
+      "sha256": "9180410d37c1db91a87ef9a0581a1870af1d25962caf5659e3dc55647f64c6c9",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "11c80e00f558b0bd160d921137320930e75afa30235884494134ed70a63f7ce0",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+      "sha256": "471ff282849ec52ab77d0841112e9f07abc3a2bba3c2ae65926d0b25a7364d90",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bf614605980f6ba0b11889221074f9213b5d4d989323891b5e67d93a95f2d16f",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/generate-architecture-overview.mjs",
+      "sha256": "55b33118db49060f3aed008a604fbc749d0a0ff8097bbb17a9bdab6e9703cac6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "00701160d537054a2eef16b07d3f6884d0185418f76042028a39c15b5bf66f4b",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/checkpoint-push-audit.mjs",
+      "sha256": "9c5e21211d96171d770328a59e4268b73009c06dac8e8588b11be60338b0ba94",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "2da414cb2cd9a97100d5cff9d2ab0f82b3d872820410fbcd800ad4e5a50cf3ab",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "sha256": "616059c54e33adc7ef56f6c95dbbc8f9c46afdbb64ee0e271c60ad6e7f18b3ff",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "04554af9d5eab7f044a5b516c8aee4315828248fb03181b08d8ab7a6edd3a94f",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+      "sha256": "97b8dfded6918c4e6151b960d44fb85c9963168ff6008cee274ecf8428c904e4",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "960fb8171e3b6ba981368f5c0c6f6724213fab5bd766f5ff0a3ba8b547ddcf70",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/organization-architecture-source-store.mjs",
+      "sha256": "9275d39e2bea45c6fa60d59eb14c7f3ef59bc730ae25745fde192a165f53eba3",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3d52d1e2f15d30446e9fbe2fde6439eb2ecff2f7e2c5eb5bcdb50515146510b2",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/organization-architecture-source.mjs",
+      "sha256": "4b25267160f7fd599d0604defb9cfa6772f92b3dea13c36b63f7046427558e6a",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "9aadaf5ed07470bf512de8dafb27269f9b68f01aaa9737000a5e3928675e5de2",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-decision-waiver-store.mjs",
+      "sha256": "6bd029bc472869356e5a2f0e937594c816385c92387b89b9c0b51cf49c8074b5",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "6794fa4e874d69fc1afc90fe345105c402d2d517e028b5cfc384446fe77ff5a6",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/report-interruptions.mjs",
+      "sha256": "e5c519414b8716c853b7e29bf60f9b280f95c214efb2f7eed84a3ef433431bde",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3ec9bec6bc36efe5a8e6b238d389439bc24d1bb4714d9999f9c3460c37d4c4d7",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/entrypoint.mjs",
+      "sha256": "ea43c7d71788eed911369d07707b6f2e9adf711a21229613cf7faa8c897438e8",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "0f0a1a7f6f1912f445a40d69d7168c3710a3baee45d44669db91f11a8d93263b",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/interruption-receipt-store.mjs",
+      "sha256": "f2916158bc27a30038db0e7a6ccf09edba729bf8cb4f1641f36dccb25291e2fd",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "53dff56c6a9f67ae48f8746ac1fa8271ac9910e620e6796e13762b7c9173ec62",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/invocation-reliability.mjs",
+      "sha256": "e8434c07475cb2585d9def27ea3dddd6df15eb1274c2b3a856ec38b70074b3b8",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "7474bacb9b9346726dff86a40039874fa3f2cf544af8dd81da14e6bbcda0397a",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/interruption-receipts.mjs",
+      "sha256": "c89bf9d668ca6d5a91bf3ea71123617e75774c5e37b8949a16c6e4f9411f7e2e",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3a86877894ac6b7c83b56645384e33ca477014bcc9f2344a3c2a5e301da4e39b",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "policies/interruption-registry.v1.json",
+      "sha256": "a37b5ab200f0b88cae6e45adb8befa4e273a8949494197d2958d01df094e23e9",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "4a58498284db8410e13625384742da1ea3f5dc0c069aff1eb15d281026d0abde",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "plugins/pipeline-core/architecture/agent-first-profile.v1.json",
+      "sha256": "c51289e73f0990514bd7c201d26322cc5b3db197bb643e8458671dd5ca51eb14",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c405b1549b866482a056e2496d7d2ab9e6efe5b41203887a386be94eee4b8dc4",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 2,
+      "status": "exact-inspection-conserved"
+    },
+    {
+      "path": "policies/rigor-derivation.v1.json",
+      "sha256": "be538203b3eaec76b9463390c652535e7819e3341b079a11d18ee7b6f11cea30",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "b36054c76d460649e3a1f04563dee56724bdab08aab3be40d9d33feae13fd81b",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1,
+      "status": "exact-inspection-conserved"
+    }
+  ],
+  "failures": [],
+  "wholeNativeClaim": false,
+  "testsRun": 0,
+  "MainWrites": 0,
+  "status": "conserved"
+}

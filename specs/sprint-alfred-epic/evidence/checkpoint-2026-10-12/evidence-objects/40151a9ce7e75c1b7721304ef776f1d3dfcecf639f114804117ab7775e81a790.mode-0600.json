@@ -1,0 +1,127 @@
+{
+  "schema": "alfred.m4.independent15.execution.v1",
+  "runs": 1,
+  "freezeSha256": "68d025a1ee61049f6536f0a0963616d62634d4b53a4c87d683b2752622440703",
+  "graphManifestSha256": "56d65b25af07cd11d59208d9fb2a40bc8bf20aeba62b37e9d2d8fe3097502430",
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "7cb5d9f16929648d49ab2461cb1020976476c04eaa1a269808ab7dfd77d3242e",
+    "caseSetSha256": "134f821e2a2abfa233d5e89ae0116c4cc874f167fa4a04d54e670bdfaac0a5b6",
+    "dispositionsSha256": "c3a88d46cdeb09e56699f99c6c8fb418377b218bc1f7ae4b0215ba744bc21b89",
+    "declaredCount": 15,
+    "disposedCount": 15,
+    "counts": {
+      "pass": 15,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionError": null,
+  "conservationError": null,
+  "caseAudit": [
+    {
+      "id": "HFR001",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR002",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR003",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR004",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR005",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR006",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR007",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR008",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR009",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR010",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR011",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR012",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR013",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR014",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "HFR015",
+      "phase": "semantic",
+      "outcome": "pass"
+    }
+  ],
+  "preparationFailures": [],
+  "semanticRED": false,
+  "inheritedNodeOptionsPresent": false,
+  "inheritedCodexThreadPresent": true,
+  "captures": [
+    {
+      "path": "captures/stdout.txt",
+      "sha256": "af20d0bacd07733ed4645768ee89322e5b87fc4e2cab73badfb340d62e1ee42d"
+    },
+    {
+      "path": "captures/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "captures/completion.jsonl",
+      "sha256": "12ca9159313565de6890ed66f917cd0c4fb843f87ff3968feef2a79277a23b51"
+    }
+  ],
+  "limits": [
+    "synthetic in-memory signing authority and controlled real public writers/target only",
+    "no actual human, attended chat positive or native Windows proof",
+    "ordinary completion is unchanged; historical qualification remains unknown",
+    "no second run or self-repair after this reservation"
+  ]
+}

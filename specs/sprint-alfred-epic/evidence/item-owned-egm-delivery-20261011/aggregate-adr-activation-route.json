@@ -1,0 +1,20 @@
+{
+  "schema": "alfred.egm-aggregate-adr-route-evidence.v1",
+  "finding": "Signed quality authorizes exact patch transport but does not activate ADRs. Existing DAB signature schema can be retained while adding source-owned prospective materialization.",
+  "actualLifecycle": "project/pipeline-state.json, Alfred continuity revision32, planApproval.v7; no authority inferred from .claude state absence.",
+  "existingAuthorities": [
+    "design-approval-binding.mjs:95 sources companions",
+    "design-decision-bindings.mjs:285 actual DAB verification",
+    "architecture-design.mjs:347 source writer with create-only staging, recheck, readback and rollback"
+  ],
+  "requiredSourceClosure": [
+    "Explicit versioned prospective DDB descriptor/companion binding immutable proposed inputs, original chat choices and deterministic future ADR postimages",
+    "Keep exact existing DAB approval envelope and actual source-review/candidate/trust checks; no reinterpretation of quality proof",
+    "Create accepted numbered successor and superseded 0005 sidecar bound to unchanged historical markdown only after verified aggregate approval",
+    "Retain manifest-to-materialized-output authority and original signed inputs"
+  ],
+  "assignedOwner": "egm_architecture_materialization_delivery",
+  "effectiveADRGranted": false,
+  "newPOChoicePending": false,
+  "signatureRequestReady": false
+}

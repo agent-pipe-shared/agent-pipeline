@@ -1,0 +1,7 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "I08T010"
+  ],
+  "maxBytes": 65536
+}

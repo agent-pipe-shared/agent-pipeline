@@ -1,0 +1,69 @@
+{
+  "schema": "alfred.hgo.focused-method-receipt.v1",
+  "result": "5-PASS",
+  "caseIds": [
+    "HDN001",
+    "HDN002",
+    "HDN003",
+    "HDN004",
+    "HGS003"
+  ],
+  "counts": {
+    "pass": 5,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "actualExecutionSha256": "3023acae467da1474f7c1c69b83c13873ce50947c8f4d82a52847eae97db9fca",
+  "actualFD3Sha256": "86c782262810b0058f28061b931e420428c44ef55d734b740a11a9338ee77929",
+  "actualFD3Bytes": 1155,
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "5d9e19aa2c4129631dbf6f1abc9d33076c0411c91fb7d60945e7b599d16e9b09",
+    "caseSetSha256": "caade74a43fe20c556ed7b7afc0d8803512d63e7918544a11b9f236cde7ad1c5",
+    "dispositionsSha256": "c10f4e8580f7cd07a2184fee6845a9b5f0824c642efdcf038ee347204c72fb8f",
+    "declaredCount": 5,
+    "disposedCount": 5,
+    "counts": {
+      "pass": 5,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "errors": {
+    "preparation": null,
+    "completion": null,
+    "conservation": null,
+    "signal": null,
+    "spawn": null
+  },
+  "all371Conserved": true,
+  "original371Restored": true,
+  "sourceSelectedSha256": "13e022b43fb4000fe3e1e353ecef3e9169dbf8d09727c1d744de7dce6189552c",
+  "sourceBeforeSha256": "5a99c7352a618776fee8157c8d56943c9d5c45766d82c1071fc701b8826e5bc2",
+  "sourceAfterSha256": "5a99c7352a618776fee8157c8d56943c9d5c45766d82c1071fc701b8826e5bc2",
+  "independentTestSha256": "3fe5b50d29b2de21818b2e728d91f967b5e994c7ad433524bcbd7f50cd9c7fbe",
+  "fixtureSha256": "936d992329c946ae800c10a47a3fd7cc95db142a88991a716f56bda3962f2a34",
+  "policyFileSha256": "e5c66bfd5fedf13e8454a2620c2a1bdc974f308c3ca99355ba8dd035e785b33f",
+  "dependencyClosureSha256": "77adf713a163fadc6dcd8f0fb2c793ac8a675cf2499231ecfff86198404f16e1",
+  "sourceManifestSha256": "c78e0ea0d03fc5e7f9f9e906d4d58f618fcc009419d38fd8fc6349b60a422448",
+  "relatedItems": [
+    "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+    "pipeline.hgo-patch-preflight-before-signature",
+    "pipeline.sign-intent-disclosure-scan-blocks-for-minutes"
+  ],
+  "assurance": "Actual public HGO METHOD APIs and memory Ed25519 signatures with explicit synthetic public trust",
+  "inheritedGitHooksSigningPreserved": true,
+  "removedEnvironmentKeys": [],
+  "limits": [
+    "Nine prior successes remain predecessor-source evidence; no full10 rerun on13e.",
+    "Persisted malformed request negatives qualified; malformed signed plan/capability readers not separately qualified.",
+    "Native apply_patch rehearsal producer remains unavailable.",
+    "Actual attended Human signing, native host integration, whole three-item acceptance and release certification remain unqualified."
+  ],
+  "nativeHostIssued": false,
+  "humanAttested": false,
+  "wholeItemClosure": false
+}

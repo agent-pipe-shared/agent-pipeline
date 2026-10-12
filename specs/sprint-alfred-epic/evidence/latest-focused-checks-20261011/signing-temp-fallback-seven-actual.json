@@ -1,0 +1,106 @@
+{
+  "schema": "alfred.public.signing-temp-fallback-seven.actual.v1",
+  "rawReceiptSha256": "48a7dd4148cc79e6fa5e8780a7c2c6f9cfbdba52f3205db689359a1aa1dfb9d3",
+  "rawReceiptBytes": 1625,
+  "privateForensicsRetained": true,
+  "result": "PASS",
+  "caseIds": [
+    "STF001",
+    "STF002",
+    "STF003",
+    "STF004",
+    "STF005",
+    "STF006",
+    "STF007"
+  ],
+  "caseScopes": [
+    {
+      "id": "STF001",
+      "scope": "clean temporary base retains home cwd and owned cleanup"
+    },
+    {
+      "id": "STF002",
+      "scope": "contaminated temporary base uses validated home and conserves temp namespace"
+    },
+    {
+      "id": "STF003",
+      "scope": "regular file temporary base retains typed local I/O failure without fallback"
+    },
+    {
+      "id": "STF004",
+      "scope": "unsafe home never uses temporary working directory or creates material"
+    },
+    {
+      "id": "STF005",
+      "scope": "toolchain sign failure stays Ed25519 class with no second workspace"
+    },
+    {
+      "id": "STF006",
+      "scope": "late replacement child is preserved and verify is refused"
+    },
+    {
+      "id": "STF007",
+      "scope": "missing executable remains toolchain finding before workspace creation"
+    }
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "1ce0800e981e2cf161846126505fec0e472a3a8d71f78b88329dafe27e483eb4",
+    "caseSetSha256": "e7a04454f41ca8b345dc5e8c5cc7a1337e492a29ce9bcfd78c99dd165662b460",
+    "dispositionsSha256": "64003c343eb920d3680033390fb6a41070736920242f42abaece7ac9d766742a",
+    "declaredCount": 7,
+    "disposedCount": 7,
+    "counts": {
+      "pass": 7,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "db840e0923ca06a19fe007409dfd49f3d727ee16b9fd3cf587f74054dad01970",
+  "invocation": {
+    "executor": "Root",
+    "kind": "isolated production API with controlled METHOD spawn port",
+    "launcherSha256": "c2042a7ad473c8589616548510da86130cf67f025a2239c17f6c4eca1587b797",
+    "readySha256": "94f37327d1e175c88f17dd65eaed399729f5e618a7fb0b9e8bc85527f69d8578",
+    "runFreezeSha256": "561009fb4a584324e51771f149dd0ad27f6c6d43635ac370daaef9601fad0e25",
+    "resourceFreezeSha256": "53725bbb9b751043a1a122d9616503a45c174f2ba84c1c1f9103248621c9c611",
+    "callbacksSha256": "22799e01775d10b4791b838188db4896c6bd63c29fd2cd8efdfdf0d2cbe9389d",
+    "driverSha256": "0072d2607b1692493790a1aa954ea93ea36845ef5db898b1de2d8ead028f074b"
+  },
+  "sources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "7ded03ccd533e4330992531919c8a1d9ee87ff67170439cc92cb2168da23cd11"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9",
+      "role": "coherent-runtime-dependency"
+    }
+  ],
+  "sourceManifestSha256": "c0428d88b5c5f94a036b89590d63a4420b3baebfe56416545c4ebdcb5f75851d",
+  "observed": {
+    "donorRuntimeConserved": true,
+    "sourceClosureConserved": true,
+    "callbackBodiesUnchanged": true,
+    "controlledMethodSpawnPort": true,
+    "mainSourceWrites": 0,
+    "frozenSignerRuntimeWrites": 0,
+    "hostTempEstateWrites": 0,
+    "humanKeyAccess": false
+  },
+  "limits": {
+    "formalItemStage": "OPEN",
+    "wholeItemClosed": false,
+    "requesterAuthorityGranted": false,
+    "readyGranted": false,
+    "humanSigningQualified": false,
+    "nativeDabQualified": false,
+    "gitCommitOrPushPerformedByPublication": false,
+    "nativeOpenSslQualified": false,
+    "installedMainAcceptance": false,
+    "controlledToolSuccessIsNativeSuccess": false
+  }
+}

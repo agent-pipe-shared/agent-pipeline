@@ -1,0 +1,99 @@
+{
+  "schema": "alfred.generic-seven-public-content-integration.v1",
+  "evidenceKind": "actual-Main-content-integration-and-readback",
+  "originalItem": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+  "originReceipts": {
+    "applicationSha256": "ba1fd4528adc84489b5e1d7a1e5188313a890a08aee874cc44d2237fa01af749",
+    "postReadbackSha256": "f56d40df93cb957445b0fad4ba39adb42df4d0a1d44d447876b767c0b2a55e39",
+    "officialClassificationSha256": "cf9242794baf924d89a81412c3e1cf1b3a9d60a1d2130961d977b96be6068f58"
+  },
+  "targets": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "parentSha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+      "parentState": "present",
+      "postSha256": "54e9abd562c1b41d18d6f5a598d84942b5aecb7efb667c92672847bc355a9534",
+      "bytes": 57731,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "parentSha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+      "parentState": "present",
+      "postSha256": "34c3a8b0744b91f759f9ea82398e11e46c02e2c29fb0fcd539e49369eaef82ae",
+      "bytes": 37568,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/agents/critic.md",
+      "parentSha256": "5bffe3b1c7ffa2abea2829da9ce60afc541b1dcba23f0039f9b613b3c8c57f16",
+      "parentState": "present",
+      "postSha256": "5117e46bb7a9a6e320cb296fbb1922e0ee1919c0af24885b56114f9cf82eff7e",
+      "bytes": 17508,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "parentSha256": "f5abdb6ea08d913c5f858fd4fa41ae6ab8b077d0cff13928fda2694833ffc5d1",
+      "parentState": "present",
+      "postSha256": "e38b501be6b6d615c3979ca0fe8a606cbba6df970870910e5e5dc0c5d029c20f",
+      "bytes": 30464,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "parentSha256": "f325205d075479eceab79691b77116ebeee362be390a197ded4dbf8f1034689b",
+      "parentState": "present",
+      "postSha256": "b9048141a53cca52299416b7ff7ff0343f9f1713fdc68f81025517a188fb5222",
+      "bytes": 48391,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "templates/prompts/critic-review.md",
+      "parentSha256": "f325205d075479eceab79691b77116ebeee362be390a197ded4dbf8f1034689b",
+      "parentState": "present",
+      "postSha256": "b9048141a53cca52299416b7ff7ff0343f9f1713fdc68f81025517a188fb5222",
+      "bytes": 48391,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "parentSha256": null,
+      "parentState": "absent",
+      "postSha256": "ca7be38d383d4c15c77db10f1403ef6f7265c39fc6204851fe47f39037aba83f",
+      "bytes": 30644,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "appliedCount": 7,
+  "failure": null,
+  "atomicPerLeaf": true,
+  "batchAtomic": false,
+  "nonTargetDependencyCount": 297,
+  "nonTargetDependenciesConserved": true,
+  "classificationAuthorityConserved": true,
+  "officialClassification": "seven-noRule",
+  "functionalReady": false,
+  "protectedArgsApplied": false,
+  "existingNotesGuidancePreserved": true,
+  "sourceApiScope": "Existing registered generic-batch implementation only; no old UNREGISTERED adoption API.",
+  "qualification": {
+    "businessTestsExecutedByThisIntegration": 0,
+    "genericGBIReceiptBinding": "pending exact retained qualification receipts",
+    "nativeAssurance": false,
+    "actualCriticConsumedCourse": false,
+    "wholeItemAcceptance": false
+  },
+  "limits": [
+    "Protected cumulative args1437 and coherent State/I03/Registry dependencies remain separate integration ownership.",
+    "Current finite classpath is not runtime qualification.",
+    "Historical ambiguous old courses remain readable/held; no fresh-history reset."
+  ]
+}

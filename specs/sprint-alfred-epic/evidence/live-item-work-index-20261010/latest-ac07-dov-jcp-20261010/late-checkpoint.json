@@ -1,0 +1,108 @@
+{
+  "schema": "alfred.late-finite-checkpoint.v1",
+  "stb": {
+    "input": {
+      "path": "scratch/alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/execution-terminal.json",
+      "sha256": "9a7141c0cce33bc45de68dad7f846d4774b0e926b87d64abf926d23aa8d2e35c"
+    },
+    "freezeSha256": "f0f2ea224233ac6fffd4418d7cedcba6d55749f8e7046bc199163fa702e4f08e",
+    "suites": [
+      {
+        "name": "diagnostic1",
+        "status": 1,
+        "signal": null,
+        "completion": {
+          "schema": "pipeline.verify-case-completion-attestation.v1",
+          "status": "complete",
+          "policySha256": "4ec2df7f89a7ee750e74d3abc585261727e29e9ff37aa73c5f4d79b63b37c1e3",
+          "caseSetSha256": "ee1ed7d8bfa5c83ca2b3c00f0dc88b5c5e662cf35ebd85a6a2a74ece1c2d9608",
+          "dispositionsSha256": "ae318a9ff2a7424032c190684e38c7450c826533000d5c5c78f63092a0e935bf",
+          "declaredCount": 1,
+          "disposedCount": 1,
+          "counts": {
+            "pass": 0,
+            "fail": 1,
+            "skip": 0,
+            "todo": 0
+          }
+        },
+        "parserError": null,
+        "completionSha256": "e6b9c85e53451ba8c57d7e286aaac292fae2ea5d133946823f14467e05dd5812"
+      }
+    ],
+    "parentConserved": true,
+    "sourceDiagnosis": {
+      "basis": "Root-reported diagnosis, not independently reconstructed here",
+      "projectionPassed": true,
+      "failure": "state-owner-witness: one actual operation counted in operations and legacy alias",
+      "owner": "alfred_state_i08_invariant_assertions",
+      "nextAction": "identity dedup source correction and unchanged focused qualification"
+    },
+    "originalState24": "separate scoped PASS retained",
+    "fullLifecycle26": "open"
+  },
+  "cmo": {
+    "basis": "Root-reported latest receipt, exact receipt locator not supplied here",
+    "counts": {
+      "pass": 0,
+      "fail": 12
+    },
+    "targetEffectsReached": false,
+    "failure": "bootstrap selected-mode fixture prerequisite",
+    "owner": "agy_greenfield_acceptance_audit",
+    "nextAction": "one-case fixture schema successor; preserve older trailer/setup failures"
+  },
+  "officialItemsOpen": 176,
+  "acceptanceChange": false,
+  "latestSTB": {
+    "input": {
+      "path": "scratch/alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/source-bug-successor/execution-terminal.json",
+      "sha256": "b90d0360660d9957a782e5cde9bcee2bcd8631e23c8027ecf56f69db11434087",
+      "bytes": 1327
+    },
+    "freezeSha256": "a1af74d9db91321599f49a4427f8aca459edeaae60cdeb2bc7a8c6622a32f719",
+    "parentConserved": true,
+    "suites": [
+      {
+        "name": "diagnostic1",
+        "status": 0,
+        "signal": null,
+        "completion": {
+          "schema": "pipeline.verify-case-completion-attestation.v1",
+          "status": "complete",
+          "policySha256": "4ec2df7f89a7ee750e74d3abc585261727e29e9ff37aa73c5f4d79b63b37c1e3",
+          "caseSetSha256": "ee1ed7d8bfa5c83ca2b3c00f0dc88b5c5e662cf35ebd85a6a2a74ece1c2d9608",
+          "dispositionsSha256": "5431d3d4ad32bbabd8b5f9b7d2ef8df798ac9b732c907741cbb2a37e3b41654e",
+          "declaredCount": 1,
+          "disposedCount": 1,
+          "counts": {
+            "pass": 1,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          }
+        },
+        "parserError": null,
+        "completionSha256": "bb88b6fde4da83ee817f3ed0c9e730bd33a6bcf663ee980e1bf68b7d54ca6ff2"
+      }
+    ],
+    "scope": "single original STB003 assertion only; historical whole20 four failures retained; remaining cases and full26 constructors unqualified"
+  },
+  "agyV8": {
+    "input": {
+      "path": "scratch/alfred-agy-observed-version-independent-tests-20261010/refresh-integration-execution-v8.json",
+      "sha256": "24e48415a2141b40ecfa6c91fce73875b6936915c583a542bab7b8fe994cb9a7",
+      "bytes": 315
+    },
+    "status": "setup-failed-before-tests",
+    "testExecuted": false,
+    "error": "Error: pinned source closure schema/count/completeness mismatch",
+    "nextAction": "source-owned closure metadata correction v9; no22 business outcomes"
+  },
+  "disprovedVerifyHypothesis": {
+    "basis": "Root confirmed source-author exact character inspection",
+    "adapterSourceDefect": false,
+    "consumerPatchWarranted": false,
+    "actualOrderingQualification": "pending"
+  }
+}

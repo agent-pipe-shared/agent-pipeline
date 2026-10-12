@@ -1,0 +1,14 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["LDO001","LDO002","LDO003","LDO004","LDO005","LDO006","LDO007","LDO008","LDO009","LDO010","LDO011","LDO012"],"caseCount":12,"caseSetSha256":"0405c76692c857ef27477c0320a66a5f0c424935bc6379c4e4ebf4f9987e1bcf"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO003","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO004","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO005","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO006","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO007","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO008","ordinal":7,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO009","ordinal":8,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO010","ordinal":9,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO011","ordinal":10,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO012","ordinal":11,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":12,"disposedCount":12,"caseIds":["LDO001","LDO002","LDO003","LDO004","LDO005","LDO006","LDO007","LDO008","LDO009","LDO010","LDO011","LDO012"],"caseSetSha256":"0405c76692c857ef27477c0320a66a5f0c424935bc6379c4e4ebf4f9987e1bcf","dispositionsSha256":"bfe8ec652d78dc4b1d44df68de7eb1514bac063b7c557db76cf643b539dd9e94","counts":{"pass":12,"fail":0,"skip":0,"todo":0}}

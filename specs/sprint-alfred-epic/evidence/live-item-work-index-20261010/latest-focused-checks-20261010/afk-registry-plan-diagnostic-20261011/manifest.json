@@ -1,0 +1,15 @@
+{
+  "schema": "alfred.focused-afk-diagnostic-public-manifest.v1",
+  "status": "actual-failed-diagnostic-not-qualified",
+  "files": [
+    {
+      "name": "diagnostic-proof.json",
+      "sha256": "6e0932ce148145e9015c8725d2b0d85837b57ed07d2856be1bdf05ad7a87818c",
+      "bytes": 3957
+    }
+  ],
+  "executionSha256": "7a8bc8cad6bdb94193462e802f18af3c2ddd4813983454720f9da11bda910f99",
+  "repairNormManifestSha256": "55feac018c00fc39ada582eb7b09a28c6a4db8398b73432658ea10db9159b81d",
+  "successfulBusinessQualification": false,
+  "wholeAfkQualified": false
+}

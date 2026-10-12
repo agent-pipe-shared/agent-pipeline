@@ -1,0 +1,275 @@
+{
+  "schema": "alfred.windows-root-rule.thirty-method.public-proof.v1",
+  "status": "qualified-method-thirty",
+  "assurance": "METHOD",
+  "scope": "Actual production private predicate/comparator exercised by thirty fixed METHOD controls. Mutant observations do not establish native identity or admission.",
+  "source": {
+    "sha256": "bbeee41326116cb5152752e10177ca37636bc9819f5172f9ddb30b56fe5d1a11"
+  },
+  "result": {
+    "declaredCount": 30,
+    "disposedCount": 30,
+    "counts": {
+      "pass": 30,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "childExitCode": 0,
+    "transportError": null,
+    "parserError": null,
+    "inputsConserved": true,
+    "sourceConserved": true,
+    "toolsConserved": true
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "c34817b740942f1a5b05b8001002539721e8911aec1fe3219a85474b5fd05744",
+    "caseSetSha256": "f8f90042f47aa040b61b7cf66e640e805bfc24da0d2092f2f30fba28dfe4b825",
+    "dispositionsSha256": "5ec5baadef0da180f7dd234fed2898cdd9ca8cb1bae9abc0cf852a001c1d4783",
+    "declaredCount": 30,
+    "disposedCount": 30,
+    "counts": {
+      "pass": 30,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "sha256": "6ea8dfbcce75d1e325075e14a7e17e1fe58369fbff86f5f877a11e619827b0c6"
+  },
+  "cases": [
+    {
+      "id": "WRN001",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN002",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN003",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN004",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN005",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN006",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN007",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN008",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN009",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-OWNER",
+      "actualCode": "WIN-AUTH-ANCESTOR-OWNER",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN010",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-OWNER",
+      "actualCode": "WIN-AUTH-ANCESTOR-OWNER",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN011",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-ACL",
+      "actualCode": "WIN-AUTH-ANCESTOR-ACL",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN012",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-ACL",
+      "actualCode": "WIN-AUTH-ANCESTOR-ACL",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN013",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN014",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN015",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "actualCode": "WIN-AUTH-ANCESTOR-MUTATION",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN016",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-INPUT",
+      "actualCode": "WIN-AUTH-INPUT",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN017",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-INPUT",
+      "actualCode": "WIN-AUTH-INPUT",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN018",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-INPUT",
+      "actualCode": "WIN-AUTH-INPUT",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN019",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-INPUT",
+      "actualCode": "WIN-AUTH-INPUT",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN020",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ANCESTOR-OWNER",
+      "actualCode": "WIN-AUTH-ANCESTOR-OWNER",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN021",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-ALIAS",
+      "actualCode": "WIN-AUTH-ALIAS",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN022",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-RACE",
+      "actualCode": "WIN-AUTH-RACE",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN023",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-RACE",
+      "actualCode": "WIN-AUTH-RACE",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN024",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-RACE",
+      "actualCode": "WIN-AUTH-RACE",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN025",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-RACE",
+      "actualCode": "WIN-AUTH-RACE",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN026",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-RACE",
+      "actualCode": "WIN-AUTH-RACE",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN027",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-RACE",
+      "actualCode": "WIN-AUTH-RACE",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN028",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-RACE",
+      "actualCode": "WIN-AUTH-RACE",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN029",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-RACE",
+      "actualCode": "WIN-AUTH-RACE",
+      "assurance": "METHOD"
+    },
+    {
+      "id": "WRN030",
+      "disposition": "pass",
+      "expectedCode": "WIN-AUTH-OWNER",
+      "actualCode": "WIN-AUTH-OWNER",
+      "assurance": "METHOD"
+    }
+  ],
+  "limits": {
+    "nativeAdmissionProven": false,
+    "nativeRaceProven": false,
+    "installationQualified": false,
+    "wholeItemClosed": false,
+    "productionReadinessGranted": false,
+    "itemStagesChanged": false
+  },
+  "history": {
+    "previousOutcome": {
+      "pass": 11,
+      "fail": 19,
+      "executionSha256": "1256753fcaa6ad72299611ff968f8cfcc67121a15ee9f8a9961fffa93f6fc266",
+      "evidenceVisibility": "private preserved receipt; no previous public result overwritten"
+    },
+    "priorEvidencePreserved": true,
+    "priorOutcomeSupersededOnlyForTheseThirtyMethodControls": true
+  },
+  "privateEvidence": {
+    "executionSha256": "e29f7d0d8f7e67d7b9eff0301b7335f58cd62909bd21113aa6ccd95eded8fd87",
+    "completionSha256": "6ea8dfbcce75d1e325075e14a7e17e1fe58369fbff86f5f877a11e619827b0c6"
+  }
+}

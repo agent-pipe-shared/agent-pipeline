@@ -1,0 +1,57 @@
+{
+  "schema": "alfred.advisor-ancestor-focused-seven.receipt-bindings.v1",
+  "receipts": [
+    {
+      "path": "scratch/alfred-advisor-ancestor-identity-source-20261011/manifest.json",
+      "sha256": "1d163d165eba2a9c45046403b3c4b5df878939d9d1c6bf6d7cfc1773e573f231",
+      "bytes": 3738
+    },
+    {
+      "path": "scratch/alfred-advisor-ancestor-independent-qualification-20261011/execution.json",
+      "sha256": "da5be556f385a20d5662815567df0152228b05acaf01969aaa7f80c63242583a",
+      "bytes": 1554
+    },
+    {
+      "path": "scratch/alfred-advisor-ancestor-independent-qualification-20261011/test-contract.json",
+      "sha256": "8ff82ab655c6ea42ec0f64e986d21dc5415cad7f69100c6e00115e63992dae50",
+      "bytes": 2257
+    },
+    {
+      "path": "scratch/alfred-advisor-ancestor-independent-qualification-20261011/freeze.json",
+      "sha256": "dab7cc312f27fdd9588e7062e93b60a7e060e471e4bb3022c3dbb1cbf8d95c73",
+      "bytes": 8479
+    },
+    {
+      "path": "scratch/alfred-advisor-ancestor-independent-qualification-20261011/completion.ndjson",
+      "sha256": "cd7bd479a277eff1e471cf49c66ee96823861d13b9dc324a1be31ed135d18239",
+      "bytes": 1436
+    },
+    {
+      "path": "scratch/alfred-partial01-engineering-completion-mapping-20261011/advisor-parent-identity-norm.json",
+      "sha256": "e51435ac5f6d281c9915d951c930026a8187d74e4feaa76908ff627fec99956d",
+      "bytes": 2280
+    },
+    {
+      "path": "scratch/alfred-advisor-ancestor-identity-source-20261011/postimages/plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "sha256": "e6abbc7369e16bf9620213df7f875b893dfe1c01dc8fbe88e6cfd2a115b20bfc",
+      "bytes": 8489
+    },
+    {
+      "path": "scratch/alfred-advisor-ancestor-identity-source-20261011/parents/plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "bytes": 8306
+    },
+    {
+      "path": "scratch/alfred-advisor-ancestor-identity-source-20261011/main-integration-preparation/atomic-one-successor/application-root/execution.json",
+      "sha256": "b042d302427d4871fe46abac19dc6c91808f27342433467aaeb0d4c6dea0443d",
+      "bytes": 4241
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "sha256": "e6abbc7369e16bf9620213df7f875b893dfe1c01dc8fbe88e6cfd2a115b20bfc",
+      "bytes": 8489
+    }
+  ],
+  "sourceAuthority": "Independent actual controlled physical reader/retry qualification; source presence is not acceptance",
+  "publicPayload": "Selected hashes, case dispositions and scope only. No private logs, absolute fixture paths, host identity records or authority payloads exported."
+}

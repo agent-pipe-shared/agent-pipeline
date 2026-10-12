@@ -1,0 +1,21 @@
+{
+  "schema": "alfred.qualified-source-case-records.v1",
+  "sourceManifestSha256": "9e5ab219120cb7efbfe727b917af8ec99a71f5bc05cef66027f3fef617ec9d36",
+  "records": [
+    {
+      "path": "finalizer-fixtures-native-goldfish-host-finalizer-regression.case-completion.jsonl",
+      "sha256": "998654f3ccfcd2675842da0e615729dc43188cde14f388d465669ac2172ed2e3",
+      "bytes": 895
+    },
+    {
+      "path": "finalizer-fixtures-native-goldfish-host-finalizer.case-completion.jsonl",
+      "sha256": "070a7e1707c640c10df3be4c265a5a92034990b2f56a402fcb1612e2f3793661",
+      "bytes": 1025
+    }
+  ],
+  "pass": 7,
+  "sourceVariant": "historical frozen configured Codex route seven-case GREEN; later compatibility and portability amendments separately qualified",
+  "wholeCandidatePassed": false,
+  "nativeProviderHostQualification": false,
+  "testsReplayed": false
+}

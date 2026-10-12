@@ -1,0 +1,44 @@
+{
+  "schema": "alfred.rggram-independent-execution.v1",
+  "baseline": {
+    "commit": "e40b6ede927cc052be467fb816f98429a3b0164f",
+    "tree": "6f786fd7fe31758dc6dd2db8bab2636bec0c7a53"
+  },
+  "child": {
+    "argv": [
+      "<outside-repository-host-path-excluded>",
+      "<repository>/legacy-origin:alfred-rggram-sorted-parent-fixture-replay-preparation-20261010/placement-independent.test.mjs"
+    ],
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  "completionSha256": "ddddde8bbbda697f69df90025625eb336af31ba523ce1af4e769701a4c1cbc49",
+  "stdoutSha256": "8d368d3b3204baf2b9a4996546f7585d9a52a74d789263ceebad050b9c783189",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "parsed": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "efc0e6bf0d09130630f59c5716b1594ec5bf59664b7cae386bafddfb4d2e28da",
+    "caseSetSha256": "bf214a66e54e85f96d1c1f13d0c4e5ae508dd6ddbe5156bfba9f2291623acfaa",
+    "dispositionsSha256": "7fb86eb44a5ddcc7e6a47d0044f241f06c98c1c1f079d65b889873b27728abe1",
+    "declaredCount": 4,
+    "disposedCount": 4,
+    "counts": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "parseError": null,
+  "graphConserved": true,
+  "graphMembershipConserved": true,
+  "childTimeoutMs": 120000,
+  "allInheritedGitSettingsPreserved": true,
+  "execArgvPreserved": true,
+  "inheritedNodeOptionsPresent": false,
+  "businessRuns": 1,
+  "nativeProof": false,
+  "sourceAuthoredCasesExecuted": false
+}

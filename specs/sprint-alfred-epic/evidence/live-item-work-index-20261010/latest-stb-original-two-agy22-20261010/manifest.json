@@ -1,0 +1,52 @@
+{
+  "schema": "alfred.additive-publication-preparation.v1",
+  "inputs": [
+    {
+      "path": "scratch/alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/source-bug-successor/mechanical-two-and-current-five-successor/original2/execution-terminal.json",
+      "sha256": "2be2e8dbc3f299953044e125d748be5f27d30763b4469deb2a43d93a4f998acf",
+      "bytes": 1322
+    },
+    {
+      "path": "scratch/alfred-agy-observed-version-independent-tests-20261010/refresh-integration-readback-supplement-v2.json",
+      "sha256": "404af06fe1790e72c557beadf1926d2dc3009798039ad929246b7d4241312e1f",
+      "bytes": 326256
+    }
+  ],
+  "files": [
+    {
+      "path": "stb-original-two-public-proof.json",
+      "sha256": "638b060b09771564527feb9ac6338299c0a1fbf3dcd7f318ec927442a6d98367",
+      "bytes": 1504,
+      "mode": 420
+    },
+    {
+      "path": "agy22-supplement-public-proof.json",
+      "sha256": "92403271bcd76e9c90134bed812d7cad3ee1af1a83a29c7630e314c7bc266e02",
+      "bytes": 4483,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "dad23fc91c0335b811957302adc5e7600a5605724ee11cc8031508b098a14d31",
+      "bytes": 1487,
+      "mode": 420
+    },
+    {
+      "path": "handover-update.md",
+      "sha256": "cab039539b7737421634542a870433fe36b58aece8fe9a606b6864f896d3716f",
+      "bytes": 796,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "5b6cb21f38fbb54e4252bf85e2de954b84d80336482b957205706dc17d6c6c52",
+      "bytes": 648,
+      "mode": 420
+    }
+  ],
+  "archiveExecutions": 0,
+  "businessRuns": 0,
+  "gitWrites": 0,
+  "privacy": "closed projections; no raw captures/runtime directories/source graph/key data",
+  "historicalParentsPreserved": true
+}

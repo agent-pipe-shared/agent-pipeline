@@ -1,0 +1,13 @@
+{
+  "schema": "alfred.afk-registry-call-diagnostic-public-manifest.v1",
+  "files": [
+    {
+      "name": "diagnostic-proof.json",
+      "sha256": "7ab57e74a9173295454360eed1cd5218c0f7b1cc0d3433e0b79ca2d2d24dc261",
+      "bytes": 4548
+    }
+  ],
+  "actualExecutionSha256": "c11084a9574fd6155047df4cc166809b782e8b70825ca88ade5db512e4861e9c",
+  "businessQualification": false,
+  "wholeAFKQualified": false
+}

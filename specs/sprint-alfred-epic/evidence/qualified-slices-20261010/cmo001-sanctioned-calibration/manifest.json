@@ -1,0 +1,34 @@
+{
+  "schema": "alfred.cmo001-public-proof-preview.v1",
+  "status": "prepared-not-published",
+  "files": [
+    {
+      "name": "focused-method-proof.json",
+      "sha256": "455eba17adaa3416b308e50a45ee1fd366547acf763af594d47a1ca337b7255d",
+      "bytes": 6435,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "name": "completion.fd3.jsonl",
+      "sha256": "d9c6d9b3dc15fb84fe4c4f00593a01004e8583b9a3a792db36eeeb7e8a1d0d0a",
+      "bytes": 635,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "name": "policy.json",
+      "sha256": "758ab9e39309ecfff7ffcf95b95adc3aab53fe1e1502cc0fd286588d27cfa00b",
+      "bytes": 114,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "originalExecutionSha256": "67ad290619e63f4aa2559a848f185b33e48b63a3cffbb59e7cb728b702ca53a0",
+  "originalFd3Sha256": "d9c6d9b3dc15fb84fe4c4f00593a01004e8583b9a3a792db36eeeb7e8a1d0d0a",
+  "sourcePostCount": 9,
+  "caseCount": 1,
+  "privacy": "No raw execution/cwd/private fixture names/keys/transcripts exported; original FD3 byte exact.",
+  "publicationProposedPath": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/cmo001-sanctioned-calibration",
+  "businessRunsByAuthor": 0
+}

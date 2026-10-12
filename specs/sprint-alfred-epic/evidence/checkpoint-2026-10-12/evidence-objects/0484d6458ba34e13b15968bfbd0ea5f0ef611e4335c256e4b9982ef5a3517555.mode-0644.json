@@ -1,0 +1,259 @@
+{
+  "schema": "alfred.critic-adoption-whole-item-checkpoint.v1",
+  "status": "private-code-checkpoint-unqualified",
+  "accepted": false,
+  "sourceConserved": true,
+  "conserved": [
+    {
+      "path": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+      "preimage": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+      "current": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+      "conserved": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "preimage": "27145a72a140f1c56aad17a292041352a8911892f22c4235d27206a667c73886",
+      "current": "27145a72a140f1c56aad17a292041352a8911892f22c4235d27206a667c73886",
+      "conserved": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "preimage": "28bc89a4b4825082cfebfc7f00dda41c8a938cd6d088fcd55bbee919523a23e9",
+      "current": "28bc89a4b4825082cfebfc7f00dda41c8a938cd6d088fcd55bbee919523a23e9",
+      "conserved": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "preimage": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91",
+      "current": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91",
+      "conserved": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "preimage": "8aa3b98ec54545d966dd1a45f66902630e0b11ca11d441d6d0b1aa9840b4cb86",
+      "current": "8aa3b98ec54545d966dd1a45f66902630e0b11ca11d441d6d0b1aa9840b4cb86",
+      "conserved": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "preimage": "d07ffe67a485be83e00462457a1abf51b363bf40bebb2b589eddba9c10ac2168",
+      "current": "d07ffe67a485be83e00462457a1abf51b363bf40bebb2b589eddba9c10ac2168",
+      "conserved": true
+    }
+  ],
+  "packetPreimage": {
+    "path": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+    "sha256": "54e9abd562c1b41d18d6f5a598d84942b5aecb7efb667c92672847bc355a9534",
+    "bytes": 57731,
+    "mode": 420
+  },
+  "publicCode": [
+    {
+      "localPath": "candidate/plugins/pipeline-core/lib/critic-course-adoption.mjs",
+      "sourcePath": "plugins/pipeline-core/lib/critic-course-adoption.mjs",
+      "kind": "new-source",
+      "preimage": null,
+      "sha256": "001968575edfb06ee6542745e06f96581b9f912bfcd28bf4ca05dd1cb9fd2524",
+      "bytes": 18043,
+      "mode": 420
+    },
+    {
+      "localPath": "candidate/plugins/pipeline-core/scripts/critic-course-adoption.mjs",
+      "sourcePath": "plugins/pipeline-core/scripts/critic-course-adoption.mjs",
+      "kind": "new-source",
+      "preimage": null,
+      "sha256": "8042430b8378bc61e760617b6c7f7f5ec17af943130cf8a9a51b21075a028b94",
+      "bytes": 1826,
+      "mode": 420
+    },
+    {
+      "localPath": "candidate/plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "sourcePath": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "kind": "postimage",
+      "preimage": {
+        "path": "lib/critic-generic-batch.mjs",
+        "sha256": "27145a72a140f1c56aad17a292041352a8911892f22c4235d27206a667c73886",
+        "mode": 420,
+        "bytes": 43729
+      },
+      "sha256": "55facac4f93b53b18344a67ede21d0d2a03ed823469ef4bf3f590f8ec606d216",
+      "bytes": 50913,
+      "mode": 420
+    },
+    {
+      "localPath": "candidate/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "sourcePath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "kind": "postimage",
+      "preimage": {
+        "path": "scripts/check-critic-skip-coverage.mjs",
+        "sha256": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91",
+        "mode": 420,
+        "bytes": 60667
+      },
+      "sha256": "fdadc5589f99436e65de084c507aa25bd72dd65768c229b75f7fde529edbfb8c",
+      "bytes": 62667,
+      "mode": 420
+    },
+    {
+      "localPath": "candidate/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "sourcePath": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "kind": "postimage",
+      "preimage": {
+        "path": "scripts/critic-dispatch-preflight.mjs",
+        "sha256": "8aa3b98ec54545d966dd1a45f66902630e0b11ca11d441d6d0b1aa9840b4cb86",
+        "mode": 420,
+        "bytes": 31074
+      },
+      "sha256": "cb3d91941fb002d3b978dcc5e5db6d83a887e24cc7579c087287a632e5bd13e6",
+      "bytes": 32448,
+      "mode": 420
+    },
+    {
+      "localPath": "candidate/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "sourcePath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "kind": "postimage",
+      "preimage": {
+        "path": "scripts/session-critic-finalizer.mjs",
+        "sha256": "d07ffe67a485be83e00462457a1abf51b363bf40bebb2b589eddba9c10ac2168",
+        "mode": 420,
+        "bytes": 39127
+      },
+      "sha256": "abfb029ba786ae2241919871900d9a8a1fc5f32825fa1f610c3e8944ca70b678",
+      "bytes": 41467,
+      "mode": 420
+    },
+    {
+      "localPath": "candidate/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "sourcePath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "kind": "postimage",
+      "preimage": {
+        "path": "scripts/critic-packet-preflight.mjs",
+        "sha256": "54e9abd562c1b41d18d6f5a598d84942b5aecb7efb667c92672847bc355a9534",
+        "mode": 420,
+        "bytes": 57731
+      },
+      "sha256": "00719df8e353903e502961dc20f1b931b31294f46fc3ae9b028427d79a72084d",
+      "bytes": 59238,
+      "mode": 420
+    }
+  ],
+  "support": [
+    {
+      "localPath": "prepare.mjs",
+      "kind": "support",
+      "sha256": "6ff7fc9cbef39220c90b169ce53783c1295037583d43ea0c81a7c54ccd6b9e7d",
+      "bytes": 2503,
+      "mode": 420
+    },
+    {
+      "localPath": "analysis.md",
+      "kind": "support",
+      "sha256": "98e6fa7a3a4f8926ce4875b5ae043e16428d64189d9030c1e554746dbe20868b",
+      "bytes": 1754,
+      "mode": 420
+    },
+    {
+      "localPath": "frozen-cases.json",
+      "kind": "support",
+      "sha256": "ddff00a9fbe7ce48df7553565dff45f0891fa8a04250148a19bd9ebb932bb2a5",
+      "bytes": 1526,
+      "mode": 420
+    },
+    {
+      "localPath": "source-binding.json",
+      "kind": "support",
+      "sha256": "fa75ffea05fad4337fcbcc2ab7601a8ca881cc86f79fc155f9970a2391ce6180",
+      "bytes": 363487,
+      "mode": 420
+    },
+    {
+      "localPath": "tests.mjs",
+      "kind": "support",
+      "sha256": "10979eedd6354803424b11c2b469fb3ea10ab5554b049525c055d44af6ebf210",
+      "bytes": 9535,
+      "mode": 420
+    },
+    {
+      "localPath": "tests-v2.mjs",
+      "kind": "support",
+      "sha256": "8feac8b0d01c53523fa95a469700430370ad331c33d931d76dbaabd167a70d24",
+      "bytes": 5030,
+      "mode": 420
+    },
+    {
+      "localPath": "execution.environment-hold.json",
+      "kind": "support",
+      "sha256": "19ac2f8f9fe9df2c39c6ca7b568dfbab6a24f5a665dafb9194d5993603abb901",
+      "bytes": 363,
+      "mode": 420
+    },
+    {
+      "localPath": "results.json",
+      "kind": "support",
+      "sha256": "66ecb1b12f538290e4654357b805aea7084079bba507b6b03b8b623d71a1ea3e",
+      "bytes": 2835,
+      "mode": 420
+    },
+    {
+      "localPath": "results-v2.json",
+      "kind": "support",
+      "sha256": "51aa58eb355c0361972786dcdb3a66c55fd6b4a1c7ed421ba9f064586d987d78",
+      "bytes": 1266,
+      "mode": 420
+    },
+    {
+      "localPath": "adr-draft-critic-course-adoption.md",
+      "kind": "support",
+      "sha256": "5fa6f9f40c7b48928207bab18aab07b1bf8848bfb29a8b691f8db2cf0ce011d0",
+      "bytes": 3558,
+      "mode": 420
+    },
+    {
+      "localPath": "adr-draft-critic-course-adoption.json",
+      "kind": "support",
+      "sha256": "dd158515e385a336e3bded18257aafcaf292f3e09c58ae791a345438adb89474",
+      "bytes": 366,
+      "mode": 420
+    },
+    {
+      "localPath": "HANDOVER.md",
+      "kind": "support",
+      "sha256": "d900ec4d3aaabb2aa6bda4584b721b6a9d1cd6234139ac860bea98d13aafaea4",
+      "bytes": 5205,
+      "mode": 420
+    },
+    {
+      "localPath": "checkpoint.mjs",
+      "kind": "support",
+      "sha256": "b646638c9b13d0c5ab28edeab013dae9f9d40019277384c9d1255f6cb1a8edca",
+      "bytes": 3604,
+      "mode": 420
+    }
+  ],
+  "architecture": {
+    "status": "proposed",
+    "chatDirection": {
+      "excluded": true,
+      "rawSha256": "44fff4ea97a11fcc9f5feb6e693130e3ab5ba6db7573b5cf46b155806b71b086",
+      "bytes": 47,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "aggregateApproval": "not-effective",
+    "separateAdrSignature": false
+  },
+  "holds": [
+    "genuine-accepted-mapping-policy-and-original-budget-unavailable",
+    "positive-source-publication-registration-admission-unqualified",
+    "adopted-correction-carrier-unimplemented",
+    "full-verify-and-independent-critic-not-run",
+    "no-native-installed-qualification"
+  ],
+  "liveProcessHandles": [],
+  "reviewBudgetConsumed": 0,
+  "publicCaptureRequired": true,
+  "exclude": [
+    "fixtures/**/.git/**",
+    "private authority stores",
+    "key/proof bodies"
+  ]
+}

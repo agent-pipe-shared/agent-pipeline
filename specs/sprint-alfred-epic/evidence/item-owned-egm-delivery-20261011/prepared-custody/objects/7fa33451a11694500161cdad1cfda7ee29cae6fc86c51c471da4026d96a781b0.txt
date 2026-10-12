@@ -1,0 +1,12 @@
+✔ a live counter owner blocks a second acquisition and releases its exact inode (184.667277ms)
+✔ R7-11d: at hook level a live holder beyond the bound refuses with counter-lock-timeout, names the holder age and counts nothing (207.535577ms)
+✔ R7-11d: at hook level a holder that releases within the bound lets the call through, counted exactly once (205.755988ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1614.253464
+

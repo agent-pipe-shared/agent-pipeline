@@ -1,0 +1,95 @@
+{
+  "schema": "alfred.focused-proof-events.v1",
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "sourceGeneration": 146,
+  "officialItemsOpen": 176,
+  "acceptanceCriteria": 37,
+  "integrationRequirements": 4,
+  "events": [
+    {
+      "id": "ac07-fourteen",
+      "status": "focused-qualified",
+      "counts": {
+        "pass": 14,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": "ac07-fourteen-proof.json",
+      "limitation": "independent controlled component; whole AC07 and genuine full State lifecycle remain unqualified",
+      "currentResponsible": "Root",
+      "integration": "not established by this proof publication"
+    },
+    {
+      "id": "ac07-additional-four",
+      "status": "focused-qualified",
+      "counts": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": "ac07-additional-four-proof.json",
+      "limitation": "source-author controlled focused test; RDJ019–022 and whole AC07 remain open",
+      "currentResponsible": "Root",
+      "integration": "not established by this proof publication"
+    },
+    {
+      "id": "declared-override-twenty",
+      "status": "focused-qualified",
+      "counts": {
+        "pass": 20,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": "declared-override-twenty-proof.json",
+      "limitation": "controlled real writer/pure comparator; no native model or consumed review",
+      "currentResponsible": "Root",
+      "integration": "not established by this proof publication"
+    },
+    {
+      "id": "joint-command-placement-twelve",
+      "status": "focused-qualified",
+      "counts": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": "joint-command-placement-twelve-proof.json",
+      "limitation": "joint command-placement focused controlled fixture; no native host READY or whole candidate assurance",
+      "currentResponsible": "Root",
+      "integration": "not established by this proof publication"
+    }
+  ],
+  "stageChanges": [],
+  "stageRule": "75 requires same-scope focused qualification and actual materialized integration; separate PASS receipts alone do not promote whole items",
+  "retainedStageSnapshot": {
+    "stage75": 7,
+    "stage50": 4,
+    "stage25": 2,
+    "unknown": 163
+  },
+  "stb": {
+    "status": "historical one-case failure retained; newer single-case PASS in late-checkpoint",
+    "processReference": "15519",
+    "receiptBinding": null,
+    "parentConserved": "Root-reported",
+    "nextAction": "Root supplies exact receipt locator; retain original State24 scoped PASS and full26 lifecycle gap",
+    "latestEvent": "late-checkpoint.json#latestSTB"
+  },
+  "owners": [
+    {
+      "actor": "quality_inline_coordinator_audit",
+      "workLocation": "scratch/alfred-existing-route-source-followthrough-20261010/i03-owned-operation-source",
+      "nextAction": "freeze genuine operation bridge and pass exact source interface to full lifecycle author"
+    },
+    {
+      "actor": "alfred_reader_controller_independent_tests",
+      "workLocation": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent",
+      "nextAction": "construct lawful fourteen State and twelve I08 lifecycle vectors after bridge prerequisites"
+    }
+  ],
+  "candidateReady": false
+}

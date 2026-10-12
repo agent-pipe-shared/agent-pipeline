@@ -1,0 +1,89 @@
+{
+  "schema": "alfred.generic-ca7-historical-qualification.v1",
+  "originalItem": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+  "evidenceKind": "two-distinct-historical-controlled-executions",
+  "source": {
+    "leafSha256": "ca7be38d383d4c15c77db10f1403ef6f7265c39fc6204851fe47f39037aba83f",
+    "manifestSha256": "9e35ea6a838742f1373f2af5c69789024e5ea4b265168dce3a98c2ae0d9c2237",
+    "graphFreezeSha256": "d27960abb31c5ef01752d97dbaf45aee63a2dc1612d4aeb35a4d4d085d7c8975",
+    "assertionFreezeSha256": "9b647d290757d13d18773f512a5083a1000ac505ea887f068602d293502f709b"
+  },
+  "receiptMappingSha256": "95038e30b12bf48fbb8ca2dab20c1944eea16188d7d16d532717cc6ecae51a6f",
+  "runs": [
+    {
+      "scope": "original-seventeen-with-batch-id-format-erratum",
+      "executionSha256": "63fc53c4a540ce7ce98f421bf6603b63708798f9d3418d196c9f058b50d74b31",
+      "completionSha256": "0b49b8d59f64fd0ab6d1df0235b5f258aee5fa722125831f578ff48926861a7b",
+      "caseIds": [
+        "GBI001",
+        "GBI002",
+        "GBI003",
+        "GBI004",
+        "GBI005",
+        "GBI006",
+        "GBI007",
+        "GBI008",
+        "GBI009",
+        "GBI011",
+        "GBI012",
+        "GBI014",
+        "GBI015",
+        "GBI017",
+        "GBI018",
+        "GBI019",
+        "GBI023"
+      ],
+      "declared": 17,
+      "disposed": 17,
+      "counts": {
+        "pass": 15,
+        "fail": 2,
+        "skip": 0,
+        "todo": 0
+      },
+      "childStatus": 1,
+      "signal": null,
+      "error": null,
+      "parserError": null,
+      "graphConserved": true,
+      "failedCaseIds": [
+        "GBI007",
+        "GBI012"
+      ]
+    },
+    {
+      "scope": "targeted-retained-reservation-observer-correction",
+      "executionSha256": "74e20ea8cfe2e986a7525199e9c6d78915b4cfc3e2eb675b17d0a1366d1d53ef",
+      "completionSha256": "91e2c578d637c352e97aac394b1c9d2c5834c887fb38ab69b5d36e2f87bae5e9",
+      "caseIds": [
+        "GBI007",
+        "GBI012"
+      ],
+      "declared": 2,
+      "disposed": 2,
+      "counts": {
+        "pass": 2,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "childStatus": 0,
+      "signal": null,
+      "error": null,
+      "parserError": null,
+      "graphConserved": true,
+      "failedCaseIds": []
+    }
+  ],
+  "interpretation": "Fifteen original passing dispositions plus separately qualified GBI007 and GBI012 observer corrections. The original two failures remain recorded.",
+  "limits": {
+    "jointSeventeenPassRun": false,
+    "currentMainRuntimeQualified": false,
+    "nativeAssurance": false,
+    "actualIndependentCriticReview": false,
+    "actualConsumedCriticCourse": false,
+    "wholeItemAcceptance": false,
+    "focusedFiveIncluded": false
+  },
+  "remaining": "Coherent protected companion integration and current runtime qualification remain separate. Historical ambiguous unregistered courses remain held."
+}

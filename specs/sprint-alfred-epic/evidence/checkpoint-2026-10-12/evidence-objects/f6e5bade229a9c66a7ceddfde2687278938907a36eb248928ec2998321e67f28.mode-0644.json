@@ -1,0 +1,1910 @@
+{
+  "schema": "alfred.next-intake-criterion-matrix.v1",
+  "assignmentSHA256": "c6e0f78c97455ec0a0f7e969b1baeb42787b1a79a70e215bcaef12d87476d3dc",
+  "items": [
+    {
+      "index": 0,
+      "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "a5db003d227d8eafe0bd4d2d83e96776055cff2b65e27db6807fe8ec88fd4a5f",
+        "bytes": 210,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "missing-functional",
+      "finding": "Consumption still compares the complete capability.repository with fresh repositoryObservation, including dirty status. Request/plan freshness narrowing is a different boundary. No new native-file target-preimage capability was established by these reads.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+          "locator": "966–977;2183–2215;4410–4435",
+          "sourceSHA256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another::29.1",
+          "heading": "Acceptance",
+          "lineStart": 31,
+          "lineEnd": 51,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "de3adab457ee31e7de161ac73166c9a58f92e46d5c5684c9176b761fa1270700",
+            "bytes": 1451,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "missing-functional",
+          "finding": "Consumption still compares the complete capability.repository with fresh repositoryObservation, including dirty status. Request/plan freshness narrowing is a different boundary. No new native-file target-preimage capability was established by these reads.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+              "locator": "966–977;2183–2215;4410–4435",
+              "sourceSHA256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Introduce a separately versioned native-file target-preimage contract; retain legacy and Bash/plugin bindings. Qualify the original disjoint-action/drift matrix and preparer serial-dependency disclosure.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another::29.2",
+          "heading": "Acceptance",
+          "lineStart": 53,
+          "lineEnd": 54,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "78b01d5cf7e216d3a9cece135bd0f4f966bf1e91e23b4ca3952239294d0d2ba6",
+            "bytes": 149,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "missing-functional",
+          "finding": "Consumption still compares the complete capability.repository with fresh repositoryObservation, including dirty status. Request/plan freshness narrowing is a different boundary. No new native-file target-preimage capability was established by these reads.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+              "locator": "966–977;2183–2215;4410–4435",
+              "sourceSHA256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Introduce a separately versioned native-file target-preimage contract; retain legacy and Bash/plugin bindings. Qualify the original disjoint-action/drift matrix and preparer serial-dependency disclosure.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Introduce a separately versioned native-file target-preimage contract; retain legacy and Bash/plugin bindings. Qualify the original disjoint-action/drift matrix and preparer serial-dependency disclosure.",
+      "accepted": false,
+      "historicalTriage": []
+    },
+    {
+      "index": 1,
+      "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "ae9c78b1ae40c10dbf87482f7696d8726a28fc1d9b7c9d2a89ca49b8d5830f49",
+        "bytes": 219,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "Current guard contains Windows owner identity/live-dead-ambiguous handling and bounded 3000ms backoff; the real guard caller selects the wait variant. Existing R7-11 tests name counted-once and timeout controls. Actual native Windows Read/Write/Bash host evidence and exact first-write briefing coverage were not established.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "locator": "895–1050;1157–1260;1644–1652",
+          "sourceSHA256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+          "binding": "matching-selected-digest"
+        },
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+          "locator": "968–991;1270–1370",
+          "sourceSHA256": "006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::19.1",
+          "heading": "Observed again 2026-10-06/07 — root cause in source, PO decision #26",
+          "lineStart": 21,
+          "lineEnd": 34,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "aad761483ebcc23adc247da70bcd19339ddd5a7a5322ecbfd45b2a0091053c6e",
+            "bytes": 1062,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Current guard contains Windows owner identity/live-dead-ambiguous handling and bounded 3000ms backoff; the real guard caller selects the wait variant. Existing R7-11 tests name counted-once and timeout controls. Actual native Windows Read/Write/Bash host evidence and exact first-write briefing coverage were not established.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "locator": "895–1050;1157–1260;1644–1652",
+              "sourceSHA256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+              "locator": "968–991;1270–1370",
+              "sourceSHA256": "006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind existing R7-11 cases to the selected guard and a genuine Windows hook run; verify first-write receipt instructions separately. Do not replace the delivered wait algorithm merely because native proof is absent.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::36.1",
+          "heading": "Description",
+          "lineStart": 38,
+          "lineEnd": 41,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "d4ebeb09d8b7483706286dabacfa62cda46c047345b52e9f7adcf2137930326e",
+            "bytes": 255,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Current guard contains Windows owner identity/live-dead-ambiguous handling and bounded 3000ms backoff; the real guard caller selects the wait variant. Existing R7-11 tests name counted-once and timeout controls. Actual native Windows Read/Write/Bash host evidence and exact first-write briefing coverage were not established.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "locator": "895–1050;1157–1260;1644–1652",
+              "sourceSHA256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+              "locator": "968–991;1270–1370",
+              "sourceSHA256": "006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind existing R7-11 cases to the selected guard and a genuine Windows hook run; verify first-write receipt instructions separately. Do not replace the delivered wait algorithm merely because native proof is absent.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::36.2",
+          "heading": "Description",
+          "lineStart": 43,
+          "lineEnd": 52,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "c17c8b475c10d53d297473834dad4c7a0f78aec8d23fcfdeb8a8e6a93f686b0e",
+            "bytes": 694,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Current guard contains Windows owner identity/live-dead-ambiguous handling and bounded 3000ms backoff; the real guard caller selects the wait variant. Existing R7-11 tests name counted-once and timeout controls. Actual native Windows Read/Write/Bash host evidence and exact first-write briefing coverage were not established.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "locator": "895–1050;1157–1260;1644–1652",
+              "sourceSHA256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+              "locator": "968–991;1270–1370",
+              "sourceSHA256": "006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind existing R7-11 cases to the selected guard and a genuine Windows hook run; verify first-write receipt instructions separately. Do not replace the delivered wait algorithm merely because native proof is absent.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::36.3",
+          "heading": "Description",
+          "lineStart": 54,
+          "lineEnd": 59,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "de1361503f21b517950bf455bceb852905909d1ddbb2797dc4060dc8087c7833",
+            "bytes": 433,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Current guard contains Windows owner identity/live-dead-ambiguous handling and bounded 3000ms backoff; the real guard caller selects the wait variant. Existing R7-11 tests name counted-once and timeout controls. Actual native Windows Read/Write/Bash host evidence and exact first-write briefing coverage were not established.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "locator": "895–1050;1157–1260;1644–1652",
+              "sourceSHA256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+              "locator": "968–991;1270–1370",
+              "sourceSHA256": "006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind existing R7-11 cases to the selected guard and a genuine Windows hook run; verify first-write receipt instructions separately. Do not replace the delivered wait algorithm merely because native proof is absent.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::36.4",
+          "heading": "Description",
+          "lineStart": 61,
+          "lineEnd": 68,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "4e8d1705d58c951e13fc16aad25028eab39ca3c6f54e04ab78fcd01cf08fe82c",
+            "bytes": 601,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Current guard contains Windows owner identity/live-dead-ambiguous handling and bounded 3000ms backoff; the real guard caller selects the wait variant. Existing R7-11 tests name counted-once and timeout controls. Actual native Windows Read/Write/Bash host evidence and exact first-write briefing coverage were not established.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "locator": "895–1050;1157–1260;1644–1652",
+              "sourceSHA256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+              "locator": "968–991;1270–1370",
+              "sourceSHA256": "006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind existing R7-11 cases to the selected guard and a genuine Windows hook run; verify first-write receipt instructions separately. Do not replace the delivered wait algorithm merely because native proof is absent.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::70.1",
+          "heading": "Acceptance",
+          "lineStart": 72,
+          "lineEnd": 79,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "ba426677b7e8a520f6b7ad156fe485cbfcebe324a1955cd20340ea88f7e74f23",
+            "bytes": 512,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Current guard contains Windows owner identity/live-dead-ambiguous handling and bounded 3000ms backoff; the real guard caller selects the wait variant. Existing R7-11 tests name counted-once and timeout controls. Actual native Windows Read/Write/Bash host evidence and exact first-write briefing coverage were not established.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "locator": "895–1050;1157–1260;1644–1652",
+              "sourceSHA256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+              "locator": "968–991;1270–1370",
+              "sourceSHA256": "006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind existing R7-11 cases to the selected guard and a genuine Windows hook run; verify first-write receipt instructions separately. Do not replace the delivered wait algorithm merely because native proof is absent.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Bind existing R7-11 cases to the selected guard and a genuine Windows hook run; verify first-write receipt instructions separately. Do not replace the delivered wait algorithm merely because native proof is absent.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 81,
+          "text": "\n- **Decision:**\n- **Rationale:**\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "b88c463a66ecf151c028890284be40c44fa5e9e317ab1b6b1f5464854640caaf",
+        "bytes": 215,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "present-source-qualification-gap",
+      "finding": "Role normalization accepts capitalized runner spellings. No-prohibition batches return not-applicable before parsing. Invalid prohibited roles receive APB-ROLE-UNPARSEABLE with the offending value. Current exact alone/parallel regression and host result were not read.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
+          "locator": "normalizedRole;prepareAdvisorProhibitionBindings",
+          "sourceSHA256": "0b4fb977c7d16ddf684a6801f7a57502a4cc35d60dc68480d411070d3253bd24",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types::19.1",
+          "heading": "Description",
+          "lineStart": 21,
+          "lineEnd": 29,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "1c80c3180a9e8ccf1f4565302a0b86859c10d5307096a4695a9f7fd4745e8fc8",
+            "bytes": 612,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Role normalization accepts capitalized runner spellings. No-prohibition batches return not-applicable before parsing. Invalid prohibited roles receive APB-ROLE-UNPARSEABLE with the offending value. Current exact alone/parallel regression and host result were not read.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
+              "locator": "normalizedRole;prepareAdvisorProhibitionBindings",
+              "sourceSHA256": "0b4fb977c7d16ddf684a6801f7a57502a4cc35d60dc68480d411070d3253bd24",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Reuse the source correction and bind the original Explore/Plan/general-purpose/pipeline-core and parallel matrix to current qualification.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types::19.2",
+          "heading": "Description",
+          "lineStart": 31,
+          "lineEnd": 31,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "55a48f62c67b790f7e25b7985fde1c15c3ed401b9cba9a2d17d70994d2436c5b",
+            "bytes": 20,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Role normalization accepts capitalized runner spellings. No-prohibition batches return not-applicable before parsing. Invalid prohibited roles receive APB-ROLE-UNPARSEABLE with the offending value. Current exact alone/parallel regression and host result were not read.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
+              "locator": "normalizedRole;prepareAdvisorProhibitionBindings",
+              "sourceSHA256": "0b4fb977c7d16ddf684a6801f7a57502a4cc35d60dc68480d411070d3253bd24",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Reuse the source correction and bind the original Explore/Plan/general-purpose/pipeline-core and parallel matrix to current qualification.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types::19.3",
+          "heading": "Description",
+          "lineStart": 33,
+          "lineEnd": 39,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "596fdc40d2dd0751f306dc94cbe6e384d21b38337aaa2f614ff72af120f6a263",
+            "bytes": 523,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Role normalization accepts capitalized runner spellings. No-prohibition batches return not-applicable before parsing. Invalid prohibited roles receive APB-ROLE-UNPARSEABLE with the offending value. Current exact alone/parallel regression and host result were not read.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
+              "locator": "normalizedRole;prepareAdvisorProhibitionBindings",
+              "sourceSHA256": "0b4fb977c7d16ddf684a6801f7a57502a4cc35d60dc68480d411070d3253bd24",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Reuse the source correction and bind the original Explore/Plan/general-purpose/pipeline-core and parallel matrix to current qualification.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types::41.1",
+          "heading": "Acceptance",
+          "lineStart": 43,
+          "lineEnd": 49,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "9e06b392dae521257178bf1155a8e7731d0f4924a7739bf4d45eb8b810c24215",
+            "bytes": 442,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Role normalization accepts capitalized runner spellings. No-prohibition batches return not-applicable before parsing. Invalid prohibited roles receive APB-ROLE-UNPARSEABLE with the offending value. Current exact alone/parallel regression and host result were not read.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
+              "locator": "normalizedRole;prepareAdvisorProhibitionBindings",
+              "sourceSHA256": "0b4fb977c7d16ddf684a6801f7a57502a4cc35d60dc68480d411070d3253bd24",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Reuse the source correction and bind the original Explore/Plan/general-purpose/pipeline-core and parallel matrix to current qualification.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Reuse the source correction and bind the original Explore/Plan/general-purpose/pipeline-core and parallel matrix to current qualification.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 51,
+          "text": "\n- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).\n- **Rationale:** commit(s) `57e397b0f`.\n- **Assignment (if accepted):** sprint-alfred-epic close-out batch.\n- **Date:** 2026-10-08.\n"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "de5a0e0ffcdf51d3545274e5a3bff1c231f3d011b09e11596d86b9821bbdce8a",
+        "bytes": 213,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "missing-functional",
+      "finding": "evaluate invokes claimDispatchRecordOwnership as a PreToolUse side effect after collision checks and before the actual native write. The lane can publish a claim for an absent requested file; no landed-creation witness is established. M5 immutable terminal records do not repair this separate native ownership path.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "locator": "310–335",
+          "sourceSHA256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+          "binding": "matching-selected-digest"
+        },
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+          "locator": "claimDispatchRecordOwnership;checkDispatchRecordCollision",
+          "sourceSHA256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 21,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "a50ed1134aa0046273b9f2f3053bed5c3d75d8bfe75193526e91555295a256bd",
+            "bytes": 321,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "missing-functional",
+          "finding": "evaluate invokes claimDispatchRecordOwnership as a PreToolUse side effect after collision checks and before the actual native write. The lane can publish a claim for an absent requested file; no landed-creation witness is established. M5 immutable terminal records do not repair this separate native ownership path.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+              "locator": "310–335",
+              "sourceSHA256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+              "locator": "claimDispatchRecordOwnership;checkDispatchRecordCollision",
+              "sourceSHA256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Retain the historical withdrawn/deferred F3 correction. Close a landed-creation witness with genuine linked-worktree/shared-claim RC1/RC2 controls, rather than importing M5 completion as ownership proof.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation::23.1",
+          "heading": "Proposal",
+          "lineStart": 25,
+          "lineEnd": 28,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "f638e4d5d2fe1b275c0fe14aa66a8b27a19f8ce6939e4809e843b9e6cc1a584d",
+            "bytes": 276,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "missing-functional",
+          "finding": "evaluate invokes claimDispatchRecordOwnership as a PreToolUse side effect after collision checks and before the actual native write. The lane can publish a claim for an absent requested file; no landed-creation witness is established. M5 immutable terminal records do not repair this separate native ownership path.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+              "locator": "310–335",
+              "sourceSHA256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+              "locator": "claimDispatchRecordOwnership;checkDispatchRecordCollision",
+              "sourceSHA256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Retain the historical withdrawn/deferred F3 correction. Close a landed-creation witness with genuine linked-worktree/shared-claim RC1/RC2 controls, rather than importing M5 completion as ownership proof.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Retain the historical withdrawn/deferred F3 correction. Close a landed-creation witness with genuine linked-worktree/shared-claim RC1/RC2 controls, rather than importing M5 completion as ownership proof.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 30,
+          "text": "\n- **Decision:**\n- **Rationale:**\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ],
+      "deferredBoundary": "Historical F3 remedy was withdrawn/deferred from signed bundle. This is not a whole-item deferral or authorization to reinterpret claims as landed."
+    },
+    {
+      "index": 4,
+      "id": "pipeline.dispatch-records-land-under-specs-evidence",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "d3f3cf24006c110e02365341d968d22984418bd8a544bbd84441dd7a6be29441",
+        "bytes": 202,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "The lane recognizes only root evidence/dispatch-record-*.json and its collision/ownership handling is called by evaluate for evidence artifacts. The surrounding native path classifier could not be read under the refused locator; a complete outside-root record refusal was therefore not established. Template/writer behavior and moving the two historical files need separate evidence.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+          "locator": "root record regex;checkDispatchRecordCollision",
+          "sourceSHA256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        },
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "locator": "310–335",
+          "sourceSHA256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.dispatch-records-land-under-specs-evidence::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 20,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "0bc7e3b270fd9d71d473141e49b1ac9ab7922a04d52b915c920ae15f5b6ab5af",
+            "bytes": 223,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "The lane recognizes only root evidence/dispatch-record-*.json and its collision/ownership handling is called by evaluate for evidence artifacts. The surrounding native path classifier could not be read under the refused locator; a complete outside-root record refusal was therefore not established. Template/writer behavior and moving the two historical files need separate evidence.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+              "locator": "root record regex;checkDispatchRecordCollision",
+              "sourceSHA256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+              "locator": "310–335",
+              "sourceSHA256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Prove a genuine direct Write outside repository-root evidence is refused, with root positive/collision controls; source correction only if that substantive case fails. Do not move old evidence under this audit.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.dispatch-records-land-under-specs-evidence::31.1",
+          "heading": "Proposal",
+          "lineStart": 33,
+          "lineEnd": 35,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "9db84326da345550c91a807bdfd36f27863e7f6b6e778aff2640950c2f910df7",
+            "bytes": 155,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "The lane recognizes only root evidence/dispatch-record-*.json and its collision/ownership handling is called by evaluate for evidence artifacts. The surrounding native path classifier could not be read under the refused locator; a complete outside-root record refusal was therefore not established. Template/writer behavior and moving the two historical files need separate evidence.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+              "locator": "root record regex;checkDispatchRecordCollision",
+              "sourceSHA256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+              "locator": "310–335",
+              "sourceSHA256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Prove a genuine direct Write outside repository-root evidence is refused, with root positive/collision controls; source correction only if that substantive case fails. Do not move old evidence under this audit.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Prove a genuine direct Write outside repository-root evidence is refused, with root positive/collision controls; source correction only if that substantive case fails. Do not move old evidence under this audit.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 37,
+          "text": "\n- **Decision:** accepted; template wording plus a refusal for a misplaced record.\n- **Rationale:** RECPATH-d (`e8fb0729a`, `specs/sprint-alfred-epic/evidence/night-2026-10-05/dispatch-record-path.md`): the writer and readers use root `evidence/` only, but a direct Write of `dispatch-record-*.json` elsewhere is admitted (`lib/guard/dispatch-record-lane.mjs` returns null for a non-root path, mirrored in the live monolith `hooks/guard-lifecycle-ready.mjs`), so a misplaced record escapes ownership and collision protection; two misplaced records are tracked under `specs/sprint-alfred-epic/evidence/`. The live refusal sits in a protected hook (PB-GUARD-HOOKS), so it needs a signed package after S2 package 1 lands.\n- **Assignment (if accepted):** (1) template wording \"repository-root `evidence/`\" in `goldfish-task.md` and its vendored copy (ordinary edit); (2) RED test then refusal in the split lane once S2 package 1 is applied (protected, PO signature); (3) decide whether to move the two tracked misplaced records. Reader coverage of the diagnosis is partial (listed in the note).\n- **Date:** 2026-10-06\n"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "f5e5d5d6197e0a411f96fc631f18bbf6cbb99e8625ca814190e2c9a66462407b",
+        "bytes": 215,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "Original requirement demands version/config/rule/span/value reproduction before scanner remedy, credential-positive retention, and no automatic ignore. Routing hints and reported scanner findings are not that reproduction. Relevant exact scanner producer/proof was not established in the bounded reads.",
+      "sourceEvidence": [],
+      "criteria": [
+        {
+          "criterionId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 17,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "4251729e689cdbca8313e5be798fe32efca68a7137d89b81e2d995b49a017d53",
+            "bytes": 372,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original requirement demands version/config/rule/span/value reproduction before scanner remedy, credential-positive retention, and no automatic ignore. Routing hints and reported scanner findings are not that reproduction. Relevant exact scanner producer/proof was not established in the bounded reads.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Pin the actual domain-scanner binary/config/rule and candidate public expression; independently reproduce original positive/negative values before any suppression change.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::29.1",
+          "heading": "Proposal",
+          "lineStart": 31,
+          "lineEnd": 31,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "618da09f45db5090005e1faeef8b9112f301a8758dbfbd1725d72497dd76679a",
+            "bytes": 446,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original requirement demands version/config/rule/span/value reproduction before scanner remedy, credential-positive retention, and no automatic ignore. Routing hints and reported scanner findings are not that reproduction. Relevant exact scanner producer/proof was not established in the bounded reads.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Pin the actual domain-scanner binary/config/rule and candidate public expression; independently reproduce original positive/negative values before any suppression change.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::33.1",
+          "heading": "Acceptance",
+          "lineStart": 35,
+          "lineEnd": 39,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "0130eb1f750f9dda4d579e191fd6451add1d2fb19647ee3f03458e9a60771368",
+            "bytes": 715,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original requirement demands version/config/rule/span/value reproduction before scanner remedy, credential-positive retention, and no automatic ignore. Routing hints and reported scanner findings are not that reproduction. Relevant exact scanner producer/proof was not established in the bounded reads.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Pin the actual domain-scanner binary/config/rule and candidate public expression; independently reproduce original positive/negative values before any suppression change.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Pin the actual domain-scanner binary/config/rule and candidate public expression; independently reproduce original positive/negative values before any suppression change.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 47,
+          "text": "\n- **Decision:** Accepted for additive Alfred planning under the PO's 2026-10-09 intake direction; status remains open.\n- **Rationale:** Narrow successor/slice with the evidence boundaries above; no historical closure is rewritten.\n- **Assignment (if accepted):** Alfred, per the [additive remediation plan](../../specs/sprint-alfred-epic/plans/greenfield-agy-ab-remediation-2026-10-09.md).\n- **Date:** 2026-10-09\n\n"
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "4fd29fff30abd779222593ed8a73509cf650fd7dc693fcb225822ca2c3804fc7",
+        "bytes": 216,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "Original quantitative wake-up/read/administration observations were read, but a repeatable C1 classifier and candidate-bound before/after enforcement measurements were not established. Source proposal counts or unrelated budget tests cannot prove the requested time-share change.",
+      "sourceEvidence": [],
+      "criteria": [
+        {
+          "criterionId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 20,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "68b7214d81ad05ba5b2f209c3da1a8ba55df3d61ddb5cfdb7c2529209a16745f",
+            "bytes": 300,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original quantitative wake-up/read/administration observations were read, but a repeatable C1 classifier and candidate-bound before/after enforcement measurements were not established. Source proposal counts or unrelated budget tests cannot prove the requested time-share change.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Identify the sanctioned minimizing measurement producer and original C1 grouping, then bind before/after evidence for each cause and the stated administration target without reading private transcripts directly.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.2",
+          "heading": "Description",
+          "lineStart": 22,
+          "lineEnd": 24,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "194d923c771ce2c813bae8153de44f8ad34a866529c487be856ae2be49f0398e",
+            "bytes": 184,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original quantitative wake-up/read/administration observations were read, but a repeatable C1 classifier and candidate-bound before/after enforcement measurements were not established. Source proposal counts or unrelated budget tests cannot prove the requested time-share change.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Identify the sanctioned minimizing measurement producer and original C1 grouping, then bind before/after evidence for each cause and the stated administration target without reading private transcripts directly.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.3",
+          "heading": "Description",
+          "lineStart": 26,
+          "lineEnd": 26,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "a9741566d0fea73c642e8320fb47c5338438f60e9e2c75ace0d2a8d9a2d40e28",
+            "bytes": 48,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original quantitative wake-up/read/administration observations were read, but a repeatable C1 classifier and candidate-bound before/after enforcement measurements were not established. Source proposal counts or unrelated budget tests cannot prove the requested time-share change.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Identify the sanctioned minimizing measurement producer and original C1 grouping, then bind before/after evidence for each cause and the stated administration target without reading private transcripts directly.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::28.1",
+          "heading": "Acceptance",
+          "lineStart": 30,
+          "lineEnd": 31,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "bc1c587f55193135b0c332d4c6552d5db174bf5842406f49f86318364edb153a",
+            "bytes": 153,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original quantitative wake-up/read/administration observations were read, but a repeatable C1 classifier and candidate-bound before/after enforcement measurements were not established. Source proposal counts or unrelated budget tests cannot prove the requested time-share change.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Identify the sanctioned minimizing measurement producer and original C1 grouping, then bind before/after evidence for each cause and the stated administration target without reading private transcripts directly.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Identify the sanctioned minimizing measurement producer and original C1 grouping, then bind before/after evidence for each cause and the stated administration target without reading private transcripts directly.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 33,
+          "text": "\n- **Decision:**\n- **Rationale:**\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "3ab8855234732476125f9b4fa29cd979864b0a9342c876c4e6e5153cc74b2e82",
+        "bytes": 206,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "The requirement is to remove the first-write bootstrap detour through a genuine sanctioned receipt-producing route. A template keyword search found no bootstrap-preflight instruction in the examined current template. This alone does not establish absence of an alternative receipt producer; no current genuine first-Write qualification was consumed.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/templates/prompts/goldfish-task.md",
+          "locator": "bounded bootstrap-preflight/preflight/receipt search",
+          "sourceSHA256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 19,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "1c80a39b54093664b6c5a61ff13d87f4b85e7b2727aaf48eb043cce752f88835",
+            "bytes": 263,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "The requirement is to remove the first-write bootstrap detour through a genuine sanctioned receipt-producing route. A template keyword search found no bootstrap-preflight instruction in the examined current template. This alone does not establish absence of an alternative receipt producer; no current genuine first-Write qualification was consumed.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/templates/prompts/goldfish-task.md",
+              "locator": "bounded bootstrap-preflight/preflight/receipt search",
+              "sourceSHA256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind the actual receipt route and platform spellings to one genuine dispatched first Write. Preserve the original distinction between preflight-before-write and retry-after-refusal.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour::21.1",
+          "heading": "Acceptance",
+          "lineStart": 23,
+          "lineEnd": 25,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "1c60c9f44b4def5e8a6b5c5b4436b8d688cef1e4e590ba2320cc2ed27512f652",
+            "bytes": 217,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "The requirement is to remove the first-write bootstrap detour through a genuine sanctioned receipt-producing route. A template keyword search found no bootstrap-preflight instruction in the examined current template. This alone does not establish absence of an alternative receipt producer; no current genuine first-Write qualification was consumed.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/templates/prompts/goldfish-task.md",
+              "locator": "bounded bootstrap-preflight/preflight/receipt search",
+              "sourceSHA256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind the actual receipt route and platform spellings to one genuine dispatched first Write. Preserve the original distinction between preflight-before-write and retry-after-refusal.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Bind the actual receipt route and platform spellings to one genuine dispatched first Write. Preserve the original distinction between preflight-before-write and retry-after-refusal.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 54,
+          "text": "\n- **Decision:**\n- **Rationale:**\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "id": "pipeline.evidence-artifacts-carry-no-commit-identity",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "219a0dae995dae5ddf75b699990468fb007259a3e36a0c08dba2fbb72819ac9d",
+        "bytes": 203,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "present-source-qualification-gap",
+      "finding": "capture-evidence reads HEAD/tree/dirty identity and passes it to artifact formatting; source identity unavailability is not fabricated. The exact candidate-bound header regression receipt was not consumed by this audit.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/capture-evidence.mjs",
+          "locator": "readHeadIdentity;formatArtifact;captureEvidence",
+          "sourceSHA256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.evidence-artifacts-carry-no-commit-identity::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 18,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "cae7b5b9b3af86c822caecf31d1fc0944ff76b94bf84bb4e2e4c57c42575b4ec",
+            "bytes": 199,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "capture-evidence reads HEAD/tree/dirty identity and passes it to artifact formatting; source identity unavailability is not fabricated. The exact candidate-bound header regression receipt was not consumed by this audit.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/capture-evidence.mjs",
+              "locator": "readHeadIdentity;formatArtifact;captureEvidence",
+              "sourceSHA256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind existing capture header tests/receipt to this exact source and preserve unknown identity handling; no second reporter is needed.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.evidence-artifacts-carry-no-commit-identity::29.1",
+          "heading": "Proposal",
+          "lineStart": 31,
+          "lineEnd": 31,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "1ec03716f4548406fab59af8643cd696eee812ff9900a0d10c3903a095470273",
+            "bytes": 76,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "capture-evidence reads HEAD/tree/dirty identity and passes it to artifact formatting; source identity unavailability is not fabricated. The exact candidate-bound header regression receipt was not consumed by this audit.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/capture-evidence.mjs",
+              "locator": "readHeadIdentity;formatArtifact;captureEvidence",
+              "sourceSHA256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind existing capture header tests/receipt to this exact source and preserve unknown identity handling; no second reporter is needed.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Bind existing capture header tests/receipt to this exact source and preserve unknown identity handling; no second reporter is needed.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 33,
+          "text": "\n- **Decision:** accepted.\n- **Rationale:** evidence that cannot be bound to a commit cannot be audited.\n- **Assignment (if accepted):** to be assigned.\n- **Date:** 2026-10-08\n"
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "id": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "e7b42eefb12f2db1b071cb2835c85e23afc0ca07af170bc74740412fb942af3c",
+        "bytes": 207,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "The signer source has an explicit existing po-private.pem recovery branch and PO-HUMAN-AUTHORITY-READY recovered result. The full key byte conservation, first-anchor attended recovery, replay/path-alias/wrong-key/Windows contract was not qualified here. No actual private key was read.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+          "locator": "2028–2152 locator observations",
+          "sourceSHA256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [],
+      "nextAction": "Reuse the existing key-recovery producer; bind the original first-anchor and conservation matrix using synthetic method keys without granting human signature authority.",
+      "accepted": false,
+      "historicalTriage": []
+    },
+    {
+      "index": 10,
+      "id": "pipeline.first-enrollment-enters-retirement-before-consent",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "7effa9542948ba7b7f84232396dabfaf4303dd5de2b11d380bb30ae690f6a38d",
+        "bytes": 209,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "present-source-qualification-gap",
+      "finding": "Current onboarding source distinguishes fresh roots and retirement history. Its reader returns intake-required until a retired generation has fresh recorded consent, and activation-required when ready but not active. Original complete FRB/OBC consumer assertions and installed host evidence remain separate from these source facts.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "locator": "1518–1527;5504–5522;6135–6139",
+          "sourceSHA256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.first-enrollment-enters-retirement-before-consent::70.1",
+          "heading": "Acceptance",
+          "lineStart": 72,
+          "lineEnd": 80,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "a699607cda1dd8348d166e059658c787b6b799b76a73f2a3e39486514ca3cb69",
+            "bytes": 675,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Current onboarding source distinguishes fresh roots and retirement history. Its reader returns intake-required until a retired generation has fresh recorded consent, and activation-required when ready but not active. Original complete FRB/OBC consumer assertions and installed host evidence remain separate from these source facts.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+              "locator": "1518–1527;5504–5522;6135–6139",
+              "sourceSHA256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Reconcile the exact original FRB001–004 and OBC298 receipts with current source, foreign bytes, fresh portable/Git and retired-declined routes; do not infer installed acceptance from historical labels.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Reconcile the exact original FRB001–004 and OBC298 receipts with current source, foreign bytes, fresh portable/Git and retired-declined routes; do not infer installed acceptance from historical labels.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 82,
+          "text": "\n- **2026-10-08 close-out check:** not closable — OBC298 label absent; installed-candidate qualification needs host run.\n"
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "id": "pipeline.foreign-worktree-closes-the-implementation-gate",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "19fa179c3c316e536a80a4b2e037f179af3fe6656f9f495b1c5482fcdb9bf7fa",
+        "bytes": 207,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "The original foreign-worktree error attribution and read-only recovery requirement was fully read. The bounded plan-spec query did not establish the actual topology failure classification; no complete current Windows/WSL reader proof was consumed. ADR0085 mandatory Advisor must remain retired.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+          "locator": "bounded worktree/unavailable/reader/architecture locator query",
+          "sourceSHA256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.foreign-worktree-closes-the-implementation-gate::16.1",
+          "heading": "Description",
+          "lineStart": 18,
+          "lineEnd": 26,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "b218fc1d7347c2680d25dab343c62d13551ec139a0f76c940bbb7dc678c321b5",
+            "bytes": 943,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "The original foreign-worktree error attribution and read-only recovery requirement was fully read. The bounded plan-spec query did not establish the actual topology failure classification; no complete current Windows/WSL reader proof was consumed. ADR0085 mandatory Advisor must remain retired.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+              "locator": "bounded worktree/unavailable/reader/architecture locator query",
+              "sourceSHA256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Trace the exact actual failing repository reader with known declared paths, preserve its error, and qualify environment-unavailable versus content drift plus admitted diagnostics; no blanket architecture reopening.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.foreign-worktree-closes-the-implementation-gate::39.1",
+          "heading": "Proposal",
+          "lineStart": 41,
+          "lineEnd": 46,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "941cbcad0cb70fb29a862abdccf0154dbf4d5327a7a40010eee0aa9a365d676f",
+            "bytes": 461,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "The original foreign-worktree error attribution and read-only recovery requirement was fully read. The bounded plan-spec query did not establish the actual topology failure classification; no complete current Windows/WSL reader proof was consumed. ADR0085 mandatory Advisor must remain retired.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+              "locator": "bounded worktree/unavailable/reader/architecture locator query",
+              "sourceSHA256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Trace the exact actual failing repository reader with known declared paths, preserve its error, and qualify environment-unavailable versus content drift plus admitted diagnostics; no blanket architecture reopening.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Trace the exact actual failing repository reader with known declared paths, preserve its error, and qualify environment-unavailable versus content drift plus admitted diagnostics; no blanket architecture reopening.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 48,
+          "text": "\n- **Decision:**\n- **Rationale:**\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "b83fbf4aa64009e54dcd4aa7d0c5531746887cac91fe4a01f8ea2f363e2337fb",
+        "bytes": 208,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "original-drift-current-body-separately-read",
+      "disposition": "original-body-provenance-gap",
+      "finding": "Assigned original c5da body differs from current f29 bytes. Root authorized original retained criterion TEXT as metadata-only basis, not raw-body CAS. Current body was separately read: it still requests minimized merged transcript export, digest recovery, executable Verify, and source/gate index, and adds public-safe completeness distinctions. Actual transcript reader is Codex-only and refuses more than one matching session segment.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+          "locator": "178–194;293–301",
+          "sourceSHA256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.forensics-and-audit-evidence-not-reconstructable::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 33,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "d4e803da1fa158a3600df51f81e199a0b7c3c1cc0205f9d407eb4f7cf408000b",
+            "bytes": 1117,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "original-body-provenance-gap",
+          "finding": "Assigned original c5da body differs from current f29 bytes. Root authorized original retained criterion TEXT as metadata-only basis, not raw-body CAS. Current body was separately read: it still requests minimized merged transcript export, digest recovery, executable Verify, and source/gate index, and adds public-safe completeness distinctions. Actual transcript reader is Codex-only and refuses more than one matching session segment.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+              "locator": "178–194;293–301",
+              "sourceSHA256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Resolve original Git-blob custody independently. Multi-segment/all-runner transcript export remains a concrete source gap in the examined reader; reconcile continuity/Verify/index clauses separately and current additions as unreconciled provenance, never substitute f29 for c5da.",
+          "accepted": false,
+          "basis": "retained-original-criterion-text-only-not-original-raw-body-CAS"
+        },
+        {
+          "criterionId": "pipeline.forensics-and-audit-evidence-not-reconstructable::35.1",
+          "heading": "Acceptance",
+          "lineStart": 37,
+          "lineEnd": 47,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "df8ca43bdb6a4115f272eb6c73144fd2b9f94f546abadc2598edf82693a47a55",
+            "bytes": 629,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "original-body-provenance-gap",
+          "finding": "Assigned original c5da body differs from current f29 bytes. Root authorized original retained criterion TEXT as metadata-only basis, not raw-body CAS. Current body was separately read: it still requests minimized merged transcript export, digest recovery, executable Verify, and source/gate index, and adds public-safe completeness distinctions. Actual transcript reader is Codex-only and refuses more than one matching session segment.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+              "locator": "178–194;293–301",
+              "sourceSHA256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Resolve original Git-blob custody independently. Multi-segment/all-runner transcript export remains a concrete source gap in the examined reader; reconcile continuity/Verify/index clauses separately and current additions as unreconciled provenance, never substitute f29 for c5da.",
+          "accepted": false,
+          "basis": "retained-original-criterion-text-only-not-original-raw-body-CAS"
+        }
+      ],
+      "nextAction": "Resolve original Git-blob custody independently. Multi-segment/all-runner transcript export remains a concrete source gap in the examined reader; reconcile continuity/Verify/index clauses separately and current additions as unreconciled provenance, never substitute f29 for c5da.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 49,
+          "text": "\n- **Decision:**\n- **Rationale:**\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ],
+      "currentBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+        "sha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+        "originalIdentitySubstitution": false,
+        "additions": "2026-10-10 public-safe candidate-bound index completeness distinctions read separately; provenance/coverage unreconciled, not grandfathered into original c5da raw binding"
+      }
+    },
+    {
+      "index": 13,
+      "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "e6829c69e7a1593c97551ec9871cb32a9676c419b6fe50e2d843ed2d9ba14108",
+        "bytes": 210,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "Original Git-for-Windows null-device requirement and historical source-fix claims were read. A guessed git-spawn locator was guard-refused with no retry action; no source conclusion was drawn from denied bytes. Complete hardened-spawn ratchet, supported Windows Git versions, and Node-open distinction remain unverified here.",
+      "sourceEvidence": [],
+      "criteria": [
+        {
+          "criterionId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 23,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "4f4d04527d6994bda6a37690d9546cb67902c166b835b433a4bcbce1ee6604fe",
+            "bytes": 707,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original Git-for-Windows null-device requirement and historical source-fix claims were read. A guessed git-spawn locator was guard-refused with no retry action; no source conclusion was drawn from denied bytes. Complete hardened-spawn ratchet, supported Windows Git versions, and Node-open distinction remain unverified here.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Use a separately declared exact existing shared Git helper and original ratchet/host receipt; preserve original fixes and do not clear inherited Git configuration in qualification transport.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::15.2",
+          "heading": "Description",
+          "lineStart": 25,
+          "lineEnd": 28,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "31b989057b8ac3f22de49f72044ae7cefcf4d5536ae89c80a76d6367763d0e09",
+            "bytes": 337,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original Git-for-Windows null-device requirement and historical source-fix claims were read. A guessed git-spawn locator was guard-refused with no retry action; no source conclusion was drawn from denied bytes. Complete hardened-spawn ratchet, supported Windows Git versions, and Node-open distinction remain unverified here.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Use a separately declared exact existing shared Git helper and original ratchet/host receipt; preserve original fixes and do not clear inherited Git configuration in qualification transport.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::40.1",
+          "heading": "Proposal",
+          "lineStart": 42,
+          "lineEnd": 47,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "74a13926c5732e3d18f230ac697a78a0fda4f753dd7b7b4ba75a05ff5d991c66",
+            "bytes": 626,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Original Git-for-Windows null-device requirement and historical source-fix claims were read. A guessed git-spawn locator was guard-refused with no retry action; no source conclusion was drawn from denied bytes. Complete hardened-spawn ratchet, supported Windows Git versions, and Node-open distinction remain unverified here.",
+          "sourceEvidence": [],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Use a separately declared exact existing shared Git helper and original ratchet/host receipt; preserve original fixes and do not clear inherited Git configuration in qualification transport.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Use a separately declared exact existing shared Git helper and original ratchet/host receipt; preserve original fixes and do not clear inherited Git configuration in qualification transport.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 49,
+          "text": "\n- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).\n- **Rationale:** commit(s) `12ac0a7af, 2532a96fe`.\n- **Assignment (if accepted):** sprint-alfred-epic close-out batch.\n- **Date:** 2026-10-08.\n"
+        }
+      ]
+    },
+    {
+      "index": 14,
+      "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "188aa85a0e8fce88ca0a6481c07ff373bdd4b066c5e28d9a5f962e4767cb7654",
+        "bytes": 218,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "present-source-qualification-gap",
+      "finding": "Snapshot producer explicitly includes protected-baseline.json as a shipped root file, fails if missing, hashes copied inventory, and verifies physical content/aliases. Generated admission permits that exact root data and verifies its digest. Original onboarding handover and installed complete qualification were not established.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+          "locator": "PUBLIC_ROOT_FILES;enumerate;readInventory;verifyFullGitHookRuntimeSnapshot",
+          "sourceSHA256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        },
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+          "locator": "renderGitHookSnapshotAdmission",
+          "sourceSHA256": "0bb1f7d42faf7529430096dbb09e94a555c8411751751818b2c5ffaebd5e109b",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog::52.1",
+          "heading": "Acceptance criteria",
+          "lineStart": 54,
+          "lineEnd": 63,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "8270f93010ab60d2b07501cb20a79d76f3daab41b5d33bd4a79a8455e74c8ed8",
+            "bytes": 707,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Snapshot producer explicitly includes protected-baseline.json as a shipped root file, fails if missing, hashes copied inventory, and verifies physical content/aliases. Generated admission permits that exact root data and verifies its digest. Original onboarding handover and installed complete qualification were not established.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+              "locator": "PUBLIC_ROOT_FILES;enumerate;readInventory;verifyFullGitHookRuntimeSnapshot",
+              "sourceSHA256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+              "locator": "renderGitHookSnapshotAdmission",
+              "sourceSHA256": "0bb1f7d42faf7529430096dbb09e94a555c8411751751818b2c5ffaebd5e109b",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind the delivered catalogue fix, original missing/changed/aliased controls, and the complete actual handover/host result. Historical 55 PASS and interrupted 184 remain different evidence.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Bind the delivered catalogue fix, original missing/changed/aliased controls, and the complete actual handover/host result. Historical 55 PASS and interrupted 184 remain different evidence.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 79,
+          "text": "\n- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).\n- **Rationale:** commit(s) `26fef9e7d`, host run needed.\n- **Assignment (if accepted):** sprint-alfred-epic close-out batch.\n- **Date:** 2026-10-08.\n"
+        }
+      ]
+    },
+    {
+      "index": 15,
+      "id": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "21c3f6f760119a9c732691e32cb9159da4789e888cda068cd9270ba0da04794f",
+        "bytes": 216,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "qualification-gap",
+      "finding": "Source-owned snapshot inspect/publish/full physical verification exists. The examined producer/admission did not establish the requested HOOK-SNAPSHOT-STALE preflight/commit diagnostic, one admitted refresh command or source-versus-destination cross-repo classification. Those consumer requirements need exact tracing/proof; no missing implementation is inferred solely from this module search.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+          "locator": "inspectGitHookSourceSnapshot;publishGitHookRuntimeSnapshot;verifyGitHookRuntimeSnapshot",
+          "sourceSHA256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        },
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+          "locator": "renderGitHookSnapshotAdmission",
+          "sourceSHA256": "0bb1f7d42faf7529430096dbb09e94a555c8411751751818b2c5ffaebd5e109b",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 28,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "591e29486f276d1b87b08587f77e39358ccaafc8b4e1f1953020c3969374724f",
+            "bytes": 892,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Source-owned snapshot inspect/publish/full physical verification exists. The examined producer/admission did not establish the requested HOOK-SNAPSHOT-STALE preflight/commit diagnostic, one admitted refresh command or source-versus-destination cross-repo classification. Those consumer requirements need exact tracing/proof; no missing implementation is inferred solely from this module search.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+              "locator": "inspectGitHookSourceSnapshot;publishGitHookRuntimeSnapshot;verifyGitHookRuntimeSnapshot",
+              "sourceSHA256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+              "locator": "renderGitHookSnapshotAdmission",
+              "sourceSHA256": "0bb1f7d42faf7529430096dbb09e94a555c8411751751818b2c5ffaebd5e109b",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind actual install/refresh and commit/preflight consumers, then qualify stale diagnosis and cp/mv/install destination semantics on the original POSIX/Windows consumer layouts.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes::15.2",
+          "heading": "Description",
+          "lineStart": 30,
+          "lineEnd": 33,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "3452d71786ef592b5656b27508ddfb93939a9323d54f0dc67ea8e671de09c8b5",
+            "bytes": 250,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Source-owned snapshot inspect/publish/full physical verification exists. The examined producer/admission did not establish the requested HOOK-SNAPSHOT-STALE preflight/commit diagnostic, one admitted refresh command or source-versus-destination cross-repo classification. Those consumer requirements need exact tracing/proof; no missing implementation is inferred solely from this module search.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+              "locator": "inspectGitHookSourceSnapshot;publishGitHookRuntimeSnapshot;verifyGitHookRuntimeSnapshot",
+              "sourceSHA256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+              "locator": "renderGitHookSnapshotAdmission",
+              "sourceSHA256": "0bb1f7d42faf7529430096dbb09e94a555c8411751751818b2c5ffaebd5e109b",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind actual install/refresh and commit/preflight consumers, then qualify stale diagnosis and cp/mv/install destination semantics on the original POSIX/Windows consumer layouts.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes::47.1",
+          "heading": "Proposal",
+          "lineStart": 49,
+          "lineEnd": 56,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "2357958aa44a8c30e9056c383d3d3cd028ab6bd849e2ec9576f8f06696fe2e98",
+            "bytes": 527,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "qualification-gap",
+          "finding": "Source-owned snapshot inspect/publish/full physical verification exists. The examined producer/admission did not establish the requested HOOK-SNAPSHOT-STALE preflight/commit diagnostic, one admitted refresh command or source-versus-destination cross-repo classification. Those consumer requirements need exact tracing/proof; no missing implementation is inferred solely from this module search.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+              "locator": "inspectGitHookSourceSnapshot;publishGitHookRuntimeSnapshot;verifyGitHookRuntimeSnapshot",
+              "sourceSHA256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+              "locator": "renderGitHookSnapshotAdmission",
+              "sourceSHA256": "0bb1f7d42faf7529430096dbb09e94a555c8411751751818b2c5ffaebd5e109b",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind actual install/refresh and commit/preflight consumers, then qualify stale diagnosis and cp/mv/install destination semantics on the original POSIX/Windows consumer layouts.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Bind actual install/refresh and commit/preflight consumers, then qualify stale diagnosis and cp/mv/install destination semantics on the original POSIX/Windows consumer layouts.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 58,
+          "text": "\n- **Decision:**\n- **Rationale:**\n- **Assignment (if accepted):**\n- **Date:**\n"
+        }
+      ]
+    },
+    {
+      "index": 16,
+      "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "58d01de5ee4a2a797c91214289e5572be103274b46a55122d29b9e6059ff4096",
+        "bytes": 214,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "present-source-qualification-gap",
+      "finding": "normalizeCandidateFindingPath converts absolute findings to strict repository-relative paths and normalizes relative backslashes on Windows only. Ignore authority validation remains strict. This is the intended path fix, not a claim that CRLF or real Windows suppression has been newly measured.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+          "locator": "187–200;275–299",
+          "sourceSHA256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 20,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "240d9dc32686b733d08d5baf9e94067f092489df525c073cc731f870eb74528b",
+            "bytes": 270,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "normalizeCandidateFindingPath converts absolute findings to strict repository-relative paths and normalizes relative backslashes on Windows only. Ignore authority validation remains strict. This is the intended path fix, not a claim that CRLF or real Windows suppression has been newly measured.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+              "locator": "187–200;275–299",
+              "sourceSHA256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind the original GLWIN LF/CRLF and absolute/relative slash matrix plus native Windows result; do not substitute unrelated real-binary detection or narrower GLR fingerprint proof.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows::31.1",
+          "heading": "Proposal",
+          "lineStart": 33,
+          "lineEnd": 35,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "f5754f6c2ad1d801f31ced8c90f09c58488d39500797fc6e669a9205cb50d307",
+            "bytes": 191,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "normalizeCandidateFindingPath converts absolute findings to strict repository-relative paths and normalizes relative backslashes on Windows only. Ignore authority validation remains strict. This is the intended path fix, not a claim that CRLF or real Windows suppression has been newly measured.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+              "locator": "187–200;275–299",
+              "sourceSHA256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind the original GLWIN LF/CRLF and absolute/relative slash matrix plus native Windows result; do not substitute unrelated real-binary detection or narrower GLR fingerprint proof.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Bind the original GLWIN LF/CRLF and absolute/relative slash matrix plus native Windows result; do not substitute unrelated real-binary detection or narrower GLR fingerprint proof.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 37,
+          "text": "\n- **Decision:** accepted; fix in sprint alfred.\n- **Rationale:** reproduced by GLWIN-t (`1dbcb22cc`): path separators, not line endings — a nested finding keeps its absolute path on win32 and never matches a content-v1 key (`specs/sprint-alfred-epic/evidence/night-2026-10-05/gitleaks-windows-suppression.md`). A backslash-relative finding path is normalised on win32 only, where a backslash is never a filename character; `safeAuthorityPath` stays strict for ignore-file entries.\n- **Assignment (if accepted):** red test GLWIN-t (done, `1dbcb22cc`); production fix GLWIN (separate dispatch, QG-04); Critic after the fix. The existing `gitleaks.test.mjs` failure at its real-binary ledger case is detection-side and out of this item.\n- **Date:** 2026-10-06\n"
+        }
+      ]
+    },
+    {
+      "index": 17,
+      "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "fbdae367be216a14fc7acefca9a725351dbcb497ded59d92c37b155528f87d50",
+        "bytes": 231,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "present-source-qualification-gap",
+      "finding": "repairStaleIgnoreEntry computes the live value at the OLD line, compares its digest to the reviewed stale digest, and returns value-binding-mismatch before writing. The current exact F1 prefix assertion and F2 protected suite registration were not reconciled here. Historical body reports RED2/5 then GREEN5/5 and two Critic minors.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+          "locator": "repairStaleIgnoreEntry value-binding block",
+          "sourceSHA256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 21,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "dfeb2a8c818e977b5785b4d58f4c00bd1536562102a650f45412d99c961c24b0",
+            "bytes": 560,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "repairStaleIgnoreEntry computes the live value at the OLD line, compares its digest to the reviewed stale digest, and returns value-binding-mismatch before writing. The current exact F1 prefix assertion and F2 protected suite registration were not reconciled here. Historical body reports RED2/5 then GREEN5/5 and two Critic minors.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+              "locator": "repairStaleIgnoreEntry value-binding block",
+              "sourceSHA256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind current value-change/no-mutation cases and both original follow-ups; preserve GLR secret-disclosure issues as a separate scope rather than weakening reviewed-value binding.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one::32.1",
+          "heading": "Proposal",
+          "lineStart": 34,
+          "lineEnd": 36,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "61c00d0a424a5385b718a32a6ff92d63d412884b06ccc9cd6a094b36b505ad82",
+            "bytes": 351,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "repairStaleIgnoreEntry computes the live value at the OLD line, compares its digest to the reviewed stale digest, and returns value-binding-mismatch before writing. The current exact F1 prefix assertion and F2 protected suite registration were not reconciled here. Historical body reports RED2/5 then GREEN5/5 and two Critic minors.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+              "locator": "repairStaleIgnoreEntry value-binding block",
+              "sourceSHA256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind current value-change/no-mutation cases and both original follow-ups; preserve GLR secret-disclosure issues as a separate scope rather than weakening reviewed-value binding.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Bind current value-change/no-mutation cases and both original follow-ups; preserve GLR secret-disclosure issues as a separate scope rather than weakening reviewed-value binding.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 38,
+          "text": "\n- **Decision:** accepted; implemented test-first — GLREP-t `3f85cff0c` (red 2/5), GLREP `2c2aafccd` (5/5).\n- **Rationale:** the content-v1 line binding exists to force a fresh review; the repair must not bypass it. Opus Critic\n  PASS (`specs/sprint-alfred-epic/evidence/critic-2026-10-05/glrep.md`) with two minors: F1 (refusal prefix not pinned\n  by a test) and F2 (the new suite is not yet registered in the protected `verify.mjs`).\n- **Assignment (if accepted):** F1 test-only follow-up dispatch; F2 staged `verify.mjs` registration for the PO's next\n  signature. The item stays open until both land (due before the 0.7.0 release candidate).\n- **Date:** 2026-10-06\n"
+        }
+      ]
+    },
+    {
+      "index": 18,
+      "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "da39b6892f4aa541af0cd841a86db2dfc0ca937d4cdc0fb3574c28a818949736",
+        "bytes": 208,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "present-source-qualification-gap",
+      "finding": "Current repair CLI imports and calls shared isDirectInvocation(import.meta.url), replacing the broken file:// string comparison. A genuine Windows drive-letter CLI child action receipt was not consumed; the latest GLR010 routing hint is not independent PASS.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+          "locator": "entrypoint import;direct invocation footer",
+          "sourceSHA256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+          "binding": "matching-selected-digest"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 20,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "0a310a63aa73d05911bdec2ab6473e0cc67a0e0216df2b2d0b5e52e24570fe65",
+            "bytes": 274,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Current repair CLI imports and calls shared isDirectInvocation(import.meta.url), replacing the broken file:// string comparison. A genuine Windows drive-letter CLI child action receipt was not consumed; the latest GLR010 routing hint is not independent PASS.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+              "locator": "entrypoint import;direct invocation footer",
+              "sourceSHA256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Qualify actual CLI action on supported Windows with drive-letter invocation, retaining ordinary versus recompute behavior and the historical failure evidence.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows::30.1",
+          "heading": "Proposal",
+          "lineStart": 32,
+          "lineEnd": 34,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "a9257702edcd5a6188faa3495d24815ca8b593e1eeb04a1b4503be22e4a30e4d",
+            "bytes": 225,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Current repair CLI imports and calls shared isDirectInvocation(import.meta.url), replacing the broken file:// string comparison. A genuine Windows drive-letter CLI child action receipt was not consumed; the latest GLR010 routing hint is not independent PASS.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+              "locator": "entrypoint import;direct invocation footer",
+              "sourceSHA256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+              "binding": "matching-selected-digest"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Qualify actual CLI action on supported Windows with drive-letter invocation, retaining ordinary versus recompute behavior and the historical failure evidence.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Qualify actual CLI action on supported Windows with drive-letter invocation, retaining ordinary versus recompute behavior and the historical failure evidence.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 36,
+          "text": "\n- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).\n- **Rationale:** commit(s) `c30c005d8`.\n- **Assignment (if accepted):** sprint-alfred-epic close-out batch.\n- **Date:** 2026-10-08.\n"
+        }
+      ]
+    },
+    {
+      "index": 19,
+      "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+      "originalBody": {
+        "excluded": true,
+        "rawSha256": "513682d93312d4d763bbff532f466b4f8b99ec769f0c523e6efa9c5a312de4c6",
+        "bytes": 203,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bodyReadStatus": "full-body-read-hash-matched",
+      "disposition": "present-source-qualification-gap",
+      "finding": "Current BUGFIX module requires a test-only RED repro dispatch followed by a separate fix dispatch forbidden to edit its validating tests. QG04 and Goldfish role wording agree. The historical source correction is present in these texts; no new text-mirroring tests were run or required.",
+      "sourceEvidence": [
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/templates/prompts/goldfish-task.md",
+          "locator": "491–508",
+          "sourceSHA256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+          "binding": "matching-selected-digest"
+        },
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/guardrails/quality-gates.md",
+          "locator": "69–75",
+          "sourceSHA256": "c393edf8d2c55313bc3926357f5be3bacaed3974c5c0e3be63f3e7d7f993abdf",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        },
+        {
+          "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/roles/goldfish.md",
+          "locator": "54",
+          "sourceSHA256": "02ab6b5f2bdeb25c5a7f4da2b2473586201664a84eb36bac3d45ba44f43242c9",
+          "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 23,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "8a689975b999afa1badc58e1a718c5134ba4a3c9ce00d119e1a975506061f6f2",
+            "bytes": 720,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Current BUGFIX module requires a test-only RED repro dispatch followed by a separate fix dispatch forbidden to edit its validating tests. QG04 and Goldfish role wording agree. The historical source correction is present in these texts; no new text-mirroring tests were run or required.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/templates/prompts/goldfish-task.md",
+              "locator": "491–508",
+              "sourceSHA256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/guardrails/quality-gates.md",
+              "locator": "69–75",
+              "sourceSHA256": "c393edf8d2c55313bc3926357f5be3bacaed3974c5c0e3be63f3e7d7f993abdf",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/roles/goldfish.md",
+              "locator": "54",
+              "sourceSHA256": "02ab6b5f2bdeb25c5a7f4da2b2473586201664a84eb36bac3d45ba44f43242c9",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind canonical/mirror source conservation and final candidate review/host checklist. Preserve the separate proposed successor generation; do not call historical open item accepted.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        },
+        {
+          "criterionId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04::36.1",
+          "heading": "Proposal",
+          "lineStart": 38,
+          "lineEnd": 42,
+          "originalText": {
+            "excluded": true,
+            "rawSha256": "b0d05c0b05302e8a6d4d2e6ac80579dd6dadcb10d5a0d1347ce4a6b40fe2a85f",
+            "bytes": 564,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "disposition": "present-source-qualification-gap",
+          "finding": "Current BUGFIX module requires a test-only RED repro dispatch followed by a separate fix dispatch forbidden to edit its validating tests. QG04 and Goldfish role wording agree. The historical source correction is present in these texts; no new text-mirroring tests were run or required.",
+          "sourceEvidence": [
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/templates/prompts/goldfish-task.md",
+              "locator": "491–508",
+              "sourceSHA256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+              "binding": "matching-selected-digest"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/guardrails/quality-gates.md",
+              "locator": "69–75",
+              "sourceSHA256": "c393edf8d2c55313bc3926357f5be3bacaed3974c5c0e3be63f3e7d7f993abdf",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            },
+            {
+              "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/roles/goldfish.md",
+              "locator": "54",
+              "sourceSHA256": "02ab6b5f2bdeb25c5a7f4da2b2473586201664a84eb36bac3d45ba44f43242c9",
+              "binding": "unselected-physical-provider-not-claimed-as-new-selected-source"
+            }
+          ],
+          "qualification": "No new semantic or native qualification. Historical body/assignment claims remain reported claims unless an exact current receipt is separately bound.",
+          "nextAction": "Bind canonical/mirror source conservation and final candidate review/host checklist. Preserve the separate proposed successor generation; do not call historical open item accepted.",
+          "accepted": false,
+          "basis": "full-original-body-hash-matched-and-read"
+        }
+      ],
+      "nextAction": "Bind canonical/mirror source conservation and final candidate review/host checklist. Preserve the separate proposed successor generation; do not call historical open item accepted.",
+      "accepted": false,
+      "historicalTriage": [
+        {
+          "line": 44,
+          "text": "\n- **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).\n- **Rationale:** commit(s) `b3cabc7f8`.\n- **Assignment (if accepted):** sprint-alfred-epic close-out batch.\n- **Date:** 2026-10-08.\n"
+        }
+      ]
+    }
+  ],
+  "itemCount": 20,
+  "criterionGroupCount": 47,
+  "wholeItemClosures": 0,
+  "semanticRuns": 0,
+  "nativeRuns": 0,
+  "gitMutations": 0,
+  "exclusions": "Exact disjoint20 only; no Nightwing/Batman or explicitly excluded/deferred scope promoted. Historical descriptions are not invented additional acceptance conditions."
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "alfred.focused-method-progress.v1",
+  "date": "2026-10-11",
+  "scope": "Executed focused controls; separate from intermediate functional commit 46495b209fb4b447a6c2c8f28f92574a50ba5aea",
+  "checks": [
+    {
+      "name": "model-channel-negative-controls",
+      "caseIds": ["MQN001", "MQN002", "MQN003", "MQN004", "MQN005", "MQN006", "MQN007"],
+      "counts": {"pass": 7, "fail": 0, "skip": 0, "todo": 0},
+      "completion": "complete",
+      "sourceConserved": true,
+      "executionSha256": "b173c6232e8b46dc0bb414a32ed0d0442e202043851eef0fabc4099ff1133b38",
+      "completionSha256": "6ac95a156d127527cf0e713f2e8894ed2980b7bbf250504996df565467cc9bd8",
+      "priorStartupFailuresRetained": true,
+      "genuineModelMutationCourseQualified": false
+    },
+    {
+      "name": "inner-policy-pure-projection-controls",
+      "caseIds": ["OIP001", "OIP002", "OIP003", "OIP004", "OIP005", "OIP006"],
+      "counts": {"pass": 6, "fail": 0, "skip": 0, "todo": 0},
+      "completion": "complete",
+      "enumeration": "closed-SPEC-or-TAP",
+      "sourceConserved": true,
+      "executionSha256": "0edcc64a0f0d1180f721486ccbcf1a13247aa83df30f780610448f104c1c33c2",
+      "owningCourseQualified": false
+    },
+    {
+      "name": "verify-route-metadata-source-binding-and-input-custody-controls",
+      "caseIds": ["VCR001", "VCR002", "VCR003", "VCR004", "VCR005", "VCR006", "VCR007", "VCR008", "VCR009", "VCR010", "VCR011", "VCR012", "VCR013", "VCR014"],
+      "counts": {"pass": 14, "fail": 0, "skip": 0, "todo": 0},
+      "completion": "complete",
+      "sourceConserved": true,
+      "executionSha256": "48c3cc1bfc8c87e3ac9ab92787eb0e05a2b87637867cb8726a9c4d73d2d957e0",
+      "completionSha256": "90bb6af4507127d04000d023f7895ef5b732fb4727bc5a4667f11bedfd1edd54",
+      "priorResult": {"pass": 3, "fail": 11},
+      "actualFixtureFailureCause": "Git fixture lacked author identity; corrected with an explicitly synthetic fixture-local identity",
+      "assertionsUnchanged": true,
+      "priorFailuresRetained": true,
+      "actualOwningControllerExecuted": false
+    }
+  ],
+  "nativeQualification": false,
+  "wholeItemAcceptance": false,
+  "finalCandidateReadiness": false,
+  "fullVerifyExecuted": false
+}

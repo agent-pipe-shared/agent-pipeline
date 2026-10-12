@@ -1,0 +1,256 @@
+{
+  "schema": "alfred.tca-qualification-execution.v1",
+  "semanticChildCount": 1,
+  "status": "complete-non-green",
+  "nativeHostREADY": false,
+  "inheritedProtectedGitSelectorsPresent": [],
+  "inheritedNodeOptionsPresent": false,
+  "inheritedExecArgv": [],
+  "environmentContract": "All inherited HOME/USERPROFILE/environment/Git policies/preloads/execArgv preserved; only owned TMP/TEMP/TMPDIR and explicit FD3 channel selected. External Git root/index/object selectors cause pre-effect failure; never cleared.",
+  "argv": {
+    "executable": "<outside-repository-host-path-excluded>",
+    "args": [
+      "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/inherited-home-context/joint196.test.mjs",
+      "--source-root",
+      "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph",
+      "--owned-root",
+      "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/qualification-resumption-root/cases",
+      "--retained-root",
+      "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/current-context/parents",
+      "--method-fixture",
+      "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/inherited-home-context/method-ready.transport.fixture.mjs",
+      "--baseline-path",
+      "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/qualification-resumption-root/source-baseline.json"
+    ],
+    "cwd": "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/qualification-resumption-root"
+  },
+  "setupResumption": {
+    "predecessorExecutionSha256": "e503ec91ba67b03251d7d0ad4073a71107c2128c63ccb576b8eb37c781a4077e",
+    "initNotRepeated": true,
+    "predecessorSemanticChildCount": 0
+  },
+  "baselineGit": [
+    {
+      "argv": [
+        "--git-dir",
+        "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph/.git",
+        "--work-tree",
+        "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph",
+        "-c",
+        "user.name=Joint Fixture",
+        "-c",
+        "user.email=joint-fixture@example.invalid",
+        "add",
+        "--all"
+      ],
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdout": {
+        "excluded": true,
+        "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "reason": "Raw stream excluded; finite structured outcomes retained"
+      },
+      "stderr": {
+        "excluded": true,
+        "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "reason": "Raw stream excluded; finite structured outcomes retained"
+      }
+    },
+    {
+      "argv": [
+        "--git-dir",
+        "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph/.git",
+        "--work-tree",
+        "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph",
+        "-c",
+        "user.name=Joint Fixture",
+        "-c",
+        "user.email=joint-fixture@example.invalid",
+        "commit",
+        "-m",
+        "test: joint196 controlled resource baseline",
+        "-m",
+        "AI-Assisted: true\nDispatch: stage-0 (elephant)"
+      ],
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdout": {
+        "excluded": true,
+        "rawSha256": "3f91730c23c7843af21a1ad9ffaac34aab9a086db37e701df2955c5c82aed056",
+        "bytes": 169776,
+        "reason": "Raw stream excluded; finite structured outcomes retained"
+      },
+      "stderr": {
+        "excluded": true,
+        "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "reason": "Raw stream excluded; finite structured outcomes retained"
+      }
+    },
+    {
+      "argv": [
+        "--git-dir",
+        "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph/.git",
+        "--work-tree",
+        "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph",
+        "-c",
+        "user.name=Joint Fixture",
+        "-c",
+        "user.email=joint-fixture@example.invalid",
+        "rev-parse",
+        "HEAD"
+      ],
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdout": {
+        "excluded": true,
+        "rawSha256": "d270cf0b4f15ad3e2e36af05a75a76932d8a5227afe17f23c3b449d84c147af7",
+        "bytes": 41,
+        "reason": "Raw stream excluded; finite structured outcomes retained"
+      },
+      "stderr": {
+        "excluded": true,
+        "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "reason": "Raw stream excluded; finite structured outcomes retained"
+      }
+    },
+    {
+      "argv": [
+        "--git-dir",
+        "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph/.git",
+        "--work-tree",
+        "<repository>/legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/graph",
+        "-c",
+        "user.name=Joint Fixture",
+        "-c",
+        "user.email=joint-fixture@example.invalid",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdout": {
+        "excluded": true,
+        "rawSha256": "bae4a08f68deb3a1158f486ef0220cf6404d0e870ea0c25dc7168f6b20f576d9",
+        "bytes": 41,
+        "reason": "Raw stream excluded; finite structured outcomes retained"
+      },
+      "stderr": {
+        "excluded": true,
+        "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "reason": "Raw stream excluded; finite structured outcomes retained"
+      }
+    }
+  ],
+  "actualSyntheticBaseline": {
+    "commit": "3b1863dc0e82ea49cad924f95ccaa28411d32def",
+    "tree": "781a1f0f2ec41f6d3df6852d9e30addbf3c28038",
+    "gitDir": "graph/.git"
+  },
+  "child": {
+    "status": 1,
+    "signal": null,
+    "timedOut": false,
+    "spawnError": null,
+    "elapsedMs": 23510
+  },
+  "captureHashes": {
+    "stdout.log": {
+      "sha256": "5174847d6ccc4455f41fb3e2b860a77c9d9c879003d57264050f4960b5a20b67",
+      "size": 7242,
+      "mode": 384,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "78c4914f8f07dd00683be3a4eeaaa69c918a27a76aa8055d6b20315856cb1b39",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    "stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "mode": 384,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "80e1ab9e3a3d02389d3f58951027f572ff6e3ca6c068b0dce58e66f0b6908ac5",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    "completion.fd3.jsonl": {
+      "sha256": "aa872d84d9265b5dff50fa0f5a7a5f12e4d42c34f9810fd511dd160bfb0b6f82",
+      "size": 2071,
+      "mode": 384,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "336d7bdf1f08c1de08b0391c9b09d675c49f49f0aeb53692f390675de6e8d5bd",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    }
+  },
+  "completionPolicy": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "JCP001",
+      "JCP002",
+      "JCP003",
+      "JCP004",
+      "JCP005",
+      "JCP006",
+      "JCP007",
+      "JCP008",
+      "JCP009",
+      "JCP010",
+      "JCP011",
+      "JCP012"
+    ],
+    "maxBytes": 32768
+  },
+  "parsedCompletion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "db68e87b4068a76c76dd68a5e5126b1f259e17dcefe32c980fbaaf4fcbed23df",
+    "caseSetSha256": "cfdf1747a8930caf817357d3381faa64bdd876642729a9675150701d808ccaf6",
+    "dispositionsSha256": "38e07cf79ca485e62427fb8102c230740af6cd88402b1f7c660472e7814c1335",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 10,
+      "fail": 2,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "actualOwnGitDirectoryPresent": true,
+  "graphAndFixtureConserved": true
+}

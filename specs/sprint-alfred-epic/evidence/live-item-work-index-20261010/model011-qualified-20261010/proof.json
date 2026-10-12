@@ -1,0 +1,104 @@
+{
+  "schema": "alfred.model011.public-actual-proof.v1",
+  "status": "qualified-controlled-method",
+  "caseId": "I08T011",
+  "caseCount": 1,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "3a92c0077e236cfa3313deaf4b40171306e6ba975351557e9147ed672151dfd5",
+    "caseSetSha256": "6ade307684b298d61501e91120959ec2dece0190e2bf99cf694c3f3ada69eeb2",
+    "dispositionsSha256": "4a479f7edcf8e700622efedfdd541c18907c63ccd54e416ecef8ad17c0d8ace7",
+    "declaredCount": 1,
+    "disposedCount": 1,
+    "counts": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "childStatus": 0,
+  "signal": null,
+  "timeoutTriggered": false,
+  "restoredOriginalGraph": true,
+  "originalGraphFileCount": 1705,
+  "observation": {
+    "schema": "pipeline.model-transition-observation.v1",
+    "caseId": "I08T011",
+    "observations": [
+      {
+        "id": "ticket-replay",
+        "stage": "after-original-execution-before-ticket-close",
+        "outcome": "refused",
+        "errorName": "SessionAuthorityError",
+        "code": "SDC-AUTHORITY-CAS",
+        "reason": "domain-transition-replay"
+      },
+      {
+        "id": "wrong-port",
+        "stage": "private-ticket-validation-or-refresh",
+        "outcome": "refused",
+        "errorName": "SessionAuthorityError",
+        "code": "SDC-AUTHORITY-CAS",
+        "reason": "domain-transition-refresh-ticket"
+      },
+      {
+        "id": "wrong-repository",
+        "stage": "actual-source-owned-repository-port-predicate",
+        "outcome": "refused",
+        "errorName": null,
+        "code": null,
+        "reason": null
+      },
+      {
+        "id": "wrong-boundary",
+        "stage": "nested-foreign-boundary-before-callback",
+        "outcome": "refused",
+        "errorName": "SessionAuthorityError",
+        "code": "SDC-ROOT",
+        "reason": "nested-boundary-repository"
+      },
+      {
+        "id": "late-refresh",
+        "stage": "after-refresh-and-ticket-finally-close",
+        "outcome": "refused",
+        "errorName": "SessionAuthorityError",
+        "code": "SDC-AUTHORITY-UNAVAILABLE",
+        "reason": "domain-transition-unowned-or-closed"
+      },
+      {
+        "id": "source-module-drift",
+        "stage": "after-source-context-capture-before-revalidation",
+        "outcome": "refused",
+        "errorName": "SessionAuthorityError",
+        "code": "SDC-AUTHORITY-UNAVAILABLE",
+        "reason": "model-family-host:module-context-drift"
+      }
+    ],
+    "originalEffectCount": 1,
+    "originalResultIdentityPreserved": true,
+    "protectedHistoryConserved": true,
+    "wrongBoundaryCallbackReachCount": 0,
+    "assurance": "controlled-unit-method"
+  },
+  "coverageCeilings": {
+    "wrongBoundary": "nested-foreign-root-early-refusal",
+    "innerCapturedBoundaryBranch": false,
+    "moduleDrift": "owned-copied-subject-validator",
+    "native": false
+  },
+  "executionReceiptSha256": "e9f5e262e14ddac7b77b7ab6fa4d719f6e5332e0aa9bdea2094d537d65d4e3f7",
+  "stdout": {
+    "sha256": "851b6000af2a57931d6f0dd6e2e7fda1cbfca99a6979c31359f63f5c977086a3",
+    "byteLength": 1642
+  },
+  "fd3": {
+    "sha256": "51cf88ca3afc591693f4d6c722d3ee3afd794d1867ff3e92200a30ddfc669fe6",
+    "byteLength": 638
+  },
+  "nativeAssurance": false,
+  "humanApproval": false,
+  "full26": false,
+  "adoptionStatus": "proposal-only"
+}

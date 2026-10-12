@@ -1,0 +1,56 @@
+{
+  "schema": "alfred.codex-segment-case-scope.v1",
+  "cases": [
+    {
+      "id": "CSR001",
+      "assertion": "Actual Codex payload.id authenticates one segment; raw bytes preserved",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR002",
+      "assertion": "Two same-session/project segments read in explicitly labelled storage order",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR003",
+      "assertion": "Only necessary JSONL separator inserted for unterminated segment",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR004",
+      "assertion": "Wrong-session selection unavailable",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR005",
+      "assertion": "Current session excluded",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR006",
+      "assertion": "Foreign project metadata unavailable",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR007",
+      "assertion": "Conflicting session metadata unavailable",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR008",
+      "assertion": "Symlink member excluded",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR009",
+      "assertion": "Hardlinked full-read member refused",
+      "actualDisposition": "pass"
+    },
+    {
+      "id": "CSR010",
+      "assertion": "List is bounded/path-free; unsupported foreign runners remain unavailable",
+      "actualDisposition": "pass"
+    }
+  ],
+  "fixtures": "Exclusive owned synthetic JSONL files; actual declared Codex metadata shape. No host transcript used."
+}

@@ -1,0 +1,2 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["NGHS01","NGHS02","NGHS03","NGHS04","NGHS05","NGHS06","NGHS07","NGHS08","NGHS09","NGHS10","NGHS11","NGHS12","NGHS13","NGHS14","NGHS15","NGHS16","NGHS17","NGHS18","NGHS19"],"caseCount":19,"caseSetSha256":"50cc647125bce50a056e2c75b94d2396dd7a0dc3a6d1e2e27c46b5b5064902f8"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"NGHS19","ordinal":18,"disposition":"fail"}

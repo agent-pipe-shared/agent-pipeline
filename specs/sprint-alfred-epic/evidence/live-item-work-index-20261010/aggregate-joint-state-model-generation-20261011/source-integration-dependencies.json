@@ -1,0 +1,749 @@
+{
+  "schema": "alfred.aggregate5.integration-intent.v1",
+  "status": "Root-only intent; no product apply or final candidate admission",
+  "actualCombinedProofSha256": "1becd6f257db5faf46d60ac0ee1f0aabfd6a4a763e38c2739ca313816d4628f1",
+  "qualifiedSourceManifest": {
+    "path": "scratch/alfred-u-aggregate5-model-host-reconciliation-source-20261010/manifest.json",
+    "sha256": "b91ed5e7052b0c49feeb0ea13ac6a6c700ec900670e4158bd66504c2fd4bcc28"
+  },
+  "targets": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "source": {
+        "path": "scratch/alfred-architecture-aggregate-efficacy-source-20261010/pending-applicability-successor/postimages/plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+        "sha256": "f4c2c37135d225148cd79cbe61fce4d45480a60f133a6167ef51c8eb08290c5f",
+        "bytes": 14911,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "4181273"
+      },
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+        "sha256": "616059c54e33adc7ef56f6c95dbbc8f9c46afdbb64ee0e271c60ad6e7f18b3ff",
+        "bytes": 12701,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "734753",
+        "sameAsSelectedSource": false,
+        "regularSingleLink": false,
+        "preimageArtifact": {
+          "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/public-proof-preparation/parents/main/plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+          "sha256": "616059c54e33adc7ef56f6c95dbbc8f9c46afdbb64ee0e271c60ad6e7f18b3ff",
+          "bytes": 12701,
+          "mode": 420,
+          "nlink": 1,
+          "dev": "2096",
+          "ino": "4264595"
+        }
+      },
+      "audit": {
+        "present": true,
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+        "sha256": "616059c54e33adc7ef56f6c95dbbc8f9c46afdbb64ee0e271c60ad6e7f18b3ff",
+        "bytes": 12701,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "2924495",
+        "sameAsSelectedSource": false,
+        "regularSingleLink": true,
+        "preimageArtifact": {
+          "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/public-proof-preparation/parents/audit/plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+          "sha256": "616059c54e33adc7ef56f6c95dbbc8f9c46afdbb64ee0e271c60ad6e7f18b3ff",
+          "bytes": 12701,
+          "mode": 420,
+          "nlink": 1,
+          "dev": "2096",
+          "ino": "4264616"
+        }
+      },
+      "protectedRulesStatic": [],
+      "guardAdmissionEstablished": false,
+      "sourceBehaviorScope": "exact dependency in combined12; not all behavior of whole leaf"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-decision-bindings.mjs",
+      "source": {
+        "path": "scratch/alfred-architecture-aggregate-efficacy-source-20261010/pending-applicability-successor/postimages/plugins/pipeline-core/lib/design-decision-bindings.mjs",
+        "sha256": "6a3167e0f23d7edcce10d4bc9d20df0ea823d845623f373514678b18ae87a8ac",
+        "bytes": 42131,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "4181298"
+      },
+      "main": {
+        "present": false,
+        "observation": "actual lstat/read absence; not inferred from other tree"
+      },
+      "audit": {
+        "present": false,
+        "observation": "actual lstat/read absence; not inferred from other tree"
+      },
+      "protectedRulesStatic": [],
+      "guardAdmissionEstablished": false,
+      "sourceBehaviorScope": "exact dependency in combined12; not all behavior of whole leaf"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "source": {
+        "path": "scratch/alfred-architecture-aggregate-efficacy-source-20261010/pending-applicability-successor/postimages/plugins/pipeline-core/lib/architecture-design.mjs",
+        "sha256": "bb7c73a10080810fec955297232191334f1952266a789c3ec4eb0bd55aaf88ca",
+        "bytes": 30810,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "4181302"
+      },
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+        "sha256": "d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6",
+        "bytes": 27987,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "736355",
+        "sameAsSelectedSource": false,
+        "regularSingleLink": false,
+        "preimageArtifact": {
+          "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/public-proof-preparation/parents/main/plugins/pipeline-core/lib/architecture-design.mjs",
+          "sha256": "d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6",
+          "bytes": 27987,
+          "mode": 420,
+          "nlink": 1,
+          "dev": "2096",
+          "ino": "4264624"
+        }
+      },
+      "audit": {
+        "present": true,
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+        "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+        "bytes": 29652,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "3657445",
+        "sameAsSelectedSource": false,
+        "regularSingleLink": true,
+        "preimageArtifact": {
+          "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/public-proof-preparation/parents/audit/plugins/pipeline-core/lib/architecture-design.mjs",
+          "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+          "bytes": 29652,
+          "mode": 420,
+          "nlink": 1,
+          "dev": "2096",
+          "ino": "4264627"
+        }
+      },
+      "protectedRulesStatic": [],
+      "guardAdmissionEstablished": false,
+      "sourceBehaviorScope": "exact dependency in combined12; not all behavior of whole leaf"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-authority.mjs",
+      "source": {
+        "path": "scratch/alfred-aggregate-design-decision-binding-source-20261010/canonical-dab-successor/postimages/plugins/pipeline-core/lib/model-family-authority.mjs",
+        "sha256": "c35b26f0650f88fa07a56536632ea4464a5d68c10cac9071e85f19418c4680b2",
+        "bytes": 22102,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "4145801"
+      },
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/model-family-authority.mjs",
+        "sha256": "a26ec5d3c3785b8bd32dd50197236e9106124956dd062cca2eb3d4e3dad29518",
+        "bytes": 18911,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "827446",
+        "sameAsSelectedSource": false,
+        "regularSingleLink": false,
+        "preimageArtifact": {
+          "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/public-proof-preparation/parents/main/plugins/pipeline-core/lib/model-family-authority.mjs",
+          "sha256": "a26ec5d3c3785b8bd32dd50197236e9106124956dd062cca2eb3d4e3dad29518",
+          "bytes": 18911,
+          "mode": 420,
+          "nlink": 1,
+          "dev": "2096",
+          "ino": "4264630"
+        }
+      },
+      "audit": {
+        "present": true,
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-authority.mjs",
+        "sha256": "a26ec5d3c3785b8bd32dd50197236e9106124956dd062cca2eb3d4e3dad29518",
+        "bytes": 18911,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "2924901",
+        "sameAsSelectedSource": false,
+        "regularSingleLink": true,
+        "preimageArtifact": {
+          "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/public-proof-preparation/parents/audit/plugins/pipeline-core/lib/model-family-authority.mjs",
+          "sha256": "a26ec5d3c3785b8bd32dd50197236e9106124956dd062cca2eb3d4e3dad29518",
+          "bytes": 18911,
+          "mode": 420,
+          "nlink": 1,
+          "dev": "2096",
+          "ino": "4264633"
+        }
+      },
+      "protectedRulesStatic": [],
+      "guardAdmissionEstablished": false,
+      "sourceBehaviorScope": "exact dependency in combined12; not all behavior of whole leaf"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "source": {
+        "path": "scratch/alfred-model-transition-observation-source-20261010/postimages/plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "sha256": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f",
+        "bytes": 79837,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "4211943"
+      },
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "sha256": "0e5bd3554720a34c96f8a49f8ebe1962776cb448b06b54d4719ca7703ce80bec",
+        "bytes": 62084,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "828686",
+        "sameAsSelectedSource": false,
+        "regularSingleLink": false,
+        "preimageArtifact": {
+          "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/public-proof-preparation/parents/main/plugins/pipeline-core/lib/model-family-host-store.mjs",
+          "sha256": "0e5bd3554720a34c96f8a49f8ebe1962776cb448b06b54d4719ca7703ce80bec",
+          "bytes": 62084,
+          "mode": 420,
+          "nlink": 1,
+          "dev": "2096",
+          "ino": "4264636"
+        }
+      },
+      "audit": {
+        "present": true,
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "sha256": "ef11c9b2daa8298979c802dd9df69c8572fa322ba6a6af72d1b7071229f72ced",
+        "bytes": 71220,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "4120936",
+        "sameAsSelectedSource": false,
+        "regularSingleLink": true,
+        "preimageArtifact": {
+          "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/public-proof-preparation/parents/audit/plugins/pipeline-core/lib/model-family-host-store.mjs",
+          "sha256": "ef11c9b2daa8298979c802dd9df69c8572fa322ba6a6af72d1b7071229f72ced",
+          "bytes": 71220,
+          "mode": 420,
+          "nlink": 1,
+          "dev": "2096",
+          "ino": "4264639"
+        }
+      },
+      "protectedRulesStatic": [],
+      "guardAdmissionEstablished": false,
+      "sourceBehaviorScope": "exact dependency in combined12; not all behavior of whole leaf"
+    }
+  ],
+  "directImportAndAuthorityDependencies": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+      "qualifiedSha256": "97b8dfded6918c4e6151b960d44fb85c9963168ff6008cee274ecf8428c904e4",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+        "sha256": "97b8dfded6918c4e6151b960d44fb85c9963168ff6008cee274ecf8428c904e4",
+        "bytes": 6002,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "734723",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "qualifiedSha256": "f4c2c37135d225148cd79cbe61fce4d45480a60f133a6167ef51c8eb08290c5f",
+      "qualifiedResourceSource": "scratch/alfred-architecture-aggregate-efficacy-source-20261010/pending-applicability-successor/postimages/plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+        "sha256": "616059c54e33adc7ef56f6c95dbbc8f9c46afdbb64ee0e271c60ad6e7f18b3ff",
+        "bytes": 12701,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "734753",
+        "sameAsQualifiedDependency": false
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+      "qualifiedSha256": "471ff282849ec52ab77d0841112e9f07abc3a2bba3c2ae65926d0b25a7364d90",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+        "sha256": "471ff282849ec52ab77d0841112e9f07abc3a2bba3c2ae65926d0b25a7364d90",
+        "bytes": 1619,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "672896",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critical-human-proof-policy.mjs",
+      "qualifiedSha256": "af32994b4894614ab6714dd3772f857a0c75a2441b5b52afe83580cc06bce15c",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/critical-human-proof-policy.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/critical-human-proof-policy.mjs",
+        "sha256": "af32994b4894614ab6714dd3772f857a0c75a2441b5b52afe83580cc06bce15c",
+        "bytes": 32885,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "736317",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-approval-binding.mjs",
+      "qualifiedSha256": "c161e1d0d1423d3d757439a0b212c119f0af22220105081b47831ca17c297daf",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/design-approval-binding.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/design-approval-binding.mjs",
+        "sha256": "c161e1d0d1423d3d757439a0b212c119f0af22220105081b47831ca17c297daf",
+        "bytes": 19407,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "2574875",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-decision-bindings.mjs",
+      "qualifiedSha256": "6a3167e0f23d7edcce10d4bc9d20df0ea823d845623f373514678b18ae87a8ac",
+      "qualifiedResourceSource": "scratch/alfred-architecture-aggregate-efficacy-source-20261010/pending-applicability-successor/postimages/plugins/pipeline-core/lib/design-decision-bindings.mjs",
+      "main": {
+        "present": false
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+      "qualifiedSha256": "49bcaff5030e06b88dbdff6b87772ce020c4489a8968b2b8a9b71ca06d5ae783",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/design-workflow-approval.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+        "sha256": "49bcaff5030e06b88dbdff6b87772ce020c4489a8968b2b8a9b71ca06d5ae783",
+        "bytes": 13344,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "736312",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+      "qualifiedSha256": "c05a085035e9117c272ced4c0d615dc30de99838ae09ad2d6a268500aae43550",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/design-workflow-package.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+        "sha256": "c05a085035e9117c272ced4c0d615dc30de99838ae09ad2d6a268500aae43550",
+        "bytes": 49112,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "805833",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/governance-event.mjs",
+      "qualifiedSha256": "bacdef30154cb0c30561bd7e056503ec20f0af3a647f3036a91e58d684d5a06e",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/governance-event.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/governance-event.mjs",
+        "sha256": "bacdef30154cb0c30561bd7e056503ec20f0af3a647f3036a91e58d684d5a06e",
+        "bytes": 15831,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "736366",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+      "qualifiedSha256": "a891dc26214b7e4c3cb25043cc4fc9c494c2469fc48a6e24366fb18dfd91c9fe",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+        "sha256": "6bd26c6fcfa10d6cffe0705914cbfaca181ec8a0ed2bd0ef279498ff95a1b13e",
+        "bytes": 46972,
+        "mode": 420,
+        "nlink": 1,
+        "dev": "2096",
+        "ino": "4234101",
+        "sameAsQualifiedDependency": false
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-authority.mjs",
+      "qualifiedSha256": "c35b26f0650f88fa07a56536632ea4464a5d68c10cac9071e85f19418c4680b2",
+      "qualifiedResourceSource": "scratch/alfred-aggregate-design-decision-binding-source-20261010/canonical-dab-successor/postimages/plugins/pipeline-core/lib/model-family-authority.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/model-family-authority.mjs",
+        "sha256": "a26ec5d3c3785b8bd32dd50197236e9106124956dd062cca2eb3d4e3dad29518",
+        "bytes": 18911,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "827446",
+        "sameAsQualifiedDependency": false
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-discovery.mjs",
+      "qualifiedSha256": "77d86d1a053fb9fae682ec76b62e8a7c7041b83447204fb9351c9ec94df07a60",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/model-family-discovery.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/model-family-discovery.mjs",
+        "sha256": "77d86d1a053fb9fae682ec76b62e8a7c7041b83447204fb9351c9ec94df07a60",
+        "bytes": 19122,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "828682",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-latest-selection.mjs",
+      "qualifiedSha256": "8e8737ff33e800a91e7ef1bd7c8a73bdcfc157448c02f70e7f417c3cc0780973",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/model-family-latest-selection.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/model-family-latest-selection.mjs",
+        "sha256": "8e8737ff33e800a91e7ef1bd7c8a73bdcfc157448c02f70e7f417c3cc0780973",
+        "bytes": 18365,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "828690",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-route-source.mjs",
+      "qualifiedSha256": "8aa04cac147e1c48d4b38ef35759482096b270bcfede7e471d1e5ad4a5aa458d",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/model-family-route-source.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/model-family-route-source.mjs",
+        "sha256": "8aa04cac147e1c48d4b38ef35759482096b270bcfede7e471d1e5ad4a5aa458d",
+        "bytes": 3910,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "828694",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-role-approved-policy.mjs",
+      "qualifiedSha256": "e933ad66324e21e1efce28829dfbc15886b33f6c5cdb3042727a8a40e9011f08",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/model-role-approved-policy.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/model-role-approved-policy.mjs",
+        "sha256": "e933ad66324e21e1efce28829dfbc15886b33f6c5cdb3042727a8a40e9011f08",
+        "bytes": 7818,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "827416",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-role-route-source.mjs",
+      "qualifiedSha256": "768d8f5800d96ff33e4a7e75e03782ffa581e967cd3952912c0e602607942182",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/model-role-route-source.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/model-role-route-source.mjs",
+        "sha256": "768d8f5800d96ff33e4a7e75e03782ffa581e967cd3952912c0e602607942182",
+        "bytes": 8003,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "827428",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+      "qualifiedSha256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+        "sha256": "bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f",
+        "bytes": 74598,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "828652",
+        "sameAsQualifiedDependency": false
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/po-approval-proof.mjs",
+      "qualifiedSha256": "df04c60c72f311387b2d2d02b5dad9c9c891dc94a92ef57e6a1e1fb255420ff4",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/po-approval-proof.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/po-approval-proof.mjs",
+        "sha256": "df04c60c72f311387b2d2d02b5dad9c9c891dc94a92ef57e6a1e1fb255420ff4",
+        "bytes": 4667,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "736457",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/po-gate-authority.mjs",
+      "qualifiedSha256": "e9c97d87d525d6141f99d623555e94a0ad7993f5d5ef14b8788a8e15b9eabd7c",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/po-gate-authority.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/po-gate-authority.mjs",
+        "sha256": "e9c97d87d525d6141f99d623555e94a0ad7993f5d5ef14b8788a8e15b9eabd7c",
+        "bytes": 50010,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "736402",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-authority.mjs",
+      "qualifiedSha256": "19eacbfa09a5b4aac039e8bdeeefc2e1d5dbcca918f63655e14dc5bbdbbbc602",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/project-authority.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/project-authority.mjs",
+        "sha256": "19eacbfa09a5b4aac039e8bdeeefc2e1d5dbcca918f63655e14dc5bbdbbbc602",
+        "bytes": 79490,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "736470",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/schema-lite.mjs",
+      "qualifiedSha256": "2996e60c0be463987ececd89392f413fb870b533ad05a63f48fdebdf90cf5a2c",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/lib/schema-lite.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/schema-lite.mjs",
+        "sha256": "2996e60c0be463987ececd89392f413fb870b533ad05a63f48fdebdf90cf5a2c",
+        "bytes": 7620,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "2574859",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "qualifiedSha256": "74e0feb567ef0321a98f432054945942f963f810215b84d65c2c116b4b3764ea",
+      "qualifiedResourceSource": "scratch/alfred-model010-foreign-process-carrier-source-20261010/successor/postimages/plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "main": {
+        "present": false
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/generate-architecture-overview.mjs",
+      "qualifiedSha256": "55b33118db49060f3aed008a604fbc749d0a0ff8097bbb17a9bdab6e9703cac6",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/scripts/generate-architecture-overview.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/scripts/generate-architecture-overview.mjs",
+        "sha256": "55b33118db49060f3aed008a604fbc749d0a0ff8097bbb17a9bdab6e9703cac6",
+        "bytes": 12332,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "827812",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/module-inventory.mjs",
+      "qualifiedSha256": "3953f8f07a308962db6e8f25c3379d858f184cd83bf6a85ff0708ee47a8a49a3",
+      "qualifiedResourceSource": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/operation-root/graph/plugins/pipeline-core/scripts/module-inventory.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/scripts/module-inventory.mjs",
+        "sha256": "3953f8f07a308962db6e8f25c3379d858f184cd83bf6a85ff0708ee47a8a49a3",
+        "bytes": 13093,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "736711",
+        "sameAsQualifiedDependency": true
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "qualifiedSha256": "26c4737639e82b84e82de23c9eff4fe0b23bca97eafdfec84c1651ecba81e63d",
+      "qualifiedResourceSource": "scratch/alfred-cmo-afk-cumulative-state-composition-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+        "bytes": 706707,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "2574931",
+        "sameAsQualifiedDependency": false
+      },
+      "protectedStaticRuleIds": [
+        "PB-SANCTIONED-WRITER"
+      ]
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "qualifiedSha256": "6a3387c51fcd20ad5cba3023014f0f9506c361fd6dad238dd1fcf7b00e99a123",
+      "qualifiedResourceSource": "scratch/alfred-cmo-afk-cumulative-onboarding-composition-source-20261010/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "main": {
+        "present": true,
+        "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+        "bytes": 425437,
+        "mode": 420,
+        "nlink": 2,
+        "dev": "2096",
+        "ino": "827843",
+        "sameAsQualifiedDependency": false
+      },
+      "protectedStaticRuleIds": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "qualifiedSha256": "c99115b6ba480b727627dec585a4b5f69350dfdc0bd082b97bbbdb79dc4eb7ef",
+      "qualifiedResourceSource": "scratch/alfred-state-model-cumulative-registry-composition-20261010/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "main": {
+        "present": false
+      },
+      "protectedStaticRuleIds": []
+    }
+  ],
+  "physicalPolicyInputs": [
+    {
+      "path": "plugins/pipeline-core/protected-baseline.json",
+      "sha256": "091a984e98b3f30839cb0d07c4e41e188d84f8a1c15c035ee967e2d62d6daa29",
+      "bytes": 2613,
+      "mode": 420,
+      "nlink": 2,
+      "dev": "2096",
+      "ino": "827521"
+    },
+    {
+      "path": "project/guard-config.json",
+      "sha256": "c9daa134bf669c42ea286763ce4e5419fbf53615eac183b3a1e237e9170d470e",
+      "bytes": 4370,
+      "mode": 420,
+      "nlink": 1,
+      "dev": "2096",
+      "ino": "737198"
+    }
+  ],
+  "fullTestedClosure": {
+    "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/qualification-freeze.json",
+    "sha256": "21a8911ca0f2678cfd7a21ffb525a1d51442e39f53fdc2cf73ddf9fb0db88523",
+    "resourceCount": 1723
+  },
+  "importClosure": {
+    "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/aggregate-joint-generation-successor/constructor-resource-closure.json",
+    "sha256": "113e874fd687f3732325da99f6144306b7617b589c94e08ea892116956aeb280"
+  },
+  "sameFileProtection": "all Main and Audit preimages captured independently; never overwrite a changed observed tip; nlink/alias/custody drift is a typed hold",
+  "excludedOperations": [
+    "protected I03/onboarding and State writes held for sanctioned integration",
+    "Worker/Domain/Registry integration owned separately",
+    "Design CHAT docs/templates owned separately",
+    "no DWP revival or extra approval ceremony"
+  ],
+  "RootOrder": [
+    "Recheck every exact captured source/target/policy/dependency against final current tree; refuse mismatch/alias",
+    "Coordinate separate Domain/Registry family and protected State/I03; identify any remaining dependency-generation gap before product acceptance",
+    "Review exact five cumulative Source diffs and inverse preimages; preserve unrelated tree changes",
+    "Root alone selects sanctioned operations and applies only authorized exact targets; readback new bytes/modes and dependency closure"
+  ],
+  "applyEligible": false,
+  "productApplyCommand": null,
+  "candidateEligible": false,
+  "wholeAcceptance": false,
+  "native": false,
+  "businessRuns": 0
+}

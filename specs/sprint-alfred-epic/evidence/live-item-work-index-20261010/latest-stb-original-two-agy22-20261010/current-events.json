@@ -1,0 +1,49 @@
+{
+  "schema": "alfred.latest-actual-work-status-event.v1",
+  "sourceGeneration": 146,
+  "source164Updater": "unrun Root-reported",
+  "officialItemsOpen": 176,
+  "AC": 37,
+  "IR": 4,
+  "individualCriterionAssessments": 55,
+  "unexamined": 121,
+  "unexaminedMeaning": "not a missing-fix count",
+  "events": [
+    {
+      "id": "STB-original-two",
+      "counts": {
+        "pass": 2,
+        "fail": 0
+      },
+      "proof": "stb-original-two-public-proof.json",
+      "responsible": "Root",
+      "remaining": "full26 genuine constructors and any unqualified current five-contract scope"
+    },
+    {
+      "id": "Agy22-supplement",
+      "counts": {
+        "pass": 22,
+        "fail": 0
+      },
+      "proof": "agy22-supplement-public-proof.json",
+      "responsible": "Root",
+      "scope": "original13+9 producer FD3 reparsed; no new business rerun"
+    }
+  ],
+  "stageChanges": [],
+  "currentOwners": [
+    {
+      "actor": "alfred_state_i08_invariant_assertions",
+      "workLocation": "scratch/alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010",
+      "nextAction": "remaining current five-contract preparation/qualification"
+    },
+    {
+      "actor": "agy_greenfield_roles_audit",
+      "workLocation": "scratch/alfred-176-criterion-broad-command-closure-20261010",
+      "state": "returned",
+      "nextAction": "Root joins55 examined criteria and dispatches finite remaining scopes"
+    }
+  ],
+  "accepted": false,
+  "candidateReady": false
+}

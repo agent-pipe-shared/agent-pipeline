@@ -1,0 +1,86 @@
+{
+  "schema": "alfred.shared-credential-focused.source-binding.v1",
+  "sourceManifest": {
+    "path": "scratch/alfred-shared-credential-root-constant-source-20261011/source-manifest.json",
+    "sha256": "21e30a317412fb15485f29e4839d482058527a532ecb23c4a3a1c64a8e639be5"
+  },
+  "protectedGrammarManifest": {
+    "path": "scratch/alfred-protected12-cumulative-candidate-readiness-20261011/grammar-shared-constant-successor/manifest.json",
+    "sha256": "82cd12464760681ebdc98124f0add2c1a300bcb060be349aec179b9d848e844c"
+  },
+  "independentBeforePostNorm": {
+    "path": "scratch/alfred-shared-credential-reconciliation-independent-20261011/contract.json",
+    "sha256": "11c699d8c2e05515dbbd67416675381bf5dc8c572aade2e570f276bb89d2898c"
+  },
+  "graphManifest": {
+    "path": "scratch/alfred-shared-credential-root-independent-qualification-20261011/graph-manifest.json",
+    "sha256": "a723553e8327979b97a911455a811d7131ece94a247dc5dcd32d91c3d30b63d3",
+    "bytes": 631815
+  },
+  "dependencies": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+      "source": {
+        "path": "scratch/alfred-shared-credential-root-constant-source-20261011/postimages/plugins/pipeline-core/lib/passive-read-policy.mjs",
+        "sha256": "aec789df087f685e231cfc9517ae21b1ed635d425a5183fbab0181452c7d361f",
+        "bytes": 12454
+      },
+      "qualifiedGraphSha256": "aec789df087f685e231cfc9517ae21b1ed635d425a5183fbab0181452c7d361f"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "source": {
+        "path": "scratch/alfred-protected12-cumulative-candidate-readiness-20261011/grammar-shared-constant-successor/postimages/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "sha256": "26b4235c90c7c658a7fcf7aec38c930fd2e25d5a33876e597f6f5bc091319267",
+        "bytes": 68002
+      },
+      "qualifiedGraphSha256": "26b4235c90c7c658a7fcf7aec38c930fd2e25d5a33876e597f6f5bc091319267"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "source": {
+        "path": "scratch/alfred-mini-afk-qualified-state-composition-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9",
+        "bytes": 809043
+      },
+      "qualifiedGraphSha256": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "source": {
+        "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "b2886c88cd564b4ba713537e6d109ac69f94e5ed6d446defaf4c1283cb49fcc1",
+        "bytes": 638620
+      },
+      "qualifiedGraphSha256": "b2886c88cd564b4ba713537e6d109ac69f94e5ed6d446defaf4c1283cb49fcc1"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/test-case-completion.mjs",
+      "source": {
+        "path": "plugins/pipeline-core/lib/test-case-completion.mjs",
+        "sha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+        "bytes": 10816
+      },
+      "qualifiedGraphSha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+      "source": {
+        "path": "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+        "sha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+        "bytes": 5517
+      },
+      "qualifiedGraphSha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b"
+    }
+  ],
+  "scope": "These exact selected dependency bytes support only the five named controls; no whole State/lifecycle or protected integration claim.",
+  "limits": {
+    "original43Replayed": false,
+    "nativeWindowsOrWSLClaim": false,
+    "globalHostEnforcementClaim": false,
+    "wholeItemAcceptance": false,
+    "MainIntegrationClaim": false,
+    "HumanApprovalOrSignature": false,
+    "otherLifecycleCoverage": false
+  }
+}

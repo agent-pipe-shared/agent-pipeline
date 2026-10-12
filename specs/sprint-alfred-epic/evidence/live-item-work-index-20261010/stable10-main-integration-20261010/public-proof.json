@@ -1,0 +1,208 @@
+{
+  "schema": "alfred.stable10.integration-public-proof.v1",
+  "status": "applied",
+  "actualReceipt": {
+    "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/stable10-atomic-preparation/apply-once/actual-receipt.json",
+    "sha256": "784379ffb6ccf54892a44a24c5db131e6e020d802dd979eee2fd88e779d2f2a8"
+  },
+  "effects": [
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "effect": "noop",
+      "sha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+      "effect": "noop",
+      "sha256": "430024295fdd8d8b0be553b570bc7fe56652ebd22ecf336176e3f042bc5675aa",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+      "effect": "noop",
+      "sha256": "9ce8b654233a97a7ce63ded8a40c54fb398983939aa9ef0d121fc4381a12c44d",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+      "effect": "noop",
+      "sha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/report-source-readers.mjs",
+      "effect": "noop",
+      "sha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+      "effect": "noop",
+      "sha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+      "effect": "noop",
+      "sha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+      "effect": "noop",
+      "sha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6",
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "effect": "noop",
+      "sha256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+      "effect": "noop",
+      "sha256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "effect": "add",
+      "sha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+      "effect": "add",
+      "sha256": "430024295fdd8d8b0be553b570bc7fe56652ebd22ecf336176e3f042bc5675aa",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+      "effect": "add",
+      "sha256": "9ce8b654233a97a7ce63ded8a40c54fb398983939aa9ef0d121fc4381a12c44d",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+      "effect": "add",
+      "sha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/report-source-readers.mjs",
+      "effect": "add",
+      "sha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+      "effect": "add",
+      "sha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+      "effect": "add",
+      "sha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+      "effect": "add",
+      "sha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6",
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "effect": "add",
+      "sha256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+      "effect": "add",
+      "sha256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801",
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "conservation": {
+    "AuditSourceTargets": 10,
+    "MainNamedDependencies": 8,
+    "allExactPhysicalCAS": true,
+    "consumedPathsExcluded": 15
+  },
+  "errors": null,
+  "createdDirectories": [],
+  "productImports": 0,
+  "businessRuns": 0,
+  "protectedTargets": 0,
+  "formalAcceptance": false,
+  "qualificationScopes": [
+    {
+      "group": "transfer-comparison4",
+      "path": "scratch/alfred-qualified-transfer-comparison-assembly-20261010/actual-receipt.json",
+      "sha256": "accf957bf8cbc11f4a5d17c519003fda227325782505dac4d69c579abb582bfc",
+      "actualCases": {
+        "transfer": 16,
+        "comparison": 15
+      },
+      "ceiling": "controlled methods; no native/whole-item acceptance"
+    },
+    {
+      "group": "reporting4",
+      "path": "scratch/alfred-m2-m3-reporting-independent-20261010/qualification-manifest.json",
+      "sha256": "5b5db013bfd561f86e12d01de52e520df003846bf301f67bddc090beb9f351b7",
+      "actualCases": 11,
+      "ceiling": "report-source/control behavior, no actual candidate acceptance"
+    },
+    {
+      "group": "headroom2",
+      "path": "scratch/alfred-claude-resource-headroom-independent-20261010/qualification-manifest.json",
+      "sha256": "260febaaa80f808fa6ee7200cc26a1989feb77d37c6665426e099b2997c4f7c9",
+      "actualCases": 11,
+      "ceiling": "report arithmetic/declared observations, no measurement authentication/template workflow"
+    }
+  ]
+}

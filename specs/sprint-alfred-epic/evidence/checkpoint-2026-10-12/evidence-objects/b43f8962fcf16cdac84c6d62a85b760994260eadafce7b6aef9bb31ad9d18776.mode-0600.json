@@ -1,0 +1,55 @@
+{
+  "schema": "alfred.power-preconfig-diagnostic.execution.v1",
+  "status": "completed-startup-unavailable-control-fail",
+  "childPid": 682243,
+  "childStatus": 1,
+  "signal": null,
+  "timedOut": false,
+  "preparationError": null,
+  "spawnError": null,
+  "parserError": null,
+  "graphError": null,
+  "parentError": null,
+  "diagnosticError": null,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "715720dd9c39136f29d4d229c703cc67ec375db0cd35113669e34718941b51ba",
+    "caseSetSha256": "07d4022927318354ac5f6100a5263086f14b2c395d4936cfa78d8f9791b6f85d",
+    "dispositionsSha256": "3efc81c717b5f5e2fc4978c616fd7de82a8d05fdc668cbdebb71ec2b97429992",
+    "declaredCount": 1,
+    "disposedCount": 1,
+    "counts": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "observations": [],
+  "captures": [
+    {
+      "path": "legacy-origin:alfred-power-isolated-single-close-qualification-20261010/startup-unavailable-qualification/qualification-output/stdout.txt",
+      "sha256": "4a78deae918e6cab0d4220d83dcfd44bcba546d7554d1c9f00eda92120632833",
+      "size": 767
+    },
+    {
+      "path": "legacy-origin:alfred-power-isolated-single-close-qualification-20261010/startup-unavailable-qualification/qualification-output/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "legacy-origin:alfred-power-isolated-single-close-qualification-20261010/startup-unavailable-qualification/qualification-output/completion.ndjson",
+      "sha256": "68b9390a842a51c2e915cfef211db117bae79ae5f8be7c712e6fba2c9110057f",
+      "size": 635
+    }
+  ],
+  "oldProviderReads": 0,
+  "oldProviderWrites": 0,
+  "authorityReleaseProven": false,
+  "wholeFamilyTerminalProven": false,
+  "diagnosticOnlyNotCandidate": false,
+  "nativeAssurance": false,
+  "wholePowerFive": false,
+  "wholeFull26": false
+}

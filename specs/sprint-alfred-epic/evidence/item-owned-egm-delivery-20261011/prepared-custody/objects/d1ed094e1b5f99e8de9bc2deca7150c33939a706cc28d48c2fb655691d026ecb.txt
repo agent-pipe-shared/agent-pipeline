@@ -1,0 +1,39 @@
+✔ darwin immutable native tuple uncontended acquire/release (injected) (1.536851ms)
+✔ darwin matching foreign-PID tuple remains live, unchanged (injected) (0.835965ms)
+✔ darwin reused live foreign PID different immutable start recovers (injected) (0.898365ms)
+✔ darwin absent owner recovers (injected) (0.875155ms)
+✔ darwin changed current boot recovers old same-host owner (injected) (0.705236ms)
+✔ darwin unavailable remains ambiguous and intact (injected) (0.363688ms)
+✔ darwin unknown remains ambiguous and intact (injected) (0.449858ms)
+✔ darwin wrong-pid remains ambiguous and intact (injected) (0.391738ms)
+✔ darwin malformed remains ambiguous and intact (injected) (0.443717ms)
+✔ darwin foreign host and platform preserve bytes (injected) (0.499257ms)
+✔ darwin live owner wait shares one deadline and never steals (injected) (4.680454ms)
+✔ darwin live released during wait acquires without recovery (injected) (0.533477ms)
+✔ darwin noncanonical persisted tuple remains malformed (injected) (8.340823ms)
+✔ win32 immutable native tuple uncontended acquire/release (injected) (0.397458ms)
+✔ win32 matching foreign-PID tuple remains live, unchanged (injected) (0.343548ms)
+✔ win32 reused live foreign PID different immutable start recovers (injected) (0.927935ms)
+✔ win32 absent owner recovers (injected) (0.575497ms)
+✔ win32 changed current boot recovers old same-host owner (injected) (0.602956ms)
+✔ win32 unavailable remains ambiguous and intact (injected) (0.255979ms)
+✔ win32 unknown remains ambiguous and intact (injected) (0.391418ms)
+✔ win32 wrong-pid remains ambiguous and intact (injected) (0.333568ms)
+✔ win32 malformed remains ambiguous and intact (injected) (0.252428ms)
+✔ win32 foreign host and platform preserve bytes (injected) (0.270858ms)
+✔ win32 live owner wait shares one deadline and never steals (injected) (4.077197ms)
+✔ win32 live released during wait acquires without recovery (injected) (0.360408ms)
+✔ win32 noncanonical persisted tuple remains malformed (injected) (8.176583ms)
+✔ legacy win32 approximate tuple remains ambiguous when its PID is present (0.410038ms)
+✔ legacy win32 tuple can recover proven absent PID (0.736536ms)
+✔ native adapters reject expired shared deadline without spawning or issuing native facts (0.304169ms)
+✔ native adapters never accept injected platform as native proof (0.079669ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47.895698
+

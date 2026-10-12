@@ -1,0 +1,149 @@
+{
+  "schema": "alfred.pci-additive-actual-materialization.v1",
+  "status": "actual-selected-source-union-not-stamped",
+  "freezeSha256": "3ad34f4d8c79600c580575c5907437c08b604fff69b6347233c9b0172e939a84",
+  "planSha256": "86f44f63671e945439abbd3dbbb093700ad58b340fee62d7326c14c9af382544",
+  "parent98ExecutionSha256": "d4e0469a7724cb41dd142e705a56137d0ea1d08d7f72b9e5c189fa6af84bfa1f",
+  "counts": {
+    "sourceFiles": 104,
+    "sourceDelta": 7,
+    "pciSources": 6,
+    "packagingDeltas": 1,
+    "prior98Retained": 98,
+    "prior66ProofRetained": 66,
+    "newProofFiles": 13,
+    "newProofBytes": 52174
+  },
+  "changed": [
+    {
+      "kind": "source",
+      "path": "plugins/pipeline-core/lib/consumer-verify.mjs",
+      "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85",
+      "status": "materialized"
+    },
+    {
+      "kind": "source",
+      "path": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+      "sha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364",
+      "status": "materialized"
+    },
+    {
+      "kind": "source",
+      "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+      "sha256": "627d926b6b021a0dc9505d460ae27fd4dee8c017b9fcbf6bf5f11d61a81b6ae3",
+      "status": "materialized"
+    },
+    {
+      "kind": "source",
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "status": "materialized"
+    },
+    {
+      "kind": "source",
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+      "sha256": "31053d205a6de028d8d585a447fb0d6c394f89a2ebe1b0d9c9a425b0bba81b18",
+      "status": "materialized"
+    },
+    {
+      "kind": "source",
+      "path": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+      "sha256": "bdeee4983ef2c76ff6e57b96f52f45ff96749b99ddca7caa8075dcfde51046bc",
+      "status": "materialized"
+    },
+    {
+      "kind": "source",
+      "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/receipt.json",
+      "sha256": "6a43534f443b996746fdc9550d53b9763d356534de73031a1803c32ea827261c",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/completion.fd3.jsonl",
+      "sha256": "58b942401f1cdbdd3e1aca38e018de0b9f7d0ceb86289a1c9a494b343bba40cf",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/policy.json",
+      "sha256": "c61d8c295a59b1adadc51f12e6c74e88546066b171ca7f1df9d55bb357968d92",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/case-associations.json",
+      "sha256": "00f2705efd81593fe5d93269367ea8572f37d0db9dca44eac47ed82844e4fab8",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/history/receipt.json",
+      "sha256": "73c8acc487e63daf25c6f064c92bf7af0c4fbe211d3431bb8fb3d8743375c506",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/history/original-completion.fd3.jsonl",
+      "sha256": "d29e0ca107c9a5959cce3a759e4a0e065950e05d393c3c83e9da8b625841278c",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/history/empty-label-expectation-erratum.json",
+      "sha256": "0a33d9f27f76b30d1672dde6c68d0a2d58322e38f7778daed040dfc1fef4f9ee",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/history/role-intent-fixture-splice.json",
+      "sha256": "b0d048742bb6e4ef9f45e969d228ac9308e5f0ace2ade62d437f3b8ed572ac61",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/qualification-manifest.json",
+      "sha256": "bc4832257dbc1e8fbbb97c07f02a15ce52de072cd2b85d13481a0af52f07743d",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/qualification-report.md",
+      "sha256": "c2e18dff3dfe7b4e88b5cd7522fc39fbf5968c7c51ccd19e1555bc945efd35cf",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/public-transfer-whitelist.json",
+      "sha256": "d91a30367a333d8f5d5f750c85312c5db814d50add2a50828d2fc7fb2cd3d1fd",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/assembly-successors/actual98-byte-cas-receipt.json",
+      "sha256": "04bcb45586ca54c6370a4049136d47dadb9051bc5d4c19c6c6ba114d1a6354de",
+      "status": "materialized"
+    },
+    {
+      "kind": "public-proof",
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/assembly-successors/public-pci-source-manifest.json",
+      "sha256": "7fa425b9f819d1bdd41939ed27d5e60918e6021fd93c95f41b5ed023856f71bd",
+      "status": "materialized"
+    }
+  ],
+  "prior66ProofExact": true,
+  "all98PathsRetained": true,
+  "source98And95And89And88PackagesUnchanged": true,
+  "mainWrites": 0,
+  "installedWrites": 0,
+  "gitWrites": 0,
+  "semanticRuns": 0,
+  "nativePASS": false,
+  "humanSigning": false,
+  "itemClosure": false
+}

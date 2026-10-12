@@ -1,0 +1,124 @@
+{
+  "schema": "alfred.selected164.shell-readonly.preparation-manifest.v1",
+  "status": "Root-fixed-inspector-ready-unexecuted",
+  "files": [
+    {
+      "path": "prepare.mjs",
+      "sha256": "d94d5abc04ff1bff5f3aab2057358ac51672787d3d571d83b6bb2c8b9b89b3af",
+      "bytes": 5076,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plan-intent.json",
+      "sha256": "59889787e87e2e2dbac63d7476df5df6808b31d376d738ccf667188e8fd46078",
+      "bytes": 19194,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "inspect-physical.mjs",
+      "sha256": "ef858d9f6b1830ecbc6b7eb4911a62e31413c7c227776c4238addb4638fa017b",
+      "bytes": 5904,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "report.md",
+      "sha256": "20fc9e8f3711b6f79eb86d053bdbed581db55b76b97bddbf5ee9d70c7f4d957c",
+      "bytes": 5570,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "freeze.mjs",
+      "sha256": "5575b40044bbf7ac5e95ebc59753cab0e05f0f362801de1b5192bf96fb421a96",
+      "bytes": 2918,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "counts": {
+    "targets": 9,
+    "directAndLiteralDependencies": 14
+  },
+  "inputs": [
+    {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+      "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76"
+    },
+    {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed25-successor/remaining-delta.json",
+      "sha256": "ea3967b75a04e4cc0d1226591d7525dd00a0c879f8172c13192bd1185e11b7d2"
+    }
+  ],
+  "authoredPostReadbacks": [
+    {
+      "canonicalPath": "docs/product-capability-inventory.json",
+      "path": "legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/postimages/docs/product-capability-inventory.json",
+      "sha256": "04c4c2539df5c0a271f68b44cf07d9a3ae78eb7e82c171d85d8bf3f237c38f58",
+      "relation": "selected donor byte-equal to actual declared authored post; author parent chain not invented"
+    },
+    {
+      "canonicalPath": "docs/operating-model.md",
+      "path": "legacy-origin:alfred-current-candidate-docs-consistency-source-20261010/postimages/docs/operating-model.md",
+      "sha256": "aa98c8477636b590c29edf454ab03b3e29958a15918973089d3ebdeafe99618e",
+      "relation": "selected donor byte-equal to actual declared authored post; author parent chain not invented"
+    },
+    {
+      "canonicalPath": "harness/scripts/shell-grammar-capability-placement.test.mjs",
+      "path": "legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/postimages/harness/scripts/shell-grammar-capability-placement.test.mjs",
+      "sha256": "756de3f9a93c616c1079dc70a62d0f5c0be26e277e64b44747a83dc677f076e5",
+      "relation": "selected donor byte-equal to actual declared authored post; author parent chain not invented"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+      "path": "legacy-origin:alfred-scratch-durability-report-source-20261010/postimages/plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+      "sha256": "65275ee4adb9db869bae6fd19c4cbff902d7f717690b6fcff0aa7c1116ea65f9",
+      "relation": "selected donor byte-equal to actual declared authored post; author parent chain not invented"
+    }
+  ],
+  "adjacentHistoricalEvidence": {
+    "path": "legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/qualification-resumption-root/execution.json",
+    "sha256": "66414b715522a2ed243f1e6147cdbf374c27da58d70fcafe2ecc76b099a02c64",
+    "status": "complete-non-green",
+    "completion": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "db68e87b4068a76c76dd68a5e5126b1f259e17dcefe32c980fbaaf4fcbed23df",
+      "caseSetSha256": "cfdf1747a8930caf817357d3381faa64bdd876642729a9675150701d808ccaf6",
+      "dispositionsSha256": "38e07cf79ca485e62427fb8102c230740af6cd88402b1f7c660472e7814c1335",
+      "declaredCount": 12,
+      "disposedCount": 12,
+      "counts": {
+        "pass": 10,
+        "fail": 2,
+        "skip": 0,
+        "todo": 0
+      }
+    },
+    "graphAndFixtureConserved": true,
+    "ceiling": "historical JCP12 adjacent evidence, not current shell group/RGCP acceptance"
+  },
+  "qualification": {
+    "sourceSelected": true,
+    "nineTargetExecution": false,
+    "wholeItemAcceptance": false,
+    "individualProofJoins": "explicitly incomplete"
+  },
+  "rootCommand": [
+    "node",
+    "legacy-origin:alfred-selected164-shell-readonly-integration-preparation-20261011/inspect-physical.mjs",
+    "--inspect"
+  ],
+  "next": "Root read-only physical receipt, exact dependency coordination, then separate atomic writer; no implicit Main overwrite",
+  "limits": {
+    "authorTargetWrites": 0,
+    "productImports": 0,
+    "businessRuns": 0,
+    "GitOperations": 0,
+    "staticImportClosure": "direct relative literal imports only; not transitive evaluation or full resource closure",
+    "proofClosure": false,
+    "formalAcceptance": false
+  }
+}

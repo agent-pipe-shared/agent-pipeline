@@ -1,0 +1,229 @@
+{
+  "schema": "alfred.signed-candidate-raw18-public-actual-proof.v1",
+  "status": "actual-scoped-pass",
+  "actualReceipt": {
+    "path": "scratch/alfred-signed-candidate-worktree-controls-20261011/readonly-status-full-eighteen-successor/execution-root/execution.json",
+    "sha256": "b30a016d9073fed38823dd42618a4c9af5a26a4216e267ce43bdd3dfe3856015",
+    "bytes": 5580
+  },
+  "ready": {
+    "path": "scratch/alfred-signed-candidate-worktree-controls-20261011/readonly-status-full-eighteen-successor/ready-manifest.json",
+    "sha256": "25d7095c35afa0d7dcc7424404e33ada41683cbb30f07052175cd43df6e144fb",
+    "bytes": 6289
+  },
+  "testCases": {
+    "path": "scratch/alfred-signed-candidate-worktree-controls-20261011/readonly-status-full-eighteen-successor/cases.mjs",
+    "sha256": "f1aaabb8aacc26ab774f55f10720925ab887f344abe221ad97bb64aebb7077e2",
+    "bytes": 24375
+  },
+  "binding": {
+    "path": "scratch/alfred-signed-candidate-worktree-controls-20261011/readonly-status-full-eighteen-successor/binding.json",
+    "sha256": "cef48fd546606d1f4590fc9bfe5df658b359edf4aa597138d9d29e995ab9114e",
+    "bytes": 598919
+  },
+  "sourceManifest": {
+    "path": "scratch/alfred-quality-package-raw-materialization-source-20261011/readonly-status-successor/manifest.json",
+    "sha256": "f8bd5a92b0898c4acd500ac394baeec15d3cbca08d1938fabdb0421da5675703",
+    "bytes": 3099
+  },
+  "testedSource": {
+    "path": "scratch/alfred-quality-package-raw-materialization-source-20261011/readonly-status-successor/related-admission/postimage.mjs",
+    "sha256": "3f0ea6b0a1e560ae30f3c6f10b8df08abf56b7938d9583291d8f7fd5bd5b60fd",
+    "bytes": 39004
+  },
+  "gateSource": {
+    "path": "scratch/alfred-signed-candidate-worktree-admission-source-20261011/postimages/plugins/pipeline-core/lib/guard/gate-strength-lane.mjs",
+    "sha256": "58e6b89bfe896a38c58647ae9ad6fb1c4b96306095203bd2e6c2524c2360e6ee",
+    "bytes": 29624
+  },
+  "rawWriterSource": {
+    "path": "scratch/alfred-quality-package-raw-materialization-source-20261011/readonly-status-successor/raw/postimage.mjs",
+    "sha256": "4bf874caad6b394e1de7bc8a7b8c072eae95efa3ffd578f14494463676386ec3",
+    "bytes": 35066
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "d5320613b1fbe3f36579bc512fe4287674178034e090faeb1351177a7e8d7169",
+    "caseSetSha256": "1b40f6788ecafdd6e7783c2b858bc054874550603a930a10f561ccbaba234364",
+    "dispositionsSha256": "1e5f85fc80c48e76e5c281b650df1ba45d8ec3ce044dc113e46fe6a7ff38bcfc",
+    "declaredCount": 18,
+    "disposedCount": 18,
+    "counts": {
+      "pass": 18,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionTransport": {
+    "path": "scratch/alfred-signed-candidate-worktree-controls-20261011/readonly-status-full-eighteen-successor/public-proof-preparation/completion.fd3",
+    "sha256": "dce7fbb263f0069c072bf535b18b464b0ea98d5b4df9ad307766d69075d772f3",
+    "bytes": 2887
+  },
+  "caseIds": [
+    "CWA001P",
+    "CWA002P",
+    "CWA003P",
+    "CWA004P",
+    "CWA005P",
+    "CWA006P",
+    "CWA007P",
+    "CWA009P",
+    "CWA010P",
+    "CWA011P",
+    "RAW001",
+    "RAW002",
+    "RAW003",
+    "RAW004",
+    "RAW005",
+    "RAW006",
+    "RAW007",
+    "RAW008"
+  ],
+  "terminal": {
+    "status": 0,
+    "signal": null
+  },
+  "conservation": {
+    "descriptorConserved": true,
+    "groupSettled": true,
+    "inputsConserved": true,
+    "repositoriesConserved": true
+  },
+  "errors": {
+    "parserError": false,
+    "factsError": false,
+    "spawnError": false,
+    "timedOut": false,
+    "outputLimit": false
+  },
+  "unexpectedFailureFacts": 0,
+  "gitFailureFacts": 0,
+  "requirements": [
+    {
+      "id": "CWA001P",
+      "requirement": "Genuine signed related registered-worktree Source admission and exact installed-command grammar succeed.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA002P",
+      "requirement": "Unrelated repository and symlink-root Source admission refuse.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA003P",
+      "requirement": "Malformed, missing, changed-intent and forged-signature proof refuse without fixture fingerprint changes.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA004P",
+      "requirement": "Trust policy worktree or index drift refuses.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA005P",
+      "requirement": "Dirty candidate and stale actual HEAD refuse.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA006P",
+      "requirement": "Extra arguments, composition, redirection, wrong script and untrusted interpreter refuse.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA007P",
+      "requirement": "Genuine CLI actual wrong process.cwd refuses with unchanged candidate/Main fingerprints.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA009P",
+      "requirement": "Exact signed staged paths/modes/blobs admit; unsigned extra path, wrong mode and wrong blob refuse.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA010P",
+      "requirement": "Original same-root lexical branch remains independent of proof; related observer still rejects invalid proof.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "CWA011P",
+      "requirement": "Actual request/proof post-read byte races refuse.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "RAW001",
+      "requirement": "Actual signed 525-path package verifies LF postimages under committed CRLF attributes without target effects.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "RAW002",
+      "requirement": "Actual opt-in publication into owned fixture produces all525 exact signed bytes, LF PS1 and unchanged target index.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "RAW003",
+      "requirement": "Forged proof refuses with unchanged target fingerprint.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "RAW004",
+      "requirement": "Actual foreign target-index mutation refuses.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "RAW005",
+      "requirement": "Actual private resulting-index wrong blob and mode refuse.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "RAW006",
+      "requirement": "Unsafe actual symlink ancestor refuses.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "RAW007",
+      "requirement": "Ignored new-path target collision refuses BASE-DRIFT and preserves exact foreign bytes.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    },
+    {
+      "id": "RAW008",
+      "requirement": "Actual clean LF target at committed blob/mode publishes exact525 signed raw bytes and preserves index; separate altered-content race after real final clean check refuses and preserves all target bytes/absence/index/HEAD.",
+      "actualDisposition": "pass",
+      "scope": "Source METHOD"
+    }
+  ],
+  "scope": {
+    "qualificationKind": "Source-owned METHOD controls",
+    "testedVariant": "raw plus related admission cumulative library, exact import-only immutable dependency formation",
+    "installedNativeAdmission": false,
+    "candidateMainOrC0Application": false,
+    "signatureIssuance": false,
+    "productionCommitAuthorization": false,
+    "nativeCwaPending": [
+      "CWA001",
+      "CWA008"
+    ],
+    "originalWholeItemClosed": false,
+    "formalNativePass": false
+  },
+  "priorFailuresRetained": true,
+  "nativeOrMainClaimsInferred": false
+}

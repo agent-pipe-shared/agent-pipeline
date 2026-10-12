@@ -1,0 +1,42 @@
+{
+  "schema": "alfred.cmo-completion-locator-public-erratum.v1",
+  "supersedesOnly": "CMO raw completion availability/locator wording in parent public proof; all original files remain unchanged",
+  "parentPublicProof": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-successors-20261010/proof.json",
+    "sha256": "0f53a87092664b5c003ac2d2939dbf1d4ddaad63fe3c62b128cdc12160fb3bb5"
+  },
+  "originalExecution": {
+    "path": "scratch/alfred-controlled-method-design-materialization-admission-independent-20261010/qualification-successor/negative-execution.json",
+    "sha256": "e14fb81686021e83837ffc55567ac561cdf51654774371f71c6500ce8c9a8012",
+    "originalBytesSha256": "e14fb81686021e83837ffc55567ac561cdf51654774371f71c6500ce8c9a8012"
+  },
+  "writer": {
+    "path": "scratch/alfred-controlled-method-design-materialization-admission-independent-20261010/qualification-successor/run-negatives-once.mjs",
+    "sha256": "caba8457c7eb48530049a3531a7e6523e1f3bbadd1011594e67684d1249c951a",
+    "cause": "Writer opens completion under own/negative-qualification; receipt reports qualification/completion relative to external runtimeRoot."
+  },
+  "correctedCapture": {
+    "path": "scratch/alfred-controlled-method-design-materialization-admission-independent-20261010/qualification-successor/negative-qualification/completion.fd3.jsonl",
+    "sha256": "de375b31abaaa7c42131578944a4563371df188d23c22771acf06f188ee697fb",
+    "bytes": 895,
+    "physicalDigestRechecked": true,
+    "publicCopy": "cmo-negative-completion.fd3.jsonl"
+  },
+  "counts": {
+    "pass": 3,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "caseIds": [
+    "DMA002",
+    "DMA003",
+    "DMA004"
+  ],
+  "originalClaimedPathENOENTPreserved": true,
+  "sanitization": "All five lines fully read and shape screened: fixed case IDs, digest/count/disposition records only; no machine paths, key bytes, synthetic approval proof or stderr. Public copy byte-exact.",
+  "limits": [
+    "No new run, parser evaluation or product change; completion agrees with original Root parsed attestation.",
+    "Source METHOD negatives DMA002\u2013004 only; no native, full constructor, independent Critic, Verify or item acceptance."
+  ]
+}

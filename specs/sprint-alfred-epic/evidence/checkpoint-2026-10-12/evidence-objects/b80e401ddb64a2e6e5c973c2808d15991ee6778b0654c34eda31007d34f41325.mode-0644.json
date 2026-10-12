@@ -1,0 +1,188 @@
+{
+  "schema": "alfred.selected164.actual150.power2-append.v1",
+  "parent148": {
+    "path": "legacy-origin:alfred-current144-public-progress-preparation-20261011/public148-freeze/afr-locator-successor/lock-proof-locator-successor/integration-delta.json",
+    "sha256": "36f18277b8385cc0ad869380961070272938a98f537b0e32f0f42259f5d1111a"
+  },
+  "receipt": {
+    "path": "legacy-origin:alfred-power-functional-main-atomic-content-preparation-20261011/execution.json",
+    "sha256": "1ad055839deb6ff96f9b47e8a7221103ef79f09dcf190bb883ead703d526694f"
+  },
+  "counts": {
+    "selected": 164,
+    "currentOrApplied": 150,
+    "remaining": 14,
+    "runtime": 1,
+    "protectedSelected": 13,
+    "protectedUnion": 14,
+    "outsideNewApprovedContent": 8
+  },
+  "selectedCoverageAppend": [
+    {
+      "path": "plugins/pipeline-core/lib/session-power.mjs",
+      "post": {
+        "status": "regular",
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "7604fad85ee68f62208065e131498914c9bfb806880933dcf053fcef95e73c9d",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "size": 46028,
+        "sha256": "9c27c416f827aea84e176ffe82f417776b0b9a9bf2716fcf8258c81ea09d0e8c"
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "post": {
+        "status": "regular",
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "5f2900dbd3341d55f9422865577173042fe32a60e8cc7207d9ec5bedd00f8429",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "size": 67424,
+        "sha256": "6d439b3f52cde3e205a3e0ffd589bc7a9dc122b6f3e64f0986979e533d429377"
+      }
+    }
+  ],
+  "outsideCoverageAppend": [
+    {
+      "path": "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",
+      "post": {
+        "status": "regular",
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "94ecd970f79ebd7c92376329098bb811442ce8918f42e44239bdd4b498cead16",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "size": 31303,
+        "sha256": "2de1908e513c37830eac8a2324a3aff6a932f1261984711c030cc46ae31701c1"
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-power-controller.mjs",
+      "post": {
+        "status": "regular",
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "14cb40b1d903850753d7d81b816e7e19eb0e43b9d5e5ecd0fdead6ab986848af",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "size": 10774,
+        "sha256": "fd9f8b837acd6b9008a40bed98b95eb40cc4c4006e8719539b92b7e8ed75921e"
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-power.mjs",
+      "post": {
+        "status": "regular",
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "46bcabea56cf86cbe1d31e8b453317746f2d6548803ab49d1591a5bcdf2eba1b",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "size": 14072,
+        "sha256": "686365cb4903158691f6759468a2777c352272eb9a979cf7dfe0bfa3964f5e1a"
+      }
+    }
+  ],
+  "existingPowerHelperNoop": [
+    {
+      "path": "plugins/pipeline-core/scripts/session-power-helper.mjs",
+      "post": {
+        "status": "regular",
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "e9f194909f1a502d5b4e133b9ebf1ba70bbfb3620a9ce9b549d90a7a562f6598",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "size": 1256,
+        "sha256": "adb1ae87434fa7ecadafb60307d386b23ef48ac01756e2ca8cd1233f1a0889a3"
+      }
+    }
+  ],
+  "conservedNativeHelper124dd": "AlreadyR02-covered; actual peer conservation; no new selected membership.",
+  "mapTipUpdate": {
+    "receipt": {
+      "path": "legacy-origin:alfred-runtime-architecture-map-alignment-preparation-20261011/actual-map-integration.json",
+      "sha256": "918125ada7e3837ddf71077f366b9f7baabcb950f5d021846cba1d88257b7657"
+    },
+    "canonicalPath": "architecture/map/pipeline-core.md",
+    "postSha256": "98f2fcafe7c140bbdea33d32fe25c7ca9d320aa0bc63af0f54a2cd8c108d4797",
+    "newSelectedMembership": 0,
+    "alreadyCoveredBy": "R01; improves actual map tip only"
+  },
+  "remaining": {
+    "runtime": [
+      {
+        "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "owner": "alfred_obl013_override_digest_regression",
+        "status": "Root-assigned final composition; unapplied"
+      }
+    ],
+    "protected": "Exact thirteen original membership rows remain unchanged; union14 held for final authorization."
+  },
+  "AFKDiagnostic": {
+    "status": "Root reported causalSource3 session68283 LIVE; outcome not supplied at this snapshot",
+    "runtimeGreenClaim": false
+  },
+  "fullQualification": false,
+  "nativeClaim": false,
+  "formalAcceptance": false,
+  "engineeringStagesChanged": false,
+  "public148SnapshotUnchanged": true
+}

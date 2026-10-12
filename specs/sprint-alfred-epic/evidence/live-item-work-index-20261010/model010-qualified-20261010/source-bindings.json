@@ -1,0 +1,49 @@
+{
+  "schema": "alfred.model010.source-dependency-binding-proposal.v1",
+  "qualificationManifestSha256": "0a05070737265c2e97ee0ae6d5dc9e225eaf1c1aba8442d9ad5d11b8b9eafed4",
+  "source2ManifestSha256": "824471f5e97684adf4f5587d231a5d70da467b1ba333329343416711513f7bdb",
+  "sourceBindings": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "sha256": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "sha256": "74e0feb567ef0321a98f432054945942f963f810215b84d65c2c116b4b3764ea"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "sha256": "c97c3f497090fa39e7344539f2159d36abbd6d473036d8a7df75165235d75343"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "sha256": "e1c30e4d7662a0b0dc5b4f5fbd178dada5349bd2cdff37969a379f37964eb226"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "sha256": "f9ab78f6cacda4aa7555163b6f1d72bbbff0633bf83cd690ddfee83c0af170c8"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "sha256": "3c4ce04052abe17812140b98d55123e87195eb1f37db18f593fb51ed43630830"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-power-controller.mjs",
+      "sha256": "fd9f8b837acd6b9008a40bed98b95eb40cc4c4006e8719539b92b7e8ed75921e"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "sha256": "fda05d645a23c8187f19faad2419d9a916d1a4db13ac8c1c9938276384e9c711"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "sha256": "ae69d331bed4ba715458ace4ecded3de56897a636a2121875c7b12ace69442c1"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",
+      "sha256": "37679586821c8b4cd17630645f9adb6be8581f046cc07fe4d36ab9f683e5f5ae"
+    }
+  ],
+  "scope": "Original foreign mutable-owner refusal at genuine child activation pre-reservation veto only. Parent Model011 and Power dependency proof are not borrowed for this successor.",
+  "adoptionStatus": "Root-owned-pending"
+}

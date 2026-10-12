@@ -1,0 +1,46 @@
+{
+  "schema": "alfred.claude-inline-attestation-execution.v1",
+  "readySha256": "e69e7727def832683be86b6991cb8c586c8c667c742f3d698cce1a0d3b948364",
+  "runtimeRoot": "<outside-repository-host-path-excluded>",
+  "scope": "controlled-physical-preflight-only; downstream READY/native/full bootstrap unqualified",
+  "childStatus": 0,
+  "signal": null,
+  "error": null,
+  "parser": null,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "aabdf988b8945ca306d55f71e5e45bf23b108cb62271fc6b2fcd6ec3ca8fa508",
+    "caseSetSha256": "e5d690e99ab66c2f1f7b1efb0826a97d10dc77deb2b11b14f535b2dbd5c80168",
+    "dispositionsSha256": "4113f986dd8876e0807f6b915e97b12dc2a67598dad75115ca064068a9fc7cad",
+    "declaredCount": 10,
+    "disposedCount": 10,
+    "counts": {
+      "pass": 10,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "graphFileCount": 2165,
+  "graphConserved": true,
+  "sourceConserved": true,
+  "captures": [
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/qualification/stdout.log",
+      "sha256": "ab7f8bd310d0b248a834ea2751ef3c10dc78939edbc43775461ab3f3a8d5f9b3",
+      "bytes": 1091
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/qualification/stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/qualification/completion.fd3.jsonl",
+      "sha256": "d516c536bf6ca95d9d8e818048e14aa0141a6ab4427811e553a02dbf537eb5b6",
+      "bytes": 1809
+    }
+  ],
+  "environment": "HOME/Git/hooks/signing/protected environment and execArgv inherited unchanged. Explicit real receiptDirectory subject plus owned temp/fixture/FD3 variables only; no authority/status callback injection."
+}

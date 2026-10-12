@@ -1,0 +1,39 @@
+{
+  "schema": "alfred.landed-ownership.independent-execution.v1",
+  "status": "terminal",
+  "actualChild": {
+    "status": 1,
+    "signal": null,
+    "error": null
+  },
+  "graphSha256": "6ee2a3d26aa0ce087063d7339c70f443e3e5acdd4d1bd1f50b5deb47b0660fcf",
+  "sourceAndFixtureCAS": true,
+  "conservationError": null,
+  "completionError": {
+    "code": "VERIFY-CASE-COMPLETION-BOUNDS",
+    "name": "Error"
+  },
+  "attestation": null,
+  "captures": {
+    "stdout": {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/qualification-preparation/qualification-root/captures/stdout.private.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stderr": {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/qualification-preparation/qualification-root/captures/stderr.private.log",
+      "sha256": "f41e4b4c19c07f4129cedbc3e2d8a5e5ab73541da82232db01ff619fa7f5fdc3",
+      "bytes": 1349
+    },
+    "fd3": {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/qualification-preparation/qualification-root/completion.fd3.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "semanticChildInvocations": 1,
+  "assurance": "controlled-unit-method",
+  "nativeProof": false,
+  "governedLaterReadinessDenialProven": false,
+  "wholeItemAcceptance": false
+}

@@ -1,0 +1,191 @@
+{
+  "schema": "alfred.claude-design-request.independent27.execution.v1",
+  "runs": 1,
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "freezeSha256": "2c470e75499ff03ac50cbb17d190d4142bac96568be0c7750a02ebed1f256bbf",
+  "assertionsFreezeSha256": "7689c28d6f31506558e78c5c143740e93fa149b3da27edb197c8b15fd7dc5f21",
+  "graphManifestSha256": "5ab8dc088af8b2b828792e34cc0f53cce8ff2ac8ac7b486812f738869ce41fe5",
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "f2fdf8bde18457d6c295f9e54e450a857101e83e23ccee1c1af27050357e1406",
+    "caseSetSha256": "3e56a018e7457d844207ec2e82d0255ce9271916626a727ac37a7887d1724ac2",
+    "dispositionsSha256": "a3c1a68234fce53175d255a30ea3cc931aef2d6f11f95a690872d99d3f03dc39",
+    "declaredCount": 27,
+    "disposedCount": 27,
+    "counts": {
+      "pass": 27,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionError": null,
+  "conservationError": null,
+  "caseAudit": [
+    {
+      "id": "CSR001",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR002",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR003",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR004",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR005",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR006",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR007",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR008",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR009",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR010",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR011",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR012",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR013",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR014",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR015",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR016",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR017",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR018",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR019",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR020",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR021",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR022",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR023",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR024",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR025",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR026",
+      "phase": "semantic",
+      "outcome": "pass"
+    },
+    {
+      "id": "CSR027",
+      "phase": "semantic",
+      "outcome": "pass"
+    }
+  ],
+  "preparationFailures": [],
+  "semanticAssertionFailures": false,
+  "semanticRED": null,
+  "requiredOutcomeClassification": "Root must distinguish proven product failure from retained independent contract tensions CSR001 and CSR015; no status-only verdict",
+  "inheritedNodeOptionsPresent": false,
+  "inheritedCodexThreadPresent": true,
+  "captures": [
+    {
+      "path": "captures/stdout.txt",
+      "sha256": "99888f59bfd7e4f787432ef598951b172ff08eb4569bcdff01a337b8f96ac446"
+    },
+    {
+      "path": "captures/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "captures/completion.jsonl",
+      "sha256": "1e506a00d2877a3f68d33ef1000797f82dba582276565ab6a2106c02d13348df"
+    }
+  ],
+  "limits": [
+    "Synthetic public policy and real public producers/default description/CLI only",
+    "Private boundary uses a non-key sentinel; no returned private bytes, TTY or Human signing",
+    "CSR027 source literal check is static; attended unknown-purpose disclosure unavailable",
+    "No proof-publication CAS during actual signing, native runtime, official closure or whole Verify claim",
+    "ONE attempt, no self-repair or rerun"
+  ]
+}

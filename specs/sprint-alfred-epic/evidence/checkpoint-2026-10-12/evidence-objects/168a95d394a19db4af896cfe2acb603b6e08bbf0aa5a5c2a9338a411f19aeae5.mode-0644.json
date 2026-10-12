@@ -1,0 +1,67 @@
+{
+  "schema": "alfred.capability-baseline-cause-reconciliation-manifest.v1",
+  "status": "diagnosed-no-product-change-no-rerun",
+  "artifacts": [
+    {
+      "path": "contract.json",
+      "sha256": "dea9be3ec035d0b90b6f66a87e1e36ad77ffe8cdd0a02f2b6456a9f577c55845"
+    },
+    {
+      "path": "report.md",
+      "sha256": "fbd1f0122cb609521b98e6e99c2459e981bbadc98addcd15abe5974b0650aef7"
+    },
+    {
+      "path": "candidate-source-projection.json",
+      "sha256": "b5f32919d6a9f044f3a474018e8186bda137629ff2194b883fa2887dc75c9d25"
+    }
+  ],
+  "actualExecution": {
+    "path": "../execution.json",
+    "sha256": "2225f7a7be46f30a8aed73e3d278fa121c7acb6f4973e475f4fe5d86773b2598",
+    "pass": 7,
+    "fail": 3,
+    "failedIds": [
+      "CRI001",
+      "CRI003",
+      "CRI004"
+    ]
+  },
+  "actualFD3": {
+    "path": "../runtime/completion.fd3.jsonl",
+    "sha256": "0fc0e37252b7884c99790cd4c0e74f4a3395e4b6048bf214e75bc83f7e174229",
+    "bytes": 1808,
+    "complete": true
+  },
+  "cli120": {
+    "reportedByRoot": true,
+    "wholeDurableCapture": false,
+    "wholeFindingsRead": false
+  },
+  "projection": {
+    "selectedSourceRows": 164,
+    "declaredSourceReferencePaths": 267,
+    "physicalCurrentCandidateClaim": false,
+    "discoveryClaim": false,
+    "stagingWhitelist": false,
+    "purpose": "Finite metadata inputs for Root C0 source-custody review, followed by inventory C1 binding C0; no automated private-file staging"
+  },
+  "metadataTransport": {
+    "firstReview": "automatic permission review deadline, no action started",
+    "retryCount": 1,
+    "retryAuthorization": "returned timeout explicitly allowed once",
+    "retryStatus": 0,
+    "productImports": false,
+    "GitWrites": 0,
+    "businessRuns": 0
+  },
+  "preservation": {
+    "originalTenAssertionsChanged": false,
+    "originalSourceChanged": false,
+    "originalRunRepeated": false,
+    "source164HistoricalPinsRetained": true,
+    "criticPendingPreserved": true
+  },
+  "nextOwner": "Root source-custody/integration for genuine C0 regular public blob/mode candidate; capability source owner for exact C1 baseline reconciliation after C0",
+  "nativeAssurance": false,
+  "itemAcceptance": false
+}

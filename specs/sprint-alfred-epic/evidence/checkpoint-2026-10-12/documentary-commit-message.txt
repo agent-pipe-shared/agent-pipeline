@@ -1,0 +1,10 @@
+docs(alfred): preserve portable Claude continuation checkpoint
+
+Retain the current matrix, handover, public qualification records and exact
+prepared Source proposals outside ignored scratch. Preserve original bytes
+and explicit holds; archived logs and patches retain their whitespace.
+Keep durable specs/backlog evidence visible to Git, including log, jsonl
+and tmp artifacts. This is a WIP checkpoint, not review or acceptance.
+
+Dispatch: stage-0 (elephant)
+AI-Assisted: true

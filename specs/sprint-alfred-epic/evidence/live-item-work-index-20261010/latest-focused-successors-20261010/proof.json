@@ -1,0 +1,126 @@
+{
+  "schema": "alfred.latest-focused-successor-public-proof.v1",
+  "executionReceipts": [
+    {
+      "path": "scratch/alfred-host-index-lock-readonly-retry-fourcase-qualification-20261010/execution.json",
+      "sha256": "615c2cfb78e4a4273436d650cbfab352808a59e38f038f6e8ec8bd6ebfb1bd68",
+      "bytes": 1606
+    },
+    {
+      "path": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/qualification-root/execution.json",
+      "sha256": "1146cba5a1379511e0bf602c9f43ff37f419240e268e2b659f2b5a0b837fc61d",
+      "bytes": 2756
+    },
+    {
+      "path": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/foreign-owner-probe-diagnosis/one-case-preparation/qualification-root/execution.json",
+      "sha256": "7a6f28b50c8891b4c699c1d2e2579de27216fb8895a7ce9aef49e6843fd411b2",
+      "bytes": 2449
+    },
+    {
+      "path": "scratch/alfred-controlled-method-design-materialization-admission-independent-20261010/qualification-successor/negative-execution.json",
+      "sha256": "e14fb81686021e83837ffc55567ac561cdf51654774371f71c6500ce8c9a8012",
+      "bytes": 1449
+    }
+  ],
+  "checks": [
+    {
+      "id": "HIL4",
+      "caseIds": [
+        "HIL002",
+        "HIL003",
+        "HIL004",
+        "HIL010"
+      ],
+      "counts": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "completion": {
+        "locator": "scratch/alfred-host-index-lock-readonly-retry-fourcase-qualification-20261010/operation/completion.private.jsonl",
+        "sha256": "64beb4e393534da3c34c2a3a85247fddb3ab0d5789ee7a527815d8b9d893d446",
+        "bytes": 1025,
+        "publication": "digest only; synthetic local capture retained"
+      },
+      "sourceParentSha256": "7e781dd0c3e9b48488891b4fbe477d36afb341c71e0ef769bc05c2a13c7f3a8d",
+      "sourceOverlaySha256": "a40947944d52f0c817780c752633911caa1f79ae2cec3bc76e6105efa48d754a",
+      "restored": true,
+      "leaseReleased": true,
+      "assurance": "controlled-host-method-only"
+    },
+    {
+      "id": "Windows15-plus-target1",
+      "predecessor": {
+        "counts": {
+          "pass": 15,
+          "fail": 1,
+          "skip": 0,
+          "todo": 0
+        },
+        "completion": {
+          "locator": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/qualification-root/captures/completion.fd3.private.jsonl",
+          "sha256": "dc6320037bff07959afc2f5ce2ebb847e1b8feca4e320c472ba587a3e97932bb",
+          "bytes": 2595,
+          "publication": "digest only; synthetic local capture retained"
+        },
+        "retainedNonGreen": true
+      },
+      "target": {
+        "caseIds": [
+          "WHI013"
+        ],
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "completion": {
+          "locator": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/foreign-owner-probe-diagnosis/one-case-preparation/qualification-root/captures/completion.fd3.private.jsonl",
+          "sha256": "1c756a0dcf925d4e3c443f94037f20b2ffc9655011841f1d4fb1c9eefa9e3e0b",
+          "bytes": 635,
+          "publication": "digest only; synthetic local capture retained"
+        }
+      },
+      "resourcesConserved": 371,
+      "nativeWindowsEvidence": false,
+      "singleCombinedRun": false
+    },
+    {
+      "id": "CMO-negative3",
+      "caseIds": [
+        "DMA002",
+        "DMA003",
+        "DMA004"
+      ],
+      "counts": {
+        "pass": 3,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "completion": {
+        "locator": "CMO negative runtime / qualification/completion.fd3.jsonl",
+        "sha256": "de375b31abaaa7c42131578944a4563371df188d23c22771acf06f188ee697fb",
+        "bytes": 895,
+        "custody": "Root execution receipt attestation only; declared raw capture is ENOENT at public preparation",
+        "publication": "no raw capture or substitute published"
+      },
+      "sourceClosureSha256": "eeb2daf7515f5fa629d982637bbacf835f4077cf42f39ce09c8c7186c497743b",
+      "assertionFreezeSha256": "c718fa94b77f91e4ac05ed4b2c2c3808e3ed9532489bbce87d1ff2616111add8",
+      "sourceConserved": true,
+      "runtimeConserved": true,
+      "sourceMethodOnly": true
+    }
+  ],
+  "limitations": [
+    "Controlled METHOD evidence only; no native host or native Windows attestation.",
+    "Windows combines fifteen retained passes with one later targeted pass; no fabricated single sixteen-pass run.",
+    "HIL qualifies four named cases, not the full twelve or a whole candidate.",
+    "CMO qualifies DMA002–004 negatives only; no full constructor or independent Critic pass.",
+    "CMO completion digest is bound to the actual execution receipt; its declared external raw capture is unavailable at preparation, unlike physically rechecked HIL/Windows captures.",
+    "No full Verify, backlog acceptance, item closure or current whole-source integration is certified.",
+    "Failed predecessors and all available private captures remain unchanged."
+  ]
+}

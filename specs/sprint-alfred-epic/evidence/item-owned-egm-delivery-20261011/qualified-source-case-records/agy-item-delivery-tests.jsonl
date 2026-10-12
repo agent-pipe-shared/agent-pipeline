@@ -1,0 +1,8 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["AGYID01","AGYID02","AGYID03","AGYID04","AGYID05","AGYID06"],"caseCount":6,"caseSetSha256":"17e991ac18db001fc9c4e6e0172336619a00b8e88032229e1d0c6684d8b0db9c"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYID01","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYID02","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYID03","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYID04","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYID05","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYID06","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":6,"disposedCount":6,"caseIds":["AGYID01","AGYID02","AGYID03","AGYID04","AGYID05","AGYID06"],"caseSetSha256":"17e991ac18db001fc9c4e6e0172336619a00b8e88032229e1d0c6684d8b0db9c","dispositionsSha256":"a314c2a4b63849696fe277f6e40f9bfc4d52f6d454ef54cdcbc6ceeaf15da5d7","counts":{"pass":6,"fail":0,"skip":0,"todo":0}}

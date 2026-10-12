@@ -1,0 +1,573 @@
+{
+  "schema": "alfred.current-open-work-overview.v2",
+  "snapshotDate": "2026-10-10",
+  "candidateCommit": "d794e86c75c53c23400bfcaec30982b103e469f1",
+  "liveProposalApplication": false,
+  "retainedScope": {
+    "acceptanceCriteria": 37,
+    "incidentCriteria": 4,
+    "workPackages": 19,
+    "requiredCaseIdentifiers": 112
+  },
+  "historicalOpenBodiesRead": 140,
+  "initialSourceUnknownRows": 93,
+  "boundedSourceAuditDeliveredRows": 93,
+  "remainingSourceReconciliationDispatchedRows": 0,
+  "boundedAuditDoesNotMeanClosure": true,
+  "registeredAgyOpen": 5,
+  "conditionalCodexDraftGroups": 6,
+  "inventoriesOverlap": true,
+  "newOfficialClosureCount": 0,
+  "aggregateProposal": {
+    "canonicalPaths": 30,
+    "status": "assembled-proposal-not-integrated",
+    "originalSuiteRows": 184,
+    "additiveSuiteRowsProposed": 6,
+    "manifestSHA256": "630aab6dc7a3bf87fccef9183aec7cde93fb0e09e65af346f254a06af885ec97"
+  },
+  "actualFocusedEvidence": {
+    "jointJournal": {
+      "pass": 91,
+      "fail": 0,
+      "scannerFindings": 0
+    },
+    "architectureEntryRegression": {
+      "pass": 2,
+      "fail": 0
+    },
+    "architectureEntryExistingSuite": {
+      "pass": 18,
+      "fail": 0
+    },
+    "recoveryRegression": {
+      "baselinePass": 30,
+      "baselineFail": 6,
+      "fixedPass": 36,
+      "fixedFail": 0,
+      "FD3Complete": true
+    },
+    "reopenRegression": {
+      "baselinePass": 5,
+      "baselineFail": 1,
+      "fixedPass": 6,
+      "fixedFail": 0,
+      "FD3Complete": true
+    },
+    "reopenExistingSuite": {
+      "pass": 27,
+      "fail": 0
+    },
+    "qualitySingleLinkRegression": {
+      "pass": 6,
+      "fail": 0,
+      "FD3Complete": true,
+      "integrated": false
+    },
+    "sessionRunnerRegression": {
+      "pass": 6,
+      "fail": 0,
+      "FD3Complete": true,
+      "integrated": false
+    },
+    "stashReadOnlyRegression": {
+      "pass": 34,
+      "fail": 0,
+      "FD3Complete": true,
+      "integrated": false
+    },
+    "passiveCredentialFollowBaseline": {
+      "pass": 27,
+      "fail": 9,
+      "FD3Complete": true
+    },
+    "passiveCredentialFollowFixed": {
+      "pass": 36,
+      "fail": 0,
+      "FD3Complete": true,
+      "integrated": false
+    },
+    "optionLabelFixedWorkerReport": {
+      "pass": 20,
+      "fail": 0,
+      "FD3Complete": true,
+      "integrated": false,
+      "sourcePostSHA256": "1c08d20586b9191c2a67d1e7d749b2ed8ba4ff0d5e4b8996ad9530a534cb8163"
+    },
+    "criticCourseIndependentBaseline": {
+      "pass": 7,
+      "fail": 7,
+      "FD3Complete": true
+    },
+    "criticCoursePartialFixed": {
+      "pass": 14,
+      "fail": 0,
+      "FD3Complete": true,
+      "integrationReady": false,
+      "open": [
+        "authenticated-actual-PASS-exception",
+        "valid-prelaunch-routing"
+      ]
+    },
+    "bootstrapDiagnosticBaseline": {
+      "pass": 4,
+      "fail": 2,
+      "FD3Complete": true
+    },
+    "bootstrapDiagnosticFixed": {
+      "pass": 6,
+      "fail": 0,
+      "FD3Complete": true,
+      "manifestSHA256": "df80f0247a8359c61914ebb9c653fe5d40e1fb465098a33290256427221afcbb",
+      "recoveryEndpoint": "open",
+      "integrated": false
+    },
+    "nativeWindowsSeparatorBaseline": {
+      "pass": 10,
+      "fail": 2,
+      "platform": "win32",
+      "node": "v24.20.0"
+    },
+    "nativeWindowsSeparatorFixed": {
+      "pass": 12,
+      "fail": 0,
+      "platform": "win32",
+      "node": "v24.20.0",
+      "manifestSHA256": "7ac61013d191b7c9ab6435bc15a5ecb859489ac90409f1d25f36c38c8f025bd7",
+      "FD3Complete": false,
+      "nativeHookProof": "open",
+      "integrated": false
+    }
+  },
+  "materialChoices": [
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6"
+  ],
+  "materialChoiceDirections": {
+    "M1": "A",
+    "M2": "B",
+    "M3": "B",
+    "M4": "A",
+    "M5": "A",
+    "M6": "A",
+    "source": "po-direction-selections.json",
+    "pendingDirectionQuestions": 0,
+    "implementationAndFinalCandidateBinding": "pending",
+    "newM2M3CompletionEnforcementSelected": false
+  },
+  "routineCorrectiveScopeAuthorized": true,
+  "backlogScopeSelection": {
+    "source": "po-backlog-scope-selection.json",
+    "excludedEpics": [
+      "Nightwing",
+      "Batman"
+    ],
+    "excludeExplicitlyDeferred": true,
+    "remainingDefaultEpic": "Alfred",
+    "newOtherEpicFeatureException": true,
+    "pendingScopeQuestion": false,
+    "currentCanonicalReconciliation": "in-progress; historical140 is not complete current inventory"
+  },
+  "independentReview": "open",
+  "nativeAcceptance": "open",
+  "finalSignedStampedCandidate": "not-ready",
+  "signingRequestReady": false,
+  "evidenceArchive": {
+    "earlierOverviewAnd80InputsCommitted": "8ae4ae637",
+    "sourceAuditDeliveriesAndComplete30": "574859185",
+    "current43": "f2acf5b035da6242fa4a73a8138ae89dab627b63",
+    "latestArchiveFiles": 77,
+    "losslessSourceTransfers": 43,
+    "sanitizedProofProjections": 23,
+    "excludedPreviouslyRefusedNonnormativeReports": 2,
+    "newestBGDWindowsS1Packages": "archive-pending"
+  },
+  "consolidatedRepairQueue": {
+    "status": "delivered",
+    "obligations": 54,
+    "routingFamilies": 53,
+    "uniqueRemainingSourceFixCount": null,
+    "manifestSHA256": "18cad43c8dc6bad7dffb81d888439fd716290e47acf6328f35d5a4d52911d6fe"
+  },
+  "currentFocusedWork": [
+    "critic39-authentic-review-target-fixture-closure",
+    "critic-original-paragraph-numbered-criterion24",
+    "critic-external-stop-independent13",
+    "gh-qualified-twohook-successor-composition",
+    "signed-cleanup-24case-final-fixture-freeze-then-producer-default-implementation",
+    "source72-successor-integration-and-tracked-archival",
+    "independent-review-admission-and-material-choices"
+  ],
+  "criticAcceptedContractSource": {
+    "manifestSHA256": "c569d226160c5b1c137880bd5a2baaf17edde6109614b9dfbaae85bcd196bba8",
+    "postimages": 4,
+    "changedModuleSyntaxExitZero": 3,
+    "independentAssertions": 42,
+    "FD3Pass": 42,
+    "qualificationManifestSHA256": "96b8f445accb34b3477b218a11b5e9855c0d973de158d92c6545ae4c61f0b5ef",
+    "finalEvidenceReadback": "completed",
+    "fixtureRepair": "completed-before-one-run",
+    "actualApprovePlanRuntimeProof": "open",
+    "lifecycleConsumerAudit": "running"
+  },
+  "current46Assembly": {
+    "canonicalPaths": 46,
+    "suiteRows": 195,
+    "manifestSHA256": "6e859e9bdf681e6f539290285909b379fa2c8521ecb2d3da8f83a87835c8b59e",
+    "allPrior43ByteExact": true,
+    "includesBGDCause": true,
+    "includesWindowsSeparator": true,
+    "jointQualification": "open",
+    "integrated": false
+  },
+  "criticExactDelta": {
+    "unchangedControlPass": 14,
+    "newAssertions": 7,
+    "previousTargetBaseline": "masked-by-invalid-fixture-claim-token",
+    "fixtureRepair": "completed",
+    "semanticRED": true,
+    "baselinePass": 5,
+    "baselineFail": 2,
+    "failedIds": [
+      "CDX004",
+      "CDX005"
+    ],
+    "qualificationManifestSHA256": "be5a606ad0c325d639a3ca4374cb5b637a75042236f2d06a6cd7b933b55ccf4c",
+    "sourceFix": "dispatched"
+  },
+  "newGreenProposalsNotYetInComplete30": [
+    "quality-single-link",
+    "session-runner-entry",
+    "stash-readonly",
+    "passive-credential-follow"
+  ],
+  "currentGreenAssembly": {
+    "canonicalPaths": 43,
+    "suiteRows": 195,
+    "manifestSHA256": "a589a4245942ccf59f683f85fcea7356e426d60ee1a0d7a555539cdce754ae98",
+    "integrated": false,
+    "includesCredentialFollow": true,
+    "includesOptionLabels": true,
+    "jointQualification": "open",
+    "SSRIRegistration": "self-contained-fixture-qualified"
+  },
+  "ROPT009Adjudication": "stale-blanket-outside-file-expectation-against-SEC11",
+  "windowsPathRegression": "actual-native-baseline10-pass2-fail-to-fixed12-pass0-fail; unchanged-test-and-refusals",
+  "criticChatAuthorityAdjudication": {
+    "status": "routine-already-authorized-mode-honest-capture",
+    "manifestSHA256": "53c128a6722e188070aaf8d9ca461ec99d2ad2744035f2c289a06bb6b35c0cd8",
+    "newCryptographicChatGateRequired": false,
+    "newPOQuestionRequired": false
+  },
+  "fourSuiteMetadataProposal": {
+    "suiteRows": 195,
+    "SSRIRegistration": "self-contained-fixture-qualified",
+    "manifestSHA256": "a589a4245942ccf59f683f85fcea7356e426d60ee1a0d7a555539cdce754ae98"
+  },
+  "latestStatusSupersedesEarlierProposalSnapshots": true,
+  "latestComposedProposal": {
+    "canonicalPaths": 73,
+    "suiteRows": 195,
+    "manifestSHA256": "2ad6867a853b1848b0bde3c315e8a2f4b2ff371b94a7ecc2d2755913157b7ea4",
+    "source72RetainedPaths": 72,
+    "source72ByteExactPaths": 71,
+    "qualifiedTwoHookSuccessorIncluded": true,
+    "source73Archive": "pending privacy review and tracked custody",
+    "integrated": false,
+    "jointQualification": "open",
+    "sourcePathCountDoesNotMeanObligationClosure": true,
+    "readerCoreIncluded": true,
+    "readerProductionIncluded": true,
+    "pureCriterionParserIncluded": true,
+    "consumedCriticResultIncluded": true,
+    "prior69Retained": true,
+    "qualifiedHGO16Included": true,
+    "partialCourseModulesIncluded": false
+  },
+  "latestFocusedResults": {
+    "approvalRetentionConsumers": {
+      "pass": 72,
+      "fail": 0
+    },
+    "pureBootstrapDiagnostic": {
+      "pass": 46,
+      "fail": 0
+    },
+    "criticExactRegisteredDelta": {
+      "pass": 21,
+      "fail": 0
+    },
+    "actualArchitecturePublication": {
+      "pass": 10,
+      "fail": 0
+    },
+    "quotedHeredoc": {
+      "pass": 12,
+      "fail": 0
+    },
+    "sharedGhMergeGuard": {
+      "pass": 10,
+      "fail": 0,
+      "runtimeAdapterScheduling": "open"
+    },
+    "readerControllerCoreV4": {
+      "pass": 24,
+      "fail": 0,
+      "productionIntegration": "focused-qualified"
+    },
+    "readerProductionIntegration": {
+      "pass": 18,
+      "fail": 0,
+      "existingControlsPass": 24,
+      "existingControlsFail": 0
+    },
+    "registeredDefaultApprovalReader": {
+      "pass": 12,
+      "fail": 0
+    },
+    "pureOriginalCriterionParser": {
+      "pass": 32,
+      "fail": 0,
+      "physicalOriginalSourceRuntimeBinding": "focused-qualified-24-cases"
+    },
+    "physicalOriginalCriterionBinding": {
+      "pass": 24,
+      "fail": 0,
+      "integrated": false,
+      "manifestSHA256": "5ebf5d09b7aa6fbf1f22a7d3af4a79c4da68451a0397dbaf90925b2f31d9ea2e"
+    },
+    "legacyMaterializerBaseline": {
+      "pass": 3,
+      "fail": 3,
+      "repair": "focused-qualified-6-pass-0-fail"
+    },
+    "legacyMaterializerFixed": {
+      "pass": 6,
+      "fail": 0,
+      "integrated": false,
+      "manifestSHA256": "0e57c82e2a383fb1bb05f3bd2a1a0db511113cbd3506f780a0973c859c016dbd"
+    },
+    "signedDescriptorCleanup": {
+      "pass": 8,
+      "fail": 0,
+      "earlierPass": 5,
+      "earlierFail": 3,
+      "actualAuthorityProducers": "open",
+      "actualRequesterDefault": "open",
+      "manifestSHA256": "10f0910240757f8c4a69e6b7b6dd40112221e5903316ae36a219645b0b01b6dc"
+    },
+    "visibleOverrideMismatchDiagnostic": {
+      "pass": 16,
+      "fail": 0,
+      "actualHookAssertionsReached": true,
+      "earlierTwo15of16AttemptsRetained": true,
+      "unchanged16Qualification": "completed-one-run-16-pass-0-fail",
+      "nativeQualified": false,
+      "manifestSHA256": "6361b3e2ee6d4084563e1d00f0e75447b29316f3db2ab6a29bfeb5d7d56b511c"
+    },
+    "nativeScannerSuppressionCIStep": {
+      "sourcePrepared": true,
+      "syntaxAndConservationChecked": true,
+      "nativeCIExecuted": false,
+      "manifestSHA256": "a0786017a3838f49c29a79be7c061a36b2a1151c92167031a497b6f6c4247826"
+    },
+    "linuxScannerSuppression": {
+      "pass": 38,
+      "fail": 0,
+      "platformSkip": 6,
+      "trustedScannerControlPass": 1,
+      "nativeWindowsQualification": "open"
+    },
+    "consumedCriticResult": {
+      "pass": 23,
+      "fail": 0,
+      "fixtureIsolationQualified": true,
+      "actualGitVersion": "2.53.0",
+      "actualModelCriticPASS": false,
+      "manifestSHA256": "3e8ff370c9494e7d2036a9822377a9703c3322eb8381c0f33882af770faad4fd"
+    }
+  },
+  "latestEvidenceArchive": {
+    "auditCommit": "3094a130b559e212ae90b277a33cbfd3ffb5035a",
+    "source65AuditCommit": "c2a9a612bb232afc2a0062dabec1c2d1ded05142",
+    "current46AndSeparateS1Commit": "ece629d334068b08ac90850ab4fb00e82363acb8",
+    "originalFocusedCompletionStreamsTracked": 5,
+    "newestAdditionalCompletionStreamsTracked": 5,
+    "newestAdditionalCases": 67,
+    "source65TransferPayloadFiles": 103,
+    "source65TrackedArchive": "committed-106-files",
+    "source65ArchiveFiles": 106,
+    "source65CommittedGitBlobModeVerification": "verified-106-blobs-104-original-inputs-65-source-mappings",
+    "source65CommittedCustodyVerificationManifestSHA256": "2fdaedd3d5de58de4cb38c3aed8a94ce408fd6aca2c4619c209555f55cd17cac",
+    "source65ArchiveIndexSHA256": "b8ed630c86f58c6b58c1262d3229a7ed2c58c7ae9c78486667100d4dde885773",
+    "source65ProductionReceiptReparseSHA256": "a7912d3cd70ea2d61b98f3fa3ff3c238f3ff791f275272725be456e47fc57c2f",
+    "source65ReparsedExistingReceipts": 7,
+    "newestDeliveries": "qualified-source72-committed-157-files-and-exact-git-custody-verified",
+    "source72PublicPayloadFiles": 155,
+    "source72TransferIndexIncludedFiles": 156,
+    "source72TrackedArchive": "committed-and-verified",
+    "source72ArchiveGitObjects": 157,
+    "source72OriginalInputsVerified": 156,
+    "source72CanonicalMappingsVerified": 72,
+    "source72VerificationManifestSHA256": "2f308cd6c2d28cd7c15da84398410f0ca7bb5a2b041f363000069e918d1a6573",
+    "source72ActualVerificationReceiptSHA256": "88bb47c9f112a4bc97a218285028fe46c0cf42491cbcbad85598824b229e1800"
+  },
+  "actualApprovePlanWriter": {
+    "pass": 11,
+    "fail": 0,
+    "actualSanctionedWriter": true,
+    "registeredReaderQualified": true,
+    "manifestSHA256": "b721284b7e5105bcb47e4ae8f5f72f83549c47bf066745027f42745241348427"
+  },
+  "overrideDigestQualification": {
+    "status": "focused-semantic-digest-repair-green-not-item-closure",
+    "completedCases": 10,
+    "productRED": true,
+    "baselinePass": 8,
+    "baselineFail": 2,
+    "fixedPass": 10,
+    "fixedFail": 0,
+    "manifestSHA256": "6a4b29b7237ed99aee4c9c30b9530d259bbeb1b3b7e995cc37af8a9cf9cafacd",
+    "earlierFixtureFailureRetained": "direct-import-source-has-multiple-inode-links",
+    "next": "differing-input-diagnostic-runtime-integration-review"
+  },
+  "latestContinuationStatus": {
+    "readerProductionIndependentCases": {
+      "authored": 18,
+      "executed": 18,
+      "pass": 18,
+      "fail": 0,
+      "existingControlsPass": 24,
+      "freeze": "qualified"
+    },
+    "readerMetadataCommonGraph": {
+      "selectedCanonicalPaths": 57,
+      "retainsAllPrior54": true,
+      "qualification": "70-cases-green-on-earlier-common-graph"
+    },
+    "registeredDefaultReader": {
+      "lastAttemptPass": 12,
+      "lastAttemptFail": 0,
+      "manifestSHA256": "4a026a4ca3f24125bc031d322b704e614a27b999abc0fe92a2b40e393c95b1b4",
+      "earlierFailedAttemptsRetained": true
+    },
+    "signedCleanup": {
+      "proposedApiClosed": true,
+      "independentCases": 8,
+      "pass": 8,
+      "fail": 0,
+      "implementation": "registry-and-requester-source-implementation-dispatched",
+      "actualRequesterAndNonresourceAuthorityProducers": "open",
+      "authorityProducerImplementationContract": "closed-proposed-static-adoption-verified",
+      "proposedProducerSlices": 9,
+      "draftIndependentCallbacks": 24,
+      "completeExecutableFreeze": true,
+      "constructiveFreezeSHA256": "62b77c35e10d70525c00fe59182d2978586e67da168bdbb3b2ab5d825ab57293",
+      "new24SemanticQualification": "not-run",
+      "AFKHostAUTHI08Adopted": true,
+      "sourceReleaseCheckpoint": "auth24-source-release-checkpoint.json",
+      "disjointFixtureAuthors": 3
+    },
+    "actualCodexDaemonHealth": {
+      "code": "CAS-READY",
+      "version": "0.162.1",
+      "projectReadyEstablished": false
+    },
+    "criticConsumedResultIsolation": {
+      "qualified": true,
+      "sourceBoundGitConfigurationIsolation": true,
+      "existingFailedWrapperProbeRetained": true
+    },
+    "adapterFirstPlanDiagnostic": {
+      "manifestSHA256": "fbbde7be61ab3dd70e0ac0c56923e387853cbabe7baebd1cafd66eacda339bef",
+      "defaultActualPlanJSON": "empty",
+      "reportedError": "EPERM",
+      "bareNodeVersionValidBothCorridors": true,
+      "exactCause": "unresolved",
+      "adapterCasesRun": 0
+    },
+    "adapterSupportedCorridor": {
+      "firstPlanValidJSON": true,
+      "manifestSHA256": "b1cfed40636b353d9f437d2a9938b71e6d68e6ffcbad1f4a00e4af3176da0132",
+      "codexMethodReadyReached": true,
+      "nativeReadyProven": false,
+      "agyFixtureFailure": "Codex-only-firstRestartIntake-assumption",
+      "outcomeManifestSHA256": "2923908f66ac178a079944396ded98441f1105186c290399050152e0b4375774",
+      "independentFixtureErratum": "dispatched",
+      "adapterCasesRun": 0
+    },
+    "criticCourseRuntimeImplementation": {
+      "frozenIndependentCallbacks": 39,
+      "originalCaseTarget": 40,
+      "freezeSHA256": "29e855787f0e04bbd3850b1f128263a7ab4ab3971e9313105cfbb8a5e8a85d2b",
+      "sourceSlices": 2,
+      "sourcePostimages": 7,
+      "status": "authentic39-terminal-fixture-physical-mode-prerequisite-failed",
+      "externalStopIntegration": "pending",
+      "qualificationRuns": 3,
+      "casePass": 0,
+      "caseFail": 39,
+      "preliminaryCRT001AssertionsReached": false,
+      "completeCaseQualificationAvailable": false,
+      "semanticProductRED": false,
+      "firstSampledCause": "fixture mode equality: original0600 versus mirror0644 before target admission",
+      "exhaustiveFailureCauseGrouping": "not-established",
+      "priorCDIAndCPPFailuresRetained": true,
+      "latestExecutionRoot": "legacy-origin:alfred-critic39-authentic-target-qualification-20261010",
+      "latestProcess": {
+        "sessionId": {
+          "excluded": true,
+          "rawSha256": "3efba2a27828996211e551852b125de81f173f0f6c10e5c605cecb4ef9cb72b6",
+          "bytes": 5,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "terminalExitCode": 1,
+        "oneBusinessChild": true,
+        "FD3CompleteCases": 39,
+        "completionError": null,
+        "conservationError": null
+      },
+      "previousExecutionManifestSHA256": "10d4d567145c6877c0b1aa3833f24d6a92e6f7ebe563913715c3445d3a6440ca",
+      "next": "independent-mode-preserving-mirror-fixture-erratum; no blind rerun"
+    },
+    "actualAdapterBaseline": {
+      "completedCases": 12,
+      "pass": 8,
+      "fail": 4,
+      "failedIds": [
+        "GHA001",
+        "GHA002",
+        "GHA003",
+        "GHA004"
+      ],
+      "codexDefaultMethodReady": true,
+      "agyDefaultMethodReady": true,
+      "nativeReadyProven": false,
+      "mergeCommandsActuallyExecuted": false,
+      "completionManifestSHA256": "9724c6741b417f184e21808b74bc688b189a30c51f028761dba76a3ca1c6443f",
+      "sourceRepair": "qualified-fixed12-pass"
+    },
+    "actualAdapterFixed": {
+      "completedCases": 12,
+      "pass": 12,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0,
+      "oneBusinessChild": true,
+      "actualDefaultMethodReadyBoth": true,
+      "nativeReadyProven": false,
+      "graphFilesConserved": 6594,
+      "manifestSHA256": "cb5a606f861d8530243f6ff4a62cd7c56f7ababaa999c9e25630f056aca73712",
+      "executionSHA256": "cbe2cd552e3bd984911dbd23744ca128b862344e0fb7f1f2594322258da6c837",
+      "FD3SHA256": "dfe6a04384fdca4fdcaf4280efa3cd5c4f66ed77eb98299f1990c2a08eeac18b",
+      "originalFailedBaselineRetained": true,
+      "integration": "pending"
+    },
+    "refreshedFullObligationMatrix": "unavailable-prior-guard-refusal-retained",
+    "officialAdditionalClosures": 0,
+    "replacementCandidateReady": false
+  }
+}

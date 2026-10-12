@@ -1,0 +1,124 @@
+{
+  "schema": "alfred.landed-dispatch-ownership.independent-manifest.v1",
+  "status": "independent-twelve-callbacks-frozen-before-source",
+  "freeze": {
+    "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/assertion-freeze.json",
+    "sha256": "011495020c0d09afdea12f2ade2b145253e1a528e2c06c7071162720f1891f1f",
+    "bytes": 4775,
+    "mode": "0644",
+    "nlink": 1
+  },
+  "artifacts": [
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/fixtures.mjs",
+      "sha256": "ecfe6bb66a26a87dc210818c641e97850bc2bd1bb7ab086df8640d88095b86e8",
+      "bytes": 5985,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/callbacks.mjs",
+      "sha256": "31ce9dec018435b9be4690bc2c7efe93de7bf9c7e759053d56999090a14b92d2",
+      "bytes": 10044,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/driver.mjs",
+      "sha256": "4609989dd16053891a7da2cf10435f33225944450e544f0e11864cb919825cdb",
+      "bytes": 199,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/norm-contract.json",
+      "sha256": "b6ec9577768856a2ad2ddc45e357935764d0a035ce4cfb45db41697894b80667",
+      "bytes": 4309,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/norm-freeze.json",
+      "sha256": "72d56f2a329758c45e60be03854c7cf3e8fd94ab5f6da7f2b485c0d32fbb8762",
+      "bytes": 1578,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/expectation-context.json",
+      "sha256": "56fcddcd72601caab145f31fe2830ef7ecb908b7c769d16175481c015be99bd5",
+      "bytes": 1640,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/interface-checkpoint.json",
+      "sha256": "28e6383ef4756b4e6b225bd33df8507defdbc449f3d16f5fae50f9e39b09673c",
+      "bytes": 3007,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/report.md",
+      "sha256": "7748e427186ffff5baafa951a62b8c1b6194f03811593eec69b53538825c552f",
+      "bytes": 3674,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/final-report.md",
+      "sha256": "762d2318615e7a45318ff88f5c31db09aa5b24e1e1c0830421a180bfe4475a9c",
+      "bytes": 4626,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/freeze-norm.py",
+      "sha256": "85b9567f18c779ebd921a82065147d86efe64ad9a075b86c74b749ec00c80dc3",
+      "bytes": 1613,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/freeze-assertions.py",
+      "sha256": "a885550d2a0140a285043a663c69331722318500dff5bcb302a31e99f35a09d6",
+      "bytes": 2827,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "mechanicalContracts": [
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/api-contract.json",
+      "sha256": "b8e4e08ef8f7637401e29278cb21e3f8a6d2fc31b9e0fd49b8e1dcbf4b7b04fa",
+      "bytes": 3606,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/api-details.json",
+      "sha256": "59f7b205dce064391118bca8e82ba2358f4d539b14aa57591feeb53c866f510e",
+      "bytes": 3331,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/controlled-fixture-contract.json",
+      "sha256": "216a98a3dec88895372305ea9a26e4563d85511a8f81641f9d98996bf1d5b2de",
+      "bytes": 3204,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/native-compatibility-supplement.json",
+      "sha256": "da6f0e778ee94c55d8970dee84473640847a43a613c4a75318371ee01af86064",
+      "bytes": 2409,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "semanticRuns": 0,
+  "qualificationReady": false,
+  "nativeProof": false,
+  "wholeItemAcceptance": false
+}

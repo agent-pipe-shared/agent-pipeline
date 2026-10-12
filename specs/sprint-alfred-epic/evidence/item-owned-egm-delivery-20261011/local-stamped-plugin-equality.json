@@ -1,0 +1,47 @@
+{
+  "schema": "alfred.local-egm-candidate-physical-copy.v1",
+  "functionalCommit": "a7a9b3cfa2dd32407f8e7b1d80959f1090c77859",
+  "planSha256": "885f554139334da51d968a948130f333c1157d64e7f3330a0fb2b8b864e19264",
+  "rows": [
+    {
+      "path": "plugins/pipeline-core/plugin.json",
+      "beforeSHA": "748dea42c7a9711e3dea3787352a1d87afb3b3ff04ebac50fedd8fb97d558af6",
+      "postSHA": "11b2a50cb07b8641abf0fdc7b9341abd4d82f9c462e9a439feae385ab04fbf80",
+      "oldInode": 4577426,
+      "newInode": 4583047
+    },
+    {
+      "path": "plugins/pipeline-core/.claude-plugin/plugin.json",
+      "beforeSHA": "32581a7baccaffab1504cc4a39fa780a54ea3aa861919a2131360720d682a4e5",
+      "postSHA": "a86cea950e2b64d82ca7aa949945a1a5e3b388582b223ba3eecc73734b76da1d",
+      "oldInode": 4576360,
+      "newInode": 4577426
+    },
+    {
+      "path": "plugins/pipeline-core/.codex-plugin/plugin.json",
+      "beforeSHA": "8940b40c42d09961fb9a021dd0b00445017caf5067306300b327b1895c1fa34a",
+      "postSHA": "7664ed35e15e32b621e32567c9729acdce1057c489435577214db47730a62c5b",
+      "oldInode": 4576362,
+      "newInode": 4576360
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-native-process-observer.ps1",
+      "beforeSHA": "ac29b7f40e18f5d014c7dc20d47be57cfdf5abb82ae20c4580af22f547f0feb6",
+      "postSHA": "6c55d97eba1c18ef37befab1c6e6052301f8ecc0b90d1521a49e158a49fc4d40",
+      "oldInode": 4577402,
+      "newInode": 4576362
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-owned-authority-native.ps1",
+      "beforeSHA": "800350691e4c3ef2bdfc3346614e7c7a458d553353e026d1f70ff15cd3391525",
+      "postSHA": "66865ee9c17f83cd1fe9bb68f9acd593e06b8064257f1b10b84c224e9cd4d720",
+      "oldInode": 4577404,
+      "newInode": 4577402
+    }
+  ],
+  "trackedCount": 7309,
+  "outsideChanges": [],
+  "pluginCount": 1892,
+  "fullPluginEquality": true,
+  "physicalSourceReadsetSha256": "108cdc0001c12e322576f84495a6a767e6335d453b98ee70c37fd661911b9005"
+}

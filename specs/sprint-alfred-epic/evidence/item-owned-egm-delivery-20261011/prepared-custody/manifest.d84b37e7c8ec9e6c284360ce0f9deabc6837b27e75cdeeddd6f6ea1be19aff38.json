@@ -1,0 +1,2039 @@
+{
+  "schema": "alfred.prepared-repair-evidence-custody.v2",
+  "scope": "scope-v2 administrative extension of same original task/history; no reset",
+  "status": "prepared-not-applied-not-reviewed-not-accepted",
+  "previousCapsule": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd.json",
+      "sha256": "5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd",
+      "bytes": 34539,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.413b03ad8649577cba2adb65b86cbacfa1c313e235792c1edf50bbcf4bb6d2f2.json",
+      "sha256": "413b03ad8649577cba2adb65b86cbacfa1c313e235792c1edf50bbcf4bb6d2f2",
+      "bytes": 11761,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/README.md",
+      "sha256": "80f80f542aa4d5b48c57931d2d9914680814052123e6b1fb9176224c9c35258d",
+      "bytes": 728,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "retainedFirst22": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7c9b2f7571f93d9a328a46d5fda88e23d416b1fb69dd3d6566f7fb8caefe7a6c.json",
+      "sha256": "7c9b2f7571f93d9a328a46d5fda88e23d416b1fb69dd3d6566f7fb8caefe7a6c",
+      "bytes": 504142,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/858e299d0efca393f27a74472430710e573adb3818b3833d2e8817c10b20c773.md",
+      "sha256": "858e299d0efca393f27a74472430710e573adb3818b3833d2e8817c10b20c773",
+      "bytes": 3657,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d0eba07ca25362b9d1c6346bf49a986ccf8f9ef81e1b1b027d8c044561f828e1.json",
+      "sha256": "d0eba07ca25362b9d1c6346bf49a986ccf8f9ef81e1b1b027d8c044561f828e1",
+      "bytes": 255666,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/af3c92c6757cbaa6850c62c3adaf5ebe0099eb5152444957b88c7fd5b017c1d9.md",
+      "sha256": "af3c92c6757cbaa6850c62c3adaf5ebe0099eb5152444957b88c7fd5b017c1d9",
+      "bytes": 2422,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/270a8ebf49659b39038990b67db08c4539ec6cea0e8f175cd0367b8042c34683.json",
+      "sha256": "270a8ebf49659b39038990b67db08c4539ec6cea0e8f175cd0367b8042c34683",
+      "bytes": 2317,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9fff6ed971e82fa63fafb868ee2e3246dd4a0e3bf0ee4552c9c6da93fbde8b48.json",
+      "sha256": "9fff6ed971e82fa63fafb868ee2e3246dd4a0e3bf0ee4552c9c6da93fbde8b48",
+      "bytes": 102312,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4dbfe26ea9c0e8e69eca55bca019fe4a651499ff9663633c33d0738958c22b6a.json",
+      "sha256": "4dbfe26ea9c0e8e69eca55bca019fe4a651499ff9663633c33d0738958c22b6a",
+      "bytes": 4627,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d1d7598ea24b312b9901b30b02fcc4a60002de370e35e63401a3d06d51e8673c.md",
+      "sha256": "d1d7598ea24b312b9901b30b02fcc4a60002de370e35e63401a3d06d51e8673c",
+      "bytes": 7306,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5d7ba717d05d093460c14e7aaca472f2bab544ddf4b020fb118a26f1265ee757.fd",
+      "sha256": "5d7ba717d05d093460c14e7aaca472f2bab544ddf4b020fb118a26f1265ee757",
+      "bytes": 2726,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f2c8d6762cabf86ee1ff489b5d7974722bb80959c28e4e7f06ef74803dbf35cd.log",
+      "sha256": "f2c8d6762cabf86ee1ff489b5d7974722bb80959c28e4e7f06ef74803dbf35cd",
+      "bytes": 757,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8bd10e0dfce87ad3469f345d574f332365cb7fa3f845c597b88334755b550090.mjs",
+      "sha256": "8bd10e0dfce87ad3469f345d574f332365cb7fa3f845c597b88334755b550090",
+      "bytes": 4120,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ec09e83c98ec827b3da8931ccc60046ef68d2acbc2069273551ad55cc35059ec.log",
+      "sha256": "ec09e83c98ec827b3da8931ccc60046ef68d2acbc2069273551ad55cc35059ec",
+      "bytes": 5287,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d3ed1730bed506298f2c1f89a369a7710b20ad31dc1717bcc99b55e2c74b15c6.json",
+      "sha256": "d3ed1730bed506298f2c1f89a369a7710b20ad31dc1717bcc99b55e2c74b15c6",
+      "bytes": 6520,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/feb2cb106c0736a308a0c30ac299e7c4774a193ba86242acd25ad401e27a7e7b.json",
+      "sha256": "feb2cb106c0736a308a0c30ac299e7c4774a193ba86242acd25ad401e27a7e7b",
+      "bytes": 12640,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1998721753f19221ecd5771fa88d9bddc74de24ed9a0d46b5679cd14937f14b6.mjs",
+      "sha256": "1998721753f19221ecd5771fa88d9bddc74de24ed9a0d46b5679cd14937f14b6",
+      "bytes": 6049,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f5fec6d56804a30b217a2874196dc7809c21f80f396a274417b9eed980551ee1.fd",
+      "sha256": "f5fec6d56804a30b217a2874196dc7809c21f80f396a274417b9eed980551ee1",
+      "bytes": 2726,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7dd818d78cc92937c743f1839060ed7fc47ce3b2f0bb2449786c6e94556a17c2.stdout",
+      "sha256": "7dd818d78cc92937c743f1839060ed7fc47ce3b2f0bb2449786c6e94556a17c2",
+      "bytes": 1918,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e676e125ac205c26613f4913feef2ca77be158e9d3af7b56775f183ac1f3d729.stdout",
+      "sha256": "e676e125ac205c26613f4913feef2ca77be158e9d3af7b56775f183ac1f3d729",
+      "bytes": 1919,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2.mjs",
+      "sha256": "2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2",
+      "bytes": 9275,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b.mjs",
+      "sha256": "4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b",
+      "bytes": 16017,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6.mjs",
+      "sha256": "3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6",
+      "bytes": 21131,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f.mjs",
+      "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+      "bytes": 123685,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "rulesetSha": "9aa0551222ad682fb7fa40af9aa6b8e7ff52ecaa98143fd35657f9c053e5b3a3",
+  "requestedRoute": {
+    "model": "gpt-6-luna",
+    "effort": "high",
+    "observed": false
+  },
+  "functionalRole": "Goldfish",
+  "productiveAdmission": false,
+  "nativeWindowsProof": false,
+  "sourceApplied": false,
+  "committed": false,
+  "published": false,
+  "testsRepeated": false,
+  "criticCalls": 0,
+  "packages": [
+    {
+      "directory": "wave-b-git_grep",
+      "itemID": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "status": "held-preparation-only",
+      "criterion": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.md",
+        "sha256": "882aad4c80f31716aeb1e9729e8bb0e330532e8d6dc28d74c5da4e603d319529",
+        "bytes": 1392,
+        "mode": 420
+      },
+      "sourceManifest": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/manifest.json",
+        "sha256": "c9c3c58de83eb312b77018e0b6fb76472aedc730647657da4e46f4798f6e8422",
+        "bytes": 10517,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "qualificationCeiling": "68 private checks; actual native POSIX reads; installed/cross-platform/whole acceptance held."
+    },
+    {
+      "directory": "wave-b-verify_journal",
+      "itemID": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+      "status": "PREPARED ONLY",
+      "criterion": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.md",
+        "sha256": "cdbb7719958f6803d84684b86d1364d8120607089769401c28f5e60ed6e029e8",
+        "bytes": 1678,
+        "mode": 420
+      },
+      "sourceManifest": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/manifest.json",
+        "sha256": "1efd452a2365838a5d62fb5dbd9ce78a122cecdbac0170ea1ac7f58029725a6e",
+        "bytes": 6526,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "qualificationCeiling": "Clean product RED5/6 then GREEN6/6; initial fixture-collision receipt is infrastructure, not product RED; actual DrvFs/native DACL held."
+    },
+    {
+      "directory": "wave-b-design_material",
+      "itemID": "pipeline.design-generator-repeats-large-source-material",
+      "status": "PRIVATE_CHANGED_INTEGRATION_QUALIFIED_ACCEPTANCE_HELD",
+      "criterion": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-design-generator-repeats-large-source-material.md",
+        "sha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+        "bytes": 4735,
+        "mode": 420,
+        "nlink": 1
+      },
+      "sourceManifest": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/manifest.json",
+        "sha256": "fe17bad2c31394bda610de596bc96fa4bf320d9bfc468cb1daa97c1f9d409260",
+        "bytes": 17325,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "qualificationCeiling": "Current21/21 completion; historical comparison preserved; native budget/tokens/truncation/reader usability held."
+    },
+    {
+      "directory": "wave-b-signed_quality",
+      "itemID": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+      "status": "prepared-native-hold",
+      "criterion": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-signed-quality-package-route-is-not-agent-operable-on-windows.md",
+        "sha256": "c609e29f4f2fd943791a7fc621196981a2a068b74b2b8f96e34ef2dd0d4c917e",
+        "bytes": 5527,
+        "mode": 420,
+        "nlink": 1
+      },
+      "sourceManifest": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/manifest.json",
+        "sha256": "02ee28be9e5d6a3221490269d7b777176553c9fa6126c7c79e25c1765c02bb01",
+        "bytes": 20397,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "qualificationCeiling": "Linux43/43+4/4+6/6; native Windows one-signature/materializer/backstop/prompt latency and concurrent replacement qualification held."
+    },
+    {
+      "directory": "wave-b-kernel_violations",
+      "itemID": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "status": "PREPARED-PARTIAL-CLOSURE-RED",
+      "criterion": {
+        "path": "<repository>/scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-kernel-closure-check-masks-violations-after-the-first.md",
+        "sha256": "f7aff936f73def74cf91fd4eb07a5f9bcb91d0980763d93a2c1d12c9cefae6b2",
+        "bytes": 1095,
+        "mode": 420
+      },
+      "sourceManifest": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/manifest.json",
+        "sha256": "5636fd6acd91a53a9d05ee50068d128dc562de8d7e3d1117bd4cf1adb0bf580b",
+        "bytes": 18574,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "qualificationCeiling": "PARTIAL RED:65 grounded denial targets/5 dynamic declarations; original coherent8PASS/2FAIL; later exact doc-token isolated checks qualified; generated-import authority unresolved. No final full-suite GREEN."
+    }
+  ],
+  "sourceCAS": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+      "bytes": 150958,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "matched": true,
+      "expectedSha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+      "bytes": 78973,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "matched": true,
+      "expectedSha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-journal.mjs",
+      "sha256": "6e4cde624280bfe16fcb5be76ab1656fef57f069cc182fed3b3b3523d38ca4a0",
+      "bytes": 83860,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+      "matched": true,
+      "expectedSha256": "6e4cde624280bfe16fcb5be76ab1656fef57f069cc182fed3b3b3523d38ca4a0",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "6077ccde87ec104c3e1689ea187ac917edf24c35f2592f6771a29ce21e42fa6e",
+      "bytes": 661528,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.design-generator-repeats-large-source-material",
+      "matched": true,
+      "expectedSha256": "6077ccde87ec104c3e1689ea187ac917edf24c35f2592f6771a29ce21e42fa6e",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+      "bytes": 423673,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.design-generator-repeats-large-source-material",
+      "matched": true,
+      "expectedSha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "sha256": "0050f25191b7576df2c52d7f6d82b24e32cbc60f1f75b7fb1547b7ba856776d3",
+      "bytes": 78142,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.design-generator-repeats-large-source-material",
+      "matched": true,
+      "expectedSha256": "0050f25191b7576df2c52d7f6d82b24e32cbc60f1f75b7fb1547b7ba856776d3",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "sha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+      "bytes": 26630,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.design-generator-repeats-large-source-material",
+      "matched": true,
+      "expectedSha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "sha256": "3f0ea6b0a1e560ae30f3c6f10b8df08abf56b7938d9583291d8f7fd5bd5b60fd",
+      "bytes": 39004,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+      "matched": true,
+      "expectedSha256": "3f0ea6b0a1e560ae30f3c6f10b8df08abf56b7938d9583291d8f7fd5bd5b60fd",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "sha256": "b0ec85c5ba52a0a42aa7be1f7bc04c2eb07b88f3876071ad0729f512da1c4fc1",
+      "bytes": 121945,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "matched": true,
+      "expectedSha256": "b0ec85c5ba52a0a42aa7be1f7bc04c2eb07b88f3876071ad0729f512da1c4fc1",
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "sha256": "f0a897d5fe38e7f54bfe7bd812f997a75c647f0d92a5e8eccd970bed471cc933",
+      "bytes": 50258,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "matched": true,
+      "expectedSha256": "f0a897d5fe38e7f54bfe7bd812f997a75c647f0d92a5e8eccd970bed471cc933",
+      "observationOnly": true
+    },
+    {
+      "path": "docs/guard-maintenance-window-threat-model.md",
+      "sha256": "fb68cb9a6071a0a5730fa509ef0eaea283b82589ebede4e4c905e7bbd765eab0",
+      "bytes": 38647,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "matched": true,
+      "expectedSha256": "fb68cb9a6071a0a5730fa509ef0eaea283b82589ebede4e4c905e7bbd765eab0",
+      "observationOnly": true
+    },
+    {
+      "path": "harness/scripts/verify.mjs",
+      "sha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+      "bytes": 122965,
+      "mode": "0644",
+      "nlink": 2,
+      "item": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "matched": true,
+      "expectedSha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+      "observationOnly": true
+    }
+  ],
+  "proposals": [
+    {
+      "item": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "bytes": 150958,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/postimages/plugins/pipeline-core/hooks/guard-push.mjs",
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "bytes": 150958,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": false
+    },
+    {
+      "item": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+        "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+        "bytes": 78973,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/postimages/plugins/pipeline-core/lib/git-cmd.mjs",
+        "sha256": "95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268",
+        "bytes": 83723,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+      "canonicalPath": "plugins/pipeline-core/scripts/verify-journal.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/verify-journal.mjs",
+        "sha256": "6e4cde624280bfe16fcb5be76ab1656fef57f069cc182fed3b3b3523d38ca4a0",
+        "bytes": 83860,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/snapshot/plugins/pipeline-core/scripts/verify-journal.mjs",
+        "sha256": "151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46",
+        "bytes": 83773,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.design-generator-repeats-large-source-material",
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "6077ccde87ec104c3e1689ea187ac917edf24c35f2592f6771a29ce21e42fa6e",
+        "bytes": 661528,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "cd4f6f335d18fc6b0b53d93687347eca91867aac77d9a423762d7f58cf610bfb",
+        "bytes": 663036,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.design-generator-repeats-large-source-material",
+      "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "bytes": 423673,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "bytes": 423673,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": false
+    },
+    {
+      "item": "pipeline.design-generator-repeats-large-source-material",
+      "canonicalPath": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "sha256": "0050f25191b7576df2c52d7f6d82b24e32cbc60f1f75b7fb1547b7ba856776d3",
+        "bytes": 78142,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "sha256": "263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68",
+        "bytes": 81206,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.design-generator-repeats-large-source-material",
+      "canonicalPath": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+        "sha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+        "bytes": 26630,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+        "sha256": "2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636",
+        "bytes": 26666,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+      "canonicalPath": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+        "sha256": "3f0ea6b0a1e560ae30f3c6f10b8df08abf56b7938d9583291d8f7fd5bd5b60fd",
+        "bytes": 39004,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.mjs",
+        "sha256": "ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce",
+        "bytes": 40810,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "canonicalPath": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+        "sha256": "b0ec85c5ba52a0a42aa7be1f7bc04c2eb07b88f3876071ad0729f512da1c4fc1",
+        "bytes": 121945,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+        "sha256": "8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493",
+        "bytes": 126057,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "canonicalPath": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+        "sha256": "f0a897d5fe38e7f54bfe7bd812f997a75c647f0d92a5e8eccd970bed471cc933",
+        "bytes": 50258,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+        "sha256": "b3db62ff859e8258640adf0959bc74cf79c60217bd980096d46b43ddecaa8366",
+        "bytes": 48115,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "canonicalPath": "docs/guard-maintenance-window-threat-model.md",
+      "preimage": {
+        "path": "docs/guard-maintenance-window-threat-model.md",
+        "sha256": "fb68cb9a6071a0a5730fa509ef0eaea283b82589ebede4e4c905e7bbd765eab0",
+        "bytes": 38647,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/docs/guard-maintenance-window-threat-model.md",
+        "sha256": "0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c",
+        "bytes": 43025,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    },
+    {
+      "item": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "canonicalPath": "harness/scripts/verify.mjs",
+      "preimage": {
+        "path": "harness/scripts/verify.mjs",
+        "sha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+        "bytes": 122965,
+        "mode": "0644",
+        "nlink": 2
+      },
+      "postimage": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/harness/scripts/verify.mjs",
+        "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+        "bytes": 123685,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "proposalOnly": true,
+      "changed": true
+    }
+  ],
+  "artifacts": [
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/manifest.json",
+        "sha256": "c9c3c58de83eb312b77018e0b6fb76472aedc730647657da4e46f4798f6e8422",
+        "bytes": 10517,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/3adb2dcd54fb9ed086369d85c81c1b9f34a4b57084f386942a58200933ba1260.json",
+        "sha256": "3adb2dcd54fb9ed086369d85c81c1b9f34a4b57084f386942a58200933ba1260",
+        "bytes": 8795,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3adb2dcd54fb9ed086369d85c81c1b9f34a4b57084f386942a58200933ba1260.json",
+        "sha256": "3adb2dcd54fb9ed086369d85c81c1b9f34a4b57084f386942a58200933ba1260",
+        "bytes": 8795,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/report.md",
+        "sha256": "c33e8b45a389ef7fd9c1cd0c8b237a6ef64e2a5d7f806dbb7444c330b9c70a94",
+        "bytes": 4223,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/c33e8b45a389ef7fd9c1cd0c8b237a6ef64e2a5d7f806dbb7444c330b9c70a94.md",
+        "sha256": "c33e8b45a389ef7fd9c1cd0c8b237a6ef64e2a5d7f806dbb7444c330b9c70a94",
+        "bytes": 4223,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c33e8b45a389ef7fd9c1cd0c8b237a6ef64e2a5d7f806dbb7444c330b9c70a94.md",
+        "sha256": "c33e8b45a389ef7fd9c1cd0c8b237a6ef64e2a5d7f806dbb7444c330b9c70a94",
+        "bytes": 4223,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/qualification.json",
+        "sha256": "01ac7099293b9e8fb50973a40c77f3b0b29c3b41d7407bdd964762434d5a9b88",
+        "bytes": 16371,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/68b7b1b530063fbd2f75171a4544275597b925e3085670d5a6d4e191d5675ddb.json",
+        "sha256": "68b7b1b530063fbd2f75171a4544275597b925e3085670d5a6d4e191d5675ddb",
+        "bytes": 11196,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/68b7b1b530063fbd2f75171a4544275597b925e3085670d5a6d4e191d5675ddb.json",
+        "sha256": "68b7b1b530063fbd2f75171a4544275597b925e3085670d5a6d4e191d5675ddb",
+        "bytes": 11196,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/raw-results.json",
+        "sha256": "df5b7f461866689978d1d02d3286ab7eeff91f753ce088fbfb26bbb8d4a64354",
+        "bytes": 29392,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/4c0e4e59fcc83eb3a28e5cc515fcf22a5ef707c9af54cb4806faa53a708417e2.json",
+        "sha256": "4c0e4e59fcc83eb3a28e5cc515fcf22a5ef707c9af54cb4806faa53a708417e2",
+        "bytes": 23023,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4c0e4e59fcc83eb3a28e5cc515fcf22a5ef707c9af54cb4806faa53a708417e2.json",
+        "sha256": "4c0e4e59fcc83eb3a28e5cc515fcf22a5ef707c9af54cb4806faa53a708417e2",
+        "bytes": 23023,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/cas-pre.json",
+        "sha256": "09cc850f1abdb2d618e5855df04493231f70fd7fb65b6d4878e1e99e05200dbe",
+        "bytes": 389598,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/ef977925a156bed8251622ae2e320efbfbe9bad63217b8c2cdf4d84133efef58.json",
+        "sha256": "ef977925a156bed8251622ae2e320efbfbe9bad63217b8c2cdf4d84133efef58",
+        "bytes": 331547,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ef977925a156bed8251622ae2e320efbfbe9bad63217b8c2cdf4d84133efef58.json",
+        "sha256": "ef977925a156bed8251622ae2e320efbfbe9bad63217b8c2cdf4d84133efef58",
+        "bytes": 331547,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/cas-post.json",
+        "sha256": "1f04204d80378e9a8f4db0f12ee7ab0cf7323b4e487574dca06d11d887668610",
+        "bytes": 412850,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/439d3706a6f32269628a803ffc63d31644d46e89bce90af98a22db95144bf4c9.json",
+        "sha256": "439d3706a6f32269628a803ffc63d31644d46e89bce90af98a22db95144bf4c9",
+        "bytes": 331568,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/439d3706a6f32269628a803ffc63d31644d46e89bce90af98a22db95144bf4c9.json",
+        "sha256": "439d3706a6f32269628a803ffc63d31644d46e89bce90af98a22db95144bf4c9",
+        "bytes": 331568,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/postimages/plugins/pipeline-core/hooks/guard-push.mjs",
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "bytes": 150958,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe.mjs",
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "bytes": 150958,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe.mjs",
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "bytes": 150958,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/postimages/plugins/pipeline-core/lib/git-cmd.mjs",
+        "sha256": "95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268",
+        "bytes": 83723,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268.mjs",
+        "sha256": "95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268",
+        "bytes": 83723,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268.mjs",
+        "sha256": "95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268",
+        "bytes": 83723,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/manifest.json",
+        "sha256": "1efd452a2365838a5d62fb5dbd9ce78a122cecdbac0170ea1ac7f58029725a6e",
+        "bytes": 6526,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/d11c40ed79bc5c17ea0ba7aec1851a03f15c458e02f846c2ebe4d2b8c49df108.json",
+        "sha256": "d11c40ed79bc5c17ea0ba7aec1851a03f15c458e02f846c2ebe4d2b8c49df108",
+        "bytes": 5767,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d11c40ed79bc5c17ea0ba7aec1851a03f15c458e02f846c2ebe4d2b8c49df108.json",
+        "sha256": "d11c40ed79bc5c17ea0ba7aec1851a03f15c458e02f846c2ebe4d2b8c49df108",
+        "bytes": 5767,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/report.md",
+        "sha256": "7dc998c3cb4cac7362b8a56a501483e5f73b866df3f1832c72a051dfeee4b5de",
+        "bytes": 2751,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/7dc998c3cb4cac7362b8a56a501483e5f73b866df3f1832c72a051dfeee4b5de.md",
+        "sha256": "7dc998c3cb4cac7362b8a56a501483e5f73b866df3f1832c72a051dfeee4b5de",
+        "bytes": 2751,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7dc998c3cb4cac7362b8a56a501483e5f73b866df3f1832c72a051dfeee4b5de.md",
+        "sha256": "7dc998c3cb4cac7362b8a56a501483e5f73b866df3f1832c72a051dfeee4b5de",
+        "bytes": 2751,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/red-proof.json",
+        "sha256": "04674f68d81ec48f3976568d19494e80f05f7c295a1b4067a4750d1a6c1ee601",
+        "bytes": 3122,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/b018bb3cefbe4de037c51fc8bb9e70c203315e426775c05ff5a82b775a910ab1.json",
+        "sha256": "b018bb3cefbe4de037c51fc8bb9e70c203315e426775c05ff5a82b775a910ab1",
+        "bytes": 2849,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b018bb3cefbe4de037c51fc8bb9e70c203315e426775c05ff5a82b775a910ab1.json",
+        "sha256": "b018bb3cefbe4de037c51fc8bb9e70c203315e426775c05ff5a82b775a910ab1",
+        "bytes": 2849,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/proof.json",
+        "sha256": "352ae0ef9b8f75317b94ce01d6668b0d369eb40472c3c4842321efea8cc77bc5",
+        "bytes": 1576,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/e7f5ae2e110510b5e61341f53752ccc32e77504564afe6743b9c1468c2b8c3d4.json",
+        "sha256": "e7f5ae2e110510b5e61341f53752ccc32e77504564afe6743b9c1468c2b8c3d4",
+        "bytes": 1336,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e7f5ae2e110510b5e61341f53752ccc32e77504564afe6743b9c1468c2b8c3d4.json",
+        "sha256": "e7f5ae2e110510b5e61341f53752ccc32e77504564afe6743b9c1468c2b8c3d4",
+        "bytes": 1336,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/red-with-fixture-collisions-proof.json",
+        "sha256": "1e916e7b9c6511b093d7253ea8aeb52f609a72bf2fe43fa4107c51734a166fc0",
+        "bytes": 8144,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/d5012f22d6a2e6507d1e46aa7f3c14faeb18228e9355cb30975a9822ebf61c36.json",
+        "sha256": "d5012f22d6a2e6507d1e46aa7f3c14faeb18228e9355cb30975a9822ebf61c36",
+        "bytes": 7409,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d5012f22d6a2e6507d1e46aa7f3c14faeb18228e9355cb30975a9822ebf61c36.json",
+        "sha256": "d5012f22d6a2e6507d1e46aa7f3c14faeb18228e9355cb30975a9822ebf61c36",
+        "bytes": 7409,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/proof.tap",
+        "sha256": "1ce0ef61d61b4650d5b58363d3a3be728492bc5faf57e9d3159b650185a227bb",
+        "bytes": 687,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/1ce0ef61d61b4650d5b58363d3a3be728492bc5faf57e9d3159b650185a227bb.tap",
+        "sha256": "1ce0ef61d61b4650d5b58363d3a3be728492bc5faf57e9d3159b650185a227bb",
+        "bytes": 687,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1ce0ef61d61b4650d5b58363d3a3be728492bc5faf57e9d3159b650185a227bb.tap",
+        "sha256": "1ce0ef61d61b4650d5b58363d3a3be728492bc5faf57e9d3159b650185a227bb",
+        "bytes": 687,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/red-proof.tap",
+        "sha256": "ea6eee12e33e8cbb0b548da5ba0b9372e4868514b056be3e1947694530f82063",
+        "bytes": 2212,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/c4e3172f4c8d1d4ad6b9803890ee8e5139f52612f0d8bb6160cb44ca9df970e7.tap",
+        "sha256": "c4e3172f4c8d1d4ad6b9803890ee8e5139f52612f0d8bb6160cb44ca9df970e7",
+        "bytes": 2179,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c4e3172f4c8d1d4ad6b9803890ee8e5139f52612f0d8bb6160cb44ca9df970e7.tap",
+        "sha256": "c4e3172f4c8d1d4ad6b9803890ee8e5139f52612f0d8bb6160cb44ca9df970e7",
+        "bytes": 2179,
+        "mode": "0644"
+      },
+      "sanitization": "Repository host prefix normalized; technical diagnostics/counts preserved.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/red-with-fixture-collisions-proof.tap",
+        "sha256": "1f4a0ce048738376877eb94b435fa9b740692fbdc2026044115fc196bbad53da",
+        "bytes": 7179,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/1faea786440a51f42e3ec8669270083a87bbe116883a8f27574a5a28ecd783b9.tap",
+        "sha256": "1faea786440a51f42e3ec8669270083a87bbe116883a8f27574a5a28ecd783b9",
+        "bytes": 6684,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1faea786440a51f42e3ec8669270083a87bbe116883a8f27574a5a28ecd783b9.tap",
+        "sha256": "1faea786440a51f42e3ec8669270083a87bbe116883a8f27574a5a28ecd783b9",
+        "bytes": 6684,
+        "mode": "0644"
+      },
+      "sanitization": "Repository host prefix normalized; technical diagnostics/counts preserved.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/snapshot/plugins/pipeline-core/scripts/verify-journal.mjs",
+        "sha256": "151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46",
+        "bytes": 83773,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46.mjs",
+        "sha256": "151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46",
+        "bytes": 83773,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46.mjs",
+        "sha256": "151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46",
+        "bytes": 83773,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/manifest.json",
+        "sha256": "fe17bad2c31394bda610de596bc96fa4bf320d9bfc468cb1daa97c1f9d409260",
+        "bytes": 17325,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/7fd8ff9595025385214c73278b59af6a72cd42fe2f694bdfcfb22bed70fce9d3.json",
+        "sha256": "7fd8ff9595025385214c73278b59af6a72cd42fe2f694bdfcfb22bed70fce9d3",
+        "bytes": 14560,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7fd8ff9595025385214c73278b59af6a72cd42fe2f694bdfcfb22bed70fce9d3.json",
+        "sha256": "7fd8ff9595025385214c73278b59af6a72cd42fe2f694bdfcfb22bed70fce9d3",
+        "bytes": 14560,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/report.md",
+        "sha256": "2d3448426dd19bb3a93030633f0ff105ff829c2fd79f4616146f44c4630aca39",
+        "bytes": 4119,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/2d3448426dd19bb3a93030633f0ff105ff829c2fd79f4616146f44c4630aca39.md",
+        "sha256": "2d3448426dd19bb3a93030633f0ff105ff829c2fd79f4616146f44c4630aca39",
+        "bytes": 4119,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d3448426dd19bb3a93030633f0ff105ff829c2fd79f4616146f44c4630aca39.md",
+        "sha256": "2d3448426dd19bb3a93030633f0ff105ff829c2fd79f4616146f44c4630aca39",
+        "bytes": 4119,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/execution-terminal.json",
+        "sha256": "da10478e9a12d2378e00e9ebe2f488050e06be69710b185701d6ce60a0219f65",
+        "bytes": 1143,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/9a08daf2e6cdbd01f05adc2653c76f9430b212b5004829be93574b6548f2cdfe.json",
+        "sha256": "9a08daf2e6cdbd01f05adc2653c76f9430b212b5004829be93574b6548f2cdfe",
+        "bytes": 994,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9a08daf2e6cdbd01f05adc2653c76f9430b212b5004829be93574b6548f2cdfe.json",
+        "sha256": "9a08daf2e6cdbd01f05adc2653c76f9430b212b5004829be93574b6548f2cdfe",
+        "bytes": 994,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/qualification-freeze.json",
+        "sha256": "f0eb0df84568969c93f40491fda5abcf139b3566c7a19f2f631c07da0768e9a7",
+        "bytes": 1136161,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/3d279814e31240dc67b105c2a023c7a5ecaab88fbc7d4aa2efc06ba474f603f3.json",
+        "sha256": "3d279814e31240dc67b105c2a023c7a5ecaab88fbc7d4aa2efc06ba474f603f3",
+        "bytes": 953753,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3d279814e31240dc67b105c2a023c7a5ecaab88fbc7d4aa2efc06ba474f603f3.json",
+        "sha256": "3d279814e31240dc67b105c2a023c7a5ecaab88fbc7d4aa2efc06ba474f603f3",
+        "bytes": 953753,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/completion.ndjson",
+        "sha256": "a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa",
+        "bytes": 3250,
+        "mode": "0600",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa.ndjson",
+        "sha256": "a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa",
+        "bytes": 3250,
+        "mode": "0600"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa.ndjson",
+        "sha256": "a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa",
+        "bytes": 3250,
+        "mode": "0600"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/stdout.txt",
+        "sha256": "2a52930e0ad2ffd71268aa74139a21ff7f740094e031fe161381b11b26a8540f",
+        "bytes": 6121,
+        "mode": "0600",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/2a52930e0ad2ffd71268aa74139a21ff7f740094e031fe161381b11b26a8540f.txt",
+        "sha256": "2a52930e0ad2ffd71268aa74139a21ff7f740094e031fe161381b11b26a8540f",
+        "bytes": 6121,
+        "mode": "0600"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2a52930e0ad2ffd71268aa74139a21ff7f740094e031fe161381b11b26a8540f.txt",
+        "sha256": "2a52930e0ad2ffd71268aa74139a21ff7f740094e031fe161381b11b26a8540f",
+        "bytes": 6121,
+        "mode": "0600"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "mode": "0600",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "mode": "0600"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "mode": "0600"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/cas.json",
+        "sha256": "750261b2d796d97b366e6f8b271aa1b578bb3e705a853f91303fbcc632beee79",
+        "bytes": 16765,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/b6150ad427d9ffcb8e2958ee1968f6105557555a467c854842f8f2c5a3e25302.json",
+        "sha256": "b6150ad427d9ffcb8e2958ee1968f6105557555a467c854842f8f2c5a3e25302",
+        "bytes": 15454,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b6150ad427d9ffcb8e2958ee1968f6105557555a467c854842f8f2c5a3e25302.json",
+        "sha256": "b6150ad427d9ffcb8e2958ee1968f6105557555a467c854842f8f2c5a3e25302",
+        "bytes": 15454,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/companion-cas.json",
+        "sha256": "3f62ef1fbd3e26a2e0e9d91cd109c7ce5c1556bb92e9d68daeeeab1c7c2a18de",
+        "bytes": 6468,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/309e7c8dd2e0b37e56803b343f824004744d34ab2d1e7d366cdb9408142a8b6e.json",
+        "sha256": "309e7c8dd2e0b37e56803b343f824004744d34ab2d1e7d366cdb9408142a8b6e",
+        "bytes": 5903,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/309e7c8dd2e0b37e56803b343f824004744d34ab2d1e7d366cdb9408142a8b6e.json",
+        "sha256": "309e7c8dd2e0b37e56803b343f824004744d34ab2d1e7d366cdb9408142a8b6e",
+        "bytes": 5903,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "cd4f6f335d18fc6b0b53d93687347eca91867aac77d9a423762d7f58cf610bfb",
+        "bytes": 663036,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/cd4f6f335d18fc6b0b53d93687347eca91867aac77d9a423762d7f58cf610bfb.mjs",
+        "sha256": "cd4f6f335d18fc6b0b53d93687347eca91867aac77d9a423762d7f58cf610bfb",
+        "bytes": 663036,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/cd4f6f335d18fc6b0b53d93687347eca91867aac77d9a423762d7f58cf610bfb.mjs",
+        "sha256": "cd4f6f335d18fc6b0b53d93687347eca91867aac77d9a423762d7f58cf610bfb",
+        "bytes": 663036,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "bytes": 423673,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14.mjs",
+        "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "bytes": 423673,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14.mjs",
+        "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "bytes": 423673,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "sha256": "263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68",
+        "bytes": 81206,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68.mjs",
+        "sha256": "263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68",
+        "bytes": 81206,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68.mjs",
+        "sha256": "263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68",
+        "bytes": 81206,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+        "sha256": "2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636",
+        "bytes": 26666,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636.mjs",
+        "sha256": "2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636",
+        "bytes": 26666,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636.mjs",
+        "sha256": "2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636",
+        "bytes": 26666,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/manifest.json",
+        "sha256": "02ee28be9e5d6a3221490269d7b777176553c9fa6126c7c79e25c1765c02bb01",
+        "bytes": 20397,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/38c3f18ecc86b84204a267a4c4fdb05033ea2f1828ff64284419911b72472e55.json",
+        "sha256": "38c3f18ecc86b84204a267a4c4fdb05033ea2f1828ff64284419911b72472e55",
+        "bytes": 15259,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/38c3f18ecc86b84204a267a4c4fdb05033ea2f1828ff64284419911b72472e55.json",
+        "sha256": "38c3f18ecc86b84204a267a4c4fdb05033ea2f1828ff64284419911b72472e55",
+        "bytes": 15259,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/report.md",
+        "sha256": "b973ec883d5b1a753010bf0d35027d7061ba9eabb9722bda9bc4ef5c4df72dae",
+        "bytes": 5477,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/b973ec883d5b1a753010bf0d35027d7061ba9eabb9722bda9bc4ef5c4df72dae.md",
+        "sha256": "b973ec883d5b1a753010bf0d35027d7061ba9eabb9722bda9bc4ef5c4df72dae",
+        "bytes": 5477,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b973ec883d5b1a753010bf0d35027d7061ba9eabb9722bda9bc4ef5c4df72dae.md",
+        "sha256": "b973ec883d5b1a753010bf0d35027d7061ba9eabb9722bda9bc4ef5c4df72dae",
+        "bytes": 5477,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/test-results.json",
+        "sha256": "0d31c6f76c42ce5a39492993e441027bb5cfcf8482a427760d8f094282e37a31",
+        "bytes": 1364,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/28a4f24d721b0cedd021973c87c287431070a0c49191ca007c112a44ce75d106.json",
+        "sha256": "28a4f24d721b0cedd021973c87c287431070a0c49191ca007c112a44ce75d106",
+        "bytes": 809,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/28a4f24d721b0cedd021973c87c287431070a0c49191ca007c112a44ce75d106.json",
+        "sha256": "28a4f24d721b0cedd021973c87c287431070a0c49191ca007c112a44ce75d106",
+        "bytes": 809,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/red-test-results.json",
+        "sha256": "ccb784ff5139c884f7f4bbfb70107bce18f38a7c5a77ffa26fe617faeadfca45",
+        "bytes": 1364,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/195dc8c3941fdb54d9c85bb4a331ae96c106656c61b853baecfdab3a4bf77ee9.json",
+        "sha256": "195dc8c3941fdb54d9c85bb4a331ae96c106656c61b853baecfdab3a4bf77ee9",
+        "bytes": 809,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/195dc8c3941fdb54d9c85bb4a331ae96c106656c61b853baecfdab3a4bf77ee9.json",
+        "sha256": "195dc8c3941fdb54d9c85bb4a331ae96c106656c61b853baecfdab3a4bf77ee9",
+        "bytes": 809,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/original.stdout.log",
+        "sha256": "a4bcf207a7b3bacaedf75bc0d5e92dbc4e137fb9eb3439d95d3fdfac06108997",
+        "bytes": 3596,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/a4bcf207a7b3bacaedf75bc0d5e92dbc4e137fb9eb3439d95d3fdfac06108997.log",
+        "sha256": "a4bcf207a7b3bacaedf75bc0d5e92dbc4e137fb9eb3439d95d3fdfac06108997",
+        "bytes": 3596,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a4bcf207a7b3bacaedf75bc0d5e92dbc4e137fb9eb3439d95d3fdfac06108997.log",
+        "sha256": "a4bcf207a7b3bacaedf75bc0d5e92dbc4e137fb9eb3439d95d3fdfac06108997",
+        "bytes": 3596,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/orchestration.stdout.log",
+        "sha256": "5c9f67bb73e54f1ff09d59fd7819b877dee0cf753b61c95cf733e6bb4a5f403d",
+        "bytes": 456,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/5c9f67bb73e54f1ff09d59fd7819b877dee0cf753b61c95cf733e6bb4a5f403d.log",
+        "sha256": "5c9f67bb73e54f1ff09d59fd7819b877dee0cf753b61c95cf733e6bb4a5f403d",
+        "bytes": 456,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5c9f67bb73e54f1ff09d59fd7819b877dee0cf753b61c95cf733e6bb4a5f403d.log",
+        "sha256": "5c9f67bb73e54f1ff09d59fd7819b877dee0cf753b61c95cf733e6bb4a5f403d",
+        "bytes": 456,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/single-link.stdout.log",
+        "sha256": "d63f63a0cc058f200cc48cf306286f0c60aa5c7471f6e92e359fff6159e23925",
+        "bytes": 631,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/d63f63a0cc058f200cc48cf306286f0c60aa5c7471f6e92e359fff6159e23925.log",
+        "sha256": "d63f63a0cc058f200cc48cf306286f0c60aa5c7471f6e92e359fff6159e23925",
+        "bytes": 631,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d63f63a0cc058f200cc48cf306286f0c60aa5c7471f6e92e359fff6159e23925.log",
+        "sha256": "d63f63a0cc058f200cc48cf306286f0c60aa5c7471f6e92e359fff6159e23925",
+        "bytes": 631,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/red-original.stdout.log",
+        "sha256": "b4c4fa6e6cff65e3d40d220df6e6daeb66edb1fba408587d6a78a3dc7b430f37",
+        "bytes": 27269,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/5bff72cfb467d570a2c0c22e4a83ec0ad982d70fd497600d06287ec4d26928d0.log",
+        "sha256": "5bff72cfb467d570a2c0c22e4a83ec0ad982d70fd497600d06287ec4d26928d0",
+        "bytes": 26180,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5bff72cfb467d570a2c0c22e4a83ec0ad982d70fd497600d06287ec4d26928d0.log",
+        "sha256": "5bff72cfb467d570a2c0c22e4a83ec0ad982d70fd497600d06287ec4d26928d0",
+        "bytes": 26180,
+        "mode": "0644"
+      },
+      "sanitization": "Repository host prefix normalized; technical diagnostics/counts preserved.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/red-orchestration.stdout.log",
+        "sha256": "46c933815d3fe3181fa5203faf6a0579803bf67df6e56d1d6b099e92160b1c17",
+        "bytes": 1646,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/a87f234208dffbbef770e9b0bedb6c3f8119b97ca55bc6469a48a64163d8f587.log",
+        "sha256": "a87f234208dffbbef770e9b0bedb6c3f8119b97ca55bc6469a48a64163d8f587",
+        "bytes": 1613,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a87f234208dffbbef770e9b0bedb6c3f8119b97ca55bc6469a48a64163d8f587.log",
+        "sha256": "a87f234208dffbbef770e9b0bedb6c3f8119b97ca55bc6469a48a64163d8f587",
+        "bytes": 1613,
+        "mode": "0644"
+      },
+      "sanitization": "Repository host prefix normalized; technical diagnostics/counts preserved.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/red-single-link.stdout.log",
+        "sha256": "e0619f49554f2e2a5a43ba389b07356f3b7673778527d6a597c89d5328789f3a",
+        "bytes": 633,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/e0619f49554f2e2a5a43ba389b07356f3b7673778527d6a597c89d5328789f3a.log",
+        "sha256": "e0619f49554f2e2a5a43ba389b07356f3b7673778527d6a597c89d5328789f3a",
+        "bytes": 633,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e0619f49554f2e2a5a43ba389b07356f3b7673778527d6a597c89d5328789f3a.log",
+        "sha256": "e0619f49554f2e2a5a43ba389b07356f3b7673778527d6a597c89d5328789f3a",
+        "bytes": 633,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.mjs",
+        "sha256": "ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce",
+        "bytes": 40810,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce.mjs",
+        "sha256": "ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce",
+        "bytes": 40810,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce.mjs",
+        "sha256": "ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce",
+        "bytes": 40810,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/manifest.json",
+        "sha256": "5636fd6acd91a53a9d05ee50068d128dc562de8d7e3d1117bd4cf1adb0bf580b",
+        "bytes": 18574,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/064cf9431dc61786691620ae010b1f5b3413b406568e8a69ed4fd6a2602732d7.json",
+        "sha256": "064cf9431dc61786691620ae010b1f5b3413b406568e8a69ed4fd6a2602732d7",
+        "bytes": 15648,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/064cf9431dc61786691620ae010b1f5b3413b406568e8a69ed4fd6a2602732d7.json",
+        "sha256": "064cf9431dc61786691620ae010b1f5b3413b406568e8a69ed4fd6a2602732d7",
+        "bytes": 15648,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/report.md",
+        "sha256": "fcc18320f049f6739a83c7350ecbe953c5af7d76a0c224691545af5de3ea8755",
+        "bytes": 3929,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/fcc18320f049f6739a83c7350ecbe953c5af7d76a0c224691545af5de3ea8755.md",
+        "sha256": "fcc18320f049f6739a83c7350ecbe953c5af7d76a0c224691545af5de3ea8755",
+        "bytes": 3929,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fcc18320f049f6739a83c7350ecbe953c5af7d76a0c224691545af5de3ea8755.md",
+        "sha256": "fcc18320f049f6739a83c7350ecbe953c5af7d76a0c224691545af5de3ea8755",
+        "bytes": 3929,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-preparation.json",
+        "sha256": "8d4c77d467bfef2801bafde225521978184399f9bcaa6892f0991589eaec5963",
+        "bytes": 51398,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/fd93bcb15c5019e8a2bd4d8d2e5bef4946065271aed3ef517d6094aacf38d07d.json",
+        "sha256": "fd93bcb15c5019e8a2bd4d8d2e5bef4946065271aed3ef517d6094aacf38d07d",
+        "bytes": 47671,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fd93bcb15c5019e8a2bd4d8d2e5bef4946065271aed3ef517d6094aacf38d07d.json",
+        "sha256": "fd93bcb15c5019e8a2bd4d8d2e5bef4946065271aed3ef517d6094aacf38d07d",
+        "bytes": 47671,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-execution.json",
+        "sha256": "1225a9dd9035e6a3049bfae04dc415e9eb505b39e2619442b24a400e47d891f8",
+        "bytes": 1113,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/8ee91caa6707ef1c2895411bd8bbd7939c822d21fa192bab8ff4284ad11a2a1e.json",
+        "sha256": "8ee91caa6707ef1c2895411bd8bbd7939c822d21fa192bab8ff4284ad11a2a1e",
+        "bytes": 829,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8ee91caa6707ef1c2895411bd8bbd7939c822d21fa192bab8ff4284ad11a2a1e.json",
+        "sha256": "8ee91caa6707ef1c2895411bd8bbd7939c822d21fa192bab8ff4284ad11a2a1e",
+        "bytes": 829,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2.stdout",
+        "sha256": "68f961fbea14eef28aa3be89b4dab0fe71be545f5163aeb64d2762955044d64c",
+        "bytes": 1008,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/68f961fbea14eef28aa3be89b4dab0fe71be545f5163aeb64d2762955044d64c.stdout",
+        "sha256": "68f961fbea14eef28aa3be89b4dab0fe71be545f5163aeb64d2762955044d64c",
+        "bytes": 1008,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/68f961fbea14eef28aa3be89b4dab0fe71be545f5163aeb64d2762955044d64c.stdout",
+        "sha256": "68f961fbea14eef28aa3be89b4dab0fe71be545f5163aeb64d2762955044d64c",
+        "bytes": 1008,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2.stderr",
+        "sha256": "11bb0d6f99c481c69b0129fb3f4dd9789a6f6e0f993aad65f3f6ebcc1c1a12d7",
+        "bytes": 2843,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/6c842314f845b9d88468bc25f7c73d8e8403b4fb5908a15289c96105c3459f83.stderr",
+        "sha256": "6c842314f845b9d88468bc25f7c73d8e8403b4fb5908a15289c96105c3459f83",
+        "bytes": 2612,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6c842314f845b9d88468bc25f7c73d8e8403b4fb5908a15289c96105c3459f83.stderr",
+        "sha256": "6c842314f845b9d88468bc25f7c73d8e8403b4fb5908a15289c96105c3459f83",
+        "bytes": 2612,
+        "mode": "0644"
+      },
+      "sanitization": "Repository host prefix normalized; technical diagnostics/counts preserved.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/original.stderr",
+        "sha256": "5299249193d86d426270b6183044f77ad4ba38352ffc2bcb7b5b39836ab35e31",
+        "bytes": 34067,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/5b5328e7ebe7c8d8328b70c1a91995e6fe7043f19eedc208edcaa60b3c5f4ab9.stderr",
+        "sha256": "5b5328e7ebe7c8d8328b70c1a91995e6fe7043f19eedc208edcaa60b3c5f4ab9",
+        "bytes": 33935,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5b5328e7ebe7c8d8328b70c1a91995e6fe7043f19eedc208edcaa60b3c5f4ab9.stderr",
+        "sha256": "5b5328e7ebe7c8d8328b70c1a91995e6fe7043f19eedc208edcaa60b3c5f4ab9",
+        "bytes": 33935,
+        "mode": "0644"
+      },
+      "sanitization": "Repository host prefix normalized; technical diagnostics/counts preserved.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/violations.json",
+        "sha256": "25a01525238f990366b86054660a391c42c089808e6bae517c3ec631a74f29b7",
+        "bytes": 34365,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/75e1d3cfd4b36356e28cd7790e25c4530f9dbe266f5988aba49683f3666fe7b6.json",
+        "sha256": "75e1d3cfd4b36356e28cd7790e25c4530f9dbe266f5988aba49683f3666fe7b6",
+        "bytes": 33884,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/75e1d3cfd4b36356e28cd7790e25c4530f9dbe266f5988aba49683f3666fe7b6.json",
+        "sha256": "75e1d3cfd4b36356e28cd7790e25c4530f9dbe266f5988aba49683f3666fe7b6",
+        "bytes": 33884,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/doc-token-qualification.json",
+        "sha256": "1a71769c0f376d89adec54fae77129fec7fba8473b201693e342d96679f7e9de",
+        "bytes": 2863,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/36d6e585feb6d4043bed9c03e7405fe7da09a2d71d296ad97495e0f6e290f94e.json",
+        "sha256": "36d6e585feb6d4043bed9c03e7405fe7da09a2d71d296ad97495e0f6e290f94e",
+        "bytes": 2581,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/36d6e585feb6d4043bed9c03e7405fe7da09a2d71d296ad97495e0f6e290f94e.json",
+        "sha256": "36d6e585feb6d4043bed9c03e7405fe7da09a2d71d296ad97495e0f6e290f94e",
+        "bytes": 2581,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/registration-preservation.json",
+        "sha256": "2399f825458384598fd8a5a43cf5125e65ddbcf899f8c7870a79d605a8cb35bc",
+        "bytes": 3455,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/704dacf49ad118ecb32e315e3910513ce00e2a34691d816ac57b7414450befb1.json",
+        "sha256": "704dacf49ad118ecb32e315e3910513ce00e2a34691d816ac57b7414450befb1",
+        "bytes": 2715,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/704dacf49ad118ecb32e315e3910513ce00e2a34691d816ac57b7414450befb1.json",
+        "sha256": "704dacf49ad118ecb32e315e3910513ce00e2a34691d816ac57b7414450befb1",
+        "bytes": 2715,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical JSON: host paths/node executable normalized; private owner/correlation/raw-requirement/stamp fields excluded; compacted.",
+      "conservation": "exact sanitized prepared->copy bytes and mode; raw source SHA/mode retained separately"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/remaining-decisions.md",
+        "sha256": "8fd0f0ce69fb2a96d2279c0487e17924b87e4ab42e30971dbfff191cf5b55112",
+        "bytes": 4120,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/8fd0f0ce69fb2a96d2279c0487e17924b87e4ab42e30971dbfff191cf5b55112.md",
+        "sha256": "8fd0f0ce69fb2a96d2279c0487e17924b87e4ab42e30971dbfff191cf5b55112",
+        "bytes": 4120,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8fd0f0ce69fb2a96d2279c0487e17924b87e4ab42e30971dbfff191cf5b55112.md",
+        "sha256": "8fd0f0ce69fb2a96d2279c0487e17924b87e4ab42e30971dbfff191cf5b55112",
+        "bytes": 4120,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+        "sha256": "8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493",
+        "bytes": 126057,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493.mjs",
+        "sha256": "8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493",
+        "bytes": 126057,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493.mjs",
+        "sha256": "8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493",
+        "bytes": 126057,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+        "sha256": "b3db62ff859e8258640adf0959bc74cf79c60217bd980096d46b43ddecaa8366",
+        "bytes": 48115,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/b3db62ff859e8258640adf0959bc74cf79c60217bd980096d46b43ddecaa8366.mjs",
+        "sha256": "b3db62ff859e8258640adf0959bc74cf79c60217bd980096d46b43ddecaa8366",
+        "bytes": 48115,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b3db62ff859e8258640adf0959bc74cf79c60217bd980096d46b43ddecaa8366.mjs",
+        "sha256": "b3db62ff859e8258640adf0959bc74cf79c60217bd980096d46b43ddecaa8366",
+        "bytes": 48115,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/docs/guard-maintenance-window-threat-model.md",
+        "sha256": "0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c",
+        "bytes": 43025,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c.md",
+        "sha256": "0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c",
+        "bytes": 43025,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c.md",
+        "sha256": "0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c",
+        "bytes": 43025,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/harness/scripts/verify.mjs",
+        "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+        "bytes": 123685,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f.mjs",
+        "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+        "bytes": 123685,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f.mjs",
+        "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+        "bytes": 123685,
+        "mode": "0644"
+      },
+      "sanitization": "none",
+      "conservation": "exact original->prepared->copy bytes and mode"
+    },
+    {
+      "original": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.json",
+        "sha256": "b9edada0a9e9ea540bf741d504f242b614152a9501918c4736c3e831f7908418",
+        "bytes": 474671,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v2/objects/0c9626a79a19e689ac691514dc9c8af43d3ea4328f947cd628f5c6f070e86f58.json",
+        "sha256": "0c9626a79a19e689ac691514dc9c8af43d3ea4328f947cd628f5c6f070e86f58",
+        "bytes": 348143,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0c9626a79a19e689ac691514dc9c8af43d3ea4328f947cd628f5c6f070e86f58.json",
+        "sha256": "0c9626a79a19e689ac691514dc9c8af43d3ea4328f947cd628f5c6f070e86f58",
+        "bytes": 348143,
+        "mode": "0644"
+      },
+      "sanitization": "Sanitized technical matrix: private owners/correlation/raw requirement fields excluded, host prefixes normalized; all original rows,45 refreshed assessments and Main/prepared state fields retained.",
+      "conservation": "exact sanitized prepared->copy bytes/mode; current original digest bound"
+    }
+  ],
+  "matrix": {
+    "original": {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.json",
+      "sha256": "b9edada0a9e9ea540bf741d504f242b614152a9501918c4736c3e831f7908418",
+      "bytes": 474671,
+      "mode": "0644",
+      "nlink": 1
+    },
+    "rows": 174,
+    "counts": {
+      "25": 56,
+      "50": 75,
+      "75": 8,
+      "100": 0,
+      "UNKNOWN": 35
+    },
+    "stagePromotions": 2,
+    "accepted": 0,
+    "meaning": "Evidence-bound25->50 promotions are prepared implementation; no new Main delta integration inferred."
+  },
+  "holds": [
+    "productive SQ admission unavailable",
+    "signed protected-source authorization and source application pending",
+    "final exact candidate registry/completion configuration binding",
+    "affected integrated qualification and whole candidate Verify pending",
+    "independent coherent batch FULL1 + maximum 3 DIFF review pending; existing history unchanged",
+    "native runner Windows/macOS/Claude/Codex/Agy assurance unresolved as stated in original reports",
+    "PO acceptance open",
+    "Kernel closure generated producer/import authority remains RED",
+    "Signing requests/proofs/human keys are excluded; PO AFK authorization remains prepared-only",
+    "Design independent reader usability, same-input native budget and latency proofs remain held"
+  ],
+  "exclusions": [
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/recovered-assessment.json",
+      "reason": "Contains originalRequirement/originalAssessment fields: raw private requirement bodies excluded; criterion identifier/digest and sanitized manifest clauses retained."
+    },
+    {
+      "reason": "Raw private requirements, original-criterion.md bodies, transcripts, environment dumps, actual keys/signing requests/proofs/private runtime bindings, arbitrary unknown tree contents not opened or copied."
+    },
+    {
+      "reason": "Raw host paths normalized; code token names sessionId/PRIVATE KEY and credential-detection regexes are repository implementation syntax, not private runtime values or key material."
+    },
+    {
+      "reason": "Synthetic disposable test keys/path tokens mentioned in qualification reports remain synthetic labels only; key/proof files never opened. Synthetic substitution, traversal, credential-path and generated actual-support.mjs negative fixtures are test strings, not grants of authority."
+    },
+    {
+      "reason": "Empty stderr, unchanged broad snapshot source copies and helper scripts omitted unless selected technical dependency pins; original artifacts remain intact."
+    }
+  ],
+  "immutability": "Digest-named write-once additions; original22/manifest/readback/README checked unchanged; no OS immutable-bit claim.",
+  "guardRecovery": "One audit helper syntax error corrected in owned scratch; no product test execution or guard bypass.",
+  "verification": "Physical single-link copies, exact SHA/mode conservation, current Main source CAS and not-ignored canonical readback required; checks are administrative, not qualification."
+}

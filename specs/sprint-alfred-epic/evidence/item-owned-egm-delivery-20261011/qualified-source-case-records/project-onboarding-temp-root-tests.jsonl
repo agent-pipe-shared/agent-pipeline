@@ -1,0 +1,6 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["POTR01","POTR02","POTR03","POTR04"],"caseCount":4,"caseSetSha256":"76514f777cf14f8f1e7d194a283d91a02bcbbe533ca7211ee8b2452a766f59b5"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"POTR01","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"POTR02","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"POTR03","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"POTR04","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":4,"disposedCount":4,"caseIds":["POTR01","POTR02","POTR03","POTR04"],"caseSetSha256":"76514f777cf14f8f1e7d194a283d91a02bcbbe533ca7211ee8b2452a766f59b5","dispositionsSha256":"6496236166bdca6a6598bc6ac2d94e3cb4dcf3925c88794b0557369992f527c3","counts":{"pass":4,"fail":0,"skip":0,"todo":0}}

@@ -1,0 +1,63 @@
+{
+  "schema": "pipeline.reporting-qualification-closure.v1",
+  "status": "closed-controlled-qualification",
+  "sources": [
+    {
+      "path": "plugins/pipeline-core/lib/report-source-readers.mjs",
+      "sha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756",
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+      "sha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b",
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+      "sha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a",
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+      "sha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6",
+      "mode": 493
+    }
+  ],
+  "files": [
+    {
+      "path": "qualification.json",
+      "sha256": "c8a52b5fab6e66cc8470b740d2ff31767d94d7ae94f4c041c1db9dd3122f350f",
+      "bytes": 3000
+    },
+    {
+      "path": "public-proof.json",
+      "sha256": "ecf23d40ca0e06074fb1cc3e68fbc99920b971ce53a6d2573daeb0b3249c5e79",
+      "bytes": 1777
+    },
+    {
+      "path": "qualification-report.md",
+      "sha256": "9ad874e5cc9b156637135fdb2175f9b8341d5386cb507d86ee9d305785764296",
+      "bytes": 2947
+    },
+    {
+      "path": "close-qualification.mjs",
+      "sha256": "209bea6729f05c22f7715a92fe3c360f05ed6085cfeb71e0cde190d7396a511c",
+      "bytes": 4947
+    },
+    {
+      "path": "execution.json",
+      "sha256": "cfd1493f5577e1a3e30f2b0dc4b01c44fc6e3e23a5d753bee5d08f828c7698ac",
+      "bytes": 1504
+    },
+    {
+      "path": "completion.fd3",
+      "sha256": "be1146b34473e9956cb14cce7ad840af11f37a8dc9c61fd705f7613382d12873",
+      "bytes": 1940
+    }
+  ],
+  "preparedManifestSha256": "dc4efa0346c41b8a5f5cc620dfbebc8647455bc95048f7e988dd56c4954b2d3d",
+  "frozenInputsPreserved": true,
+  "semanticRuns": 1,
+  "native": "unqualified",
+  "acceptance": "open"
+}

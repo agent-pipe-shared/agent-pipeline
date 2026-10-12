@@ -1,0 +1,5 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": ["DLP001", "DLP002", "DLP003", "DLP004", "DLP005", "LDO003", "LDO008", "LDO010"],
+  "maxBytes": 65536
+}

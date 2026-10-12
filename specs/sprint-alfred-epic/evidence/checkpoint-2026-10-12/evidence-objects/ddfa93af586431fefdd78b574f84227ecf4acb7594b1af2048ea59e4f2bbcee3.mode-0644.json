@@ -1,0 +1,148 @@
+{
+  "schema": "alfred.critic-cap.independent-freeze.v1",
+  "status": "frozen-static-only; no semantic verdict",
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "calibration": "SourceProposal; independent assertion author",
+  "route": "methodology-only; model/native unverified",
+  "caseCount": 8,
+  "files": [
+    {
+      "relativePath": "case-contract.json",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/case-contract.json",
+      "sha256": "34c25726c951ee7cf4026f9f6f222dd34a6ce6e8fb31c4d4b078964121890942",
+      "bytes": 2934,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "fixture-transport-derivative.json",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/fixture-transport-derivative.json",
+      "sha256": "1ddc441d725060054e9ff33edb2f2c5532b0452ce69b0ad29ee16da45067b4b4",
+      "bytes": 2961,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "resource-contract.json",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/resource-contract.json",
+      "sha256": "8489c1d02870d85527e4491ea10204c25f215832d8778cd0f522db836df8049d",
+      "bytes": 4288,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "static-import-closure.json",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/static-import-closure.json",
+      "sha256": "90c57aee13109db3b92bc7942b9576e53735890ea506784cdf09f3c417d0a5cd",
+      "bytes": 310390,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "case-brief.md",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/case-brief.md",
+      "sha256": "e5f80432023ef01951e7e5da5512bbec1706e7b56fc1b315e0519e7f19cb29b3",
+      "bytes": 3059,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "prepare-fixtures.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/prepare-fixtures.mjs",
+      "sha256": "67048f916cb120283d797b52855ca5430f25236184803b639a94469c63856b40",
+      "bytes": 4175,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "close-packet.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/close-packet.mjs",
+      "sha256": "8cafe069b44e157fcb5ac434332e89913a01b80933598862b5368eb81e1241a2",
+      "bytes": 7109,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "postimages/plugins/pipeline-core/scripts/critic-one-plus-diff.independent.test.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/postimages/plugins/pipeline-core/scripts/critic-one-plus-diff.independent.test.mjs",
+      "sha256": "e1c35eda591939424fb4b7c52025bab9c4db878ada82c029454db40c61d5d474",
+      "bytes": 12107,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "postimages/plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/postimages/plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "sha256": "f6835e041ae38345688c7faa16b93ec101cb23fd052e1b6070dbc3d5bf7992c2",
+      "bytes": 22654,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "postimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/postimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "sha256": "0f3f01486109426fd101e5f510aeea4c03ffb9e1468899aca3b48094a74969db",
+      "bytes": 26326,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "preimages/plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/preimages/plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "sha256": "45dc3c4b150568975049a45337d7c055bd71ce7faba8b8af527ca39c93aa9470",
+      "bytes": 23284,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "inverse-postimages/plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/inverse-postimages/plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "sha256": "45dc3c4b150568975049a45337d7c055bd71ce7faba8b8af527ca39c93aa9470",
+      "bytes": 23284,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "inverses/critic-inherited-policy-registration.fixture.mjs.json",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/inverses/critic-inherited-policy-registration.fixture.mjs.json",
+      "sha256": "55e615f734e616f4cc04aae278a18be7eca4f9e58a21fb23af18e0dfd9d9974d",
+      "bytes": 1427,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "preimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/preimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "sha256": "279575b8b22644b51865439fc79dc620cca5ed62b4528c72bf1b943bdc04647a",
+      "bytes": 26419,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "inverse-postimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/inverse-postimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "sha256": "279575b8b22644b51865439fc79dc620cca5ed62b4528c72bf1b943bdc04647a",
+      "bytes": 26419,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "relativePath": "inverses/critic-inherited-policy-course.fixture.mjs.json",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/inverses/critic-inherited-policy-course.fixture.mjs.json",
+      "sha256": "119c93e6a77cfd565df1b4daebc30d75154e70732081cef5f7847843212c94db",
+      "bytes": 612,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "syntaxChecks": {
+    "test": 0,
+    "registrationFixture": 0,
+    "courseFixture": 0
+  },
+  "businessRuns": 0,
+  "productImports": 0,
+  "canonicalWrites": 0,
+  "GitOperations": 0,
+  "qualification": false
+}

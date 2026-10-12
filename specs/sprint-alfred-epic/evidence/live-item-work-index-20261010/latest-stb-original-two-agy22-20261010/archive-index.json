@@ -1,0 +1,44 @@
+{
+  "schema": "alfred.focused-proof-archive-index.v1",
+  "planSha256": "9c691d2e7ef2b67a19ce203742fd586858e4e7abd6b2f0841f74591b83743ac2",
+  "files": [
+    {
+      "path": "stb-original-two-public-proof.json",
+      "sha256": "638b060b09771564527feb9ac6338299c0a1fbf3dcd7f318ec927442a6d98367",
+      "bytes": 1504,
+      "mode": 420
+    },
+    {
+      "path": "agy22-supplement-public-proof.json",
+      "sha256": "92403271bcd76e9c90134bed812d7cad3ee1af1a83a29c7630e314c7bc266e02",
+      "bytes": 4483,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "dad23fc91c0335b811957302adc5e7600a5605724ee11cc8031508b098a14d31",
+      "bytes": 1487,
+      "mode": 420
+    },
+    {
+      "path": "handover-update.md",
+      "sha256": "cab039539b7737421634542a870433fe36b58aece8fe9a606b6864f896d3716f",
+      "bytes": 796,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "5b6cb21f38fbb54e4252bf85e2de954b84d80336482b957205706dc17d6c6c52",
+      "bytes": 648,
+      "mode": 420
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "ec68d9e7bd3900b933451ee4c3c03cf554f53c1c13e0b4bd72c5583e563f7a23",
+      "bytes": 1817,
+      "mode": 420
+    }
+  ],
+  "nativeAuthority": false,
+  "accepted": false
+}

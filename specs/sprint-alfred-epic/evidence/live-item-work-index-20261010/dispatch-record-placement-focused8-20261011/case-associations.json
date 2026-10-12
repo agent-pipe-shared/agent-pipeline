@@ -1,0 +1,63 @@
+{
+  "schema": "alfred.dispatch-placement.case-associations.v1",
+  "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+  "cases": [
+    {
+      "id": "DLP001",
+      "disposition": "pass",
+      "meaning": "Original misplaced specs record refuses before collision/owner observations; formatter identifies canonical root evidence and preserves supplied guidance.",
+      "originalCallbackUnchanged": false
+    },
+    {
+      "id": "DLP002",
+      "disposition": "pass",
+      "meaning": "Misplaced backlog/nested/archive/docs/bare-root dispatch basenames refuse with no ownership or reservation effects.",
+      "originalCallbackUnchanged": false
+    },
+    {
+      "id": "DLP003",
+      "disposition": "pass",
+      "meaning": "Fresh canonical record remains allowed without creating an owner or reservation.",
+      "originalCallbackUnchanged": false
+    },
+    {
+      "id": "DLP004",
+      "disposition": "pass",
+      "meaning": "Actual completed canonical record keeps original collision refusal/formatter and unchanged bytes.",
+      "originalCallbackUnchanged": false
+    },
+    {
+      "id": "DLP005",
+      "disposition": "pass",
+      "meaning": "Unrelated evidence and ordinary filenames remain outside the lane without effects.",
+      "originalCallbackUnchanged": false
+    },
+    {
+      "id": "LDO003",
+      "disposition": "pass",
+      "meaning": "Unchanged original callback: genuine exclusive creation and private common claim agree; duplicate conserves record/claim.",
+      "originalCallbackUnchanged": true
+    },
+    {
+      "id": "LDO008",
+      "disposition": "pass",
+      "meaning": "Unchanged original callback: actual linked worktree foreign dispatch cannot reuse shared claim with missing local record.",
+      "originalCallbackUnchanged": true
+    },
+    {
+      "id": "LDO010",
+      "disposition": "pass",
+      "meaning": "Unchanged original callback: terminal record permits identical owning rewrite only; changed/empty/foreign mutation refuses.",
+      "originalCallbackUnchanged": true
+    }
+  ],
+  "limits": {
+    "methodOnly": true,
+    "nativeHostClaim": false,
+    "topLevelGovernedDirectWriteProven": false,
+    "wholeItemAcceptance": false,
+    "templateMirrorOrHistoricalMigrationProven": false,
+    "protectedIntegrationAuthorization": false,
+    "priorWholeLDO12Replayed": false
+  }
+}

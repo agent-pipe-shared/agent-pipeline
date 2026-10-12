@@ -1,0 +1,130 @@
+{
+  "schema": "alfred.afk-authentic-uncertainty-focused-proof.v1",
+  "status": "scoped-original-AFX009S-pass",
+  "historicalSixGeneration": {
+    "executionSha256": "fe5a7d009621990037eab468a7453a91b98a10dbafb4229bf751d6bff11f6aba",
+    "complete": true,
+    "counts": {
+      "pass": 5,
+      "fail": 1,
+      "skip": 0,
+      "todo": 0
+    },
+    "dispositions": [
+      {
+        "id": "AFR001",
+        "disposition": "pass"
+      },
+      {
+        "id": "AFR002",
+        "disposition": "pass"
+      },
+      {
+        "id": "AFX004",
+        "disposition": "pass"
+      },
+      {
+        "id": "AFX007",
+        "disposition": "pass"
+      },
+      {
+        "id": "AFX009H",
+        "disposition": "pass"
+      },
+      {
+        "id": "AFX009S",
+        "disposition": "fail"
+      }
+    ],
+    "fd3Sha256": "172200d7716df70389d97953fe7a7c4b55a78aaa1187260ecb87fe743fd94fdb",
+    "stdoutSha256": "c2a50f2c4cb8ee30c30bb99ef5afad58b69b95f285555a354a6a42e78ff2ed2d",
+    "stderrSha256": "7182543e0e7d6efacc3ed201374d96a289b7df7a7c1f24c3b6a212326ffee8c8",
+    "sourcePins": {
+      "plugins/pipeline-core/lib/afk-ledger.mjs": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+      "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+      "plugins/pipeline-core/lib/interruption-receipt-store.mjs": "cd68275ea86691a68102691e2f919601e3f60b9df7b07e9647e50a03541df98f",
+      "plugins/pipeline-core/lib/onboarding-continuity.mjs": "1d393c1eff205bb9e032c791161b2fccad6b70b2f0a6620b01033e109f30c871",
+      "plugins/pipeline-core/lib/session-authority-registry.mjs": "d30aaa52c97ac7f17c852a181572b773d952e2090fa5496afe4e609b86b5bea0",
+      "plugins/pipeline-core/scripts/pipeline-state.mjs": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9",
+      "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": "99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4",
+      "plugins/pipeline-core/scripts/report-interruptions.mjs": "fdcc6fe6d707303fdc7a9758715248bad62ed2b4eb9879dfe901c37f4da931c4",
+      "plugins/pipeline-core/lib/afk-transaction-host.mjs": "a79718659a5bd44f087bdd2343f3407b7255d4358b2dccb22ff11b0ce3c48ae6",
+      "plugins/pipeline-core/scripts/check-vendored-template-sync.mjs": "b9dd50c6dba7be991d4d40eac48846ac94c1f39687ab2d07d257e02c613d4b43",
+      "plugins/pipeline-core/config/interruption-registry.v1.json": "a37b5ab200f0b88cae6e45adb8befa4e273a8949494197d2958d01df094e23e9",
+      "plugins/pipeline-core/scripts/sync-interruption-registry-asset.mjs": "7b583a8f1a9d842f71249bd30e3d55269822750e14473550ed51df65643f0e7c",
+      "plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c"
+    },
+    "sourceConserved": true,
+    "runtimeConserved": true,
+    "environmentConserved": true,
+    "noSharedProviderAccess": true
+  },
+  "currentFocusedGeneration": {
+    "executionSha256": "bea724734d2ddc3ce9b3fd3bc4f5cf9ef943739e66e7b572bf2851e6fc66803e",
+    "complete": true,
+    "counts": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "dispositions": [
+      {
+        "id": "AFX009S",
+        "disposition": "pass"
+      }
+    ],
+    "fd3Sha256": "75cdd1e277858aff65c978cff0dadb2e5f66775b8c5cf76d08e076634506f21b",
+    "stdoutSha256": "ffea7a3547581545d23dd202471460ced1ae293e2f700dad3e7b54754229a27e",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sourcePins": {
+      "plugins/pipeline-core/lib/afk-ledger.mjs": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+      "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+      "plugins/pipeline-core/lib/interruption-receipt-store.mjs": "cd68275ea86691a68102691e2f919601e3f60b9df7b07e9647e50a03541df98f",
+      "plugins/pipeline-core/lib/onboarding-continuity.mjs": "b2886c88cd564b4ba713537e6d109ac69f94e5ed6d446defaf4c1283cb49fcc1",
+      "plugins/pipeline-core/lib/session-authority-registry.mjs": "d30aaa52c97ac7f17c852a181572b773d952e2090fa5496afe4e609b86b5bea0",
+      "plugins/pipeline-core/scripts/pipeline-state.mjs": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9",
+      "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": "99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4",
+      "plugins/pipeline-core/scripts/report-interruptions.mjs": "fdcc6fe6d707303fdc7a9758715248bad62ed2b4eb9879dfe901c37f4da931c4",
+      "plugins/pipeline-core/lib/afk-transaction-host.mjs": "a79718659a5bd44f087bdd2343f3407b7255d4358b2dccb22ff11b0ce3c48ae6",
+      "plugins/pipeline-core/scripts/check-vendored-template-sync.mjs": "b9dd50c6dba7be991d4d40eac48846ac94c1f39687ab2d07d257e02c613d4b43",
+      "plugins/pipeline-core/config/interruption-registry.v1.json": "a37b5ab200f0b88cae6e45adb8befa4e273a8949494197d2958d01df094e23e9",
+      "plugins/pipeline-core/scripts/sync-interruption-registry-asset.mjs": "7b583a8f1a9d842f71249bd30e3d55269822750e14473550ed51df65643f0e7c",
+      "plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c"
+    },
+    "sourceConserved": true,
+    "runtimeConserved": true,
+    "environmentConserved": true,
+    "noSharedProviderAccess": true
+  },
+  "criterion": {
+    "id": "AFX009S",
+    "originalAssertionsPreserved": true,
+    "result": "PASS",
+    "behavior": "Genuine atomic State rename followed by directory-sync interruption remains unavailable with retained Host effects and uncertain State durability; physical snapshots and retained lifetime assertions pass.",
+    "observedDispositionRange": [
+      "durability-unknown",
+      "indeterminate"
+    ],
+    "exactDispositionSeparatelyLogged": false
+  },
+  "scopedSourceChange": {
+    "module": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+    "parentSha256": "68a97e8f7c767ca6f258922d1f57de32c033a417948d5adc1a4e4d1f2f2fb79f",
+    "postSha256": "b2886c88cd564b4ba713537e6d109ac69f94e5ed6d446defaf4c1283cb49fcc1",
+    "sourceManifestSha256": "eaf02ed6c89599d44b2a0b418b37b056946154ae80b25cec2f75d3dab9f7cba9",
+    "independentNormSha256": "223e77e0c3abf9a9e34ba11f79310d2f5a2a2eaf3893afd73b9c707b8f9a7133",
+    "alignmentSha256": "a5755956e952cbde4f6150e0c9a765b15a8c3616f93bb7716541df4f0eea56e5",
+    "description": "Three local expressions transport only the authentic direct Host uncertain failure after existing fresh private checks; strict admission, Current refusal, writer gates, error code, attempted flag and finally remain unchanged."
+  },
+  "limits": {
+    "jointSixOnCurrentGeneration": false,
+    "historicalFiveNotReexecutedHere": true,
+    "wholeAFKAccepted": false,
+    "wholeACAccepted": false,
+    "nativeAssurance": false,
+    "canonicalProductIntegrationClaimed": false,
+    "remainingSixthCustodyCorridorOutsideThisProof": true
+  },
+  "authorBusinessRuns": 0
+}

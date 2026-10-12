@@ -1,0 +1,2136 @@
+{
+  "schema": "portable.original-requirements-and-authorities.v1",
+  "status": "repository-existing-associations-only",
+  "publicOriginals": [
+    {
+      "itemId": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+      "publicRepositoryPath": "backlog/items/2026-10-07-a-read-only-probe-can-dump-the-process-environment-into-a-transcript.md",
+      "sha256": "775c4ba06d069b47e93995d0afe93610fc9dd457ac25d711e787587772418623",
+      "bytes": 2271,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+      "publicRepositoryPath": "backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+      "sha256": "b634c2c005eb96484ba435dab5c98bb0929fded2003e4282280cd1e1d693c264",
+      "bytes": 1791,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+      "publicRepositoryPath": "backlog/items/2026-09-28-advisor-demand-reuse-has-no-design-course-bound.md",
+      "sha256": "7f0655c836ccbd7ca23bc0a115f1038afd564cf3c08c861e5d9c925338be434d",
+      "bytes": 3129,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+      "publicRepositoryPath": "backlog/items/2026-10-05-advisor-provenance-ancestor-check-fails-on-any-sibling-write.md",
+      "sha256": "0b452ee003de2dd268f3b841bbeddc1dc65ed8a496eaa6c829553d063c998f26",
+      "bytes": 2430,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+      "publicRepositoryPath": "backlog/items/2026-09-28-advisor-question-contract-and-final-source-binding-conflict.md",
+      "sha256": "d3df4f1d68a2214304dc3fbc55233b83fafa17f9e40b1faaa08738e1e154deff",
+      "bytes": 2579,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+      "publicRepositoryPath": "backlog/items/2026-10-09-agent-obligations-recommends-a-commit-spelling-guard-push-refuses.md",
+      "sha256": "29cd61635a8da9f6bef4b97880f2feac361500ebfce289efed9cf7beda3e18be",
+      "bytes": 2291,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+      "publicRepositoryPath": "backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md",
+      "sha256": "ed97e3e18ecaf7fc9b4e20a3ceec3bb31c1e99fd5fa7925577b4e0bcf4a37aa0",
+      "bytes": 1809,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+      "publicRepositoryPath": "backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+      "sha256": "c38d8a7892efffed0434302eb65b7f842e7a752c7637e1f4e68bbc8edf8b42d6",
+      "bytes": 2896,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.agy-el01-write-authorization-gap",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+      "publicRepositoryPath": "backlog/items/2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md",
+      "sha256": "e52d5dbfa54e12897a81b6a235740f21f65da97dfce1f7a01bd1515064cda73d",
+      "bytes": 18906,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+      "publicRepositoryPath": "backlog/items/2026-09-29-agy-managed-copy-first-start-lacks-attestation.md",
+      "sha256": "56527a4e86ca827101f0c3e980f53e851abf34e862bbc2ca882fc9615fed9cf9",
+      "bytes": 2066,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+      "publicRepositoryPath": "backlog/items/2026-09-29-antigravity-1-2-13-blocks-managed-refresh.md",
+      "sha256": "a31faebfd202e541189574161b11485687a19f4dbc9fb865d40d6ff872f867b5",
+      "bytes": 1773,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+      "publicRepositoryPath": "backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md",
+      "sha256": "c9fa8e859c076d94fa3b81aa01269571aab64e557762c1189bf47f043de288e7",
+      "bytes": 3968,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+      "publicRepositoryPath": "backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+      "sha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+      "bytes": 3710,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+      "publicRepositoryPath": "backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md",
+      "sha256": "7b38f2789c2e3a93fbee6e11a29ca663e891c11dd57c4fcc65a91a90215b1756",
+      "bytes": 3200,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+      "publicRepositoryPath": "backlog/items/2026-10-08-auto-install-pre-push-hook-with-the-plugin.md",
+      "sha256": "b8c658eed4e89c89b136a96d767a4fe873285927ddddf133c9ef338b4af2d784",
+      "bytes": 1456,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+      "publicRepositoryPath": "backlog/items/2026-10-05-bootstrap-should-refresh-hooks-when-the-plugin-updated.md",
+      "sha256": "60bb24fca0448db604323300345908562b967611fb5a4ea3e68b4b038c43076a",
+      "bytes": 2775,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.bounded-reader-terminal-binding",
+      "publicRepositoryPath": "backlog/items/2026-09-27-bounded-reader-terminal-binding.md",
+      "sha256": "945803369c365d209df83a06b165aa65b1c327f98817083bfb3ba2b2c421c57e",
+      "bytes": 6671,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+      "publicRepositoryPath": "backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+      "sha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+      "bytes": 5074,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+      "publicRepositoryPath": "backlog/items/2026-10-05-budget-checkpoint-fires-below-the-briefed-cap.md",
+      "sha256": "4de25e1110e18486e44ff5df3c4ffbad4e81643828f649d52c9236daf21c02c5",
+      "bytes": 1559,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.capability-inventory-checker-is-red-at-head",
+      "publicRepositoryPath": "backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+      "sha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+      "bytes": 887,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+      "publicRepositoryPath": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "sha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+      "bytes": 1413,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md",
+      "sha256": "649a165d68b106c0156500878e4c48cee37f912286ed572cdb51c9c18e4debe4",
+      "bytes": 2435,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "publicRepositoryPath": "backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+      "sha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+      "bytes": 764,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+      "publicRepositoryPath": "backlog/items/2026-10-03-claude-session-start-emits-codex-transcript-recovery-hint.md",
+      "sha256": "6a14b634a1e207ea7dd6331b54a7890a6c71bcb34fa0c61bb0ba2fc775ecd32b",
+      "bytes": 2173,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+      "publicRepositoryPath": "backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+      "sha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+      "bytes": 2524,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+      "publicRepositoryPath": "backlog/items/2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md",
+      "sha256": "c324ad339647bacded677944953b112f2adeb18d00f60de9bf47cd4ac6ad31d0",
+      "bytes": 7857,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+      "publicRepositoryPath": "backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+      "sha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+      "bytes": 1818,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "publicRepositoryPath": "backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+      "sha256": "fa597b23a60e3c71ff88dc712df2802fe0b466826c0a2b91c12aef85b975dbc3",
+      "bytes": 5539,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "publicRepositoryPath": "backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+      "sha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+      "bytes": 1579,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.codex-design-readiness-child-rejects-valid-review",
+      "publicRepositoryPath": "backlog/items/2026-09-28-codex-design-readiness-child-rejects-valid-review.md",
+      "sha256": "bffd844c1ecc3ffcf63adc2c87932cfd29eb3f49ecc0f5b7ba7828e691a99b9a",
+      "bytes": 9277,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.codex-own-session-audit-export-missing",
+      "publicRepositoryPath": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+      "sha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+      "bytes": 1295,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+      "accepted": false,
+      "publicRepositoryPath": "backlog/items/2026-09-28-prepared-codex-readiness-receipt-does-not-bind-finalized-output.md",
+      "sha256": "7e27ec8e94b05a8a82d8fbd93b09992b4432946c6b117e7a4293da12244af340",
+      "bytes": 10798,
+      "mode": "0644",
+      "association": "Exact existing public filename referenced in archived assessment artifact; no private original opened",
+      "approvedOriginalEquality": "Declared original digests retained; equality not inferred from path",
+      "declaredOriginalHashes": [
+        "146b0ecb9c3b43b4f2e1e7400a3fd9f26d633d32d656e4a2d3940b232530317a"
+      ]
+    },
+    {
+      "itemId": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+      "publicRepositoryPath": "backlog/items/2026-09-27-codex-wsl-required-advisor-has-no-completable-route.md",
+      "sha256": "502bebf32289bc2e6c1585a48f1981c52d809251fec995608397c9789e5f618f",
+      "bytes": 12968,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+      "publicRepositoryPath": "backlog/items/2026-09-29-commit-grammar-hint-still-requires-scratch-message-file.md",
+      "sha256": "bd6c57d0490ed5033a96becca308fca3c2ab52c02aac9e6f6f8bc51b5abf487a",
+      "bytes": 1822,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+      "publicRepositoryPath": "backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md",
+      "sha256": "ec78d35d337742f899ad0e89ea79e1c80d7e83a967371d2c3c5c7ae24760a48f",
+      "bytes": 2326,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+      "publicRepositoryPath": "backlog/items/2026-10-05-completion-fd-suites-cannot-run-as-single-files.md",
+      "sha256": "e7d18e20cc7884fe6f1cfeb35e20a32f987fdc70c4d22aa77918f69e1bf11799",
+      "bytes": 2044,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-09-concurrent-session-warning-never-fires-on-native-windows.md",
+      "sha256": "c8374bd7c6082ff219c6ea49efc886c788b67319318e45997e7c9ed9d7777513",
+      "bytes": 2672,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+      "publicRepositoryPath": "backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md",
+      "sha256": "e6248906519a7293dd277391f6ba97e358c87ef4f2f0b1453758faea812e836a",
+      "bytes": 2450,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+      "publicRepositoryPath": "backlog/items/2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced.md",
+      "sha256": "9902bbf50e5adbf70a050b5a4ebc2fb995ae1095d87e469112dc12a6efa3e86f",
+      "bytes": 2775,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+      "publicRepositoryPath": "backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md",
+      "sha256": "1844826ef26e0e5e780846049d864f33adb7bd7ac0c8c296dd2ad6a5970d14e8",
+      "bytes": 2659,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.critic-scratch-notes-write-is-refused-again",
+      "publicRepositoryPath": "backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md",
+      "sha256": "1e05defaa8783e708372ed5c2bf39a80dd2e3677ee92c908b2a1db44794943e8",
+      "bytes": 2555,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+      "publicRepositoryPath": "backlog/items/2026-09-29-cross-runner-chat-intake-reference-needs-host-capture.md",
+      "sha256": "ada9034284b3b0a2da3fa30569323b9dc968f34809788a352819f880eef0cf5e",
+      "bytes": 1343,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.declared-system-skill-read-requires-human-override",
+      "publicRepositoryPath": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+      "sha256": "99d542713254a5b5b8d2de92742b0212ec6de1f1e9e4f9d4f19bb8552fd11c81",
+      "bytes": 2376,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.denial-names-a-diagnosis-it-refuses",
+      "publicRepositoryPath": "backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md",
+      "sha256": "733ee0fe268a4804d2b9606d1312ee98708d20c99085499871e20b6f34582c87",
+      "bytes": 1398,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-approval-validator-rejects-json-key-reordering",
+      "publicRepositoryPath": "backlog/items/2026-09-28-design-approval-validator-rejects-json-key-reordering.md",
+      "sha256": "8cd34d32ca207cd54ff90bd6507d25356617f3acc68b5c11290cf65c1e8644e3",
+      "bytes": 2272,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+      "publicRepositoryPath": "backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+      "sha256": "e30e8618fe231ceb6475428cbdf727fd8ddfc411737b2e090de7f34f515ac050",
+      "bytes": 1872,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+      "publicRepositoryPath": "backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md",
+      "sha256": "928968269e65b5757e369c457c1a93f2e2e678eacbd9d28d66a1bb4c28ed28e4",
+      "bytes": 2294,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-generator-repeats-large-source-material",
+      "publicRepositoryPath": "backlog/items/2026-09-27-design-generator-repeats-large-source-material.md",
+      "sha256": "e5d6187f5a32f11c8b8a84550771197daaf212449b47940945db45cc36a1deab",
+      "bytes": 4733,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-intake-generator-omits-question-answers",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-package-parent-metadata-false-drift",
+      "accepted": false,
+      "publicRepositoryPath": "backlog/items/2026-09-29-unrelated-directory-entry-changes-reject-approved-design-package.md",
+      "sha256": "75e0f777573708f64da8a527c39c11f42d6a42a04abd890f58a86412df6f2e30",
+      "bytes": 2899,
+      "mode": "0644",
+      "association": "Exact existing public filename referenced in archived assessment artifact; no private original opened",
+      "approvedOriginalEquality": "Declared original digests retained; equality not inferred from path",
+      "declaredOriginalHashes": [
+        "c4c5abcdde60d56440f019ae16cb5a952821341602218ea3fdd0ce19706ac1e5"
+      ]
+    },
+    {
+      "itemId": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+      "publicRepositoryPath": "backlog/items/2026-10-07-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.md",
+      "sha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+      "bytes": 2193,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-trailer-verifier-lost-after-closure",
+      "publicRepositoryPath": "backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md",
+      "sha256": "4c5ecfea1efcec86ad8bbad4dcb91b07408419d8d66edd1c1a5de2b0ee4f8204",
+      "bytes": 2049,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-workflow-package-omits-contract",
+      "publicRepositoryPath": "backlog/items/2026-09-28-design-workflow-package-omits-contract.md",
+      "sha256": "ccd389af04c143e239a3b529ac41e20dadb63f73fbf5f57a1e6ded666df44764",
+      "bytes": 4844,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+      "sha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+      "bytes": 1489,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.desktop-app-support-is-unverified",
+      "publicRepositoryPath": "backlog/items/2026-10-07-desktop-app-support-is-unverified.md",
+      "sha256": "d6059abe31ef6ea8ba7868d9f3057a5bc39d28a6821f04dfbb34a0475cf494f1",
+      "bytes": 2213,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "publicRepositoryPath": "backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+      "sha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+      "bytes": 3050,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md",
+      "sha256": "7a02040dc1a2de7a1dfbf16190cf62a407a79ff7e778c179fd0b55c9316324e4",
+      "bytes": 4937,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+      "publicRepositoryPath": "backlog/items/2026-10-03-dispatch-guard-rejects-built-in-capitalized-agent-types.md",
+      "sha256": "7d02ca0e1585e41cd88af9d5660378ef8ef46dbaa95765071dfb173236e34bed",
+      "bytes": 3371,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+      "publicRepositoryPath": "backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md",
+      "sha256": "26e8a52017698b47281510a88bd3c8a1114f5e2bdb9fb5e4f6d2bec3e0d9a225",
+      "bytes": 1679,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+      "publicRepositoryPath": "backlog/items/2026-10-05-dispatch-record-ownership-binds-an-attempted-creation.md",
+      "sha256": "965b26a1ddad50fd6c35129e1be985c1f937fd1c39c40f1297b13f199e1be582",
+      "bytes": 1201,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+      "publicRepositoryPath": "backlog/items/2026-10-05-dispatch-records-land-under-specs-evidence.md",
+      "sha256": "967fad3dca7987083be6f3ba5b5102bde841115396f031b1f04e2de3a734f114",
+      "bytes": 2136,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+      "publicRepositoryPath": "backlog/items/2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md",
+      "sha256": "61479577fc83265c8fb96773e3dbe33c443c034b760d07c65d6ae9e0a7eeb8d2",
+      "bytes": 3561,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+      "publicRepositoryPath": "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+      "sha256": "b023654546b97b18ebaf5b2ad8d5e5ac7492bf61d39db14cc315235b0e554453",
+      "bytes": 1324,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+      "publicRepositoryPath": "backlog/items/2026-10-05-every-dispatch-pays-a-bootstrap-receipt-detour.md",
+      "sha256": "10643def2c741552c7150bd4738c859b9db1ec5d0d07a1d71b5f267679db3dfc",
+      "bytes": 3047,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.evidence-artifacts-carry-no-commit-identity",
+      "publicRepositoryPath": "backlog/items/2026-10-08-evidence-artifacts-carry-no-commit-identity.md",
+      "sha256": "cbf0732122c1387abe68b8cc588d7dba92c9b385dd49cada0d4914a1be0b6815",
+      "bytes": 1284,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+      "publicRepositoryPath": "backlog/items/2026-09-29-existing-signing-key-reuse-deadlocks-onboarding.md",
+      "sha256": "440165b16c815c1a856a2afe9e3c762a909a36404cedeaac21ecdb93cf224d50",
+      "bytes": 961,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.feature-branch-push-admitted-without-signature-approval",
+      "publicRepositoryPath": "backlog/items/2026-10-03-feature-branch-push-admitted-without-signature-approval.md",
+      "sha256": "bbea391e74d35fb4d64b44dc6c614f2ef14de2c7cf9c8fdd2a72441ec6c661d1",
+      "bytes": 3330,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.first-enrollment-enters-retirement-before-consent",
+      "publicRepositoryPath": "backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md",
+      "sha256": "178e806e3b888644be771ca73197f29cd399c86ac5362c0e2515e172e75a7cce",
+      "bytes": 4591,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.foreign-worktree-closes-the-implementation-gate",
+      "publicRepositoryPath": "backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+      "sha256": "f3999c47e1f56e70ac226a508f911818d4e960f56399d86e0999312a9018471f",
+      "bytes": 2442,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "publicRepositoryPath": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "sha256": "3b98d882612220ea6b935571f26040e29bdd09f1b799d801b456b0b76efc3c2c",
+      "bytes": 2402,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.gh-delivery-classifier-is-not-wired",
+      "publicRepositoryPath": "backlog/items/2026-10-08-gh-delivery-classifier-is-not-wired.md",
+      "sha256": "293f5636a4e7b8129700dc831f1a4de00f3689162cf25f886427e32ca0bcc79a",
+      "bytes": 1164,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "publicRepositoryPath": "backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+      "sha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+      "bytes": 2872,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+      "publicRepositoryPath": "backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md",
+      "sha256": "0dbc98748ef47df3f3cc97f8ee99c4c29cba4daef58f008c625976b53ee22324",
+      "bytes": 4266,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+      "publicRepositoryPath": "backlog/items/2026-10-04-git-hook-runtime-snapshots-go-stale-after-plugin-changes.md",
+      "sha256": "5f4446d22e09a3270689a0c9846f3d13cf52c602901b57680abe33e71df131e8",
+      "bytes": 2758,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+      "publicRepositoryPath": "backlog/items/2026-10-08-git-push-classifier-misses-env-s-and-editor-bang.md",
+      "sha256": "79daa455d33635fefc5a9711dc93fa2406eb51ea09e8a2e8aa124049c397051e",
+      "bytes": 960,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.git-stash-list-classified-as-working-tree-write",
+      "publicRepositoryPath": "backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md",
+      "sha256": "29d7567ec44486b684570d40029c00d6d1e8229464eaecc558e469212c283b6e",
+      "bytes": 1940,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-05-gitleaks-content-suppression-does-not-match-on-windows.md",
+      "sha256": "18571ff078dc529d7c782309a8bd6d708f85d589fb049a6b599b8a6e923ff709",
+      "bytes": 1862,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+      "publicRepositoryPath": "backlog/items/2026-10-06-gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.md",
+      "sha256": "08d50dff7797dafe4850ccc92573a93be1e34b30b4182b31e5f8fd3f8c3d5cec",
+      "bytes": 2436,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-05-gitleaks-repair-ignore-cli-is-a-no-op-on-windows.md",
+      "sha256": "e64046fe9fd69016b1615679bf19f51a61eff96c941b46e16055486e743d3f4e",
+      "bytes": 1360,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "publicRepositoryPath": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+      "sha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+      "bytes": 1486,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+      "publicRepositoryPath": "backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md",
+      "sha256": "74cf933c951d38189b3a97a0755abd435bcf08ea19ba6db28cdd99f5649b4bdc",
+      "bytes": 2545,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.governance-scope-rejects-readonly-host-git-control",
+      "publicRepositoryPath": "backlog/items/2026-09-29-governance-scope-rejects-readonly-host-git-control.md",
+      "sha256": "174d6e04aa78aaa21e292d3b0e3405550c1b01e77e4b0685bce25eccaa6abad5",
+      "bytes": 2619,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+      "publicRepositoryPath": "backlog/items/2026-09-27-greenfield-approval-policy-applies-after-intake-transition.md",
+      "sha256": "e0fe1a972cd5dfeb50470416bb0bc351c1623c3f1facf50d8ba407e5ae5948e8",
+      "bytes": 5418,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.greenfield-design-course-cost-and-proportionality",
+      "publicRepositoryPath": "backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md",
+      "sha256": "598b589fbb90a28947f585d99d858bc561db835c02f7a2b49f24c456fad5b507",
+      "bytes": 5088,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.greenfield-machine-output-and-skill-budget",
+      "publicRepositoryPath": "backlog/items/2026-09-29-greenfield-machine-output-and-skill-budget.md",
+      "sha256": "2d5579581ab886e21ba92409318259fc04c343a0c4cebe7badc8b64b79beebc6",
+      "bytes": 1227,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.guard-override-request-digest-drifts-after-arming",
+      "publicRepositoryPath": "backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+      "sha256": "a959bb6a375bd9dcee9815092113b40c263a092082ee60f90df6b7aad593e46c",
+      "bytes": 2131,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "publicRepositoryPath": "backlog/items/2026-10-05-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.md",
+      "sha256": "882aad4c80f31716aeb1e9729e8bb0e330532e8d6dc28d74c5da4e603d319529",
+      "bytes": 1392,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.guard-push-refuses-read-only-git-without-push",
+      "publicRepositoryPath": "backlog/items/2026-10-09-guard-push-refuses-read-only-git-without-push.md",
+      "sha256": "4690c05e8f039d5ee30cad8a53bd8bdb4d775a4d31df0e49252987cf7d019120",
+      "bytes": 1412,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+      "publicRepositoryPath": "backlog/items/2026-10-05-guard-push-treats-gitleaks-as-a-git-command.md",
+      "sha256": "133beaa77554a123bc2e39c4e8a1c09c605502f6f1a16d403631dbe8812638f8",
+      "bytes": 1249,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+      "sha256": "91587203452e42a0a71871425899375db5359505be5561aca8d0dab7503694d6",
+      "bytes": 1738,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.handover-doc-committed-without-governance-classification",
+      "publicRepositoryPath": "backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+      "sha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+      "bytes": 2002,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+      "publicRepositoryPath": "backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md",
+      "sha256": "b25facc5185da9499432d6fb3d3a1a07cba3c166ee3bfecf1242a79de19b4a50",
+      "bytes": 1879,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+      "accepted": false,
+      "publicRepositoryPath": "backlog/items/2026-10-09-a-dead-owner-audit-lock-is-permanently-ambiguous-on-windows.md",
+      "sha256": "ff0b78244c8313befb10e71144f242344a68bff8358d0d66a0d26a11142897d1",
+      "bytes": 2586,
+      "mode": "0644",
+      "association": "Exact existing public filename referenced in archived assessment artifact; no private original opened",
+      "approvedOriginalEquality": "Declared original digests retained; equality not inferred from path",
+      "declaredOriginalHashes": [
+        "89233587365e2ad51d15b887b42536ba2f35e95217fecc5fd1fb04c76302ffdd"
+      ]
+    },
+    {
+      "itemId": "pipeline.hgo-patch-preflight-before-signature",
+      "publicRepositoryPath": "backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+      "sha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+      "bytes": 4585,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.hgo-stale-capability-shadows-current-authorization",
+      "accepted": false,
+      "publicRepositoryPath": "backlog/items/2026-09-28-stale-hgo-capability-shadows-current-authorization.md",
+      "sha256": "e9a996a5db12262e5d9fa5f15c9058dca6808133d22e8ea375f30f4a760e2dd3",
+      "bytes": 5128,
+      "mode": "0644",
+      "association": "Exact existing public filename referenced in archived assessment artifact; no private original opened",
+      "approvedOriginalEquality": "Declared original digests retained; equality not inferred from path",
+      "declaredOriginalHashes": [
+        "fb5191c9ece5ce049b49eb132d51884163cfe3f36ec74b2abc147c9486f9f771"
+      ]
+    },
+    {
+      "itemId": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+      "publicRepositoryPath": "backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+      "sha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+      "bytes": 1717,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+      "publicRepositoryPath": "backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md",
+      "sha256": "2db1d79416dd18bbfe07a9e8ee8ebd44bd1afc7bb692121a2bba657dba6e5b0e",
+      "bytes": 3161,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "publicRepositoryPath": "backlog/items/2026-10-05-kernel-closure-check-masks-violations-after-the-first.md",
+      "sha256": "f7aff936f73def74cf91fd4eb07a5f9bcb91d0980763d93a2c1d12c9cefae6b2",
+      "bytes": 1095,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+      "publicRepositoryPath": "backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md",
+      "sha256": "eb5dd7b86b29e75d4fb43a8ded316d010c1c7a13a4bfd6d161029c1cd5496730",
+      "bytes": 3159,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+      "publicRepositoryPath": "backlog/items/2026-09-28-lifecycle-inspect-omits-current-plan-spec-digests.md",
+      "sha256": "5bce89950c0643ead4430be005eb7ed2efb31e01dabd59e72607c91a864f8b08",
+      "bytes": 3296,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+      "publicRepositoryPath": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+      "sha256": "4f7bc8c7cbd6d63b8a2a7b2d5a613e6961aa8c24d2885aa5a4a7c9451c5aaaed",
+      "bytes": 1979,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+      "publicRepositoryPath": "backlog/items/2026-10-06-mandatory-hook-readiness-returned-refusal-skips-rollback.md",
+      "sha256": "3522e4621e0246a8d69b56d096ad98756c564b6ede9d4a2a59f07be832da48a8",
+      "bytes": 1944,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.merge-commit-message-skips-conventional-type-check",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.model-family-approval-with-automatic-version-upgrades",
+      "publicRepositoryPath": "backlog/items/2026-09-30-model-family-approval-with-automatic-version-upgrades.md",
+      "sha256": "241d32ed22c27521c161df682580a722b394723f74d921d603c3104073ce90ac",
+      "bytes": 2212,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-08-model-role-bootstrap-is-always-unavailable-on-native-windows.md",
+      "sha256": "8b5fbaa1eefa716041dcf3a37a2e4466dcaef63d6fb6467fbec14b58ba2c1941",
+      "bytes": 2330,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+      "publicRepositoryPath": "backlog/items/2026-09-28-model-role-confirmation-prompt-obscures-required-digest.md",
+      "sha256": "ab00cad73174c3a6480c4e3d29c6a125c30d91c641768b894a22ab534e31df35",
+      "bytes": 2921,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.native-patch-rename-drops-protected-content-markers",
+      "publicRepositoryPath": "backlog/items/2026-09-29-native-patch-rename-drops-protected-content-markers.md",
+      "sha256": "2d1c1da41c19511ea133f22e433161b9054dcd88badbb962eb223ed43a13e0eb",
+      "bytes": 2361,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+      "publicRepositoryPath": "backlog/items/2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md",
+      "sha256": "39840fdab94645876989e3c5e27b98df2d78cbf6c7d8f307fd3730ab5691f0d7",
+      "bytes": 15507,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+      "publicRepositoryPath": "backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md",
+      "sha256": "886c6875baf84a45278a5fa1d4661c213d98c460b0ae80db4742ce31d4082f77",
+      "bytes": 1435,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+      "publicRepositoryPath": "backlog/items/2026-09-29-nongit-retirement-reader-calls-inaccessible-controller-helper.md",
+      "sha256": "7c6cfca086ba408002bcbf81cb15528ec251da8fac2cea04d3d7cd533aaabc11",
+      "bytes": 2093,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+      "publicRepositoryPath": "backlog/items/2026-09-28-onboarding-home-override-does-not-bind-machine-plane.md",
+      "sha256": "495e0f443b4483136a70820e06227f2b5209c5d885ac1cab33d826e67e16cce7",
+      "bytes": 4628,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+      "publicRepositoryPath": "backlog/items/2026-09-29-onboarding-init-greenfield-matrix-is-serial-and-slow.md",
+      "sha256": "b0bd22b0cb4e1f2d5b62b2ed678f2852b445acbdce0947c16e2b8bf56d7d2bee",
+      "bytes": 1429,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+      "publicRepositoryPath": "backlog/items/2026-09-29-onboarding-test-runner-reports-async-pass-before-settlement.md",
+      "sha256": "c9bdc02219343ac90e459b4d3c465ab03f4293a1445341e91dc428a763637bab",
+      "bytes": 3098,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+      "publicRepositoryPath": "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md",
+      "sha256": "cc9e87ea795f8b08a28fd87e19e7a7c2ced041387f5b46965933d28246ac1117",
+      "bytes": 4805,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+      "publicRepositoryPath": "backlog/items/2026-10-05-outside-root-read-label-skips-option-value-file-tokens.md",
+      "sha256": "44c5b214dfd33ca087ab08f4d72a0fffaf2edb43228a388cbc7bfc57f8fe3e7d",
+      "bytes": 1101,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "publicRepositoryPath": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+      "sha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+      "bytes": 3704,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+      "publicRepositoryPath": "backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+      "sha256": "68433f8d12cbea149864924df9134bb5bc7c0361c10df99c036ee869360b40eb",
+      "bytes": 2046,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+      "publicRepositoryPath": "backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+      "sha256": "f66799f0d8c7c9720b67e27071751ee9fc5a53005b4f70bd5fabf8b5e620f3a9",
+      "bytes": 14999,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+      "publicRepositoryPath": "backlog/items/2026-09-28-plan-submission-must-not-require-separate-po-approval.md",
+      "sha256": "f29b9dfbb62927ddf8138bd58bdd4c8ab1e8e462a1480ab86785ab98c686098d",
+      "bytes": 2230,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+      "publicRepositoryPath": "backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+      "sha256": "a2e2fbb3b955625a7758fc320b2bf5d3d4754751de194d82d47f7c8b70ea1775",
+      "bytes": 2128,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+      "publicRepositoryPath": "backlog/items/2026-10-06-preflight-hides-the-git-error-behind-gs-git-unavailable.md",
+      "sha256": "d004f3fd834bd9a4c33443575529d07f20d3d07dd3c0d27b890701061ca3e2f7",
+      "bytes": 1879,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+      "publicRepositoryPath": "backlog/items/2026-10-05-preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.md",
+      "sha256": "55ceaf1b4eec17a7f1c4839e0c46b70ecd2716cc80249e7a02cb2f844c49eef5",
+      "bytes": 3128,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+      "publicRepositoryPath": "backlog/items/2026-10-07-private-temp-root-not-secure-branch-has-no-test-seam.md",
+      "sha256": "18af92514b323bf2f38910e0e7f23ac8026d590df28f19c37bd1493c69aa5db8",
+      "bytes": 1457,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+      "publicOriginalAssociation": "unresolved",
+      "candidateCount": 0,
+      "reason": "No unique existing public filename association; no private original opened or filename guessed",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+      "publicRepositoryPath": "backlog/items/2026-09-29-protected-baseline-rejects-canonical-discarded-idle-state.md",
+      "sha256": "20faa16cd7ee4faf7706b72c40188b1b1c59e3ea7dfb8f4080108a12f55c1665",
+      "bytes": 2883,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+      "publicRepositoryPath": "backlog/items/2026-10-06-push-classifier-deny-list-does-not-converge.md",
+      "sha256": "f8b421a273d3c553bc6703867931e4fa9e3dc96829fd102deaf760ed14b3ae39",
+      "bytes": 2658,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+      "publicRepositoryPath": "backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md",
+      "sha256": "39ba0b3a2998378badf615e8c0341195c373aeb0d60d2eaaf7ab8f6c91836c64",
+      "bytes": 2453,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+      "publicRepositoryPath": "backlog/items/2026-10-05-push-classifier-misreads-backslash-escaped-quotes.md",
+      "sha256": "09d07d66f49f3d7e6ed75a5f99bad1cc131307f263119d5484cb1106328fa8f6",
+      "bytes": 2383,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+      "publicRepositoryPath": "backlog/items/2026-10-06-push-classifier-misses-nested-quotes-and-redirect-before-push.md",
+      "sha256": "7d5599588be99f2480f6595c9194e361f4d5c8decfa8a41c128325fb9fc27db6",
+      "bytes": 2607,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+      "publicRepositoryPath": "backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md",
+      "sha256": "c45590ae6c71961262f2036ddc4e9439c1343db360b2f7919da3e93955c0b591",
+      "bytes": 2575,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+      "publicRepositoryPath": "backlog/items/2026-09-30-read-only-guard-admits-execution-and-output-options.md",
+      "sha256": "b8b90ded3071e53a544969980e7ce42b726c3b598e9dc9a9a7e6ee5a02d758a5",
+      "bytes": 2544,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+      "publicRepositoryPath": "backlog/items/2026-09-28-readiness-input-omits-current-advisor-observation.md",
+      "sha256": "f82ac8fd4dcac39e1df1f4a57e2ca1ca2b10021262d165517606040e981c504b",
+      "bytes": 5022,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+      "publicRepositoryPath": "backlog/items/2026-09-29-reconnect-sandbox-empty-child-output-breaks-bootstrap.md",
+      "sha256": "00079cd396e5191e2da96a44048c998a2aa775f99b965d64f6ca4bbc6b9c016a",
+      "bytes": 1416,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+      "publicRepositoryPath": "backlog/items/2026-09-29-retirement-reader-masks-typed-unsafe-layout-inspection.md",
+      "sha256": "3f86b5fbaba344474930360c6f3a0cd8e19fc86385f6f40be4b32a05921bb442",
+      "bytes": 2794,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+      "publicRepositoryPath": "backlog/items/2026-10-04-revised-native-design-cannot-reach-a-new-advisor-course.md",
+      "sha256": "3223d2671bdd488c9c8cb5ffb854297a226b629030b32b7d013755de1fc54586",
+      "bytes": 2749,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+      "publicRepositoryPath": "backlog/items/2026-10-03-role-route-preflight-with-self-dispatch-fallback.md",
+      "sha256": "46cbd6502fe091a27a2ec4a5af79d94190b99ac53efe0d4566ba51ee03f795dd",
+      "bytes": 2297,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.scratch-has-no-retention-and-no-durability-check",
+      "publicRepositoryPath": "backlog/items/2026-10-05-scratch-has-no-retention-and-no-durability-check.md",
+      "sha256": "70c82ba3de815edfca42bdc74dfe66859063e2aa83113a24d76109b7207d5180",
+      "bytes": 1373,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+      "publicRepositoryPath": "backlog/items/2026-09-27-scratch-must-remain-writable-across-lifecycle-states.md",
+      "sha256": "700055aed5299473e88b87c1086dac2909983155da1661262c26be5db63f7376",
+      "bytes": 10824,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+      "publicRepositoryPath": "backlog/items/2026-10-05-script-mediated-writes-bypass-protected-test-paths.md",
+      "sha256": "6939ae43ec6a9890fa9525cd0148bc6013aa2f55c0b795c5c7d8a3b2989b7d25",
+      "bytes": 1479,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.security-scanner-failure-provenance",
+      "accepted": false,
+      "publicRepositoryPath": "backlog/items/2026-09-29-security-scanner-failures-lose-executable-and-timeout-provenance.md",
+      "sha256": "c4aabd8ab68160d02a57b525892a766398e5bd93748fceac3769876a5fa800d9",
+      "bytes": 5184,
+      "mode": "0644",
+      "association": "Exact existing public filename referenced in archived assessment artifact; no private original opened",
+      "approvedOriginalEquality": "Declared original digests retained; equality not inferred from path",
+      "declaredOriginalHashes": [
+        "de4d7af94ac0a8a3244ac820a852f40c1cb30815983a7777355854cfc05e2a1f"
+      ]
+    },
+    {
+      "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+      "publicRepositoryPath": "backlog/items/2026-10-07-semgrep-console-coverage-note-has-no-test.md",
+      "sha256": "3488e8ae6dca2cd8a365177a446e36b2eccd41411a7aae7df7ddef9fcf87cf0d",
+      "bytes": 1715,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.semgrep-offline-default-version-check",
+      "accepted": false,
+      "publicRepositoryPath": "backlog/items/2026-09-29-semgrep-default-version-check-blocks-offline-local-rules-scan.md",
+      "sha256": "83c3e54766d2de3517b7c22cc2a083366892f864ddd6cc08e7a4fe277c54a787",
+      "bytes": 3254,
+      "mode": "0644",
+      "association": "Exact existing public filename referenced in archived assessment artifact; no private original opened",
+      "approvedOriginalEquality": "Declared original digests retained; equality not inferred from path",
+      "declaredOriginalHashes": [
+        "fec0e688c2ee11af89bb5d09cb2681badefee6960371cfa4355b5b6f8ab8ee6f"
+      ]
+    },
+    {
+      "itemId": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+      "publicRepositoryPath": "backlog/items/2026-10-06-semgrep-partial-parsing-warnings-fail-the-whole-scan.md",
+      "sha256": "b0a6ae962927943f60c35008cfb219a95028e85241d2196a0a0d0032ea0bffd4",
+      "bytes": 2417,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+      "publicRepositoryPath": "backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+      "sha256": "42fc4b81bb2759d9a3399b3b1e097dbb6bb2809ffd83946554a987fc1dffd22f",
+      "bytes": 2875,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+      "publicRepositoryPath": "backlog/items/2026-10-05-shell-classifier-faults-on-heredoc-body-text.md",
+      "sha256": "0db7189bc3fe2e6f7fe1a28e7effb1bfc0feeae938779a331cda24e4bbbdeb10",
+      "bytes": 1038,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+      "publicRepositoryPath": "backlog/items/2026-10-05-shell-grammar-file-is-a-kernel-path-without-capability-placement.md",
+      "sha256": "4157fdc52a2371691d8451f2d130ea321922d63b0a4434a1942c44d1a9c845f6",
+      "bytes": 910,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+      "sha256": "2fc3f35c97a66d043394a8887bcc0f4940ad8da3b5d57dbc5fcf541883a89eb6",
+      "bytes": 2977,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+      "publicRepositoryPath": "backlog/items/2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md",
+      "sha256": "f5821326de25faf9ad97c78bfbd427fe497e6b20bee14152366f1bd0f89c0dc1",
+      "bytes": 2492,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+      "publicRepositoryPath": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "sha256": "20ed5d496cb2d27fb0387917f7e5f66cc9564f16f9525dd777a265f82f349750",
+      "bytes": 2674,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+      "publicRepositoryPath": "backlog/items/2026-10-04-signed-quality-package-route-is-not-agent-operable-on-windows.md",
+      "sha256": "c609e29f4f2fd943791a7fc621196981a2a068b74b2b8f96e34ef2dd0d4c917e",
+      "bytes": 5527,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+      "publicRepositoryPath": "backlog/items/2026-10-07-signing-default-test-fixture-root-escapes-the-repository.md",
+      "sha256": "91aa7275971ee47198642729b93e69fb8bcc373fe6a782adb0bd0b39fa409ea9",
+      "bytes": 1918,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.signing-prompt-prints-the-whole-review-package",
+      "publicRepositoryPath": "backlog/items/2026-10-04-signing-prompt-prints-the-whole-review-package.md",
+      "sha256": "c64ef2691bae5bbc0707ff0685b146baa3affda795d491cb47af9064e56221a0",
+      "bytes": 3598,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.signing-toolchain-readiness",
+      "publicRepositoryPath": "backlog/items/2026-10-08-signing-toolchain-readiness.md",
+      "sha256": "d047205a23377866b44ea14924e02a1f43f71489dccdbe2ba1b73f370bc0cec9",
+      "bytes": 1758,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+      "publicRepositoryPath": "backlog/items/2026-10-05-source-agent-definition-change-locks-that-agent-until-install.md",
+      "sha256": "1275061a160fd0d4414c0468762f85953fd8bf77a61ec7ce8f336457c032f0c6",
+      "bytes": 1955,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
+      "publicRepositoryPath": "backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md",
+      "sha256": "d47722e00823a900742474c2eec5ffbbf6b02c5303ba161816b7a28ca1200f7b",
+      "bytes": 2439,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.transfer-redaction-alters-digest-bound-files",
+      "publicRepositoryPath": "backlog/items/2026-10-08-transfer-redaction-alters-digest-bound-files.md",
+      "sha256": "f6967fa71d3b483650269fc178c32441c6f071dd00124c74e94be4fce1cb58a3",
+      "bytes": 1707,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+      "publicRepositoryPath": "backlog/items/2026-09-29-unasked-advisor-export-consent-in-fresh-seed.md",
+      "sha256": "226f9811d496f84003dc7eb5a5348ed9bd8a2756ea342e9aae79fa95cfc97b1d",
+      "bytes": 965,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+      "publicRepositoryPath": "backlog/items/2026-10-05-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.md",
+      "sha256": "cdbb7719958f6803d84684b86d1364d8120607089769401c28f5e60ed6e029e8",
+      "bytes": 1678,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+      "publicRepositoryPath": "backlog/items/2026-10-07-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.md",
+      "sha256": "9284cb7f3228767b26e596ba3c7a3ca9c25a29af0800fbf5362ce4877de902d1",
+      "bytes": 1616,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+      "publicRepositoryPath": "backlog/items/2026-09-29-windows-greenfield-scratch-write-denied.md",
+      "sha256": "4f0ba42f3a082ec76cfe036fdeb9f25963fa6450d5e8d99de5a571815c4e9935",
+      "bytes": 761,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+      "publicRepositoryPath": "backlog/items/2026-10-05-windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.md",
+      "sha256": "5a9ec602187f7e5a8ab06833d68f949040cbd3f9427cfb69a91ac2c9947c6f36",
+      "bytes": 1908,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+      "publicRepositoryPath": "backlog/items/2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.md",
+      "sha256": "5e48edc20f4d8a0e0562c3cc83d0eedd5292bd549b4c98972402a9c692d8fff6",
+      "bytes": 2268,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+      "publicRepositoryPath": "backlog/items/2026-09-29-windows-pre-push-installer-fsync-and-relative-action.md",
+      "sha256": "3e0fb5d931a0d04fb4750fd53cba39c35c49e66244b2e6c3788ad5dc9f38cb75",
+      "bytes": 796,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+      "publicRepositoryPath": "backlog/items/2026-09-28-worktree-process-start-parser-misreads-spaced-comm.md",
+      "sha256": "e394a14bc6a3f26d23ff3fc6033f60b0695fe3e713f2e377bc6817215071eaf7",
+      "bytes": 3108,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    },
+    {
+      "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+      "publicRepositoryPath": "backlog/items/2026-09-29-worktrees-share-onboarding-private-state-with-root-bound-intake.md",
+      "sha256": "93a0e50737c7364a8f6a35757a69d4056c3d2fe945d81e5a01a5b6ad205f6085",
+      "bytes": 2966,
+      "mode": "0644",
+      "association": "Existing public canonical original; reused by repository-relative path, no body copied/rewritten",
+      "approvedOriginalEquality": "Not inferred merely from filename; exact approved-prefix associations listed separately",
+      "accepted": false
+    }
+  ],
+  "approvedPrefixAssociations": [
+    {
+      "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+      "approvedOriginal": {
+        "sha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+        "bytes": 1413,
+        "byteRange": [
+          0,
+          1413
+        ]
+      },
+      "suffix": {
+        "sha256": "6172371e7e01def3440d8de2280ebd42ecaf9ecc9e4191088b3b1efb5b735823",
+        "bytes": 990,
+        "byteRange": [
+          1413,
+          2403
+        ],
+        "classification": "normative-finite-additional-acceptance-not-pure-status-editorial",
+        "contentMeaning": "Adds specific emitted answers-file, present/approve ordering and mkdir -p guard qualification; preserves existing validator/no grammar widening.",
+        "intakeProvenance": "2026-10-10 fourth Claude Greenfield report intake; exact source/report/manual-matrix digests and CL finding IDs remain in observed suffix"
+      },
+      "canonicalPublicAssociation": {
+        "path": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+        "available": true,
+        "observation": {
+          "path": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+          "sha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+          "bytes": 1413,
+          "mode": 420,
+          "symlink": false
+        },
+        "matchesApprovedOriginal": true,
+        "classification": "exact-approved-original-present",
+        "diff": {
+          "path": "scratch/alfred-postinstall-whole-items-20261011/criterion-reconciliation/approved-to-canonical/pipeline.catalogue-admit-prescribed-lifecycle-verbs.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "mode": 420
+        }
+      },
+      "safeResolution": "Retain approved original SHA and observed byte range as original binding. Keep Oct10 suffix with its own SHA/intake provenance under the user-standing additive Alfred scope authorization supplied by Root. Private preparation includes both; normal fixed-design/signature/admission gates still apply. Do not strip Claude requirements or rewrite authoritative body/hash/closure. Canonical divergences are lineage observations, not permission to restore files.",
+      "specificM2M3Continuity": {
+        "disposition": "No contradictory automatic stricter closure/admission gate is required by this suffix. Method proof/audit class distinctions/refusal controls remain separate from additional closure enforcement.",
+        "standingChoicePreserved": "<historical-correlation-excluded> questions1/2: report-only/no additional closure enforcement",
+        "authorityLimit": "Generalized report intake does not revoke the specific standing report-only decisions; any future stricter enforcement interpretation needs bounded reconciliation."
+      },
+      "privateOriginalBodyExcluded": true
+    },
+    {
+      "itemId": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+      "approvedOriginal": {
+        "sha256": "f0f9ba2bf9b79d7e993cfbe37aaae326f1f6779df765f5fbd31792f09a448379",
+        "bytes": 4557,
+        "byteRange": [
+          0,
+          4557
+        ]
+      },
+      "suffix": {
+        "sha256": "798886d44e72b2449d899f2276b6c01093ef225c2bec1085e3b5fc70655cfaf4",
+        "bytes": 1092,
+        "byteRange": [
+          4557,
+          5649
+        ],
+        "classification": "normative-finite-additional-acceptance-not-pure-status-editorial",
+        "contentMeaning": "Adds consumer-specific AC14 enemy behavior, actual tests/stale test references and significant-decision or honest nonsignificant disposition; excludes generic browser-gate invention.",
+        "intakeProvenance": "2026-10-10 fourth Claude Greenfield report intake; exact source/report/manual-matrix digests and CL finding IDs remain in observed suffix"
+      },
+      "canonicalPublicAssociation": {
+        "path": "backlog/items/2026-10-09-declared-product-criteria-need-matching-acceptance-evidence.md",
+        "available": false,
+        "classification": "canonical-path-absent-approved-bytes-recoverable-in-recorded-scratch-prefix"
+      },
+      "safeResolution": "Retain approved original SHA and observed byte range as original binding. Keep Oct10 suffix with its own SHA/intake provenance under the user-standing additive Alfred scope authorization supplied by Root. Private preparation includes both; normal fixed-design/signature/admission gates still apply. Do not strip Claude requirements or rewrite authoritative body/hash/closure. Canonical divergences are lineage observations, not permission to restore files.",
+      "specificM2M3Continuity": {
+        "disposition": "No contradictory automatic stricter closure/admission gate is required by this suffix. Method proof/audit class distinctions/refusal controls remain separate from additional closure enforcement.",
+        "standingChoicePreserved": "<historical-correlation-excluded> questions1/2: report-only/no additional closure enforcement",
+        "authorityLimit": "Generalized report intake does not revoke the specific standing report-only decisions; any future stricter enforcement interpretation needs bounded reconciliation."
+      },
+      "privateOriginalBodyExcluded": true
+    },
+    {
+      "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "approvedOriginal": {
+        "sha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+        "bytes": 3470,
+        "byteRange": [
+          0,
+          3470
+        ]
+      },
+      "suffix": {
+        "sha256": "fa7d580b060dbb90b099440bcb94acba22e11df58969accf20c68eb182145bb8",
+        "bytes": 1057,
+        "byteRange": [
+          3470,
+          4527
+        ],
+        "classification": "normative-finite-additional-acceptance-not-pure-status-editorial",
+        "contentMeaning": "Adds public-safe candidate audit index distinguishing Verify/security/Critic/consumer acceptance/push/closure; raw private evidence stays local.",
+        "intakeProvenance": "2026-10-10 fourth Claude Greenfield report intake; exact source/report/manual-matrix digests and CL finding IDs remain in observed suffix"
+      },
+      "canonicalPublicAssociation": {
+        "path": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+        "available": true,
+        "observation": {
+          "path": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+          "sha256": "3b98d882612220ea6b935571f26040e29bdd09f1b799d801b456b0b76efc3c2c",
+          "bytes": 2402,
+          "mode": 420,
+          "symlink": false
+        },
+        "matchesApprovedOriginal": false,
+        "classification": "canonical-lacks-2026-10-09-addendum-already-in-approved-original",
+        "normativeAcceptanceChanged": true,
+        "diff": {
+          "path": "scratch/alfred-postinstall-whole-items-20261011/criterion-reconciliation/approved-to-canonical/pipeline.forensics-and-audit-evidence-not-reconstructable.diff",
+          "sha256": "980983b73d8ec211ea068d5c4ca646e037e3bb10768b2ca1cf655ff273f7b7de",
+          "bytes": 1306,
+          "mode": 420
+        }
+      },
+      "safeResolution": "Retain approved original SHA and observed byte range as original binding. Keep Oct10 suffix with its own SHA/intake provenance under the user-standing additive Alfred scope authorization supplied by Root. Private preparation includes both; normal fixed-design/signature/admission gates still apply. Do not strip Claude requirements or rewrite authoritative body/hash/closure. Canonical divergences are lineage observations, not permission to restore files.",
+      "specificM2M3Continuity": {
+        "disposition": "No contradictory automatic stricter closure/admission gate is required by this suffix. Method proof/audit class distinctions/refusal controls remain separate from additional closure enforcement.",
+        "standingChoicePreserved": "<historical-correlation-excluded> questions1/2: report-only/no additional closure enforcement",
+        "authorityLimit": "Generalized report intake does not revoke the specific standing report-only decisions; any future stricter enforcement interpretation needs bounded reconciliation."
+      },
+      "privateOriginalBodyExcluded": true
+    },
+    {
+      "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "approvedOriginal": {
+        "sha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+        "bytes": 1486,
+        "byteRange": [
+          0,
+          1486
+        ]
+      },
+      "suffix": {
+        "sha256": "eedc63f8ab3f3ef7fcb7ec6dff18d2a2a7cb8925e12b902d1661a744f806e4cd",
+        "bytes": 1045,
+        "byteRange": [
+          1486,
+          2531
+        ],
+        "classification": "normative-finite-additional-acceptance-not-pure-status-editorial",
+        "contentMeaning": "Adds real effective-cap canonical Bash closing-route positive and wrong-record/nonclosing/exhaustion controls; direct Write CRT13 is explicitly insufficient.",
+        "intakeProvenance": "2026-10-10 fourth Claude Greenfield report intake; exact source/report/manual-matrix digests and CL finding IDs remain in observed suffix"
+      },
+      "canonicalPublicAssociation": {
+        "path": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+        "available": true,
+        "observation": {
+          "path": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+          "sha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+          "bytes": 1486,
+          "mode": 420,
+          "symlink": false
+        },
+        "matchesApprovedOriginal": true,
+        "classification": "exact-approved-original-present",
+        "diff": {
+          "path": "scratch/alfred-postinstall-whole-items-20261011/criterion-reconciliation/approved-to-canonical/pipeline.goldfish-budgets-omit-the-closing-ceremony.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "mode": 420
+        }
+      },
+      "safeResolution": "Retain approved original SHA and observed byte range as original binding. Keep Oct10 suffix with its own SHA/intake provenance under the user-standing additive Alfred scope authorization supplied by Root. Private preparation includes both; normal fixed-design/signature/admission gates still apply. Do not strip Claude requirements or rewrite authoritative body/hash/closure. Canonical divergences are lineage observations, not permission to restore files.",
+      "specificM2M3Continuity": {
+        "disposition": "No contradictory automatic stricter closure/admission gate is required by this suffix. Method proof/audit class distinctions/refusal controls remain separate from additional closure enforcement.",
+        "standingChoicePreserved": "<historical-correlation-excluded> questions1/2: report-only/no additional closure enforcement",
+        "authorityLimit": "Generalized report intake does not revoke the specific standing report-only decisions; any future stricter enforcement interpretation needs bounded reconciliation."
+      },
+      "privateOriginalBodyExcluded": true
+    },
+    {
+      "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "approvedOriginal": {
+        "sha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+        "bytes": 3704,
+        "byteRange": [
+          0,
+          3704
+        ]
+      },
+      "suffix": {
+        "sha256": "fd2b775bb00afa6930ff7a815abf230a96aa81269bc864f37e5d69e404b2a4cc",
+        "bytes": 1005,
+        "byteRange": [
+          3704,
+          4709
+        ],
+        "classification": "normative-finite-additional-acceptance-not-pure-status-editorial",
+        "contentMeaning": "Adds method dependency-wave recommendations, disjoint worktree briefings and ordered merges; retains commit-terminal/lost-ack invariants and excluded post-candidate enforcement.",
+        "intakeProvenance": "2026-10-10 fourth Claude Greenfield report intake; exact source/report/manual-matrix digests and CL finding IDs remain in observed suffix"
+      },
+      "canonicalPublicAssociation": {
+        "path": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+        "available": true,
+        "observation": {
+          "path": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+          "sha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+          "bytes": 3704,
+          "mode": 420,
+          "symlink": false
+        },
+        "matchesApprovedOriginal": true,
+        "classification": "exact-approved-original-present",
+        "diff": {
+          "path": "scratch/alfred-postinstall-whole-items-20261011/criterion-reconciliation/approved-to-canonical/pipeline.parallel-work-in-one-checkout-is-unsafe.diff",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "mode": 420
+        }
+      },
+      "safeResolution": "Retain approved original SHA and observed byte range as original binding. Keep Oct10 suffix with its own SHA/intake provenance under the user-standing additive Alfred scope authorization supplied by Root. Private preparation includes both; normal fixed-design/signature/admission gates still apply. Do not strip Claude requirements or rewrite authoritative body/hash/closure. Canonical divergences are lineage observations, not permission to restore files.",
+      "specificM2M3Continuity": {
+        "disposition": "No contradictory automatic stricter closure/admission gate is required by this suffix. Method proof/audit class distinctions/refusal controls remain separate from additional closure enforcement.",
+        "standingChoicePreserved": "<historical-correlation-excluded> questions1/2: report-only/no additional closure enforcement",
+        "authorityLimit": "Generalized report intake does not revoke the specific standing report-only decisions; any future stricter enforcement interpretation needs bounded reconciliation."
+      },
+      "privateOriginalBodyExcluded": true
+    },
+    {
+      "itemId": "pipeline.security-scanner-failure-provenance",
+      "approvedOriginal": {
+        "sha256": "de4d7af94ac0a8a3244ac820a852f40c1cb30815983a7777355854cfc05e2a1f",
+        "bytes": 5186,
+        "byteRange": [
+          0,
+          5186
+        ]
+      },
+      "suffix": {
+        "sha256": "14b61409ff736ec954a8f9e9f6518741fea41a9b50c2bfa4b1b8992eafe4e103",
+        "bytes": 1040,
+        "byteRange": [
+          5186,
+          6226
+        ],
+        "classification": "normative-finite-additional-acceptance-not-pure-status-editorial",
+        "contentMeaning": "Adds real project push/security prerequisite inventory and authentic rule/candidate/location/sanitized KeyR evidence before repair/suppression; unavailable capability stays unavailable.",
+        "intakeProvenance": "2026-10-10 fourth Claude Greenfield report intake; exact source/report/manual-matrix digests and CL finding IDs remain in observed suffix"
+      },
+      "canonicalPublicAssociation": {
+        "path": "backlog/items/2026-09-29-security-scanner-failures-lose-executable-and-timeout-provenance.md",
+        "available": true,
+        "observation": {
+          "path": "backlog/items/2026-09-29-security-scanner-failures-lose-executable-and-timeout-provenance.md",
+          "sha256": "c4aabd8ab68160d02a57b525892a766398e5bd93748fceac3769876a5fa800d9",
+          "bytes": 5184,
+          "mode": 420,
+          "symlink": false
+        },
+        "matchesApprovedOriginal": false,
+        "classification": "planning-metadata-only-sprint-assignment-difference",
+        "normativeAcceptanceChanged": false,
+        "diff": {
+          "path": "scratch/alfred-postinstall-whole-items-20261011/criterion-reconciliation/approved-to-canonical/pipeline.security-scanner-failure-provenance.diff",
+          "sha256": "6a09220ee41f1261ab4790876cce25fc533b428298d30b85bf6adad4b8d50beb",
+          "bytes": 432,
+          "mode": 420
+        }
+      },
+      "safeResolution": "Retain approved original SHA and observed byte range as original binding. Keep Oct10 suffix with its own SHA/intake provenance under the user-standing additive Alfred scope authorization supplied by Root. Private preparation includes both; normal fixed-design/signature/admission gates still apply. Do not strip Claude requirements or rewrite authoritative body/hash/closure. Canonical divergences are lineage observations, not permission to restore files.",
+      "specificM2M3Continuity": {
+        "disposition": "No contradictory automatic stricter closure/admission gate is required by this suffix. Method proof/audit class distinctions/refusal controls remain separate from additional closure enforcement.",
+        "standingChoicePreserved": "<historical-correlation-excluded> questions1/2: report-only/no additional closure enforcement",
+        "authorityLimit": "Generalized report intake does not revoke the specific standing report-only decisions; any future stricter enforcement interpretation needs bounded reconciliation."
+      },
+      "privateOriginalBodyExcluded": true
+    },
+    {
+      "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+      "approvedOriginal": {
+        "sha256": "6d4630b7eb0ab4a628530f584e7ae4d7ae9125549d7a9c23c2884937d3ce69b0",
+        "bytes": 3645,
+        "byteRange": [
+          0,
+          3645
+        ]
+      },
+      "suffix": {
+        "sha256": "47236ed3e99e95e60f8c48668c117bc5d750872fadf23593067f22fbbc775c67",
+        "bytes": 961,
+        "byteRange": [
+          3645,
+          4606
+        ],
+        "classification": "normative-finite-additional-acceptance-not-pure-status-editorial",
+        "contentMeaning": "Adds exact emitted design request schema/signer purpose/intent digest/continuation binding; separate DWP handler support cannot substitute.",
+        "intakeProvenance": "2026-10-10 fourth Claude Greenfield report intake; exact source/report/manual-matrix digests and CL finding IDs remain in observed suffix"
+      },
+      "canonicalPublicAssociation": {
+        "path": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+        "available": true,
+        "observation": {
+          "path": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+          "sha256": "20ed5d496cb2d27fb0387917f7e5f66cc9564f16f9525dd777a265f82f349750",
+          "bytes": 2674,
+          "mode": 420,
+          "symlink": false
+        },
+        "matchesApprovedOriginal": false,
+        "classification": "canonical-lacks-2026-10-09-addendum-already-in-approved-original",
+        "normativeAcceptanceChanged": true,
+        "diff": {
+          "path": "scratch/alfred-postinstall-whole-items-20261011/criterion-reconciliation/approved-to-canonical/pipeline.signature-ceremony-requires-operator-work-and-breaks.diff",
+          "sha256": "458e4cf48b7e7a18b32a6eaa65b1b21eb04bc22188378f5c753447883f287333",
+          "bytes": 1213,
+          "mode": 420
+        }
+      },
+      "safeResolution": "Retain approved original SHA and observed byte range as original binding. Keep Oct10 suffix with its own SHA/intake provenance under the user-standing additive Alfred scope authorization supplied by Root. Private preparation includes both; normal fixed-design/signature/admission gates still apply. Do not strip Claude requirements or rewrite authoritative body/hash/closure. Canonical divergences are lineage observations, not permission to restore files.",
+      "specificM2M3Continuity": {
+        "disposition": "No contradictory automatic stricter closure/admission gate is required by this suffix. Method proof/audit class distinctions/refusal controls remain separate from additional closure enforcement.",
+        "standingChoicePreserved": "<historical-correlation-excluded> questions1/2: report-only/no additional closure enforcement",
+        "authorityLimit": "Generalized report intake does not revoke the specific standing report-only decisions; any future stricter enforcement interpretation needs bounded reconciliation."
+      },
+      "privateOriginalBodyExcluded": true
+    }
+  ],
+  "prefixEvidenceCanonical": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/daf99fa049cfd1d0555613888a5aace0253edbeb6dd1fa8f7316e03e13220cdb.mode-0644.json",
+  "publicSpecAndReentryInputs": [
+    {
+      "repositoryRelativePath": "specs/sprint-alfred-epic/acceptance.md",
+      "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7",
+      "bytes": 24030,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
+      "bytes": 189041,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": "AGENTS.md",
+      "sha256": "88993c07d0261ab26c4123cceacfc4465b3f41b63043f61813bb6ee03b52e335",
+      "bytes": 1434,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": "architecture/map/index.md",
+      "sha256": "0be55fea783854a105d1f7d6a1cd34d85734b96bba10a605455d3d8b270a4117",
+      "bytes": 1916,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": "architecture/map/pipeline-core.md",
+      "sha256": "26104f48f04d034d13bac8c1e218aa0d09cc04f6f0829ba2dd39a666daa61da7",
+      "bytes": 65310,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": "docs/operating-model.md",
+      "sha256": "94ef546f55838b1bb5c2b17f795a64bf0b8d35d4aec8cf7f05f9095b4ca8c559",
+      "bytes": 75503,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": ".claude/pipeline.yaml",
+      "sha256": "4c287d572f49806e587e0c1264e33b1c1b6fcde64bc634b2d7b3bdbf6b93e086",
+      "bytes": 3304,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": "project/architecture-decisions.compiled.json",
+      "sha256": "74a92f967e10620570d3f40b77b95341d409cb4b50c5009ec34192de4de44e2c",
+      "bytes": 45727,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": "templates/prompts/agent-obligations.md",
+      "sha256": "8991bcbe2aba3f3f4a49112ef203599aecfa0bcff971d47f3dd131e00f61336d",
+      "bytes": 9526,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    },
+    {
+      "repositoryRelativePath": "templates/prompts/goldfish-task.md",
+      "sha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58",
+      "bytes": 58251,
+      "mode": "0644",
+      "role": "Existing public repository authority/spec/navigation input; no runtime approval inferred"
+    }
+  ],
+  "privateOriginalBodiesCaptured": false,
+  "authoritativeRequirementsRewritten": false,
+  "scope37AC4IR": "Existing acceptance/spec and archived original-AC audits; no acceptance",
+  "holds": [
+    "A public counterpart does not silently replace differing approved original/addendum bindings",
+    "The seven exact approved prefixes and normative suffix hashes remain separately bound; canonical absence/drift is not permission to repair requirements",
+    "Human approval/signature/native/consumed packet/original budget custody not carried as authority"
+  ]
+}

@@ -1,0 +1,385 @@
+{
+  "schema": "alfred.unknown03.original-twelve-focused-refresh.v1",
+  "originalGroupSha256": "bc7d856db7fc8b7f60df98b48224ff7793c88dbf9341f9e5fd54fc26bd55248a",
+  "membershipPreserved": 12,
+  "stagePromotions": 0,
+  "readinessClaim": "Component evidence only; original stage and manual acceptance remain unchanged.",
+  "rows": [
+    {
+      "id": "pipeline.powershell-bypasses-onboarding-read-boundary",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+        "sha256": "a2e2fbb3b955625a7758fc320b2bf5d3d4754751de194d82d47f7c8b70ea1775"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.powershell-bypasses-onboarding-read-boundary::15.1",
+          "lineStart": 17,
+          "lineEnd": 24
+        },
+        {
+          "id": "pipeline.powershell-bypasses-onboarding-read-boundary::31.1",
+          "lineStart": 33,
+          "lineEnd": 38
+        },
+        {
+          "id": "pipeline.powershell-bypasses-onboarding-read-boundary::40.1",
+          "lineStart": 42,
+          "lineEnd": 47
+        }
+      ],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": [
+        {
+          "owner": "/root",
+          "activeRouting": [],
+          "nextAction": "Actual current lane registration/refusal and declared recovery coverage unresolved; audit does not prove continuing bypass. Safe synthetic lane controls before conditional source fix.",
+          "exactReceiptGap": "No exact actual current receipt/case binding retained; unknown is not an unimplemented fix",
+          "review": "official independent Critic not established for whole item",
+          "acceptance": "open; no closure inferred"
+        },
+        "Actual current lane registration/refusal and declared recovery coverage unresolved; audit does not prove continuing bypass. Safe synthetic lane controls before conditional source fix."
+      ],
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.readiness-input-omits-current-advisor-observation",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-09-28-readiness-input-omits-current-advisor-observation.md",
+        "sha256": "49d8425d687df36f27d5633f379c9ba3e17564af21bb782d534dfb3f142c0aee"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.readiness-input-omits-current-advisor-observation::41.1",
+          "lineStart": 43,
+          "lineEnd": 60
+        },
+        {
+          "id": "pipeline.readiness-input-omits-current-advisor-observation::41.2",
+          "lineStart": 62,
+          "lineEnd": 64
+        }
+      ],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": "Retain actual optional consultation/source/range provenance where used; no blanket whole-item deferral or new ceremony.",
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-10-04-revised-native-design-cannot-reach-a-new-advisor-course.md",
+        "sha256": "3223d2671bdd488c9c8cb5ffb854297a226b629030b32b7d013755de1fc54586"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course::15.1",
+          "lineStart": 17,
+          "lineEnd": 18
+        },
+        {
+          "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course::15.2",
+          "lineStart": 20,
+          "lineEnd": 32
+        },
+        {
+          "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course::15.3",
+          "lineStart": 34,
+          "lineEnd": 36
+        },
+        {
+          "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course::38.1",
+          "lineStart": 40,
+          "lineEnd": 44
+        }
+      ],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": "Qualify sanctioned current-source revision/rebind and optional native consultation if requested; preserve independent final authority.",
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.scratch-has-no-retention-and-no-durability-check",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-10-05-scratch-has-no-retention-and-no-durability-check.md",
+        "sha256": "70c82ba3de815edfca42bdc74dfe66859063e2aa83113a24d76109b7207d5180"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.scratch-has-no-retention-and-no-durability-check::15.1",
+          "lineStart": 17,
+          "lineEnd": 17
+        },
+        {
+          "id": "pipeline.scratch-has-no-retention-and-no-durability-check::15.2",
+          "lineStart": 19,
+          "lineEnd": 19
+        },
+        {
+          "id": "pipeline.scratch-has-no-retention-and-no-durability-check::25.1",
+          "lineStart": 27,
+          "lineEnd": 28
+        },
+        {
+          "id": "pipeline.scratch-has-no-retention-and-no-durability-check::25.2",
+          "lineStart": 30,
+          "lineEnd": 30
+        }
+      ],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": "Locate declared durability owner and actual staging/handover/push checks; do not infer absence from cleanup module.",
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.semgrep-console-coverage-note-has-no-test",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-10-07-semgrep-console-coverage-note-has-no-test.md",
+        "sha256": "3488e8ae6dca2cd8a365177a446e36b2eccd41411a7aae7df7ddef9fcf87cf0d"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.semgrep-console-coverage-note-has-no-test::16.1",
+          "lineStart": 18,
+          "lineEnd": 22
+        },
+        {
+          "id": "pipeline.semgrep-console-coverage-note-has-no-test::32.1",
+          "lineStart": 34,
+          "lineEnd": 36
+        }
+      ],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": [
+        {
+          "owner": "/root",
+          "activeRouting": [],
+          "nextAction": "Freeze actual security-scan console degraded/complete/failed output cases using controlled Semgrep protocol; test-only change unless actual source seam defect is proven.",
+          "exactReceiptGap": "No exact actual current receipt/case binding retained; unknown is not an unimplemented fix",
+          "review": "official independent Critic not established for whole item",
+          "acceptance": "open; no closure inferred"
+        },
+        "Freeze actual security-scan console degraded/complete/failed output cases using controlled Semgrep protocol; test-only change unless actual source seam defect is proven."
+      ],
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+        "sha256": "42fc4b81bb2759d9a3399b3b1e097dbb6bb2809ffd83946554a987fc1dffd22f"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready::15.1",
+          "lineStart": 17,
+          "lineEnd": 25
+        },
+        {
+          "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready::15.2",
+          "lineStart": 27,
+          "lineEnd": 30
+        },
+        {
+          "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready::42.1",
+          "lineStart": 44,
+          "lineEnd": 48
+        }
+      ],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": "Measure exact concurrent failure source and stable snapshots; diagnostics correction does not prove flapping fixed.",
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-10-05-shell-grammar-file-is-a-kernel-path-without-capability-placement.md",
+        "sha256": "4157fdc52a2371691d8451f2d130ea321922d63b0a4434a1942c44d1a9c845f6"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement::15.1",
+          "lineStart": 17,
+          "lineEnd": 19
+        },
+        {
+          "id": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement::21.1",
+          "lineStart": 23,
+          "lineEnd": 24
+        }
+      ],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": [
+        "Retain original criterion and bind current full-item proof before promotion.",
+        "RGGRAM placement/fixture is explicitly split out; no exact capability inventory placement or fixture completion located. Assign finite registration/fixture identity reconciliation, no general parser rewrite."
+      ],
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+        "sha256": "2fc3f35c97a66d043394a8887bcc0f4940ad8da3b5d57dbc5fcf541883a89eb6"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows::15.1",
+          "lineStart": 17,
+          "lineEnd": 23
+        },
+        {
+          "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows::34.1",
+          "lineStart": 36,
+          "lineEnd": 40
+        },
+        {
+          "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows::49.1",
+          "lineStart": 51,
+          "lineEnd": 51
+        }
+      ],
+      "engineeringState": "native-Windows-hold-not-covered-by-H001",
+      "covered": [],
+      "remaining": [
+        "Preserve the explicit accepted key-directory executable residual risk.",
+        "PO2 Linux controlled signing is not native Windows executable-resolution or decoy-process proof."
+      ],
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md",
+        "sha256": "f5821326de25faf9ad97c78bfbd427fe497e6b20bee14152366f1bd0f89c0dc1"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes::16.1",
+          "lineStart": 18,
+          "lineEnd": 23
+        },
+        {
+          "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes::35.1",
+          "lineStart": 37,
+          "lineEnd": 43
+        }
+      ],
+      "engineeringState": "controlled-components-qualified-full-item-open",
+      "covered": [
+        "U03H001 genuine CLI/library index publication and bounded physical indexed-disclosure/refusal course",
+        "Earlier U03Q001/002 pure quality descriptor and U03P001/002 readiness/signature controlled-unit courses, separately bound"
+      ],
+      "remaining": [
+        "Actual native/attended timing and full sign-intent consumer course remain unproven.",
+        "Sanctioned consumed/expired request cleanup sweep remains separate.",
+        "No aggregate counts substitute for latency or secret-redaction acceptance."
+      ],
+      "proofReceiptSha256": [
+        "7437d89ddf29b695a981579b9ef4f346855fc56c7da823ab9cb01a3c928c2863",
+        "dd37103939383c0a3f75a744561a8f29c32cdcd891d6dd87955f5860ee7fea1b",
+        "90e069aed31236eb6d2147fda6bb45a3d33f3da7e750fca6b130b4f77f1f2c2f"
+      ],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.windows-greenfield-scratch-write-denied",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-09-29-windows-greenfield-scratch-write-denied.md",
+        "sha256": "4f0ba42f3a082ec76cfe036fdeb9f25963fa6450d5e8d99de5a571815c4e9935"
+      },
+      "originalClauses": [],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": "Bind exact native in-root scratch positive and alias/outside negative through actual guard/runtime without parser expansion.",
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.md",
+        "sha256": "97011a4fbc40b872388f5f57248cc6795c63183da5dbf163914ecbdb3b87dfa2"
+      },
+      "originalClauses": [
+        {
+          "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error::15.1",
+          "lineStart": 17,
+          "lineEnd": 23
+        },
+        {
+          "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error::15.2",
+          "lineStart": 25,
+          "lineEnd": 27
+        },
+        {
+          "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error::36.1",
+          "lineStart": 38,
+          "lineEnd": 47
+        }
+      ],
+      "engineeringState": "not-assessed-by-this-focused-course",
+      "covered": [],
+      "remaining": "Bind Windows slash/drive identity and genuine non-Git progression/installed Claude proof; preflight separator12 is a separate identity.",
+      "proofReceiptSha256": [],
+      "accepted": false
+    },
+    {
+      "id": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+      "originalStage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "originalRequirement": {
+        "path": "backlog/items/2026-09-29-windows-pre-push-installer-fsync-and-relative-action.md",
+        "sha256": "3e0fb5d931a0d04fb4750fd53cba39c35c49e66244b2e6c3788ad5dc9f38cb75"
+      },
+      "originalClauses": [],
+      "engineeringState": "Linux-controlled-component-qualified-native-Windows-open",
+      "covered": [
+        "Earlier U03I001/002 actual Linux durable file descriptor/fsync/readback and foreign-hook refusal"
+      ],
+      "remaining": [
+        "Native Windows install/marker/blocking-push/removal and canonical absolute action consumer coverage remain required."
+      ],
+      "proofReceiptSha256": [
+        "dd37103939383c0a3f75a744561a8f29c32cdcd891d6dd87955f5860ee7fea1b"
+      ],
+      "accepted": false
+    }
+  ],
+  "nativeClaims": false,
+  "humanAuthorization": false,
+  "itemAcceptance": false
+}

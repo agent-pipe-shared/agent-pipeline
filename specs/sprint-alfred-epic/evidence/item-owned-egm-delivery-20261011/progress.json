@@ -1,0 +1,1194 @@
+{
+  "schema": "alfred.item-owned-egm-progress.v1",
+  "recordedAt": "2026-10-11T20:31:08.600451+00:00",
+  "stage": "local-candidate-ready-installation-pause",
+  "uniqueIntegratedPaths": 101,
+  "applications": [
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-26-receipt.json",
+      "sha256": "660e688905c1a1dc41ae870b4eb3fd3cd479899d19dee2cd50a994d46cedecd9",
+      "pathCount": 26,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-15-receipt.json",
+      "sha256": "105bfb7f6921ad4cc6d9acb40799d6476fba43ea360dcc4e88614c21e539c7f1",
+      "pathCount": 15,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-completion-receipt.json",
+      "sha256": "443351b8ca10d5e0425f84f36528d3c34309859aa57edec71542fb5c7b1372c3",
+      "pathCount": 1,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-test-enrollment-closure-receipt.json",
+      "sha256": "f9b0c98b8c32b18c88c5a85e4aaf12d65620a2299045bab431f4ef42328fac14",
+      "pathCount": 6,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-rule-c1-preservation-receipt.json",
+      "sha256": "66d60f5e7969758bf3bf41b1b436231cb30c4946560cc71d36d312ea62b0f796",
+      "pathCount": 4,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-package-recovery5-receipt.json",
+      "sha256": "10d8e37b9913655df1823291f457c3470ba334fb0741ec86a951c92e69974171",
+      "pathCount": 5,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-architecture8-receipt.json",
+      "sha256": "899805ca0175ccb7ef157c1a84a2aabb08c90733dd37a5c235187a03c87dedd1",
+      "pathCount": 8,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-runtime31-receipt.json",
+      "sha256": "12759ac270a88f50db64a56eec031f9d1032587238e35ae9efbc88e344868f33",
+      "pathCount": 31,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-prospective-manifest1-receipt.json",
+      "sha256": "f8e267ff10303a0389f9d37336a6928f5f702b564198debdb83a02a98cc1e7f0",
+      "pathCount": 1,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-shared-primary8-receipt.json",
+      "sha256": "2e34a331f93f3bed327c6298a4853cfcb526d67a682cd61fdcb3028c8560d535",
+      "pathCount": 8,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-metadata6-receipt.json",
+      "sha256": "436b135f049059f78ebd3a7e61fe7157c3d95bc8b43fa20d200f8eab2b8eaa8c",
+      "pathCount": 6,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-codex-final8-receipt.json",
+      "sha256": "e8ebcc939915905f1f39041463402771ef7b76649558eed78c1279a918ac48e3",
+      "pathCount": 8,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/integration-final-enrollment1-receipt.json",
+      "sha256": "4d61607753242f1fc5275f9cb9087e8dc2e735f2bdc5d7eaec39586371fa2396",
+      "pathCount": 1,
+      "testsReplayed": false,
+      "staged": false,
+      "committed": false,
+      "pushed": false,
+      "installed": false
+    }
+  ],
+  "integratedPaths": [
+    {
+      "path": "PIPELINE_FLOW.de.md",
+      "preSha256": "dc98c7416893321e6ef07f98398a476994bd672c9179b0f4030290734fb86d42",
+      "postSha256": "6e115ca69c1b4b8db826876112b458909289ea98ff8f782251611101011d61e5",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "PIPELINE_FLOW.md",
+      "preSha256": "a5dea7a0d12464a65355bd69029416e59db5bb8df39e0689e23360905aee7682",
+      "postSha256": "f5240a2cde5dfa3e4906f6e1fcf2e9bdf169bafa0f49b08eb61aa9e8c26ec2c6",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "README.md",
+      "preSha256": "515e9e20c19a4fa3d901439dec2be1f30699a13cd33ff87550d5e764081b93dd",
+      "postSha256": "7376aa8f89c88c3dd3127d29e6a20e9d9e73f276937e7dc12bdde4485c3eab1d",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "architecture/map/harness.md",
+      "preSha256": "152321fb726495702cd435ba87d477ee57d0f94d79f5d2fa6e89b5c2a08fb92b",
+      "postSha256": "02b8eeeef6c66e23c6652b20a1890f6b320b6c28e64c6f84e26b7d3514115196",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "architecture/map/pipeline-core.md",
+      "preSha256": "98f2fcafe7c140bbdea33d32fe25c7ca9d320aa0bc63af0f54a2cd8c108d4797",
+      "postSha256": "26104f48f04d034d13bac8c1e218aa0d09cc04f6f0829ba2dd39a666daa61da7",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "docs/adr/draft-item-owned-egm-retained-quality-gates.json",
+      "preSha256": null,
+      "postSha256": "adc2d840b5f50befc8221655f341f6285a7d9f24e089e099c92c7d889065b8d9",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "docs/adr/draft-item-owned-egm-retained-quality-gates.md",
+      "preSha256": null,
+      "postSha256": "385f657e2e33f7c71a8b4f5179e87184557b0e862445a647184de2a9e047e71f",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "docs/cost-and-measurement.md",
+      "preSha256": "e100a04e64e99db2d2dd2c4ce948bc7d20c7f9e647513567328f582fdad53dc7",
+      "postSha256": "30bffe9e3c53ca8c29f6b058f943a9ad873469dfddca571896dc8aa069974f0c",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "docs/operating-model.md",
+      "preSha256": "06ae570040ebfcd4b0ed49f63154ab3df073dae49af3af3e246be47cd66fa842",
+      "postSha256": "94ef546f55838b1bb5c2b17f795a64bf0b8d35d4aec8cf7f05f9095b4ca8c559",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "docs/parallel-work.md",
+      "preSha256": "01989da7a7227468eac94c4fd598b0635a9f52ca0c4607abb6015bef7f1ae795",
+      "postSha256": "b24e3faf1ec00cf923a1e5ca64cdb93f3ec4d862ec906e9ea5f60c7893cd91cc",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "docs/product-capability-inventory.json",
+      "preSha256": "5288af5ee5588b3dc0f01e6838d623d86b6d1276246c3b280be7d5628ce96cb6",
+      "postSha256": "d543df5b9b32b8a837f5ec33264e374f187428372dabf487723bf4f5ba719e6f",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "docs/usage.md",
+      "preSha256": "07fd8ce7b7b49fd21e4c7bc602201c3de06187a7c8f4b10f834846fb2cc96762",
+      "postSha256": "5dd90fbbb6ef2971c6ed7c7dd8db88bba6adf974329ebaef1eac5b7bc08f964d",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "governance/observation-doc-governance.json",
+      "preSha256": "6c62d99c8b0a32a0473e5574b6bb8627513f377db3df7a8aca108c4ac6dde19a",
+      "postSha256": "a4ed7741bfcc93a8ebf7f2ccac7b5b086d548c1f4c2dff8dbc4fda807b1bc0a9",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "guardrails/quality-gates.md",
+      "preSha256": "c393edf8d2c55313bc3926357f5be3bacaed3974c5c0e3be63f3e7d7f993abdf",
+      "postSha256": "565b3a3386ec26e299dc4938c593039fd303a314f605f4012d4889a1621ea429",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "harness/checklists/critic-review.md",
+      "preSha256": "bb6e1b658eb9d43b8aa8560c5bb8764b46a84d52e6d3db2711ae5f9bf7c1f906",
+      "postSha256": "bb6e1b658eb9d43b8aa8560c5bb8764b46a84d52e6d3db2711ae5f9bf7c1f906",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "harness/checklists/goldfish-dispatch.md",
+      "preSha256": "f018581d0ef78f8547ad3b45d2451db4b0fb35293dfb7fee8302f942655e0f7d",
+      "postSha256": "f018581d0ef78f8547ad3b45d2451db4b0fb35293dfb7fee8302f942655e0f7d",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "harness/config/verify-case-completion-augmentations.v1.json",
+      "preSha256": "e1ec23b26edce4adb17532ab1a85bd3d22bc5432d611019419ff337cbd065630",
+      "postSha256": "aa3cb5d21609e2412ef6e2d392f1e21af3383fb0c09426c3532fe2779b4f8448",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "harness/config/verify-case-completion.v1.json",
+      "preSha256": "2ee48d6d7ef033f9b684f00ee43e2cfa385d473406ce99c16e7c863002b95306",
+      "postSha256": "43c168b8c7d034a18ae575279bf5be97b28725420062861d7f67efe0596904b5",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
+      "preSha256": null,
+      "postSha256": "e6a5d390d2d1a72e875785653447ad1d0b9bbc26abde43bd0ec6ce8691a06c6f",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "harness/scripts/check-verify-case-completion.mjs",
+      "preSha256": "c30416b8aa9cf0e05467c6c7dab9f75c5158670b0a9ae9abad7fcc3925e77b5d",
+      "postSha256": "e5a0828584339805d6c252cd146d7af80305b1b239d0c8046e6c4ea5748d6e13",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "harness/scripts/check-verify-case-completion.test.mjs",
+      "preSha256": "527f785c819a42ba38f3db08571bc5dfac19893f0002ba8f16006fae66d35aeb",
+      "postSha256": "7b45dd246d709ac646fa630666fa6ec476b38fcf6a252bb36521b450eb50806b",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/agents/critic.md",
+      "preSha256": "39df2b39449b0209dfaa1c5290828048df33655695362e74184c8dae692e68ef",
+      "postSha256": "39df2b39449b0209dfaa1c5290828048df33655695362e74184c8dae692e68ef",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/docs/adr/draft-item-owned-egm-retained-quality-gates.json",
+      "preSha256": null,
+      "postSha256": "adc2d840b5f50befc8221655f341f6285a7d9f24e089e099c92c7d889065b8d9",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/docs/adr/draft-item-owned-egm-retained-quality-gates.md",
+      "preSha256": null,
+      "postSha256": "385f657e2e33f7c71a8b4f5179e87184557b0e862445a647184de2a9e047e71f",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/docs/operating-model.md",
+      "preSha256": "356dc6eda5cbd770fc94452e65a4ab74053934f0b2cbd05183988b2d13c621ee",
+      "postSha256": "94ef546f55838b1bb5c2b17f795a64bf0b8d35d4aec8cf7f05f9095b4ca8c559",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/guardrails/quality-gates.md",
+      "preSha256": "c393edf8d2c55313bc3926357f5be3bacaed3974c5c0e3be63f3e7d7f993abdf",
+      "postSha256": "565b3a3386ec26e299dc4938c593039fd303a314f605f4012d4889a1621ea429",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+      "preSha256": "afef271c5b8c2a644045ed78fcf0f55d03519f666f7545ea89fe7326350a4de9",
+      "postSha256": "ced48b5d8016b5113ebc6b144b2bb4302dce7b98d8c7f1587f1ba19629c24789",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
+      "preSha256": "97eab37a9dc859183df98f703060469c9271c94406c125ec4063b42a9670bb03",
+      "postSha256": "0fa3f4802650d857d0e90c88be5738b91194b57104c2b1e1f94485315cebd792",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/post-compact-reground.mjs",
+      "preSha256": "c62b3f71a2c154488a32b2b763c2a012f0cc43f17cf4ca3a1699406c7288637c",
+      "postSha256": "9796b4b4c0b955e57dad822f45078b2fd4703b16199a89ec35a8dbcf027aaeee",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/install-agy.inline-candidate.test.mjs",
+      "preSha256": null,
+      "postSha256": "b0d6bb00ba7631c38a534db112eb0ca410aced4538a62677efd66cec796dc64c",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/agy-host-commit-admission.mjs",
+      "preSha256": "6b77eb864615b8ffd4996e008cb9e0847acfe5a1516cb082be1cf9796ceb02ea",
+      "postSha256": "c8a6a893ba479650c0396e3e914b75e514653ddb54bdfaffe7ed95f4e46fd877",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+      "preSha256": "a40947944d52f0c817780c752633911caa1f79ae2cec3bc76e6105efa48d754a",
+      "postSha256": "4cd6566184570e30055f350e7d170956fc2f28806cac5db66da0de2b4800951d",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+      "preSha256": "33057d57247a103ba9b739d9c42f0e145ad8f5e7775b9fc16bb5183a28e75b99",
+      "postSha256": "757e15546cb9261741fa735c641cec7b903d4c61d29d0a7d2041c23f0b9962c8",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/agy-item-delivery.mjs",
+      "preSha256": null,
+      "postSha256": "af30b68739a916623500ca79a90ae8c25bb4add21feff3dfdd3c55aaaf346c44",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/agy-item-delivery.test.mjs",
+      "preSha256": null,
+      "postSha256": "14105aec6fc8f30beaa46f02443bcb803fdd84f73b227a57f676c22d1fa48bbd",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/agy-session-authority.mjs",
+      "preSha256": "e1c576f78629a5fdc87137d8ec190ba2118e77b0e9379022dc9b182400ba63b0",
+      "postSha256": "b430a32ebd3788ab1457b799bcfca768bb8810b89438e1f67f08d24e88c55676",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+      "preSha256": "4d82954f182b8e21ed6711efcca335284f2d6aac15f2af1d36d9e681d0edb20f",
+      "postSha256": "311cfcb047f87ad00b67fad30404ccde6d6b0f550c4d7b358fc6a37cc2a0e7ef",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "preSha256": "bb7c73a10080810fec955297232191334f1952266a789c3ec4eb0bd55aaf88ca",
+      "postSha256": "2b0d12eb464aca66aeefb08e84cd3b6ec77bfdcccfe263fefa46fc6a2bbc0fc7",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-design.test.mjs",
+      "preSha256": "63f85a3eb953d16342df0efa6171491ea1a801ba554ae992dd2212605bca0532",
+      "postSha256": "dc3a9b1a7b3401a35196c1a2fbfe0677922cba76f3609a9088ffa51c12dc2197",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+      "preSha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+      "postSha256": "0dbcd67869a9ae835a3b15d0e62713eb41b327ad571bcc9bea1aab00c6ebff75",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs",
+      "preSha256": null,
+      "postSha256": "7bd65028fe3b4c306603f00a8822e6523d2a24fd59ce3bbf4796401e9dcfadc5",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-prospective-materialization.fixture.mjs",
+      "preSha256": null,
+      "postSha256": "c6b553f722a1b210759ed0ba89fa31551fb07ba31229e998be16828447906798",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-prospective-materialization.mjs",
+      "preSha256": null,
+      "postSha256": "ea2d121b1f20a154bf4313e6eadc7ac3f85f5a1b1ff5cc10e5c285e9ca2242cb",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs",
+      "preSha256": null,
+      "postSha256": "349c371274ac86674f2004916b2afb71fb9e413e58722ae80f3292b4ce010668",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-exec-worker.mjs",
+      "preSha256": "da64eddced054475606fdf98ae36513c856723e1a0e404c8e1e4de399f07e7b0",
+      "postSha256": "80df4e98b404c0a5eba326624c9e9bd5f6de3adef628ecf06f06dab146deeb36",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "preSha256": "4f3eb53d70f7f91bd0ed5585392c0c6b2c24c834a7448b4542aee61dd6bd2083",
+      "postSha256": "64e184c08e29de8f426e103e367b8bd0a4c9d370f73fe27f64024db69ca50fbf",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-launcher.mjs",
+      "preSha256": "34e4c85b3ffb3243d77ea643cc76f75d33b77f809b7852e82b0d44749b644f4f",
+      "postSha256": "92eeffcec2cb41266ebed8fb9613797fc614f6e2d1682cc4bc5c28fa1c7727a1",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "preSha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c",
+      "postSha256": "eeead195e1109a0566ff93c3afb48a2bbec420eff47d2c76a676741b1dc208eb",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "preSha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+      "postSha256": "28bc89a4b4825082cfebfc7f00dda41c8a938cd6d088fcd55bbee919523a23e9",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+      "preSha256": "abf37fd71a0ca46e863b3c705e90436c6a9495f01a2112b09c9e2a6d1209b00a",
+      "postSha256": "439aade945d0781d44d910e2a7521746836c57a43842456d9289a9beb02066fe",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "preSha256": "ca7be38d383d4c15c77db10f1403ef6f7265c39fc6204851fe47f39037aba83f",
+      "postSha256": "27145a72a140f1c56aad17a292041352a8911892f22c4235d27206a667c73886",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "preSha256": "a2ea44d448cb763ac19ec370790195f05f9bda296abd94a0952a52326826f2ed",
+      "postSha256": "8992c0d298d1c05b563d411e45f33ac7c8ebf27d3c10bbebac4aaead72151340",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+      "preSha256": null,
+      "postSha256": "cd10c75b11d0f1b61c93bcda210c196614ed90b964033d237941bafbda6b8946",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+      "preSha256": null,
+      "postSha256": "3f6c46fcd7d879a5327a6a0a152dd353de8edb8c396d594b34acc7b7220d5128",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/darwin-requester-integration.test.mjs",
+      "preSha256": null,
+      "postSha256": "8bee4a76bce2f845f975472b80a22a623fc54720f08beda3be8e29d782f2f1a5",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-decision-bindings.mjs",
+      "preSha256": "6a3167e0f23d7edcce10d4bc9d20df0ea823d845623f373514678b18ae87a8ac",
+      "postSha256": "1445b1b5a319c72915ecd4d3a229d1bdf83abd10167ffbdbac7839844cd65ee0",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer-regression.test.mjs",
+      "preSha256": "8880e1b725f9c83276394637d1f673c10ef36a777c78374ac3ed006955af4ab9",
+      "postSha256": "4e9ea1676cbdda72a27876c6931b56b7365bcccfbae560e2f4bb1388ed3eb9b3",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+      "preSha256": "9191d350383af8820fbab531428d4515dbf34b3dd1e5692befc2e3ae679f1e7b",
+      "postSha256": "821fc33d0b68131d88124250ea2126272efb5644e1642cd04a6055b87a500df7",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+      "preSha256": "5706e798616ae3909846d190c586cc85b601b38161226e42935bf48e09a36ba0",
+      "postSha256": "2a4067dd75541d487548752c6fb60ddb9612c436279a7cf6da24f6ea822447b2",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-observation.mjs",
+      "preSha256": "5fd07e62beb34379a9774bb6ae1bc610c613ed0746468ada77409f6d2f9702c1",
+      "postSha256": "f10f6adcd71bfb285029ab48cef57401d188a3a855ac2f5539f8b15e1d6f2d3e",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+      "preSha256": "bb6b2eaa460ca09f6fbfbd9821780d2871e0868c6e26802d00ee8add59c7c613",
+      "postSha256": "a8d26ea4052ead96de9f0ac91714b4f8151df3c45586dffee9acfe6dbcc7683d",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+      "preSha256": "f5ed4884aba2cd73c5074846d5911d784646f31a8023e994f4f3506d0eed6196",
+      "postSha256": "dccb42adeeddaa4f1bce921004f58f7ee238eeb057e86f93de829369244a61d9",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+      "preSha256": "055fe40149e3f9a975b533f363a40ef9ccb69426b4825e95374c5e3d9c7b49a0",
+      "postSha256": "9c42fd65d0fb2550ca18a6f606bbc34853bb5c09f13df6cb2b8339f32dd9e766",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+      "preSha256": "05b52ae90b8cc6c281a44d3204fde6aec6ca55137a37eb543d3ff1fa4281ed0b",
+      "postSha256": "276e4ffd724864892ccc83f50a639fedeb2f71341bae5dc2a1c8e7eafd353f28",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+      "preSha256": null,
+      "postSha256": "ed8b29eb1d121e5bf9b374e286b8cdd9f70ee11dfc88e8b0538f71ac34ab39c3",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+      "preSha256": null,
+      "postSha256": "b623dd91e4f1ce9f4fa4fc27d97bd56db248870c42b566551bb33efb917d248a",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/native/darwin-requester-observer.c",
+      "preSha256": null,
+      "postSha256": "da758b21eeb5eebf2f4a8798727610b499123ce946997b7f70c75c5fe3a2494d",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+      "preSha256": "e506c151c9be0c389eb4028d7df62e1044b43f101ce13a74d05f9b9f7a1e757c",
+      "postSha256": "d799ddb7f9f1d097e7a0a514927f879f21491d0995c8754e1667acb70d7d0e71",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/review-economy.mjs",
+      "preSha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9",
+      "postSha256": "6e284d8c99bbd2c4c09c5d468fe552ff277c8819714b8890def89c61c4935459",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/review-economy.test.mjs",
+      "preSha256": "1dbf1879319f6048fefb5c2e6d2b53827a46f5adc2eb70d8167598b07640e449",
+      "postSha256": "4a8891b3b9f90af8e3607634b22937e9f8bc18fdef98b6b2e8f68197d07eb7e3",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "preSha256": "fcd6df13ed6849411eeb0893ea7c1791247944e61563408eeb90c9cb53a85e69",
+      "postSha256": "3cca9daa697fb0911ac51261c8c8581b1e4bfd1c21720b97c4a062c5b29dc076",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "preSha256": "b183089c76a078820652221d14b8d8637a49186b622ee11539d1f740e686bfe6",
+      "postSha256": "ef1467d638ad52660a9b358ad70b2eab599529cb5465727cb496396380dcde0e",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/slice-queue.mjs",
+      "preSha256": "54769d92730856c467daaf6ea3df0bddd7e9c7fed39a5e1c4c4fd40bb65e8146",
+      "postSha256": "603cd4a447de55e733ebc304ef9abb8e6d29eaaaa9f8ad25a3f069ff0bd845cc",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/slice-queue.test.mjs",
+      "preSha256": "44cc0c03db29046d41b077da8ddf64a07cfb8f8ca7304fa5619b6c67b69d9d91",
+      "postSha256": "1ab281bb4049e1b87315eeb545a4ca707722dc78f168cc6174de9619ed4ba2ec",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs",
+      "preSha256": "3bb749c9b9930c949f4089c022796b6e77d36b8210be2bd6064ea0f52d8b4235",
+      "postSha256": "fd27e48eb344a62b9b1cf4468a75bc8960723bfc29c6276eec39e060ec28009a",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/lib/verify-suite-registration.mjs",
+      "preSha256": "afcfa71773ae25e19a4c1e3fcf154e250ded6898ab5174d537fac0131784c5c7",
+      "postSha256": "175dcca36693bfacfa83088dc7dc8b4cdd7dee34cb0950324f0d10344cc858a7",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/roles/critic.md",
+      "preSha256": "ca1adea71c3fba9185336409d57c69e13526f59893be2a920806d0eb60783cc0",
+      "postSha256": "4e2b1c15bf19e03ff8688ce3df64189b896d0bbe79abd595b07e10723606e579",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/roles/elephant.md",
+      "preSha256": "94eb8d4d4ce4ddd8294e011ed9608c7e92ed4d900e73fbf22676da564721056e",
+      "postSha256": "e1e622998c5f26595dcfc2aaf4e4c8e7ca958003c1c670551c9a94d6ae547442",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/roles/goldfish.md",
+      "preSha256": "02ab6b5f2bdeb25c5a7f4da2b2473586201664a84eb36bac3d45ba44f43242c9",
+      "postSha256": "1ea7b417e2145b27730e84a01a56a25b0dfbab1978b4fa6b86dafd25c488e0dd",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/agy-host-observed-finalize.mjs",
+      "preSha256": "e1ff6e9ad8d4e13048c7396f763431a5f903e5e38425ba6a740f3521d4c1be41",
+      "postSha256": "155c51185cb476c64472ccaa2e0177b671ad2b9bbc3d5ae53c617b62378d7b1e",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "preSha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29",
+      "postSha256": "8aa3b98ec54545d966dd1a45f66902630e0b11ca11d441d6d0b1aa9840b4cb86",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs",
+      "preSha256": "9c9e333f458c2288ca50284ba373dc97e157274065f957f75a8d30a3b03b19a7",
+      "postSha256": "83783db4a1bd5e01037389c1b13c9d97255ae851b7242e32c26a8668603693fe",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+      "preSha256": "c40f2ffc693886828b95c7fa17b9b39efb9279e79330ec7f2edf05c3e6937cc4",
+      "postSha256": "bd1cd325a532268b03ece886da3dbcb196889bdd6786c3469fd9a9f3f4544297",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.mjs",
+      "preSha256": "f9515393c5db4e1370e1998eaf65211b4aeda1af8c1a761e157b5ff45a0ef65e",
+      "postSha256": "7d8da1d2623c6759eeae20c5b860389fbef446b2a1e4fdebdb9251475f77a019",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs",
+      "preSha256": null,
+      "postSha256": "22b88fa2ce52eab3bad1aa6c848abcb80dcf14646bbec722fcf3b0f1699fbaa1",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+      "preSha256": null,
+      "postSha256": "4894fb06d83b1c3fd2b398d89bc1703f60028a4251ef1d41e75a54b6d678039c",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/review-attempt.schema.json",
+      "preSha256": "b5307cfd7194538b0a3e14e20b8efff595e6b958364754878a7272f4cb60818b",
+      "postSha256": "40c7fef6f561bff9201fcfa11eb2702e9fa10046e6f140fc77565a262acc0e1d",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "preSha256": "34c3a8b0744b91f759f9ea82398e11e46c02e2c29fb0fcd539e49369eaef82ae",
+      "postSha256": "d07ffe67a485be83e00462457a1abf51b363bf40bebb2b589eddba9c10ac2168",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/slice-queue.mjs",
+      "preSha256": "51a8a7b197ff67282ed8306ff0bdbe129d8a4ce95099df9d9dde6e3c777acdc1",
+      "postSha256": "7a35df192b45c77a4c4d28281353cd66768722286545fd4e30feec4124e7ea95",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "preSha256": "e38b501be6b6d615c3979ca0fe8a606cbba6df970870910e5e5dc0c5d029c20f",
+      "postSha256": "c0c150a3f75323896d33111879e80871fe22852b7317ff18694a74633fa2a179",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md",
+      "preSha256": "4403bca7526862f0a4937e4f718f6d2637d04eac7d525f2406ed43081d6fd39d",
+      "postSha256": "d28003d31192fc3263e9ecb9131f76ce049f71222cc9256f09f8a222ce01d76f",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "preSha256": "009b43379ed7e519ef9f6d91a1767ce47cb5aa588638663c65b83462bbd2ac97",
+      "postSha256": "009b43379ed7e519ef9f6d91a1767ce47cb5aa588638663c65b83462bbd2ac97",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/elephant-kickoff.md",
+      "preSha256": "dd5a8e96303c36eda91eee0ce8d0f42994008fd2daf6b75bf7fab9d91ed281cc",
+      "postSha256": "bf8de53b0650049e611057acf5cff739744d099b55ff7b051524df2f0ef0e618",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "preSha256": "83541355713146a99e59cfae3f1c5954848a172388cf15e96b3a2bccb61da425",
+      "postSha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "roles/critic.md",
+      "preSha256": "ca1adea71c3fba9185336409d57c69e13526f59893be2a920806d0eb60783cc0",
+      "postSha256": "7f5406c12aa5bc21efd8283d929a88ed1ebcbc7b610834bab55d2b414113d1e2",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "roles/elephant.md",
+      "preSha256": "a56a27ec1c7fae2464ddc6d742daaedc953d72b36fb5b0827ad472415819b7ae",
+      "postSha256": "e1e622998c5f26595dcfc2aaf4e4c8e7ca958003c1c670551c9a94d6ae547442",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "roles/goldfish.md",
+      "preSha256": "02ab6b5f2bdeb25c5a7f4da2b2473586201664a84eb36bac3d45ba44f43242c9",
+      "postSha256": "1ea7b417e2145b27730e84a01a56a25b0dfbab1978b4fa6b86dafd25c488e0dd",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prospective-materialization-0088.json",
+      "preSha256": null,
+      "postSha256": "bbb4304cdd5e90baafddaca9676f7cdbd55160553715d677aefd61b63032f7b9",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "templates/prompts/critic-review.md",
+      "preSha256": "009b43379ed7e519ef9f6d91a1767ce47cb5aa588638663c65b83462bbd2ac97",
+      "postSha256": "009b43379ed7e519ef9f6d91a1767ce47cb5aa588638663c65b83462bbd2ac97",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "templates/prompts/elephant-kickoff.md",
+      "preSha256": "dd5a8e96303c36eda91eee0ce8d0f42994008fd2daf6b75bf7fab9d91ed281cc",
+      "postSha256": "bf8de53b0650049e611057acf5cff739744d099b55ff7b051524df2f0ef0e618",
+      "nlink": 1,
+      "mode": 420
+    },
+    {
+      "path": "templates/prompts/goldfish-task.md",
+      "preSha256": "83541355713146a99e59cfae3f1c5954848a172388cf15e96b3a2bccb61da425",
+      "postSha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58",
+      "nlink": 1,
+      "mode": 420
+    }
+  ],
+  "acceptanceClaim": false,
+  "installableCandidate": true,
+  "remaining": [
+    "User installs Codex/Claude from MAIN, then resumes; all agent work stopped",
+    "Agy installation follow-up deferred by explicit PO instruction: clean C2 is detached; no branch or config change made",
+    "After resume: sanctioned generic batch adoption, one FULL Critic and at most three DIFF reviews with a retained Correction Goldfish",
+    "Full Verify, actual fixes and remaining Alfred scope before final acceptance"
+  ],
+  "existingAlfredMatrix": {
+    "open": 174,
+    "accepted": 0,
+    "at25": 59,
+    "at50": 72,
+    "at75": 9,
+    "unknown": 34,
+    "note": "Inherited engineering inventory, not a newly audited intermediate readiness percentage."
+  },
+  "qualificationLimits": [
+    "Targeted Source qualification does not establish universal native Windows/macOS/runner qualification.",
+    "Elephant reuses exact owner targeted-test evidence; no routine replay.",
+    "ADR-0088 was genuinely signed, accepted and materialized in C2; MAIN lifecycle remains its earlier distinct binding.",
+    "Technical batch Critic and Full Verify explicitly deferred by PO until installation/resume; no final acceptance."
+  ],
+  "latestFocusedEvidence": {
+    "completionCheckerNewCases": {
+      "pass": 8,
+      "fail": 0,
+      "redPass": 3,
+      "redFail": 5
+    },
+    "completionCheckerExistingCorpus": {
+      "pass": 31,
+      "fail": 1,
+      "hold": "VCR01: identical pre-existing Main registry/completion metadata failures; must qualify coherent candidate"
+    },
+    "reviewCompletion": {
+      "courseCases": 18,
+      "preflightCases": 46,
+      "economyCompletionCases": 1,
+      "economyOriginalChecks": 120,
+      "allPass": true,
+      "negativeExitOneProducesFail": true
+    },
+    "darwinSourceReady": {
+      "pass": 13,
+      "nativeMacSkipped": 2,
+      "actualMainIntegrated": true,
+      "coherentCommon53RequalifiedCase": "DRI002",
+      "amendmentSha256": "a40ba6ba3b9fa8d82736a1454ec514d8be678bb23e116f87318b36ceee034d19",
+      "coherentSharedPrimary17RequalifiedCase": "DRI002",
+      "sharedPrimaryAmendmentSha256": "0488b12ce06670a4c4a77299d366f646e336648bb60f56d444803e6c2f312f35",
+      "currentBasisAnnotationSha256": "73820752d1802586f725875ca3f1d194e67d2b62855135e6ae418b3374752e0a",
+      "sourceOnlyCodexPortNotIncluded": true,
+      "finalCodexImpact": {
+        "receiptPath": "scratch/alfred-egm-operating-optimization-20261011/root-bound-darwin-final8-impact/final-impact-receipt.json",
+        "sha256": "1f05f94860f20e571d3b1521795d03fe1c74686aebaf3d4887c68a70e93feb56",
+        "changedExecutedBranches": false,
+        "testsReplayed": false,
+        "actualMainFinal8Bound": true
+      }
+    },
+    "c1Composition": {
+      "prior41Exact": 39,
+      "ruleFilesNeedingCombinedSource": 0,
+      "targetUnchanged": true,
+      "combinedCanonicalPackageRuleFilesNowIntegrated": 4
+    },
+    "nativeSourceReady": {
+      "manifestPath": "scratch/alfred-egm-operating-optimization-20261011/root-bound-shared-primary17/source-manifest.json",
+      "manifestSha256": "b4cc1ddc849f21736343e237067d0ba973cd60bc479f2e120e77670519af4d60",
+      "queuePass": 37,
+      "nativePass": 18,
+      "syntaxPass": 10,
+      "dependencyBeforeEqualsAfter": true,
+      "mainApplied": true,
+      "openClauses": [
+        "Native Codex configured-route opening authority; preserved positive finalizer tests fail honestly",
+        "Opaque native cancellation witness unavailable; reservation retained"
+      ],
+      "authenticatedScopeAmendmentQualified": true,
+      "impactedChecksOnlyRequalificationQualified": true,
+      "criterionAliasRefusalQualified": true
+    },
+    "agySourceReady": {
+      "manifestSha256": "b30b178521ce6157d3b2af3530bc6f9da552122bae25279e2b218da3505d10e9",
+      "pass": 6,
+      "syntaxPass": 6,
+      "actualMainIntegrated": true,
+      "nativeDisposalQualified": false,
+      "heldReservationRetainedWhenNativeProofUnavailable": true,
+      "authenticEffectiveNativeScopeAndOriginalCriterionAliasRefusal": true
+    },
+    "runtimeInputCustody": {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/root-bound-common53-agy7-darwin11/custody.json",
+      "sha256": "0638ce8f00348b4e17b3cb68cf2d8ab1d5198612d93ff0bb1dfb4e21427a137e",
+      "frozenReadyPaths": 31,
+      "retainedEvidence": 36,
+      "mainApplied": true
+    },
+    "c1CurrentMainComposition": {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/candidate-composition/current-main101-final-enrollment-local-candidate/manifest.json",
+      "sha256": "ce611e639948f44bae48109d9f6d5e8bd2efdd4ba5f19ac253aff1cee0988f9b",
+      "paths": 144,
+      "strictGitApplyCheck": true,
+      "candidateApplied": false,
+      "testsReplayed": false,
+      "notSignatureReady": false,
+      "maintenanceQualitySigningReady": true,
+      "actualHostHelperCheckPassed": true,
+      "wholeCandidatePassed": false
+    },
+    "packageClosure": {
+      "manifestSha256": "cc2a07945a45716f766de0cb123a240d8c86d28fd876f99b6b48ebbb31c6f578",
+      "targetedPass": 12,
+      "MainPostsIntegrated": 4,
+      "existingFunctionalModuleEOFNormalizedAndQualified": true
+    },
+    "recoveryProtocol": {
+      "manifestSha256": "cf7d6e69050b8a17ca06db3bad9da0fa60e7497182a1b468010f1f81f3b91d8c",
+      "casePass": 53,
+      "protocolRedFindings": 3,
+      "protocolGreenFindings": 0,
+      "MainPOTRIntegrated": true,
+      "remainingSourceGuardFilesProtected": 2,
+      "requiresExactSignedPackageForProtectedIntegration": true
+    },
+    "architectureMaterialization": {
+      "manifestSha256": "c1abedd8175be70976504b9aa936d7a9cfb3381381eb18f90a28bcee64e1c15b",
+      "sourcePostimages": 9,
+      "prospectiveLibraryPass": 18,
+      "controlledCompanionPass": 3,
+      "originalArchitectureCallbacksPass": 13,
+      "originalAssertionLinesPreserved": 59,
+      "ordinaryMainPostsIntegrated": 8,
+      "heldProtectedStateCLI": true,
+      "brownfieldADRNoMapQualified": true,
+      "replayAndUnownedStaleRefusalQualified": true,
+      "assurance": "genuine-source-method; not actual PO/native host approval"
+    },
+    "metadataSourceProposal": {
+      "mainManifestSha256": "306e5e5d422f891b08e96b3e98273bd874d65ec908a6add1ff3f5841d1638d9f",
+      "c1ManifestSha256": "b4ac3cdf20e0bad16883f937e6a944307bbe79cde7e9b3e299ce756d75b725c1",
+      "producerStreams": 19,
+      "dispositions": 246,
+      "pass": 244,
+      "explicitDarwinSkip": 2,
+      "newMetadataFindings": 0,
+      "mainApplied": true,
+      "remaining": "final qualified Codex delta; shared-primary DRI002 actual amendment complete with zero metadata delta",
+      "ordinaryMainPostsIntegrated": 6,
+      "protectedVerifyRegistryStillHeld": true
+    },
+    "parallelAuthoring": {
+      "stage": "qualified-source-native18-integrated-main8-codex-opening-authority-open",
+      "newCase": "NGHS17",
+      "assurance": "controlled genuine Source METHOD and Git qualification; not universal provider host certification",
+      "mechanism": "actual native-adapter shared-primary authoring with Source-authenticated foreign item scopes and genuine returned commit lineage; Source commit mutex",
+      "arbitraryForeignDirtyTolerance": false,
+      "callerConstructibleAuthority": false,
+      "oldAgyAPIsPreserved": true,
+      "nativeSuitePass": 18,
+      "syntaxPass": 10,
+      "SourceDependencyCASStable": true,
+      "actualMainIntegrated": true,
+      "allOriginalNegativeAssertionsPreserved": true,
+      "worktreeOffMeans": "no worktree creation; no invented global concurrency-off setting"
+    },
+    "actualAlfredProspectivePackage": {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/root-bound-actual-dab-authoring/ready-manifest.json",
+      "sha256": "241d85e4b646001325dde28f7035b88f0d4cb43f13e8d1381fc1071a38f4ccd2",
+      "stage": "private deterministic manifest/future targets and byte-preserving spec carrier prepared",
+      "canonicalApprovedADRPublished": false,
+      "signatureReady": false,
+      "number": 88,
+      "numberReserved": false,
+      "actualSignedC1NamespaceChecked": true,
+      "descriptorParsed": true,
+      "physicalDraftInspectionPendingCanonicalInputs": true,
+      "prospectiveManifestMainPublished": true,
+      "privatePrdSuccessorReady": true,
+      "privatePrdPostSha256": "f75d5d81ed3ca1c60c8635412386129e713524e9aa9997663da4afad5b183e45",
+      "mainSpecPrdWritten": false
+    },
+    "qualifiedSourceRawRecords": {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/manifest.json",
+      "sha256": "7dcea1c54b543dd3f02953849eab495de239f20d8f86a19e9c382d17fb5bacc5",
+      "publicRecordFiles": 19,
+      "pass": 244,
+      "skip": 2,
+      "gitIgnored": false,
+      "testsReplayed": false,
+      "wholeCandidatePassed": false
+    },
+    "nativeFinalizerFailure": {
+      "manifestPath": "scratch/alfred-egm-operating-optimization-20261011/admission/manifest-finalizer-fixtures.json",
+      "sha256": "e2f4400d7cf8d3e2cb76288c429706ff6a1bf5514878966cfa955c2c90e5adf8",
+      "status": "historical RED manifest and two case-record streams retained; five historical result artifacts lost; current Source full Codex roundtrip GREEN, narrow compatibility corrections pending",
+      "productionBypassIntroduced": false,
+      "newSourceIntegrated": true,
+      "completeHistoricalRunCustody": false,
+      "custodyGapPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/historical-finalizer-custody-gap.json"
+    },
+    "nativeCodexSourceQualification": {
+      "originalFinalizerPass": 7,
+      "impactedNativeCasesPass": 8,
+      "impactedEvidenceForm": "three genuine PASS dispositions in timeout fragment plus five PASS dispositions in completed remainder; not a fabricated whole-suite receipt",
+      "mainApplied": true,
+      "remaining": "final additive metadata enrollment and platform no-replay binding",
+      "manifestPath": "scratch/alfred-egm-operating-optimization-20261011/root-bound-codex-final8/source-manifest.json",
+      "manifestSha256": "62d21f7648e1377449f198ca8f607b4a98e92de307214813e521ab51b9fecd1a",
+      "newV2NegativeRegressionPass": true,
+      "portableFixtureQualified": true,
+      "syntaxPass": 8
+    },
+    "qualifiedCodexFinalizerRawRecords": {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-codex-finalizer-records/manifest.json",
+      "sha256": "c79af54ce4fe1fcb24e4e99cd29e2644d183b6b32d282642bab0bb58127adeac",
+      "publicRecordFiles": 2,
+      "pass": 7,
+      "gitIgnored": false,
+      "sourceVariant": "frozen historical9e5a; final compatibility and portability amendments pending",
+      "wholeCandidatePassed": false
+    },
+    "finalMetadata": {
+      "mainManifestSha256": "14314ec0eadc9a09529693029dea1ebad1b1f1e5376206f08a3323f7e735bb6a",
+      "c1ManifestSha256": "f6f91734b6c0529c4528a29c4893788e72e6e8f8551731946055a75d41e3b7ae",
+      "sourceFilesCopied": 70,
+      "ordinaryActualMainDelta": 1,
+      "protectedRegistryHeld": true,
+      "newMetadataFindings": 0,
+      "existingC1RegistrationResiduals": 49,
+      "existingC1DocumentationResiduals": 4,
+      "currentC1CompletionFindings": 0,
+      "wholeCandidateVerificationPassed": false
+    },
+    "firstSignedTransfer": {
+      "intentSha256": "1ed119963f4fffe8e6fb65ca38800a53a89fb5d920c2ba78410ccfcebb26e1d0",
+      "signatureVerified": true,
+      "candidateApplied": true,
+      "readbackCorrected": true,
+      "localCommitBlockedByInheritedDocInventory": true
+    }
+  },
+  "prospectiveChatChoice": {
+    "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prospective-chat-selection.json",
+    "sha256": "7e9fa154d35efe219e8370e67b544bbaa61702706d7c09f3ebd9495f94f93c5b",
+    "status": "selected-only-not-design-approval",
+    "originRecordSha256": "5e4995ac4c1b97105b56fee13b11e407c0499597dfffb935d9d10a445c81ddde"
+  },
+  "currentCompleteOutcomeOwners": {
+    "commonRuntime": "egm_outcome_admission_delivery",
+    "architectureMaterialization": "complete: Source9 qualified, ordinary Main8 integrated; sanctioned State CLI held exact signed package",
+    "recoveryTestProtocol": "complete; ordinary POTR Main integrated, two protected Source posts await package",
+    "installedPackageClosure": "complete; four Main posts integrated",
+    "metadataEnrollment": "egm_verify_enrollment_delivery: Native18 incorporated,246 genuine dispositions; impacted Darwin update pending",
+    "platformImpactedQualification": "egm_darwin_requester_delivery: DRI002 final runtime composition only"
+  },
+  "runtimeSpeedPreference": {
+    "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/runtime-speed-preference.json",
+    "fastUntil": "operating-model-intermediate-ready",
+    "subsequentAlfredMode": "standard",
+    "configurationChanged": false
+  },
+  "localCandidateVerificationScope": {
+    "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/local-candidate-verification-scope.json",
+    "fullVerifyBeforeLocalCandidate": false,
+    "fullVerifyDeferred": true,
+    "finalAlfredAcceptanceStillRequiresFullVerify": true,
+    "postinstallCriticScopePath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/local-candidate-postinstall-review-scope.json"
+  },
+  "humanActionRequired": {
+    "type": "installation",
+    "designSignatureConsumed": true,
+    "additionalSignatureNeededForThisCandidate": false,
+    "installSource": "plugins/pipeline-core",
+    "installSourcePathBase": "repository-root",
+    "resumeAfterInstallation": true
+  },
+  "currentCandidate": {
+    "root": ".claude/worktrees/alfred-egm-local-candidate-20261011",
+    "qualityCommit": "dba068b1abc712d02ef0813da409ea9197e803fd",
+    "qualityIntentSha256": "7b47fe1e4cbc31e4d5823ddf9131df406796f022d5cbf46192e54c17c30b7201",
+    "signedPaths": 144,
+    "canonicalPostcommitReadback": "scratch/alfred-egm-operating-optimization-20261011/quality-package-committed-readback.json",
+    "designStatus": "genuine v9 signature consumed; ADR-0088 accepted and materialized; canonical implementation phase in C2",
+    "formalBatchCriticStatus": "explicit PO deferral: after local test candidate installation/resume",
+    "installed": false,
+    "pushed": false,
+    "mainInstallReady": true,
+    "signedProtectedPluginTransferToMain": {
+      "paths": 3,
+      "status": "applied-and-readback",
+      "receipt": "scratch/alfred-egm-operating-optimization-20261011/main-signed-plugin-transfer3/execution.json",
+      "receiptSha256": "50e73593d7102d9d83c4d3ad7683666f0401c681888021a2d162c8bca80b4e01"
+    },
+    "functionalCommit": "a7a9b3cfa2dd32407f8e7b1d80959f1090c77859",
+    "stampedCommit": "2137b756448606516528697a12945af18bb96943",
+    "stampedTree": "517f1b1733164b9d34355db3dcfd60597f0ebee0",
+    "assurance": "local-test-unreviewed",
+    "physicalPluginEquality": {
+      "files": 1892,
+      "bytesAndModesMatch": true,
+      "readsetSha256": "108cdc0001c12e322576f84495a6a767e6335d453b98ee70c37fd661911b9005"
+    },
+    "stampReceipt": "scratch/alfred-egm-operating-optimization-20261011/local-egm-candidate-stamp/application-once/receipt.json",
+    "versions": {
+      "antigravity": "0.7.0+antigravity.20261011202443.a7a9b3cf",
+      "claude": "0.7.0+claude.20261011202443.a7a9b3cf",
+      "codex": "0.7.0+codex.20261011202443.a7a9b3cf"
+    },
+    "signedSpecDescriptorFix": {
+      "mainIntegrated": true,
+      "candidateIntegrated": true,
+      "deliverySha256": "1118af56a284f91ffec37d6fb4dece3591a8a8558f08c22482f1c42ff2d75cae",
+      "newCases": {
+        "redPass": 1,
+        "redFail": 5,
+        "greenPass": 6,
+        "greenFail": 0
+      },
+      "originalCasesPass": 18,
+      "originalCriteriaPreserved": true
+    },
+    "installationReadiness": {
+      "codex": "stamped-source-ready-not-installed",
+      "claude": "stamped-source-ready-not-installed",
+      "antigravity": "live-refusal-deferred-by-PO",
+      "agyReason": "SNT-A2-GIT-DETACHED for clean C2",
+      "physicalCustodyRepair": "scratch/alfred-egm-operating-optimization-20261011/local-egm-candidate-stamp/physical-custody-repair.json",
+      "agyReadback": "scratch/alfred-egm-operating-optimization-20261011/local-egm-candidate-stamp/agy-live-source-readback.json"
+    }
+  },
+  "publicProjection": {
+    "originalDocumentSha256": "04c59b1dfb53c966be0f196eba2629305379f4482716185750543c37b632e355",
+    "privateOriginalRetainedByDigestOnly": true,
+    "excludedMachineLocalPathOccurrences": 1,
+    "historicalStatusSnapshot": true,
+    "installationSourceRepresentation": "Repository-relative public Source path; resolve from the new checkout root.",
+    "historicalScratchAndWorktreePointersAreProvenanceOnly": true,
+    "noCurrentInstallationReadinessRequalification": true,
+    "historicalClaimsUnchanged": true,
+    "testsRerun": false
+  },
+  "installationPause": {
+    "workersStopped": true,
+    "resumeOnlyAfterUserUpdate": true
+  }
+}

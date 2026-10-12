@@ -1,0 +1,1131 @@
+{
+  "schema": "alfred.unresolved-item-partition.v1",
+  "group": "unknown-01",
+  "stage": "UNKNOWN",
+  "count": 12,
+  "membershipOrder": "Original items-trace row order; no semantic regrouping or reassessment",
+  "source": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+    "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27"
+  },
+  "rows": [
+    {
+      "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+          "canonicalPath": "backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+          "sha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+          "bytes": 2711,
+          "parentSha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.advertised-git-to-head-pipeline-is-refused::15.1",
+            "lineStart": 17,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.advertised-git-to-head-pipeline-is-refused::15.2",
+            "lineStart": 24,
+            "lineEnd": 27
+          },
+          {
+            "id": "pipeline.advertised-git-to-head-pipeline-is-refused::40.1",
+            "lineStart": 42,
+            "lineEnd": 44
+          }
+        ]
+      },
+      "recordedRationale": "Read-to-head implementation is a lead, but actual normalized rev:path admission/body coverage is not reconciled sufficiently for all-functional stage.",
+      "recordedRemaining": [
+        "Existing parser surface is a fix lead, not actual normalized Agy/rev:path admission proof. Bind exact current grammar+scope guard and positive/negative cases.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Historical installed Agy normalization and source identity unproven; no general relaxation warranted. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+            "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+            "bytes": 19968,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+              "current164Sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+                "currentSha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+                "retained142Sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            },
+            {
+              "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+              "current164Sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+                "currentSha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+                "retained142Sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.advertised-git-to-head-pipeline-is-refused"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.advertised-git-to-head-pipeline-is-refused"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+          "canonicalPath": "backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+          "sha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+          "bytes": 4086,
+          "parentSha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.2",
+            "lineStart": 19,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.3",
+            "lineStart": 24,
+            "lineEnd": 25
+          },
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.4",
+            "lineStart": 27,
+            "lineEnd": 47
+          },
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::49.1",
+            "lineStart": 51,
+            "lineEnd": 55
+          }
+        ]
+      },
+      "recordedRationale": "Umbrella route requirements lack an exact current implementation/proof relationship; overlapping fixes do not establish the whole route.",
+      "recordedRemaining": "Reuse the existing EL01/missing-dispatch work and bind actual current native/CLI worker routing plus loaded hashes.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+        "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.approval-verification-demands-head-equals-candidate",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+          "canonicalPath": "backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+          "sha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+          "bytes": 3710,
+          "parentSha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.approval-verification-demands-head-equals-candidate::15.1",
+            "lineStart": 17,
+            "lineEnd": 26
+          },
+          {
+            "id": "pipeline.approval-verification-demands-head-equals-candidate::40.1",
+            "lineStart": 42,
+            "lineEnd": 46
+          }
+        ]
+      },
+      "recordedRationale": "Existing approval verification does not establish that the specific original-candidate restriction was corrected.",
+      "recordedRemaining": "Trace actual verifier consumers and bind exact candidate-bound positive/negative cases before altering the existing implementation.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+            "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+            "bytes": 29652,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+              "selected146": {
+                "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+                "bytes": 29652,
+                "mode": 420,
+                "selection": "BASE73",
+                "currentMatchesInventory": true
+              },
+              "currentAuditPhysical": {
+                "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+                "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+                "bytes": 29652,
+                "mode": 420,
+                "nlink": 1
+              },
+              "bindingScope": "selected146-bound"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+        "id": "pipeline.approval-verification-demands-head-equals-candidate"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.approval-verification-demands-head-equals-candidate"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.approval-verification-demands-head-equals-candidate"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+          "canonicalPath": "backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+          "sha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+          "bytes": 5074,
+          "parentSha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.1",
+            "lineStart": 17,
+            "lineEnd": 21
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.2",
+            "lineStart": 23,
+            "lineEnd": 27
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.3",
+            "lineStart": 29,
+            "lineEnd": 29
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.4",
+            "lineStart": 31,
+            "lineEnd": 38
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.5",
+            "lineStart": 40,
+            "lineEnd": 41
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.6",
+            "lineStart": 43,
+            "lineEnd": 44
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::57.1",
+            "lineStart": 59,
+            "lineEnd": 66
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::57.2",
+            "lineStart": 68,
+            "lineEnd": 69
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.1",
+            "lineStart": 73,
+            "lineEnd": 81
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.2",
+            "lineStart": 83,
+            "lineEnd": 87
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.3",
+            "lineStart": 89,
+            "lineEnd": 90
+          }
+        ]
+      },
+      "recordedRationale": "Entry gates exist; the specific brownfield exemption/course behavior is not established by retained evidence.",
+      "recordedRemaining": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+            "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+            "bytes": 29652,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+              "selected146": {
+                "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+                "bytes": 29652,
+                "mode": 420,
+                "selection": "BASE73",
+                "currentMatchesInventory": true
+              },
+              "currentAuditPhysical": {
+                "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+                "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+                "bytes": 29652,
+                "mode": 420,
+                "nlink": 1
+              },
+              "bindingScope": "selected146-bound"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+            "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+            "bytes": 25281,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+              "selected146": {
+                "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+                "bytes": 25281,
+                "mode": 420,
+                "selection": "BASE73",
+                "currentMatchesInventory": true
+              },
+              "currentAuditPhysical": {
+                "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+                "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+                "bytes": 25281,
+                "mode": 420,
+                "nlink": 1
+              },
+              "bindingScope": "selected146-bound"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+        "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.capability-inventory-checker-is-red-at-head",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+          "canonicalPath": "backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+          "sha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+          "bytes": 887,
+          "parentSha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.capability-inventory-checker-is-red-at-head::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.capability-inventory-checker-is-red-at-head::19.1",
+            "lineStart": 21,
+            "lineEnd": 21
+          }
+        ]
+      },
+      "recordedRationale": "No current candidate-bound failing checker case establishes an active implementation defect or completed fix.",
+      "recordedRemaining": "Reproduce and bind an independent current failing case and the suppression matrix; only then decide whether source repair is needed.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+        "id": "pipeline.capability-inventory-checker-is-red-at-head"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.capability-inventory-checker-is-red-at-head"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.capability-inventory-checker-is-red-at-head"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+          "canonicalPath": "backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+          "sha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+          "bytes": 764,
+          "parentSha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+          "assignmentChanged": false
+        },
+        "clauses": []
+      },
+      "recordedRationale": "Selected-runner writer and consent/export boundary are not bound to the complete original requirement.",
+      "recordedRemaining": "Use a separately authorized exact-candidate execution dispatch to bind selected-runner and consent/activation cases; do not infer completion from zero extracted criteria.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+        "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.claude-greenfield-seeds-unselected-codex-targets"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.claude-greenfield-seeds-unselected-codex-targets"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+          "canonicalPath": "backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+          "sha256": "c1953268b51ad1659956ce0cd7c521964da365db5ceb8f16b4026dfa4c0746b2",
+          "bytes": 5541,
+          "parentSha256": "fa597b23a60e3c71ff88dc712df2802fe0b466826c0a2b91c12aef85b975dbc3",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::15.1",
+            "lineStart": 17,
+            "lineEnd": 24
+          },
+          {
+            "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::15.2",
+            "lineStart": 26,
+            "lineEnd": 30
+          },
+          {
+            "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::39.1",
+            "lineStart": 41,
+            "lineEnd": 46
+          },
+          {
+            "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::48.1",
+            "lineStart": 50,
+            "lineEnd": 58
+          }
+        ]
+      },
+      "recordedRationale": "Existing namespace/store logic does not establish a corrected fresh-identity ownership route.",
+      "recordedRemaining": "Reuse the current source and qualify fresh-repository/private-store ownership with the controlled source-owned producer; no manual chmod.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+        "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+          "canonicalPath": "backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+          "sha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+          "bytes": 1579,
+          "parentSha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-bootstrap-in-the-typed-next-action::16.1",
+            "lineStart": 18,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.codex-bootstrap-in-the-typed-next-action::33.1",
+            "lineStart": 35,
+            "lineEnd": 36
+          }
+        ]
+      },
+      "recordedRationale": "Actual fresh-host manual-toil premise and host callback relationship are unverified.",
+      "recordedRemaining": "Verify the fresh-host/bootstrap premise from recurring-toil evidence and qualify native Desktop/host control callbacks before adding a typed action.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "docs/admin-steps-inventory.md",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "docs/admin-steps-inventory.md",
+              "selected146": null,
+              "currentAuditPhysical": {
+                "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/admin-steps-inventory.md",
+                "sha256": "f5ae2acef9b76b74c73054c4eb22570c71c5b62851340bec863014ba02ea987f",
+                "bytes": 8432,
+                "mode": 420,
+                "nlink": 1
+              },
+              "bindingScope": "physical-present-but-not-in-selected146-row-set"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+              "selected146": null,
+              "currentAuditPhysical": {
+                "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+                "sha256": "665b5dc45b621b472c870e04db6950900edfd16a609177bfe7c9a437395933a8",
+                "bytes": 16233,
+                "mode": 420,
+                "nlink": 1
+              },
+              "bindingScope": "physical-present-but-not-in-selected146-row-set"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+        "id": "pipeline.codex-bootstrap-in-the-typed-next-action"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.codex-bootstrap-in-the-typed-next-action"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.codex-bootstrap-in-the-typed-next-action"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.declared-system-skill-read-requires-human-override",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+          "canonicalPath": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+          "sha256": "e7b41017ccebcf99996f4728b10c6a9b13d173aecc99acac83d075913f425aad",
+          "bytes": 2378,
+          "parentSha256": "99d542713254a5b5b8d2de92742b0212ec6de1f1e9e4f9d4f19bb8552fd11c81",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.declared-system-skill-read-requires-human-override::15.1",
+            "lineStart": 17,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.declared-system-skill-read-requires-human-override::15.2",
+            "lineStart": 24,
+            "lineEnd": 26
+          },
+          {
+            "id": "pipeline.declared-system-skill-read-requires-human-override::33.1",
+            "lineStart": 35,
+            "lineEnd": 40
+          },
+          {
+            "id": "pipeline.declared-system-skill-read-requires-human-override::42.1",
+            "lineStart": 44,
+            "lineEnd": 50
+          }
+        ]
+      },
+      "recordedRationale": "Actual runtime-owned catalog/installed host skill authority route not established; no complete or concrete partial implementation binding in retained inputs.",
+      "recordedRemaining": [
+        {
+          "gap": "Historical declared catalog read denial; current outside-root catalog authority proof absent.",
+          "nextAction": "Freeze actual runtime-owned catalog readonly scope against private-home/credential/alias negatives; reuse M6 classification only as dependency, not as catalog authorization proof.",
+          "crosswalkAction": "Bind exact current source/case/actual receipt/integration from retained requirements and original mapper evidence"
+        },
+        "Freeze actual runtime-owned catalog readonly scope against private-home/credential/alias negatives; reuse M6 classification only as dependency, not as catalog authorization proof."
+      ],
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.declared-system-skill-read-requires-human-override",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.declared-system-skill-read-requires-human-override"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.declared-system-skill-read-requires-human-override"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+          "canonicalPath": "backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+          "sha256": "7289e7117fa060c1e0395123f7b407316e2672ee2d4f1ed4a045cc4a200e52e8",
+          "bytes": 1874,
+          "parentSha256": "e30e8618fe231ceb6475428cbdf727fd8ddfc411737b2e090de7f34f515ac050",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract::34.1",
+            "lineStart": 36,
+            "lineEnd": 39
+          },
+          {
+            "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract::41.1",
+            "lineStart": 43,
+            "lineEnd": 47
+          }
+        ]
+      },
+      "recordedRationale": "Original null-Verify requirement and newer baseline-only policy need exact applicability adjudication; no completion inferred.",
+      "recordedRemaining": "Root policy/source owner: reconcile the original rejection clause with the accepted newer baseline-only implementation contract using an exact authority reference. Until then keep original clause unresolved; do not silently mark it passed or tighten the implementation gate from this audit.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/consumer-verify.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/consumer-verify.mjs",
+            "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85",
+            "bytes": 6738,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/consumer-verify.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/consumer-verify.mjs",
+              "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85",
+              "bytes": 6738,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85",
+                "selection": "PCI-actual12",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "selected164Source": {
+            "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+            "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+            "mode": 420,
+            "metadataOrigin": "actual content receipt checkpoint; not a semantic proof"
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+              "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+              "bytes": 423484,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+                "selection": "PCI-actual12",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+            "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+            "bytes": 111990,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+            "sha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+            "bytes": 796531,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "protected-transfer-held",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+              "sha256": "a52fec798a5c83966d70d830633a74e97ba77d9fee8b3c279750b495dd17f4db",
+              "bytes": 794431,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "a52fec798a5c83966d70d830633a74e97ba77d9fee8b3c279750b495dd17f4db",
+                "selection": "qualified-HGL12-current-parent-adoption",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/final-location-successor/criterion-source-matrix.json",
+        "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+          "canonicalPath": "backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+          "sha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+          "bytes": 1489,
+          "parentSha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows::16.1",
+            "lineStart": 18,
+            "lineEnd": 20
+          },
+          {
+            "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows::30.1",
+            "lineStart": 32,
+            "lineEnd": 33
+          }
+        ]
+      },
+      "recordedRationale": "Linux-only storage and explicit Windows skip disclose the limit but do not implement the requested Windows capability.",
+      "recordedRemaining": "Windows fixture/source owner: supply a genuine supported store/constructor transport or explicitly authorized criterion disposition while preserving original RC12C001 and skip evidence. WSL diagnostics do not establish native Windows proof; ordinary retired flow is separate.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "docs/adr/0085-one-review-one-signature-design-approval.md",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "docs/adr/0085-one-review-one-signature-design-approval.md",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/adr/0085-one-review-one-signature-design-approval.md",
+              "sha256": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa",
+              "bytes": 6091,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+              "sha256": "f8ac123be647522add8f51c0cc4ad1a0cf12968b26b009a00bce6089e5da3f61",
+              "bytes": 9636,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
+              "sha256": "fe6e3d22ce9fcc5bfcb20fc457034bc7203516808880d90727483caa632604f6",
+              "bytes": 23878,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/final-location-successor/criterion-source-matrix.json",
+        "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "stage": "UNKNOWN",
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+          "canonicalPath": "backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+          "sha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+          "bytes": 3050,
+          "parentSha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another::29.1",
+            "lineStart": 31,
+            "lineEnd": 51
+          },
+          {
+            "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another::29.2",
+            "lineStart": 53,
+            "lineEnd": 54
+          }
+        ]
+      },
+      "recordedRationale": "Whole-repository dirty binding remains; safe disjoint signed action semantics are not implemented or specified completely.",
+      "recordedRemaining": "Introduce a separately versioned native-file target-preimage contract; retain legacy and Bash/plugin bindings. Qualify the original disjoint-action/drift matrix and preparer serial-dependency disclosure.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another"
+      },
+      "accepted": false
+    }
+  ],
+  "limits": [
+    "Declarative dispatch inputs only; actual Source assessment belongs to the next assigned owner.",
+    "UNKNOWN is not proof of missing implementation; stage25 retains functional-or-coverage remainder.",
+    "No Source fix, static stage promotion, acceptance or native claim.",
+    "Source/proof pointers retain their original generations; assembled-Main compatibility is not invented."
+  ]
+}

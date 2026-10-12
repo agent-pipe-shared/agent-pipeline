@@ -1,0 +1,59 @@
+{
+  "schema": "alfred.m6-literal-read-baseline.execution.v1",
+  "runs": 1,
+  "exit": 0,
+  "signal": null,
+  "errorCode": null,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "89d8c512987b9ce1c3de0f96e1f005ecb9c52d01f3fe861caa400584cce4df05",
+    "caseSetSha256": "535017b55d54e852b2f32581d2b844fb3c22bf0d19d6b5bfe48899faab0af6b6",
+    "dispositionsSha256": "1e09e8ac617e447a01b26120105bf64516327cb136887d648c2d79fab7a1c537",
+    "declaredCount": 35,
+    "disposedCount": 35,
+    "counts": {
+      "pass": 35,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionError": null,
+  "conservationError": null,
+  "fixtureRelativePath": "runtime/synthetic-iC3t70",
+  "cwd": "owned-exclusive-synthetic-fixture",
+  "argv": [
+    "plugins/pipeline-core/lib/m6-literal-read.test.mjs"
+  ],
+  "inheritedEnvironmentNames": [
+    "PATH",
+    "LANG",
+    "LC_ALL"
+  ],
+  "inheritedPreloadPreserved": false,
+  "graphSHA256": "e13c5a23fcf28d61ffd32bad6d46219b66f0d4ce0e79f3024d1e68d98998cbb3",
+  "freezeSHA256": "6efdf9aaea025695392ee74c3f577f1595d8dd95404d14eefb7a46687935294e",
+  "driverSHA256": "8039d0a4ac5bbd1a4df814bf5ca7a45bdd7d11e748cc8d56c8cc1323384d9720",
+  "captures": [
+    {
+      "path": "captures/stdout.txt",
+      "sha256": "29b2fff3c05d4d8edb9175b8477240824e3f034184161f845badc70f48df7c33"
+    },
+    {
+      "path": "captures/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "captures/completion.jsonl",
+      "sha256": "025828738a4b29fa9f26cb5dd14c326cb28ab18aba50f46ce377ac99c4e80472"
+    }
+  ],
+  "limits": [
+    "commands are inert strings never executed",
+    "synthetic .netrc placeholder only",
+    "no Git/HOME/key/credential host reads",
+    "no actual hook/native/Windows/PO qualification",
+    "rejected Ruling157 is not authority"
+  ]
+}

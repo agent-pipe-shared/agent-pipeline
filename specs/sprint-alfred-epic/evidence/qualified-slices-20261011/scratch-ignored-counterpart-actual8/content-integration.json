@@ -1,0 +1,21 @@
+{
+  "schema": "alfred.scratch-counterpart-public-content-integration.v1",
+  "item": "pipeline.scratch-has-no-retention-and-no-durability-check",
+  "canonicalPath": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+  "parentSha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+  "postSha256": "bde2d769d8e0642a2d57e144c703c882d3a38e4a9417102c06177fb3fc1f55fe",
+  "applicationReceiptSha256": "93047ac986769b87f6d9bdfbc4c75bc113d0c4bd3dd0601f1f5dea1c23b5883f",
+  "postReadbackReceiptSha256": "1bd96cd94821ff99693505be225820dbe3ab54459e95ef0df5b125e62a577c09",
+  "classificationReceiptSha256": "49573a4683dfa6ed634db4da0f3568c7e9a89f19d39ed704e35d9ebb728faa5d",
+  "appliedLeaves": 1,
+  "failure": null,
+  "atomicPerLeaf": true,
+  "exclusiveNewInode": true,
+  "nonTargetDependenciesConserved": true,
+  "classificationAuthorityConserved": true,
+  "controlledReporterEightCaseProof": true,
+  "wholeItemAccepted": false,
+  "nativeOrInstalledProof": false,
+  "packageCommitSweepQualified": false,
+  "scope": "Root applied one officially noRule content leaf and read it back. This receipt is separate from controlled test proof; actual push/handover execution and package-bound staging sweep remain unqualified."
+}

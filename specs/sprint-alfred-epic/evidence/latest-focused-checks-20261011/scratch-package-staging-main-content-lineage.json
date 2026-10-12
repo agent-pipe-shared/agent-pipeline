@@ -1,0 +1,102 @@
+{
+  "schema": "alfred.scratch-package-staging.main-content-lineage.v1",
+  "date": "2026-10-11",
+  "status": "EXACT-FOUR-CONTENT-INTEGRATED",
+  "actualAtomicIntegrationReceiptSha256": "fc34b284887f6f6de3ca706e88adc16f50be59dd1e14a82700664fd209133927",
+  "officialClassificationReceiptSha256": "683159719d0e05ddae553a77dccb53b4faac3a697e3f310a12b94d6dc6319f06",
+  "officialClassification": {
+    "targetCount": 4,
+    "classifications": [
+      "noRule",
+      "noRule",
+      "noRule",
+      "noRule"
+    ],
+    "inputsConserved": true,
+    "meaning": "Current official path-rule absence only; not an authority waiver or new acceptance verdict."
+  },
+  "currentMain": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-retention.mjs",
+      "sha256": "0fa925d7dd40b18c52f383514d23de99752748aa3b9d2af0457da0b3599d2ca3",
+      "bytes": 7667,
+      "mode": "0644",
+      "nlink": 1,
+      "matchesActualAtomicReceipt": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/scratch-sweep.mjs",
+      "sha256": "78be835d3e2e92a923aa447fafd9313adf018cedc87e3b977f0375546da1dfc6",
+      "bytes": 8608,
+      "mode": "0644",
+      "nlink": 1,
+      "matchesActualAtomicReceipt": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-package-staging.mjs",
+      "sha256": "31ae427807af0bd37484290c0db40532153df8926287cc89b186b925d849fc64",
+      "bytes": 26336,
+      "mode": "0644",
+      "nlink": 1,
+      "matchesActualAtomicReceipt": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+      "sha256": "8c0e69313f0bec42b787c36bf0adee731306a57365f27f02f9e8cec2f1917f24",
+      "bytes": 12687,
+      "mode": "0644",
+      "nlink": 1,
+      "matchesActualAtomicReceipt": true
+    }
+  ],
+  "nonTargetPeersConservedByActualIntegrator": true,
+  "historicalParents": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-retention.mjs",
+      "sha256": "01baa676983f1a93e617cb2f3e334af0cddbc8b386ade534f9e5b7f7e43f9601",
+      "originalBytesInodeModeRetained": true,
+      "oldNlinkAndCtimeChangedByNamespaceReplacement": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/scratch-sweep.mjs",
+      "sha256": "5a7507fb85b9dc7f17640eb1ac7347a4b9938dec08e9d9e1a712d68abd2e0a4f",
+      "originalBytesInodeModeRetained": true,
+      "oldNlinkAndCtimeChangedByNamespaceReplacement": true
+    }
+  ],
+  "originalSevenProof": {
+    "path": "specs/sprint-alfred-epic/evidence/latest-focused-checks-20261011/scratch-package-staging-seven-actual.json",
+    "sha256": "5aba26ae4487935d6e996cca23a8e0b1e5fe6d45a2cd875b6053ad5a12cd02fa",
+    "completionPath": "specs/sprint-alfred-epic/evidence/latest-focused-checks-20261011/scratch-package-staging-seven-completion.ndjson",
+    "completionSha256": "2426fe1424409894bcf2adc63290efcfec2c1ff10483b56076050a62058d8266",
+    "actualExecutionSha256": "8d2cbefde182030fe82d96627b4b2ae8f9b0045f5a05de16b4e705586034a943",
+    "caseIds": [
+      "SPC001",
+      "SPC002",
+      "SPC003",
+      "SPC004",
+      "SPC005",
+      "SPC006",
+      "SPC007"
+    ],
+    "counts": {
+      "pass": 7,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "meaning": "Original seven controlled callbacks passed against private Source3 before canonical import/CLI adaptation. No repeated business run."
+  },
+  "canonicalTestAdaptation": {
+    "sourceManifestSha256": "d68c65223ca8806554f42313cc27dcc391549bc095630428ed7ac98b8f6c5fcd",
+    "canonicalPath": "plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+    "changedOnly": "Four module import prefixes and one CLI URL prefix; original callback bodies and full inverse preserved.",
+    "noAdditionalMainBusinessExecution": true
+  },
+  "remaining": {
+    "suiteAndCompletionRegistration": "Separate protected Source2 proposal e186 exists; this four-leaf receipt contains no actual registry integration or final protected-tuple acceptance.",
+    "native": "Genuine native host and Windows custody/durability course remain outside these controlled seven cases.",
+    "wholeItem": "Original70c82 durability/content obligations and final product-generation acceptance remain separate; this record does not promote their status.",
+    "pushOrSignature": "No push, install, Human signing or extra approval request."
+  }
+}

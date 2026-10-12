@@ -1,0 +1,16 @@
+{
+  "schema": "alfred.local-candidate-verification-scope.v1",
+  "source": "explicit user instruction in current chat",
+  "userInstruction": "Ein full verify ist mE für einen lokalen test Kandidaten nicht zwingend nötig wenn die ein Zieltests grün sind",
+  "localCandidateRequires": [
+    "green targeted owner tests for included changes",
+    "exact integration and readback",
+    "agreed meaningful batch Critic",
+    "required exact human approvals for protected integration and design",
+    "frozen installation candidate and stamp describing actual qualification"
+  ],
+  "fullVerifyRequiredBeforeLocalCandidate": false,
+  "fullVerifyDeferredUntil": "after local test candidate delivery; before final Alfred acceptance",
+  "fullAlfredScopeReduced": false,
+  "wholeItemAcceptanceImplied": false
+}

@@ -1,0 +1,39 @@
+{"measurement":"controlled-generator-storage-byte-comparison","beforeBytes":56881,"afterBytes":24173,"oldSourceCopies":3,"newSourceCopies":1,"outputTokens":null,"nativeBudget":null,"displayTruncation":null}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+{"measurement":"controlled-public-enabled-runner-prerequisite","changedField":"runners.enabled","before":["codex"],"after":["codex","claude"],"beforeSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","afterSha256":"481cc0d17f3d1086df8d7508cdf20f2f4bc718e1bbd1b816be6bbc6c660e3fa3","validation":"actual-v3-schema","projectionStatus":"applied","samePhysicalRoot":true}
+✔ GSC001 Real captured requirements and answers resolve through both derived source references (179.805532ms)
+✔ GSC002 Same real checkpoint compares actual old and new stored bytes without coverage loss (117.309113ms)
+✔ GSC003 Real whole-source, original section, projected section and Spec marker hashes agree (162.23028ms)
+✔ GSC004 Plan replay and actual apply replay preserve deterministic bytes and checkpoint revision (214.011391ms)
+✔ GSC005 Sanctioned capture and Q/A replacement change binding and reject the old apply digest (156.798571ms)
+✔ GSC006 Unowned evidence/checkpoint mutation fails before target publication (226.79492ms)
+✔ GSC007 Private local path bytes remain exact while projected source hash is distinct (144.050022ms)
+✔ GSC008 Exactly256 sections are complete and257 sections cannot publish a hidden prefix (6596.135071ms)
+✔ GSC009 No-input precondition and genuine explicit no-open-questions remain honest (206.177754ms)
+✔ GSC010 Generation retains activation, consent, one-round answers and no PO marker (214.811416ms)
+✔ GSC011 Genuine portable writer creates asks and default actual CLI returns full read-only output (7470.458465ms)
+✔ GSC012 Shown actual ask digest returns all references and only a full readonly recovery action (7676.103634ms)
+✔ GSC013 Unknown shown digest exposes genuine full asks and cannot answer or grant consent (8705.70943ms)
+✔ GSC014 Physical project, runner and intent changes invalidate the old ask binding (17304.885926ms)
+✔ GSC015 Actual consent writer answers language without re-asking or suppressing other fields (8369.15649ms)
+✔ GSC016 Pure public ask projection binds actual question/default/guidance/trust/input bytes (0.314888ms)
+✔ GSC017 Actual CLI and qualifier close shown selector to the readonly exact inspect route (9533.868574ms)
+✔ GSC018 Ask source, count, names and UTF8 bounds never drop hidden fields or grant a step (10.273982ms)
+✔ GSC019 Actual generic driver surfaces genuine asks before mutation after default or compact read (17849.225041ms)
+✔ GSC020 Actual summary and explicit full-plan read retain complete changed generator output (258.391414ms)
+✔ GSC021 A genuinely disabled runner is refused before ask compaction without mutation (6026.199533ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 91435.836453

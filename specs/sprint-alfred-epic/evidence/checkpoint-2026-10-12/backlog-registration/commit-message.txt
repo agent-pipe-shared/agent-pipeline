@@ -1,0 +1,8 @@
+chore(backlog): register pending Alfred items for handover
+
+Normalize three existing open item schemas and retain the signed-candidate
+defect as open. Follow immediately with official ledger reconciliation;
+no item acceptance is claimed.
+
+Dispatch: administrative (elephant)
+AI-Assisted: true

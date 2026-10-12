@@ -1,0 +1,47 @@
+✖ RC15C001 HGO-SCAN: authenticated stale matching record cannot shadow a current matching capability (470.215027ms)
+✖ RC15C002 HGO-SCAN: stale-only candidates remain refused without capability consumption (121.719035ms)
+✔ RC15C003 HGO-SCAN: corrupt authenticated audit still fails globally before later valid candidates (231.237281ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 827.627287
+
+✖ failing tests:
+
+test at scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/stale_capability/private/plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC15C001 HGO-SCAN: authenticated stale matching record cannot shadow a current matching capability (470.215027ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '2a69667e7d54fecefaf8b353ab557c706e17eb7608106b12520fd038ffa37b29'
+  - '5d64080cf63e38d80f1f459486fd3c9002e9a584473391759ce8e19664670c1c'
+  
+      at Object.run (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/stale_capability/private/plugins/pipeline-core/lib/human-guard-override-capability-scan.test.mjs:27:558)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/stale_capability/private/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '2a69667e7d54fecefaf8b353ab557c706e17eb7608106b12520fd038ffa37b29',
+    expected: '5d64080cf63e38d80f1f459486fd3c9002e9a584473391759ce8e19664670c1c',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/stale_capability/private/plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC15C002 HGO-SCAN: stale-only candidates remain refused without capability consumption (121.719035ms)
+  ReferenceError: beforeStatus is not defined
+      at Object.run (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/stale_capability/private/plugins/pipeline-core/lib/human-guard-override-capability-scan.test.mjs:28:267)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/stale_capability/private/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)

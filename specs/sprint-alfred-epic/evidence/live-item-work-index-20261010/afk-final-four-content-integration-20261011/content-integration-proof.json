@@ -1,0 +1,56 @@
+{
+  "schema": "alfred.afk-four-content-integration-public.v1",
+  "status": "Main-content-integrated-readback-verified",
+  "MainPosts": [
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "b2886c88cd564b4ba713537e6d109ac69f94e5ed6d446defaf4c1283cb49fcc1",
+      "bytes": 638620,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+      "sha256": "a79718659a5bd44f087bdd2343f3407b7255d4358b2dccb22ff11b0ce3c48ae6",
+      "bytes": 30068,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "sha256": "d30aaa52c97ac7f17c852a181572b773d952e2090fa5496afe4e609b86b5bea0",
+      "bytes": 137168,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs",
+      "sha256": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c",
+      "bytes": 26882,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "integrationReceiptSha256": "c1fd441bfbb7b0b4c809801cb6abeb249e5b45b5d5bc724368f92118a7f3141a",
+  "classificationSha256": "b2b28d0947df15813796659ce50863ac9b76a300cf68a463c634818a8adb4e47",
+  "officialClassification": "four targets not matched by the current official protected baseline; classification is not qualification or approval",
+  "actualAffectedCase": {
+    "id": "AFX009S",
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0,
+    "executionSha256": "bea724734d2ddc3ce9b3fd3bc4f5cf9ef943739e66e7b572bf2851e6fc66803e",
+    "fd3Sha256": "75cdd1e277858aff65c978cff0dadb2e5f66775b8c5cf76d08e076634506f21b",
+    "sourceRuntimeEnvironmentConserved": true
+  },
+  "limits": [
+    "State88f remains separately protected and is not installed",
+    "Other fiveAFK and Lock6 proofs are on ancestral1d393; no current-generation whole6 proof",
+    "No native-host, whole26, whole-item or final acceptance claim"
+  ],
+  "MainReadbackVerified": true,
+  "fixedMainPeerBindingsConserved": true,
+  "sourcePostsConserved": true,
+  "businessReplays": 0
+}

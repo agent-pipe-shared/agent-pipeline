@@ -1,0 +1,32 @@
+{
+  "schema": "alfred.claude-inline-attestation-mechanical-agreement.v1",
+  "beforeSourcePosts": true,
+  "normativeSha256": "f55f2a3c28e6ca1f17e21af084806591736b585b93336d3166b5290d805d1d57",
+  "publicApi": "Existing synchronous observePipelineStartPreflight; no new exported function, CLI, caller source input or envelope field.",
+  "trigger": "Claude actual copied local-development loaded root; initial genuine verifier unavailable; initial exact nonnull source-owned registry binding.",
+  "sequence": [
+    "Fresh resolveClaudeRegistryBinding reads resolvedPluginList and knownMarketplaces, not the stale initial list snapshot.",
+    "Require fresh installed root equal initial observed binding root and pluginRoot; fresh marketplace root equal initial binding source; exact selected plugin name/version.",
+    "Derive sourcePluginRoot only from that actual marketplace binding; invoke real writeClaudeRegistryInstalledPluginReceipt with actual fresh registry readers and unchanged protected paths.",
+    "Require exact existing host-result schema and status written, then real readInstalledPluginAttestationSetup with the same exact subject and fresh registry readers.",
+    "Require exact existing host-result schema and verified readback, then rerun the existing ordinary verifier with the existing Claude registryInstalledPluginRoot input.",
+    "Only the existing verified schema/status may replace initial unavailable. Throw/rejection/stale/ambiguous/readback mismatch retains unavailable; no new setupAction or manual terminal."
+  ],
+  "fixtures": {
+    "physical": "Actual owned source plugins/pipeline-core checkout with real Git candidate/branch/credential-free synthetic method origin and clean bytes; distinct physical copied install; actual JSON registry reader inputs; actual host writer/readback and default observer.",
+    "governance": "Actual createGovernanceScopeController plus opaque planDecision enroll and applyDecision handle writes/reobserves physical enrollment; default preflight observer reads the actual config, never a supplied active result.",
+    "scope": "Attestation verified plus truthful unchanged downstream onboarding/hooks/project prerequisites. Whole bootstrap ready remains separate unless genuine original producers establish it.",
+    "hostIsolation": "Confine default receipt/registry host stores to an exclusively owned fixture HOME in Root-launched controlled method child; do not change global environment or open real human keys. Root must review actual transport before executing.",
+    "forbidden": [
+      "observe ready stub",
+      "verify verified stub",
+      "caller approval/native boolean",
+      "handwritten receipt authority",
+      "manual PO terminal",
+      "scope-ready injection"
+    ]
+  },
+  "agreement": "The source owner's fresh-read private synchronous sequence satisfies CIA001–010 as a design contract. Executable constructors/graph/launcher remain independent preparation, not frozen actual PASS.",
+  "sourcePostsAuthoredByIndependentActor": 0,
+  "semanticRuns": 0
+}

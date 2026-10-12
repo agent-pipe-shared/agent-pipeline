@@ -1,0 +1,277 @@
+{
+  "schema": "alfred.joint-state-model.integration-dependencies.v1",
+  "status": "dependency-plan-only; Root target custody and admission pending",
+  "actualProofSha256": "74a50ead61e6775703297544b14f248014e51e6ada7709fe87810e762e0ba979",
+  "exactQualifiedSourceRows": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-ledger.mjs",
+      "sha256": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+      "bytes": 33712,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-afk-owned-projection-host-source-20261010/selector-completeness-successor/postimages/plugins/pipeline-core/lib/afk-ledger.mjs",
+      "sourceSha256": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+      "sha256": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+      "bytes": 29103,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-afk-private-exercise-source-20261010/postimages/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+      "sourceSha256": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "sha256": "f9ab78f6cacda4aa7555163b6f1d72bbbff0633bf83cd690ddfee83c0af170c8",
+      "bytes": 30051,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-aggregate-design-decision-binding-source-20261010/canonical-dab-successor/postimages/plugins/pipeline-core/lib/architecture-design.mjs",
+      "sourceSha256": "f9ab78f6cacda4aa7555163b6f1d72bbbff0633bf83cd690ddfee83c0af170c8",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "sha256": "e1c30e4d7662a0b0dc5b4f5fbd178dada5349bd2cdff37969a379f37964eb226",
+      "bytes": 12852,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-aggregate-design-decision-binding-source-20261010/canonical-dab-successor/postimages/plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "sourceSha256": "e1c30e4d7662a0b0dc5b4f5fbd178dada5349bd2cdff37969a379f37964eb226",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+      "sha256": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+      "bytes": 16811,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-cmo-existing-layout-parity-counterpart-source-20261010/postimages/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+      "sourceSha256": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "sha256": "ae69d331bed4ba715458ace4ecded3de56897a636a2121875c7b12ace69442c1",
+      "bytes": 48384,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-power-managed-journal-child-origin-source-20261010/repository-subject-successor/postimages/plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "sourceSha256": "ae69d331bed4ba715458ace4ecded3de56897a636a2121875c7b12ace69442c1",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "sha256": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f",
+      "bytes": 79837,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-model-transition-observation-source-20261010/postimages/plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "sourceSha256": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "6a3387c51fcd20ad5cba3023014f0f9506c361fd6dad238dd1fcf7b00e99a123",
+      "bytes": 587140,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-cmo-afk-cumulative-onboarding-composition-source-20261010/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sourceSha256": "6a3387c51fcd20ad5cba3023014f0f9506c361fd6dad238dd1fcf7b00e99a123",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "sha256": "74e0feb567ef0321a98f432054945942f963f810215b84d65c2c116b4b3764ea",
+      "bytes": 55229,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-model010-foreign-process-carrier-source-20261010/successor/postimages/plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "sourceSha256": "74e0feb567ef0321a98f432054945942f963f810215b84d65c2c116b4b3764ea",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "sha256": "c99115b6ba480b727627dec585a4b5f69350dfdc0bd082b97bbbdb79dc4eb7ef",
+      "bytes": 130374,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-state-model-cumulative-registry-composition-20261010/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "sourceSha256": "c99115b6ba480b727627dec585a4b5f69350dfdc0bd082b97bbbdb79dc4eb7ef",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",
+      "sha256": "37679586821c8b4cd17630645f9adb6be8581f046cc07fe4d36ab9f683e5f5ae",
+      "bytes": 28911,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-power-held-domain-source-20261010/single-close-successor/postimages/plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",
+      "sourceSha256": "37679586821c8b4cd17630645f9adb6be8581f046cc07fe4d36ab9f683e5f5ae",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "sha256": "3c4ce04052abe17812140b98d55123e87195eb1f37db18f593fb51ed43630830",
+      "bytes": 34142,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-power-held-domain-source-20261010/single-close-successor/postimages/plugins/pipeline-core/lib/session-power.mjs",
+      "sourceSha256": "3c4ce04052abe17812140b98d55123e87195eb1f37db18f593fb51ed43630830",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "sha256": "fda05d645a23c8187f19faad2419d9a916d1a4db13ac8c1c9938276384e9c711",
+      "bytes": 67380,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-power-requester-ack-custody-source-successor-20261010/postcommit-channel-lifetime-successor/postimages/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "sourceSha256": "fda05d645a23c8187f19faad2419d9a916d1a4db13ac8c1c9938276384e9c711",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "26c4737639e82b84e82de23c9eff4fe0b23bca97eafdfec84c1651ecba81e63d",
+      "bytes": 806354,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-cmo-afk-cumulative-state-composition-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sourceSha256": "26c4737639e82b84e82de23c9eff4fe0b23bca97eafdfec84c1651ecba81e63d",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [
+        {
+          "id": "PB-SANCTIONED-WRITER",
+          "class": "sanctioned-writer"
+        }
+      ],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "sha256": "99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4",
+      "bytes": 59900,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-cmo-existing-layout-parity-counterpart-source-20261010/postimages/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "sourceSha256": "99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-power-controller.mjs",
+      "sha256": "fd9f8b837acd6b9008a40bed98b95eb40cc4c4006e8719539b92b7e8ed75921e",
+      "bytes": 10774,
+      "mode": 420,
+      "sourcePath": "scratch/alfred-power-held-domain-source-20261010/owned-lifecycle-successor/postimages/plugins/pipeline-core/scripts/session-power-controller.mjs",
+      "sourceSha256": "fd9f8b837acd6b9008a40bed98b95eb40cc4c4006e8719539b92b7e8ed75921e",
+      "role": "exact dependency of this qualified three-case generation",
+      "historicalProtectedReadinessRules": [],
+      "currentTargetPreimage": null,
+      "currentGuardAdmissionEstablished": false,
+      "wholeLeafBehaviorQualified": false
+    }
+  ],
+  "coSelection": {
+    "Registry": "c99115b6ba480b727627dec585a4b5f69350dfdc0bd082b97bbbdb79dc4eb7ef",
+    "I03": "6a3387c51fcd20ad5cba3023014f0f9506c361fd6dad238dd1fcf7b00e99a123",
+    "State": "26c4737639e82b84e82de23c9eff4fe0b23bca97eafdfec84c1651ecba81e63d",
+    "Domain": "74e0feb567ef0321a98f432054945942f963f810215b84d65c2c116b4b3764ea",
+    "Model": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f",
+    "AFKHost": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+    "AFKLedger": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+    "CalibrationHelper": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+    "HookInstaller": "99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4"
+  },
+  "fullResourceClosure": {
+    "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/cmo-cumulative-generation-successor/qualification-freeze.json",
+    "sha256": "16d8ea37be41e80aac467a1ffa876e942878b5567b8e227457bd3ac704b5fb99",
+    "resourceCount": 1715
+  },
+  "importClosure": {
+    "path": "scratch/alfred-state-model-cumulative-registry-joint-qualification-preparation-20261010/cmo-cumulative-generation-successor/constructor-resource-closure.json",
+    "sha256": "96c53260dc57a9d45965fd44adb9b4e5281978583ba6b3a0024ad4a1e0c0c1b7"
+  },
+  "lineage": [
+    "Registry af840 -> Model011 f8bf -> Model010 c97 plus exact authentic-refresh7a8 span -> c991",
+    "I03 clean8667 -> AFK/CMO/private-exercise5d488 -> exact three CMO order spans6a338",
+    "State repair5d -> AFK/private exercise002503 -> exact four calibration spans26c473",
+    "Domain b283 -> Model01150b7 -> Model01074e retained; this proof does not grant Power acceptance"
+  ],
+  "rootPreparationOrder": [
+    "freeze actual Main and Audit target identities, bytes, modes and aliases separately; no old preimage inference",
+    "compare every chosen dependency with the exact tested closure or record a new generation gap",
+    "preserve all unrelated Main/Audit edits and newer same-file Source successors; do not overlay ancestors",
+    "rederive final actual protected-path policy and obtain sanctioned authority for protected operations",
+    "prepare exact reversible per-target fullposts and verify literal API/resource closure before applying",
+    "Root alone applies/publishes and reads back exact resulting custody"
+  ],
+  "protectedReadinessBasis": {
+    "path": "scratch/alfred-hgo-protected-path-readiness-20261010/protected-change-map.json",
+    "sha256": "fd24069bc454d3c96530c2d4690c6fd5a8479d7e5f0de0c8af4c8cfd50f19551",
+    "authorityGrant": false
+  },
+  "aggregateBoundary": {
+    "manifestPath": "scratch/alfred-u-aggregate5-model-host-reconciliation-source-20261010/manifest.json",
+    "manifestSha256": "b91ed5e7052b0c49feeb0ea13ac6a6c700ec900670e4158bd66504c2fd4bcc28",
+    "cumulativeHost29acRetained": true,
+    "thisRunQualifiesCombinedAggregate5": false,
+    "reason": "this exact closure retains its declared DAB providers; aggregate f4c2/6a31/bb7 selection has separate scoped proof and requires explicit combined dependency reconciliation"
+  },
+  "pending": [
+    "new private approval-ticket Registry618c/I0351a1 not selected",
+    "AFK6 controls and disposable repository custody require their distinct actual proof",
+    "Power lifecycle source successors not qualified by joint3",
+    "final target preimages/guard admission/candidate-wide closure unmeasured"
+  ],
+  "applyEligible": false,
+  "productApplyCommand": null,
+  "businessRunsByPreparer": 0,
+  "native": false,
+  "wholeItemAccepted": false
+}

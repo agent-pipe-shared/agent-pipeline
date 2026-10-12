@@ -1,0 +1,83 @@
+{
+  "schema": "alfred.design.prepare-commit-public-actual-proof.v1",
+  "status": "focused-eight-controls-pass",
+  "framework": "Native node:test direct-import actual SPEC output; no pipeline FD3 receipt",
+  "cases": [
+    {
+      "id": "DPC001",
+      "status": "pass"
+    },
+    {
+      "id": "DPC002",
+      "status": "pass"
+    },
+    {
+      "id": "DPC003",
+      "status": "pass"
+    },
+    {
+      "id": "DPC004",
+      "status": "pass"
+    },
+    {
+      "id": "DPC005",
+      "status": "pass"
+    },
+    {
+      "id": "DPC006",
+      "status": "pass"
+    },
+    {
+      "id": "DPC007",
+      "status": "pass"
+    },
+    {
+      "id": "DPC008",
+      "status": "pass"
+    }
+  ],
+  "summary": {
+    "tests": 8,
+    "pass": 8,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+    "sha256": "d6d7c7ece9a82d50772e9b210f35f7c45ff99298ad301e2a295407d671c363bc"
+  },
+  "assertions": [
+    {
+      "label": "parser and refusal controls",
+      "sha256": "b8cd9153f5267c617fb060dcce699420f976b019bbd6eea6e692774ff636bf16"
+    },
+    {
+      "label": "genuine signed apply-stage-authorize and partial-failure controls",
+      "sha256": "07de08b496c2cd15f4fe420143b078dd01522c1aa78df30f03fb5223f1aec548"
+    }
+  ],
+  "actual": {
+    "executionReceiptSha256": "530bd9a0796560b467f27fbbb5ec92519549dcc92485a33b720d7fe10cf326d7",
+    "stdoutSha256": "e932b441829638fa5a004ce886dce09cf2f4791262509db472a2f8a54e6978f8",
+    "stderrSha256": "98c440615dd0c75140714525baa5d70bb1a6ddd9a6feefc5b381902ab6574be5",
+    "childExit": 0,
+    "signal": null,
+    "timedOut": false,
+    "recordedConservation": true
+  },
+  "scope": [
+    "Five physical CLI arguments and original modes",
+    "Apply before signed-path-only staging before exact-index authorization",
+    "Real unit Ed25519 signature against committed synthetic trust policy",
+    "Typed stage/storage refusal retains applied/staged effects and foreign artifacts",
+    "No automatic commit or reset"
+  ],
+  "limits": [
+    "Unit signature method keys are not attended Human approval or native signing assurance",
+    "Focused eight controls do not close all Design, I08, Windows, or whole-item criteria"
+  ],
+  "originalReceiptPreserved": true,
+  "businessReruns": 0
+}

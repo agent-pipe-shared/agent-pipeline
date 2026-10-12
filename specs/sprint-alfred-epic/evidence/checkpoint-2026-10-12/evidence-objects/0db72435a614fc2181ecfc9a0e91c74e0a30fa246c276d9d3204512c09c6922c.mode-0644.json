@@ -1,0 +1,299 @@
+{
+  "schema": "alfred.cia-coherent-main-integration-group.v1",
+  "status": "Root-fixed-inspection-ready; source-apply-held",
+  "files": [
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/README.md",
+      "sha256": "05ecdc3600a1f89b902eb7bb21c513a32192427ced1564d4b55567a2a2d9fe41",
+      "bytes": 932,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/integration-intent.json",
+      "sha256": "8d6124f250ceecceab7aaa64f02a66b3f154b120b3ab1e667cd464e4d8091e33",
+      "bytes": 104179,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/dependency-surfaces.json",
+      "sha256": "2d1da01aeb1f917f5c1697bf0ec507535354134bdd34704bbdb10abe9c934e90",
+      "bytes": 313182,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/governance-forward-splice.json",
+      "sha256": "eb4eef9439e4e90c86e33bd05265eac86d462f57308e3badfb098947ab810647",
+      "bytes": 79550,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/governance-inverse-splice.json",
+      "sha256": "c0d86bd91834f73e571afc63cee06c77515127f4a96425a23ddd85264b626c68",
+      "bytes": 79550,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/diagnostic-entry-inverse.json",
+      "sha256": "ca35d351e2f9ca5f19083158c206d5022c23e0e811d4c5f8919574ae9ca59e6b",
+      "bytes": 610,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/linkage-observation.json",
+      "sha256": "e6c0b0897846285c19337b3a19d5f0e2b3499a465e0488763b78ae307a3ecd1d",
+      "bytes": 471582,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/validation.json",
+      "sha256": "3f526c17ac68340bf0c3d154ff8af44091b4e57529993b27659aa35cfabf233e",
+      "bytes": 2101,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/inspect-linkage.mjs",
+      "sha256": "1555fd868136f2700a81643d21d4e4d3de264bd7978933225102fe64bdda9f9c",
+      "bytes": 2969,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/prepare-group.mjs",
+      "sha256": "3d1f37336413958a4938dfd2f3ddcb8cc77df7d96addbeb9d930d4a4e289d021",
+      "bytes": 9252,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/preserve-resource-draft.mjs",
+      "sha256": "75209566916c43375284c352777c991b779ecef1f667dbfec636ba4cee02d448",
+      "bytes": 769,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/inspect-once.mjs",
+      "sha256": "3859d2122df7bd3f3d91a0857d6bbadd96dae17dbb850e22f35d83a8903ce5e5",
+      "bytes": 2991,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/freeze-group.mjs",
+      "sha256": "95367b0193e0ef3aab653d738f9c4a613ddb9a3dba6deb06ed021339adf943c4",
+      "bytes": 4322,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "targets": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "main": {
+        "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "present": true,
+        "sha256": "6a89acd711265e7b86e38cfcca84accf811fabbc154ff63f85bd1a0cf568c65b",
+        "bytes": 111646,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "704e9bbd686c6a6c8d2472b638a0513141a348c7f21e602fd5b92827162c2ec4",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "source": {
+        "path": "legacy-origin:alfred-claude-inline-attestation-receipt-store-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "present": true,
+        "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+        "bytes": 115016,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "7dfec0c78f776437a504a89026cef65750bcda58eb3a8914fe9bc7b142aee78c",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "protectedRules": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "main": {
+        "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+        "present": true,
+        "sha256": "d6495ab13e2d3d87c60fca73cb30cc112fb0ec2dea399e5a1ebd0ce31c8cea24",
+        "bytes": 31767,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "202e7dfc6eae8c27bee0e4307aebc7ce1b9a53a95772f7e069409dfd531931c9",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+        "present": true,
+        "sha256": "5d77cb3c8a806f7ccfe1aea7486e9493ca8039c235da7c31828d91d3420a8514",
+        "bytes": 31767,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "9fa6ced333f5e230d9b6e90276e13de3461849f7ec09da75192a4894098d8150",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "protectedRules": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "main": {
+        "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+        "present": true,
+        "sha256": "f93fae9e9638a148110e87f987c7e812c269f3f05744c0a55c7adbd72d1a4a4a",
+        "bytes": 42936,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "b45f3be3bb3db5bac48859b87bf009ac7914bb691f43d36b0d19d22f6a64bb61",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/governance-scope.mjs",
+        "present": true,
+        "sha256": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+        "bytes": 46697,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "729d03967023780850409c55925765f47bb2717244e9167184ebd74431c57b0d",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "protectedRules": []
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+      "main": {
+        "path": "plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+        "present": false
+      },
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+        "present": true,
+        "sha256": "5f665b3ccb60c8a5eab3816a90e006222d93eb51da9567cbe5d906fb5014a383",
+        "bytes": 4806,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "99d82184b28595fb5ae408b22f726a374b8c20de831daa706947a96decbde4d1",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "protectedRules": []
+    }
+  ],
+  "originalFeasibility": {
+    "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/main-composition-feasibility/manifest.json",
+    "sha256": "765fd84b0e65641d3a69086f6bd700cefdf2f6688ee705a2f42d502b9d56a67e",
+    "bytes": 3385,
+    "mode": 420,
+    "nlink": 1
+  },
+  "qualifiedProof": {
+    "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/qualification-manifest.json",
+    "present": true,
+    "sha256": "272d9b341eaa2d0ea15da83762185afdde1979340ecb0afe261b61a9eebc4943",
+    "bytes": 5717,
+    "mode": 420,
+    "nlink": 1,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "778e41c88299e5d7338642ae0ca2d6fda9b0feb0d6832b70fd825e4bf4387b21",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "inspection": {
+    "script": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/inspect-once.mjs",
+    "intentSha256": "8d6124f250ceecceab7aaa64f02a66b3f154b120b3ab1e667cd464e4d8091e33",
+    "command": "node legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/inspect-once.mjs 8d6124f250ceecceab7aaa64f02a66b3f154b120b3ab1e667cd464e4d8091e33",
+    "oneUse": true,
+    "productImports": false,
+    "sourceApply": false
+  },
+  "scope": "Four-source preparation only. No whole-family semantic qualification, native/bootstrap/full Verify/stamp or authority granted.",
+  "history": {
+    "resourceLocatorDraft": "resource-locator-draft/",
+    "status": "unexecuted metadata draft; schema locator corrected from actual Source declaration"
+  }
+}

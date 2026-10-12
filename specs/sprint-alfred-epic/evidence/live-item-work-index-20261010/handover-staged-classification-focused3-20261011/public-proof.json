@@ -1,0 +1,108 @@
+{
+  "schema": "alfred.handover-staged-classification-focused-proof.v1",
+  "date": "2026-10-11",
+  "itemID": "pipeline.handover-doc-committed-without-governance-classification",
+  "scope": "Source-author normal regression with actual owned Git indexes",
+  "originalNorm": {
+    "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+    "sha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+    "lines": [
+      42,
+      45
+    ],
+    "requirement": "A handover or any new docs/*.md must not be committable unclassified. Run the observation-governance check at commit time."
+  },
+  "actualCases": [
+    {
+      "id": "HSG001",
+      "name": "staged handover absent from actual staged policy is refused",
+      "disposition": "pass"
+    },
+    {
+      "id": "HSG002",
+      "name": "handover and matching classification staged together are admitted",
+      "disposition": "pass"
+    },
+    {
+      "id": "HSG003",
+      "name": "unstaged matching classification cannot authorize staged handover",
+      "disposition": "pass"
+    }
+  ],
+  "actualCompletion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "619d331e8d1e39eb5e3b859f5a84407caa0f9dd26646806f4402fb3714d0f58f",
+    "caseSetSha256": "e2db1830b5d16b40b145817b96729a213550559a2ac9502dd8456fb865ef758c",
+    "dispositionsSha256": "8444fd32e0515945978dd850676516ab79abfca7621094428d093af65f1c7708",
+    "declaredCount": 3,
+    "disposedCount": 3,
+    "counts": {
+      "pass": 3,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "actualChild": {
+    "status": 0,
+    "signal": null,
+    "errorCode": null
+  },
+  "SourceFixtureConserved": true,
+  "Source": {
+    "manifestSha256": "3782d11711d5c2781b274b0b7a5cadfc79397d1b8af1885f0a276bc755f80911",
+    "posts": [
+      {
+        "path": "plugins/pipeline-core/lib/observation-doc-classification.mjs",
+        "sha256": "66d34286ac333603b327bdca8a2672f0917bb10ed7a0f943145f90a75aad42e4"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+        "sha256": "71b16efa02b9c17c94fa6fd0b3f188f92abc930b42ffd2ee45a1236d2f55e270"
+      },
+      {
+        "path": "harness/scripts/check-observation-governance.mjs",
+        "sha256": "51e2719ed972feed90c2db8acaa46019c04da2d5824a2d371759201dedf89652"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/staged-observation-doc-classification.mjs",
+        "sha256": "2dbcc624a02112f33ed783a03cf39c1363c2067ee93541775914b16f5dde22c2"
+      }
+    ],
+    "testSha256": "fc799f152fda9abd83f50a8fca95ea0e388223592f6c528abc9759954bf0f685"
+  },
+  "MainTransfer": {
+    "status": "applied-content-only",
+    "files": [
+      {
+        "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+        "sha256": "71b16efa02b9c17c94fa6fd0b3f188f92abc930b42ffd2ee45a1236d2f55e270"
+      },
+      {
+        "path": "harness/scripts/check-observation-governance.mjs",
+        "sha256": "51e2719ed972feed90c2db8acaa46019c04da2d5824a2d371759201dedf89652"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/observation-doc-classification.mjs",
+        "sha256": "66d34286ac333603b327bdca8a2672f0917bb10ed7a0f943145f90a75aad42e4"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/staged-observation-doc-classification.mjs",
+        "sha256": "2dbcc624a02112f33ed783a03cf39c1363c2067ee93541775914b16f5dde22c2"
+      }
+    ],
+    "sourceAndPeerConservation": true,
+    "CMOCumulativeInstallerPreserved": true
+  },
+  "limits": [
+    "Three cases cover the real staged function boundary: refusal, staged matching-policy admission, and unstaged-only-policy refusal.",
+    "Assertions are Source-author regression evidence, prepared after Source publication under original norm; not independent before-post acceptance.",
+    "Installed hook execution and native host assurance are not established by these cases.",
+    "No installation, signature, full candidate Verify, readiness or whole-item acceptance is claimed."
+  ],
+  "testRunsAddedByPublication": 0,
+  "nativeEvidence": false,
+  "wholeItemAcceptance": false,
+  "readiness": false
+}

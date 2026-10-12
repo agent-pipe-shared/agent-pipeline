@@ -1,0 +1,3124 @@
+{
+  "schema": "alfred.item-stage50-75.partition.v1",
+  "group": "functional-50-01",
+  "stage": 50,
+  "count": 34,
+  "membershipOrder": "Original frozen trace order; no reassessment",
+  "rows": [
+    {
+      "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-advisor-demand-reuse-has-no-design-course-bound.md",
+          "canonicalPath": "backlog/items/2026-09-28-advisor-demand-reuse-has-no-design-course-bound.md",
+          "sha256": "5c721a9e998226fc812d19a2a01b53ae5f9693b68d2275e89407f562e6dd62f2",
+          "bytes": 3131,
+          "parentSha256": "7f0655c836ccbd7ca23bc0a115f1038afd564cf3c08c861e5d9c925338be434d",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound::30.1",
+            "lineStart": 32,
+            "lineEnd": 46
+          },
+          {
+            "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound::30.2",
+            "lineStart": 48,
+            "lineEnd": 49
+          }
+        ]
+      },
+      "recordedRationale": "Retained directed/store/coordinator source implements on-demand course-bound reuse; restart/new-dispatch targeted binding and native admission remain qualification gaps.",
+      "recordedRemaining": [
+        "Bind retained directed7/store10/coordinator3 receipts to selected on-demand source and restart/new-dispatch controls. Do not reinstate ordinary mandatory Advisor/readiness.",
+        "Reconcile genuine retained on-demand course-budget implementation and those receipts; qualify restart/new-dispatch reuse once on selected source. Do not restore mandatory Advisor/DWP."
+      ],
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.advisor-demand-reuse-has-no-design-course-bound"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.advisor-demand-reuse-has-no-design-course-bound"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md",
+          "canonicalPath": "backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md",
+          "sha256": "658764caf1e03625d56a4a7a73ecff2a06fdd77f6287ac3e7027c999d2d77af5",
+          "bytes": 2707,
+          "parentSha256": "658764caf1e03625d56a4a7a73ecff2a06fdd77f6287ac3e7027c999d2d77af5",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments::27.1",
+            "lineStart": 29,
+            "lineEnd": 29
+          }
+        ]
+      },
+      "recordedRationale": "Original complete body explicitly records source-fixed commit7b1b4083b; generator equality/current targeted host checks remain open, no75 inferred.",
+      "recordedRemaining": [
+        "Canonical body retains source fix7b1b4083b; exact current generator/case receipt and host checklist remain unbound.",
+        "Verify final candidate source semantics and the named host acceptance/regression evidence; retain OPEN until parent acceptance reconciliation."
+      ],
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-antigravity-1-2-13-blocks-managed-refresh.md",
+          "canonicalPath": "backlog/items/2026-09-29-antigravity-1-2-13-blocks-managed-refresh.md",
+          "sha256": "a31faebfd202e541189574161b11485687a19f4dbc9fb865d40d6ff872f867b5",
+          "bytes": 1773,
+          "parentSha256": "a31faebfd202e541189574161b11485687a19f4dbc9fb865d40d6ff872f867b5",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh::20.1",
+            "lineStart": 22,
+            "lineEnd": 29
+          }
+        ]
+      },
+      "recordedRationale": "Version-specific refresh handling and future-version refusal are implemented; installed route/stamp proof remains open.",
+      "recordedRemaining": "Qualify installed refresh/readback against the current candidate; preserve the passing controlled cases.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+        "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.antigravity-1-2-13-blocks-managed-refresh"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.antigravity-1-2-13-blocks-managed-refresh"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md",
+          "canonicalPath": "backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md",
+          "sha256": "c9fa8e859c076d94fa3b81aa01269571aab64e557762c1189bf47f043de288e7",
+          "bytes": 3968,
+          "parentSha256": "c9fa8e859c076d94fa3b81aa01269571aab64e557762c1189bf47f043de288e7",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory::15.1",
+            "lineStart": 17,
+            "lineEnd": 24
+          },
+          {
+            "id": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory::38.1",
+            "lineStart": 40,
+            "lineEnd": 46
+          }
+        ]
+      },
+      "recordedRationale": "Retained immutable accepted-contract/custody source addresses surviving approval portability; original ordinary mandatory DWP duty is retired, ignored/untracked/final host qualification remains open.",
+      "recordedRemaining": [
+        "Current retained envelope/portability source and ignored/untracked fail-closed cases unbound. Resolve narrowed surviving custody duty against actual accepted decisions.",
+        "Qualify retained approval portability and unchanged strict-default versus implementation-boundary reader; retire obsolete ordinary package requirement."
+      ],
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md",
+          "canonicalPath": "backlog/items/2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md",
+          "sha256": "c324ad339647bacded677944953b112f2adeb18d00f60de9bf47cd4ac6ad31d0",
+          "bytes": 7857,
+          "parentSha256": "c324ad339647bacded677944953b112f2adeb18d00f60de9bf47cd4ac6ad31d0",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.1",
+            "lineStart": 27,
+            "lineEnd": 29
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.2",
+            "lineStart": 31,
+            "lineEnd": 36
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.3",
+            "lineStart": 38,
+            "lineEnd": 43
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.4",
+            "lineStart": 45,
+            "lineEnd": 48
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.5",
+            "lineStart": 50,
+            "lineEnd": 53
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.6",
+            "lineStart": 55,
+            "lineEnd": 56
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.7",
+            "lineStart": 58,
+            "lineEnd": 60
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.8",
+            "lineStart": 62,
+            "lineEnd": 75
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.9",
+            "lineStart": 77,
+            "lineEnd": 88
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.10",
+            "lineStart": 90,
+            "lineEnd": 93
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.11",
+            "lineStart": 95,
+            "lineEnd": 100
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::25.12",
+            "lineStart": 102,
+            "lineEnd": 103
+          },
+          {
+            "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read::118.1",
+            "lineStart": 120,
+            "lineEnd": 127
+          }
+        ]
+      },
+      "recordedRationale": "Native-path/case normalization plus returned passive unhealthy-auxiliary source correction cover the diagnosed code cause; Windows16 startup prerequisite/native readback remain qualification, not absence of implementation.",
+      "recordedRemaining": [
+        "Passive-read-policy current bytes bound; exact native normalization/read-root receipt and case identities still absent; not60 assumed missing fixes.",
+        "Recover current drive/case/MSYS/session-root controls and current native receipt; do not infer60 missing fixes or repeat root-cause audit."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/passive-read-policy.mjs",
+            "sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+            "bytes": 9965,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+              "current164Sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+                "currentSha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/passive-read-policy.mjs",
+                "retained142Sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.claude-windows-guard-refuses-every-in-repo-read"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.claude-windows-guard-refuses-every-in-repo-read"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-prepared-codex-readiness-receipt-does-not-bind-finalized-output.md",
+          "canonicalPath": "backlog/items/2026-09-28-prepared-codex-readiness-receipt-does-not-bind-finalized-output.md",
+          "sha256": "146b0ecb9c3b43b4f2e1e7400a3fd9f26d633d32d656e4a2d3940b232530317a",
+          "bytes": 10800,
+          "parentSha256": "7e27ec8e94b05a8a82d8fbd93b09992b4432946c6b117e7a4293da12244af340",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-readiness-private-receipt-omits-output-custody::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.codex-readiness-private-receipt-omits-output-custody::15.2",
+            "lineStart": 25,
+            "lineEnd": 31
+          },
+          {
+            "id": "pipeline.codex-readiness-private-receipt-omits-output-custody::15.3",
+            "lineStart": 33,
+            "lineEnd": 39
+          },
+          {
+            "id": "pipeline.codex-readiness-private-receipt-omits-output-custody::15.4",
+            "lineStart": 41,
+            "lineEnd": 52
+          },
+          {
+            "id": "pipeline.codex-readiness-private-receipt-omits-output-custody::70.1",
+            "lineStart": 72,
+            "lineEnd": 79
+          },
+          {
+            "id": "pipeline.codex-readiness-private-receipt-omits-output-custody::70.2",
+            "lineStart": 81,
+            "lineEnd": 87
+          },
+          {
+            "id": "pipeline.codex-readiness-private-receipt-omits-output-custody::89.1",
+            "lineStart": 91,
+            "lineEnd": 123
+          }
+        ]
+      },
+      "recordedRationale": "Retained receipt validates journal/output digest and source custody; default caller/native causality qualification remains open.",
+      "recordedRemaining": "Root retained-host qualification owner: bind exact finalization/store/default-reader callback cases for empty process, output digest/truncation/growth/recovery and actual supported host. Preserve original parent body7e27 and authorized current body146b; no private store reads by this mapper.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "docs/adr/0085-one-review-one-signature-design-approval.md",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "docs/adr/0085-one-review-one-signature-design-approval.md",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/adr/0085-one-review-one-signature-design-approval.md",
+              "sha256": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa",
+              "bytes": 6091,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+              "sha256": "f8ac123be647522add8f51c0cc4ad1a0cf12968b26b009a00bce6089e5da3f61",
+              "bytes": 9636,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/codex-isolated-structured-host.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/codex-isolated-structured-host.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-isolated-structured-host.mjs",
+              "sha256": "975cdba90fb05a3c1626b4491d09717c51f1de9a4bd7dd95828acbc6383879d2",
+              "bytes": 32872,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/codex-readiness-host-record.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/codex-readiness-host-record.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-readiness-host-record.mjs",
+              "sha256": "6bb399298e4b81bb724e602286a79be85f78b873570e6a397201662fce9cfbde",
+              "bytes": 6744,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/final-location-successor/criterion-source-matrix.json",
+        "id": "pipeline.codex-readiness-private-receipt-omits-output-custody"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.codex-readiness-private-receipt-omits-output-custody"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.codex-readiness-private-receipt-omits-output-custody"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-commit-grammar-hint-still-requires-scratch-message-file.md",
+          "canonicalPath": "backlog/items/2026-09-29-commit-grammar-hint-still-requires-scratch-message-file.md",
+          "sha256": "bd6c57d0490ed5033a96becca308fca3c2ab52c02aac9e6f6f8bc51b5abf487a",
+          "bytes": 1822,
+          "parentSha256": "bd6c57d0490ed5033a96becca308fca3c2ab52c02aac9e6f6f8bc51b5abf487a",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file::28.1",
+            "lineStart": 30,
+            "lineEnd": 34
+          }
+        ]
+      },
+      "recordedRationale": "Original complete body marks file-free hint source-fixed15722ce6a; exact POSIX/Windows spelling/guard union qualification remains.",
+      "recordedRemaining": [
+        "Retain original criterion and bind current full-item proof before promotion.",
+        "Commit15722ce6a and file-free hint correction retained; policy consistency overlaps obligations item; bind POSIX/Windows admitted spelling then close."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+            "sha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+            "bytes": 67834,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "protected-transfer-held",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+              "current164Sha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+                "currentSha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+                "retained142Sha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "selected142-successor-requires-exact-case-rebinding"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.commit-grammar-hint-still-requires-scratch-message-file"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.commit-grammar-hint-still-requires-scratch-message-file"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md",
+          "canonicalPath": "backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md",
+          "sha256": "ec78d35d337742f899ad0e89ea79e1c80d7e83a967371d2c3c5c7ae24760a48f",
+          "bytes": 2326,
+          "parentSha256": "ec78d35d337742f899ad0e89ea79e1c80d7e83a967371d2c3c5c7ae24760a48f",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap::27.1",
+            "lineStart": 29,
+            "lineEnd": 29
+          }
+        ]
+      },
+      "recordedRationale": "CLI canonicalizes paths and provides bounded copyable output; exact public consumption proof remains open.",
+      "recordedRemaining": "Commit-route host qualification owner: bind retained c277/fixed checklist to the actual candidate public command and one-line copy rendering. Preserve strict duplicate/path validation; do not change global tool-count policy solely for this original ordering issue.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs",
+              "sha256": "3bcd399e1162dfc1241c3d6a801b8be3030accad76702d1e6983ae41c1b2c21e",
+              "bytes": 4031,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs",
+              "sha256": "58eac527522e523a58a7e70428e2e12e057c8c8ee8cef65e1200474af1b385ae",
+              "bytes": 1964,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/final-location-successor/criterion-source-matrix.json",
+        "id": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-completion-fd-suites-cannot-run-as-single-files.md",
+          "canonicalPath": "backlog/items/2026-10-05-completion-fd-suites-cannot-run-as-single-files.md",
+          "sha256": "e7d18e20cc7884fe6f1cfeb35e20a32f987fdc70c4d22aa77918f69e1bf11799",
+          "bytes": 2044,
+          "parentSha256": "e7d18e20cc7884fe6f1cfeb35e20a32f987fdc70c4d22aa77918f69e1bf11799",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.completion-fd-suites-cannot-run-as-single-files::15.1",
+            "lineStart": 17,
+            "lineEnd": 24
+          },
+          {
+            "id": "pipeline.completion-fd-suites-cannot-run-as-single-files::35.1",
+            "lineStart": 37,
+            "lineEnd": 40
+          }
+        ]
+      },
+      "recordedRationale": "Original complete body marks single-file completion route source-fixed2f0c00932; targeted host checklist is not yet bound.",
+      "recordedRemaining": [
+        {
+          "gap": null,
+          "nextAction": "Verify final candidate source semantics and the named host acceptance/regression evidence; retain OPEN until parent acceptance reconciliation.",
+          "crosswalkAction": "Bind exact current source/case/actual receipt/integration from retained requirements and original mapper evidence"
+        },
+        "Verify final candidate source semantics and the named host acceptance/regression evidence; retain OPEN until parent acceptance reconciliation."
+      ],
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.completion-fd-suites-cannot-run-as-single-files"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.completion-fd-suites-cannot-run-as-single-files"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-concurrent-session-warning-never-fires-on-native-windows.md",
+          "canonicalPath": "backlog/items/2026-10-09-concurrent-session-warning-never-fires-on-native-windows.md",
+          "sha256": "c8374bd7c6082ff219c6ea49efc886c788b67319318e45997e7c9ed9d7777513",
+          "bytes": 2672,
+          "parentSha256": "c8374bd7c6082ff219c6ea49efc886c788b67319318e45997e7c9ed9d7777513",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.concurrent-session-warning-never-fires-on-native-windows::16.1",
+            "lineStart": 18,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.concurrent-session-warning-never-fires-on-native-windows::36.1",
+            "lineStart": 38,
+            "lineEnd": 43
+          }
+        ]
+      },
+      "recordedRationale": "Advisory Windows liveness handling is implemented; native live/dead/old-boot checks remain open.",
+      "recordedRemaining": "Windows host checklist owner: observe second live session warning and dead/previous-boot negatives on native Windows with exact source. Preserve probable caveat and absence of orchestration/grants; no Batman/Nightwing scope.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+            "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+            "bytes": 117511,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+              "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+              "bytes": 117511,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+                "selection": "qualified-HGL12-current-parent-adoption",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+            "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+            "bytes": 111990,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+              "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+              "bytes": 111990,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+                "selection": "BASE73",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/final-location-successor/criterion-source-matrix.json",
+        "id": "pipeline.concurrent-session-warning-never-fires-on-native-windows"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.concurrent-session-warning-never-fires-on-native-windows"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.concurrent-session-warning-never-fires-on-native-windows"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md",
+          "canonicalPath": "backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md",
+          "sha256": "e6248906519a7293dd277391f6ba97e358c87ef4f2f0b1453758faea812e836a",
+          "bytes": 2450,
+          "parentSha256": "e6248906519a7293dd277391f6ba97e358c87ef4f2f0b1453758faea812e836a",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard::27.1",
+            "lineStart": 29,
+            "lineEnd": 29
+          }
+        ]
+      },
+      "recordedRationale": "Supported notes Write/Edit route and truthful budget documentation Source are delivered; genuine security-class dispatch/notes persistence remains targeted qualification.",
+      "recordedRemaining": [
+        {
+          "gap": null,
+          "nextAction": "Retain completed DBLO13 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Actual CRT035 plus DBLO001–012; controlled producer/guard/course/claim/finalizer. Later b507 guard successor needs conserved joint candidate binding; no host/model/human authority.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step.",
+          "crosswalkAction": "Bind exact current source/case/actual receipt/integration from retained requirements and original mapper evidence"
+        },
+        "Retain completed DBLO13 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Actual CRT035 plus DBLO001–012; controlled producer/guard/course/claim/finalizer. Later b507 guard successor needs conserved joint candidate binding; no host/model/human authority.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+            "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+            "bytes": 118731,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "current164Sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+                "currentSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+                "retained142Sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+          "selected164Source": {
+            "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+            "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+            "mode": 420,
+            "metadataOrigin": "actual content receipt checkpoint; not a semantic proof"
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+              "current164Sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+                "currentSha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-course-admission.mjs",
+                "retained142Sha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": []
+        }
+      ],
+      "existingProofs": [
+        {
+          "reference": {
+            "name": "DBLO13",
+            "proof": {
+              "path": "legacy-origin:alfred-critic-external-stop-combined-qualification-20261010/execution-v2.json",
+              "sha256": "bdf9671f926a27fee22e4d12d4f684dd0cd16c6101d6176816318f231106f0ce"
+            },
+            "pass": 13,
+            "caseEvidence": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "cabe4b13c1d4cc5ca92f783a90a8dec47569dc1811ff1814d21b027546596ab9",
+              "caseSetSha256": "97602d24323e998ce10c015bf0f5506832486de2132ebe1216c67a1697be0896",
+              "dispositionsSha256": "16c9ba1dbe9c252e5f8cbc3546bb112540bace1ec7db2f196aa45ad0cf1a63a7",
+              "declaredCount": 13,
+              "disposedCount": 13,
+              "counts": {
+                "pass": 13,
+                "fail": 0,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "canonicalPaths": [
+              "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+              "plugins/pipeline-core/lib/critic-course-admission.mjs"
+            ],
+            "backlogIds": [
+              "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+              "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+              "pipeline.goldfish-budgets-omit-the-closing-ceremony"
+            ],
+            "relatedCriteria": [
+              "AC-29",
+              "AC-37"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Actual CRT035 plus DBLO001–012; controlled producer/guard/course/claim/finalizer. Later b507 guard successor needs conserved joint candidate binding; no host/model/human authority."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+                "currentAuditSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+              },
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+                "currentAuditSha256": null
+              },
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+                "currentAuditSha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0"
+              }
+            ],
+            "officialClosure": false
+          },
+          "claim": "Retained item-scoped reference; no new execution/parser/authenticity inference."
+        }
+      ],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.design-approval-validator-rejects-json-key-reordering",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-design-approval-validator-rejects-json-key-reordering.md",
+          "canonicalPath": "backlog/items/2026-09-28-design-approval-validator-rejects-json-key-reordering.md",
+          "sha256": "8cd34d32ca207cd54ff90bd6507d25356617f3acc68b5c11290cf65c1e8644e3",
+          "bytes": 2272,
+          "parentSha256": "8cd34d32ca207cd54ff90bd6507d25356617f3acc68b5c11290cf65c1e8644e3",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-approval-validator-rejects-json-key-reordering::29.1",
+            "lineStart": 31,
+            "lineEnd": 39
+          }
+        ]
+      },
+      "recordedRationale": "Canonical closed-key comparison is implemented; exact default signing permutation tests remain open.",
+      "recordedRemaining": "Signing qualification owner: bind existing exact default-validator permutation/mutation cases plus disposable-key readback, without injecting a validator or requesting another PO ceremony. Preserve retained approval compatibility.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "docs/adr/0085-one-review-one-signature-design-approval.md",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "docs/adr/0085-one-review-one-signature-design-approval.md",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/adr/0085-one-review-one-signature-design-approval.md",
+              "sha256": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa",
+              "bytes": 6091,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-workflow-approval.mjs",
+              "sha256": "49bcaff5030e06b88dbdff6b87772ce020c4489a8968b2b8a9b71ca06d5ae783",
+              "bytes": 13344,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+            "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+            "bytes": 178532,
+            "mode": 493
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+              "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+              "bytes": 178532,
+              "mode": 493,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+                "selection": "qualified-HGL12-current-parent-adoption",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/final-location-successor/criterion-source-matrix.json",
+        "id": "pipeline.design-approval-validator-rejects-json-key-reordering"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.design-approval-validator-rejects-json-key-reordering"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.design-approval-validator-rejects-json-key-reordering"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.design-package-parent-metadata-false-drift",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-unrelated-directory-entry-changes-reject-approved-design-package.md",
+          "canonicalPath": "backlog/items/2026-09-29-unrelated-directory-entry-changes-reject-approved-design-package.md",
+          "sha256": "c4c5abcdde60d56440f019ae16cb5a952821341602218ea3fdd0ce19706ac1e5",
+          "bytes": 2901,
+          "parentSha256": "75e0f777573708f64da8a527c39c11f42d6a42a04abd890f58a86412df6f2e30",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-package-parent-metadata-false-drift::32.1",
+            "lineStart": 34,
+            "lineEnd": 40
+          }
+        ]
+      },
+      "recordedRationale": "Parent metadata narrowing and exact-leaf checks are implemented; historical test counts are not a bound execution receipt.",
+      "recordedRemaining": "Physical reader/registry owner: bind original72823 historical21 receipt and complete original IDs to exact current reader and registry count; classify registration-only delta separately. No new signature ceremony and no host causality claim from synthetic mutation controls.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "harness/verify-suites.json",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/harness/verify-suites.json",
+            "sha256": "b220d0c4cc91691e4218941a088ee8265adb1e3bc9495553c317c93d2a25a139",
+            "bytes": 112089,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "protected-transfer-held",
+          "responsible": "/root",
+          "historicalItemSourceBinding": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-workflow-approval.mjs",
+              "sha256": "49bcaff5030e06b88dbdff6b87772ce020c4489a8968b2b8a9b71ca06d5ae783",
+              "bytes": 13344,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-workflow-package.mjs",
+              "sha256": "c05a085035e9117c272ced4c0d615dc30de99838ae09ad2d6a268500aae43550",
+              "bytes": 49112,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package.test.mjs",
+          "selected164Source": null,
+          "contentCheckpointStatus": "outside-or-unbound-selected164",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package.test.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-workflow-package.test.mjs",
+              "sha256": "aa3bdaa59026ad5b28bd46a0632f613e743c414b19f5c3e89a592cde32044b41",
+              "bytes": 50572,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/final-location-successor/criterion-source-matrix.json",
+        "id": "pipeline.design-package-parent-metadata-false-drift"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.design-package-parent-metadata-false-drift"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.design-package-parent-metadata-false-drift"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md",
+          "canonicalPath": "backlog/items/2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md",
+          "sha256": "7a02040dc1a2de7a1dfbf16190cf62a407a79ff7e778c179fd0b55c9316324e4",
+          "bytes": 4937,
+          "parentSha256": "7a02040dc1a2de7a1dfbf16190cf62a407a79ff7e778c179fd0b55c9316324e4",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::19.1",
+            "lineStart": 21,
+            "lineEnd": 34
+          },
+          {
+            "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::36.1",
+            "lineStart": 38,
+            "lineEnd": 41
+          },
+          {
+            "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::36.2",
+            "lineStart": 43,
+            "lineEnd": 52
+          },
+          {
+            "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::36.3",
+            "lineStart": 54,
+            "lineEnd": 59
+          },
+          {
+            "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::36.4",
+            "lineStart": 61,
+            "lineEnd": 68
+          },
+          {
+            "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows::70.1",
+            "lineStart": 72,
+            "lineEnd": 79
+          }
+        ]
+      },
+      "recordedRationale": "Windows owner classification and bounded wait/count handling exist; native first-write route qualification remains open.",
+      "recordedRemaining": "Bind existing R7-11 cases to the selected guard and a genuine Windows hook run; verify first-write receipt instructions separately. Do not replace the delivered wait algorithm merely because native proof is absent.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-dispatch-guard-rejects-built-in-capitalized-agent-types.md",
+          "canonicalPath": "backlog/items/2026-10-03-dispatch-guard-rejects-built-in-capitalized-agent-types.md",
+          "sha256": "7d02ca0e1585e41cd88af9d5660378ef8ef46dbaa95765071dfb173236e34bed",
+          "bytes": 3371,
+          "parentSha256": "7d02ca0e1585e41cd88af9d5660378ef8ef46dbaa95765071dfb173236e34bed",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types::19.1",
+            "lineStart": 21,
+            "lineEnd": 29
+          },
+          {
+            "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types::19.2",
+            "lineStart": 31,
+            "lineEnd": 31
+          },
+          {
+            "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types::19.3",
+            "lineStart": 33,
+            "lineEnd": 39
+          },
+          {
+            "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types::41.1",
+            "lineStart": 43,
+            "lineEnd": 49
+          }
+        ]
+      },
+      "recordedRationale": "Case normalization and typed unparseable role handling exist; exact single/parallel consumer tests remain open.",
+      "recordedRemaining": "Reuse the source correction and bind the original Explore/Plan/general-purpose/pipeline-core and parallel matrix to current qualification.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md",
+          "canonicalPath": "backlog/items/2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md",
+          "sha256": "61479577fc83265c8fb96773e3dbe33c443c034b760d07c65d6ae9e0a7eeb8d2",
+          "bytes": 3561,
+          "parentSha256": "61479577fc83265c8fb96773e3dbe33c443c034b760d07c65d6ae9e0a7eeb8d2",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight::15.1",
+            "lineStart": 17,
+            "lineEnd": 18
+          },
+          {
+            "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight::15.2",
+            "lineStart": 20,
+            "lineEnd": 25
+          },
+          {
+            "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight::15.3",
+            "lineStart": 27,
+            "lineEnd": 31
+          },
+          {
+            "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight::15.4",
+            "lineStart": 33,
+            "lineEnd": 43
+          },
+          {
+            "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight::15.5",
+            "lineStart": 45,
+            "lineEnd": 51
+          },
+          {
+            "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight::64.1",
+            "lineStart": 66,
+            "lineEnd": 71
+          }
+        ]
+      },
+      "recordedRationale": "Closed bootstrap/inspection argv catalogue and shared admitted-boundary implementation are retained; exact draft-to-ready installed/platform run remains qualification.",
+      "recordedRemaining": [
+        "Bind draft-phase exact installed-root argv, forward/backslash and literal plugin-root spellings, read-only inspectors and returned provisioning actions through ready confirmation without override. Source catalogue presence is insufficient.",
+        "Shared admitted-boundary46 retained; exact installed preflight/clone action and Windows spelling coverage still bind independently. Cleanup risk is separate from grammar admission."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+            "sha256": "66ded1749b49a6725044704b4e96cbcffa78b1dd8db6f76041088e6f02fae4b9",
+            "bytes": 31179,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "protected-transfer-held",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+              "current164Sha256": "66ded1749b49a6725044704b4e96cbcffa78b1dd8db6f76041088e6f02fae4b9",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+                "currentSha256": "b8444707124eb122757643646c6f2c9383acba7ee83f673f4a83cc3ba23081f4",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+                "retained142Sha256": "b8444707124eb122757643646c6f2c9383acba7ee83f673f4a83cc3ba23081f4",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+            "sha256": "dfb3e9f7e944e9c1e9ebf69f1cc17a8bd14e4470c694f2e6378432a384197301",
+            "bytes": 15851,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "protected-transfer-held",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+              "current164Sha256": "dfb3e9f7e944e9c1e9ebf69f1cc17a8bd14e4470c694f2e6378432a384197301",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+                "currentSha256": "43c17ce4232104d607596f11e6d1df3481cecbba6c6b6bd428130e0cbdfb5389",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+                "retained142Sha256": "43c17ce4232104d607596f11e6d1df3481cecbba6c6b6bd428130e0cbdfb5389",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+            "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+            "bytes": 111990,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+              "current164Sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+                "currentSha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+                "retained142Sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.evidence-artifacts-carry-no-commit-identity",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-evidence-artifacts-carry-no-commit-identity.md",
+          "canonicalPath": "backlog/items/2026-10-08-evidence-artifacts-carry-no-commit-identity.md",
+          "sha256": "cbf0732122c1387abe68b8cc588d7dba92c9b385dd49cada0d4914a1be0b6815",
+          "bytes": 1284,
+          "parentSha256": "cbf0732122c1387abe68b8cc588d7dba92c9b385dd49cada0d4914a1be0b6815",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.evidence-artifacts-carry-no-commit-identity::15.1",
+            "lineStart": 17,
+            "lineEnd": 18
+          },
+          {
+            "id": "pipeline.evidence-artifacts-carry-no-commit-identity::29.1",
+            "lineStart": 31,
+            "lineEnd": 31
+          }
+        ]
+      },
+      "recordedRationale": "Capture emits actual HEAD/tree/dirty identity with unavailable handling; exact artifact-header proof remains open.",
+      "recordedRemaining": "Bind existing capture header tests/receipt to this exact source and preserve unknown identity handling; no second reporter is needed.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.evidence-artifacts-carry-no-commit-identity"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.evidence-artifacts-carry-no-commit-identity"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.evidence-artifacts-carry-no-commit-identity"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.feature-branch-push-admitted-without-signature-approval",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-feature-branch-push-admitted-without-signature-approval.md",
+          "canonicalPath": "backlog/items/2026-10-03-feature-branch-push-admitted-without-signature-approval.md",
+          "sha256": "bbea391e74d35fb4d64b44dc6c614f2ef14de2c7cf9c8fdd2a72441ec6c661d1",
+          "bytes": 3330,
+          "parentSha256": "bbea391e74d35fb4d64b44dc6c614f2ef14de2c7cf9c8fdd2a72441ec6c661d1",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.feature-branch-push-admitted-without-signature-approval::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.feature-branch-push-admitted-without-signature-approval::15.2",
+            "lineStart": 25,
+            "lineEnd": 28
+          },
+          {
+            "id": "pipeline.feature-branch-push-admitted-without-signature-approval::15.3",
+            "lineStart": 30,
+            "lineEnd": 43
+          },
+          {
+            "id": "pipeline.feature-branch-push-admitted-without-signature-approval::58.1",
+            "lineStart": 60,
+            "lineEnd": 64
+          }
+        ]
+      },
+      "recordedRationale": "Current signed push producer/guard/pre-push implementation and human-flow source preserve exact-commit approvals for feature/checkpoint branches; full signature-mode happy-path qualification remains.",
+      "recordedRemaining": [
+        "Bind session guard and installed pre-push hook to exact-commit Ed25519 approval for every signature-mode branch, including slim checkpoints; keep full release/main prerequisites. Retain the historical unsigned checkpoint diagnosis and test stale/no approval.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+            "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+            "bytes": 150958,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+              "current164Sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+                "currentSha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+                "retained142Sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "selected142-successor-requires-exact-case-rebinding"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.feature-branch-push-admitted-without-signature-approval",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.feature-branch-push-admitted-without-signature-approval"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.feature-branch-push-admitted-without-signature-approval"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.first-enrollment-enters-retirement-before-consent",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md",
+          "canonicalPath": "backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md",
+          "sha256": "178e806e3b888644be771ca73197f29cd399c86ac5362c0e2515e172e75a7cce",
+          "bytes": 4591,
+          "parentSha256": "178e806e3b888644be771ca73197f29cd399c86ac5362c0e2515e172e75a7cce",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.first-enrollment-enters-retirement-before-consent::70.1",
+            "lineStart": 72,
+            "lineEnd": 80
+          }
+        ]
+      },
+      "recordedRationale": "Fresh-root versus retired-history intake and consent activation handling exist; genuine full consumer checks remain open.",
+      "recordedRemaining": "Reconcile the exact original FRB001–004 and OBC298 receipts with current source, foreign bytes, fresh portable/Git and retired-declined routes; do not infer installed acceptance from historical labels.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.first-enrollment-enters-retirement-before-consent"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.first-enrollment-enters-retirement-before-consent"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.first-enrollment-enters-retirement-before-consent"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md",
+          "canonicalPath": "backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md",
+          "sha256": "0dbc98748ef47df3f3cc97f8ee99c4c29cba4daef58f008c625976b53ee22324",
+          "bytes": 4266,
+          "parentSha256": "0dbc98748ef47df3f3cc97f8ee99c4c29cba4daef58f008c625976b53ee22324",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog::52.1",
+            "lineStart": 54,
+            "lineEnd": 63
+          }
+        ]
+      },
+      "recordedRationale": "Protected baseline inclusion, missing-file refusal and digest binding exist; installed/handover checks remain open.",
+      "recordedRemaining": "Bind the delivered catalogue fix, original missing/changed/aliased controls, and the complete actual handover/host result. Historical 55 PASS and interrupted 184 remain different evidence.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+            "sha256": "f6b827cd56383996ed1e5c7fe78fd4199e9ceb42e3dfa1a8d9fa1839badf5536",
+            "bytes": 573921,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": []
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-git-push-classifier-misses-env-s-and-editor-bang.md",
+          "canonicalPath": "backlog/items/2026-10-08-git-push-classifier-misses-env-s-and-editor-bang.md",
+          "sha256": "79daa455d33635fefc5a9711dc93fa2406eb51ea09e8a2e8aa124049c397051e",
+          "bytes": 960,
+          "parentSha256": "79daa455d33635fefc5a9711dc93fa2406eb51ea09e8a2e8aa124049c397051e",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.git-push-classifier-misses-env-s-and-editor-bang::15.1",
+            "lineStart": 17,
+            "lineEnd": 18
+          },
+          {
+            "id": "pipeline.git-push-classifier-misses-env-s-and-editor-bang::28.1",
+            "lineStart": 30,
+            "lineEnd": 30
+          }
+        ]
+      },
+      "recordedRationale": "Retained env split-string/editor-bang extraction and positive/negative pins implement both narrow forms; exact descendant guard qualification remains.",
+      "recordedRemaining": [
+        "Bind current tests and actual env -S/editor-bang refusal at the real guard boundary, retaining inert quoted-data read controls. A classifier-only result cannot prove guard enforcement.",
+        "env split-string/editor extraction and positive/negative tests already present; reconcile exact GITCLS cases to M6 descendant source before conditional repair."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-cmd.mjs",
+            "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+            "bytes": 78973,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+              "current164Sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+                "currentSha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-cmd.mjs",
+                "retained142Sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.git-stash-list-classified-as-working-tree-write",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md",
+          "canonicalPath": "backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md",
+          "sha256": "29d7567ec44486b684570d40029c00d6d1e8229464eaecc558e469212c283b6e",
+          "bytes": 1940,
+          "parentSha256": "29d7567ec44486b684570d40029c00d6d1e8229464eaecc558e469212c283b6e",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.git-stash-list-classified-as-working-tree-write::15.1",
+            "lineStart": 17,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.git-stash-list-classified-as-working-tree-write::15.2",
+            "lineStart": 24,
+            "lineEnd": 29
+          },
+          {
+            "id": "pipeline.git-stash-list-classified-as-working-tree-write::41.1",
+            "lineStart": 43,
+            "lineEnd": 45
+          }
+        ]
+      },
+      "recordedRationale": "Retained stash list/show closed-operand implementation and stash34 focused cases exist; current parser/target-extraction descendant correspondence still needs binding before75.",
+      "recordedRemaining": [
+        "Reconcile current ab6ce325 grammar and existing stash reader tests with the older absent-branch diagnosis. Bind list/show closed flags and optional stash operand, mutating stash/output denial, correct sed target, and actual draft gate admission before considering a new fix.",
+        "Inspect exact current reader and target extraction bodies; freeze bounded Git-to-head parity and stash list/show versus mutation/output controls; keep unsupported shell grammar closed"
+      ],
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.git-stash-list-classified-as-working-tree-write",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.git-stash-list-classified-as-working-tree-write"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.git-stash-list-classified-as-working-tree-write"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-gitleaks-content-suppression-does-not-match-on-windows.md",
+          "canonicalPath": "backlog/items/2026-10-05-gitleaks-content-suppression-does-not-match-on-windows.md",
+          "sha256": "18571ff078dc529d7c782309a8bd6d708f85d589fb049a6b599b8a6e923ff709",
+          "bytes": 1862,
+          "parentSha256": "18571ff078dc529d7c782309a8bd6d708f85d589fb049a6b599b8a6e923ff709",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows::15.1",
+            "lineStart": 17,
+            "lineEnd": 20
+          },
+          {
+            "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows::31.1",
+            "lineStart": 33,
+            "lineEnd": 35
+          }
+        ]
+      },
+      "recordedRationale": "Strict path normalization is implemented; original Windows representation and native matrix remain unqualified.",
+      "recordedRemaining": "Bind the original GLWIN LF/CRLF and absolute/relative slash matrix plus native Windows result; do not substitute unrelated real-binary detection or narrower GLR fingerprint proof.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.md",
+          "canonicalPath": "backlog/items/2026-10-06-gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.md",
+          "sha256": "08d50dff7797dafe4850ccc92573a93be1e34b30b4182b31e5f8fd3f8c3d5cec",
+          "bytes": 2436,
+          "parentSha256": "08d50dff7797dafe4850ccc92573a93be1e34b30b4182b31e5f8fd3f8c3d5cec",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one::15.1",
+            "lineStart": 17,
+            "lineEnd": 21
+          },
+          {
+            "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one::32.1",
+            "lineStart": 34,
+            "lineEnd": 36
+          }
+        ]
+      },
+      "recordedRationale": "Reviewed value hash and prewrite drift refusal exist; exact assertion/registration qualification remains open.",
+      "recordedRemaining": "Bind current value-change/no-mutation cases and both original follow-ups; preserve GLR secret-disclosure issues as a separate scope rather than weakening reviewed-value binding.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-gitleaks-repair-ignore-cli-is-a-no-op-on-windows.md",
+          "canonicalPath": "backlog/items/2026-10-05-gitleaks-repair-ignore-cli-is-a-no-op-on-windows.md",
+          "sha256": "e64046fe9fd69016b1615679bf19f51a61eff96c941b46e16055486e743d3f4e",
+          "bytes": 1360,
+          "parentSha256": "e64046fe9fd69016b1615679bf19f51a61eff96c941b46e16055486e743d3f4e",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows::15.1",
+            "lineStart": 17,
+            "lineEnd": 20
+          },
+          {
+            "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows::30.1",
+            "lineStart": 32,
+            "lineEnd": 34
+          }
+        ]
+      },
+      "recordedRationale": "Shared direct invocation fixes CLI entry; genuine Windows drive-letter child behavior remains unqualified.",
+      "recordedRemaining": "Qualify actual CLI action on supported Windows with drive-letter invocation, retaining ordinary versus recompute behavior and the historical failure evidence.",
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md",
+          "canonicalPath": "backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md",
+          "sha256": "74cf933c951d38189b3a97a0755abd435bcf08ea19ba6db28cdd99f5649b4bdc",
+          "bytes": 2545,
+          "parentSha256": "74cf933c951d38189b3a97a0755abd435bcf08ea19ba6db28cdd99f5649b4bdc",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04::36.1",
+            "lineStart": 38,
+            "lineEnd": 42
+          }
+        ]
+      },
+      "recordedRationale": "Canonical instructions agree on independent RED-before-FIX and immutable tests; mirror/integration review remains open.",
+      "recordedRemaining": "Bind canonical/mirror source conservation and final candidate review/host checklist. Preserve the separate proposed successor generation; do not call historical open item accepted.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/templates/prompts/goldfish-task.md",
+            "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+            "bytes": 57670,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": []
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-next-intake-audit-20261010/matrix.json",
+        "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+        "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e",
+        "rowId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.governance-scope-rejects-readonly-host-git-control",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-governance-scope-rejects-readonly-host-git-control.md",
+          "canonicalPath": "backlog/items/2026-09-29-governance-scope-rejects-readonly-host-git-control.md",
+          "sha256": "174d6e04aa78aaa21e292d3b0e3405550c1b01e77e4b0685bce25eccaa6abad5",
+          "bytes": 2619,
+          "parentSha256": "174d6e04aa78aaa21e292d3b0e3405550c1b01e77e4b0685bce25eccaa6abad5",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.governance-scope-rejects-readonly-host-git-control::42.1",
+            "lineStart": 44,
+            "lineEnd": 48
+          }
+        ]
+      },
+      "recordedRationale": "Source-owned readonly-host control topology and genuine original host callbacks are delivered; whole mount/corrupt/nonempty/current HGL qualification remains open.",
+      "recordedRemaining": [
+        "Reuse sealed host-layout recognizer and HGL12 complete-resource evidence from its exact declared generation. Bind both original readonly host callbacks, root/mount identity, corrupt/retained and writable/nonempty near misses, no Git writes, and joint current source integration; no invented capability or plan approval.",
+        "Existing ENV-DUMP source/protocol qualification; fresh host bootstrap premise, native Desktop, original host control callbacks"
+      ],
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.governance-scope-rejects-readonly-host-git-control",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.governance-scope-rejects-readonly-host-git-control"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.governance-scope-rejects-readonly-host-git-control"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.guard-override-request-digest-drifts-after-arming",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+          "canonicalPath": "backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+          "sha256": "a959bb6a375bd9dcee9815092113b40c263a092082ee60f90df6b7aad593e46c",
+          "bytes": 2131,
+          "parentSha256": "a959bb6a375bd9dcee9815092113b40c263a092082ee60f90df6b7aad593e46c",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.guard-override-request-digest-drifts-after-arming::15.1",
+            "lineStart": 17,
+            "lineEnd": 21
+          },
+          {
+            "id": "pipeline.guard-override-request-digest-drifts-after-arming::15.2",
+            "lineStart": 23,
+            "lineEnd": 32
+          },
+          {
+            "id": "pipeline.guard-override-request-digest-drifts-after-arming::34.1",
+            "lineStart": 36,
+            "lineEnd": 42
+          }
+        ]
+      },
+      "recordedRationale": "Cosmetic-field exclusion with exact semantic/signature bindings is present for the requested digest fix; current retry/platform proof binding remains open.",
+      "recordedRemaining": "Bind actual retry/sign/arm/consume receipt and platform controls to current selected bytes.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+            "sha256": "2dff589e957ae9b2de059b35b57888232a2a18e3f28ffb39832c8f64a0bc0fc6",
+            "bytes": 28714,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+              "sha256": "2dff589e957ae9b2de059b35b57888232a2a18e3f28ffb39832c8f64a0bc0fc6"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+          "selected164Source": {
+            "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+            "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+            "mode": 420,
+            "metadataOrigin": "actual content receipt checkpoint; not a semantic proof"
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+              "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+              "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+            "bytes": 539214,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "runtime-transfer-pending",
+          "responsible": "/root/alfred_obl013_override_digest_regression",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+              "sha256": "b0aa73f591bd3043c55703830d095fc64e5326a91145910d3fdb3922684060a6"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-registry.mjs",
+            "sha256": "af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9",
+            "bytes": 122649,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+              "sha256": "3c9f9cb0f5e792e3aca1447436d289bba3d948230b4a545581d1cfa11b835c2d"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [
+        {
+          "name": "STB12-first"
+        },
+        {
+          "name": "STB12-second"
+        }
+      ],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-remaining-fanout-20261010/own-source164-generation-successor/matrix.json",
+        "id": "pipeline.guard-override-request-digest-drifts-after-arming"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-61/progress-final.json",
+        "sha256": "804a9396dfb72803bf0317136bfaf2da05ec8bbcc455073309c5f3466c53409a",
+        "rowId": "pipeline.guard-override-request-digest-drifts-after-arming"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [
+        "/root/alfred_obl013_override_digest_regression"
+      ],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.guard-override-request-digest-drifts-after-arming"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.md",
+          "canonicalPath": "backlog/items/2026-10-05-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.md",
+          "sha256": "882aad4c80f31716aeb1e9729e8bb0e330532e8d6dc28d74c5da4e603d319529",
+          "bytes": 1392,
+          "parentSha256": "882aad4c80f31716aeb1e9729e8bb0e330532e8d6dc28d74c5da4e603d319529",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target::27.1",
+            "lineStart": 29,
+            "lineEnd": 29
+          }
+        ]
+      },
+      "recordedRationale": "Current lexical non-push route includes exact git-grep read logic; M6 receipt is a partial classifier relation, not automatically complete original guard boundary proof.",
+      "recordedRemaining": [
+        "Retain completed M6_35 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Inert command strings and synthetic placeholder only; no actual hook/native/Windows qualification. Driver inherited a limited environment and did not preserve preload.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+            "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+            "bytes": 150958,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+              "current164Sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+                "currentSha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+                "retained142Sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "selected142-successor-requires-exact-case-rebinding"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-cmd.mjs",
+            "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+            "bytes": 78973,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+              "current164Sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+                "currentSha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-cmd.mjs",
+                "retained142Sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [
+        {
+          "reference": {
+            "name": "M6_35",
+            "proof": {
+              "path": "legacy-origin:alfred-m6-literal-read-baseline-closure-v2-20261010/fixed-current-nine/execution.json",
+              "sha256": "a77d90e25b638f32a7e22813d18964397d4ea09af6bb3a881ce3e3f61344f780"
+            },
+            "pass": 35,
+            "caseEvidence": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "89d8c512987b9ce1c3de0f96e1f005ecb9c52d01f3fe861caa400584cce4df05",
+              "caseSetSha256": "535017b55d54e852b2f32581d2b844fb3c22bf0d19d6b5bfe48899faab0af6b6",
+              "dispositionsSha256": "1e09e8ac617e447a01b26120105bf64516327cb136887d648c2d79fab7a1c537",
+              "declaredCount": 35,
+              "disposedCount": 35,
+              "counts": {
+                "pass": 35,
+                "fail": 0,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "canonicalPaths": [
+              "plugins/pipeline-core/lib/git-cmd.mjs"
+            ],
+            "backlogIds": [
+              "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+              "pipeline.read-only-guard-admits-execution-and-output-options",
+              "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+              "pipeline.guard-push-refuses-read-only-git-without-push"
+            ],
+            "relatedCriteria": [
+              "AC-27",
+              "IR-4"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Inert command strings and synthetic placeholder only; no actual hook/native/Windows qualification. Driver inherited a limited environment and did not preserve preload."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+                "currentAuditSha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78"
+              }
+            ],
+            "officialClosure": false
+          },
+          "claim": "Retained item-scoped reference; no new execution/parser/authenticity inference."
+        }
+      ],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.guard-push-refuses-read-only-git-without-push",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-guard-push-refuses-read-only-git-without-push.md",
+          "canonicalPath": "backlog/items/2026-10-09-guard-push-refuses-read-only-git-without-push.md",
+          "sha256": "4690c05e8f039d5ee30cad8a53bd8bdb4d775a4d31df0e49252987cf7d019120",
+          "bytes": 1412,
+          "parentSha256": "4690c05e8f039d5ee30cad8a53bd8bdb4d775a4d31df0e49252987cf7d019120",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.guard-push-refuses-read-only-git-without-push::16.1",
+            "lineStart": 18,
+            "lineEnd": 20
+          },
+          {
+            "id": "pipeline.guard-push-refuses-read-only-git-without-push::32.1",
+            "lineStart": 34,
+            "lineEnd": 35
+          }
+        ]
+      },
+      "recordedRationale": "Plain actual subcommand/version routing is implemented; nested wrapper treatment must retain accepted Q12/M6 strong negatives, current exact full-item tests not promoted.",
+      "recordedRemaining": [
+        "Retain completed M6_35 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Inert command strings and synthetic placeholder only; no actual hook/native/Windows qualification. Driver inherited a limited environment and did not preserve preload.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-cmd.mjs",
+            "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+            "bytes": 78973,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+              "current164Sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+                "currentSha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-cmd.mjs",
+                "retained142Sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [
+        {
+          "reference": {
+            "name": "M6_35",
+            "proof": {
+              "path": "legacy-origin:alfred-m6-literal-read-baseline-closure-v2-20261010/fixed-current-nine/execution.json",
+              "sha256": "a77d90e25b638f32a7e22813d18964397d4ea09af6bb3a881ce3e3f61344f780"
+            },
+            "pass": 35,
+            "caseEvidence": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "89d8c512987b9ce1c3de0f96e1f005ecb9c52d01f3fe861caa400584cce4df05",
+              "caseSetSha256": "535017b55d54e852b2f32581d2b844fb3c22bf0d19d6b5bfe48899faab0af6b6",
+              "dispositionsSha256": "1e09e8ac617e447a01b26120105bf64516327cb136887d648c2d79fab7a1c537",
+              "declaredCount": 35,
+              "disposedCount": 35,
+              "counts": {
+                "pass": 35,
+                "fail": 0,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "canonicalPaths": [
+              "plugins/pipeline-core/lib/git-cmd.mjs"
+            ],
+            "backlogIds": [
+              "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+              "pipeline.read-only-guard-admits-execution-and-output-options",
+              "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+              "pipeline.guard-push-refuses-read-only-git-without-push"
+            ],
+            "relatedCriteria": [
+              "AC-27",
+              "IR-4"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Inert command strings and synthetic placeholder only; no actual hook/native/Windows qualification. Driver inherited a limited environment and did not preserve preload."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+                "currentAuditSha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78"
+              }
+            ],
+            "officialClosure": false
+          },
+          "claim": "Retained item-scoped reference; no new execution/parser/authenticity inference."
+        }
+      ],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.guard-push-refuses-read-only-git-without-push",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.guard-push-refuses-read-only-git-without-push"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.guard-push-refuses-read-only-git-without-push"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-guard-push-treats-gitleaks-as-a-git-command.md",
+          "canonicalPath": "backlog/items/2026-10-05-guard-push-treats-gitleaks-as-a-git-command.md",
+          "sha256": "133beaa77554a123bc2e39c4e8a1c09c605502f6f1a16d403631dbe8812638f8",
+          "bytes": 1249,
+          "parentSha256": "133beaa77554a123bc2e39c4e8a1c09c605502f6f1a16d403631dbe8812638f8",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command::15.1",
+            "lineStart": 17,
+            "lineEnd": 19
+          },
+          {
+            "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command::29.1",
+            "lineStart": 31,
+            "lineEnd": 33
+          }
+        ]
+      },
+      "recordedRationale": "Original complete body marks exact executable-token fix6b0413700/6ca4474d3 delivered; current targeted guard example/host checks remain.",
+      "recordedRemaining": [
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+          "selected164Source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+            "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+            "bytes": 150958,
+            "mode": 420
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+              "current164Sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+                "currentSha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+                "retained142Sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "selected142-successor-requires-exact-case-rebinding"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.guard-push-treats-gitleaks-as-a-git-command"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.guard-push-treats-gitleaks-as-a-git-command"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md",
+          "canonicalPath": "backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md",
+          "sha256": "b25facc5185da9499432d6fb3d3a1a07cba3c166ee3bfecf1242a79de19b4a50",
+          "bytes": 1879,
+          "parentSha256": "b25facc5185da9499432d6fb3d3a1a07cba3c166ee3bfecf1242a79de19b4a50",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier::16.1",
+            "lineStart": 18,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier::32.1",
+            "lineStart": 34,
+            "lineEnd": 35
+          }
+        ]
+      },
+      "recordedRationale": "Accepted AF command-receiver source and pins are retained; execute exact current receiver set before75, no active quoted-data exemption restored.",
+      "recordedRemaining": [
+        "Coordinate same git-cmd owner with M6; independently freeze xargs/at/ed/sqlite/php/lua/awk-f executable-data receivers plus inert controls if absent from current35. Retain actual targeted GREEN receipt, select exact affected case IDs, finish uncovered clauses and integrate/requalify selected candidate; do not rerun unchanged cases solely for bookkeeping."
+      ],
+      "sourceTrace": [],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-criterion-closure-reconciliation-20261010/criterion-inventory.json",
+        "id": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+        "status": "previous55-detailed-packets-and-original-proof-references-retained-not-reassessed"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+        "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f",
+        "rowId": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-a-dead-owner-audit-lock-is-permanently-ambiguous-on-windows.md",
+          "canonicalPath": "backlog/items/2026-10-09-a-dead-owner-audit-lock-is-permanently-ambiguous-on-windows.md",
+          "sha256": "89233587365e2ad51d15b887b42536ba2f35e95217fecc5fd1fb04c76302ffdd",
+          "bytes": 2588,
+          "parentSha256": "ff0b78244c8313befb10e71144f242344a68bff8358d0d66a0d26a11142897d1",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows::31.1",
+            "lineStart": 33,
+            "lineEnd": 41
+          }
+        ]
+      },
+      "recordedRationale": "New original-criterion Windows process-start observer and HGO integration are fully authored; independent16 frozen, Root qualification/native Windows remain open.",
+      "recordedRemaining": "Identify sanctioned native start-time identity producer or exact accepted amendment; preserve ambiguity and attended recovery.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+          "selected164Source": {
+            "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+            "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+            "mode": 420,
+            "metadataOrigin": "actual content receipt checkpoint; not a semantic proof"
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+              "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+              "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-remaining-fanout-20261010/own-source164-generation-successor/matrix.json",
+        "id": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-61/progress-final.json",
+        "sha256": "804a9396dfb72803bf0317136bfaf2da05ec8bbcc455073309c5f3466c53409a",
+        "rowId": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows"
+      },
+      "accepted": false
+    },
+    {
+      "id": "pipeline.hgo-stale-capability-shadows-current-authorization",
+      "stage": 50,
+      "officialStatus": "OPEN",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-stale-hgo-capability-shadows-current-authorization.md",
+          "canonicalPath": "backlog/items/2026-09-28-stale-hgo-capability-shadows-current-authorization.md",
+          "sha256": "fb5191c9ece5ce049b49eb132d51884163cfe3f36ec74b2abc147c9486f9f771",
+          "bytes": 5130,
+          "parentSha256": "e9a996a5db12262e5d9fa5f15c9058dca6808133d22e8ea375f30f4a760e2dd3",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.hgo-stale-capability-shadows-current-authorization::38.1",
+            "lineStart": 40,
+            "lineEnd": 55
+          }
+        ]
+      },
+      "recordedRationale": "Actual stale-capability scanner skips expired/drifted entries, preserves corrupt audit refusal and consumes the exact current authorization; focused receipt binding open.",
+      "recordedRemaining": "Bind actual RC15C receipt; do not duplicate existing scanner correction.",
+      "sourceTrace": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+          "selected164Source": {
+            "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+            "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+            "mode": 420,
+            "metadataOrigin": "actual content receipt checkpoint; not a semantic proof"
+          },
+          "contentCheckpointStatus": "covered-by-actual148-checkpoint; no item-level semantic proof",
+          "responsible": "/root",
+          "historicalItemSourceBinding": [
+            {
+              "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+              "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+              "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616"
+            }
+          ]
+        }
+      ],
+      "existingProofs": [],
+      "proofCaseAssociations": [],
+      "originalAssessment": {
+        "path": "legacy-origin:alfred-176-remaining-fanout-20261010/own-source164-generation-successor/matrix.json",
+        "id": "pipeline.hgo-stale-capability-shadows-current-authorization"
+      },
+      "stageBasis": {
+        "path": "legacy-origin:alfred-item-progress-estimate-20261010/partition-61/progress-final.json",
+        "sha256": "804a9396dfb72803bf0317136bfaf2da05ec8bbcc455073309c5f3466c53409a",
+        "rowId": "pipeline.hgo-stale-capability-shadows-current-authorization"
+      },
+      "currentResponsible": "/root",
+      "explicitPendingSourceOwners": [],
+      "retainedOwner": {
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "recordBasis": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "freshAssignmentConfirmed": false
+      },
+      "originalTraceLocator": {
+        "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+        "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27",
+        "rowId": "pipeline.hgo-stale-capability-shadows-current-authorization"
+      },
+      "accepted": false
+    }
+  ],
+  "limits": [
+    "Stage50 records functional presence, not fresh Main execution.",
+    "Stage75 has targeted evidence, not whole-item verification-only status.",
+    "Preserve exact original native/consumer/acceptance scope and reuse unchanged compatible receipts.",
+    "No source review/test repeat or ownership grant follows merely from this partition."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "alfred.public.windows-owned-authority-four.content.v1",
+  "rawReceiptSha256": "c6221c28a1c0cc270ddb941c30a9fbdda52349355a811b3d8aa12259ffcf517d",
+  "rawReceiptBytes": 3340,
+  "privateForensicsRetained": true,
+  "status": "applied",
+  "transferManifestSha256": "c05e12efd7b5098c07eb5d86737106939dc94b5b4e34bac11f5192c66ae9a67c",
+  "officialClassificationSha256": "48c296f034cf47f823c53f645218c7bd222777603489ce99b4ab99124f917158",
+  "officialClassification": "actual-noRule",
+  "targets": [
+    {
+      "path": "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+      "sha256": "3e9922b327791479ab4c61fab22589b48708877d561e1909298f0379ff597be7",
+      "size": 7490,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-owned-authority-native.ps1",
+      "sha256": "66865ee9c17f83cd1fe9bb68f9acd593e06b8064257f1b10b84c224e9cd4d720",
+      "size": 18539,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+      "sha256": "412fddb4b951bb43db07e62c85abbae3480835a4724509207fa8ecb9a6b0395a",
+      "size": 6904,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-native-process-observer.ps1",
+      "sha256": "6c55d97eba1c18ef37befab1c6e6052301f8ecc0b90d1521a49e158a49fc4d40",
+      "size": 13949,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "nonTargetPeersConserved": true,
+  "semanticRuns": 0,
+  "qualifiedSourceProof": "windows-owned-authority-six-actual.json",
+  "limits": {
+    "formalItemStage": "OPEN",
+    "wholeItemClosed": false,
+    "requesterAuthorityGranted": false,
+    "readyGranted": false,
+    "humanSigningQualified": false,
+    "nativeDabQualified": false,
+    "gitCommitOrPushPerformedByPublication": false,
+    "contentIntegrationIsRuntimeAcceptance": false,
+    "receiptIsCurrentMainRequalification": false
+  }
+}

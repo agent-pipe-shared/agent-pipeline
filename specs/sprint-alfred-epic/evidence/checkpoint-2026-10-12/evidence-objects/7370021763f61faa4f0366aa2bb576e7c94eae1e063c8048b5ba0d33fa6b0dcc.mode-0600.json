@@ -1,0 +1,103 @@
+{
+  "schema": "alfred.original-clause.compatibility-terminal.v1",
+  "runs": 1,
+  "status": "green",
+  "before": {
+    "originalMembers": 6595,
+    "explicitAddedMembers": 2,
+    "parentFacts": 6596,
+    "addedSourceParents": 2,
+    "globalMembershipClaim": false
+  },
+  "after": {
+    "originalMembers": 6595,
+    "explicitAddedMembers": 2,
+    "parentFacts": 6596,
+    "addedSourceParents": 2,
+    "globalMembershipClaim": false
+  },
+  "afterError": null,
+  "records": [
+    {
+      "schema": "alfred.original-clause.compatibility-suite-result.v1",
+      "suite": "pure32",
+      "runs": 1,
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "0e4309925bb009aa4c902617a64b3dabd41e3b2082a8639f6434806059441721",
+        "caseSetSha256": "3565621d47f2ab0d1eb9dd2782c8f328ddc501a4ce8ab5a8bd8982c3ad3d86c0",
+        "dispositionsSha256": "20c509cd5b049be6e6941d9fd2a76e97f890d38394efe407309a8699f0f3dd9a",
+        "declaredCount": 32,
+        "disposedCount": 32,
+        "counts": {
+          "pass": 32,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionError": null,
+      "conservation": {
+        "originalMembers": 6595,
+        "explicitAddedMembers": 2,
+        "parentFacts": 6596,
+        "addedSourceParents": 2,
+        "globalMembershipClaim": false
+      },
+      "conservationError": null,
+      "testSha256": "34086f5d5bede192796a5b770a50561dba0cf5e7c7e4f1b173bd41f6ab94839b",
+      "captureSha256": "a68fc7a8c510fdf7223edd2f20637b4c36ff7b3095b1eeb30da99d7842040ab6",
+      "stdoutSha256": "9feae8cc6469d408761cfdb1ed12835e4cb34688e18fe59ff4d664e3040d59ea",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requiredPass": 32
+    },
+    {
+      "schema": "alfred.original-clause.compatibility-suite-result.v1",
+      "suite": "physical24",
+      "runs": 1,
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "d1631169127eae2ed12d104dc376299917aa659e9affaa0a3e109c947ab210a7",
+        "caseSetSha256": "7147fda66a3d2430e19a64c9b2028b9e69713e5cfba8baaee36322e58fd8921c",
+        "dispositionsSha256": "1962f8457a98422ad8baf3b6261b0983f877df152919f3c61388931814dbbbee",
+        "declaredCount": 24,
+        "disposedCount": 24,
+        "counts": {
+          "pass": 24,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionError": null,
+      "conservation": {
+        "originalMembers": 6595,
+        "explicitAddedMembers": 2,
+        "parentFacts": 6596,
+        "addedSourceParents": 2,
+        "globalMembershipClaim": false
+      },
+      "conservationError": null,
+      "testSha256": "c9f91e11c6aabfc9add6d188678cc1f45bf3b231cb8f1b59d4df88e41ea47d37",
+      "captureSha256": "826a3badf03de0c1714f8a3a1cfa84615d2bbb4e1b7df2f70ba63054f3d69c64",
+      "stdoutSha256": "b099aa7a1cf0d620e9dd6adf2be359e3a846f3ac85036c6c8727ce338e7f4088",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "requiredPass": 24
+    }
+  ],
+  "endedAt": "2026-10-10T05:51:03.277Z",
+  "limits": [
+    "Only existing pure32 and physical24; no runtime39/wholeVerify/native",
+    "Two direct Node children maximum, one per suite, no retry",
+    "Original6595 membership conserved plus two separately frozen entries; no global membership claim",
+    "Child synthetic repositories and memory-only signers in separately owned output; inherited preload retained"
+  ]
+}

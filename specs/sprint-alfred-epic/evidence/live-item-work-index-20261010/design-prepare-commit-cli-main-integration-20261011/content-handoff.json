@@ -1,0 +1,21 @@
+{
+  "schema":"alfred.design-prepare-commit-cli.public-content-handoff.v1",
+  "status":"applied-exact-cli-new-inode",
+  "integrationExecutionSha256":"d7ee8dcd3c03f30221005933251c976af8b8aceb9806b9bf9120f8cc4093d829",
+  "integrationPlanSha256":"4e0faee52c29ad49e85a424170a7f86d979cfd72741d5f34dee83d6b862f30c7",
+  "target":{"canonicalPath":"plugins/pipeline-core/scripts/quality-package-materializer.mjs","sha256":"f37f8d9d0c48d380d83a863584acf2235b76be3acab338f61e768f36a7acf84e","bytes":1262,"mode":"0644","nlink":1},
+  "preservedDependency":{"canonicalPath":"plugins/pipeline-core/lib/signed-quality-package.mjs","sha256":"d6d7c7ece9a82d50772e9b210f35f7c45ff99298ad301e2a295407d671c363bc"},
+  "declaredCliSourceManifestSha256":"31e467a211c9a7900fcd7bb088e6298e58e600385e37fe28c54c209ec1c57429",
+  "officialTargetClassification":{"receiptSha256":"4fbb42aa0bed0e584d906e551d8244213002cc6a3d6f7191c4c4b72503e5909d","classification":"noRule"},
+  "inputsConserved":true,
+  "boundRegularInputCount":22,
+  "semanticRunsByIntegration":0,
+  "separateLibraryQualification":{"publicProofPath":"specs/sprint-alfred-epic/evidence/latest-focused-checks-20261010/design-prepare-commit-8-actual.json","publicProofSha256":"05b8d4c1a3b432788e1c0fe9a86cae125eb9a4c63f07cdea822ee8c8f525045f","pass":8,"fail":0,"scope":"Cumulative d6 library/parser/apply-stage-authorize controls; Native node:test SPEC output, no pipeline FD3 receipt."},
+  "wholeCliProcessQualified":false,
+  "nativeHumanClaim":false,
+  "wholeItemAcceptance":false,
+  "pushPerformed":false,
+  "hookInstallationPerformed":false,
+  "automaticCommitOrResetPerformed":false,
+  "limits":["Content integration does not execute the CLI or establish a genuine attended signing course.","The separate eight-case library qualification must not be recast as whole CLI-process qualification.","This records the applied generation only; later successors require separate bindings."]
+}

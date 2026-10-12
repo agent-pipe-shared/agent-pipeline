@@ -1,0 +1,133 @@
+{
+  "schema": "alfred.approval-lock-source5-manifest.v1",
+  "sourceFiles": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "parent": {
+        "path": "legacy-origin:alfred-approval-lock-witness-pre-gate-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "62d2258f77ca3852d263501689a4133c7459a94c51da5757b135db0a9079316a",
+        "size": 807847,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "post": {
+        "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "beea4f37baa9e8bc0210c3b66f02e2eb9935f1f63982d72ae2d9e25f04ba4d60",
+        "size": 807952,
+        "mode": "0644",
+        "nlink": 1
+      },
+      "inverseExact": true,
+      "outsideTwoSplicesConserved": true
+    }
+  ],
+  "unchangedDependencies": [
+    {
+      "path": "legacy-origin:alfred-approval-lock-witness-pre-gate-source-20261011/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "0609c893126b35df0a7a4b7bdb926ba15ab7e0ddf056b057ab9bbadecb9a297c",
+      "size": 616733,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-ticket-private-exercise-source-corrective-20261011/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "sha256": "5827757549f06da7c9f11f12fedf115479ee50cb5d2818a58460dfdeb4143da4",
+      "size": 137154,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-afk-isolated-repository-custody-terminal-owner-first-successor-20261010/postimages/plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs",
+      "sha256": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c",
+      "size": 26882,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "independentBeforePostNorm": {
+    "path": "legacy-origin:alfred-state-two-repair-qualification-20261010/actual443-diagnosis/lock-ticket-controls-qualification-preparation/source4-lock-six-qualification-successor/static-catch-blocker-and-before-post-addendum.json",
+    "sha256": "1ac1985c40e6d5bfac98ee4c2735d8286ebf77eb80aae9f6d785929bd68976ab",
+    "size": 3091,
+    "mode": "0644",
+    "nlink": 1
+  },
+  "artifacts": [
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/build.py",
+      "sha256": "bc017e15370a9e265ca12f9f37bbd6eae9a57ce43c8c0f0633c664adf71899ac",
+      "size": 4879,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/freeze.py",
+      "sha256": "6c2ab6126120a2510027bddcee8602cf37b1558706e8f24b479baae171c693af",
+      "size": 3796,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/exact-splices.json",
+      "sha256": "8a78ea27f24e0fb90e7ee0d6dc86f5ed4681682c908c7f55936fd155f0fae2f9",
+      "size": 407,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/forward.patch",
+      "sha256": "dc51ff9d0dcea77508a5fc990f2f0d59312cc61a3148dab7a7f68a93cf3f0e32",
+      "size": 1019,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/inverse.patch",
+      "sha256": "d239dd5db401188d7d617f36169136afccd135b8dbda3dc5ae796f4a61087bd0",
+      "size": 1019,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/api-contract.json",
+      "sha256": "170bb1be009401856169b2a05814da1bd9a2b1768dcf6b96b7ea886172b0a3b8",
+      "size": 2588,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/prepared-manifest.json",
+      "sha256": "5ab5b84ae4c16cc2e20971f5d6ca3c2b9695f9f30a35c74ff2033b48064a988f",
+      "size": 3235,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/static-checks.json",
+      "sha256": "7d52ab8040c13039e41ac5adc4397e576b9b17f6ebe1834128415675b7dcb8b1",
+      "size": 279,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/report.md",
+      "sha256": "53b887619c2bc299e2beb7cade74e6975a5dd608d418146000a5cbf5f9ecfa01",
+      "size": 1092,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/source-freeze.json",
+      "sha256": "e48f4d3b37a9f137e1c5c013bb4f3af48599bd2c0af25b07151345add1926cc2",
+      "size": 4452,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "originalSixCallbacksUnchanged": true,
+  "previousSource4HeldUnrun": true,
+  "priorTicketFivePassRetained": true,
+  "protectedApplyHeld": true,
+  "businessRuns": 0,
+  "qualificationPending": true,
+  "nativeAssurance": false
+}

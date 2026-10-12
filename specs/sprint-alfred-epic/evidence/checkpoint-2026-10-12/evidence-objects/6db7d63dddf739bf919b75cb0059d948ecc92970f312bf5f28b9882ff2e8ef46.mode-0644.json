@@ -1,0 +1,183 @@
+{
+  "schema": "alfred.landed-dispatch-ownership.source-manifest.v1",
+  "status": "source-frozen-not-qualified",
+  "files": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "parentPath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "parentSha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+      "postimagePath": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/postimages/plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "postSha256": "e87ee9b834c2f17cfbfbda90400e9962bbb197abf50fe1dcd93c61303b429e91",
+      "bytes": 32938,
+      "mode": "0644",
+      "nlink": 1,
+      "inverseExact": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+      "parentPath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+      "parentSha256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+      "postimagePath": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/postimages/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+      "postSha256": "c90e1be45723b44bfe8fa7a0276004e93aea2b43172f806b39ee70d7bf1174b7",
+      "bytes": 28107,
+      "mode": "0644",
+      "nlink": 1,
+      "inverseExact": true
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/source-freeze.json",
+      "sha256": "d9495eb3c134ae37d4cb7cdef150b2e22c69535ff04fdb83c6cee60a1b6b5b3f",
+      "bytes": 3415,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/forward.patch",
+      "sha256": "5793ad5202f9942dc951848c3cbbecc82212f29986bf06bc55be953d9f030bec",
+      "bytes": 22458,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/inverse.patch",
+      "sha256": "29972f24e9e46ab8b33b797b17ce63a5ee09cdb41cf22e016c539cd3c1b73de3",
+      "bytes": 22458,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/final-splice-map.json",
+      "sha256": "3b5c0359589462c0af0da282e3fb48fdfce1ee833aa66f34696f9974a050a783",
+      "bytes": 28179,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/report.md",
+      "sha256": "e7ebc0e0ef0919a70ba35bc9abef8636e3ce85db6c6c41c9d467d2fa64177be8",
+      "bytes": 6535,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/native-capability-gap.json",
+      "sha256": "53c7bb8b4ee015464187ce715e56befe38a729f748203d2e34c416c053804a5b",
+      "bytes": 1123,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/api-contract.json",
+      "sha256": "b8e4e08ef8f7637401e29278cb21e3f8a6d2fc31b9e0fd49b8e1dcbf4b7b04fa",
+      "bytes": 3606,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/api-details.json",
+      "sha256": "59f7b205dce064391118bca8e82ba2358f4d539b14aa57591feeb53c866f510e",
+      "bytes": 3331,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/controlled-fixture-contract.json",
+      "sha256": "216a98a3dec88895372305ea9a26e4563d85511a8f81641f9d98996bf1d5b2de",
+      "bytes": 3204,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/native-compatibility-supplement.json",
+      "sha256": "da6f0e778ee94c55d8970dee84473640847a43a613c4a75318371ee01af86064",
+      "bytes": 2409,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/input-custody.json",
+      "sha256": "c9a2bf4284a201e4ba1250f5df4ae5e4afa55e928ccc31b57b419ee20d8b5ba4",
+      "bytes": 2620,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/freeze-source.py",
+      "sha256": "0aa44c70f2fceff189e8bd6fe6b40b7a170acfaf58c80d1c4475a22525c1b3a6",
+      "bytes": 3097,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/close-manifest.mjs",
+      "sha256": "d21e00a0d3e9ecdab8766a65a9cf984deb541ecae4a821bc16ddb629ed044be2",
+      "bytes": 2370,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "independentManifest": {
+    "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/manifest.json",
+    "sha256": "fb6aa2d0618f61e5edda750f841e21a1f534ed757bc59897ea8b2c1cd8cb6903"
+  },
+  "dependencies": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+      "bytes": 39560,
+      "mode": 420,
+      "nlink": 1,
+      "role": "existing public dependency"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+      "bytes": 117511,
+      "mode": 420,
+      "nlink": 1,
+      "role": "existing public dependency"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/dispatch-record.mjs",
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/dispatch-record.mjs",
+      "sha256": "f1a4e43424983a86bb75015377f123658f9fe26d4f7d136e1d15f4b8f7f64f52",
+      "bytes": 20787,
+      "mode": 420,
+      "nlink": 1,
+      "role": "existing public dependency"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/capture-evidence.mjs",
+      "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+      "bytes": 31343,
+      "mode": 420,
+      "nlink": 1,
+      "role": "existing public dependency"
+    }
+  ],
+  "syntaxChecks": {
+    "dispatch-record-lane.mjs": 0,
+    "evaluate.mjs": 0
+  },
+  "sourceFullRead": true,
+  "inverseExact": true,
+  "semanticRuns": 0,
+  "completeImportClosure": false,
+  "nativeV1ContinuationPreserved": true,
+  "nativeLandedIssuerAvailable": false,
+  "wholeItemAcceptance": false,
+  "authoritativeReplay": "forward.patch and final-splice-map.json",
+  "supersededInitialAuthoringSnapshots": [
+    "source-cas.json",
+    "lane-splices.json",
+    "evaluate-splices.json",
+    "prepare-source.mjs",
+    "landed-creation.mjs.txt"
+  ],
+  "nextAction": "Root full Source review and complete public resource graph, then ONE unchanged independent LDO12 qualification; native compatibility and host carrier remain separate."
+}

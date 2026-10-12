@@ -1,0 +1,149 @@
+{
+  "schema": "alfred.wel12-expectation-successor-actual-qualification-proof.v1",
+  "status": "actual-portable-twelve-green-native-unavailable",
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+    "declaredPostimagePath": "legacy-origin:alfred-claude-windows-evidence-launch-source-20261010/postimages/plugins/pipeline-core/scripts/capture-evidence.mjs",
+    "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+    "manifestPath": "legacy-origin:alfred-claude-windows-evidence-launch-source-20261010/manifest.json",
+    "manifestSha256": "57a5928d12eb60aff3e41725b8cb64909a958e2c0e9392a1eaf7cbc1836318d4",
+    "preimageSha256": "b44f0c1f6114f664e3033981dfafd8c6391f10a65cfff0d2441d54e86184a33e",
+    "sourceChangedByErratum": false
+  },
+  "preparation": {
+    "path": "legacy-origin:alfred-claude-windows-evidence-launch-independent-20261010/pathext-expectation-erratum/preparation-manifest.json",
+    "sha256": "301981fc3009bc1d8f65ff9ec131d9135804caad85b27e5657cfd8bc6ff46371",
+    "executionFreezeSha256": "24be79b601df5381c495ef2e470d81485fe94f3adbc70ec131128b8fa2ddda58",
+    "assertionsSha256": "136f1ef0e5b3b1f2837417361d6275e0d905c8fb74d9d57557f48a318fc1e543",
+    "exactFourSpliceSha256": "7de42f8a3d81adeb928cfa9d5276b5c0f49beaa4037cde3238cd3f873f93f7c2",
+    "sameLauncherSha256": "80f17516b2ad9b43e754798d8dd545ecdd5c683e481281f9c016cbd8702f400f"
+  },
+  "receiptRoot": "legacy-origin:alfred-claude-windows-evidence-launch-independent-20261010/pathext-expectation-erratum/",
+  "receipts": [
+    {
+      "path": "execution-reservation.json",
+      "sha256": "41e6183a6af9554c119a9a7bfd32245afdf2c331e061adb236bc4f9c6db67011"
+    },
+    {
+      "path": "execution-terminal.json",
+      "sha256": "ac9b7f35c8803de97fe27930b426a2638439e56f2afa597dc85fff5dac23d827"
+    },
+    {
+      "path": "qualification-output/stdout.txt",
+      "sha256": "bccc9891aecee1428821f21112a12c5dcf2c0e97272eee5ed7f235e10fd09620"
+    },
+    {
+      "path": "qualification-output/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "qualification-output/completion.ndjson",
+      "sha256": "bac5f21e6987b8b041fb3bac9a0004af9c0e887aff43672350bed0c0ce2211ae"
+    }
+  ],
+  "actualTerminal": {
+    "status": 0,
+    "signal": null,
+    "spawnError": null,
+    "error": null,
+    "conservationError": null,
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 12,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "policySha256": "9b895f6710c7f0e58b7c49ae57d58843cb17781e01052b996f83178ee57b3811",
+    "caseSetSha256": "bc865c323c865dc29a6fc9241aa56acc33d49bcc9d94bcc30a8801edb30263d7",
+    "dispositionsSha256": "bfcd2a33b9d93b4bfcce0518296b7d0a372788b91cef4db0c4e035c4a204e680",
+    "parserSha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b"
+  },
+  "matrix": [
+    {
+      "id": "WEL001",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL002",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL003",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL004",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL005",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL006",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL007",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL008",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL009",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL010",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL011",
+      "disposition": "pass"
+    },
+    {
+      "id": "WEL012",
+      "disposition": "pass"
+    }
+  ],
+  "previouslyUnexecutedTailsNowObserved": {
+    "WEL002": "Actual method spawn/result/settings and same frozen environment assertions completed",
+    "WEL004": "Exact cwd/PATHEXT observation order, relative PATH and matching/conflicting environment assertions completed",
+    "WEL005": "Actual portable Node argv roundtrip completed"
+  },
+  "conservation": {
+    "sourceFileCount": 4,
+    "copiedSourceModesAndNlink1": "actual checked before and after",
+    "sourceParentBytesModeDevInoNlink": "actual checked before and after",
+    "originalNineCallbackBytes": "byte-exact controls retained",
+    "originalQualification": "9PASS3FAIL preserved and all nine selected original assertions/freezes/reservation/receipt files conserved"
+  },
+  "originalFailedQualificationProof": {
+    "path": "legacy-origin:alfred-claude-windows-evidence-launch-independent-20261010/actual-qualification-proof.json",
+    "sha256": "ecfb327242812520eedbc64fce7694423aad13a0c67664d52c68154ccfb9087f"
+  },
+  "methodLimits": [
+    "Windows filesystem observations remain controlled source-method fixtures",
+    "Normalized method result forwarding executes a portable Node child, not cmd.exe/npm.cmd",
+    "Portable argv and8191 ceiling do not prove native Windows argument semantics",
+    "Native attended Windows launcher/cwd/output/status0/status7/refusal checks remain unavailable-not-executed",
+    "No overall Alfred AC, backlog closure, release certificate or native host enforcement claim"
+  ],
+  "publicPrivacyReview": "Repository-relative source/receipt references, hashes, fixed IDs and method summaries only; no actual absolute host paths, private keys, raw environment values or human transcript in this public proof.",
+  "closureReadReceipts": [
+    "6915a1",
+    "aac66c"
+  ],
+  "closureOperations": {
+    "reruns": 0,
+    "sourceEdits": 0,
+    "assertionEdits": 0,
+    "gitWrites": 0,
+    "nativeRuns": 0
+  }
+}

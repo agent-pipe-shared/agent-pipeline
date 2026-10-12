@@ -1,0 +1,59 @@
+{
+  "schema": "alfred.hgo.retained-history.v1",
+  "executions": [
+    {
+      "executionSha256": "fabaf442cb5e61836fda1a3656218e42f079806e5a4e0b9bedd44c266108f266",
+      "child": {
+        "status": 1,
+        "signal": null,
+        "error": null
+      },
+      "counts": {
+        "pass": 9,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      },
+      "completionError": null,
+      "conserved": true,
+      "restored": true,
+      "sourceSelectedSha256": "ab1b5d609401f2f161a72571357a0a7a81a894018d0ae4f4be08b3b20998ccd0",
+      "semanticDisposition": "Retained earlier-source failure with independent actual completion"
+    },
+    {
+      "executionSha256": "2d9cbd116e0fb5fd9b657c2ea48e34c67e0152ce6ee80be4c2ea4d404fe527b9",
+      "child": {
+        "status": 1,
+        "signal": null,
+        "error": null
+      },
+      "counts": {
+        "pass": 0,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      },
+      "completionError": null,
+      "conserved": true,
+      "restored": true,
+      "sourceSelectedSha256": "335b849edc6b4936e9bae49ed95ba72ec96f58630cc34e9d93dfd92dd3802a5e",
+      "semanticDisposition": "Retained earlier-source failure with independent actual completion"
+    },
+    {
+      "executionSha256": "d204cc901c9c1b3c92542e3b8290bec7ff04b1651616ae10a4f8cdb71a597856",
+      "child": {
+        "status": 1,
+        "signal": null,
+        "error": null
+      },
+      "counts": null,
+      "completionError": "VERIFY-CASE-COMPLETION-POLICY",
+      "conserved": true,
+      "restored": true,
+      "sourceSelectedSha256": "13e022b43fb4000fe3e1e353ecef3e9169dbf8d09727c1d744de7dce6189552c",
+      "semanticDisposition": "Startup-only TCC-CASE-ORDER; zero business outcomes"
+    }
+  ],
+  "semanticInputErratumSha256": "50f244568995f0164f86ffe7954aaf20edda75f177104abe6992ee23f5021e7a",
+  "orderOnlyFreezeSha256": "8a9fb8ac9a062566d152e5b20ad4027f362fa0e92b8b6a960d5044ea3cf5ec9a"
+}

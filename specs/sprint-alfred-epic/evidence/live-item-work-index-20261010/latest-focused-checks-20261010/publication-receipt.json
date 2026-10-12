@@ -1,0 +1,37 @@
+{
+  "schema": "alfred.focused-checks.local-publication.v1",
+  "status": "published-and-readback-byte-equal",
+  "publishedAt": "2026-10-10T17:30:08.994Z",
+  "previewFreezeSha256": "e2f394655cf575dac0fbae7fd592c4ec66d35297c7cc759489a6df3b93e7e574",
+  "outputs": [
+    {
+      "name": "checks.json",
+      "sha256": "1ad3c7218738bc1714a9714bd703ab3c199975f53d13f6948459bf99c04bcb3c",
+      "bytes": 14254,
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/checks.json",
+      "mode": 420
+    },
+    {
+      "name": "README.md",
+      "sha256": "50903c8abbad8215cd6f2deae0089ddf51f354a882b1a43c8591bbb20a5c4449",
+      "bytes": 1843,
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/README.md",
+      "mode": 420
+    },
+    {
+      "name": "receipt-bindings.json",
+      "sha256": "153ab79558b4449e701799216ba13da3a916b869fd033f8a74b75e8b7d9191b4",
+      "bytes": 5980,
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/receipt-bindings.json",
+      "mode": 420
+    }
+  ],
+  "inputReceiptsConserved": true,
+  "previewsConserved": true,
+  "businessRuns": 0,
+  "productImports": 0,
+  "gitCommands": 0,
+  "remotePublication": false,
+  "nativeAcceptance": false,
+  "itemAcceptance": false
+}

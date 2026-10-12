@@ -1,0 +1,3 @@
+Root executed four focused controlled checks: 4 PASS, 0 FAIL, complete FD3, 368 resource files and secure runtime ancestry conserved. The actual pure quality descriptor and installer artifact sync/readback/foreign-hook refusal passed on the exact selected private source generation.
+
+These results do not establish an attended Human ceremony, authentic HGO index publication, native Windows durability, latency, item acceptance or the whole lifecycle. U03P001/P002/H001 remain explicit prerequisites. The proposal author wrote this regression; it is separate from the independent Critic. Public files contain only bounded case results, public source digests and capture digests; private runtime paths/logs/keys are omitted.

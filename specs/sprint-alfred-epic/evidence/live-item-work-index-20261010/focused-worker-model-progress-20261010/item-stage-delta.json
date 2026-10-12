@@ -1,0 +1,123 @@
+{
+  "schema": "alfred.latest-item-stage-delta.v1",
+  "proposedOnly": true,
+  "publicMutation": false,
+  "baselineCounts": {
+    "0": 0,
+    "25": 61,
+    "50": 68,
+    "75": 8,
+    "100": 0,
+    "UNKNOWN": 37
+  },
+  "proposedCounts": {
+    "25": 62,
+    "50": 68,
+    "75": 8,
+    "100": 0,
+    "UNKNOWN": 36
+  },
+  "delta": [
+    {
+      "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-dispatch-record-ownership-binds-an-attempted-creation.md",
+          "canonicalPath": "backlog/items/2026-10-05-dispatch-record-ownership-binds-an-attempted-creation.md",
+          "sha256": "965b26a1ddad50fd6c35129e1be985c1f937fd1c39c40f1297b13f199e1be582",
+          "bytes": 1201,
+          "parentSha256": "965b26a1ddad50fd6c35129e1be985c1f937fd1c39c40f1297b13f199e1be582",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation::15.1",
+            "lineStart": 17,
+            "lineEnd": 21
+          },
+          {
+            "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "oldStage": "UNKNOWN",
+      "proposedStage": 25,
+      "reason": "Actual controlled landed creation and linked-worktree shared registry checks now establish concrete partial implementation; UNKNOWN source premise no longer holds.",
+      "proof": {
+        "path": "scratch/alfred-landed-dispatch-ownership-independent-20261010/publication-preparation/proof.json",
+        "sha256": "bffe61d0504540b54ab88bf1f1683e42ef5b5719c28f888c93fbe4d06c0b34d5"
+      },
+      "caseIds": [
+        "LDO001",
+        "LDO002",
+        "LDO003",
+        "LDO004",
+        "LDO005",
+        "LDO006",
+        "LDO007",
+        "LDO008",
+        "LDO009",
+        "LDO010",
+        "LDO011",
+        "LDO012"
+      ],
+      "sourceBindings": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+          "source": {
+            "path": "scratch/alfred-landed-dispatch-ownership-source-20261010/postimages/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+            "sha256": "c90e1be45723b44bfe8fa7a0276004e93aea2b43172f806b39ee70d7bf1174b7",
+            "bytes": 28107
+          }
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "source": {
+            "path": "scratch/alfred-landed-dispatch-ownership-source-20261010/postimages/plugins/pipeline-core/lib/guard/evaluate.mjs",
+            "sha256": "e87ee9b834c2f17cfbfbda90400e9962bbb197abf50fe1dcd93c61303b429e91",
+            "bytes": 32938
+          }
+        }
+      ],
+      "remaining": [
+        "Controlled source-owned METHOD creation and private requester context are qualified; no installed/native posttool ownership issuer is certified.",
+        "Native v1 attempted-write compatibility is retained and is not proof that a file landed.",
+        "Governed later-readiness denial and the whole original item/native end state remain open.",
+        "Historical RC1/RC2 test identifiers were not located; actual linked-worktree shared-owner continuation and foreign refusal are independently exercised.",
+        "No official item closure, candidate integration or release acceptance is claimed."
+      ],
+      "stage50Supported": false,
+      "stage75Supported": false,
+      "officialStatus": "OPEN",
+      "accepted": false,
+      "nativeCertified": false
+    }
+  ],
+  "noPromotion": [
+    {
+      "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+      "stage": 25,
+      "reason": "EFC/AGD focused successes leave genuine inherited/close positive and original happy-path one-review/PO flow unqualified, integration pending."
+    },
+    {
+      "id": "pipeline.model-family-approval-with-automatic-version-upgrades",
+      "stage": 25,
+      "reason": "Model3 does not prove current native source/launch upgrade ownership or full original item."
+    }
+  ],
+  "unmappedWorker": "Component proof retained without inventing a whole-item assignment.",
+  "planningBracket": {
+    "old": {
+      "lowerUnknown0": 31.75287356321839,
+      "upperUnknown75": 47.701149425287355
+    },
+    "proposed": {
+      "lowerUnknown0": 31.896551724137932,
+      "upperUnknown75": 47.41379310344828
+    },
+    "meaning": "Same equal-item/UNKNOWN0–75 formula; one unknown becomes25. This narrows uncertainty, not measured effort gain or acceptance."
+  }
+}

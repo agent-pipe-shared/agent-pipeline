@@ -1,0 +1,14 @@
+{
+  "schema": "alfred.selected164.actual150.private-append.packet.v1",
+  "status": "frozen private metadata; no publisher",
+  "files": [
+    {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed150-power2-append/integration-delta.json",
+      "sha256": "d24f4d3b47ca289093f343c819aea777f4f5bee57990e1bceb2874f40351d931"
+    }
+  ],
+  "productWrites": 0,
+  "businessRuns": 0,
+  "GitOperations": 0,
+  "formalAcceptance": false
+}

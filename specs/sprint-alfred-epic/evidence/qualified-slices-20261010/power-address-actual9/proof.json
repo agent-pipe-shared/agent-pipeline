@@ -1,0 +1,34 @@
+{
+  "schema": "alfred.power-address-focused-proof.v1",
+  "date": "2026-10-10",
+  "scope": "Actual bounded native address namespace and original PWS003 foreign-socket refusal",
+  "caseIds": ["PAN001", "PAN002", "PAN003", "PAN005", "PAN006", "PAN008", "PAN010", "PAN011", "PWS003"],
+  "result": {"exitStatus": 0, "signal": null, "timedOut": false, "declared": 9, "disposed": 9, "pass": 9, "fail": 0, "skip": 0, "todo": 0, "errors": 0},
+  "conservation": {"isolatedSourceFiles": 444, "beforeAfterCas": true, "sharedProviderWrites": 0, "historicalAuthoritiesUntouched": true},
+  "source": {
+    "manifestSha256": "c4adb026fa8347fdba6f613e02ec63ca87a085f38447cc23f56760d6289a144c",
+    "sessionPowerSha256": "9c27c416f827aea84e176ffe82f417776b0b9a9bf2716fcf8258c81ea09d0e8c",
+    "ownedLifecycleSha256": "5b722e4c7a9bf9cd7945947e668107449ab26bcacd45cd266dc184e8986939db",
+    "requesterSha256": "fda05d645a23c8187f19faad2419d9a916d1a4db13ac8c1c9938276384e9c711",
+    "originalPws003CallbackModuleSha256": "88920b6bc1e85b54bc4b03b06f21553bcbf7b1518c81aaf4872ae01fa5407ca1"
+  },
+  "evidenceDigests": {
+    "rootExecutionSha256": "ba72b71fcd6bb495d224af9b062208e45005678b715633c14ba510ab60dbfecd",
+    "stdoutSha256": "d65b5b556c72974986dc9a0c97cefb6cab692c3db0bc0c22f5c0ec04022cfbfa",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fd3Sha256": "12570584312e7a49dd5e81f7e32cdcafaa842f270941792123b9226215325074",
+    "policySha256": "f2bc31317c469fbb35dde4132d9f14258d7b83d41f5d860e1a65d62d53516557",
+    "caseSetSha256": "552842a7da6bf087d6e8b60a9bde1068b806a22d0b5e1f3eab2a500ca27ef6f3",
+    "dispositionsSha256": "88e380b4acbc4d4c66b9dcbfba9e6ad9440ec49196b949c586e3a3ed4b921980"
+  },
+  "held": {
+    "PAN004": "Actual original activation handle and binding publication require separate lifecycle qualification.",
+    "PAN007": "Actual activation binding collision control requires separate lifecycle qualification.",
+    "PAN009": "Admitted child/controller/socket custody requires separate lifecycle qualification.",
+    "PAN012": "An actual overlong OS-home path is not representable on this host without prohibited substitution.",
+    "PAN013": "Original member lifecycle and terminal settlement require separate lifecycle qualification.",
+    "PAN014": "Late foreign endpoint replacement requires separate lifecycle qualification."
+  },
+  "claims": {"nativeAssurance": false, "humanApproval": false, "activatedController": false, "registryRelease": false, "wholePan14": false, "wholePws21": false, "wholeFull26": false},
+  "privacy": "Only sanitized counts, Source identity digests and evidence digests are public. Private baseline paths, runtime identifiers and raw logs are omitted."
+}

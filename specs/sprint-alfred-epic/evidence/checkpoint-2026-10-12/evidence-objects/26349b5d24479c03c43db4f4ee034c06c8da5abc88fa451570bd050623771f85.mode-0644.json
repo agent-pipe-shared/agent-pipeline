@@ -1,0 +1,1738 @@
+{
+  "schema": "alfred.group03.current-main-assessment.v1",
+  "scopeSha256": "aa44cea2e486474b7dc44075a9da91e1d7bf6520872a918bbeb8e7afd4ab2671",
+  "items": [
+    {
+      "id": "pipeline.desktop-app-support-is-unverified",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-desktop-app-support-is-unverified.md",
+        "canonicalPath": "backlog/items/2026-10-07-desktop-app-support-is-unverified.md",
+        "sha256": "d6059abe31ef6ea8ba7868d9f3057a5bc39d28a6821f04dfbb34a0475cf494f1",
+        "bytes": 2213,
+        "parentSha256": "d6059abe31ef6ea8ba7868d9f3057a5bc39d28a6821f04dfbb34a0475cf494f1",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "d6059abe31ef6ea8ba7868d9f3057a5bc39d28a6821f04dfbb34a0475cf494f1",
+      "bodyDrift": false,
+      "disposition": "implemented-guidance/native-hold",
+      "implemented": "Desktop support warning and WSL no-plugin limit are present.",
+      "remaining": "Actual Windows Desktop bootstrap/denial/background/status-line checklist remains unverified.",
+      "nextOwnerDuty": "Native installed consumer qualifier",
+      "currentMainSources": [
+        {
+          "path": "docs/runner-support.md",
+          "present": true,
+          "sha256": "1668a5b4efd54fa34d4caca0ac14ef07457ca0bee96f771b69e66f195eb3ce7f"
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Native Desktop checklist owner: observe original accepted gates on actual supported Desktop Windows host; retain typed unverified status and published warnings until qualified. No network/vendor support or native claims made by this audit.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md",
+        "canonicalPath": "backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md",
+        "sha256": "26e8a52017698b47281510a88bd3c8a1114f5e2bdb9fb5e4f6d2bec3e0d9a225",
+        "bytes": 1679,
+        "parentSha256": "26e8a52017698b47281510a88bd3c8a1114f5e2bdb9fb5e4f6d2bec3e0d9a225",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "26e8a52017698b47281510a88bd3c8a1114f5e2bdb9fb5e4f6d2bec3e0d9a225",
+      "bodyDrift": false,
+      "disposition": "partial-implementation/functional-gap",
+      "implemented": "Native finalizer now records genuine host-prepared/return observations; CLR12 conserves closing lane.",
+      "remaining": "Real worker phase events and count/measurement carrier remain missing; host calls are not worker tool counts.",
+      "nextOwnerDuty": "Native dispatch progress source owner",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "present": true,
+          "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+        }
+      ],
+      "retainedProofReferences": [
+        {
+          "reference": {
+            "name": "CLR12",
+            "proof": {
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/clr12/qualification-manifest.json",
+              "sha256": "6a8bfbeaaa6998257ca397d7377cbb4633a83c9c20e2977f7e7c9108cc6042b8"
+            },
+            "pass": 12,
+            "caseEvidence": null,
+            "canonicalPaths": [
+              "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs"
+            ],
+            "backlogIds": [
+              "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+              "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries"
+            ],
+            "relatedCriteria": [
+              "AC-29",
+              "AC-37"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Closing command lane only; no full phase-record population or native host proof; five bounded attempts retained."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+                "currentAuditSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+              }
+            ],
+            "officialClosure": false
+          },
+          "claim": "Retained item-scoped reference; no new execution/parser/authenticity inference."
+        }
+      ],
+      "originalRecordedRemaining": [
+        "Reuse CLR12 closing-lane proof; independently bind actual per-phase population, skipped-entry cause measurements, append cost and terminal nonempty-log behavior. Closing allowance alone does not prove these clauses.",
+        "Retain completed CLR12 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Closing command lane only; no full phase-record population or native host proof; five bounded attempts retained.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step."
+      ],
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-dispatch-record-ownership-binds-an-attempted-creation.md",
+        "canonicalPath": "backlog/items/2026-10-05-dispatch-record-ownership-binds-an-attempted-creation.md",
+        "sha256": "965b26a1ddad50fd6c35129e1be985c1f937fd1c39c40f1297b13f199e1be582",
+        "bytes": 1201,
+        "parentSha256": "965b26a1ddad50fd6c35129e1be985c1f937fd1c39c40f1297b13f199e1be582",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "965b26a1ddad50fd6c35129e1be985c1f937fd1c39c40f1297b13f199e1be582",
+      "bodyDrift": false,
+      "disposition": "focused-proof/current-binding-gap",
+      "implemented": "LDO12 actual controlled-method proof exists.",
+      "remaining": "Bind its exact three qualified Source leaves to current Main; native landed issuer/consumer remains held.",
+      "nextOwnerDuty": "Integration owner plus native dispatch owner",
+      "currentMainSources": [],
+      "retainedProofReferences": [
+        {
+          "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/publication-preparation/proof.json",
+          "sha256": "bffe61d0504540b54ab88bf1f1683e42ef5b5719c28f888c93fbe4d06c0b34d5"
+        }
+      ],
+      "originalRecordedRemaining": [
+        "Controlled source-owned METHOD creation and private requester context are qualified; no installed/native posttool ownership issuer is certified.",
+        "Native v1 attempted-write compatibility is retained and is not proof that a file landed.",
+        "Governed later-readiness denial and the whole original item/native end state remain open.",
+        "Historical RC1/RC2 test identifiers were not located; actual linked-worktree shared-owner continuation and foreign refusal are independently exercised.",
+        "No official item closure, candidate integration or release acceptance is claimed."
+      ],
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.dispatch-records-land-under-specs-evidence",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-dispatch-records-land-under-specs-evidence.md",
+        "canonicalPath": "backlog/items/2026-10-05-dispatch-records-land-under-specs-evidence.md",
+        "sha256": "967fad3dca7987083be6f3ba5b5102bde841115396f031b1f04e2de3a734f114",
+        "bytes": 2136,
+        "parentSha256": "967fad3dca7987083be6f3ba5b5102bde841115396f031b1f04e2de3a734f114",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "967fad3dca7987083be6f3ba5b5102bde841115396f031b1f04e2de3a734f114",
+      "bodyDrift": false,
+      "disposition": "functional-gap/source-proposal",
+      "implemented": "Direct evidence Write chain does not reject nested dispatch-record filename; sanctioned writer already requires root evidence.",
+      "remaining": "Private lane-only correction prepared; Root CAS integration and consumer qualification remain pending.",
+      "nextOwnerDuty": "Root integration",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+          "sha256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+          "bytes": 12838,
+          "mode": "0o644",
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+          "bytes": 32556,
+          "mode": "0o644",
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+          "sha256": "c6bcf57a93093af9bdd0307ff9df91d71edaa9059d997bba8061ebf003022bc8",
+          "bytes": 34029,
+          "mode": "0o644",
+          "nlink": 1
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Prove a genuine direct Write outside repository-root evidence is refused, with root positive/collision controls; source correction only if that substantive case fails. Do not move old evidence under this audit.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-existing-signing-key-reuse-deadlocks-onboarding.md",
+        "canonicalPath": "backlog/items/2026-09-29-existing-signing-key-reuse-deadlocks-onboarding.md",
+        "sha256": "440165b16c815c1a856a2afe9e3c762a909a36404cedeaac21ecdb93cf224d50",
+        "bytes": 961,
+        "parentSha256": "440165b16c815c1a856a2afe9e3c762a909a36404cedeaac21ecdb93cf224d50",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "440165b16c815c1a856a2afe9e3c762a909a36404cedeaac21ecdb93cf224d50",
+      "bodyDrift": false,
+      "disposition": "implemented/consumer-verification",
+      "implemented": "Canonical existing-key realpath comparison and child-only private-key ceremony exist.",
+      "remaining": "Qualify attended reuse/recovery with synthetic keys at current consumer boundary; no real key reads.",
+      "nextOwnerDuty": "Onboarding consumer qualifier",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/scripts/onboarding-init.mjs",
+          "sha256": "95334f693f879d43c18903aa57f79c89bc9b8ad6e21ab1fe2ca8755d52752c40",
+          "bytes": 77337,
+          "mode": "0o644",
+          "nlink": 2
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Reuse the existing key-recovery producer; bind the original first-anchor and conservation matrix using synthetic method keys without granting human signature authority.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+        "canonicalPath": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+        "sha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+        "bytes": 3470,
+        "parentSha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+      "bodyDrift": true,
+      "disposition": "functional-gap/provenance-hold",
+      "implemented": "Explicit Codex multi-segment private successor prepared from observed Main reader; published Main still refuses repeated IDs.",
+      "remaining": "Root CAS integration/independent qualification of Codex segment proposal; Claude/Agy host-authenticated adapter and consent contracts; child relation/all-turn usage projection; original body custody drift.",
+      "nextOwnerDuty": "Transcript recovery Source owner",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+          "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+          "bytes": 15099,
+          "mode": "0o644",
+          "nlink": 1
+        },
+        {
+          "path": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+          "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+          "bytes": 7902,
+          "mode": "0o644",
+          "nlink": 1
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Resolve original Git-blob custody independently. Multi-segment/all-runner transcript export remains a concrete source gap in the examined reader; reconcile continuity/Verify/index clauses separately and current additions as unreconciled provenance, never substitute f29 for c5da.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [
+        {
+          "line": 37,
+          "text": {
+            "excluded": true,
+            "rawSha256": "36f2f9435d708f80216c53eefa270ff69d04d87a490bf1cc2ca08fd3e2388ed8",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 38,
+          "text": {
+            "excluded": true,
+            "rawSha256": "1dfa76216ffcc1238bf7466f27ff9299c0c03031632bf13a45c9461157e70a28",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 39,
+          "text": {
+            "excluded": true,
+            "rawSha256": "a096b8a7d18a091d579d8c9babdc36ecd562c65c0f97d2c5ae68b092a9ccff29",
+            "bytes": 24,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 40,
+          "text": {
+            "excluded": true,
+            "rawSha256": "c04f530f46cb4df44132cb1cf187c724363ec0ed3ceae35b0cdb0dc9c922a284",
+            "bytes": 76,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 41,
+          "text": {
+            "excluded": true,
+            "rawSha256": "0d937040f0aee5b4efe87d0f4dc5ae993fa4aabf2e7ff7ed5935e58cff24e6a3",
+            "bytes": 40,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 42,
+          "text": {
+            "excluded": true,
+            "rawSha256": "33c94c386cb6034c6fd2f0f944e056aa68e338b54c83f993bcaa9756daa0e2fe",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 43,
+          "text": {
+            "excluded": true,
+            "rawSha256": "22baa99a07197ff502162747ee2178284a8c8a34ff120719ad106d4c87182c6c",
+            "bytes": 32,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 44,
+          "text": {
+            "excluded": true,
+            "rawSha256": "a10dec965773254988bc74f9490ef7fea7eb2e30ce0a173dbaeb1a437e24c0e4",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 45,
+          "text": {
+            "excluded": true,
+            "rawSha256": "c2b8d0e2ceb129d663ffc18e14e94616548bba3ff96af00c4cdb8f01757b4651",
+            "bytes": 27,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 46,
+          "text": {
+            "excluded": true,
+            "rawSha256": "1d3c879589d2876af53d57caa5dc2a926fc428f279da434f7dd88e46f19ad9c6",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 47,
+          "text": {
+            "excluded": true,
+            "rawSha256": "6dae346b03daf8c7761acd81cb199cdafdfdd8055db86d9675268bb9aeaaa431",
+            "bytes": 38,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-git-hook-runtime-snapshots-go-stale-after-plugin-changes.md",
+        "canonicalPath": "backlog/items/2026-10-04-git-hook-runtime-snapshots-go-stale-after-plugin-changes.md",
+        "sha256": "5f4446d22e09a3270689a0c9846f3d13cf52c602901b57680abe33e71df131e8",
+        "bytes": 2758,
+        "parentSha256": "5f4446d22e09a3270689a0c9846f3d13cf52c602901b57680abe33e71df131e8",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "5f4446d22e09a3270689a0c9846f3d13cf52c602901b57680abe33e71df131e8",
+      "bodyDrift": false,
+      "disposition": "implemented-integrity/freshness-binding-gap",
+      "implemented": "Snapshot publisher double-reads Source and verifies immutable snapshot content.",
+      "remaining": "A frozen snapshot integrity check does not establish comparison to currently installed plugin identity; bind actual refresh/admission consumer and POSIX/Windows evidence.",
+      "nextOwnerDuty": "Hook installer consumer owner",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+          "sha256": "0bb1f7d42faf7529430096dbb09e94a555c8411751751818b2c5ffaebd5e109b",
+          "bytes": 4089,
+          "mode": "0o644",
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+          "sha256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+          "bytes": 21968,
+          "mode": "0o644",
+          "nlink": 2
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Bind actual install/refresh and commit/preflight consumers, then qualify stale diagnosis and cp/mv/install destination semantics on the original POSIX/Windows consumer layouts.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+        "canonicalPath": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+        "sha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+        "bytes": 1486,
+        "parentSha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "bd8c02353bc7c72c310bc6ffbdba0d5d1f8fe93b4fa53585f9deb1e1e845bd47",
+      "bodyDrift": true,
+      "disposition": "focused-implementation/consumer-verification",
+      "implemented": "Template reserves five closing calls and CLR12 closing lane is qualified.",
+      "remaining": "Current canonical writer ceremony and index.lock retry consumption still require exact candidate proof.",
+      "nextOwnerDuty": "Commit producer qualifier",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "present": true,
+          "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+          "present": true,
+          "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+          "present": false,
+          "sha256": null
+        },
+        {
+          "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+          "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+          "bytes": 57670,
+          "mode": "0o644",
+          "nlink": 1
+        }
+      ],
+      "retainedProofReferences": [
+        {
+          "reference": {
+            "name": "CLR12",
+            "proof": {
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/clr12/qualification-manifest.json",
+              "sha256": "6a8bfbeaaa6998257ca397d7377cbb4633a83c9c20e2977f7e7c9108cc6042b8"
+            },
+            "pass": 12,
+            "caseEvidence": null,
+            "canonicalPaths": [
+              "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs"
+            ],
+            "backlogIds": [
+              "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+              "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries"
+            ],
+            "relatedCriteria": [
+              "AC-29",
+              "AC-37"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Closing command lane only; no full phase-record population or native host proof; five bounded attempts retained."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+                "currentAuditSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+              }
+            ],
+            "officialClosure": false
+          },
+          "claim": "Retained item-scoped reference; no new execution/parser/authenticity inference."
+        },
+        {
+          "reference": {
+            "name": "DBLO13",
+            "proof": {
+              "path": "legacy-origin:alfred-critic-external-stop-combined-qualification-20261010/execution-v2.json",
+              "sha256": "bdf9671f926a27fee22e4d12d4f684dd0cd16c6101d6176816318f231106f0ce"
+            },
+            "pass": 13,
+            "caseEvidence": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "cabe4b13c1d4cc5ca92f783a90a8dec47569dc1811ff1814d21b027546596ab9",
+              "caseSetSha256": "97602d24323e998ce10c015bf0f5506832486de2132ebe1216c67a1697be0896",
+              "dispositionsSha256": "16c9ba1dbe9c252e5f8cbc3546bb112540bace1ec7db2f196aa45ad0cf1a63a7",
+              "declaredCount": 13,
+              "disposedCount": 13,
+              "counts": {
+                "pass": 13,
+                "fail": 0,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "canonicalPaths": [
+              "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+              "plugins/pipeline-core/lib/critic-course-admission.mjs"
+            ],
+            "backlogIds": [
+              "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+              "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+              "pipeline.goldfish-budgets-omit-the-closing-ceremony"
+            ],
+            "relatedCriteria": [
+              "AC-29",
+              "AC-37"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Actual CRT035 plus DBLO001–012; controlled producer/guard/course/claim/finalizer. Later b507 guard successor needs conserved joint candidate binding; no host/model/human authority."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+                "currentAuditSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+              },
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+                "currentAuditSha256": null
+              },
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+                "currentAuditSha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0"
+              }
+            ],
+            "officialClosure": false
+          },
+          "claim": "Retained item-scoped reference; no new execution/parser/authenticity inference."
+        }
+      ],
+      "originalRecordedRemaining": [
+        "First bind the unreconciled ac988e33→bd8c0235 body successor. Reuse CLR12 actual canonical closing-lane checks. Still bind full template closing allowance, foreground long-suite behavior and single internal index.lock retry, plus the observed CL-P-21 cap/record/root/dispatch negative controls without equating CRT direct Write proof to Bash-positive evidence.",
+        "Retain completed CLR12, DBLO13 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Closing command lane only; no full phase-record population or native host proof; five bounded attempts retained.; Actual CRT035 plus DBLO001–012; controlled producer/guard/course/claim/finalizer. Later b507 guard successor needs conserved joint candidate binding; no host/model/human authority.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step."
+      ],
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-goldfish-test-briefs-lack-targeted-and-quick-command-routes.md",
+        "sha256": "0f942f9a630b0f1230425e1849da1756544abdab666b828ab6ff8f2420dce136"
+      },
+      "observedBodySha256": "0f942f9a630b0f1230425e1849da1756544abdab666b828ab6ff8f2420dce136",
+      "bodyDrift": false,
+      "disposition": "implemented-guidance/consumer-gap",
+      "implemented": "Template defines targeted commands, honest absent Quick and Coordinator final full Verify.",
+      "remaining": "Actual emitted brief/Quick configured-or-absent consumer coverage remains missing; do not fabricate a Quick command.",
+      "nextOwnerDuty": "Quick consumer qualification owner",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "present": true,
+          "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e"
+        },
+        {
+          "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+          "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+          "bytes": 57670,
+          "mode": "0o644",
+          "nlink": 1
+        }
+      ],
+      "retainedProofReferences": [
+        {
+          "reference": {
+            "name": "HRC20",
+            "scope": "closed reporter command classification",
+            "baselineCounts": {
+              "pass": 15,
+              "fail": 5,
+              "skip": 0,
+              "todo": 0
+            },
+            "fixedCounts": {
+              "pass": 20,
+              "fail": 0,
+              "skip": 0,
+              "todo": 0
+            },
+            "executionSha256": "6ff8957555d2051183a77bf1b6a8c8d9a09b61d18cae44cbbdda9ba222f69551",
+            "trackedProof": {
+              "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/hrc-actual20/manifest.json",
+              "sha256": "a618c76883be86f44579d6c1b274383754e61ac9b67a44595749f475fbd23f3b",
+              "fixedPass": 20
+            },
+            "noNativeClaim": true
+          },
+          "claim": "Retained item-scoped reference; no new execution/parser/authenticity inference."
+        }
+      ],
+      "originalRecordedRemaining": [
+        "Retain original criterion and bind current full-item proof before promotion.",
+        "Retain actual HRC20 proof and audit104 materialization; qualify remaining item-specific reporter/runtime/native obligations before any acceptance or closure."
+      ],
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [
+        {
+          "line": 25,
+          "text": {
+            "excluded": true,
+            "rawSha256": "25ee0221ed02f53b65db978f0d812abb15af9d05267fd3f85db2ac4460a1550b",
+            "bytes": 133,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 26,
+          "text": {
+            "excluded": true,
+            "rawSha256": "5e251118eae7a5628ad7acd636ed0a1b4e2d763b9c161b41b74c01baeb42b03f",
+            "bytes": 95,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 27,
+          "text": {
+            "excluded": true,
+            "rawSha256": "b45423ca41379f6a52ecb50a3be07ce53234207861edb9897005c6d1af4dad75",
+            "bytes": 164,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 28,
+          "text": {
+            "excluded": true,
+            "rawSha256": "3df84f9eb04816379afbc0cda77499f5141886687071061af257a11267574aed",
+            "bytes": 147,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 29,
+          "text": {
+            "excluded": true,
+            "rawSha256": "9cee1bb7d48e2fe7398e8bab9e637d0d5a8f86d7cc0f7b98eb35cca38fd4428a",
+            "bytes": 179,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-greenfield-approval-policy-applies-after-intake-transition.md",
+        "canonicalPath": "backlog/items/2026-09-27-greenfield-approval-policy-applies-after-intake-transition.md",
+        "sha256": "e0fe1a972cd5dfeb50470416bb0bc351c1623c3f1facf50d8ba407e5ae5948e8",
+        "bytes": 5418,
+        "parentSha256": "e0fe1a972cd5dfeb50470416bb0bc351c1623c3f1facf50d8ba407e5ae5948e8",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "e0fe1a972cd5dfeb50470416bb0bc351c1623c3f1facf50d8ba407e5ae5948e8",
+      "bodyDrift": false,
+      "disposition": "implemented/boundary-verification",
+      "implemented": "Initial-answer routing and pre-design policy choices are present in project Source.",
+      "remaining": "Current multilingual policy publication/nextAction and no-progress return behavior need candidate-bound actual proof.",
+      "nextOwnerDuty": "Onboarding consumer qualifier",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "present": true,
+          "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9"
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Reconcile published ask with existing trust-anchor/Ruling157 authority rather than broaden guard; qualify atomic answer persistence/phase/exit parity on actual allowed route.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [
+        {
+          "line": 49,
+          "text": {
+            "excluded": true,
+            "rawSha256": "c40e32aeea0ca795bcfebbe11182c9e07b7078410d04e8e37b52187c61d6d04a",
+            "bytes": 74,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 50,
+          "text": {
+            "excluded": true,
+            "rawSha256": "832a9efbebfdb21956653a0f3e3460354b2be12f7eeac7b2a56ed5c294bc73bd",
+            "bytes": 61,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 51,
+          "text": {
+            "excluded": true,
+            "rawSha256": "eb61c7cf1b255a46579d41beefcc254f0b5217e33906f94153faba1719e94b00",
+            "bytes": 65,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 52,
+          "text": {
+            "excluded": true,
+            "rawSha256": "a6340a714d212ef0f14cb4913f9dfafd2aa460c8c12df7edff884e01a63b963b",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 53,
+          "text": {
+            "excluded": true,
+            "rawSha256": "86255bd39a9921629ff945524878c03e0d315db3d21c2ca5e6930997955edc5b",
+            "bytes": 66,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 54,
+          "text": {
+            "excluded": true,
+            "rawSha256": "5e071850f7592ed0c1830f43afc1ee98ef6d1662ab6847f732b82b08edef96e1",
+            "bytes": 72,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 55,
+          "text": {
+            "excluded": true,
+            "rawSha256": "28158c0f480d9f7d1694317f01ddf152d6cdd658df709bc7787bb8ab21251f43",
+            "bytes": 44,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 56,
+          "text": {
+            "excluded": true,
+            "rawSha256": "d2625584226c562fafa5e58580fac166f99cb0258c09cca371c30115c45df5c8",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 57,
+          "text": {
+            "excluded": true,
+            "rawSha256": "2db773e15b95aea3e6da04d5d8e4d5ae5b6f09b11e0cf7cc9349bf746ffb7f49",
+            "bytes": 76,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 58,
+          "text": {
+            "excluded": true,
+            "rawSha256": "f481b3f10758e864adbc6e4f27accaefb003b0fb222712f8cddac0169897561a",
+            "bytes": 54,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 60,
+          "text": {
+            "excluded": true,
+            "rawSha256": "fb2a0401e46229cb8a87f40bbf0aa2e2297107c5e14f5c8eefddef49d5fcefd5",
+            "bytes": 74,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 61,
+          "text": {
+            "excluded": true,
+            "rawSha256": "7e4023f46fdd653e71c98975835bf98edfe58c2e41b8207761ef8519b639c6be",
+            "bytes": 33,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-greenfield-comparisons-need-reproducible-public-evidence.md",
+        "canonicalPath": "backlog/items/2026-10-09-greenfield-comparisons-need-reproducible-public-evidence.md",
+        "sha256": "39eb93d4a6fa0b5d3f737f8fe4791e417f735ffd879b680aea520fcd7146af6e",
+        "bytes": 3690,
+        "parentSha256": "39eb93d4a6fa0b5d3f737f8fe4791e417f735ffd879b680aea520fcd7146af6e",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "39eb93d4a6fa0b5d3f737f8fe4791e417f735ffd879b680aea520fcd7146af6e",
+      "bodyDrift": false,
+      "disposition": "focused-implementation/real-input-hold",
+      "implemented": "Public comparison implements arithmetic, denominators, uncertainty, privacy projection and exclusive CAS output.",
+      "remaining": "Real retrospective data lineage and consumer input custody remain unknown; synthetic comparison proof is not real reports.",
+      "nextOwnerDuty": "Public comparison consumer owner",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+          "present": true,
+          "sha256": "9ce8b654233a97a7ce63ded8a40c54fb398983939aa9ef0d121fc4381a12c44d"
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Bind synthetic Comparison15 and actual public derivative lineage; original private artifacts unavailable is visible, no ROI or original reproduction claim.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [
+        {
+          "line": 35,
+          "text": {
+            "excluded": true,
+            "rawSha256": "71dd61e35b061bfc7024ab17d07210c6ba597fb97e3ea6c58e24fc1df4ac93a3",
+            "bytes": 165,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 36,
+          "text": {
+            "excluded": true,
+            "rawSha256": "3e591ae42b5cda615ecf831352554ed4203b9e417d7037d84aaebc481369b787",
+            "bytes": 186,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 37,
+          "text": {
+            "excluded": true,
+            "rawSha256": "fee9d3d1e2e98426b814d278822d9be83213c7d16aeaf2095a96e78a455689bf",
+            "bytes": 162,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 38,
+          "text": {
+            "excluded": true,
+            "rawSha256": "4bc8ee48f1b41df95c6d07217c16b66552634f9cabbcd7c79a7ff76f5dd30acb",
+            "bytes": 243,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 39,
+          "text": {
+            "excluded": true,
+            "rawSha256": "8b70bf941d388c55e287b1a2879cf44f62596f7367f3836c4846cac4b1328a71",
+            "bytes": 215,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.greenfield-design-course-cost-and-proportionality",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md",
+        "canonicalPath": "backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md",
+        "sha256": "ab10d421a47de3aee032785042c5029b69f734323b6a1844fa376f706ca17942",
+        "bytes": 6115,
+        "parentSha256": "ab10d421a47de3aee032785042c5029b69f734323b6a1844fa376f706ca17942",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "ab10d421a47de3aee032785042c5029b69f734323b6a1844fa376f706ca17942",
+      "bodyDrift": false,
+      "disposition": "policy-successor/consumer-verification",
+      "implemented": "Current design-course uses receipt-based aggregated design, optional Advisor, one full/one correction and one bundled approval.",
+      "remaining": "Historical mandatory Advisor/DWP clauses are retired; qualify current happy course and measure actual cost without restoring them.",
+      "nextOwnerDuty": "Design-course qualifier",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "present": true,
+          "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9"
+        },
+        {
+          "path": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+          "present": true,
+          "sha256": "3f6be98c495e7318523987632528584119d3b99b0ddf04a9f7942694a069fb3a"
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Actual phase/tool/human wait and trustworthy host tokens plus fresh low-risk/high-risk run remain unqualified.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [
+        {
+          "line": 37,
+          "text": {
+            "excluded": true,
+            "rawSha256": "442c04dd7850450a26da75f91e3205d11bd4059372dffa3edaca619e23879616",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 38,
+          "text": {
+            "excluded": true,
+            "rawSha256": "b491fefa80c56881e57dc552081e2ecb106a7be4421070ac7adb4e36c8c0aef4",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 39,
+          "text": {
+            "excluded": true,
+            "rawSha256": "e5cac605ddc37baf59c9e6d4399548b8b75310dfab9e64d0761e3d0b82d5171b",
+            "bytes": 48,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 40,
+          "text": {
+            "excluded": true,
+            "rawSha256": "e372a0fb48fbe77e67810f3c7d57393a98ac9027df81f1d37bec6690564bd902",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 41,
+          "text": {
+            "excluded": true,
+            "rawSha256": "a8a72b85be5b8911772fa938b302c57562b54578dde588c584a7a00e04126ff3",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 42,
+          "text": {
+            "excluded": true,
+            "rawSha256": "4a131f181579f74b5b1b5b7a0e36a9cded2e96e3181f06998ccc256fdaec5c57",
+            "bytes": 72,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 43,
+          "text": {
+            "excluded": true,
+            "rawSha256": "b56ef64bf18cfa576112aef99edce18e9233e05a1808ee4224776df9cbaad31f",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 44,
+          "text": {
+            "excluded": true,
+            "rawSha256": "9bbffaed06ee2321a8a8f411d8fdaade95a5a472b159a23cc072f0217296bfd1",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 45,
+          "text": {
+            "excluded": true,
+            "rawSha256": "7750cc07887c9e6ba8c513e81528742ae3c2a9b62be07730934d3c373f3554d7",
+            "bytes": 80,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 46,
+          "text": {
+            "excluded": true,
+            "rawSha256": "ea54c3e9c2f8d4d78883ccd9bf22032866e8961a90a5babede14a6cba78748ac",
+            "bytes": 71,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 47,
+          "text": {
+            "excluded": true,
+            "rawSha256": "c36e87c4e86b85586341269f3750d066d3ef3b0030fc8799750a8f9d411b0ec0",
+            "bytes": 70,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 48,
+          "text": {
+            "excluded": true,
+            "rawSha256": "1efa7d4d38af8d5490668f0d7c991019939c04322c0cbaf79eb2e9018fb0b650",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 49,
+          "text": {
+            "excluded": true,
+            "rawSha256": "fe398c6da2be7eb58488935652982d19f17f8b1ab933cd53b985d932393ce234",
+            "bytes": 59,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 50,
+          "text": {
+            "excluded": true,
+            "rawSha256": "461dbcd1afae94422146b9c69a6fd7b4bcd2566668bb8da88736f84a79042c62",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 51,
+          "text": {
+            "excluded": true,
+            "rawSha256": "a39b345dec7fbe6b4785234da4b0bc929de009343886d9412ddd473d2d1fe5c8",
+            "bytes": 73,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 52,
+          "text": {
+            "excluded": true,
+            "rawSha256": "185cc0d7fb50bd3e6ab774864f54be18e360236b5a21a699c1a6e8681901c61b",
+            "bytes": 65,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 53,
+          "text": {
+            "excluded": true,
+            "rawSha256": "b4115d2220b18f78f466a1eac7ea1345b219de931c13aa83c8bc3757cf02b6ec",
+            "bytes": 79,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 54,
+          "text": {
+            "excluded": true,
+            "rawSha256": "91f6e3153d9e44a3a4c327b0c9de9fc20473ccbcfeb5dd5cd9ea9880d295ab8e",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 55,
+          "text": {
+            "excluded": true,
+            "rawSha256": "35ae0328e72c090a6bd71bf37b0587ad5162f94269638d91379af3b9e40b043d",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 56,
+          "text": {
+            "excluded": true,
+            "rawSha256": "e4d301b6ffaf416c580582b103d24c88a2eed00d3a8b38978e99a06a83991341",
+            "bytes": 71,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 57,
+          "text": {
+            "excluded": true,
+            "rawSha256": "88341fdbe7263845d68da48e2245b0eb36e457fe3541712710aa41b3279abb22",
+            "bytes": 61,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.greenfield-machine-output-and-skill-budget",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-greenfield-machine-output-and-skill-budget.md",
+        "canonicalPath": "backlog/items/2026-09-29-greenfield-machine-output-and-skill-budget.md",
+        "sha256": "2d5579581ab886e21ba92409318259fc04c343a0c4cebe7badc8b64b79beebc6",
+        "bytes": 1227,
+        "parentSha256": "2d5579581ab886e21ba92409318259fc04c343a0c4cebe7badc8b64b79beebc6",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "2d5579581ab886e21ba92409318259fc04c343a0c4cebe7badc8b64b79beebc6",
+      "bodyDrift": false,
+      "disposition": "partial-implementation/consumer-verification",
+      "implemented": "Initial ask deduplication and bounded/lazy common bootstrap are present.",
+      "remaining": "Current denial/help digest and stable byte budgets across all three actual runners still need precise consumer bindings.",
+      "nextOwnerDuty": "Bootstrap and help consumer qualifier",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "present": true,
+          "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9"
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": "Bind digest-help/common-skill producer and byte budget on all three runners; no broad output-budget receipt exists in selected proof mapping.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [
+        {
+          "line": 17,
+          "text": {
+            "excluded": true,
+            "rawSha256": "37ae02b133814ae67026d47b7974da1c427de2379821e11576a99d2193705063",
+            "bytes": 76,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 18,
+          "text": {
+            "excluded": true,
+            "rawSha256": "31eb7b010d3c47c447a4210476ddba5e632bff483b933828a83966ede4d6d162",
+            "bytes": 52,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 19,
+          "text": {
+            "excluded": true,
+            "rawSha256": "732cf13705aca75913c336818b5f677f9c4f7d91e935277a70031b7cba5aecf1",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 20,
+          "text": {
+            "excluded": true,
+            "rawSha256": "b72dd0d2ea7ce629e1c0828847621b64e74e443094a13370ca40e615bb326482",
+            "bytes": 77,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 21,
+          "text": {
+            "excluded": true,
+            "rawSha256": "49702d9a692ba8a9d3c40184b9cb781077c1105b8cf54dafe661b986e075751e",
+            "bytes": 54,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 22,
+          "text": {
+            "excluded": true,
+            "rawSha256": "f877eb0d1731443618c52e0fce81cfea1157c5e32ece452a62cd5e1c3ed6bfd8",
+            "bytes": 74,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 23,
+          "text": {
+            "excluded": true,
+            "rawSha256": "d7559059fc8b3c858c8219603327c0e60f10ffee2a1e84b92eecf95b0fb4cac2",
+            "bytes": 73,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 24,
+          "text": {
+            "excluded": true,
+            "rawSha256": "5f166afab8fa4f6ef8e73c39d5fce822d2aae0b73e51408b36869abb11cb19e8",
+            "bytes": 34,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 25,
+          "text": {
+            "excluded": true,
+            "rawSha256": "873216beab8e769923f00ab286a8677301cff9b5a2a7002a45bb2e31f702d0da",
+            "bytes": 76,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 26,
+          "text": {
+            "excluded": true,
+            "rawSha256": "222969167606088d3493424c100d84fdf59db9b9c4c5894426b8d573a3a3d0d2",
+            "bytes": 76,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 27,
+          "text": {
+            "excluded": true,
+            "rawSha256": "073e2a86b5164986d3680d1b38a7c4012c0c17a0d3dc78984e4dcd819358d3f9",
+            "bytes": 41,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+        "canonicalPath": "backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+        "sha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+        "bytes": 1717,
+        "parentSha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+      "bodyDrift": false,
+      "disposition": "native-consumer-verification-hold",
+      "implemented": "Original item explicitly requests testing existing orphan recovery, not speculative new implementation.",
+      "remaining": "Installed mid-Verify crash, resource readback and typed archival/orphan/unknown classifications remain unqualified.",
+      "nextOwnerDuty": "Recovery native consumer qualifier",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+          "present": true,
+          "sha256": "2dff589e957ae9b2de059b35b57888232a2a18e3f28ffb39832c8f64a0bc0fc6"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "present": true,
+          "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/session-authority-observers.mjs",
+          "present": true,
+          "sha256": "2df8489463e3e63a24e55904738b8a9f2e10a648804e9c12815caa281866b819"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+          "present": true,
+          "sha256": "c99115b6ba480b727627dec585a4b5f69350dfdc0bd082b97bbbdb79dc4eb7ef"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+          "present": true,
+          "sha256": "90d173880447fdd17507e438d5227d09cd0d7e20f2e94e8067df5cda6b9cbad0"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+          "present": true,
+          "sha256": "6d439b3f52cde3e205a3e0ffd589bc7a9dc122b6f3e64f0986979e533d429377"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "present": true,
+          "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/session-cleanup.mjs",
+          "present": true,
+          "sha256": "3f7c68b622a6f9ab756ce4b7dbefed315890081883b7f26a8f86fb866ce48d4d"
+        }
+      ],
+      "retainedProofReferences": [
+        {
+          "name": "STB12-first"
+        },
+        {
+          "name": "STB12-second"
+        }
+      ],
+      "originalRecordedRemaining": "Bind genuine crash/resource signed-custody qualification; zero-authority archive alone is insufficient.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-implementation-without-dispatch-escapes-review-coverage.md",
+        "canonicalPath": "backlog/items/2026-10-09-implementation-without-dispatch-escapes-review-coverage.md",
+        "sha256": "f859ed29ffbb04f81d07dd990d5e5da071ecf4e7f8c21540a5fa8bd17ab4fd5c",
+        "bytes": 3470,
+        "parentSha256": "f859ed29ffbb04f81d07dd990d5e5da071ecf4e7f8c21540a5fa8bd17ab4fd5c",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "f859ed29ffbb04f81d07dd990d5e5da071ecf4e7f8c21540a5fa8bd17ab4fd5c",
+      "bodyDrift": false,
+      "disposition": "report-only-implemented/consumer-verification",
+      "implemented": "M2 report explicitly rejects zero-row coverage, retains unknown and has no completion effect.",
+      "remaining": "Candidate baseline/mapping/admission consumer evidence remains missing; accepted M2B forbids adding a completion gate.",
+      "nextOwnerDuty": "Coverage report consumer qualifier",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "present": true,
+          "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+          "present": true,
+          "sha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+          "present": true,
+          "sha256": "e36c1e06fbe8917e276420348ba0620f991fc2d5252f9db7a37599ae04d10c03"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+          "present": true,
+          "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+          "present": false,
+          "sha256": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-lifecycle.mjs",
+          "present": false,
+          "sha256": null
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+          "present": true,
+          "sha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+          "present": true,
+          "sha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+          "present": true,
+          "sha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+          "present": true,
+          "sha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/report-source-readers.mjs",
+          "present": true,
+          "sha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/review-economy.mjs",
+          "present": true,
+          "sha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+          "present": true,
+          "sha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+          "present": true,
+          "sha256": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+          "present": true,
+          "sha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+          "present": true,
+          "sha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+          "present": true,
+          "sha256": "c6bcf57a93093af9bdd0307ff9df91d71edaa9059d997bba8061ebf003022bc8"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+          "present": true,
+          "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+          "present": true,
+          "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125"
+        }
+      ],
+      "retainedProofReferences": [
+        {
+          "name": "M2-M3_11",
+          "reference": {
+            "path": "legacy-origin:alfred-m2-m3-reporting-independent-20261010/qualification-manifest.json",
+            "sha256": "5b5db013bfd561f86e12d01de52e520df003846bf301f67bddc090beb9f351b7"
+          },
+          "pass": 11,
+          "limits": [
+            "Report-only implementation/evidence association does not authenticate observations or introduce a completion gate; actual consuming project proof pending."
+          ]
+        },
+        {
+          "name": "M4_15",
+          "reference": {
+            "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/qualification-manifest.json",
+            "sha256": "9350eb10f321031bd556c5146fabd6f65b6165a361f738d453896a42da0dac0a"
+          },
+          "counts": {
+            "pass": 15,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "pass": 15,
+          "limits": [
+            "Synthetic administrative historical-review exception; ordinary completion stays blocked; unknown historical debt is not review coverage; original setup failure retained."
+          ]
+        },
+        {
+          "name": "M5_18",
+          "reference": {
+            "path": "legacy-origin:alfred-m5-admission-lineage-fixed-qualification-20261010/qualification-manifest.json",
+            "sha256": "d05f67dfc055fd7aeaa298c93d6ef861aaa02001d2d62414052e93fe88ab2898"
+          },
+          "pass": 18,
+          "limits": [
+            "Controlled hook observations, actual default producer and Git/private proof readback on Linux; native attribution unavailable."
+          ]
+        },
+        {
+          "name": "Clause56",
+          "reference": {
+            "path": "legacy-origin:alfred-critic-original-clause-fixed-qualification-20261010/compatibility-terminal.json",
+            "sha256": "7370021763f61faa4f0366aa2bb576e7c94eae1e063c8048b5ba0d33fa6b0dcc"
+          },
+          "pass": 56,
+          "limits": [
+            "32 pure plus24 physical actual cases; do not double-count separate Clause24. No whole candidate/Verify/native proof."
+          ]
+        },
+        {
+          "name": "CRT39_39",
+          "reference": {
+            "path": "legacy-origin:alfred-critic39-current-nine-final-qualification-20261010/qualification-manifest.json",
+            "sha256": "b7f673ab7cb4be638236646cc2381f21432f3638b812e2954043b1709310cb95"
+          },
+          "counts": {
+            "pass": 39,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "pass": 39,
+          "limits": [
+            "Actual current-nine controlled runtime; later guard b507 successor differs from b7d3 qualified guard. No blanket joint qualification on current source104."
+          ]
+        }
+      ],
+      "originalRecordedRemaining": "Bind accepted report-only disposition and M2/M3 actual11; explicitly retain genuine positive admitted review/baseline/native custody gaps, no new gate invented.",
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [
+        {
+          "line": 35,
+          "text": {
+            "excluded": true,
+            "rawSha256": "6056de702327e7e82a633e4ecf7c6e81ccc472918443af167859164e128a2b27",
+            "bytes": 211,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 36,
+          "text": {
+            "excluded": true,
+            "rawSha256": "1cfbd1dd9c22b610e73b537e48dbedf3df95dbeeda6712062eee1719a10e090b",
+            "bytes": 148,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 37,
+          "text": {
+            "excluded": true,
+            "rawSha256": "90d161d38c29a65e63ce263efb9efff8ce665c3144dcea50cddd7d0f6f5c0c5a",
+            "bytes": 159,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 38,
+          "text": {
+            "excluded": true,
+            "rawSha256": "7ba683b42938367a58a94c47004273fe8cb0f34066c5a053e5d8a9c2e03a658d",
+            "bytes": 183,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 39,
+          "text": {
+            "excluded": true,
+            "rawSha256": "01b44d2b770be9cd0fddac2ad049535e58621a1167b3589f0f57b9a28dd02f4a",
+            "bytes": 130,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    },
+    {
+      "id": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+      "requirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md",
+        "canonicalPath": "backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md",
+        "sha256": "eb5dd7b86b29e75d4fb43a8ded316d010c1c7a13a4bfd6d161029c1cd5496730",
+        "bytes": 3159,
+        "parentSha256": "eb5dd7b86b29e75d4fb43a8ded316d010c1c7a13a4bfd6d161029c1cd5496730",
+        "assignmentChanged": false
+      },
+      "observedBodySha256": "eb5dd7b86b29e75d4fb43a8ded316d010c1c7a13a4bfd6d161029c1cd5496730",
+      "bodyDrift": false,
+      "disposition": "existing-route/current-binding-gap",
+      "implemented": "Actual evaluate chain has command catalogue and emitted onboarding nextAction checks.",
+      "remaining": "Bind all offered exact argv and typed repair routes to current Source and Windows end-to-end evidence; no blanket scratch execution grant.",
+      "nextOwnerDuty": "Lifecycle command qualifier",
+      "currentMainSources": [
+        {
+          "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+          "bytes": 32556,
+          "mode": "0o644",
+          "nlink": 2
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+          "sha256": "c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed",
+          "bytes": 27574,
+          "mode": "0o644",
+          "nlink": 2
+        }
+      ],
+      "retainedProofReferences": [],
+      "originalRecordedRemaining": [
+        "Qualify existing source/proposals at the required candidate boundary before new implementation; conditional repair only after independent RED. Remaining emitted actions and genuine source ownership need closed positive/negative tests. Existing sourcefix/docs proposals must be integrated/reviewed, not reimplemented."
+      ],
+      "acceptance": false,
+      "stagePromotion": false,
+      "originalAcceptanceText": [
+        {
+          "line": 40,
+          "text": {
+            "excluded": true,
+            "rawSha256": "5c4f48b70d593f5d224f62eb5688b3ddffac48d76fb3e51f9ed5cafd5631292f",
+            "bytes": 72,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 41,
+          "text": {
+            "excluded": true,
+            "rawSha256": "db611631ed67b785ab03707157938295c708be133501c541e930b477714556b5",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 42,
+          "text": {
+            "excluded": true,
+            "rawSha256": "8eb0450f71d7b2ba1e393151ca236d9133e02e3ed9eb64b0bec3c82d1ce57cdb",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 43,
+          "text": {
+            "excluded": true,
+            "rawSha256": "312e6d9a9f681884d5e015779c07bf0627e6a0006926e010a7bbc810a1b5126d",
+            "bytes": 53,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 44,
+          "text": {
+            "excluded": true,
+            "rawSha256": "18c073f55b8b74138b4b0afd6e453322a251e43468ba59fdbda3780ee4dd5fd4",
+            "bytes": 76,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 45,
+          "text": {
+            "excluded": true,
+            "rawSha256": "5307852b1b70c3c6c99c9be57ccf64fc852d13996843b19157411aa18e59981c",
+            "bytes": 54,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 46,
+          "text": {
+            "excluded": true,
+            "rawSha256": "44745cda83a3f00114854ac0561d7565d9286b761142e6cc56c10b870da58f65",
+            "bytes": 73,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 47,
+          "text": {
+            "excluded": true,
+            "rawSha256": "6d1af5d7b4b9458e5780f7b6155cb22e20caecb6d7b7a450653c75f51b0e6f31",
+            "bytes": 22,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 48,
+          "text": {
+            "excluded": true,
+            "rawSha256": "4a0632b32db3a7c8fb927eb5f5e0bc21e88e1f442c746cd83fe69797a0101980",
+            "bytes": 75,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 49,
+          "text": {
+            "excluded": true,
+            "rawSha256": "3b0601e8acb6d0f7f8aca039f6dce9eb391ad56ff31bb4913fbd2bcc99e846e2",
+            "bytes": 27,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 50,
+          "text": {
+            "excluded": true,
+            "rawSha256": "cb042afc559463741bbae82b62ff92745463ad828fef34748af33211187e22ad",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        },
+        {
+          "line": 51,
+          "text": {
+            "excluded": true,
+            "rawSha256": "8bcee25aaae7b8bd2c4562eeef3951fc44713d6c01f651691492dd78a0709410",
+            "bytes": 22,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criterionCoverageLimit": "Per-item functional assessment with original acceptance text retained; no claim that every clause has an executed proof."
+    }
+  ],
+  "method": "Source observation and retained proof references; no product execution. Source-present never means consumer/native/item acceptance.",
+  "generation": "Current Main bytes measured per leaf; selected150 is a separate integration inventory, not assumed Main parity.",
+  "sourceProposals": [
+    {
+      "schema": "alfred.group03.placement-source-proposal.v1",
+      "canonicalPath": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+      "parentSha256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+      "postSha256": "3a0813263b6f7cc99abb729c823596391e9c79f1b1ab416e26ce05876790e384",
+      "inverseExact": true,
+      "splices": 4,
+      "ownership": "private proposal only; Root integration",
+      "requirementId": "pipeline.dispatch-records-land-under-specs-evidence",
+      "entry": "existing evaluate Write/Edit evidence-artifact branch calls checkDispatchRecordCollision",
+      "behavior": "Reject nested dispatch-record JSON before owner claim/collision effects; unrelated evidence and original canonical owner/collision paths conserved.",
+      "boundaries": [
+        "No relocation of historical records",
+        "No attempted/landed ownership changes",
+        "No M5 record mutation rules changed",
+        "No native authority",
+        "No semantic execution"
+      ],
+      "vectors": [
+        "Nested specs evidence dispatch record refused before dependencies/effects",
+        "Nested backlog evidence dispatch record refused",
+        "Canonical root record retains existing owner/collision verdict",
+        "Unrelated evidence JSON unaffected",
+        "Windows normalized repo-relative path uses same caller normalization"
+      ],
+      "syntax": {
+        "command": "node --check <private-postimage>",
+        "exitCode": 0,
+        "semanticExecution": false
+      }
+    },
+    {
+      "schema": "alfred.group03.codex-segment-proposal.v1",
+      "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+      "parentSha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+      "postSha256": "30a07617ec8a07f19db157393f7635457618fe3ed02b0fe077ad98eee970e2e1",
+      "inverseExact": true,
+      "nativeEvidence": false,
+      "scope": "Explicit read of all same-session/project-authenticated Codex segments; no default export, new host scan, child relationship inference or Claude/Agy capability.",
+      "schemaEvidence": "Actual runner-own-session-audit authenticates session_meta.payload.id and cwd.",
+      "ordering": "Physical mtime ascending and internal pathname tie-break. Not event chronology or cross-host canonical order. No host paths returned.",
+      "conserved": [
+        "Current session excluded",
+        "Repository identity required for every segment",
+        "Automatic excerpt size/count bounds",
+        "Raw bytes only explicit existing CLI read",
+        "All other runners unavailable",
+        "No source imports/evaluation or private transcript reads during preparation"
+      ],
+      "remaining": [
+        "Claude/Agy host-authenticated storage/schema/consent contracts",
+        "Child session relationship and all-turn/usage projection",
+        "Independent actual qualification before Root integration"
+      ],
+      "syntax": {
+        "command": "node --check <private-postimage>",
+        "exitCode": 0,
+        "semanticExecution": false
+      }
+    }
+  ]
+}

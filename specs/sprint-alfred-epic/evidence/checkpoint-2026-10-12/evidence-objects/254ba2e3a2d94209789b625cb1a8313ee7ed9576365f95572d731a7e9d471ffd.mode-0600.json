@@ -1,0 +1,31 @@
+{
+  "businessChildren": 1,
+  "status": 1,
+  "signal": null,
+  "error": null,
+  "parsed": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "fb036beef1a6b2c34d365422afe6e24d56d21dce9b3183b06eb20983e0f82f9a",
+    "caseSetSha256": "018691d601ab5d3a1cf9169d62dc2ef26ee548ddaef05d7c0ec0f9f80069d5cb",
+    "dispositionsSha256": "5bd8c312768f47b7b8c2ee77f851c0e31573cc509d3874a931c53ab983d3e615",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 9,
+      "fail": 3,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "parserError": null,
+  "conservation": true,
+  "conservationError": null,
+  "success": false,
+  "completionSHA256": "ef5776d3de7bf637d7776b84ecb9d6f040c7db92b08e54e0e28c615ae06cbcb6",
+  "sourceSHA256": "7e781dd0c3e9b48488891b4fbe477d36afb341c71e0ef769bc05c2a13c7f3a8d",
+  "assurance": "controlled-host-method",
+  "nativeHostAttested": false,
+  "ambientConservationClaim": false,
+  "whole12Qualified": false
+}

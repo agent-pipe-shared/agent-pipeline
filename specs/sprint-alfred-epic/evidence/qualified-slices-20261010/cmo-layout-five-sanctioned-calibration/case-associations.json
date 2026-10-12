@@ -1,0 +1,26 @@
+{
+  "schema": "alfred.cmol-five.case-associations.v1",
+  "cases": [
+    {
+      "id": "CMOL001",
+      "criterion": "Genuine approved neutral singleton commits only exact configuration through the inherited hook; bytes, command, fields, modes and committed blob are preserved."
+    },
+    {
+      "id": "CMOL003",
+      "criterion": "Genuine actual layout missing-required, unexpected untracked peer, physical drift and alias are refused before configuration mutation."
+    },
+    {
+      "id": "CMOL004",
+      "criterion": "Genuine ready singleton cannot authorize mixed configuration and unrelated suite staging; ordinary commit is refused."
+    },
+    {
+      "id": "CMOL005",
+      "criterion": "Missing real ready authority, stale candidate and unowned completion handle cannot grant a configuration commit."
+    },
+    {
+      "id": "CMOL006",
+      "criterion": "Exact committed replay is inert; genuine incomplete transition stays held and consumed handle reuse refuses.",
+      "limit": "Does not prove a partial two-tier write or real legacy twin."
+    }
+  ]
+}

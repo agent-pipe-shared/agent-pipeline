@@ -1,0 +1,32 @@
+{
+  "schema": "alfred.codex-transcript-segments.public-manifest.v1",
+  "files": [
+    {
+      "name": "cases.json",
+      "sha256": "6ba986163a198ccb01ac483d099bed7c98e467651008435f7ab54ad642c24c16",
+      "bytes": 1584,
+      "mode": 420
+    },
+    {
+      "name": "proof.json",
+      "sha256": "4c83c2a58953263c538722ac04a273d83dfce17953f127f788cdba8c190e7bf2",
+      "bytes": 2653,
+      "mode": 420
+    },
+    {
+      "name": "report.md",
+      "sha256": "1e27fe98bd017858f9a700d7737c1bcc2755406de8d73b5877a7a5a3bf85ee3a",
+      "bytes": 1125,
+      "mode": 420
+    },
+    {
+      "name": "test-output.txt",
+      "sha256": "d15ea1f7e8793e98864a2010eb6823c2d7571b5a86d40626cf5902437cfffe9e",
+      "bytes": 1013,
+      "mode": 420
+    }
+  ],
+  "actualCases": 10,
+  "nativeClaims": false,
+  "wholeItemAcceptance": false
+}

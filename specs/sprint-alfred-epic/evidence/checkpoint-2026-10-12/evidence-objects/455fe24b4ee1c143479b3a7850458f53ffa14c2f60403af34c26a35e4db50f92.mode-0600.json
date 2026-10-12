@@ -1,0 +1,10 @@
+{
+  "schema": "alfred.wel12-execution-reservation.v1",
+  "at": "2026-10-10T07:13:55.269Z",
+  "pid": {
+    "excluded": true,
+    "rawSha256": "dfe23d7be7bf3188a13a01812d92f14ee4370562112890e23c35dceaaf292b78",
+    "bytes": 7,
+    "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+  }
+}

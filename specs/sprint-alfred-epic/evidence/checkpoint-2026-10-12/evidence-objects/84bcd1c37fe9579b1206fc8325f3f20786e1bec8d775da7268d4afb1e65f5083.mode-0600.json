@@ -1,0 +1,50 @@
+{
+  "schema": "alfred.landed-ownership.independent-execution.v1",
+  "status": "terminal",
+  "actualChild": {
+    "status": 1,
+    "signal": null,
+    "error": null
+  },
+  "graphSha256": "be9016af244cb0aea22ca52658d53587cfcce621fc828c00eda10b8355ec04e3",
+  "sourceAndFixtureCAS": true,
+  "conservationError": null,
+  "completionError": null,
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "91a7a2bbbd690b36042e43295def52d818e3668676abfc092b90adaf3af86a6e",
+    "caseSetSha256": "0405c76692c857ef27477c0320a66a5f0c424935bc6379c4e4ebf4f9987e1bcf",
+    "dispositionsSha256": "f6fd242367d6fed69468b0ac8f574527fe85b4b57ce739b2b88daebe8c422ae1",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 0,
+      "fail": 12,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "captures": {
+    "stdout": {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/qualification-preparation/resource-successor/qualification-root/captures/stdout.private.log",
+      "sha256": "23f74158ef3843d9219e9018414d75eac77194baecbc5457f3a0a72c3da82de7",
+      "bytes": 41361
+    },
+    "stderr": {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/qualification-preparation/resource-successor/qualification-root/captures/stderr.private.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "fd3": {
+      "path": "legacy-origin:alfred-landed-dispatch-ownership-independent-20261010/qualification-preparation/resource-successor/qualification-root/completion.fd3.jsonl",
+      "sha256": "bd48d225125a84b46dc4e18521d12a04bd01b95115ccf83b63083377dc5b5b45",
+      "bytes": 2071
+    }
+  },
+  "semanticChildInvocations": 1,
+  "assurance": "controlled-unit-method",
+  "nativeProof": false,
+  "governedLaterReadinessDenialProven": false,
+  "wholeItemAcceptance": false
+}

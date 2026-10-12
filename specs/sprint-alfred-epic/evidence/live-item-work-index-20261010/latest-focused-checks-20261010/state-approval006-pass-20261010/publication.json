@@ -1,0 +1,38 @@
+{
+  "schema": "alfred.original006.durable-completion-supplement.v1",
+  "status": "exact-byte-completion-publication",
+  "caseId": "FULLSTATE006",
+  "executionSha256": "269018af279ead2f41897fd60b638eeb8a0bbb0fdc86e3340455dde13f7faca2",
+  "originalPublicationSha256": "76ea3867e4251fe64daeccaa336ccf704af8689aa37f1e14af636cb187b8947a",
+  "existingPublicFiles": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/state-approval006-pass-20261010/proof.json",
+      "sha256": "63786a138898cac7851b0c665ba8e7f2efa716680892d0619b3839d2095d544d",
+      "bytes": 3752
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/state-approval006-pass-20261010/preview.md",
+      "sha256": "905db374f9f9df02e319f686663234bc37b76fd70e675d20c7f6b56ef7f32a6a",
+      "bytes": 983
+    }
+  ],
+  "completion": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/state-approval006-pass-20261010/completion.fd3.jsonl",
+    "sha256": "192d334c72c326be7cb46f0667f62341f6f7fd243d5baf622afc838adf5029ee",
+    "bytes": 653
+  },
+  "counts": {
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "complete": true,
+  "scope": "One original controlled approval and registered accepted-contract readback; retained histories remain in the existing public proof.",
+  "nativeAssurance": false,
+  "humanApprovalEvidence": false,
+  "itemAcceptance": false,
+  "full26Qualified": false,
+  "businessReruns": 0,
+  "rawPrivatePathsOrLogsExported": false
+}

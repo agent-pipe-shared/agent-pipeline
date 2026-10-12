@@ -1,0 +1,70 @@
+{
+  "schema": "alfred.reader-focused13-public-evidence-manifest.v1",
+  "originReceiptSha256": "8752a6148cc615949519feea9a1458c8c0fca4f9abde1566e14a326326afecee",
+  "assurance": "controlled-method-unit-not-review-consumption",
+  "counts": {
+    "pass": 13,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "sourceCount": 383,
+  "sourceAndFixtureConserved": true,
+  "files": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/runtime.completion.fd3.jsonl",
+      "sha256": "0f2a99748d47424688e8f265aa0bb435bce5bb00f8764d9831d1922f854b3b77",
+      "bytes": 1285,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/runtime.policy.json",
+      "sha256": "8de24957bc36bd7d2e401cc6c0a318f769c4220aa4221cd5b60f609672e6ac9e",
+      "bytes": 184,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/v2.completion.fd3.jsonl",
+      "sha256": "e606d5a296885f878fafddbfe985b7b292089bfb4c7c4e95a11b24c8b5d83bd9",
+      "bytes": 1321,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/v2.policy.json",
+      "sha256": "362d406852922b2045732abc66a93ac0bc8aacf8a4a1af19e55c5af7cae298cb",
+      "bytes": 196,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/v1.completion.fd3.jsonl",
+      "sha256": "1f9229f856d296424cf9134447df4a1c0f28d18c1a07bf5d63b34d70f6da7f1c",
+      "bytes": 641,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/v1.policy.json",
+      "sha256": "a6a41543c92c7dcd40bcfc5febbb816327009acb503b12bac82b1db8b97bd2d7",
+      "bytes": 116,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/focused-method-receipt.json",
+      "sha256": "d521a5e86ee7486d4e4b9c1a9827d6cf6f13133fbab1d6e3c92a4083397c8aeb",
+      "bytes": 7814,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "standalonePositiveRBC015Executed": false,
+  "supplementQualificationPending": true,
+  "actualReaderReview": false,
+  "actualReaderConsumedCourse": false,
+  "nativeAssurance": false,
+  "wholeItemAcceptance": false
+}

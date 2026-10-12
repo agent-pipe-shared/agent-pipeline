@@ -1,0 +1,39 @@
+{
+  "schema": "alfred.critic-adoption-private-results.v2",
+  "results": [
+    {
+      "id": "ACA006-negative",
+      "name": "ordinary corpus defects remain blocking; diagnostic grants no target authority",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA009-negative",
+      "name": "real nonancestry is separate from accepted target authority",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA012-publication",
+      "name": "new fixed publication command refuses absent original aggregate inputs",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA012-registration",
+      "name": "raw reference cannot register an adopted target under default Source readers",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA013-adopted-preflight",
+      "name": "forged published reference fails before packet-ready",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA014-final",
+      "name": "untouched reserved/default old authority producers match frozen snapshot",
+      "status": "passed-controlled-private"
+    }
+  ],
+  "priorResultsRetained": "results.json",
+  "positiveNativeOrLive": false,
+  "fullVerify": "not-run",
+  "reviewBudgetConsumed": 0
+}

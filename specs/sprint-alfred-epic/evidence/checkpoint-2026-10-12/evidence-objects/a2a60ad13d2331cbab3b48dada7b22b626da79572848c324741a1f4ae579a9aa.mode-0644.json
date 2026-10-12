@@ -1,0 +1,3266 @@
+{
+  "schema": "alfred.unknown01.actual-source-assessment.v1",
+  "status": "ASSESSMENT-ONLY; no item accepted or stage promoted",
+  "group": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01.json",
+    "sha256": "8bbcda7a60e97acb1cc0a1734b8f42e3f4fc0f347c82272e1cb7b25798f0c976",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "12ecbbc11123ebe71acb95976c705238840c77c34cb91ab3de2df11c957eb4ad",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 53513,
+    "mtimeNs": "1791673972465763884",
+    "ctimeNs": "1791673972465763884"
+  },
+  "current150Coordination": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/current150-group-binding.json",
+    "sha256": "ec2bbee42c66e57f300a722fb082e20f5f2cf36aa2e37d86226d7ac79ea0127b",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "d3e6ab9425a24a7c28db4bcc6c9319acf34a37205bd5764b259a36189dbe6fe8",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 2995,
+    "mtimeNs": "1791674114506467552",
+    "ctimeNs": "1791674114506467552"
+  },
+  "pendingProtectedCoordination": {
+    "path": "legacy-origin:alfred-final-candidate-verify-protected-union-preparation-20261011/pending-protected-source-locator-index/index.json",
+    "sha256": "3ea154f09c41784bc870d97dc6ba831d8132f713f54a078edb8743250d8f68b5",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "9bdf41980a3f860c22932eb4c952339588b61a5ae36ccc64af740d2e6bd407a6",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o600",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 32039,
+    "mtimeNs": "1791674565823999063",
+    "ctimeNs": "1791674565823999063"
+  },
+  "count": 12,
+  "rows": [
+    {
+      "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+      "disposition": [
+        "code-present",
+        "consumer-verification"
+      ],
+      "finding": "Current Main already has a bounded read-only Git-to-head pipeline parser and its scope-guard consumer. The permitted source command, operand checks and head bound are narrow. No generalized shell relaxation is needed. The current protected grammar Source generation must be retained separately from Main.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "lines": "315-355, 684, 1005",
+          "owner": "isBoundedGitPipeline / isApprovedSingleCommandReadArg / isReadOnlyGitSubcommand"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/read-scope.mjs",
+          "lines": "11, 271",
+          "owner": "bounded pipeline scope consumer"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+          "lines": "237",
+          "owner": "parseGuardCommand"
+        },
+        {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "lines": "pending protected canonical Source",
+          "owner": "index3ea154 selected Source"
+        }
+      ],
+      "proofScope": "No actual installed Agy normalized rev:path admission receipt is established by this assessment. Source presence is not that receipt.",
+      "nextAction": "Bind the actual normalized Agy input and loaded grammar/scope source identities to existing positive/negative proof; run only an uncovered essential consumer case if those original receipts cannot be recovered. Preserve substitution/write/redirect refusal and the finite head bound.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+          "canonicalPath": "backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+          "sha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+          "bytes": 2711,
+          "parentSha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.advertised-git-to-head-pipeline-is-refused::15.1",
+            "lineStart": 17,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.advertised-git-to-head-pipeline-is-refused::15.2",
+            "lineStart": 24,
+            "lineEnd": 27
+          },
+          {
+            "id": "pipeline.advertised-git-to-head-pipeline-is-refused::40.1",
+            "lineStart": 42,
+            "lineEnd": 44
+          }
+        ]
+      },
+      "recordedRationale": "Read-to-head implementation is a lead, but actual normalized rev:path admission/body coverage is not reconciled sufficiently for all-functional stage.",
+      "recordedRemaining": [
+        "Existing parser surface is a fix lead, not actual normalized Agy/rev:path admission proof. Bind exact current grammar+scope guard and positive/negative cases.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Historical installed Agy normalization and source identity unproven; no general relaxation warranted. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+          "sha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "9f2f50f134bc38291ce39f34b92bed9018fd5cf06a7db342b272f285dbf35b6d",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 2711,
+          "mtimeNs": "1791578755196629203",
+          "ctimeNs": "1791578755196629203"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+      "disposition": [
+        "real-code-gap",
+        "consumer-verification",
+        "native-hold"
+      ],
+      "finding": "The helper's same-build already-armed branch never renews an expired lock, while genuine preflight rejects locks older than 30 minutes. Current ordinary-ready regression deliberately forbids refreshing a fresh lock. A stale-only private repair is prepared. Native identity handling and report-only role fallback exist; umbrella dispatch and greenfield happy-path completion are not established.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+          "lines": "9-26",
+          "owner": "armAntigravityBootstrapSession"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+          "lines": "95-141",
+          "owner": "validated native session and initialized Git caller"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "lines": "425, 438-535",
+          "owner": "observeAntigravityHardEnforcement freshness/build observer"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs",
+          "lines": "67-126",
+          "owner": "original repeated-ready/barrier behavior"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "lines": "502-518",
+          "owner": "native hook session/barrier consumer"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs",
+          "lines": "41, 286-295",
+          "owner": "registered readiness route resolver"
+        }
+      ],
+      "proofScope": "Private stale-lock proposal has syntax validation only. No AGY host/native worker or whole happy-path qualification is inferred from existing source or older report-era runs.",
+      "nextAction": "Root reviews the stale-only proposal and qualifies the resumed hook/observer with the original fresh-lock/barrier invariants. Separately reconcile actual native and CLI worker start/read-only/terminal records, loaded source/policy, role-route degradation and EL-01/coverage dependencies; no provider or Critic authority grant from a fallback report.",
+      "sourceProposal": "agy-stale-lock-proposal/manifest.json",
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+          "canonicalPath": "backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+          "sha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+          "bytes": 4086,
+          "parentSha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.2",
+            "lineStart": 19,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.3",
+            "lineStart": 24,
+            "lineEnd": 25
+          },
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.4",
+            "lineStart": 27,
+            "lineEnd": 47
+          },
+          {
+            "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::49.1",
+            "lineStart": 51,
+            "lineEnd": 55
+          }
+        ]
+      },
+      "recordedRationale": "Umbrella route requirements lack an exact current implementation/proof relationship; overlapping fixes do not establish the whole route.",
+      "recordedRemaining": "Reuse the existing EL01/missing-dispatch work and bind actual current native/CLI worker routing plus loaded hashes.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+          "sha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "e2ae62a99f8c28bc0e1354691facdc8b25a1dfd8f863fe0eb3ab8c50b1fd5b4e",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 4086,
+          "mtimeNs": "1791578755195107861",
+          "ctimeNs": "1791578755195107861"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.approval-verification-demands-head-equals-candidate",
+      "disposition": [
+        "code-present",
+        "consumer-verification"
+      ],
+      "finding": "Current Main forwards requireCurrentCandidate through answered and unavailable V2 package, host evidence, advisor-context and Codex-finalization readers. Legacy approved-package reread explicitly reads only approved package/PRD/Spec bytes, not live HEAD/private course state. Current v8/v9 architecture approval uses DAB admission and signed decision bindings.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+          "lines": "39-42, 86-119, 127-165",
+          "owner": "strict preparation flag and explicit forwarding"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+          "lines": "116, 151, 173",
+          "owner": "host readiness verification"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+          "lines": "4-5",
+          "owner": "context flag forwarding"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-readiness-finalization.mjs",
+          "lines": "102",
+          "owner": "Codex candidate flag forwarding"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+          "lines": "781-840",
+          "owner": "rereadApprovedDesignWorkflowPackage"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "lines": "214-221, 296",
+          "owner": "current DAB versus legacy approved-package route"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
+          "lines": "existing original CANDBIND controls",
+          "owner": "unexecuted in this assessment"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+          "lines": "existing original Codex CANDBIND controls",
+          "owner": "unexecuted in this assessment"
+        }
+      ],
+      "proofScope": "Current aggregate+State+Model twelve-case proof is a distinct DAB generation and does not substitute for the original legacy answered/unavailable/Codex descendant controls. Existing tests are source, not actual run receipts.",
+      "nextAction": "Recover and bind the original strict-preparation/approved-descendant negative and positive receipts to these current reader bytes. Keep hash, signature, feature, PRD/Spec and advisor exception CAS strict; no DWP route revival.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+          "canonicalPath": "backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+          "sha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+          "bytes": 3710,
+          "parentSha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.approval-verification-demands-head-equals-candidate::15.1",
+            "lineStart": 17,
+            "lineEnd": 26
+          },
+          {
+            "id": "pipeline.approval-verification-demands-head-equals-candidate::40.1",
+            "lineStart": 42,
+            "lineEnd": 46
+          }
+        ]
+      },
+      "recordedRationale": "Existing approval verification does not establish that the specific original-candidate restriction was corrected.",
+      "recordedRemaining": "Trace actual verifier consumers and bind exact candidate-bound positive/negative cases before altering the existing implementation.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+          "sha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "4fc2b3e6a73f109ad42d9ff48b81ad8edc28ee75da829a6c94382e83161f681f",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 3710,
+          "mtimeNs": "1791577184430895664",
+          "ctimeNs": "1791577184430895664"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+      "disposition": [
+        "code-present",
+        "consumer-verification"
+      ],
+      "finding": "Current architecture owner returns not-required for a non-fresh-greenfield project without a materialization receipt before parsing a greenfield architecture block, while existing receipts remain validated. Entry readiness permits deferred design only after physical map/model/AGENTS checks; guard entry consumer still denies unknown/incomplete/unavailable fitness. This is an exemption with retained integrity checks.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "lines": "188-260",
+          "owner": "inspectArchitectureDesignMaterialization"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "lines": "264, 432",
+          "owner": "entry readiness physical checks and deferred disposition"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/entry-gates.mjs",
+          "lines": "145-186",
+          "owner": "implementation consumer and unavailable refusal"
+        }
+      ],
+      "proofScope": "Original source hotfix is recorded in the item body; installed Windows/POSIX consumer checklist is not established by current source inspection.",
+      "nextAction": "Reconcile exact original brownfield/empty/new-greenfield consumer corpus with current effective-decision/baseline/ratchet dependencies; qualify only uncovered installed/native cases. Do not duplicate the existing source exemption.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+          "canonicalPath": "backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+          "sha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+          "bytes": 5074,
+          "parentSha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.1",
+            "lineStart": 17,
+            "lineEnd": 21
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.2",
+            "lineStart": 23,
+            "lineEnd": 27
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.3",
+            "lineStart": 29,
+            "lineEnd": 29
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.4",
+            "lineStart": 31,
+            "lineEnd": 38
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.5",
+            "lineStart": 40,
+            "lineEnd": 41
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.6",
+            "lineStart": 43,
+            "lineEnd": 44
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::57.1",
+            "lineStart": 59,
+            "lineEnd": 66
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::57.2",
+            "lineStart": 68,
+            "lineEnd": 69
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.1",
+            "lineStart": 73,
+            "lineEnd": 81
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.2",
+            "lineStart": 83,
+            "lineEnd": 87
+          },
+          {
+            "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.3",
+            "lineStart": 89,
+            "lineEnd": 90
+          }
+        ]
+      },
+      "recordedRationale": "Entry gates exist; the specific brownfield exemption/course behavior is not established by retained evidence.",
+      "recordedRemaining": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+          "sha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "10eb6b9ff830a5b17427be339899a1af31fd15a41bab25120267516337cf22d4",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 5074,
+          "mtimeNs": "1791577184426895735",
+          "ctimeNs": "1791577184426895735"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.capability-inventory-checker-is-red-at-head",
+      "disposition": [
+        "binding-only"
+      ],
+      "finding": "The checker deliberately discovers committed regular source blobs and validates an actual commit/tree baseline and inventory-only descendant. The retained original CRI10 failures were absent committed Source references, not evidence of a checker algorithm defect. Main content transfer is not a committed C0 baseline.",
+      "source": [
+        {
+          "path": "harness/scripts/check-product-capability-inventory.mjs",
+          "lines": "145-170, 249, 648-728",
+          "owner": "committed source/discovery/baseline/inventory-only checks"
+        }
+      ],
+      "proofScope": "Cause reconciliation912df records original CRI10 seven PASS/three FAIL (CRI001/003/004), absent committed Source d214/T67b. No newer actual C0/C1/checker receipt is held here.",
+      "nextAction": "After Root's lawful C0 commit/tree readback, bind inventory-only C1 to actual C0/T0 and run the remaining meaningful checker closure. Preserve committed-source semantics; no workingtree waiver/fake commit.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+          "canonicalPath": "backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+          "sha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+          "bytes": 887,
+          "parentSha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.capability-inventory-checker-is-red-at-head::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.capability-inventory-checker-is-red-at-head::19.1",
+            "lineStart": 21,
+            "lineEnd": 21
+          }
+        ]
+      },
+      "recordedRationale": "No current candidate-bound failing checker case establishes an active implementation defect or completed fix.",
+      "recordedRemaining": "Reproduce and bind an independent current failing case and the suppression matrix; only then decide whether source repair is needed.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+          "sha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "ecf0426cf90e7b989f02248336c3c58ed771e790dbf1e71d0d8dadeb47338153",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 887,
+          "mtimeNs": "1791577184426895735",
+          "ctimeNs": "1791577184426895735"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "disposition": [
+        "code-present",
+        "consumer-verification"
+      ],
+      "finding": "Current fresh intent requires the selected runner, persists enabled=[runner], and projects only that runner's target family. Migration passes enabledRunners into baseline/target selection and excludes .codex targets when Codex is disabled. In-memory seed data is not a materialized Codex configuration.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "lines": "938-948, 1476-1483, 5532-5580, 7280",
+          "owner": "fresh intent, selected runtime projection and restart"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+          "lines": "366-390, 692, 708-711",
+          "owner": "enabled runner baseline and targets"
+        }
+      ],
+      "proofScope": "No real installed three-host activation/native program receipt is established by this read-only assessment.",
+      "nextAction": "Bind existing Claude/Codex/Agy fresh and migration target reports to exact producer bytes and public managed surfaces. Inspect native host activation only if that original evidence remains uncovered; do not reimplement selected-runner filtering.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+          "canonicalPath": "backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+          "sha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+          "bytes": 764,
+          "parentSha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+          "assignmentChanged": false
+        },
+        "clauses": []
+      },
+      "recordedRationale": "Selected-runner writer and consent/export boundary are not bound to the complete original requirement.",
+      "recordedRemaining": "Use a separately authorized exact-candidate execution dispatch to bind selected-runner and consent/activation cases; do not infer completion from zero extracted criteria.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+          "sha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "51b73cf3be74a52583f85462d80f3d23636ff5c1b56f18785540e93534a1330e",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 764,
+          "mtimeNs": "1791577184422895804",
+          "ctimeNs": "1791577184422895804"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "disposition": [
+        "code-present",
+        "consumer-verification",
+        "native-hold"
+      ],
+      "finding": "Current Advisor/readiness/journal owners permit owned non-group/world-writable shared agent-pipeline ancestry, including an existing 0755 shared root, while duty/fingerprint/process descendants retain private-mode and physical identity CAS. They do not chmod a foreign shared namespace. Host platform support remains separately bounded.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+          "lines": "rootPaths / currentRoots",
+          "owner": "shared versus private ancestry custody"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+          "lines": "45-105",
+          "owner": "rootIdentity / materializeRoot"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+          "lines": "66-125",
+          "owner": "shared ancestry and private child custody"
+        }
+      ],
+      "proofScope": "Item body reports old focused cases/readiness six; those reported generations do not establish current installed Advisor+readiness concurrent native behavior.",
+      "nextAction": "Recover actual old focused receipts and compare their full Source generation; bind current installed shared-root identity and private-child/concurrency negatives only where uncovered. No shared-root chmod or broad directory-mode waiver.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+          "canonicalPath": "backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+          "sha256": "c1953268b51ad1659956ce0cd7c521964da365db5ceb8f16b4026dfa4c0746b2",
+          "bytes": 5541,
+          "parentSha256": "fa597b23a60e3c71ff88dc712df2802fe0b466826c0a2b91c12aef85b975dbc3",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::15.1",
+            "lineStart": 17,
+            "lineEnd": 24
+          },
+          {
+            "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::15.2",
+            "lineStart": 26,
+            "lineEnd": 30
+          },
+          {
+            "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::39.1",
+            "lineStart": 41,
+            "lineEnd": 46
+          },
+          {
+            "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::48.1",
+            "lineStart": 50,
+            "lineEnd": 58
+          }
+        ]
+      },
+      "recordedRationale": "Existing namespace/store logic does not establish a corrected fresh-identity ownership route.",
+      "recordedRemaining": "Reuse the current source and qualify fresh-repository/private-store ownership with the controlled source-owned producer; no manual chmod.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "c1953268b51ad1659956ce0cd7c521964da365db5ceb8f16b4026dfa4c0746b2",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+          "sha256": "c1953268b51ad1659956ce0cd7c521964da365db5ceb8f16b4026dfa4c0746b2",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "7820bfa7d13429d43e44a4fc40a47c2ca32457e2af2556049ddf16031bece829",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 5541,
+          "mtimeNs": "1791610969666138387",
+          "ctimeNs": "1791610969666138387"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "disposition": [
+        "binding-only",
+        "deferred-scope"
+      ],
+      "finding": "The original item explicitly marks the action needs-verification and post-0.7 automation unless recurring measured toil pulls it in. Presence of a bootstrap script alone does not establish recurring manual-only gate behavior or authorize revived scope.",
+      "source": [],
+      "proofScope": "No reproducible repeated invocation timing or typed-next-action failure series is supplied in this assigned scope.",
+      "nextAction": "Retain the original defer. If Root has an actual reproducible typed-next-action/manual-toil record, bind that record and the sanctioned bootstrap command generation before deciding current 0.7 work. No new automation source or fabricated toil metric.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+          "canonicalPath": "backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+          "sha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+          "bytes": 1579,
+          "parentSha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-bootstrap-in-the-typed-next-action::16.1",
+            "lineStart": 18,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.codex-bootstrap-in-the-typed-next-action::33.1",
+            "lineStart": 35,
+            "lineEnd": 36
+          }
+        ]
+      },
+      "recordedRationale": "Actual fresh-host manual-toil premise and host callback relationship are unverified.",
+      "recordedRemaining": "Verify the fresh-host/bootstrap premise from recurring-toil evidence and qualify native Desktop/host control callbacks before adding a typed action.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+          "sha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "f958a720a454df61eda6a884be2317f1ef6343127a6e4afc31410bbae6ae9f10",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 1579,
+          "mtimeNs": "1791577184430895664",
+          "ctimeNs": "1791577184430895664"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.declared-system-skill-read-requires-human-override",
+      "disposition": [
+        "consumer-verification",
+        "native-hold"
+      ],
+      "finding": "Current passive-read policy permits some physically safe explicit files outside the repository, so total absence of an outside-root route would be false. That generic path is not a runtime-catalog-bound skill authority: no genuine host-owned declared-skill catalog identity/digest revalidation producer was established from the actual scope consumer. Caller paths/booleans cannot substitute for that producer.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+          "lines": "explicit outside-root physical passive file policy",
+          "owner": "bounded passive reads, secret/system denials"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/read-scope.mjs",
+          "lines": "actual public scope consumer",
+          "owner": "not a runtime skill catalog producer"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "lines": "actual read argument consumer",
+          "owner": "passive policy delegation"
+        }
+      ],
+      "proofScope": "No exact native host catalog identity/drift contract is established here; existing guard refusals are preserved and not overridden. This assessment does not claim a fabricated catalog or a general host read grant.",
+      "nextAction": "Identify the genuine selected host runtime-catalog producer and exact entry identity/digest/custody contract. Qualify exact declared-skill positive and credential/unlisted/replaced entry negatives through that owner. Keep arbitrary external paths and private material refused.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+          "canonicalPath": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+          "sha256": "e7b41017ccebcf99996f4728b10c6a9b13d173aecc99acac83d075913f425aad",
+          "bytes": 2378,
+          "parentSha256": "99d542713254a5b5b8d2de92742b0212ec6de1f1e9e4f9d4f19bb8552fd11c81",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.declared-system-skill-read-requires-human-override::15.1",
+            "lineStart": 17,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.declared-system-skill-read-requires-human-override::15.2",
+            "lineStart": 24,
+            "lineEnd": 26
+          },
+          {
+            "id": "pipeline.declared-system-skill-read-requires-human-override::33.1",
+            "lineStart": 35,
+            "lineEnd": 40
+          },
+          {
+            "id": "pipeline.declared-system-skill-read-requires-human-override::42.1",
+            "lineStart": 44,
+            "lineEnd": 50
+          }
+        ]
+      },
+      "recordedRationale": "Actual runtime-owned catalog/installed host skill authority route not established; no complete or concrete partial implementation binding in retained inputs.",
+      "recordedRemaining": [
+        {
+          "gap": "Historical declared catalog read denial; current outside-root catalog authority proof absent.",
+          "nextAction": "Freeze actual runtime-owned catalog readonly scope against private-home/credential/alias negatives; reuse M6 classification only as dependency, not as catalog authorization proof.",
+          "crosswalkAction": "Bind exact current source/case/actual receipt/integration from retained requirements and original mapper evidence"
+        },
+        "Freeze actual runtime-owned catalog readonly scope against private-home/credential/alias negatives; reuse M6 classification only as dependency, not as catalog authorization proof."
+      ],
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "e7b41017ccebcf99996f4728b10c6a9b13d173aecc99acac83d075913f425aad",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+          "sha256": "e7b41017ccebcf99996f4728b10c6a9b13d173aecc99acac83d075913f425aad",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "7c52138323df8aadfcfb1d3d89c0655e3ed191353fac91da4c246c6b96d593e0",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 2378,
+          "mtimeNs": "1791610969666138387",
+          "ctimeNs": "1791610969666138387"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+      "disposition": [
+        "code-present",
+        "pending-source-binding",
+        "policy-conflict"
+      ],
+      "finding": "Main consumer contract check explicitly accepts baseline-only when product Verify is not configured, while the evidence producer's full-command path returns unavailable without a real product command. Current onboarding guidance allows initial design Verify to be deferred. Pending Statec28 separately classifies baseline-only and permits a deliberately configured baseline implementation route. That newer contract is not the original item's implementation-reject requirement; do not silently equate them or patch an older Main gate as if pending Source were absent.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+          "lines": "34-65",
+          "owner": "baseline-only contract and product refusal"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+          "lines": "275-314",
+          "owner": "full-command configured evidence prerequisite"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/consumer-verify.mjs",
+          "lines": "readConsumerVerifyConfiguration",
+          "owner": "null/placeholder fullCommand"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "lines": "6660, 6841",
+          "owner": "late configuration and initial design guidance"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "lines": "current Main generation",
+          "owner": "preserved current writer"
+        },
+        {
+          "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "lines": "1-26, 3544, 3605, 10642",
+          "owner": "pending Statec28 deliberately configured baseline implementation"
+        }
+      ],
+      "proofScope": "Pending Statec28/Registryd30/I03dc31 are a coupled proposed generation, not final qualification or HGO authority. No producer-evidence baseline PASS is invented.",
+      "nextAction": "Root reconciles original design-baseline/implementation-refusal clause with the explicit newer approved baseline implementation policy and pending Source owners; then bind the actual Verify evidence producer/consumer/configuration generation. Preserve genuine command execution and do not report deferred product Verify as completed.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+          "canonicalPath": "backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+          "sha256": "7289e7117fa060c1e0395123f7b407316e2672ee2d4f1ed4a045cc4a200e52e8",
+          "bytes": 1874,
+          "parentSha256": "e30e8618fe231ceb6475428cbdf727fd8ddfc411737b2e090de7f34f515ac050",
+          "assignmentChanged": true
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract::34.1",
+            "lineStart": 36,
+            "lineEnd": 39
+          },
+          {
+            "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract::41.1",
+            "lineStart": 43,
+            "lineEnd": 47
+          }
+        ]
+      },
+      "recordedRationale": "Original null-Verify requirement and newer baseline-only policy need exact applicability adjudication; no completion inferred.",
+      "recordedRemaining": "Root policy/source owner: reconcile the original rejection clause with the accepted newer baseline-only implementation contract using an exact authority reference. Until then keep original clause unresolved; do not silently mark it passed or tighten the implementation gate from this audit.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "7289e7117fa060c1e0395123f7b407316e2672ee2d4f1ed4a045cc4a200e52e8",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+          "sha256": "7289e7117fa060c1e0395123f7b407316e2672ee2d4f1ed4a045cc4a200e52e8",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "c65f139ae7d6af2c1d2a5e1611757fba85f237f0f4337c3a9693cee661b5216a",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 1874,
+          "mtimeNs": "1791610969666138387",
+          "ctimeNs": "1791610969666138387"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+      "disposition": [
+        "real-code-gap",
+        "native-hold"
+      ],
+      "finding": "Current readiness custody store explicitly requires Linux, and the original V2 fixture explicitly skips native Windows with WSL guidance. Skipping removes the original native-Windows RC-12 execution; it does not supply a cross-platform custody implementation. Retiring ordinary DWP presentation does not retroactively qualify retained legacy Windows behavior.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+          "lines": "66",
+          "owner": "Linux-only physical custody precondition"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
+          "lines": "39",
+          "owner": "explicit native Windows fixture skip"
+        }
+      ],
+      "proofScope": "No native-Windows actual readiness custody receipt or unskipped RC-12 PASS is established.",
+      "nextAction": "A separately owned real Windows custody/host transport and its identity/private-store contract are required before original RC-12 can execute there. Do not remove a platform check or equate WSL with native Windows. Root resolves retained legacy acceptance scope without reviving retired DWP happy-path ceremony.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+          "canonicalPath": "backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+          "sha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+          "bytes": 1489,
+          "parentSha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows::16.1",
+            "lineStart": 18,
+            "lineEnd": 20
+          },
+          {
+            "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows::30.1",
+            "lineStart": 32,
+            "lineEnd": 33
+          }
+        ]
+      },
+      "recordedRationale": "Linux-only storage and explicit Windows skip disclose the limit but do not implement the requested Windows capability.",
+      "recordedRemaining": "Windows fixture/source owner: supply a genuine supported store/constructor transport or explicitly authorized criterion disposition while preserving original RC12C001 and skip evidence. WSL diagnostics do not establish native Windows proof; ordinary retired flow is separate.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+          "sha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "0ac14bff2c7dce87849af225bb4833bbd56eb9d2b3dabf567d0eba8810f349df",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 1489,
+          "mtimeNs": "1791577184430895664",
+          "ctimeNs": "1791577184430895664"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    },
+    {
+      "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "disposition": [
+        "pending-source-binding",
+        "consumer-verification"
+      ],
+      "finding": "Main still performs whole-repository capability comparison at consumption. Declared cumulative pending Source13e already implements v4 native Edit/Write sorted exact physical target preimages and reclassification before excluding only statusSha256; HEAD/tree/state/policy/plugin/input/denials/expiry/replay remain bound. Legacy v3, Bash, plugin installs and apply_patch remain strict. This is pending source integration and original matrix coverage, not a missing implementation to duplicate.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+          "lines": "4328, 4388-4445",
+          "owner": "current Main whole-repository consume"
+        },
+        {
+          "path": "legacy-origin:alfred-hgo-denial-reason-validation-source-20261010/postimages/plugins/pipeline-core/lib/human-guard-override.mjs",
+          "lines": "2115-2222, 3494-3500, 4598-4626",
+          "owner": "pending v4 target-preimage producer and consumer"
+        },
+        {
+          "path": "legacy-origin:alfred-hgo-native-action-preparation-source-20261010/api-contract.json",
+          "lines": "nativeVersions and legacy/disclosure scope",
+          "owner": "exact original pending v4 contract"
+        }
+      ],
+      "proofScope": "Retained original HGO10 ran nine PASS/one HGS003 FAIL; corrected Source13e focused HDN001-004/HGS003 five PASS is denial/policy-drift scope, not the original disjoint-action matrix or native rehearsal/Human ceremony. No current joint disjoint-action acceptance is borrowed.",
+      "nextAction": "Preserve cumulative Source13e while UNKNOWN02/03 owners add their distinct rehearsal/disclosure/index work. Bind the actual v4 disjoint-target/target-drift/ancestor/HEAD/state/policy/plugin/input/replay matrix and legacy serial-dependency disclosure in its final generation. No apply_patch/native-engine grant.",
+      "sourceProposal": null,
+      "requirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+          "canonicalPath": "backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+          "sha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+          "bytes": 3050,
+          "parentSha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another::29.1",
+            "lineStart": 31,
+            "lineEnd": 51
+          },
+          {
+            "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another::29.2",
+            "lineStart": 53,
+            "lineEnd": 54
+          }
+        ]
+      },
+      "recordedRationale": "Whole-repository dirty binding remains; safe disjoint signed action semantics are not implemented or specified completely.",
+      "recordedRemaining": "Introduce a separately versioned native-file target-preimage contract; retain legacy and Bash/plugin bindings. Qualify the original disjoint-action/drift matrix and preparer serial-dependency disclosure.",
+      "assignedStatus": "OPEN",
+      "assignedStage": "UNKNOWN",
+      "bodyObservation": {
+        "expectedSha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+        "observed": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+          "sha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "a27500288c25cf79549133f69c4630954e6a3102284d70bbbd5b91dd6e995983",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": "0o644",
+          "nlink": 1,
+          "uid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "gid": {
+            "excluded": true,
+            "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "bytes": 3050,
+          "mtimeNs": "1791577184422895804",
+          "ctimeNs": "1791577184422895804"
+        },
+        "assignedBodyMatches": true
+      },
+      "accepted": false,
+      "stagePromoted": false
+    }
+  ],
+  "proofReferences": [
+    {
+      "path": "legacy-origin:alfred-capability-registration-independent-20261010/cause-reconciliation/manifest.json",
+      "sha256": "912dfc2ee4f814f85f760a4b88cc3783bc40c39db2cef8560cbe1435e5d60ed5",
+      "scope": "retained CRI10 absent committed Source cause, not current C0"
+    },
+    {
+      "path": "legacy-origin:alfred-hgo-denial-reason-validation-source-20261010/manifest.json",
+      "sha256": "c78e0ea0d03fc5e7f9f9e906d4d58f618fcc009419d38fd8fc6349b60a422448",
+      "scope": "cumulative pending13e source-only manifest; later focused Root qualification distinct"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/aggregate-joint-state-model-generation-20261011/public-actual-proof.json",
+      "sha256": "1becd6f257db5faf46d60ac0ee1f0aabfd6a4a763e38c2739ca313816d4628f1",
+      "scope": "twelve original DAB/State/Model/EFC controls, not legacy descendant/Windows/HGO/native cases"
+    }
+  ],
+  "privateProposal": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/manifest.json",
+    "sha256": "d8e4fcf1c654272aa5551176be87e5d88704f40e895181f88b8921948893c3ea",
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "41a5a6669d654c83568e517a180f4fae44074db0576707dae1bb1d0d3e6ee26c",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "mode": "0o644",
+    "nlink": 1,
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "bytes": 5695,
+    "mtimeNs": "1791675218690837173",
+    "ctimeNs": "1791675218690837173"
+  },
+  "limits": [
+    "All twelve original requirements/clauses/remainders remain the normative assigned scope; current body drift is a new observation.",
+    "Main150 and pending protected Source are compared separately; no absent Main leaf automatically means absent implementation.",
+    "No item acceptance/stage promotion, business run, test execution, product import, Main/Audit write, Git command, additional Critic, native/Human claim or new signing ceremony.",
+    "M1 host-first; M2/M3 report-only; one full Critic plus one correction diff; normal Chat with one Design and one Push signature preserved.",
+    "Nightwing/Batman and original deferred/post-0.7 work remain outside this assessment's implementation scope."
+  ],
+  "allInputBytesFullyReadForCustody": true,
+  "semanticReadScope": "Declared original bodies and cited source spans; not full-transitive graph or whole-file semantic certification.",
+  "inputBindings": [
+    {
+      "path": "harness/scripts/check-product-capability-inventory.mjs",
+      "sha256": "f33c31133b334c9b943203d35acda3aa6e57714d20f20f536dd90c07f99cbe8b",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "d6f1c3b48fe0f907e06f3e4555c2a5af1c23c56e4ee7f4a9e84f864d13d1955e",
+        "bytes": 5,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 48340,
+      "mtimeNs": "1790938622000000000",
+      "ctimeNs": "1791569417486312860"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+      "sha256": "21e57eb1ae84767887569e96963836e353f141dff7e0dcba09a9f3a4cf90fe00",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "b4e166807f92aa56cdc4463001c01780d310f782deaf82ff4bc75682bd7dd82f",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 1292,
+      "mtimeNs": "1791534747260743517",
+      "ctimeNs": "1791569417493339390"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+      "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3dd5df05b3804b0b65dc701ca2393adfe4fc0627f2f51391d754f748aaf03248",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 46463,
+      "mtimeNs": "1791672419529606226",
+      "ctimeNs": "1791672419573852086"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+      "sha256": "ed1bbbd39046057f54820f59759bb1620941ebd482dd899f717f61b864627147",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "94676488352b198f00c1df925308c40284684a1546a10c4539282227cb478208",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 6728,
+      "mtimeNs": "1791023621216891924",
+      "ctimeNs": "1791569417493339390"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs",
+      "sha256": "4317ffd3a045e9d77bec54b5b52435f090238365933c6177573c1744e3c30a02",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c7224e386ed4e639c37bdda8d09d3fb6dfe5906ceb12e8078aa0a58feff6b391",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 7250,
+      "mtimeNs": "1791023621216910705",
+      "ctimeNs": "1791569417493339390"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "ed9637d729c024291a16d5abad7e0da4f36ccd461657071859b0a4cde0f892fd",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 19968,
+      "mtimeNs": "1791670953354195500",
+      "ctimeNs": "1791670953447323945"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "sha256": "bb7c73a10080810fec955297232191334f1952266a789c3ec4eb0bd55aaf88ca",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "13e56299d81da594c7e9d8cdb625b0aac5ec4a9ab05588df913d1b13c5900542",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 30810,
+      "mtimeNs": "1791672730861744524",
+      "ctimeNs": "1791672730905955253"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+      "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "695a7bc3dc48d00ab8d7fb93def83e204fdc1d4d0ed8438b3a4f0ca276d28c88",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 25281,
+      "mtimeNs": "1791672095781872804",
+      "ctimeNs": "1791672095813050394"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "cb4265dfdea1550831e4cd427307419c69bdb8436fe825e78ce86b309a3b1749",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 8734,
+      "mtimeNs": "1791670859346375309",
+      "ctimeNs": "1791670859369486826"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+      "sha256": "f8ac123be647522add8f51c0cc4ad1a0cf12968b26b009a00bce6089e5da3f61",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "5e720c69d5636c342e237a6fcf408c1773a3d5a5ab090c7358555e6f3c11e085",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 9636,
+      "mtimeNs": "1790938622000000000",
+      "ctimeNs": "1791569417494730593"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "sha256": "ae69d331bed4ba715458ace4ecded3de56897a636a2121875c7b12ace69442c1",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "649cee7a24582e6022d453b41358f18bc53d6f8f03358b96c0724dccda5a1d77",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 48384,
+      "mtimeNs": "1791673580718857337",
+      "ctimeNs": "1791673580746856688"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-readiness-finalization.mjs",
+      "sha256": "f2240bb58b94d0fd9b2d2b063ea9f2b44f9fa1c48c99d8804534fff5fffea007",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "6e0469957222da58a895a282dffd52a219545c6623dda345442972c1b3e87ede",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 13608,
+      "mtimeNs": "1791534747268743180",
+      "ctimeNs": "1791569417497480737"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/consumer-verify.mjs",
+      "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "447b7f6c17eaad70fb29e627b3c74717f2208b899cef6352bbf37ab81b659c82",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 6738,
+      "mtimeNs": "1791672314677872230",
+      "ctimeNs": "1791672314924012543"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+      "sha256": "a00e618bcc1774959cfe721236ce1fc89aee7ca12bd38fc8d7b1a37c5d6b0b8c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "0410043eea55757a8159e279bd9cce38a3265c34cb033ae29b0565b512c70220",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 16448,
+      "mtimeNs": "1791534747272743012",
+      "ctimeNs": "1791569417494730593"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+      "sha256": "80be24f43f81826139df848729e0c0dd76801265f81636d216c27c67da0e8b47",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "ace76c47aa1d9791faec22e2cfa1aa5e316cf04e79c16840f04a7a06bc0d6d85",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 15410,
+      "mtimeNs": "1791562239606242807",
+      "ctimeNs": "1791569417494730593"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
+      "sha256": "693c72fa8aebdeb63eee1295eb24f938e1d3b7389707bfde7dc3e4264d144b4c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "f27b55045bca8ddeb6bcbe466b99da15519205f5e4e1ae2666816f2f29dad4ea",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 12778,
+      "mtimeNs": "1791562239606272707",
+      "ctimeNs": "1791569417497480737"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "00f30608d80e900770318ea3aade4075cad50d0a6d558307688f7febd9d81fa8",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 31644,
+      "mtimeNs": "1791670859362585889",
+      "ctimeNs": "1791670859381486550"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
+      "sha256": "fe6e3d22ce9fcc5bfcb20fc457034bc7203516808880d90727483caa632604f6",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bc533fd0bfb3c463d673c50514df74061806b675dadae963ef3712a066126179",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 23878,
+      "mtimeNs": "1791534747272743012",
+      "ctimeNs": "1791569417494730593"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+      "sha256": "c05a085035e9117c272ced4c0d615dc30de99838ae09ad2d6a268500aae43550",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "ccdf2d82ccaca6dcccac13dc65939616319e176421a36b4fea5e630f3c83b100",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 49112,
+      "mtimeNs": "1791534747272743012",
+      "ctimeNs": "1791569417497480737"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/entry-gates.mjs",
+      "sha256": "0f5a0a7f763823908df884b9262b6f76be206b85b106b1537dcd6eb16761551d",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "802c9b01800c6b56231602a9fea0c4c9c3728bc8381fff02d10870a7693019fd",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 15101,
+      "mtimeNs": "1791534747285300331",
+      "ctimeNs": "1791569417504326840"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/read-scope.mjs",
+      "sha256": "8e0e3901091221c67461570ad9df3b5b3d371f826a3cb28ac53448dde0fc9a14",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "434d0bfbd50f8f73ff54813d484dc9295753427e208f75bfe9de4c82ea624c11",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 36848,
+      "mtimeNs": "1791534747285300331",
+      "ctimeNs": "1791569417504326840"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "89492acee2c95c81b7ad788d2178e28d4ec03350f10d7b2c83a4548c842dcda4",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 65092,
+      "mtimeNs": "1791562239606615179",
+      "ctimeNs": "1791569417504326840"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "4200d893dd0ae3fac47674c30df04f8845ecd86c32e7002fd5cc1f504ddff7e0",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 301059,
+      "mtimeNs": "1791673041389964659",
+      "ctimeNs": "1791673041413175509"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+      "sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "a31c937011de35c00160e4b939f67a111035a58116126d23979704b96dab48c1",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 9965,
+      "mtimeNs": "1791670953366712116",
+      "ctimeNs": "1791670953455323761"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "bbebeff70e8bded92fc0f049b0c1b3e1b633193265ff767e92184e66dde5a6df",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 423484,
+      "mtimeNs": "1791673041393694793",
+      "ctimeNs": "1791673041416922663"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+      "sha256": "4ed5c3250eef668a06a384461ded32ab5f43882603a18b4e0f141f037eb18046",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "fe637ec3b321fde3f9d16f5d502321887581c8bdc77efd72d02a9fddf130bfcd",
+        "bytes": 6,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 597,
+      "mtimeNs": "1791534747296742001",
+      "ctimeNs": "1791569417497480737"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+      "sha256": "31053d205a6de028d8d585a447fb0d6c394f89a2ebe1b0d9c9a425b0bba81b18",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "5d08ad5d6a837fc6cd4860e1f017135ebb969c78ac263fb1ba500ec388c6f318",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 76336,
+      "mtimeNs": "1791672217606250523",
+      "ctimeNs": "1791672217698349696"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+      "sha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "aa2af64dd7d019e27847dd831da8d7af2cbb11a6261791d0d9b9226867133bc4",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 3702,
+      "mtimeNs": "1791672314672701562",
+      "ctimeNs": "1791672314920012635"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "fb9d38707ef1630e1d0ec7f042d4e0c42dc5e3e48290ab1cf9dac26ae827ea3c",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 115016,
+      "mtimeNs": "1791670784971196653",
+      "ctimeNs": "1791670784991196194"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "afe4a5dfa4e59565342117ae0c9b26950a428e96166d88f598fb00ace5015a73",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 706707,
+      "mtimeNs": "1791562239608211867",
+      "ctimeNs": "1791569417515720835"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs",
+      "sha256": "2d4d980f83a189fce2fe74c5a8b0cf6ead59ea3b4e47a68ec04066919280b747",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "424e70feb85164ad80d657c537a3207a20ea6aa483bb3d530768ce36393880f1",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 2,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 24067,
+      "mtimeNs": "1791562239608681389",
+      "ctimeNs": "1791569417515720835"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+      "sha256": "08634960b03c7b4bbf8dab60d5796b6b5e31b179c32949570851661ec6fc07b4",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "cebdc1e46424fc8dd7e53957583595c2b407794d8b8142e2777c2651f81e3c1d",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 33950,
+      "mtimeNs": "1791672314683008058",
+      "ctimeNs": "1791672314924012543"
+    },
+    {
+      "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "c28fe82ee90f6b61632fede4cbda7e3248401225b8d2c594264d2d74226eff3a",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "b2ff371e18bfd7c163b9cb150b927c31c581e02b88fd3d4baeec8cdd70c42769",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 809796,
+      "mtimeNs": "1791673721675766598",
+      "ctimeNs": "1791673721675766598"
+    },
+    {
+      "path": "legacy-origin:alfred-capability-registration-independent-20261010/cause-reconciliation/manifest.json",
+      "sha256": "912dfc2ee4f814f85f760a4b88cc3783bc40c39db2cef8560cbe1435e5d60ed5",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "b03211520415cc00cb873435b4fc6e350f00ab4ccd1b4e4a82250943dd566d86",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 1877,
+      "mtimeNs": "1791656485249215435",
+      "ctimeNs": "1791656485249215435"
+    },
+    {
+      "path": "legacy-origin:alfred-final-candidate-verify-protected-union-preparation-20261011/pending-protected-source-locator-index/index.json",
+      "sha256": "3ea154f09c41784bc870d97dc6ba831d8132f713f54a078edb8743250d8f68b5",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "9bdf41980a3f860c22932eb4c952339588b61a5ae36ccc64af740d2e6bd407a6",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o600",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 32039,
+      "mtimeNs": "1791674565823999063",
+      "ctimeNs": "1791674565823999063"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+      "sha256": "7289e7117fa060c1e0395123f7b407316e2672ee2d4f1ed4a045cc4a200e52e8",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c65f139ae7d6af2c1d2a5e1611757fba85f237f0f4337c3a9693cee661b5216a",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 1874,
+      "mtimeNs": "1791610969666138387",
+      "ctimeNs": "1791610969666138387"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+      "sha256": "c1953268b51ad1659956ce0cd7c521964da365db5ceb8f16b4026dfa4c0746b2",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "7820bfa7d13429d43e44a4fc40a47c2ca32457e2af2556049ddf16031bece829",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 5541,
+      "mtimeNs": "1791610969666138387",
+      "ctimeNs": "1791610969666138387"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+      "sha256": "e7b41017ccebcf99996f4728b10c6a9b13d173aecc99acac83d075913f425aad",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "7c52138323df8aadfcfb1d3d89c0655e3ed191353fac91da4c246c6b96d593e0",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 2378,
+      "mtimeNs": "1791610969666138387",
+      "ctimeNs": "1791610969666138387"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+      "sha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "51b73cf3be74a52583f85462d80f3d23636ff5c1b56f18785540e93534a1330e",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 764,
+      "mtimeNs": "1791577184422895804",
+      "ctimeNs": "1791577184422895804"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+      "sha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "a27500288c25cf79549133f69c4630954e6a3102284d70bbbd5b91dd6e995983",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 3050,
+      "mtimeNs": "1791577184422895804",
+      "ctimeNs": "1791577184422895804"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+      "sha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "9f2f50f134bc38291ce39f34b92bed9018fd5cf06a7db342b272f285dbf35b6d",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 2711,
+      "mtimeNs": "1791578755196629203",
+      "ctimeNs": "1791578755196629203"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+      "sha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "e2ae62a99f8c28bc0e1354691facdc8b25a1dfd8f863fe0eb3ab8c50b1fd5b4e",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 4086,
+      "mtimeNs": "1791578755195107861",
+      "ctimeNs": "1791578755195107861"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+      "sha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "10eb6b9ff830a5b17427be339899a1af31fd15a41bab25120267516337cf22d4",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 5074,
+      "mtimeNs": "1791577184426895735",
+      "ctimeNs": "1791577184426895735"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+      "sha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "ecf0426cf90e7b989f02248336c3c58ed771e790dbf1e71d0d8dadeb47338153",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 887,
+      "mtimeNs": "1791577184426895735",
+      "ctimeNs": "1791577184426895735"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+      "sha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "0ac14bff2c7dce87849af225bb4833bbd56eb9d2b3dabf567d0eba8810f349df",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 1489,
+      "mtimeNs": "1791577184430895664",
+      "ctimeNs": "1791577184430895664"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+      "sha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "4fc2b3e6a73f109ad42d9ff48b81ad8edc28ee75da829a6c94382e83161f681f",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 3710,
+      "mtimeNs": "1791577184430895664",
+      "ctimeNs": "1791577184430895664"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+      "sha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "f958a720a454df61eda6a884be2317f1ef6343127a6e4afc31410bbae6ae9f10",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 1579,
+      "mtimeNs": "1791577184430895664",
+      "ctimeNs": "1791577184430895664"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "1038ee62cfdd24bf608cce37d0e5d54e8f898c3d2a3b3237796fdb6a8e6b24d9",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 67834,
+      "mtimeNs": "1791635660121207356",
+      "ctimeNs": "1791635660133207089"
+    },
+    {
+      "path": "legacy-origin:alfred-hgo-denial-reason-validation-source-20261010/manifest.json",
+      "sha256": "c78e0ea0d03fc5e7f9f9e906d4d58f618fcc009419d38fd8fc6349b60a422448",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "3fc90f75faf04c1482d1f5c25b271c8b0cea641e8949d9fb9a6162c213944bfd",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 2941,
+      "mtimeNs": "1791660090644361792",
+      "ctimeNs": "1791660090644361792"
+    },
+    {
+      "path": "legacy-origin:alfred-hgo-denial-reason-validation-source-20261010/postimages/plugins/pipeline-core/lib/human-guard-override.mjs",
+      "sha256": "13e022b43fb4000fe3e1e353ecef3e9169dbf8d09727c1d744de7dce6189552c",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "aba4531527b1aca9048029bed83317aa92fcda29de79b4474e7ebad01613afc2",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 321109,
+      "mtimeNs": "1791660031657426274",
+      "ctimeNs": "1791660031657426274"
+    },
+    {
+      "path": "legacy-origin:alfred-hgo-native-action-preparation-source-20261010/api-contract.json",
+      "sha256": "30f22b34585fbc45bab180f696d981e0c7e71aa15a1da6abc3d20675b9f32030",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c144fb05c15e3fd1d9e46176ffbd450ae583c39e767d58d31c0dce5003c692d4",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 6614,
+      "mtimeNs": "1791654696733628812",
+      "ctimeNs": "1791654696733628812"
+    },
+    {
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/current150-group-binding.json",
+      "sha256": "ec2bbee42c66e57f300a722fb082e20f5f2cf36aa2e37d86226d7ac79ea0127b",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "d3e6ab9425a24a7c28db4bcc6c9319acf34a37205bd5764b259a36189dbe6fe8",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 2995,
+      "mtimeNs": "1791674114506467552",
+      "ctimeNs": "1791674114506467552"
+    },
+    {
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/agy-stale-lock-proposal/before-post-contract.json",
+      "sha256": "51f0add00d45310914a4247fa510a19cf75774f76eb8e0b1ab3bc837d6f6a6df",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "7c15ef6ec91b1d2281d8a6d507fac473e82b6e35e3f7b9af9a1542e9e6ad4dd2",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 3497,
+      "mtimeNs": "1791674881552673586",
+      "ctimeNs": "1791674881552673586"
+    },
+    {
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01-source-assessment/findings.json",
+      "sha256": "011a0e76c30fd1abe92b9c524cc970d642c9b77da130aec4cbe0c4e4b2ec8a81",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "1136dee6a42222801a83e642541b4cc0efd7051b6fedcc9ba6d7ad8ab099e4f2",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 21375,
+      "mtimeNs": "1791675198233327023",
+      "ctimeNs": "1791675198233327023"
+    },
+    {
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01.json",
+      "sha256": "8bbcda7a60e97acb1cc0a1734b8f42e3f4fc0f347c82272e1cb7b25798f0c976",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "12ecbbc11123ebe71acb95976c705238840c77c34cb91ab3de2df11c957eb4ad",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 53513,
+      "mtimeNs": "1791673972465763884",
+      "ctimeNs": "1791673972465763884"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/aggregate-joint-state-model-generation-20261011/public-actual-proof.json",
+      "sha256": "1becd6f257db5faf46d60ac0ee1f0aabfd6a4a763e38c2739ca313816d4628f1",
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "029224d05960dacc410e08a4c5d56487243c3fda891f6a62511e126f4807f48c",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "mode": "0o644",
+      "nlink": 1,
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "bytes": 9024,
+      "mtimeNs": "1791670563785613850",
+      "ctimeNs": "1791670563785613850"
+    }
+  ],
+  "beforeAfterSourceCustodyConserved": true,
+  "MainAuditWrites": 0,
+  "businessRuns": 0,
+  "productImports": 0,
+  "gitCommands": 0,
+  "stagePromotions": 0,
+  "itemAcceptances": 0,
+  "additionalCritics": 0
+}

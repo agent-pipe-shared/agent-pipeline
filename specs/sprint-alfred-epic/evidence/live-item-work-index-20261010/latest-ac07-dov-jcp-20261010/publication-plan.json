@@ -1,0 +1,69 @@
+{
+  "schema": "alfred.focused-proof-archive-plan.v1",
+  "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-ac07-dov-jcp-20261010",
+  "targets": [
+    ".",
+    "scratch/alfred-greenfield-agy-audit-20261009"
+  ],
+  "files": [
+    {
+      "path": "ac07-fourteen-proof.json",
+      "sha256": "f292d97b68412500c669c817d92bb4c3ca77cc497baed5c01aeed075296a4fec",
+      "bytes": 1259,
+      "mode": 420
+    },
+    {
+      "path": "ac07-additional-four-proof.json",
+      "sha256": "1f7d93959789d70952d503e0777cded0f71f3b56fd4f7b2af4baaf54ba7cac37",
+      "bytes": 1227,
+      "mode": 420
+    },
+    {
+      "path": "declared-override-twenty-proof.json",
+      "sha256": "de85d1845f9f71b39c61e5599689aaf8231e6477efe34545ba79713b69e4b51f",
+      "bytes": 1143,
+      "mode": 420
+    },
+    {
+      "path": "joint-command-placement-twelve-proof.json",
+      "sha256": "07e3bd008771dd9e3af89e6089c948c4ddaa2ef98eda3452c0b3b01b99ed9dbf",
+      "bytes": 1171,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "b49d4e3c95778e80d461cfa1e098a11835d19f63100e6f365849852da94a666f",
+      "bytes": 3407,
+      "mode": 420
+    },
+    {
+      "path": "handover-update.md",
+      "sha256": "3eee0889c6974793a7c6b27b8b710a6ac7d276c11bd3c53042bf8446157a49cf",
+      "bytes": 1072,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "c057f2ab1d3d850b4eab449a160c4c5c6d0665fea040e4f815dc97f03c94bbf1",
+      "bytes": 767,
+      "mode": 420
+    },
+    {
+      "path": "late-checkpoint.json",
+      "sha256": "3f75cb5d1aa897f04e05902b2514e27573e306b76e3c305e65f048b826c7a062",
+      "bytes": 4492,
+      "mode": 420
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "75e908f702df8aae7b6c59e593de96a01be92c2cd1ff6c783444648806757e1b",
+      "bytes": 3541,
+      "mode": 420
+    }
+  ],
+  "noOverwrite": true,
+  "sourceInventoryGuard": {
+    "path": "scratch/alfred-agy-managed-topology-row-boundary-successor-20261010/actual-source-manifest.json",
+    "sha256": "2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381"
+  }
+}

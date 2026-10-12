@@ -1,0 +1,22 @@
+{
+  "schema": "alfred.selective-native-regression-evidence.v1",
+  "caseId": "NGHS19",
+  "actualRedExit": 1,
+  "actualGreenExit": 0,
+  "records": [
+    {
+      "path": "red.jsonl",
+      "sha256": "f1291f7ba5e030bd2dd6975117cc84d75369bc2cb7dd7ad897cee4c130f70beb",
+      "run": "2026-10-11T19-40-28-852Z-v2-red"
+    },
+    {
+      "path": "green.jsonl",
+      "sha256": "d561d5ae7b91c6921ee79aa56ec237596d7dc8e97e745a309c33053aa3f91b69",
+      "run": "2026-10-11T19-42-19-130Z-v2-green"
+    }
+  ],
+  "producerManifestSha256": "62d21f7648e1377449f198ca8f607b4a98e92de307214813e521ab51b9fecd1a",
+  "wholeNative19SuiteTerminalClaimed": false,
+  "note": "Authentic selective records; existing Native18 qualification retained separately, no invented completion terminal.",
+  "testsReplayed": false
+}

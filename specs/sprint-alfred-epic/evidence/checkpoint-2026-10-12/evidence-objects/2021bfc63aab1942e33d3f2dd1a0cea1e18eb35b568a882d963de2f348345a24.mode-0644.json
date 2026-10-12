@@ -1,0 +1,82 @@
+{
+  "schema": "alfred.critic-cap.independent-resource-contract.v1",
+  "status": "assertions-ready; Root full graph/launcher prerequisite",
+  "canonicalTest": "plugins/pipeline-core/scripts/critic-one-plus-diff.independent.test.mjs",
+  "caseIds": [
+    "CCD001",
+    "CCD002",
+    "CCD003",
+    "CCD004",
+    "CCD005",
+    "CCD006",
+    "CCD007",
+    "CCD008"
+  ],
+  "caseCount": 8,
+  "sourceManifest": {
+    "path": "legacy-origin:alfred-critic-one-plus-diff-po-decision-source-20261010/source-manifest.json",
+    "sha256": "7fb603d42e926767099db0855358115d10ca8948d1d4a8025a050f0c1e84408c",
+    "bytes": 6168,
+    "mode": 420,
+    "nlink": 1
+  },
+  "apiContract": {
+    "path": "legacy-origin:alfred-critic-one-plus-diff-po-decision-source-20261010/api-contract.json",
+    "sha256": "c4fd5cdb23fcdf180524e8baffc38e8de3e4e7dd10603a25e252a887c65d43b1",
+    "bytes": 3014,
+    "mode": 420,
+    "nlink": 1
+  },
+  "entryFiles": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-one-plus-diff.independent.test.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/postimages/plugins/pipeline-core/scripts/critic-one-plus-diff.independent.test.mjs",
+      "sha256": "e1c35eda591939424fb4b7c52025bab9c4db878ada82c029454db40c61d5d474",
+      "bytes": 12107,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/postimages/plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "sha256": "f6835e041ae38345688c7faa16b93ec101cb23fd052e1b6070dbc3d5bf7992c2",
+      "bytes": 22654,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/postimages/plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "sha256": "0f3f01486109426fd101e5f510aeea4c03ffb9e1468899aca3b48094a74969db",
+      "bytes": 26326,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "literalImportClosure": {
+    "path": "legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/static-import-closure.json",
+    "sha256": "90c57aee13109db3b92bc7942b9576e53735890ea506784cdf09f3c417d0a5cd",
+    "bytes": 310390,
+    "mode": 420,
+    "nlink": 1
+  },
+  "actualRuntimeRequirements": [
+    "Root actual selected Source graph plus exact three7fb603 overlays; no silent downgrade to retained constructor generations",
+    "Ordinary pipeline-state, accepted-contract, topology, actual Git registration, deterministic diagnostic, real private packet prepare/claim/finalize/consume, registered lineage writers and readers",
+    "Actual physical plugin architecture map/scaffold, schema, policy, agent, lifecycle and runtime resources consumed by those producers; Root binds every actual runtime resource before execution",
+    "Root-owned exclusive fresh working directory; .apw-owned-fixtures child namespace absent before import; only synthetic local author identity configuration",
+    "Inherit entire process.env, Git configuration/hooks/signing, PO/model-role environment, NODE_OPTIONS and execArgv; only Root-owned temporary location and explicit completion FD signal allowed",
+    "Direct Node file execution; regular inherited fd3 and PIPELINE_VERIFY_CASE_COMPLETION_FD=3; actual production completion parser validates eight callbacks and terminal fullcounts",
+    "Root full source/test/fixture/graph/launcher read, physical CAS before/between/after and one-use launcher; no worker semantic execution"
+  ],
+  "limits": [
+    "No current-host/native/model identity qualification",
+    "Synthetic verdicts are protocol inputs, not actual Critic reviews",
+    "CCD005 actual runtime is genuine third refusal; live fourth history cannot be created under the new cap",
+    "CCD006 historical format bytes are synthetic read-only schema controls, never private consumed authority",
+    "Generic unregistered durable per-batch accounting remains a Source gap",
+    "Static import closure is not asserted complete runtime closure"
+  ],
+  "workerBusinessRuns": 0,
+  "qualification": false
+}

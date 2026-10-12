@@ -1,0 +1,7 @@
+{
+  "schema": "alfred.m4.independent15.one-use-reservation.v1",
+  "freezeSha256": "68d025a1ee61049f6536f0a0963616d62634d4b53a4c87d683b2752622440703",
+  "graphManifestSha256": "56d65b25af07cd11d59208d9fb2a40bc8bf20aeba62b37e9d2d8fe3097502430",
+  "operation": "run-independent15",
+  "attemptsAllowed": 1
+}

@@ -1,0 +1,96 @@
+{
+  "schema": "alfred.critic-notes-controlled-actual8-proof.v1",
+  "caseResults": [
+    {
+      "id": "NCC001",
+      "disposition": "pass",
+      "criterion": "Own Write admission creates source-exclusive directory and controlled notes file"
+    },
+    {
+      "id": "NCC002",
+      "disposition": "pass",
+      "criterion": "Own Edit admission appends within the same directory identity"
+    },
+    {
+      "id": "NCC003",
+      "disposition": "pass",
+      "criterion": "Sibling dispatch target refused without creating its directory"
+    },
+    {
+      "id": "NCC004",
+      "disposition": "pass",
+      "criterion": "Existing unowned directory refused with content and inode conserved"
+    },
+    {
+      "id": "NCC005",
+      "disposition": "pass",
+      "criterion": "Symlink directory escape refused"
+    },
+    {
+      "id": "NCC006",
+      "disposition": "pass",
+      "criterion": "Hardlinked notes target refused with aliased bytes conserved"
+    },
+    {
+      "id": "NCC007",
+      "disposition": "pass",
+      "criterion": "Changed dispatch binding receipt refused without notes effects"
+    },
+    {
+      "id": "NCC008",
+      "disposition": "pass",
+      "criterion": "Exhausted working and closing allowance refuses notes creation"
+    }
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "009e225fcc6c0ae3e8c8443027477fa1be5f0bf590c7723392f083c1ea2d3599",
+    "caseSetSha256": "54dec4dc1fbd443d33c464ccc35c71368b58662afa203a9f2b1e2d3ba5fdba34",
+    "dispositionsSha256": "8b94c81461fea79a1b687850b01bd9887b63b58ddc4978ba4cb95be10dd3ed1e",
+    "declaredCount": 8,
+    "disposedCount": 8,
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "transport": {
+    "exitCode": 0,
+    "signal": null,
+    "error": null,
+    "parserError": null
+  },
+  "resourceConservation": {
+    "files": 365,
+    "conserved": true
+  },
+  "source": {
+    "hook": {
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "sha256": "b18dd62149c2be993b1801d79aa4df1dac04419ebe9394d2c0f0f8f65a725a62"
+    },
+    "controlledDependencies": {
+      "state": "c28fe82ee90f6b61632fede4cbda7e3248401225b8d2c594264d2d74226eff3a",
+      "onboarding": "dc31dfd69eec652e603a5a0654faa32f95dd48e4ebeba7eacaf3ef181a0d7b50",
+      "registry": "d30aaa52c97ac7f17c852a181572b773d952e2090fa5496afe4e609b86b5bea0",
+      "custody": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c"
+    }
+  },
+  "receiptBindings": {
+    "executionSha256": "33f1ed71007168e97bee1dbae33bf59d0c466e42b504063bb9f2a74eb1604561",
+    "completionSha256": "378a71a7ec0559d578bff8f81a349d74e34099321b66f1fc27ee22135e59c373",
+    "stdoutSha256": "f2ee00f5ad32867b0ced633c4e5a931690acf651a1c5fa1670c5eac5bb3962b9",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "provenance": "Source-author focused controlled qualification; Root executed once. Not an independent Critic review.",
+  "scope": "Genuine controlled dispatch-budget owner, authenticated unit metadata/counter join, source-exclusive directory allocation, existing Write/Edit admission and controlled file effects.",
+  "limits": [
+    "No actual native-host Write/Edit or Windows checklist certification",
+    "No generic old unregistered-course adoption or actual host chat-turn capture",
+    "Controlled dependency generation is not final Main or whole AFK acceptance"
+  ],
+  "integration": "Separate Root-only ordinary four-file integration pending; this proof does not assert applied Main content."
+}

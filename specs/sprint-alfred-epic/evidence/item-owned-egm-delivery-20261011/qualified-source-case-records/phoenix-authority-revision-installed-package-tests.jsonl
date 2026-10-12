@@ -1,0 +1,3 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["PHARI001"],"caseCount":1,"caseSetSha256":"9239f7b005f20f05c8ca58be94354a63f5232a0b324669c65df6c04c12305de9"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PHARI001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":1,"disposedCount":1,"caseIds":["PHARI001"],"caseSetSha256":"9239f7b005f20f05c8ca58be94354a63f5232a0b324669c65df6c04c12305de9","dispositionsSha256":"f6999a67033a556bbb0216b85669d65501b51c7419f8c7b4494d491b7088eb50","counts":{"pass":1,"fail":0,"skip":0,"todo":0}}

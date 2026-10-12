@@ -1,0 +1,53 @@
+{
+  "schema": "alfred.claude-inline-attestation-two-row-custody.v1",
+  "spans": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+      "before": {
+        "canonicalPath": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+        "sha256": "7e781dd0c3e9b48488891b4fbe477d36afb341c71e0ef769bc05c2a13c7f3a8d",
+        "bytes": 11818,
+        "mode": 420,
+        "nlink": 1
+      },
+      "after": {
+        "canonicalPath": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+        "sha256": "a40947944d52f0c817780c752633911caa1f79ae2cec3bc76e6105efa48d754a",
+        "bytes": 12240,
+        "mode": 420,
+        "nlink": 1
+      }
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+      "before": {
+        "canonicalPath": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+        "path": "legacy-origin:alfred-cmo-generated-architecture-commit-source-20261010/composed-gre-successor/postimages/plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+        "sha256": "f19e35184a0664821f0b55ac47a126689e8e430965692784561700d8970eade6",
+        "bytes": 47905,
+        "mode": 420,
+        "nlink": 1
+      },
+      "after": {
+        "canonicalPath": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+        "sha256": "6bd26c6fcfa10d6cffe0705914cbfaca181ec8a0ed2bd0ef279498ff95a1b13e",
+        "bytes": 46972,
+        "mode": 420,
+        "nlink": 1
+      }
+    }
+  ],
+  "inverseExact": true,
+  "allOtherRowsByteExact": true,
+  "sourceFilesAuthored": false,
+  "actualIntegrationReceipt": {
+    "path": "legacy-origin:alfred-c0-model010-reader-candidate-apply-plan-20261010/fixed10-atomic-integration-preparation/apply-once/actual-receipt.json",
+    "sha256": "3b9e763544aa710946c44b42f036c9b14c9f3b2fb8572d577f7b11430dea70f7",
+    "bytes": 4748,
+    "mode": 384,
+    "nlink": 1
+  }
+}

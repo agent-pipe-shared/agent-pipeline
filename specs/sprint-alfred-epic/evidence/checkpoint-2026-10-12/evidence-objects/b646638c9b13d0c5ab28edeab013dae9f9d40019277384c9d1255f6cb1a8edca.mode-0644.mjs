@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+const own=path.dirname(fileURLToPath(import.meta.url)),root=path.resolve(own,'../../..'),sha=b=>createHash('sha256').update(b).digest('hex');
+const binding=JSON.parse(fs.readFileSync(path.join(own,'source-binding.json'))),publicFiles=[];
+const actual=['lib/critic-course-adoption.mjs','scripts/critic-course-adoption.mjs','lib/critic-generic-batch.mjs','scripts/check-critic-skip-coverage.mjs','scripts/critic-dispatch-preflight.mjs','scripts/session-critic-finalizer.mjs','scripts/critic-packet-preflight.mjs'];
+function image(p){const s=fs.lstatSync(p);if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1)throw Error('CHECKPOINT-PHYSICAL');const b=fs.readFileSync(p);return {sha256:sha(b),bytes:b.length,mode:s.mode&0o777};}
+for(const rel of actual){const p=path.join(own,'candidate/plugins/pipeline-core',rel),before=binding.inventory.find(e=>e.path===rel);publicFiles.push({localPath:'candidate/plugins/pipeline-core/'+rel,sourcePath:'plugins/pipeline-core/'+rel,kind:before?'postimage':'new-source',preimage:before??null,...image(p)});}
+const conserved=binding.selected.map(s=>{const current=image(path.join(root,s.path));if(current.sha256!==s.sha256||current.mode!==s.mode)throw Error('SOURCE-CAS:'+s.path);return {path:s.path,preimage:s.sha256,current:current.sha256,conserved:true};});
+const packet='plugins/pipeline-core/scripts/critic-packet-preflight.mjs',packetImage=image(path.join(root,packet));if(packetImage.sha256!=='54e9abd562c1b41d18d6f5a598d84942b5aecb7efb667c92672847bc355a9534')throw Error('PACKET-CAS');
+const md=fs.readFileSync(path.join(own,'adr-draft-critic-course-adoption.md'));
+const decision={schema:'pipeline.architecture-decision.v2',id:'draft-authenticated-critic-course-adoption',title:'Authenticated current-course Critic candidate adoption',status:'proposed',digest:sha(md),scope:'module',moduleIds:['pipeline-core'],date:'2026-10-12'};
+fs.writeFileSync(path.join(own,'adr-draft-critic-course-adoption.json'),JSON.stringify(decision,null,2)+'\n',{flag:'wx'});
+const support=['prepare.mjs','analysis.md','frozen-cases.json','source-binding.json','tests.mjs','tests-v2.mjs','execution.environment-hold.json','results.json','results-v2.json','adr-draft-critic-course-adoption.md','adr-draft-critic-course-adoption.json','HANDOVER.md','checkpoint.mjs'].map(p=>({localPath:p,kind:'support',...image(path.join(own,p))}));
+const manifest={schema:'alfred.critic-adoption-whole-item-checkpoint.v1',status:'private-code-checkpoint-unqualified',accepted:false,sourceConserved:true,conserved,packetPreimage:{path:packet,...packetImage},publicCode:publicFiles,support,architecture:{status:'proposed',chatDirection:'call_3ee312646db841a7b45af8b8be547316/question0',aggregateApproval:'not-effective',separateAdrSignature:false},holds:['genuine-accepted-mapping-policy-and-original-budget-unavailable','positive-source-publication-registration-admission-unqualified','adopted-correction-carrier-unimplemented','full-verify-and-independent-critic-not-run','no-native-installed-qualification'],liveProcessHandles:[],reviewBudgetConsumed:0,publicCaptureRequired:true,exclude:['fixtures/**/.git/**','private authority stores','key/proof bodies']};
+fs.writeFileSync(path.join(own,'checkpoint-manifest.json'),JSON.stringify(manifest,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({status:manifest.status,sourceConserved:true,publicCode:publicFiles.length,manifestSha256:sha(Buffer.from(JSON.stringify(manifest,null,2)+'\n')),liveProcessHandles:[]}));

@@ -1,0 +1,1 @@
+{"schema":"scratch.kernel-arrow-regex-original-red.v1","itemID":"pipeline.kernel-closure-check-masks-violations-after-the-first","regression":"const f=error => /['\"\\s]/u.test(error);\n","status":"RED","actualSourceCause":"backlog-state.mjs arrow-return regex at observed graph-diagnostic-v8-1791763326355.json"}

@@ -1,0 +1,74 @@
+{
+  "schema": "alfred.selected164.consumed26.delta.v1",
+  "parent": {
+    "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed25-successor/remaining-delta.json",
+    "sha256": "ea3967b75a04e4cc0d1226591d7525dd00a0c879f8172c13192bd1185e11b7d2"
+  },
+  "counts": {
+    "selected": 164,
+    "integrated": 26,
+    "remaining": 138,
+    "remainingUnprotected": 125,
+    "remainingSelectedProtected": 13,
+    "protectedUnion": 14
+  },
+  "newConsumed": [
+    "plugins/pipeline-core/lib/role-dispatch-preflight.mjs"
+  ],
+  "remainingFilter": {
+    "operation": "exclude exact newConsumed from parent remainingPaths; retain every other row"
+  },
+  "currentMainSourceAppend": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+      "sha256": "d6976e58e598cd8188674bb6f0d2e82d116eebce4792afb7cdb8273a76c80c56",
+      "mode": 420,
+      "nlink": 1,
+      "actualReceipt": {
+        "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/role1-atomic-preparation/apply-once/actual-receipt.json",
+        "sha256": "95ed87ec0c8fb925d8e7210c3d68ff303ce5104fbfd54a94c8e15263a0aca002"
+      },
+      "sourceManifest": {
+        "path": "scratch/alfred-role-route-fallback-runtime-source-20261010/manifest.json",
+        "sha256": "9b5f7ae72a5cf3c34466cf2fb79e7586dda07c17a94b0463efd805eeb5ad91fa"
+      }
+    }
+  ],
+  "pending": [
+    {
+      "group": "CIA4",
+      "owner": "agy_greenfield_acceptance_audit",
+      "manifest": {
+        "path": "scratch/alfred-claude-inline-attestation-integration-group-20261010/manifest.json",
+        "sha256": "ec334d5d37e239d7085ce8378048a61d58c020d348ad2c08d13f83ff2ad8dd74"
+      },
+      "status": "preparation-not-applied"
+    },
+    {
+      "group": "DesignCHAT3 and two Elephant docs outside164",
+      "owner": "agy_greenfield_design_audit",
+      "status": "preparation-not-applied",
+      "manifest": null
+    },
+    {
+      "group": "Shell9",
+      "owner": "alfred_obl016_heredoc_extractor_regression",
+      "manifest": {
+        "path": "scratch/alfred-selected164-shell-readonly-integration-preparation-20261011/manifest.json",
+        "sha256": "6fb0cbef116254bfca7d41ced06b06caed5c399300d2852012d172ccbd903c0a"
+      },
+      "status": "fixed-inspector-preparation-not-applied"
+    },
+    {
+      "group": "OA6",
+      "owner": "alfred_r10_integration_inventory",
+      "manifest": {
+        "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/manifest.json",
+        "sha256": "9c3da8e04f836445fb8d799b0e618b08851019939b8ccfe3ec95b4dc9fc9f60e"
+      },
+      "status": "fixed-inspector-preparation-not-applied"
+    }
+  ],
+  "wholeItemAcceptance": false,
+  "nativeClaim": false
+}

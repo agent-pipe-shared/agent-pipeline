@@ -1,0 +1,175 @@
+{
+  "schema": "alfred.claude-resource-headroom-source.v1",
+  "status": "frozen-source-proposal-static-only",
+  "files": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "preimageSHA256": null,
+      "successorParentSHA256": null,
+      "postimagePath": "postimages/plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "postimageSHA256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2",
+      "bytes": 5369,
+      "additive": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+      "preimageSHA256": null,
+      "successorParentSHA256": null,
+      "postimagePath": "postimages/plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+      "postimageSHA256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801",
+      "bytes": 4790,
+      "additive": true
+    },
+    {
+      "canonicalPath": "templates/prompts/goldfish-task.md",
+      "preimageSHA256": "095f1c24ef174a404984dcfefcc27bcd41d995e4017e2758546f5623e3f2d213",
+      "successorParentSHA256": "18e75f316602aa8667b08523ef2b398a06d892f981549bf42f17ef8736582d56",
+      "postimagePath": "postimages/templates/prompts/goldfish-task.md",
+      "postimageSHA256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "bytes": 57670,
+      "additive": false
+    }
+  ],
+  "inputs": [
+    {
+      "path": "legacy-origin:alfred-claude-dispatch-test-routes-source-20261010/postimages/templates/prompts/goldfish-task.md",
+      "sha256": "18e75f316602aa8667b08523ef2b398a06d892f981549bf42f17ef8736582d56"
+    },
+    {
+      "path": "templates/prompts/goldfish-task.md",
+      "sha256": "095f1c24ef174a404984dcfefcc27bcd41d995e4017e2758546f5623e3f2d213"
+    },
+    {
+      "path": "legacy-origin:alfred-claude-resource-headroom-independent-20261010/resource-headroom.test.mjs",
+      "sha256": "55fd352dc0455cd48f2d27f2c521616108bbe352cefdccf034d47a4a43a25d2a"
+    },
+    {
+      "path": "legacy-origin:alfred-claude-resource-headroom-independent-20261010/assertions-freeze.json",
+      "sha256": "40509ea5fe168a0bece5aa1f3436c71121dace3c20f01fad42e9f71993fe885d"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/entrypoint.mjs",
+      "sha256": "ea43c7d71788eed911369d07707b6f2e9adf711a21229613cf7faa8c897438e8"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+      "sha256": "a0269e2af2323f408973f15f9a8015eeba41e32d56625ef7d3bda342ea0e9381"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+      "sha256": "e9cc3e9f59985057b00d9abc6295f41361dcbc95b9d0feff53fbfe59837002e8"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "sha256": "49d3ab05d33e1e4c4440f945234ae70c575b52c543e597dd16fee38be0e931af"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-project-resource-budget-headroom-is-not-reported.md",
+      "sha256": "dc5c10386742ef16d32cf5903f264ed700266fb4b43d234407e1e6e55f234028"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "api-contract.json",
+      "sha256": "c2eb4361f9ee8e6dc08c57b2606e3426a4e9eda31eb58526b2ce91230ccdcfa4"
+    },
+    {
+      "path": "plan.md",
+      "sha256": "6e806128d242975c4581400a024a92375606299ccf00a9134acd6f2f5786e94a"
+    },
+    {
+      "path": "build.py",
+      "sha256": "a71313bcb4958c80e47a640c64cd5127f36120bc70ef47fd01a7c33260feb4d3"
+    },
+    {
+      "path": "syntax.json",
+      "sha256": "abf586e84e04a6f26f850cb52d280bfd7cb96df5b351d576b4314feb28d637e9"
+    },
+    {
+      "path": "checks.json",
+      "sha256": "af2f561a45b0b7adb413455d7f82ff44f300fc900d98413fb0c4da0363844035"
+    },
+    {
+      "path": "report.md",
+      "sha256": "49d5b48327c9f87409328bbf2fe41bab99a76518bbe8b8d06dd554911f222988"
+    },
+    {
+      "path": "package.patch",
+      "sha256": "3950911f72626e2681156b5f6dcea3b22e066d8d1353d07e157ac82c13efb09f"
+    },
+    {
+      "path": "inverse.patch",
+      "sha256": "0f50b5b677c10c90f56a1071474ee5562d8ec39828f0ac3bb95ed4bb1f9b3c93"
+    },
+    {
+      "path": "integration.patch",
+      "sha256": "1db1e6228c891fc34b2f4badb8dc85c2ae94e5bed36212eb638518808de45a2c"
+    },
+    {
+      "path": "postimages/plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "sha256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2"
+    },
+    {
+      "path": "postimages/plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+      "sha256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801"
+    },
+    {
+      "path": "postimages/templates/prompts/goldfish-task.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6"
+    },
+    {
+      "path": "finish.py",
+      "sha256": "31622534067253c9b28ed8a60fc0362e250b35519895e1ca621bbcaa914cc67f"
+    }
+  ],
+  "importClosure": [
+    {
+      "path": "plugins/pipeline-core/lib/entrypoint.mjs",
+      "physicalPath": "plugins/pipeline-core/lib/entrypoint.mjs",
+      "sha256": "ea43c7d71788eed911369d07707b6f2e9adf711a21229613cf7faa8c897438e8"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "physicalPath": "legacy-origin:alfred-claude-resource-headroom-source-20261010/postimages/plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "sha256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2"
+    }
+  ],
+  "checks": {
+    "newCanonicalLeavesPhysicallyAbsent": true,
+    "mainTemplateParentUnchanged": true,
+    "targetedQuickTemplateParentUnchanged": true,
+    "templateGuidanceInverseByteExact": true,
+    "independentElevenCallbacksUnchanged": true,
+    "syntaxExitCodes": [
+      0,
+      0
+    ],
+    "semanticRuns": 0,
+    "productionImports": 0,
+    "GitWrites": 0,
+    "liveWrites": 0,
+    "successorPatchForwardByteExact": true,
+    "successorPatchInverseByteExact": true,
+    "mainIntegrationPatchByteExact": true,
+    "allInputAndSourceCASReadbackExact": true
+  },
+  "independentFreezeSHA256": "40509ea5fe168a0bece5aa1f3436c71121dace3c20f01fad42e9f71993fe885d",
+  "remaining": [
+    "One independent eleven-case qualification",
+    "actual READY command admission/integration",
+    "real project criterion and candidate-bound measurement observations",
+    "final changed-methodology Critic and integrated Verify"
+  ],
+  "nativePASS": false,
+  "actualMeasurementAuthentication": false,
+  "officialRegistration": false,
+  "itemClosure": false
+}

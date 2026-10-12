@@ -1,0 +1,57 @@
+{
+  "schema": "alfred.unresolved98.current150.group-binding.v1",
+  "status": "Private coordination input; original seven partitions unchanged",
+  "partitionManifest": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/manifest.json",
+    "sha256": "e11bdd809ab88a425f6929ede40ef7ee56ffc2ef08229d8c214d01daa8bd0ec9"
+  },
+  "currentPrivate150": {
+    "manifest": {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed150-power2-append/manifest.json",
+      "sha256": "7be53caab1b6350dd3d67be203f5ec211798b71ad708a267377924f73b28486c"
+    },
+    "delta": {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed150-power2-append/integration-delta.json",
+      "sha256": "d24f4d3b47ca289093f343c819aea777f4f5bee57990e1bceb2874f40351d931"
+    },
+    "actualPowerReceipt": {
+      "path": "legacy-origin:alfred-power-functional-main-atomic-content-preparation-20261011/execution.json",
+      "sha256": "1ad055839deb6ff96f9b47e8a7221103ef79f09dcf190bb883ead703d526694f"
+    },
+    "selectedCurrentOrApplied": 150,
+    "selectedTotal": 164,
+    "remainingRuntime": [
+      {
+        "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "owner": {
+          "functionalRole": "Coordinator-or-assigned-agent",
+          "historicalActorExcluded": true
+        },
+        "status": "final composition unapplied at pinned snapshot"
+      }
+    ],
+    "protectedSelectedRemaining": 13,
+    "protectedUnionHeld": 14,
+    "outsideApprovedContent": 8
+  },
+  "publishedHistorical148": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/selected148-content-checkpoint-20261011/manifest.json",
+    "sha256": "dfaafa1d16414faebac0517cdb59da58549d605baaa943a1d1151b4a8a75de68"
+  },
+  "bodyDriftRule": {
+    "assignedNorm": "Each group row's exact original requirement/body hash/clauses/recorded remainder remains the assigned normative scope.",
+    "currentBodyObservation": "If a current body hash differs because acceptance notes were appended, record that drift and treat the current body as a new observation. Do not claim the original hash matches.",
+    "immutableOriginal": "Use an immutable original only if an actual declared locator is available; do not guess another path.",
+    "assessmentContinuation": "Body drift does not abort the whole source assessment. Evaluate the preserved assigned requirement against actual current source; do not silently expand retired/deferred scope.",
+    "scopeChanges": "Any genuinely new contradictory requirement must be reported to Root; no automatic adoption or scope expansion."
+  },
+  "ownerPolicy": "Seven recipients consume their Root-assigned partition only; this packet does not assign or reassign modules. One path has one source owner, coordinated by Root.",
+  "limits": [
+    "Content transfer150/164 is not test coverage or whole-item acceptance.",
+    "Native claims and engineering stages are unchanged.",
+    "No business execution, additional Critic, Main/Audit writes or source changes by this coordination author."
+  ],
+  "stagePromotions": 0,
+  "MainAuditWrites": 0,
+  "businessRuns": 0
+}

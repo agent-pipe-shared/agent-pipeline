@@ -1,0 +1,44 @@
+{
+  "schema": "alfred.handover-focused-receipt-bindings.v1",
+  "qualification": {
+    "path": "scratch/alfred-unknown02-current-main-assessment-20261011/handover-staged-classification-source/staged-three-regression-preparation/qualification-root/execution.json",
+    "sha256": "686679b84c531009435470048bd42ba61b85a4e92dc48364a8a6180b53b95e3f"
+  },
+  "contentTransfer": {
+    "path": "scratch/alfred-unknown02-current-main-assessment-20261011/handover-staged-classification-source/main-integration-preparation/atomic-four-successor/application-root/execution.json",
+    "sha256": "4857d724c9a95af49828b8e4b310d8b59a4c2636704086d35779939733d53e1d"
+  },
+  "captures": [
+    {
+      "path": "scratch/alfred-unknown02-current-main-assessment-20261011/handover-staged-classification-source/staged-three-regression-preparation/qualification-root/stdout.private.log",
+      "sha256": "30f233e4ee06bf01e9e814d39baff0a49051e207cd406ea52202a5497d70c342",
+      "bytes": 381,
+      "rawPublicCopy": false
+    },
+    {
+      "path": "scratch/alfred-unknown02-current-main-assessment-20261011/handover-staged-classification-source/staged-three-regression-preparation/qualification-root/stderr.private.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "rawPublicCopy": false
+    },
+    {
+      "path": "scratch/alfred-unknown02-current-main-assessment-20261011/handover-staged-classification-source/staged-three-regression-preparation/qualification-root/fd3.private.jsonl",
+      "sha256": "6b8042d6867fa4905b5c5028354c5fa5aa43fa8ce7b29ec1c4025cb1bb6c012a",
+      "bytes": 895,
+      "rawPublicCopy": false
+    }
+  ],
+  "SourceManifest": {
+    "path": "scratch/alfred-unknown02-current-main-assessment-20261011/handover-staged-classification-source/manifest.json",
+    "sha256": "3782d11711d5c2781b274b0b7a5cadfc79397d1b8af1885f0a276bc755f80911"
+  },
+  "testManifest": {
+    "path": "scratch/alfred-unknown02-current-main-assessment-20261011/handover-staged-classification-source/staged-three-regression-preparation/manifest.json",
+    "sha256": "38d12c2abdd66832783cc81bf273992916b4674601c3f8861fade7377323a29d"
+  },
+  "existingTestsScope": {
+    "path": "scratch/alfred-unknown02-current-main-assessment-20261011/handover-staged-classification-source/main-integration-preparation/atomic-four-successor/existing-test-scope.json",
+    "sha256": "deeb5f4105b6bcbb5328a64ce8bef952b2250f508f3a227c3be0acf475f6ef62"
+  },
+  "privacy": "Only bounded synthetic case names, public relative artifact paths, content hashes, counts and scoped outcomes. No raw capture export, host identities, environment, Git stderr, keys or private authority payload."
+}

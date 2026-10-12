@@ -1,0 +1,48 @@
+{
+  "schema": "alfred.m4-source-postimages.v1",
+  "files": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "parentPath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "preSHA256": "549e26230caf3a5a76f9560c87ead0d3bca2f5724de2ab9000a2c6db2e7caadf",
+      "postSHA256": "6f10035fd29072a97384fdfa904ab5e927f8477cc01c6839f88c3aa0b2b82c56",
+      "postimagePath": "postimages/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "parentPath": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "preSHA256": "0171392c243b0acd2b4a13041ad59c4f167ca478feb6bfe2fb1acc55aa2375d8",
+      "postSHA256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+      "postimagePath": "postimages/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "parentPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "preSHA256": "107766ea18455f8a37084c8684b446bc4b77a91436f3b16277aa57d12ce02cc5",
+      "postSHA256": "542d31ab35cbdb6351dedf28d2126399afae8701859696dd31f61468f607b02e",
+      "postimagePath": "postimages/plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+      "parentPath": null,
+      "preSHA256": null,
+      "postSHA256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+      "postimagePath": "postimages/plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "status": "source-authored-not-qualified",
+  "businessRuns": 0,
+  "productImports": 0,
+  "completionChanged": false,
+  "unknownHistoryPreserved": true,
+  "forwardAndInverseAppliedInMemory": true,
+  "existingCompletionFunctionByteConserved": true
+}

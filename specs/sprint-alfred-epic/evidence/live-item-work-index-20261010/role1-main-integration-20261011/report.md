@@ -1,0 +1,3 @@
+Role1 is actually integrated: Main da452→d697 by atomic replacement, new nlink1; Audit noop. All16 Main dependency physical tuples conserved. No protected target changed. Current selected164 accounting is26 integrated/138 remaining (125 unprotected,13 selected protected;14 protected union). These are path counts, not item completion percentages.
+
+CIA4, DesignCHAT3 plus two Elephant docs outside164, Shell9 and OA6 remain preparation. The original eight-case METHOD proof does not establish actual fallback availability: three canonical carriers still have nlink2 and remain typed unavailable. Formal backlog acceptance/native/install readiness remain open. The prior stable10 eight public metadata copies were actually published by Root; frozen history is unchanged.

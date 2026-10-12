@@ -1,0 +1,35 @@
+{
+  "schema": "alfred.sanitized-focused-proof.v1",
+  "id": "declared-override-twenty",
+  "input": {
+    "path": "scratch/alfred-v3-declared-override-inherited-home-runner-20261010/execution.json",
+    "sha256": "442815e251bedeffd0ebd8fff22d86ab54e0bac9a6bef956915e9990415d347a",
+    "bytes": 1031
+  },
+  "child": {
+    "status": 0,
+    "signal": null
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "cdc6ad04325a20f77052f33b6404513720a4811e13f965e608189575c98bf1db",
+    "caseSetSha256": "550f4049b1f1d841bd4d0c90ff68cd24e34fc4ca336969b98cee4d3641073f5e",
+    "dispositionsSha256": "7d3b3442825f6da1cee2c04cc24a5dff9fe8adfd021b23f13d6400d52375bb4a",
+    "declaredCount": 20,
+    "disposedCount": 20,
+    "counts": {
+      "pass": 20,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "parserError": null,
+  "sourceConserved": true,
+  "sourceFreezeSha256": null,
+  "assurance": "controlled real writer/pure comparator; no native model or consumed review",
+  "nativeAuthority": false,
+  "wholeItemAccepted": false,
+  "rawCapturesExcluded": true
+}

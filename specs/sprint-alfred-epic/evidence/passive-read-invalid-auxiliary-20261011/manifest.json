@@ -1,0 +1,29 @@
+{
+  "schema": "alfred.passive-invalid-auxiliary.public-transfer.v1",
+  "files": [
+    {
+      "path": "proof.json",
+      "sha256": "42ba5a4a7ca61e822857a7d04926f921fcf2143907e4c54240f59adff607d1b7",
+      "bytes": 7926,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "report.md",
+      "sha256": "45dfc6f062081c7cfcb7309d43dbf979d54aa4cac033ce231b27ddfb75cccc4e",
+      "bytes": 745,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "lineage.json",
+      "sha256": "6e4883e854ac0efcfa92a760e6591fed01fa99cc2e5deecfa80fedf5100a9314",
+      "bytes": 899,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "destination": "specs/sprint-alfred-epic/evidence/passive-read-invalid-auxiliary-20261011",
+  "scope": "Focused method proof only; no source apply",
+  "RootOnlyPublication": true
+}

@@ -1,0 +1,14 @@
+✔ QSL001 valid signed single-link receipt remains accepted by both readers (129.527403ms)
+✔ QSL002 identical valid hardlinked receipt is refused by commit authorization (87.038762ms)
+✔ QSL003 symlinked identical receipt remains refused (89.566337ms)
+✔ QSL004 single-link receipt with forged proof remains refused (104.101025ms)
+✔ QSL005 single-link valid proof with stale staged index remains refused (121.037709ms)
+✔ QSL006 mode policy still refuses nonprivate receipt where mode bits exist (84.797175ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 620.338815

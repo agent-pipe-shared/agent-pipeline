@@ -1,0 +1,453 @@
+✖ quality package requires matching human proof and only applies verified bytes (109.475886ms)
+✔ isolated readback includes new, mixed, and explicitly ignored added paths without writing to main (302.326342ms)
+✖ quality package commit authorization binds the whole staged index and committed trust policy (73.396788ms)
+✔ commit authorization accepts .github content and staged files above the child-process default buffer (120.677892ms)
+✔ quality package refuses symlinked package outputs and receipt-directory ancestors (91.849433ms)
+✔ quality package fails closed on tamper, unsafe paths, proof failure, and base drift (31.655834ms)
+✔ SIGNED-AGENT CLI verifies, applies and authorizes with canonical committed trust (306.585936ms)
+✔ SIGNED-AGENT rejects trailing (61.962052ms)
+✔ SIGNED-AGENT rejects alternate-policy (58.607001ms)
+✔ SIGNED-AGENT rejects intent-symlink (61.291217ms)
+✔ SIGNED-AGENT rejects proof-symlink (64.008491ms)
+✔ SIGNED-AGENT rejects intent-escape (59.408497ms)
+✔ SIGNED-AGENT rejects oversized-proof (60.452571ms)
+✔ SIGNED-AGENT rejects policy-symlink (64.348977ms)
+✔ SIGNED-AGENT rejects policy-hardlink (58.382792ms)
+✔ SIGNED-AGENT rejects worktree-drift (72.179915ms)
+✔ SIGNED-AGENT rejects index-drift (72.042925ms)
+✔ SIGNED-AGENT rejects untracked-policy (76.431222ms)
+✔ SIGNED-AGENT rejects wrong-key (74.213613ms)
+✔ SIGNED-AGENT rejects forged-proof (71.326899ms)
+✔ SIGNED-AGENT rejects dirty-apply (79.998601ms)
+✔ SIGNED-AGENT rejects base-drift (80.05414ms)
+✔ SIGNED-AGENT refuses policy self-mutation even with explicit external trust (24.664812ms)
+✔ SIGNED-AGENT authorize refuses a planted untracked policy (36.962972ms)
+✖ integration precommit and postcommit verifiers bind the signed package to one exact parent and tree (67.151734ms)
+✖ integration verifier rejects wrong-intent (73.659016ms)
+✖ integration verifier rejects forged-proof (77.736003ms)
+✖ integration verifier rejects missing-authorization (74.067524ms)
+✖ integration verifier rejects extra-staged (71.362641ms)
+✖ integration verifier rejects dropped-staged (68.207517ms)
+✖ integration verifier rejects content-drift (79.909511ms)
+✖ integration verifier rejects mode-drift (75.877404ms)
+✖ integration verifier rejects symlink-submodule (74.71417ms)
+✖ integration verifier rejects postcommit-extra (75.652675ms)
+✖ integration verifier rejects wrong-parent (67.614021ms)
+✖ integration verifier rejects merge-parent (69.603868ms)
+✖ integration verifier rejects unsafe-authorization (69.641319ms)
+✖ postcommit distinguishes an absent selected receipt from present invalid authorization (70.036706ms)
+✔ hotfix 11: receiptModeBitsRefused skips the POSIX mode-bit term on win32 only and fails closed on every platform that has mode bits (0.270979ms)
+✔ hotfix 11: gitReportedPathIsSamePhysicalPath accepts the spellings of one directory (Git's forward slashes on win32) and rejects any other (2.266927ms)
+✖ hotfix 11: verify, apply, authorize-commit and the commit-time verifiers accept a correctly signed package end to end (native Windows included) (128.668588ms)
+✔ hotfix 11: the path normalisation relaxes nothing (subdirectory root, forged proof, wrong key, dirty tree, tampered policy) (115.336391ms)
+✖ hotfix 11: a receipt carrying group/other mode bits is accepted on win32 only (where the platform has no mode bits); a symlinked receipt is refused everywhere (85.317531ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 25
+ℹ fail 18
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3520.565763
+
+✖ failing tests:
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:34:1
+✖ quality package requires matching human proof and only applies verified bytes (109.475886ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'QUALITY-PACKAGE-BASE-DRIFT'
+  - 'QUALITY-PACKAGE-APPLIED'
+                     ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:39:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'QUALITY-PACKAGE-BASE-DRIFT',
+    expected: 'QUALITY-PACKAGE-APPLIED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:89:1
+✖ quality package commit authorization binds the whole staged index and committed trust policy (73.396788ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:92:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:240:1
+✖ integration precommit and postcommit verifiers bind the signed package to one exact parent and tree (67.151734ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:242:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects wrong-intent (73.659016ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects forged-proof (77.736003ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects missing-authorization (74.067524ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects extra-staged (71.362641ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects dropped-staged (68.207517ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects content-drift (79.909511ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects mode-drift (75.877404ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects symlink-submodule (74.71417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects postcommit-extra (75.652675ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects wrong-parent (67.614021ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects merge-parent (69.603868ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:251:3
+✖ integration verifier rejects unsafe-authorization (69.641319ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:253:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:279:1
+✖ postcommit distinguishes an absent selected receipt from present invalid authorization (70.036706ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at integrationReady (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:234:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:281:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:375:1
+✖ hotfix 11: verify, apply, authorize-commit and the commit-time verifiers accept a correctly signed package end to end (native Windows included) (128.668588ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'QUALITY-PACKAGE-BASE-DRIFT'
+  - 'QUALITY-PACKAGE-APPLIED'
+                     ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:381:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'QUALITY-PACKAGE-BASE-DRIFT',
+    expected: 'QUALITY-PACKAGE-APPLIED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:415:1
+✖ hotfix 11: a receipt carrying group/other mode bits is accepted on win32 only (where the platform has no mode bits); a symlinked receipt is refused everywhere (85.317531ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'QUALITY-PACKAGE-BASE-DRIFT'
+  - 'QUALITY-PACKAGE-APPLIED'
+                     ^
+  
+      at hf11Authorized (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:326:10)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.test.mjs:416:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'QUALITY-PACKAGE-BASE-DRIFT',
+    expected: 'QUALITY-PACKAGE-APPLIED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

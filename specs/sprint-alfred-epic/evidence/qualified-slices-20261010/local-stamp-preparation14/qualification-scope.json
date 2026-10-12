@@ -1,0 +1,56 @@
+{
+  "schema": "alfred.local-stamp14-public-scope.v1",
+  "originalFailure": {
+    "executionSha256": "49e6781cc23d49cd552ea78a9c6690d76b068f2245f4c248824c569476b399d6",
+    "counts": {
+      "pass": 0,
+      "fail": 14,
+      "skip": 0,
+      "todo": 0
+    },
+    "childStatus": 1,
+    "sourceAndFixtureConserved": true,
+    "cause": "All original callbacks failed at genuine fixture Git commit setup; Source helper was not reached.",
+    "causeLimit": "Original failed commit stderr was not retained. Closed readonly identity checks establish unavailable identities in preserved fixture001; observer also retains EPERM transport flags. No original signature/hook cause or pristine transport proof is invented."
+  },
+  "constructorCorrection": {
+    "sha256": "a81ebe2966be562d9c1d291f3129492774fde3ed090cfba12f60701f5c20bd57",
+    "scope": "Only explicit synthetic author identity for normal genuine owned fixture commits; no hooks/signing/HOME/env/preload/config-policy override. Normal inherited Git refusal still fails honestly.",
+    "identity": "Fixture <fixture@example.invalid>",
+    "sourceUnchanged": true,
+    "originalCallbacksByteExact": true
+  },
+  "fixturePolicy": "genuine isolated Git repositories/commits; full inherited HOME/Git config/hooks/signing/NODE_OPTIONS/execArgv; no fake approval/key/history or suppressed policy. Git setup refusal causes actual case failure, not forged fixture success. Explicit synthetic commit author only follows the existing actual Reader v2 fixture recipe; hooks/signing/config/environment/preloads remain inherited.",
+  "instrumentation": {
+    "sha256": "943f9b323b646958df3439d14ed828e2f17017a04a320d95ea846f159844e6ae",
+    "scope": "owned fixture fs physical side effects only; real fs calls/returns and Source predicates retained",
+    "kinds": [
+      "alias-write",
+      "link-count",
+      "late-output"
+    ],
+    "delivery": "explicit additional --import argument only in controlled negative subprocesses; inherited preloads retained",
+    "sourceAuthorityOrReturnSubstitution": false
+  },
+  "limitations": [
+    "LSP004 covers genuine wrong commit/tree/blob and bad-length selectors; no artificial8hex Git object collision is minted. Unambiguous-abbreviation rule remains Source-bound, not independently collision-qualified.",
+    "LSP009 validates real canonical hardlink2, symlink leaf, shared-selector inode and write-permission negatives. Foreign-owner changes/ancestor replacement require privileges/independent race constructor and are not claimed exercised.",
+    "LSP010 actual owned alias-write and link-count addition occur at a declared test-only real fs EOF seam; no Source return/authority substitution. Other drift variants are contract scope, not counted extra cases.",
+    "LSP011 uses declared real chmod of owned postimage directory before actual open to prove truthful partial failure. Not native engine or adversarial cross-user assurance.",
+    "LSP012 uses real .git permission failure on ordinary non-root Linux. Other unavailable/malformed/timeout Git conditions remain unexecuted subvariants.",
+    "No production metadata application/signature/install/push/final review/FULLVerify result. These14 are controlled METHOD preparation qualifications only."
+  ],
+  "productionParserSha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+  "productionRecorderSha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+  "claims": {
+    "nativeWindows": false,
+    "productionStamp": false,
+    "signing": false,
+    "install": false,
+    "push": false,
+    "finalReaderOrCritic": false,
+    "FULLVerify": false,
+    "readiness": false,
+    "itemAcceptance": false
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "schema": "alfred.scoped-ticket-control-proof.v1",
+  "date": "2026-10-11",
+  "scope": "Controlled private approval reference capture and four authentic ticket controls",
+  "complete": true,
+  "overallSuitePass": false,
+  "counts": {
+    "pass": 5,
+    "fail": 6,
+    "skip": 0,
+    "todo": 0
+  },
+  "passingCases": [
+    "AFTICKET-REFERENCE",
+    "AFTICKET001",
+    "AFTICKET002",
+    "AFTICKET003",
+    "AFTICKET004"
+  ],
+  "failedCases": [
+    "APLOCK003",
+    "APLOCK004",
+    "APLOCK005",
+    "APLOCK006",
+    "APLOCK007",
+    "APLOCK008"
+  ],
+  "evidence": {
+    "rootExecutionSha256": "2527fd17526a12820efd421592e2bc437e24c9d0d201867583f698c0efd1f9c4",
+    "fd3Sha256": "cce3293d4b8be1b1f906f3011cd05444be037f7fe1761b095fcc955903ec5859",
+    "fd3Bytes": 2089,
+    "caseSetSha256": "28586d999c430e75291d52a2e192824a37312342bacdb6ca45874c4eedca7516",
+    "dispositionsSha256": "4109fbe45f70a25e33798db60d54c264c7c0bdc5b2ff1b2588b0c38b00157e38",
+    "productionParserPolicySha256": "3ec9bae7a82db6f9ea83d769771a5267c96613364d6b774e6f1f8e6ab48e018c",
+    "stdoutSha256": "e2f68d70c722bc89e1d0cfdf6c48928ab8b9ba7bbdeae6bb419d8d68c7e3a7f8",
+    "stdoutBytes": 92,
+    "stderrSha256": "db64c7ccba07656faedd7155c60df0b1bd105bc7efdc5232fea038924e578f0f",
+    "stderrBytes": 3432
+  },
+  "sourceManifestSha256": "9056391e6cf29ee818bf19d3676bf4bc8fe14b088bd6988f500741b4d7c07229",
+  "sourcePins": {
+    "graph/plugins/pipeline-core/lib/afk-ledger.mjs": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+    "graph/plugins/pipeline-core/lib/afk-transaction-host.mjs": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+    "graph/plugins/pipeline-core/lib/model-family-host-store.mjs": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f",
+    "graph/plugins/pipeline-core/lib/session-authority-domain-owner.mjs": "74e0feb567ef0321a98f432054945942f963f810215b84d65c2c116b4b3764ea",
+    "graph/plugins/pipeline-core/lib/session-requester-bridge.mjs": "fda05d645a23c8187f19faad2419d9a916d1a4db13ac8c1c9938276384e9c711",
+    "graph/plugins/pipeline-core/scripts/pipeline-state.mjs": "e0c9d6ce2e76a93a4c025c58168393a0b878fc7ceb60b95f3c097b55cbc0686c",
+    "graph/plugins/pipeline-core/lib/onboarding-continuity.mjs": "3167de3b6f7776fb5f9b2edc0c54b7addb28f288ece54f4f4707dfd669e5180e",
+    "graph/plugins/pipeline-core/lib/session-authority-registry.mjs": "5827757549f06da7c9f11f12fedf115479ee50cb5d2818a58460dfdeb4143da4",
+    "graph/plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c"
+  },
+  "conservation": {
+    "original1715Resources": true,
+    "originalSourceInodeModeBytesRestored": true,
+    "addedCustodyLeafRemoved": true,
+    "noErrorsTimeoutsOrSignals": true
+  },
+  "observedScope": [
+    "Reference capture completed genuinely with exitCode0 and actual approved State under the original callback.",
+    "Ticket001 wrong genuine producer and ticket002 genuine prior write handle were typed CAS refusals while the original owning approval completed.",
+    "Ticket003 actual additional reservation/publication was refused after authentic owner refresh.",
+    "Ticket004 actual same-inode noncanonical member bytes yielded the original typed UNAVAILABLE refusal and retained physical evidence."
+  ],
+  "remainingFailures": {
+    "ids": [
+      "APLOCK003",
+      "APLOCK004",
+      "APLOCK005",
+      "APLOCK006",
+      "APLOCK007",
+      "APLOCK008"
+    ],
+    "status": "negative controls failed; Source repair pending",
+    "firstAssertion": "originalResult.status completed instead of unavailable",
+    "originalExitCodesObserved": false,
+    "laterPhysicalRetentionAssertionsReached": false,
+    "cleanupCauseEstablished": false
+  },
+  "history": [
+    {
+      "kind": "Original policy failure and recovered complete0PASS11FAIL",
+      "executionSha256": "fd4bba08f3df45effd3f301fe995bd1060d770bafac10e1c79030080e25898e9",
+      "supplementalSha256": "cd0f4eb58470fd314ec4ea855bffe871ace1c8c8db56b2c34a43213d8f1be015"
+    },
+    {
+      "kind": "Separate originalFULLSTATE006 PASS retained",
+      "executionSha256": "269018af279ead2f41897fd60b638eeb8a0bbb0fdc86e3340455dde13f7faca2"
+    }
+  ],
+  "limits": {
+    "nativeAssurance": false,
+    "whole26Qualified": false,
+    "itemAcceptance": false,
+    "aplock002Rerun": false,
+    "unchangedPassingCasesNeedNoImmediateReplay": true
+  }
+}

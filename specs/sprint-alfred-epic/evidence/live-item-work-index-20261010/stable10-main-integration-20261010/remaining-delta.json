@@ -1,0 +1,1644 @@
+{
+  "schema": "alfred.selected164.consumed25.integration-delta.v1",
+  "parentMap": {
+    "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+    "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76"
+  },
+  "counts": {
+    "selected": 164,
+    "consumed": 25,
+    "remaining": 139,
+    "remainingUnprotected": 126,
+    "remainingSelectedProtected": 13,
+    "protectedUnion": 14
+  },
+  "consumed": [
+    "plugins/pipeline-core/skills/reader-review/SKILL.md",
+    "harness/reader-review-protocol.md",
+    "plugins/pipeline-core/reader-inputs/reader-review-protocol.md",
+    "plugins/pipeline-core/reader-inputs/manifest.json",
+    "plugins/pipeline-core/scripts/doc-reader-course.mjs",
+    "plugins/pipeline-core/lib/doc-reader-course.mjs",
+    "harness/scripts/check-doc-reader-binding.mjs",
+    "harness/scripts/doc-reader-terminal-binding.mjs",
+    "plugins/pipeline-core/lib/doc-reader-default-observers.mjs",
+    "plugins/pipeline-core/lib/doc-reader-plan-scope.mjs",
+    "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+    "plugins/pipeline-core/reader-inputs/observation-doc-governance.json",
+    "plugins/pipeline-core/reader-inputs/product-capability-inventory.json",
+    "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+    "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+    "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+    "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+    "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+    "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+    "plugins/pipeline-core/lib/report-source-readers.mjs",
+    "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+    "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+    "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+    "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+    "plugins/pipeline-core/scripts/report-resource-headroom.mjs"
+  ],
+  "remainingPaths": [
+    {
+      "canonicalPath": ".github/workflows/verify.yml",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/.github/workflows/verify.yml",
+        "sha256": "73837987b4490cc67086f5fbeb97cd655a3c1966a5d31483806609b0e2140bcb",
+        "bytes": 7351,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "docs/product-capability-inventory.json",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/docs/product-capability-inventory.json",
+        "sha256": "04c4c2539df5c0a271f68b44cf07d9a3ae78eb7e82c171d85d8bf3f237c38f58",
+        "bytes": 147344,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "harness/scripts/architecture-entry-required-source.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/scripts/architecture-entry-required-source.test.mjs",
+        "sha256": "88b4100248fc868ec592677d85e08c13fe5301c24bb6ef26e112f03bcac22349",
+        "bytes": 6362,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "harness/scripts/attended-recovery.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/scripts/attended-recovery.test.mjs",
+        "sha256": "d457c2e0bdc8f996faae86831080d670e0f7f35fb52b30ac2aeb027e32f6caf1",
+        "bytes": 38178,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "harness/scripts/check-verify-suite-registration.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/scripts/check-verify-suite-registration.test.mjs",
+        "sha256": "cc193228b5eb0acbdfa8eae12f778bfaba7d46323807030233db0fec65fe0bee",
+        "bytes": 44296,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "harness/scripts/doc-reader-course-budget.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/scripts/doc-reader-course-budget.test.mjs",
+        "sha256": "0ede055126e4d2edc67c93e2d2638241726a5e6e4e4dda8c56c050fb7eb5a4cc",
+        "bytes": 14277,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "harness/scripts/plan-reopen-current-action.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/scripts/plan-reopen-current-action.test.mjs",
+        "sha256": "a7542fe842bc6c426a97be05da629a4ff5175b64ca57554ae637874b13ad9532",
+        "bytes": 5175,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "harness/verify-suites.json",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/verify-suites.json",
+        "sha256": "b220d0c4cc91691e4218941a088ee8265adb1e3bc9495553c317c93d2a25a139",
+        "bytes": 112089,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-VERIFY-REGISTRATION",
+          "pattern": "(?:harness/verify-suites\\.json|harness/scripts/check-verify-suite-registration\\.mjs|plugins/pipeline-core/scripts/check-protected-delta\\.mjs)$"
+        },
+        {
+          "id": "TP-13",
+          "pattern": "harness/verify-suites\\.json$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+        "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+        "bytes": 46463,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/codex-hooks.json",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-hooks.json",
+        "sha256": "6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34",
+        "bytes": 3949,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+        "sha256": "65291378f05fe1c894d856d4696d8ce0677e6c898ae0958b166643aaa5caa913",
+        "bytes": 36796,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+        "sha256": "46b8d4be8ac5449e3e83060c2be75ad8ea395047b6fdf3f4c2b2a861d631a85f",
+        "bytes": 15265,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+        "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+        "bytes": 19968,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+        "sha256": "2859e0607c781f415faf0be96b26962f040e1f6f808abd55491a7bf3543e185d",
+        "bytes": 28235,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+        "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+        "bytes": 118731,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "bytes": 150958,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/hooks.json",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/hooks.json",
+        "sha256": "04c639abbb518be5430dec02ee504ff0cc443c3873c320d19a1684073565e50d",
+        "bytes": 16658,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "TP-4",
+          "pattern": "plugins/pipeline-core/hooks/hooks\\.json$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+        "sha256": "21f2f72342154e62635b40238674591a3d47514e9bca578342e61c517c0c51ee",
+        "bytes": 8533,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-ledger.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987",
+        "bytes": 31759,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+        "sha256": "33057d57247a103ba9b739d9c42f0e145ad8f5e7775b9fc16bb5183a28e75b99",
+        "bytes": 26973,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agy-session-authority.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-session-authority.mjs",
+        "sha256": "e1c576f78629a5fdc87137d8ec190ba2118e77b0e9379022dc9b182400ba63b0",
+        "bytes": 36376,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+        "sha256": "4d82954f182b8e21ed6711efcca335284f2d6aac15f2af1d36d9e681d0edb20f",
+        "bytes": 51174,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+        "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+        "bytes": 29652,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+        "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+        "bytes": 25281,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+        "sha256": "354bd5fc754d08577d5a2a91b4b2ed1a9656484eabff77207d03a5017674f1d1",
+        "bytes": 14364,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+        "sha256": "2dff589e957ae9b2de059b35b57888232a2a18e3f28ffb39832c8f64a0bc0fc6",
+        "bytes": 28714,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+        "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+        "bytes": 3622,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+        "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+        "bytes": 17680,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+        "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+        "bytes": 8734,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+        "sha256": "a8bb9a199c162434721f00fa0e02dc311cbf5c3c3edc5f855db78fe1a8616fac",
+        "bytes": 26894,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+        "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c",
+        "bytes": 18854,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+        "sha256": "2d03909b66e940e665bbd684dd02498c27cc32ce1ea22043dbc2e5fa19ea3657",
+        "bytes": 49200,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+        "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+        "bytes": 6494,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/commit-message-policy.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/commit-message-policy.mjs",
+        "sha256": "3a319ce909f6872e158629d6eb29c485d581e64455b8ff5b48e2b8e136a89d8b",
+        "bytes": 23791,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/consumer-verify.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/consumer-verify.mjs",
+        "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85",
+        "bytes": 6738,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+        "sha256": "e36c1e06fbe8917e276420348ba0620f991fc2d5252f9db7a37599ae04d10c03",
+        "bytes": 28404,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+        "bytes": 49461,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-review-lineage.mjs",
+        "sha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+        "bytes": 46763,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+        "sha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4",
+        "bytes": 32310,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+        "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+        "bytes": 8306,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+        "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+        "bytes": 31644,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+        "sha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216",
+        "bytes": 340,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-cmd.mjs",
+        "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+        "bytes": 78973,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/governance-scope.mjs",
+        "sha256": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+        "bytes": 46697,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+        "sha256": "66ded1749b49a6725044704b4e96cbcffa78b1dd8db6f76041088e6f02fae4b9",
+        "bytes": 31179,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/constants.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/constants.mjs",
+        "sha256": "800dfe7041ba4b045a0f773ad0ad71e401fa893e73dec4cc27170042fd3aa1ba",
+        "bytes": 17492,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+        "sha256": "dfb3e9f7e944e9c1e9ebf69f1cc17a8bd14e4470c694f2e6378432a384197301",
+        "bytes": 15851,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+        "sha256": "e870bf1616030bd18468c1c535737a7ea7509ad13d77f027c0b88fb1130af881",
+        "bytes": 10296,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+        "sha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+        "bytes": 32926,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+        "sha256": "5cabbe9346574b40a6978bf602ae713706c6b4d0728a843fa64eb817156ec465",
+        "bytes": 3305,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+        "sha256": "708049b8d29d200cdee333fbb36c0061839990ac26eeb5f3f21c726fae41bfc1",
+        "bytes": 22914,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+        "sha256": "39639eca721081f36fca88e29bac91baa4fa0fa26872d7b65183cb53f0586544",
+        "bytes": 5826,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+        "sha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+        "bytes": 39861,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "sha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+        "bytes": 67834,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+        "sha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+        "bytes": 20127,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+        "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+        "bytes": 301059,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-supervisor-state.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351",
+        "bytes": 16936,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "sha256": "7983a552e66c86d1e81c16cd29dfa709cc88236cfa4a5e4a3b21894344f2f0d3",
+        "bytes": 74069,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+        "sha256": "04dae36b9d168c20155ff95e06a4d5b42919dc9a7523e02b42e7130ce8c6d8ea",
+        "bytes": 25106,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "sha256": "ef11c9b2daa8298979c802dd9df69c8572fa322ba6a6af72d1b7071229f72ced",
+        "bytes": 71220,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-invocation.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-invocation.mjs",
+        "sha256": "7600193f6a35670859861ab9f5bb807565951d0ac55ce20197130d4f5a256d8a",
+        "bytes": 15676,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+        "sha256": "a4421692e9a835dc2ce8b4b394adf832a6522b1a1df48117b198f3dd6e197699",
+        "bytes": 13184,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+        "sha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d",
+        "bytes": 13893,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+        "sha256": "880dfaca2300c0ec16669edcddb824a5627b5ebe32216b1ed0c29ca51649cbcd",
+        "bytes": 29615,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+        "sha256": "124dd2f01ea47f788fe0dd71a8b20d4454d6cbb5bd8d1e47115f0c2ea3625a0f",
+        "bytes": 6940,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "bytes": 539214,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+        "sha256": "696e847de64e5f99fc3c2289f068d9041902d40cd5c3ff7a9b253d7aec3ff049",
+        "bytes": 4990,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/passive-read-policy.mjs",
+        "sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+        "bytes": 9965,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+        "sha256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+        "bytes": 75585,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-calibration-identity.mjs",
+        "sha256": "bdeee4983ef2c76ff6e57b96f52f45ff96749b99ddca7caa8075dcfde51046bc",
+        "bytes": 8555,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+        "sha256": "e506c151c9be0c389eb4028d7df62e1044b43f101ce13a74d05f9b9f7a1e757c",
+        "bytes": 5141,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+        "bytes": 423484,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+        "sha256": "f6b827cd56383996ed1e5c7fe78fd4199e9ceb42e3dfa1a8d9fa1839badf5536",
+        "bytes": 573921,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/protected-test-paths.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/protected-test-paths.mjs",
+        "sha256": "7e6c14b4188d8c54d291be4e331cff489d7c4de63d5d73bb20afa8011333b262",
+        "bytes": 52724,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/review-economy.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/review-economy.mjs",
+        "sha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9",
+        "bytes": 52643,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+        "sha256": "d6976e58e598cd8188674bb6f0d2e82d116eebce4792afb7cdb8273a76c80c56",
+        "bytes": 23414,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+        "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+        "bytes": 7902,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+        "sha256": "31053d205a6de028d8d585a447fb0d6c394f89a2ebe1b0d9c9a425b0bba81b18",
+        "bytes": 76336,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+        "sha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+        "bytes": 11408,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+        "sha256": "ebe09528a07a24e7c0635dbb5ca3f9ac599d5f93dd14a87978527abe464d60bb",
+        "bytes": 30884,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-observers.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-observers.mjs",
+        "sha256": "2df8489463e3e63a24e55904738b8a9f2e10a648804e9c12815caa281866b819",
+        "bytes": 3165,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "sha256": "af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9",
+        "bytes": 122649,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+        "sha256": "90d173880447fdd17507e438d5227d09cd0d7e20f2e94e8067df5cda6b9cbad0",
+        "bytes": 149878,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd",
+        "bytes": 29072,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+        "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+        "bytes": 39560,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+        "sha256": "0bbcc5003762a14b5e3cad2271ba9edfb0080406b0205e4b487feb4d0ba7e60b",
+        "bytes": 6024,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/signed-quality-package.mjs",
+        "sha256": "c81bddab38440a69014a26dfd21c1788a8fbe9d7c1f63c63afbf0655d7ebcee3",
+        "bytes": 25033,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+        "sha256": "2998e6474055733ed3140073af22ece8777f7659b94d588283ba6d77105e13c5",
+        "bytes": 15961,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+        "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+        "bytes": 117511,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/capture-evidence.mjs",
+        "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+        "bytes": 31343,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+        "sha256": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91",
+        "bytes": 60667,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+        "sha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364",
+        "bytes": 3702,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "sha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29",
+        "bytes": 30862,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+        "sha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+        "bytes": 57419,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+        "sha256": "c6bcf57a93093af9bdd0307ff9df91d71edaa9059d997bba8061ebf003022bc8",
+        "bytes": 34029,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+        "sha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+        "bytes": 11185,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+        "sha256": "5f665b3ccb60c8a5eab3816a90e006222d93eb51da9567cbe5d906fb5014a383",
+        "bytes": 4806,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+        "sha256": "5d77cb3c8a806f7ccfe1aea7486e9493ca8039c235da7c31828d91d3420a8514",
+        "bytes": 31767,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+        "sha256": "c41e6a9d260d264ebc4a9017e5c6b8ec14b85b0f9f3a259c81c84072aeb52ba0",
+        "bytes": 9745,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
+        "sha256": "bffcd1419e14fdaa3cf83b00cda47fae80b20efcb0d80d609dbaae48d00c391d",
+        "bytes": 28115,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+        "bytes": 111990,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+        "bytes": 796531,
+        "mode": 420
+      },
+      "protectedRules": [
+        {
+          "id": "PB-SANCTIONED-WRITER",
+          "pattern": "plugins/pipeline-core/scripts/pipeline-state\\.mjs$"
+        }
+      ],
+      "disposition": "protected-final-HGO-scope"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+        "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+        "bytes": 178532,
+        "mode": 493
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+        "sha256": "58c5c88baf7d092daca29e91d5f0a7d9f8ff156d7118768530b5346604d3e743",
+        "bytes": 349546,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+        "sha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca",
+        "bytes": 59864,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+        "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+        "bytes": 15099,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+        "sha256": "65275ee4adb9db869bae6fd19c4cbff902d7f717690b6fcff0aa7c1116ea65f9",
+        "bytes": 1997,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+        "sha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+        "bytes": 33602,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+        "sha256": "96e0e5457d691a8af566fe296b43a96a810acb62f4174ce169c0ea2ac294f56b",
+        "bytes": 133755,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-cleanup.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/session-cleanup.mjs",
+        "sha256": "3f7c68b622a6f9ab756ce4b7dbefed315890081883b7f26a8f86fb866ce48d4d",
+        "bytes": 46798,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+        "bytes": 32208,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+        "sha256": "aeb99faca3653bb51c42a8a74c147d7ba0aa6c7c084e80b23870e48979956287",
+        "bytes": 56950,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+        "sha256": "08634960b03c7b4bbf8dab60d5796b6b5e31b179c32949570851661ec6fc07b4",
+        "bytes": 33950,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/verify-journal.test.mjs",
+        "sha256": "9cd6f5f91527d61f308f48b3e7c35d7b6fb2738757c7d46d4fead49351aa0abc",
+        "bytes": 134335,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/skills/close-block/SKILL.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/skills/close-block/SKILL.md",
+        "sha256": "e6101c86ceda0458930a7c27bf1a27212d12c67a138aa32854f4ff9012908333",
+        "bytes": 42932,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+        "sha256": "007e65c57b15a4216358371289158c16b5b7491396f81907c403678e94612bc8",
+        "bytes": 3679,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/templates/prompts/goldfish-task.md",
+        "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+        "bytes": 57670,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "templates/prompts/goldfish-task.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/templates/prompts/goldfish-task.md",
+        "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+        "bytes": 57670,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/install-agy.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/install-agy.mjs",
+        "sha256": "c91fd55dade9dfbb75257f13b4df6c432fc5895b1cd22b7f21b98f26a478923c",
+        "bytes": 20575,
+        "mode": 493
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+        "sha256": "ded1a614d7f8af94c2e2fc8ed102c8b571222fae232be3274d43de05d7367336",
+        "bytes": 12903,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+        "sha256": "62343bc64ef38b74355b069a8a5c19825b1df8a345fcc68be4715b5d13f180fe",
+        "bytes": 19825,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/antigravity-json-spans.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/antigravity-json-spans.mjs",
+        "sha256": "2316b295cb2290d428e7d8d1193672bf020cc125b0206212a938d4b78cb7eec4",
+        "bytes": 3485,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "architecture/map/harness.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/architecture/map/harness.md",
+        "sha256": "152321fb726495702cd435ba87d477ee57d0f94d79f5d2fa6e89b5c2a08fb92b",
+        "bytes": 4242,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "architecture/map/pipeline-core.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/architecture/map/pipeline-core.md",
+        "sha256": "f59cff2d1a314db45384f52274703000e0ee5f9d6e2c0e4491cfe17cdaaa92a0",
+        "bytes": 60234,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "docs/operating-model.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/docs/operating-model.md",
+        "sha256": "aa98c8477636b590c29edf454ab03b3e29958a15918973089d3ebdeafe99618e",
+        "bytes": 64150,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "harness/scripts/shell-grammar-capability-placement.test.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/scripts/shell-grammar-capability-placement.test.mjs",
+        "sha256": "756de3f9a93c616c1079dc70a62d0f5c0be26e277e64b44747a83dc677f076e5",
+        "bytes": 5811,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/agents/critic.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/agents/critic.md",
+        "sha256": "849c8b5bfd9b1908839d2e22e3f56c71b9b91ca8e0aab2f03722f574b9d836cc",
+        "bytes": 16813,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0",
+        "bytes": 17521,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agent-model-registry.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agent-model-registry.mjs",
+        "sha256": "f4be134fd94736c919fdfc75ab0cfb05c83145d8651dbbe74c47ef22bbd1cedc",
+        "bytes": 10769,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+        "sha256": "1ff95b3af2924d876a771ea01fe2e888c582f72b7c42f36835c3d42108ef5533",
+        "bytes": 13261,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+        "sha256": "b1de1f345667578caacc23958dc2055b9881743f576d4ea7442dc8aef27ade1d",
+        "bytes": 15027,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "current-cumulative-tuple-select-before-integration"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+        "sha256": "3079d7df467553be6466068c1606f94297ce4d074bfdea309c0216cbec06d682",
+        "bytes": 20690,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+        "sha256": "85905ace356bf3cf3c8a9ce1b4b4b8fb121bb02e2f03a2411f81e449da870a79",
+        "bytes": 7686,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/rigor-floor.mjs",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/rigor-floor.mjs",
+        "sha256": "5e1e3d43ccc655d47e6a8f42d06b11dab9cd0c60e567d1063de3dde6bb6e375a",
+        "bytes": 30257,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/verify-evidence.schema.json",
+        "sha256": "981f3e2ba9bbe0f7cbba35c6beacecca998abe2deabca1cdf424db91a397818d",
+        "bytes": 5472,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/skills/critic-review/SKILL.md",
+        "sha256": "f5abdb6ea08d913c5f858fd4fa41ae6ab8b077d0cff13928fda2694833ffc5d1",
+        "bytes": 26471,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/templates/prompts/critic-review.md",
+        "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+        "bytes": 44110,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "schemas/pipeline.rigor-journal-entry.v1.json",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/schemas/pipeline.rigor-journal-entry.v1.json",
+        "sha256": "85905ace356bf3cf3c8a9ce1b4b4b8fb121bb02e2f03a2411f81e449da870a79",
+        "bytes": 7686,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    },
+    {
+      "canonicalPath": "templates/prompts/critic-review.md",
+      "source": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/templates/prompts/critic-review.md",
+        "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+        "bytes": 44110,
+        "mode": 420
+      },
+      "protectedRules": [],
+      "disposition": "remaining-selected-source-proof-and-dependency-association"
+    }
+  ],
+  "wholeQualification": false,
+  "wholeItemAcceptance": false
+}

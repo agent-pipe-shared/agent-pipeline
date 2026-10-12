@@ -1,0 +1,3 @@
+43 focused callbacks passed: official PCF36 replay with complete production FD3, plus three retained policy tests and four retained independent auxiliary-boundary tests. The seven retained tests were not repeated. The first run passed its actual callbacks but omitted the FD3 signal and parsed only TAP; its capture failure remains preserved. The replay changed capture wiring only.
+
+Source 702019 retains bounded auxiliary roots and admits only exact regular own public files under unavailable auxiliary configuration. Credential, private, outside, alias, hardlink and directory controls passed. Native authority, whole-item acceptance and assembled Main qualification remain open. Private fixture paths and raw execution records are excluded.

@@ -1,0 +1,9 @@
+{
+  "schema": "alfred.runtime-speed-preference.v1",
+  "userStatement": "Hui das ist teuer - das lasse ich nur jetzt für den Zwischenkandidat an",
+  "fastUntil": "operating-model-intermediate-candidate-ready",
+  "subsequentAlfredMode": "standard",
+  "configurationChanged": false,
+  "backendSwitchVerified": false,
+  "pipelineGlobalModelRoutesChanged": false
+}

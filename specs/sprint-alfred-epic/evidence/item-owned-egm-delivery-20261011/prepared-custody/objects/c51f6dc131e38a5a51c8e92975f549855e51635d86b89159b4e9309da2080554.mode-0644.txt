@@ -1,0 +1,40 @@
+// Source-owned controlled-method checks. This file records no synthetic PASS.
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {lstatSync, readFileSync, realpathSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+
+const sha=b=>createHash('sha256').update(b).digest('hex');
+function file(path) {
+  const before=lstatSync(path);
+  assert(before.isFile()&&!before.isSymbolicLink()&&before.nlink===1);
+  assert.equal(realpathSync(path),path);
+  const bytes=readFileSync(path),after=lstatSync(path);
+  assert.equal(after.dev,before.dev);assert.equal(after.ino,before.ino);
+  assert.equal(after.mode,before.mode);assert.equal(after.nlink,1);
+  assert.equal(bytes.length,after.size);return bytes;
+}
+assert.equal(process.argv.length,4,'source producer supplies one physical stage and its digest');
+const stageBytes=file(process.argv[2]);assert.equal(sha(stageBytes),process.argv[3]);
+const s=JSON.parse(stageBytes);
+assert.deepEqual(Object.keys(s).sort(),['candidate','common','criticPacketId','featureId','modules','refs','root','stateFile','stateSha256'].sort());
+assert.deepEqual(Object.keys(s.modules).sort(),['lifecycle','recorder']);
+for(const ref of Object.values(s.modules)) {
+  assert.deepEqual(Object.keys(ref).sort(),['sha256','url']);
+  const url=new URL(ref.url);assert.equal(url.protocol,'file:');
+  assert.equal(sha(file(fileURLToPath(url))),ref.sha256);
+}
+const {registerTestCaseCompletion}=await import(s.modules.recorder.url);
+const {readBoundConsumedCriticReceipt}=await import(s.modules.lifecycle.url);
+function git(args) {
+  const r=spawnSync('git',['-C',s.root,...args],{encoding:'utf8',shell:false,timeout:5000});
+  assert.equal(r.error,undefined);assert.equal(r.signal,null);assert.equal(r.status,0);
+  return r.stdout.trim();
+}
+registerTestCaseCompletion({fd:3,maxBytes:16384,cases:[
+  {id:'ICV001',name:'actual immutable candidate',run(){assert.equal(git(['rev-parse','HEAD']),s.candidate.commit);assert.equal(git(['rev-parse','HEAD^{tree}']),s.candidate.tree);}},
+  {id:'ICV002',name:'physical selected State',run(){const bytes=file(s.stateFile);assert.equal(sha(bytes),s.stateSha256);assert.equal(JSON.parse(bytes).activeFeature.id,s.featureId);}},
+  {id:'ICV003',name:'actual public source bindings',run(){assert(s.refs.length>=2);for(const ref of s.refs){assert.deepEqual(Object.keys(ref).sort(),['path','sha256']);assert(!ref.path.startsWith('/')&&!ref.path.includes('\\')&&ref.path.split('/').every(x=>x&&x!=='.'&&x!=='..'));assert.equal(sha(file(s.root+'/'+ref.path)),ref.sha256);}}},
+  {id:'ICV004',name:'real consumed packet',run(){const v=readBoundConsumedCriticReceipt({gitCommonDir:s.common,criticPacketId:s.criticPacketId,candidate:s.candidate});assert.equal(v.packet.candidate.commit,s.candidate.commit);assert.equal(v.critic.candidate.tree,s.candidate.tree);}},
+]});

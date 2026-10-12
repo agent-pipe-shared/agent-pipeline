@@ -1,0 +1,72 @@
+{
+  "schema": "alfred.claude-inline-attestation-independent.v1",
+  "status": "behavioral-boundary-frozen-before-source-posts-mechanical-callbacks-pending",
+  "authority": "Explicit user happy path: one install approval; routine internal install attestation/import/preparation stays within pipeline; no added manual PO terminal or attestation ceremony.",
+  "sourceInputs": [
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc"
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "sha256": "5d77cb3c8a806f7ccfe1aea7486e9493ca8039c235da7c31828d91d3420a8514"
+    }
+  ],
+  "existingPorts": [
+    "resolveClaudeRegistryBinding",
+    "writeClaudeRegistryInstalledPluginReceipt",
+    "readInstalledPluginAttestationSetup",
+    "verifyLocalDevelopmentInstalledPluginReceipt"
+  ],
+  "requirements": [
+    {
+      "id": "CIA001",
+      "requirement": "For a genuinely selected Claude local-development copied install whose external receipt is missing, the pipeline derives the source from the existing exact trusted registry binding, performs the actual source-to-installed physical observer, existing receipt writer and independent readback, then continues bootstrap through unchanged genuine prerequisites. No manual terminal, extra human approval, caller source authority or synthetic verified result replaces this chain."
+    },
+    {
+      "id": "CIA002",
+      "requirement": "Disabled, missing, duplicate, foreign marketplace or wrong plugin-version registry observations must not write an effective receipt or continue bootstrap. Exact executing loaded root and present installPath cross-checks remain enforced; existing direct-directory topology remains truthful."
+    },
+    {
+      "id": "CIA003",
+      "requirement": "The source is the physically observed marketplacePluginRoot from the actual selected binding, not a supplied alternate clone/path/JSON. A different source, aliased root or moved registry mapping fails binding/readback and does not grant bootstrap continuation."
+    },
+    {
+      "id": "CIA004",
+      "requirement": "Drift in a protected installed/source file must be detected by the real observer and receipt validation. Hashing only plugin metadata or trusting version equality is insufficient. Physical source identity and actual current candidate remain bound by the existing producer."
+    },
+    {
+      "id": "CIA005",
+      "requirement": "A forged/tampered receipt, foreign installed-root receipt or wrong protected graph/candidate must fail independent readback and cannot be converted to verified by writer status alone. Previous rejection and binding state remain visible."
+    },
+    {
+      "id": "CIA006",
+      "requirement": "The actual external receipt/locator physical boundary retains existing regular-file, ownership, mode, one-link and source/installed-directory separation checks. An unsafe aliased receipt or locator does not grant authority."
+    },
+    {
+      "id": "CIA007",
+      "requirement": "Writer failure, missing/unavailable registry or independent readback failure remains typed unavailable/rejected. The pipeline must not claim attestation or continue merely because an action was attempted; no fallback to manual happy-path PO terminal is introduced."
+    },
+    {
+      "id": "CIA008",
+      "requirement": "A valid existing receipt is consumed without rewriting it. The direct registered source topology does not invent a copied-install receipt requirement. Codex/Agy behavior and existing protected path sets are conserved."
+    },
+    {
+      "id": "CIA009",
+      "requirement": "Attestation is installation-source evidence only. It does not grant project install consent, design approval, push approval, native host identity, human intent or authority lifetime. All existing bootstrap consent/readiness and bindings remain independently required."
+    },
+    {
+      "id": "CIA010",
+      "requirement": "Tests use actual owned physical source/installed trees, source observer, external writer and readback. Raw registry reader seams may read owned actual JSON and must be labelled controlled method, but observe-ready/verify-verified booleans or fabricated human receipts are forbidden. Root alone executes the frozen one-use qualification with real FD3 and source conservation."
+    }
+  ],
+  "mechanicalDependencies": [
+    "Source owner's exact inline preflight API/timing/result contract",
+    "Declared genuine public-core source fixture recipe without fake observer grant",
+    "Complete bounded public resource graph and actual registry/receipt adapter ownership"
+  ],
+  "semanticRuns": 0,
+  "sourceImportsExecuted": 0,
+  "sourcePostWrites": 0,
+  "nativeQualified": false
+}

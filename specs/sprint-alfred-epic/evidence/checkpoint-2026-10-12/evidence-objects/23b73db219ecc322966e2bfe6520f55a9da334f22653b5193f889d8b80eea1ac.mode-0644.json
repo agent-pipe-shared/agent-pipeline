@@ -1,0 +1,41 @@
+{
+  "schema": "alfred.p16.independent16.qualification-closure-manifest.v1",
+  "status": "closed-actual-16-pass",
+  "businessRuns": 1,
+  "closureBusinessRuns": 0,
+  "sourceEdits": 0,
+  "assertionEdits": 0,
+  "publicTransferWhitelist": [
+    {
+      "path": "actual-qualification-proof.json",
+      "sha256": "6de31c75a81ee135ca8bffa4190307566739e2cd46669fae574a8048ad65e0be"
+    },
+    {
+      "path": "actual-qualification-report.md",
+      "sha256": "497fa197f393aaabb63c831fe7a6bb1d626bd1826f85bd489d18dc5c65365837"
+    },
+    {
+      "path": "execution-terminal.json",
+      "sha256": "450766994f816e320fdf6a748547e2dad5158db996eee738edc69644439f6733"
+    },
+    {
+      "path": "qualification-output/completion.ndjson",
+      "sha256": "6dedd9f33c76a374b9f77176385505b2476ce5fad59d388654d605a64246147a"
+    },
+    {
+      "path": "qualification-output/stdout.txt",
+      "sha256": "18b6449771d6f4c97517ac9ec489131c0570ef3a6652724a6490d2ea87449209"
+    },
+    {
+      "path": "qualification-output/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "operationalBindings": {
+    "qualificationFreezeSha256": "2296bee9f3e51fc2bc0e62854184bb5c5912732ac9bbcb0e2421eca42818273d",
+    "assertionsFreezeSha256": "67a44abe5d245d9c47b15868cdaceb63e5af1f4fc74035050011bb5639118d2b",
+    "graphManifestSha256": "a4a2f4e25131a7832d50b45a3918adfda4ff2bdbcab8693b924450a79f16f482"
+  },
+  "privacy": "Whitelist contains reviewed public relative paths, digests, case identifiers and result counts. It grants no transfer permission for private State, synthetic proof bodies, signing keys, repository contents or operational fixture logs.",
+  "qualificationLimits": "Bounded source-method and ordinary installed hook qualification only; no attended human/native/model/full Verify/Alfred AC/backlog/release certificate."
+}

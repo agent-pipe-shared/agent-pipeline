@@ -1,0 +1,14 @@
+{
+  "schema": "alfred.runtime-map-atomic-application.v1",
+  "status": "applied",
+  "canonicalPath": "architecture/map/pipeline-core.md",
+  "parentSha256": "f59cff2d1a314db45384f52274703000e0ee5f9d6e2c0e4491cfe17cdaaa92a0",
+  "postSha256": "98f2fcafe7c140bbdea33d32fe25c7ca9d320aa0bc63af0f54a2cd8c108d4797",
+  "manifestSha256": "12bcceb4f322b2b1412ffaac567968f8a90faa30f3c4c95bf6dfc92f491014d1",
+  "newInode": true,
+  "dependencyConserved": 8,
+  "newSelectedMembership": 0,
+  "uniqueIntegratedCountUnchanged": 148,
+  "businessRuns": 0,
+  "nativeClaims": false
+}

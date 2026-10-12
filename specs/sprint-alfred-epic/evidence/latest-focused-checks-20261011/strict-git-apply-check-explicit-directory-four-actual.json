@@ -1,0 +1,85 @@
+{
+  "schema": "alfred.public.strict-git-apply-check-explicit-directory-four.actual.v1",
+  "rawReceiptSha256": "dc28c4d269264833c96144f64a2ef8342d1554222c552f792c661cd226fe113c",
+  "rawReceiptBytes": 6008,
+  "privateForensicsRetained": true,
+  "result": "PASS",
+  "caseIds": [
+    "GAC001",
+    "GAC002",
+    "GAC003",
+    "GAC004"
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "6653db67bd020ac5102a4d5950a6493b2be812404f40a6b059514c2d34b0e794",
+    "caseSetSha256": "73abfa4071abc0685c8678fbfb51a84f3f18b848b30f4368b522e30324a47ae7",
+    "dispositionsSha256": "ce8c9bfc389590bd0e9c6c0a230dde160ce3243ee2187bae523541c05e15db33",
+    "declaredCount": 4,
+    "disposedCount": 4,
+    "counts": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "5a396512fddc5b484330466306cfa5f301b2010bf6cc169e181ef8f767434d2b",
+  "invocation": {
+    "executor": "Root",
+    "kind": "isolated production classifier callbacks",
+    "launcherSha256": "3cabefac115060bb210d4ecd9f96434d17eb0e439b57f64dc777e2b9da31431b",
+    "readySha256": "65cc582f2a433ec5dd66c8cc8333bdf49fbbbe7cfb5fd7e82bbab27fbcb8aa2b",
+    "callbacksSha256": "689b1d1de2efa4c1aaa71a9902bdd7da945473d397a87123841cdfced2a111be",
+    "graphManifestSha256": "e71ded336284d38ac86f383446eb7c7ac94c85eaa7ab719be1e10f3d6899d215"
+  },
+  "sources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/protected-test-paths.mjs",
+      "sha256": "aedbe86fcb863c67d712da041162e25ea2c4dc5a6ef56b58be65e3eadd64106c",
+      "bytes": 53961
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "6a711bdb8a5db034007920808d36ef260873603b4a54364552f4e9f6d408ddcd",
+      "bytes": 68944
+    }
+  ],
+  "sourceManifestSha256": "474ef1c4e3c0e549066987d77e957b830e3bfbfa87e39d5d80a2decab971098e",
+  "observed": {
+    "sourceConserved": true,
+    "graphConserved": true,
+    "grammarRestored": true,
+    "fixtureRemoved": true,
+    "timeout": false,
+    "overflow": false
+  },
+  "scope": [
+    "All original GAC001-004 classifier assertions retained.",
+    "Two additional physical outside-boundary -C refusal assertions in GAC004 passed.",
+    "Explicit working directory must be an existing canonical nonsymlink directory within the approved boundary before physical patch checks."
+  ],
+  "timestampConservationLimit": "Only overlaid grammar mtime/ctime may change; same inode/dev/mode/uid/gid/nlink/size/bytes restored. Other1114 resources strict full identity conserved.",
+  "history": {
+    "precedingProof": "strict-git-apply-check-four-actual.json",
+    "precedingGrammarSha256": "c731005a20f313e2f84610732433a1ba8bec7bfb5444465d481fb5d80c5630f5",
+    "precedingProofPreserved": true,
+    "identicalCompletionBytesDoNotProveIdenticalSource": true
+  },
+  "limits": {
+    "realGitApplyExecuted": false,
+    "hooksExecuted": false,
+    "nativeExecutionQualified": false,
+    "signingQualified": false,
+    "readyGranted": false,
+    "installedMainAcceptance": false,
+    "wholeItemClosed": false
+  },
+  "correctionReview": {
+    "reportedResult": "PASS",
+    "evidenceKind": "Root message only",
+    "primaryReportBound": false,
+    "includedInCaseCounts": false
+  }
+}

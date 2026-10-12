@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: docs/old.md
+*** Move to: docs/new.md
+@@
++ordinary prose
+*** End of File
+*** End Patch

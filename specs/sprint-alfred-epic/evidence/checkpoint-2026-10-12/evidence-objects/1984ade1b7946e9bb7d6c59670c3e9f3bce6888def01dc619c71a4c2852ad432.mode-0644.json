@@ -1,0 +1,213 @@
+{
+  "schema": "alfred.original20.audit-manifest.v1",
+  "status": "read-only-audit-complete-not-acceptance",
+  "assignment": {
+    "path": "legacy-origin:alfred-176-remaining-fanout-20261010/alfred_optional_advisor_source_followthrough.json",
+    "sha256": "5de9465577a0d25b8a127d5a56113b95bf49a1ffa62da79344fe08ab4a45b41c"
+  },
+  "sourceManifest": {
+    "path": "legacy-origin:alfred-agy-managed-topology-row-boundary-successor-20261010/actual-source-manifest.json",
+    "sha256": "2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381"
+  },
+  "itemCount": 20,
+  "clauseCount": 104,
+  "artifacts": [
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/input-bindings.json",
+      "sha256": "a3c492af518ce29068d99c82579728077ad44928e3d2cbbc0409212e3f891784",
+      "bytes": 54868,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/prepare-inputs.mjs",
+      "sha256": "5ba4325a3017775808d60818edd9c90b13f4b1195f5a7cc56ef10dbfd5ad52a3",
+      "bytes": 2630,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/inspect-source.mjs",
+      "sha256": "10f079667bc266826f600f07546cb5fece7d179b7117b92887049bdb61e3fa91",
+      "bytes": 1176,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/build-audit.mjs",
+      "sha256": "fbacb797a50480f53d7dd4cd530306b716a993f901684a1e3c7018a315c81279",
+      "bytes": 26845,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/source-audit-excerpts.json",
+      "sha256": "f89a8e230f8ac719339c6a55e01432b247a11d77a9bab3f752859f12c4e1e1ca",
+      "bytes": 275650,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/criterion-source-matrix.json",
+      "sha256": "b4f4de6fe75b205797c7ffde37dd8cfe3f2926f93a44a0c0a94f655cd377eaae",
+      "bytes": 344757,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/report.md",
+      "sha256": "d5451cf26a648c15d19afcf4e91341820531e75cd9b6ea3215c5443c4ff71a66",
+      "bytes": 32657,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/01.md",
+      "sha256": "bffd844c1ecc3ffcf63adc2c87932cfd29eb3f49ecc0f5b7ba7828e691a99b9a",
+      "bytes": 9277,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/02.md",
+      "sha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+      "bytes": 1295,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/03.md",
+      "sha256": "146b0ecb9c3b43b4f2e1e7400a3fd9f26d633d32d656e4a2d3940b232530317a",
+      "bytes": 10800,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/04.md",
+      "sha256": "ec78d35d337742f899ad0e89ea79e1c80d7e83a967371d2c3c5c7ae24760a48f",
+      "bytes": 2326,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/05.md",
+      "sha256": "c8374bd7c6082ff219c6ea49efc886c788b67319318e45997e7c9ed9d7777513",
+      "bytes": 2672,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/06.md",
+      "sha256": "4de5a17c0d61b4059366356a0a521a86ebcf008eeb4c576bea8664ab650d3dd9",
+      "bytes": 2753,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/07.md",
+      "sha256": "9902bbf50e5adbf70a050b5a4ebc2fb995ae1095d87e469112dc12a6efa3e86f",
+      "bytes": 2775,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/08.md",
+      "sha256": "1844826ef26e0e5e780846049d864f33adb7bd7ac0c8c296dd2ad6a5970d14e8",
+      "bytes": 2659,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/09.md",
+      "sha256": "1e05defaa8783e708372ed5c2bf39a80dd2e3677ee92c908b2a1db44794943e8",
+      "bytes": 2555,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/10.md",
+      "sha256": "3764e98348ae4ac91010b98c0eed66f81f9af7a0e7070ab02e7d615d643a47c4",
+      "bytes": 2492,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/11.md",
+      "sha256": "8cd34d32ca207cd54ff90bd6507d25356617f3acc68b5c11290cf65c1e8644e3",
+      "bytes": 2272,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/12.md",
+      "sha256": "7289e7117fa060c1e0395123f7b407316e2672ee2d4f1ed4a045cc4a200e52e8",
+      "bytes": 1874,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/13.md",
+      "sha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+      "bytes": 4735,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/14.md",
+      "sha256": "914a10b2eba32003c39677b2a6b80204684640cb10fb2437b9b1eaecfecba099",
+      "bytes": 2638,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/15.md",
+      "sha256": "c4c5abcdde60d56440f019ae16cb5a952821341602218ea3fdd0ce19706ac1e5",
+      "bytes": 2901,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/16.md",
+      "sha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+      "bytes": 2193,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/17.md",
+      "sha256": "4c5ecfea1efcec86ad8bbad4dcb91b07408419d8d66edd1c1a5de2b0ee4f8204",
+      "bytes": 2049,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/18.md",
+      "sha256": "ccd389af04c143e239a3b529ac41e20dadb63f73fbf5f57a1e6ded666df44764",
+      "bytes": 4844,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/19.md",
+      "sha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+      "bytes": 1489,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/bodies/20.md",
+      "sha256": "d6059abe31ef6ea8ba7868d9f3057a5bc39d28a6821f04dfbb34a0475cf494f1",
+      "bytes": 2213,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "sourceCasChecked": 32,
+  "originalBodiesCasChecked": 20,
+  "sourceEdits": 0,
+  "businessRuns": 0,
+  "gitCommands": 0,
+  "nativeQualified": false,
+  "accepted": false,
+  "next": "Tracking worker consolidates exact dispositions and preserves all original body hashes/statuses; Root owns qualification/integration and policy reconciliation."
+}

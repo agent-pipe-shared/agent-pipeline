@@ -1,0 +1,2363 @@
+{
+  "schema": "alfred.unknown02.current-main-source-assessment.successor.v1",
+  "scope": "exact12 original items, private assessment; evolving Main physical observations are not Source/native/acceptance authority",
+  "ruleset": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "route": "SourceProposal metadata; methodology-only; model/native unverified",
+  "partition": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-02.json",
+    "sha256": "2d436acd232ed647dbdc5e4b1d8636cceb9249614c7bb50a3fbcdcd4f79c7583"
+  },
+  "current150Binding": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/current150-group-binding.json",
+    "sha256": "ec2bbee42c66e57f300a722fb082e20f5f2cf36aa2e37d86226d7ac79ea0127b",
+    "bytes": 2995,
+    "mode": 420,
+    "nlink": 1,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "d3e6ab9425a24a7c28db4bcc6c9319acf34a37205bd5764b259a36189dbe6fe8",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "rows": [
+    {
+      "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-domain-scanner-findings-need-reproduction-before-remedy.md",
+          "canonicalPath": "backlog/items/2026-10-09-domain-scanner-findings-need-reproduction-before-remedy.md",
+          "sha256": "9a65266594f0dd5686f486678d45e5c39374e9945b09fab7d76a78e5de017ea5",
+          "bytes": 3343,
+          "parentSha256": "9a65266594f0dd5686f486678d45e5c39374e9945b09fab7d76a78e5de017ea5",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::29.1",
+            "lineStart": 31,
+            "lineEnd": 31
+          },
+          {
+            "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::33.1",
+            "lineStart": 35,
+            "lineEnd": 39
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-domain-scanner-findings-need-reproduction-before-remedy.md",
+        "sha256": "9a65266594f0dd5686f486678d45e5c39374e9945b09fab7d76a78e5de017ea5",
+        "expectedSha256": "9a65266594f0dd5686f486678d45e5c39374e9945b09fab7d76a78e5de017ea5",
+        "bytes": 3343,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-10-09-domain-scanner-findings-need-reproduction-before-remedy.md",
+        "status": "absent-at-observation",
+        "originalByteEquivalence": false
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "consumer-input-and-workflow-gap",
+      "finding": "Current adapter binds candidate scan config and rejects findings/errors; no retained actual public-domain expression, original scanner/version/rule/span or reproduction-positive/negative receipt is declared. No classifier repair is established.",
+      "criterionCoverage": [
+        "original sanitized match",
+        "credential positive controls",
+        "exact domain controls",
+        "critical-push vs scanner binding"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::15.1",
+          "lineStart": 17,
+          "lineEnd": 17,
+          "originalExcerpt": "The reports call a public game property a generic-api-key false positive, but the exact historical scanner rule, match span, entropy/value and candidate bytes remain unverified. Bracket notation may alter lexical matching; it is not a reviewed exception or established scanner repair. Existing Gitleaks value-identity repair covers a different suppression integrity scope.",
+          "assessment": "Current adapter binds candidate scan config and rejects findings/errors; no retained actual public-domain expression, original scanner/version/rule/span or reproduction-positive/negative receipt is declared. No classifier repair is established.",
+          "nextAction": "Pin authorized sanitized finding + public candidate/tree + actual scanner/config/rule; use real reproduction before any remedy. Do not change suppression on this assessment.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::29.1",
+          "lineStart": 31,
+          "lineEnd": 31,
+          "originalExcerpt": "Provide a bounded reproduction-first diagnostic workflow binding candidate/tree, scanner version/config/rule and safely publishable finding location/span to the exact public domain expression. Classify genuine credential, verified domain false positive and unresolved finding before any remedy. A demonstrated classifier issue may receive a narrow correction with credential-positive controls; suppression follows existing human review/authority.",
+          "assessment": "Current adapter binds candidate scan config and rejects findings/errors; no retained actual public-domain expression, original scanner/version/rule/span or reproduction-positive/negative receipt is declared. No classifier repair is established.",
+          "nextAction": "Pin authorized sanitized finding + public candidate/tree + actual scanner/config/rule; use real reproduction before any remedy. Do not change suppression on this assessment.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy::33.1",
+          "lineStart": 35,
+          "lineEnd": 39,
+          "originalExcerpt": "- Authorized sanitized finding artifact and exact public candidate expression establish the match; unknown/unavailable historical match stays explicit and no false-positive PASS is invented.\n- Credential-shaped positive controls still fail, and domain cases demonstrate precisely the relevant classifier behavior.\n- No secret-prefix whitelist, automatic ignore generation, blanket suppression or lexical concealment is presented as a fix.\n- Scanner verdict and critical push authority remain separately bound; override does not imply scanner exemption.\n- The existing open value-identity repair item and its pending registration/minor follow-ups retain their scope/status; no duplicate ignore-repair implementation.",
+          "assessment": "Current adapter binds candidate scan config and rejects findings/errors; no retained actual public-domain expression, original scanner/version/rule/span or reproduction-positive/negative receipt is declared. No classifier repair is established.",
+          "nextAction": "Pin authorized sanitized finding + public candidate/tree + actual scanner/config/rule; use real reproduction before any remedy. Do not change suppression on this assessment.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+          "sha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+          "bytes": 33602,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "ca28f377571d777d21f45bc4a9cbf4a078785d156b5c6d59b4f23212e844c31c",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+          "sha256": "4f7718a9145bb599cc20b23a0b9e8d7000b84ca208e51a89ec9c345ecd3cb303",
+          "bytes": 61118,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "506af2e02653b94acb1def5f66c5e784af8d174427eee100e6ea56d1aff8a021",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Pin the actual domain-scanner binary/config/rule and candidate public expression; independently reproduce original positive/negative values before any suppression change.",
+      "nextActions": [
+        "Pin authorized sanitized finding + public candidate/tree + actual scanner/config/rule; use real reproduction before any remedy. Do not change suppression on this assessment."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+          "canonicalPath": "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+          "sha256": "b023654546b97b18ebaf5b2ad8d5e5ac7492bf61d39db14cc315235b0e554453",
+          "bytes": 1324,
+          "parentSha256": "b023654546b97b18ebaf5b2ad8d5e5ac7492bf61d39db14cc315235b0e554453",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.1",
+            "lineStart": 17,
+            "lineEnd": 20
+          },
+          {
+            "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.2",
+            "lineStart": 22,
+            "lineEnd": 24
+          },
+          {
+            "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.3",
+            "lineStart": 26,
+            "lineEnd": 26
+          },
+          {
+            "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::28.1",
+            "lineStart": 30,
+            "lineEnd": 31
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+        "sha256": "b023654546b97b18ebaf5b2ad8d5e5ac7492bf61d39db14cc315235b0e554453",
+        "expectedSha256": "b023654546b97b18ebaf5b2ad8d5e5ac7492bf61d39db14cc315235b0e554453",
+        "bytes": 1324,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+        "sha256": "b023654546b97b18ebaf5b2ad8d5e5ac7492bf61d39db14cc315235b0e554453",
+        "bytes": 1324,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "f2effa6f67a288c30da04ca1867dc54210a5a02bfa6fdcd7d4253f86ccfe481c",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "measurement-producer-binding-hold",
+      "finding": "Current budget counters and bounded locks measure dispatched calls, not the original C1 main-context administration percentage or per-cause before/after effects. No exact sanctioned minimizing measurement producer/actual before-after receipts are retained in this partition. A missing binding is not proof that no producer exists.",
+      "criterionCoverage": [
+        "repeatable C1 tool",
+        "measure per cause",
+        "wake-ups/inline/delegation/guard/briefing context",
+        "at-most10% target"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.1",
+          "lineStart": 17,
+          "lineEnd": 20,
+          "originalExcerpt": "Measured on one long Elephant session (main thread, about 1,900 API responses): about\n26 % of main-context tokens are one-line replies to stop-hook / goal / task-notification\nwake-ups, about 22 % inline investigation (reads, git, search), 5.4 % guard refusals and\n10 % persistence/briefing authoring.",
+          "assessment": "Current budget counters and bounded locks measure dispatched calls, not the original C1 main-context administration percentage or per-cause before/after effects. No exact sanctioned minimizing measurement producer/actual before-after receipts are retained in this partition. A missing binding is not proof that no producer exists.",
+          "nextAction": "Root/telemetry owner supply exact existing minimizing producer and original C1 grouping; collect candidate-bound per-cause before/after + <=10% admin result without raw/private transcripts.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.2",
+          "lineStart": 22,
+          "lineEnd": 24,
+          "originalExcerpt": "The causes are structural: wake-up loops, delegation that is costlier per action than\ninline work, `Explore`/`Plan` dispatch refused, guard false positives, and hand-written\nbriefings.",
+          "assessment": "Current budget counters and bounded locks measure dispatched calls, not the original C1 main-context administration percentage or per-cause before/after effects. No exact sanctioned minimizing measurement producer/actual before-after receipts are retained in this partition. A missing binding is not proof that no producer exists.",
+          "nextAction": "Root/telemetry owner supply exact existing minimizing producer and original C1 grouping; collect candidate-bound per-cause before/after + <=10% admin result without raw/private transcripts.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::15.3",
+          "lineStart": 26,
+          "lineEnd": 26,
+          "originalExcerpt": "PO target: at most 10 % pipeline administration.",
+          "assessment": "Current budget counters and bounded locks measure dispatched calls, not the original C1 main-context administration percentage or per-cause before/after effects. No exact sanctioned minimizing measurement producer/actual before-after receipts are retained in this partition. A missing binding is not proof that no producer exists.",
+          "nextAction": "Root/telemetry owner supply exact existing minimizing producer and original C1 grouping; collect candidate-bound per-cause before/after + <=10% admin result without raw/private transcripts.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads::28.1",
+          "lineStart": 30,
+          "lineEnd": 31,
+          "originalExcerpt": "- A repeatable measurement tool exists in the repository (C1 telemetry).\n- One enforcement-layer measure per cause, each with a before/after measurement.",
+          "assessment": "Current budget counters and bounded locks measure dispatched calls, not the original C1 main-context administration percentage or per-cause before/after effects. No exact sanctioned minimizing measurement producer/actual before-after receipts are retained in this partition. A missing binding is not proof that no producer exists.",
+          "nextAction": "Root/telemetry owner supply exact existing minimizing producer and original C1 grouping; collect candidate-bound per-cause before/after + <=10% admin result without raw/private transcripts.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+          "bytes": 118731,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "9aa507d9d4ec6c86577bdcd82c2274ee05b4461f47b12170c3a3fc91dff78861",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Identify the sanctioned minimizing measurement producer and original C1 grouping, then bind before/after evidence for each cause and the stated administration target without reading private transcripts directly.",
+      "nextActions": [
+        "Root/telemetry owner supply exact existing minimizing producer and original C1 grouping; collect candidate-bound per-cause before/after + <=10% admin result without raw/private transcripts."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-every-dispatch-pays-a-bootstrap-receipt-detour.md",
+          "canonicalPath": "backlog/items/2026-10-05-every-dispatch-pays-a-bootstrap-receipt-detour.md",
+          "sha256": "10643def2c741552c7150bd4738c859b9db1ec5d0d07a1d71b5f267679db3dfc",
+          "bytes": 3047,
+          "parentSha256": "10643def2c741552c7150bd4738c859b9db1ec5d0d07a1d71b5f267679db3dfc",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour::15.1",
+            "lineStart": 17,
+            "lineEnd": 19
+          },
+          {
+            "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour::21.1",
+            "lineStart": 23,
+            "lineEnd": 25
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-every-dispatch-pays-a-bootstrap-receipt-detour.md",
+        "sha256": "10643def2c741552c7150bd4738c859b9db1ec5d0d07a1d71b5f267679db3dfc",
+        "expectedSha256": "10643def2c741552c7150bd4738c859b9db1ec5d0d07a1d71b5f267679db3dfc",
+        "bytes": 3047,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-10-05-every-dispatch-pays-a-bootstrap-receipt-detour.md",
+        "sha256": "10643def2c741552c7150bd4738c859b9db1ec5d0d07a1d71b5f267679db3dfc",
+        "bytes": 3047,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "9f88f44e40e448d52277fcb34fd6230b2b5c5d0a5368e90ad0d200b912e10e4e",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "demonstrated-template-functional-gap",
+      "finding": "Main evaluate records only sanctioned Bash preflight and denies write when no receipt. Goldfish template body has no explicit step0 before-first-write command sequence; absent SubagentStart receipt route must not be manufactured. The original lawful option C can be made explicit without weakening receipt authority.",
+      "criterionCoverage": [
+        "receipt without agent cost OR explicit step0",
+        "fresh first Write admitted",
+        "own preflight semantics",
+        "native spellings and host binding"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour::15.1",
+          "lineStart": 17,
+          "lineEnd": 19,
+          "originalExcerpt": "Each dispatched subagent's first Write is refused with `GUARD-BOOTSTRAP-RECEIPT-MISSING`\nuntil it reads files and runs `pipeline-start-preflight.mjs`. That costs 2-3 tool calls,\n5-15 % of a 15-40-call budget (observed in SST2, QP5-PREP and NULSWEEP2, 2026-10-05).",
+          "assessment": "Main evaluate records only sanctioned Bash preflight and denies write when no receipt. Goldfish template body has no explicit step0 before-first-write command sequence; absent SubagentStart receipt route must not be manufactured. The original lawful option C can be made explicit without weakening receipt authority.",
+          "nextAction": "Private additive template step0 successor, independent targeted/Quick/five closing guidance conserved; Root integrate through existing protected route. Genuine fresh dispatch first Write proof remains required; no retry-after-refusal counted as positive.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour::21.1",
+          "lineStart": 23,
+          "lineEnd": 25,
+          "originalExcerpt": "- The receipt is recorded without agent cost (for example by the SubagentStart hook), or\n  the template's step 0 runs the preflight.\n- A regression test shows the first Write of a freshly started dispatch is admitted.",
+          "assessment": "Main evaluate records only sanctioned Bash preflight and denies write when no receipt. Goldfish template body has no explicit step0 before-first-write command sequence; absent SubagentStart receipt route must not be manufactured. The original lawful option C can be made explicit without weakening receipt authority.",
+          "nextAction": "Private additive template step0 successor, independent targeted/Quick/five closing guidance conserved; Root integrate through existing protected route. Genuine fresh dispatch first Write proof remains required; no retry-after-refusal counted as positive.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/lib/guard/bootstrap-receipt.mjs",
+          "sha256": "7a0f39e1627bd336e68123c50104b615f7538daadd0950e37b25bddd9289f0d3",
+          "bytes": 10229,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "ccb51825fd980574f1761dd0cc46e03af4ccf8e27fdeba6058fe098dc4a16025",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+          "bytes": 32556,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "2691f4c50fc77bc810c766091f2986b3fa25492abffa6c1b1d576f4f1986365a",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+          "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+          "bytes": 57670,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "bb5d30d501a6149c9cb558bf3b5c74daa75a42d3c378afd5a46bc3394f5eb26f",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Bind the actual receipt route and platform spellings to one genuine dispatched first Write. Preserve the original distinction between preflight-before-write and retry-after-refusal.",
+      "nextActions": [
+        "Private additive template step0 successor, independent targeted/Quick/five closing guidance conserved; Root integrate through existing protected route. Genuine fresh dispatch first Write proof remains required; no retry-after-refusal counted as positive."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "actualMain": {
+            "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+            "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+            "bytes": 32556,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pendingSource": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+            "sha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+            "bytes": 32926,
+            "mode": 420,
+            "nlink": 1
+          },
+          "applied": false,
+          "qualification": "not inferred; pending protected generation"
+        }
+      ],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.foreign-worktree-closes-the-implementation-gate",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+          "canonicalPath": "backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+          "sha256": "f3999c47e1f56e70ac226a508f911818d4e960f56399d86e0999312a9018471f",
+          "bytes": 2442,
+          "parentSha256": "f3999c47e1f56e70ac226a508f911818d4e960f56399d86e0999312a9018471f",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.foreign-worktree-closes-the-implementation-gate::16.1",
+            "lineStart": 18,
+            "lineEnd": 26
+          },
+          {
+            "id": "pipeline.foreign-worktree-closes-the-implementation-gate::39.1",
+            "lineStart": 41,
+            "lineEnd": 46
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+        "sha256": "f3999c47e1f56e70ac226a508f911818d4e960f56399d86e0999312a9018471f",
+        "expectedSha256": "f3999c47e1f56e70ac226a508f911818d4e960f56399d86e0999312a9018471f",
+        "bytes": 2442,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+        "sha256": "f3999c47e1f56e70ac226a508f911818d4e960f56399d86e0999312a9018471f",
+        "bytes": 2442,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "0ece850d29d718d55e5c602d99ac6cfa67fb819c5d291be18729784e560b583c",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "partial-code-present-consumer-cause-hold",
+      "finding": "Historical package reader now emits bounded source-provenance diagnostic, but unrecognized Git failure still becomes DWP2-PHYSICAL-OR-GIT/advisor-binding-source-provenance. Current Plan/Spec approval retains v2 compatibility while newer approval path avoids executing this package reader here. No genuine current foreign-worktree failure/typed environment-vs-content receipt is declared; do not reopen ordinary mandatory Advisor/readiness or weaken topology/CAS.",
+      "criterionCoverage": [
+        "preserve underlying typed error",
+        "environment condition not invalid architecture",
+        "read-only diagnostic while gate closed",
+        "reopen only verified drift",
+        "ADR0085 C2 hot-path retirement"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.foreign-worktree-closes-the-implementation-gate::16.1",
+          "lineStart": 18,
+          "lineEnd": 26,
+          "originalExcerpt": "While one WSL-registered throwaway worktree existed (`.git/worktrees/wt-preflight-564c6a47`, gitdir under `/mnt/`,\ninvisible to the Windows-side `git worktree list`), the Windows-side implementation gate failed closed for every\ndispatch and the Elephant: `DWP2-PHYSICAL-OR-GIT` on every implementation Edit and `node` run, every `specs/` docs\nEdit, and every commit (commit-msg hook `GUARD-DEVPLAN-LIFECYCLE`, even for `specs/` docs). It also failed on the\ngate's own named diagnosis command (`design-advisory-admission.mjs inspect`, refused as opaque execution).\nOnboarding `inspect` then claimed \"the approved PRD is immutable and its architecture evidence is invalid\" and offered\n`reopen-design`: a full design reopen for a transient foreign-worktree condition. The reader's catch-all\n(`design-workflow-package-v2.mjs:142`) hides the real exception. Confirmed: the first commit after the worktree was\nremoved passed unchanged (`40852a076`).",
+          "assessment": "Historical package reader now emits bounded source-provenance diagnostic, but unrecognized Git failure still becomes DWP2-PHYSICAL-OR-GIT/advisor-binding-source-provenance. Current Plan/Spec approval retains v2 compatibility while newer approval path avoids executing this package reader here. No genuine current foreign-worktree failure/typed environment-vs-content receipt is declared; do not reopen ordinary mandatory Advisor/readiness or weaken topology/CAS.",
+          "nextAction": "Bind actual active consumer reader and fixed foreign-worktree underlying enum; preserve bounded original cause; independently establish environment-unavailable vs real content drift and named read-only diagnostic admission before any narrow functional successor.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.foreign-worktree-closes-the-implementation-gate::39.1",
+          "lineStart": 41,
+          "lineEnd": 46,
+          "originalExcerpt": "- The reader keeps the underlying error code (no catch-all collapse).\n- A registered worktree outside the native view is a typed environment condition, never \"architecture evidence\n  invalid\".\n- The named read-only diagnosis is admitted while the gate is closed.\n- `reopen-design` is offered only for a verified content drift, never for an unexplained exception.\n- ADR-0085 C2 (legacy re-read without course store/candidate) removes this hot-path read entirely.",
+          "assessment": "Historical package reader now emits bounded source-provenance diagnostic, but unrecognized Git failure still becomes DWP2-PHYSICAL-OR-GIT/advisor-binding-source-provenance. Current Plan/Spec approval retains v2 compatibility while newer approval path avoids executing this package reader here. No genuine current foreign-worktree failure/typed environment-vs-content receipt is declared; do not reopen ordinary mandatory Advisor/readiness or weaken topology/CAS.",
+          "nextAction": "Bind actual active consumer reader and fixed foreign-worktree underlying enum; preserve bounded original cause; independently establish environment-unavailable vs real content drift and named read-only diagnostic admission before any narrow functional successor.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+          "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+          "bytes": 31644,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "00f30608d80e900770318ea3aade4075cad50d0a6d558307688f7febd9d81fa8",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+          "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+          "bytes": 3622,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "3e9f9f6f3866914eeaea781ec213031e3d11e036c1393b2d213d10cec19b0c00",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+          "sha256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+          "bytes": 75585,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "4f51b6b633a7be850dec9968d59d34bd873ef94877c0b3c6c012d609d26f9cc2",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+          "bytes": 706707,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "afe4a5dfa4e59565342117ae0c9b26950a428e96166d88f598fb00ace5015a73",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Trace the exact actual failing repository reader with known declared paths, preserve its error, and qualify environment-unavailable versus content drift plus admitted diagnostics; no blanket architecture reopening.",
+      "nextActions": [
+        "Bind actual active consumer reader and fixed foreign-worktree underlying enum; preserve bounded original cause; independently establish environment-unavailable vs real content drift and named read-only diagnostic admission before any narrow functional successor."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "actualMain": {
+            "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+            "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+            "bytes": 706707,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pendingSource": {
+            "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+            "sha256": "c28fe82ee90f6b61632fede4cbda7e3248401225b8d2c594264d2d74226eff3a",
+            "bytes": 809796,
+            "mode": 420,
+            "nlink": 1
+          },
+          "applied": false,
+          "qualification": "not inferred; pending protected generation"
+        }
+      ],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+          "canonicalPath": "backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+          "sha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+          "bytes": 2872,
+          "parentSha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::15.2",
+            "lineStart": 25,
+            "lineEnd": 28
+          },
+          {
+            "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::40.1",
+            "lineStart": 42,
+            "lineEnd": 47
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+        "sha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+        "expectedSha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+        "bytes": 2872,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+        "sha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+        "bytes": 2872,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "c997cff27cd83c62eb691f16408b9f8bee5bf5236b57a3b5405fc8e8b023bf90",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "functional-code-present-native-host-hold",
+      "finding": "Shared GIT_NULL_DEVICE=/dev/null and observed worktree/AFK/worker consumers import it. Existing worktree test has NUL-rejecting controlled binary plus production/fixture/single-source ratchets; these are test source, not an actual current Windows2.56 receipt. No new null-value implementation needed from this assessment.",
+      "criterionCoverage": [
+        "shared constant across production",
+        "never Node file-open",
+        "real Git and ratchet",
+        "original Node-v24 acceptance update",
+        "signed protected delivery"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::15.1",
+          "lineStart": 17,
+          "lineEnd": 23,
+          "originalExcerpt": "Hardened git spawns set `GIT_CONFIG_GLOBAL` to `\"NUL\"` on win32 (`plugins/pipeline-core/lib/worktree-lifecycle.mjs`\n`gitEnvironment`, and the same `win32 ? \"NUL\"` literal in about ten further source files: afk-git-adapter,\nafk-transaction-host, afk-claude-host, close-coordinator, local-worker-supervisor, neutral-range-plan,\npo-gate-authority, …). Git for Windows 2.56.0.windows.1 (UCRT build) fails every such call with\n`fatal: unable to access 'NUL': Invalid argument`. Repository discovery fails, the governance-scope reader reports\n`GS-GIT-UNAVAILABLE`, the preflight returns `pipeline-governance-unverifiable` with `nextAction: null`, and the guard\nstays in pre-ready lockdown for the whole session.",
+          "assessment": "Shared GIT_NULL_DEVICE=/dev/null and observed worktree/AFK/worker consumers import it. Existing worktree test has NUL-rejecting controlled binary plus production/fixture/single-source ratchets; these are test source, not an actual current Windows2.56 receipt. No new null-value implementation needed from this assessment.",
+          "nextAction": "Rebind retained real ratchet/full candidate evidence and original Git-for-Windows host matrix; keep inherited qualification Git policies. Check original Node-v24 acceptance docs in its owning item, not duplicate this fix.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::15.2",
+          "lineStart": 25,
+          "lineEnd": 28,
+          "originalExcerpt": "Measured value matrix (git spawned from Node, `GIT_CONFIG_NOSYSTEM=1`, Git 2.56.0.windows.1):\n`\"NUL\"` → 128; `os.devNull` (`\\\\.\\nul`) → 128; `\"nul\"` → 0; `\"/dev/null\"` → 0.\nUpstream: regression git-for-windows/git#6449, fixed by #6450 in Git for Windows v2.56.0(2). Updating to\n2.56.0.windows.2 cleared the session on 2026-10-06.",
+          "assessment": "Shared GIT_NULL_DEVICE=/dev/null and observed worktree/AFK/worker consumers import it. Existing worktree test has NUL-rejecting controlled binary plus production/fixture/single-source ratchets; these are test source, not an actual current Windows2.56 receipt. No new null-value implementation needed from this assessment.",
+          "nextAction": "Rebind retained real ratchet/full candidate evidence and original Git-for-Windows host matrix; keep inherited qualification Git policies. Check original Node-v24 acceptance docs in its owning item, not duplicate this fix.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul::40.1",
+          "lineStart": 42,
+          "lineEnd": 47,
+          "originalExcerpt": "One shared constant for the null device handed to git child processes: `\"/dev/null\"` on every platform (Git for Windows\nmaps it itself, in both the MSVCRT and the UCRT builds; the same file already passes `-c core.hooksPath=/dev/null` on\nwin32). Replace every `win32 ? \"NUL\"` site; never use `os.devNull` for git (fails as well); never hand the constant to a\nNode file open (Node would create `D:\\dev\\null`). Regression test that spawns real git with the constant; a ratchet\nscan against a reintroduced `\"NUL\"` git value. Update the acceptance line of the Node-v24 NUL item. Protected sites go\nthrough the next signed package.",
+          "assessment": "Shared GIT_NULL_DEVICE=/dev/null and observed worktree/AFK/worker consumers import it. Existing worktree test has NUL-rejecting controlled binary plus production/fixture/single-source ratchets; these are test source, not an actual current Windows2.56 receipt. No new null-value implementation needed from this assessment.",
+          "nextAction": "Rebind retained real ratchet/full candidate evidence and original Git-for-Windows host matrix; keep inherited qualification Git policies. Check original Node-v24 acceptance docs in its owning item, not duplicate this fix.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/lib/git-null-device.mjs",
+          "sha256": "89be7dc2c32544c5a1a0159de3515c25fc773d9a7d112689558f9e52dd1a65eb",
+          "bytes": 767,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "37a26349accc15b47b0b54763e3206908bfb1080ffa0b0d17989c45651ce2568",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+          "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+          "bytes": 117511,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "e8982dafc43664e6754c3071b0eb6aaa841a13f78e64ef57a982156e252d2a0d",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+          "sha256": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+          "bytes": 29103,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "1fc46090dd762fde88f69409455306f4e7e97737056cdb43d175e7d85cc62efe",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+          "sha256": "71b0d56fbafa91d239773e5872f3a28c51d3a4f78f8f77bf0b6b3d0c0eaae926",
+          "bytes": 77278,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "691ec5d4879f444e539c5d96f56cd6f20739b6c0754fb8d32f344aa749a97312",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs",
+          "sha256": "cf6254c19016b3215def657f48fbc6916ec2573cbb9d306628bd1fea95dc366e",
+          "bytes": 96846,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "35e81ae4c29126d4fba68998f56a65bfaf457d535f8b739c6869df7f28877b78",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Use a separately declared exact existing shared Git helper and original ratchet/host receipt; preserve original fixes and do not clear inherited Git configuration in qualification transport.",
+      "nextActions": [
+        "Rebind retained real ratchet/full candidate evidence and original Git-for-Windows host matrix; keep inherited qualification Git policies. Check original Node-v24 acceptance docs in its owning item, not duplicate this fix."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+          "canonicalPath": "backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+          "sha256": "91587203452e42a0a71871425899375db5359505be5561aca8d0dab7503694d6",
+          "bytes": 1738,
+          "parentSha256": "91587203452e42a0a71871425899375db5359505be5561aca8d0dab7503694d6",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.guard-suite-fails-60-tests-on-native-windows::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.guard-suite-fails-60-tests-on-native-windows::15.2",
+            "lineStart": 25,
+            "lineEnd": 26
+          },
+          {
+            "id": "pipeline.guard-suite-fails-60-tests-on-native-windows::37.1",
+            "lineStart": 39,
+            "lineEnd": 43
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+        "sha256": "91587203452e42a0a71871425899375db5359505be5561aca8d0dab7503694d6",
+        "expectedSha256": "91587203452e42a0a71871425899375db5359505be5561aca8d0dab7503694d6",
+        "bytes": 1738,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+        "sha256": "91587203452e42a0a71871425899375db5359505be5561aca8d0dab7503694d6",
+        "bytes": 1738,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "0836521f3b61b383c5bfe210006c13bf7250387eab2f4081165af142b1efb47d",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "native-full-suite-disposition-hold",
+      "finding": "Current guard test file exists with platform-specific and controlled dialect tests. No retained current full native-Windows result classifying original60 failures is declared; narrow source corrections or actual different suite counts do not discharge original full-suite inventory.",
+      "criterionCoverage": [
+        "classify sixty failures",
+        "align activation fixtures",
+        "record full attributable baseline"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.guard-suite-fails-60-tests-on-native-windows::15.1",
+          "lineStart": 17,
+          "lineEnd": 23,
+          "originalExcerpt": "Running `plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` (the\nrepository copy, unchanged) on native Windows on 2026-10-04 gives 273 tests,\n213 passing and 60 failing. The failures have been known since 2026-09-30 as\nstale fixture activation assumptions (\"old fixture activation assumptions\").\nA staged post-image of a guard change showed 194 pass and 79 fail; an\nidentical run with only the earlier guard hotfix staged gave the same counts,\nso the 19 extra failures are staging artefacts and not regressions.",
+          "assessment": "Current guard test file exists with platform-specific and controlled dialect tests. No retained current full native-Windows result classifying original60 failures is declared; narrow source corrections or actual different suite counts do not discharge original full-suite inventory.",
+          "nextAction": "Use exact current full native guard suite's existing/new Root host receipt with stale-fixture/platform/true-defect classification and baseline comparison. Do not rerun passed focused cases or invent native result.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.guard-suite-fails-60-tests-on-native-windows::15.2",
+          "lineStart": 25,
+          "lineEnd": 26,
+          "originalExcerpt": "Sixty red tests in the suite that guards the lifecycle make any guard change\nhard to attribute and are a candidate blocker for Verify.",
+          "assessment": "Current guard test file exists with platform-specific and controlled dialect tests. No retained current full native-Windows result classifying original60 failures is declared; narrow source corrections or actual different suite counts do not discharge original full-suite inventory.",
+          "nextAction": "Use exact current full native guard suite's existing/new Root host receipt with stale-fixture/platform/true-defect classification and baseline comparison. Do not rerun passed focused cases or invent native result.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.guard-suite-fails-60-tests-on-native-windows::37.1",
+          "lineStart": 39,
+          "lineEnd": 43,
+          "originalExcerpt": "- Classify the 60 failures (stale fixture assumption, platform difference,\n  real defect) and bring the fixtures in line with the current activation\n  model, as its own work package in the first intermediate candidate.\n- Keep a recorded baseline count so a later change can be attributed without a\n  staging experiment.",
+          "assessment": "Current guard test file exists with platform-specific and controlled dialect tests. No retained current full native-Windows result classifying original60 failures is declared; narrow source corrections or actual different suite counts do not discharge original full-suite inventory.",
+          "nextAction": "Use exact current full native guard suite's existing/new Root host receipt with stale-fixture/platform/true-defect classification and baseline comparison. Do not rerun passed focused cases or invent native result.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+          "sha256": "fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641",
+          "bytes": 702208,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "5ccca5f41eef1920fc2075e98114b91407562afd3a10f6c8cf8f09040dcdfe11",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "harness/scripts/verify.mjs",
+          "sha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+          "bytes": 122965,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "853d20d3b8ab3c90219ed84f4ce101978e3d37c63c5941e8dfe21b25153c526d",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Current exact same full native suite disposition inventory is required; narrower tests do not discharge it.",
+      "nextActions": [
+        "Use exact current full native guard suite's existing/new Root host receipt with stale-fixture/platform/true-defect classification and baseline comparison. Do not rerun passed focused cases or invent native result."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.handover-doc-committed-without-governance-classification",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+          "canonicalPath": "backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+          "sha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+          "bytes": 2002,
+          "parentSha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.handover-doc-committed-without-governance-classification::15.1",
+            "lineStart": 17,
+            "lineEnd": 23
+          },
+          {
+            "id": "pipeline.handover-doc-committed-without-governance-classification::15.2",
+            "lineStart": 25,
+            "lineEnd": 28
+          },
+          {
+            "id": "pipeline.handover-doc-committed-without-governance-classification::40.1",
+            "lineStart": 42,
+            "lineEnd": 45
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+        "sha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+        "expectedSha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+        "bytes": 2002,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+        "sha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+        "bytes": 2002,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "ebb7a568252ef0c309d404d6f574f905a494b9946f6da12b4b4342f5d3fdcfde",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "demonstrated-commit-boundary-functional-gap",
+      "finding": "Current observation checker rejects unclassified docs and check-doc-contracts integrates it at Verify. Generated pre-commit body runs privacy/protected-path/handover-size checks then returns if no protected finding; no observation inventory validation occurs. Thus mere Verify/bootstrap wiring does not enforce staged new-doc classification at commit.",
+      "criterionCoverage": [
+        "new handover/docs cannot commit unclassified",
+        "classification tracked with doc",
+        "commit-time existing checker or writer",
+        "installed hook availability vs missing hooks"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.handover-doc-committed-without-governance-classification::15.1",
+          "lineStart": 17,
+          "lineEnd": 23,
+          "originalExcerpt": "Commit `a0d83ce78` (`docs(state): record clean recovery handover for next\nsession`) added `docs/0.7-recovery-2026-10-03.md` without adding it to\n`governance/observation-doc-governance.json`. On the next session start the\nmandatory observation-governance bootstrap failed (case F6), which blocks\nwriting, dispatch and bootstrap confirmation until repaired. The same omission\nhappened before and was repaired after the fact (`e727a9893`,\n`docs(governance): classify local candidate handovers`), so it is recurring.",
+          "assessment": "Current observation checker rejects unclassified docs and check-doc-contracts integrates it at Verify. Generated pre-commit body runs privacy/protected-path/handover-size checks then returns if no protected finding; no observation inventory validation occurs. Thus mere Verify/bootstrap wiring does not enforce staged new-doc classification at commit.",
+          "nextAction": "Prepare narrow staged-index observation-inventory consumer seam: actual staged docs and staged policy, existing validator authority, source-checkout applicability and snapshot dependency closure; refuse unclassified before commit. Coordinate installer owner, preserve normal consumers and source trust. No worktree-only check/fabricated commit positive.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.handover-doc-committed-without-governance-classification::15.2",
+          "lineStart": 25,
+          "lineEnd": 28,
+          "originalExcerpt": "Contributing factor: this Windows clone had no `pre-commit`/`commit-msg` hooks\ninstalled (preflight reported `HOOK-READINESS-INSTALL-REQUIRED`). Whatever\ncommit-time check exists did not run. The handover was also authored in a\ndifferent checkout, so it is unknown whether that checkout had the hooks.",
+          "assessment": "Current observation checker rejects unclassified docs and check-doc-contracts integrates it at Verify. Generated pre-commit body runs privacy/protected-path/handover-size checks then returns if no protected finding; no observation inventory validation occurs. Thus mere Verify/bootstrap wiring does not enforce staged new-doc classification at commit.",
+          "nextAction": "Prepare narrow staged-index observation-inventory consumer seam: actual staged docs and staged policy, existing validator authority, source-checkout applicability and snapshot dependency closure; refuse unclassified before commit. Coordinate installer owner, preserve normal consumers and source trust. No worktree-only check/fabricated commit positive.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.handover-doc-committed-without-governance-classification::40.1",
+          "lineStart": 42,
+          "lineEnd": 45,
+          "originalExcerpt": "A handover or any new `docs/*.md` must not be committable unclassified.\nRun the observation-governance check in the pre-commit hook, or in the\nhandover writer itself, so the omission is caught at commit time rather than\nat the next bootstrap.",
+          "assessment": "Current observation checker rejects unclassified docs and check-doc-contracts integrates it at Verify. Generated pre-commit body runs privacy/protected-path/handover-size checks then returns if no protected finding; no observation inventory validation occurs. Thus mere Verify/bootstrap wiring does not enforce staged new-doc classification at commit.",
+          "nextAction": "Prepare narrow staged-index observation-inventory consumer seam: actual staged docs and staged policy, existing validator authority, source-checkout applicability and snapshot dependency closure; refuse unclassified before commit. Coordinate installer owner, preserve normal consumers and source trust. No worktree-only check/fabricated commit positive.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+          "sha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca",
+          "bytes": 59864,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "33db08211963e66f7b299739d507d21f9c05e3e52ed316db3d805ba9d2f31ddd",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+          "sha256": "3a2de5eb016e733b64d326cab4dc61ec405bed1490fcb347767f68e4d8fde28e",
+          "bytes": 21968,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "98ed685032a5ab0ddd6a92d40de565a8c277c26840b2f08fa7fa19940847caff",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "harness/scripts/check-observation-governance.mjs",
+          "sha256": "ea282c7f0a0021d0a6173fc4e4ffa093333d4252ebe2163d0970df001a06ee03",
+          "bytes": 14261,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "3057b4d5d974fcc2c09c74396714a0f227a8c82d5c7042cdfb98d17961fbaca0",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "harness/scripts/check-doc-contracts.mjs",
+          "sha256": "02c3fc2f8d0564125216651d912eb1e6d009153bf1ca5cdea4a54295b9908fc8",
+          "bytes": 43119,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "017f02c5bfa6e39c76c9af9b0d048dff78539250b555ea84f75adafecaac7283",
+            "bytes": 5,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Trace actual snapshot/Verify/precommit dependency and unclassified-document refusal before proposing a fix.",
+      "nextActions": [
+        "Prepare narrow staged-index observation-inventory consumer seam: actual staged docs and staged policy, existing validator authority, source-checkout applicability and snapshot dependency closure; refuse unclassified before commit. Coordinate installer owner, preserve normal consumers and source trust. No worktree-only check/fabricated commit positive."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.hgo-patch-preflight-before-signature",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+          "canonicalPath": "backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+          "sha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+          "bytes": 4585,
+          "parentSha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.hgo-patch-preflight-before-signature::63.1",
+            "lineStart": 65,
+            "lineEnd": 68
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+        "sha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+        "expectedSha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+        "bytes": 4585,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+        "sha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+        "bytes": 4585,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "8115d34744dd724f357b744547e0420aa092128d3e7bfe3bb2bdb4600045d068",
+          "bytes": 5,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "demonstrated-native-rehearsal-producer-gap",
+      "finding": "Main prepare-for-signature authenticates audit and builds plan/digest/intent with no actual native-engine rehearsal. EOF grammar correction is present but is not rehearsal. Root explicitly has no installed product-authenticated native engine API; caller tool PASS/in-memory replay cannot become engine authority.",
+      "criterionCoverage": [
+        "pre-sign exact applicability",
+        "same patch/preimage signed and redeemed",
+        "scratch available while refused",
+        "malformed before signing / corrected once",
+        "actual native grammar and readonly git check",
+        "real native hunk order/postimage digest"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.hgo-patch-preflight-before-signature::63.1",
+          "lineStart": 65,
+          "lineEnd": 68,
+          "originalExcerpt": "A malformed hunk is rejected before human signing. A corrected patch signs\nonce and applies against the same frozen preimage. A changed preimage still\nrequires a fresh review and signature. The failed attempt does not claim an\nedit or success.",
+          "assessment": "Main prepare-for-signature authenticates audit and builds plan/digest/intent with no actual native-engine rehearsal. EOF grammar correction is present but is not rehearsal. Root explicitly has no installed product-authenticated native engine API; caller tool PASS/in-memory replay cannot become engine authority.",
+          "nextAction": "Close private native-engine adapter contract before any Source activation: exact sanctioned readonly rehearsal on private exact preimages, physical hunk order, output digests/complete validation, same request/preimage intent and redemption CAS. Product capability producer unavailable remains explicit original-scope prerequisite; no gate relaxation.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+          "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+          "bytes": 301059,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "4200d893dd0ae3fac47674c30df04f8845ecd86c32e7002fd5cc1f504ddff7e0",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
+          "sha256": "d215709b2c5186b5b5f958a68d23d1627e395e89dfe775f7e939f2bea85d090b",
+          "bytes": 12281,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "6ec65d17894cc92dd5a57d1384010285dee539991d6efe8b3b5b1bcd8a7a3890",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+          "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+          "bytes": 19968,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "ed9637d729c024291a16d5abad7e0da4f36ccd461657071859b0a4cde0f892fd",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Trace actual rehearsal producer and full hunk/order/native readback separately.",
+      "nextActions": [
+        "Close private native-engine adapter contract before any Source activation: exact sanctioned readonly rehearsal on private exact preimages, physical hunk order, output digests/complete validation, same request/preimage intent and redemption CAS. Product capability producer unavailable remains explicit original-scope prerequisite; no gate relaxation."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+          "canonicalPath": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+          "sha256": "4f7bc8c7cbd6d63b8a2a7b2d5a613e6961aa8c24d2885aa5a4a7c9451c5aaaed",
+          "bytes": 1979,
+          "parentSha256": "4f7bc8c7cbd6d63b8a2a7b2d5a613e6961aa8c24d2885aa5a4a7c9451c5aaaed",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill::27.1",
+            "lineStart": 29,
+            "lineEnd": 35
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+        "sha256": "4f7bc8c7cbd6d63b8a2a7b2d5a613e6961aa8c24d2885aa5a4a7c9451c5aaaed",
+        "expectedSha256": "4f7bc8c7cbd6d63b8a2a7b2d5a613e6961aa8c24d2885aa5a4a7c9451c5aaaed",
+        "bytes": 1979,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+        "sha256": "4f7bc8c7cbd6d63b8a2a7b2d5a613e6961aa8c24d2885aa5a4a7c9451c5aaaed",
+        "bytes": 1979,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "9149832770bb975723991c57b2f70b21b8f1147b41329b79f5fd3cc9b9659e74",
+          "bytes": 5,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "partial-passive-code-present-host-carrier-hold",
+      "finding": "Current passive policy allows some exact safe visible external files and protects credential/system roots; read-scope binds registered plugin/session roots and shell shape parity. These do not authenticate a host-declared system-skill instruction carrier; no actual lifecycle declared-skill positive/alias/outside negatives are retained. Do not treat existing broad passive allowance as fulfillment of narrow host surface.",
+      "criterionCoverage": [
+        "narrow host-declared instruction surface",
+        "ordinary route after refusal",
+        "single/bounded parity",
+        "outside/traversal/alias/private negatives",
+        "actual lifecycle boundary"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill::27.1",
+          "lineStart": 29,
+          "lineEnd": 35,
+          "originalExcerpt": "- Define and admit the narrow host-owned skill instruction surface required\n  by the runtime, including a concrete ordinary route after refusal.\n- Apply identical admission to supported single and bounded diagnostic reads.\n- Keep unrelated outside-root reads, traversal, symlink escapes and sensitive\n  private surfaces refused; do not reopen the unrestricted external-read lane.\n- Verify declared-skill admission and adversarial negative cases at the real\n  lifecycle boundary, preserving current Implementation approval validation.",
+          "assessment": "Current passive policy allows some exact safe visible external files and protects credential/system roots; read-scope binds registered plugin/session roots and shell shape parity. These do not authenticate a host-declared system-skill instruction carrier; no actual lifecycle declared-skill positive/alias/outside negatives are retained. Do not treat existing broad passive allowance as fulfillment of narrow host surface.",
+          "nextAction": "Bind a genuine host declaration carrier and current lifecycle first; implement only missing closed exact instruction route after that, preserving implementation approvals/private roots/alias negatives and identical single/bounded diagnostic admission.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+          "sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+          "bytes": 9965,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "a31c937011de35c00160e4b939f67a111035a58116126d23979704b96dab48c1",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/read-scope.mjs",
+          "sha256": "8e0e3901091221c67461570ad9df3b5b3d371f826a3cb28ac53448dde0fc9a14",
+          "bytes": 36848,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "434d0bfbd50f8f73ff54813d484dc9295753427e208f75bfe9de4c82ea624c11",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+          "bytes": 32556,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "2691f4c50fc77bc810c766091f2986b3fa25492abffa6c1b1d576f4f1986365a",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": [
+        "Narrow host-declared instruction carrier and single/pipeline parity proof unresolved; preserve outside/private/alias negatives. Current passive policy alone is not declared-skill acceptance."
+      ],
+      "nextActions": [
+        "Bind a genuine host declaration carrier and current lifecycle first; implement only missing closed exact instruction route after that, preserving implementation approvals/private roots/alias negatives and identical single/bounded diagnostic admission."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "actualMain": {
+            "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+            "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+            "bytes": 32556,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pendingSource": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+            "sha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+            "bytes": 32926,
+            "mode": 420,
+            "nlink": 1
+          },
+          "applied": false,
+          "qualification": "not inferred; pending protected generation"
+        }
+      ],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-onboarding-init-greenfield-matrix-is-serial-and-slow.md",
+          "canonicalPath": "backlog/items/2026-09-29-onboarding-init-greenfield-matrix-is-serial-and-slow.md",
+          "sha256": "b0bd22b0cb4e1f2d5b62b2ed678f2852b445acbdce0947c16e2b8bf56d7d2bee",
+          "bytes": 1429,
+          "parentSha256": "b0bd22b0cb4e1f2d5b62b2ed678f2852b445acbdce0947c16e2b8bf56d7d2bee",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow::14.1",
+            "lineStart": 16,
+            "lineEnd": 19
+          },
+          {
+            "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow::28.1",
+            "lineStart": 30,
+            "lineEnd": 33
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-onboarding-init-greenfield-matrix-is-serial-and-slow.md",
+        "sha256": "b0bd22b0cb4e1f2d5b62b2ed678f2852b445acbdce0947c16e2b8bf56d7d2bee",
+        "expectedSha256": "b0bd22b0cb4e1f2d5b62b2ed678f2852b445acbdce0947c16e2b8bf56d7d2bee",
+        "bytes": 1429,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-09-29-onboarding-init-greenfield-matrix-is-serial-and-slow.md",
+        "sha256": "b0bd22b0cb4e1f2d5b62b2ed678f2852b445acbdce0947c16e2b8bf56d7d2bee",
+        "bytes": 1429,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "c7c271f9991f1c5cd0d2e448771bf6b5a8fe4da7d08f65785fc6cfd276a3dbef",
+          "bytes": 5,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "functional-cell-split-present-measurement-hold",
+      "finding": "Main MATRIX_CASES enumerates6 convergence,6 approval,7 rollback; isolated named cell selector runs one callback, group scheduler uses bounded pool2. This meets separable-cell code direction without raising process budget. No exact original-cell conservation plus measured wall/process/memory receipt is retained.",
+      "criterionCoverage": [
+        "all existing runner/key+failure cells",
+        "failure identifies own cell",
+        "lower full-selected wall time",
+        "process/memory within budget"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow::14.1",
+          "lineStart": 16,
+          "lineEnd": 19,
+          "originalExcerpt": "The cross-runner/key matrix, chat/signature matrix, and first-anchor failure\nmatrix are independent fixtures inside three long test cases. Their measured\ndurations were 109, 123, and 119 seconds respectively. Rerunning the whole\nfile to check one repair spends most of its time on unrelated cases.",
+          "assessment": "Main MATRIX_CASES enumerates6 convergence,6 approval,7 rollback; isolated named cell selector runs one callback, group scheduler uses bounded pool2. This meets separable-cell code direction without raising process budget. No exact original-cell conservation plus measured wall/process/memory receipt is retained.",
+          "nextAction": "Reconcile exact historical cells against19 current selectable cells and cleanup, bind retained duration/resource measurements/Verify scheduling. Keep pool2; original item does not authorize unconditional variable concurrency.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow::28.1",
+          "lineStart": 30,
+          "lineEnd": 33,
+          "originalExcerpt": "- Every existing runner/key and first-anchor failure cell is still executed.\n- A failure identifies its cell without waiting for unrelated cells.\n- The full selected Verify path has a measured lower wall time without raising\n  process or memory pressure beyond the runner budget.",
+          "assessment": "Main MATRIX_CASES enumerates6 convergence,6 approval,7 rollback; isolated named cell selector runs one callback, group scheduler uses bounded pool2. This meets separable-cell code direction without raising process budget. No exact original-cell conservation plus measured wall/process/memory receipt is retained.",
+          "nextAction": "Reconcile exact historical cells against19 current selectable cells and cleanup, bind retained duration/resource measurements/Verify scheduling. Keep pool2; original item does not authorize unconditional variable concurrency.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+          "sha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "bytes": 121692,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "daa190e4eb09f519ead5abb9ba980e53dadb139bf4c6abdd201fb9f48c54a6cd",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "harness/scripts/verify.mjs",
+          "sha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+          "bytes": 122965,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "853d20d3b8ab3c90219ed84f4ce101978e3d37c63c5941e8dfe21b25153c526d",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Read actual selectable cells/registry and compare complete coverage, duration and process/memory budget before classifying source work needed.",
+      "nextActions": [
+        "Reconcile exact historical cells against19 current selectable cells and cleanup, bind retained duration/resource measurements/Verify scheduling. Keep pool2; original item does not authorize unconditional variable concurrency."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+          "canonicalPath": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+          "sha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+          "bytes": 3704,
+          "parentSha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.parallel-work-in-one-checkout-is-unsafe::23.1",
+            "lineStart": 25,
+            "lineEnd": 25
+          },
+          {
+            "id": "pipeline.parallel-work-in-one-checkout-is-unsafe::23.2",
+            "lineStart": 27,
+            "lineEnd": 38
+          },
+          {
+            "id": "pipeline.parallel-work-in-one-checkout-is-unsafe::23.3",
+            "lineStart": 40,
+            "lineEnd": 40
+          },
+          {
+            "id": "pipeline.parallel-work-in-one-checkout-is-unsafe::52.1",
+            "lineStart": 54,
+            "lineEnd": 61
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+        "sha256": "d301ec3095b9043425bbba2aea1572c05c6812bc38e3c00f979cbd68a1ce5235",
+        "expectedSha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+        "bytes": 4709,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": false
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+        "sha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+        "bytes": 3704,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "8b93d2e6bf1a2961151a1403bc1077250207351b73142f5347293a1deb14747b",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": false,
+      "originalNormBasis": "exact original canonical full body recovered; Audit d301 fresh observation drift retained",
+      "disposition": "partial-functional-code-present-history-and-runtime-hold",
+      "finding": "Declared assigned body20d drifts to currentd301; canonical Main body may be separately observed. Bounded retry3s exists, live holders not reclaimed and typed timeout retained. Current record lane has owner/terminal protocols. Original shared checkout liveness, commit-then-finalize, atomic repair and transient readiness receipts remain unbound; added 2026-10-10 prose is not silently new group scope. Exact assigned original20d body is present at the already-declared Main canonical body, while Audit d301 remains a separate observation.",
+      "criterionCoverage": [
+        "bounded lock retry/self recovery",
+        "atomic repairable record",
+        "one readiness definition",
+        "safe supported shared-checkout mode",
+        "own commit then finalize",
+        "restart duplicate-writer liveness"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.parallel-work-in-one-checkout-is-unsafe::23.1",
+          "lineStart": 25,
+          "lineEnd": 25,
+          "originalExcerpt": "Three failure modes were observed during the W0-3 dispatches:",
+          "assessment": "Declared assigned body20d drifts to currentd301; canonical Main body may be separately observed. Bounded retry3s exists, live holders not reclaimed and typed timeout retained. Current record lane has owner/terminal protocols. Original shared checkout liveness, commit-then-finalize, atomic repair and transient readiness receipts remain unbound; added 2026-10-10 prose is not silently new group scope.",
+          "nextAction": "Coordinate already-owned shared-lock Source/proof and group03 record successor; bind owning-dispatch commit→terminal + lost-ack/recovery + shared readiness/liveness original requirements. No duplicate Source writer or invented background PID grants.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.parallel-work-in-one-checkout-is-unsafe::23.2",
+          "lineStart": 27,
+          "lineEnd": 38,
+          "originalExcerpt": "1. **Counter lock.** Parallel tool calls inside one dispatch make the\n   dispatch-budget counter answer `DISPATCH-BUDGET-INPUT-INVALID\n   (counter-lock-busy)` and leave it stuck for that dispatch (\"repair through\n   the trusted host path\").\n2. **Dispatch-record collision.** Two parallel edits of the dispatch's own\n   record trip `GUARD-DISPATCH-RECORD-COLLISION` once the outcome flips to\n   `committed-pending-report`, leaving an unrepairable record.\n3. **Transient not-ready.** A second agent's Write is refused with\n   `GUARD-LIFECYCLE-NOT-READY` (session readiness `partial`) while another\n   agent commits, although `inspect --intent session` reports ready right\n   afterwards (process review PF-8: the preflight and guard readiness intents\n   differ).",
+          "assessment": "Declared assigned body20d drifts to currentd301; canonical Main body may be separately observed. Bounded retry3s exists, live holders not reclaimed and typed timeout retained. Current record lane has owner/terminal protocols. Original shared checkout liveness, commit-then-finalize, atomic repair and transient readiness receipts remain unbound; added 2026-10-10 prose is not silently new group scope.",
+          "nextAction": "Coordinate already-owned shared-lock Source/proof and group03 record successor; bind owning-dispatch commit→terminal + lost-ack/recovery + shared readiness/liveness original requirements. No duplicate Source writer or invented background PID grants.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.parallel-work-in-one-checkout-is-unsafe::23.3",
+          "lineStart": 40,
+          "lineEnd": 40,
+          "originalExcerpt": "Parallel dispatch in one checkout is effectively unsafe today.",
+          "assessment": "Declared assigned body20d drifts to currentd301; canonical Main body may be separately observed. Bounded retry3s exists, live holders not reclaimed and typed timeout retained. Current record lane has owner/terminal protocols. Original shared checkout liveness, commit-then-finalize, atomic repair and transient readiness receipts remain unbound; added 2026-10-10 prose is not silently new group scope.",
+          "nextAction": "Coordinate already-owned shared-lock Source/proof and group03 record successor; bind owning-dispatch commit→terminal + lost-ack/recovery + shared readiness/liveness original requirements. No duplicate Source writer or invented background PID grants.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.parallel-work-in-one-checkout-is-unsafe::52.1",
+          "lineStart": 54,
+          "lineEnd": 61,
+          "originalExcerpt": "- Make the counter lock wait or retry briefly and recover on its own instead\n  of sticking; serialise counter updates per dispatch.\n- Make dispatch-record updates atomic and repairable, so a collision never\n  leaves an unrepairable record.\n- Use one readiness definition for preflight and guard, and never report\n  `partial` for the duration of another agent's commit.\n- Until then, document that exactly one committing agent and one tool call at\n  a time is the supported mode in a shared checkout.",
+          "assessment": "Declared assigned body20d drifts to currentd301; canonical Main body may be separately observed. Bounded retry3s exists, live holders not reclaimed and typed timeout retained. Current record lane has owner/terminal protocols. Original shared checkout liveness, commit-then-finalize, atomic repair and transient readiness receipts remain unbound; added 2026-10-10 prose is not silently new group scope.",
+          "nextAction": "Coordinate already-owned shared-lock Source/proof and group03 record successor; bind owning-dispatch commit→terminal + lost-ack/recovery + shared readiness/liveness original requirements. No duplicate Source writer or invented background PID grants.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+          "bytes": 118731,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "9aa507d9d4ec6c86577bdcd82c2274ee05b4461f47b12170c3a3fc91dff78861",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+          "sha256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+          "bytes": 12838,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "1502581d20514eaf61747d5685dee9812710ce7c2738382091316493754ad846",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/dispatch-record.mjs",
+          "sha256": "f1a4e43424983a86bb75015377f123658f9fe26d4f7d136e1d15f4b8f7f64f52",
+          "bytes": 20787,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "f3752a7ea5418e068b413de98110b6f15f6b27593ddc3dbb7b0f3d5f91a2d770",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+          "bytes": 32556,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "2691f4c50fc77bc810c766091f2986b3fa25492abffa6c1b1d576f4f1986365a",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Use separately dispatched actual shared-lock retry source/proof; dependency coordination/worktree merge and native productive-history qualification remain unbound.",
+      "nextActions": [
+        "Coordinate already-owned shared-lock Source/proof and group03 record successor; bind owning-dispatch commit→terminal + lost-ack/recovery + shared readiness/liveness original requirements. No duplicate Source writer or invented background PID grants."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "immutableOriginalRecovered": {
+        "path": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+        "sha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+        "bytes": 3704,
+        "mode": 420,
+        "nlink": 1,
+        "basis": "canonicalPath already declared by assigned requirement; actual exact20d original bytes found and fully read"
+      },
+      "adjacentRetainedProofs": {
+        "bindings": [
+          {
+            "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/receipt-bindings.json",
+            "sha256": "153ab79558b4449e701799216ba13da3a916b869fd033f8a74b75e8b7d9191b4",
+            "bytes": 5980,
+            "mode": 420,
+            "nlink": 1
+          },
+          {
+            "path": "legacy-origin:alfred-host-index-lock-full12-git-capture-successor-20261010/full12-execution.json",
+            "sha256": "254ba2e3a2d94209789b625cb1a8313ee7ed9576365f95572d731a7e9d471ffd",
+            "bytes": 1007,
+            "mode": 384,
+            "nlink": 1
+          },
+          {
+            "path": "legacy-origin:alfred-host-index-lock-full12-failure-source-successor-20261010/hil006-qualification-preparation/execution.json",
+            "sha256": "5bfe2dff3df309becdf29fa0de5c3b1d914058a62037db04443f712f7411443b",
+            "bytes": 1148,
+            "mode": 384,
+            "nlink": 1
+          }
+        ],
+        "history": "Host-index-lock full12 actual9PASS3FAIL and one HIL006 actualPASS; controlled-host-method/nativefalse/whole12false. Distinct from dispatch-budget counter and original whole shared-checkout clause; no claim transfer."
+      },
+      "pendingSourceComparison": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "actualMain": {
+            "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+            "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+            "bytes": 32556,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pendingSource": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+            "sha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+            "bytes": 32926,
+            "mode": 420,
+            "nlink": 1
+          },
+          "applied": false,
+          "qualification": "not inferred; pending protected generation"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+          "actualMain": {
+            "path": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+            "sha256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+            "bytes": 12838,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pendingSource": {
+            "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/postimages/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+            "sha256": "c90e1be45723b44bfe8fa7a0276004e93aea2b43172f806b39ee70d7bf1174b7",
+            "bytes": 28107,
+            "mode": 420,
+            "nlink": 1
+          },
+          "applied": false,
+          "qualification": "not inferred; pending protected generation"
+        }
+      ],
+      "proofStatus": "no current whole-item acceptance"
+    },
+    {
+      "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+          "canonicalPath": "backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+          "sha256": "f66799f0d8c7c9720b67e27071751ee9fc5a53005b4f70bd5fabf8b5e620f3a9",
+          "bytes": 14999,
+          "parentSha256": "f66799f0d8c7c9720b67e27071751ee9fc5a53005b4f70bd5fabf8b5e620f3a9",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.1",
+            "lineStart": 17,
+            "lineEnd": 20
+          },
+          {
+            "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.2",
+            "lineStart": 22,
+            "lineEnd": 22
+          },
+          {
+            "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.3",
+            "lineStart": 24,
+            "lineEnd": 27
+          },
+          {
+            "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.4",
+            "lineStart": 29,
+            "lineEnd": 30
+          },
+          {
+            "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.5",
+            "lineStart": 32,
+            "lineEnd": 34
+          },
+          {
+            "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::103.1",
+            "lineStart": 105,
+            "lineEnd": 148
+          }
+        ]
+      },
+      "declaredBody": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+        "sha256": "f66799f0d8c7c9720b67e27071751ee9fc5a53005b4f70bd5fabf8b5e620f3a9",
+        "expectedSha256": "f66799f0d8c7c9720b67e27071751ee9fc5a53005b4f70bd5fabf8b5e620f3a9",
+        "bytes": 14999,
+        "mode": 420,
+        "nlink": 1,
+        "originalShaMatched": true
+      },
+      "currentCanonicalBody": {
+        "path": "backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+        "sha256": "f66799f0d8c7c9720b67e27071751ee9fc5a53005b4f70bd5fabf8b5e620f3a9",
+        "bytes": 14999,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "2ad7b7ebb0c943e42c4dc302be8160fc45baa375748d89375c907a2439bfe98e",
+          "bytes": 5,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "originalByteEquivalence": true,
+      "originalNormBasis": "exact original full-body read",
+      "disposition": "functional-scope-and-wiring-present-full-consumer-hold",
+      "finding": "Main entry guard observes actual scope before input effects. Shared governance implementation and nine-hook suite include inactive/declined/destructive-union/governed checks plus automatic real wiring inventory; suite registered in declarative Verify. Original all-effects full wiring matrix/native payload capture and full23 stable-environment qualification are not proven by these facts.",
+      "criterionCoverage": [
+        "one shared actual predicate",
+        "inactive/declined no effects except enumerated exceptions",
+        "global destructive vs governed process split",
+        "nonblocking writes outside enrollment",
+        "durable decline/reversal",
+        "input checks after scope",
+        "registered wiring full regression",
+        "document global-inert contract"
+      ],
+      "clauses": [
+        {
+          "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.1",
+          "lineStart": 17,
+          "lineEnd": 20,
+          "originalExcerpt": "All three runners on the PO's machine enable `pipeline-core` at **user scope**:\n- Claude: `~/.claude/settings.json` `enabledPlugins`\n- Codex: `~/.codex/config.toml` `[plugins.\"pipeline-core@agent-pipeline-local\"]`\n- Antigravity: the managed plugin copy plus the global registry",
+          "assessment": "Main entry guard observes actual scope before input effects. Shared governance implementation and nine-hook suite include inactive/declined/destructive-union/governed checks plus automatic real wiring inventory; suite registered in declarative Verify. Original all-effects full wiring matrix/native payload capture and full23 stable-environment qualification are not proven by these facts.",
+          "nextAction": "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.2",
+          "lineStart": 22,
+          "lineEnd": 22,
+          "originalExcerpt": "So every hook runs in every directory. The PO's requirement (2026-09-28):",
+          "assessment": "Main entry guard observes actual scope before input effects. Shared governance implementation and nine-hook suite include inactive/declined/destructive-union/governed checks plus automatic real wiring inventory; suite registered in declarative Verify. Original all-effects full wiring matrix/native payload capture and full23 stable-environment qualification are not proven by these facts.",
+          "nextAction": "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.3",
+          "lineStart": 24,
+          "lineEnd": 27,
+          "originalExcerpt": "> In a repository where the Pipeline was not actively chosen, **nothing** from\n> the Pipeline may become active. It may run silently in the background.\n> **Exception, by PO decision:** the destructive-operation protection of the git\n> guard applies always and everywhere.",
+          "assessment": "Main entry guard observes actual scope before input effects. Shared governance implementation and nine-hook suite include inactive/declined/destructive-union/governed checks plus automatic real wiring inventory; suite registered in declarative Verify. Original all-effects full wiring matrix/native payload capture and full23 stable-environment qualification are not proven by these facts.",
+          "nextAction": "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.4",
+          "lineStart": 29,
+          "lineEnd": 30,
+          "originalExcerpt": "The per-repository opt-in question (the session-start hint \"Agent Pipeline is\navailable … ask whether to install\") is intended behaviour.",
+          "assessment": "Main entry guard observes actual scope before input effects. Shared governance implementation and nine-hook suite include inactive/declined/destructive-union/governed checks plus automatic real wiring inventory; suite registered in declarative Verify. Original all-effects full wiring matrix/native payload capture and full23 stable-environment qualification are not proven by these facts.",
+          "nextAction": "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::15.5",
+          "lineStart": 32,
+          "lineEnd": 34,
+          "originalExcerpt": "The measurement shows that this requirement is **not** met today. Several hooks\nblock ordinary work, inject instructions that contradict the opt-in hint, or\nwrite Pipeline state into repositories that never opted in.",
+          "assessment": "Main entry guard observes actual scope before input effects. Shared governance implementation and nine-hook suite include inactive/declined/destructive-union/governed checks plus automatic real wiring inventory; suite registered in declarative Verify. Original all-effects full wiring matrix/native payload capture and full23 stable-environment qualification are not proven by these facts.",
+          "nextAction": "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        },
+        {
+          "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in::103.1",
+          "lineStart": 105,
+          "lineEnd": 148,
+          "originalExcerpt": "1. **One predicate:** `lib/governance-scope.mjs`, returning\n   `{ state: \"governed\" | \"ungoverned\" | \"declined\", root, markers }` from one\n   marker list, resolved lazily and fail-safe. Every hook, wrapper, and nested\n   guard calls it **first**. Replace all local marker lists. The destructive\n   `guard-git` union deliberately does *not* consult it.\n2. **Contract: ungoverned or declined means inert.** Exit 0, empty or `{}`\n   stdout, no stderr, **no file writes anywhere** (including `.git/agent-pipeline/`\n   and the HOME stores). Two explicit, enumerated exceptions:\n   - (a) the `guard-git` destructive union GG-01…GG-21: PO decision, always on;\n   - (b) the opt-in hint at session start, which is suppressed once a durable\n     decline exists.\n   Anything else that should fire outside governed repos needs its own PO\n   decision and must be added to the exception list in code.\n3. **Split `guard-git`** into (a) the destructive union, always on, and (b)\n   Pipeline process rules such as **GIT-03** (trailers). **PO decision\n   needed:** does (b) apply only in governed repos? Recommendation: yes.\n   `guard-push`'s publication-executor rule (F9) is the same kind of question,\n   with the same recommendation. The ref-deletion and force parts of the push\n   protection stay in (a).\n4. **Fix F1:** in an ungoverned repo, never block writes. The opt-in question\n   belongs to the session-start hint, not to a write-blocking guard. If consent\n   gating is still wanted, it applies only *after* the user said yes (that is\n   `guard-onboarding-consent-lock`'s existing job). Never write consent markers\n   into an ungoverned repo's working tree.\n5. **Durable decline (F13):** record \"no\" durably *without* adding files to the\n   repo's working tree. For example, a local `git config agent-pipeline.optOut true`\n   (lives in `.git/config`, reversible, invisible to the tree), or a user-level\n   store keyed by the repo's real path. For a non-git folder, only the\n   user-level store works. Then `governance-scope` returns `declined`, and even\n   the hint stays silent. Provide `pipeline opt-out` / `opt-in` commands for\n   reversal.\n6. **Move the pre-governance fail-closed checks** (F7, F12) behind the predicate.\n   The Antigravity hardening layer and wrapper input checks apply only in\n   governed repos.\n7. **Regression gate:** turn the probe into a registered Verify suite (it must\n   be registered in `harness/scripts/verify.mjs`). It enumerates hooks **from\n   the wiring files**, so a newly added hook is covered automatically, and it\n   asserts the inert contract for ungoverned **and** declined fixtures on all\n   three runners. The only allowed effects are the two enumerated exceptions.\n   Also assert the governed path still enforces, so the predicate cannot become\n   a blanket disarm. Where possible, capture real Codex and agy hook payloads\n   first to replace the approximated shapes.\n8. **Docs:** state the contract (\"global install is safe: inert outside opted-in\n   repos, except destructive git protection\") in SETUP.md and `docs/runner-support.md`.",
+          "assessment": "Main entry guard observes actual scope before input effects. Shared governance implementation and nine-hook suite include inactive/declined/destructive-union/governed checks plus automatic real wiring inventory; suite registered in declarative Verify. Original all-effects full wiring matrix/native payload capture and full23 stable-environment qualification are not proven by these facts.",
+          "nextAction": "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure.",
+          "proofStatus": "no per-criterion current runtime acceptance granted"
+        }
+      ],
+      "sourceFacts": [
+        {
+          "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+          "sha256": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+          "bytes": 46697,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "b18c9f528a1bce1485e793040a95898bcc220c535ca61c8044a2bd659cd20942",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+          "bytes": 4832,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "405e729f8fde2a9693c6827b08a4d93d7d9d1228467ba2e46bc41da83e657b29",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/hook-governance-scope.test.mjs",
+          "sha256": "15911295d26a0e7ad858445b49c38cced3832246b8a0aa353ee3f25c921d8ae5",
+          "bytes": 12981,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "31c23cfc9019016a1779b3f8d8caec13b2f80b28b0cbb6f378f14e49882e1f45",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "harness/verify-suites.json",
+          "sha256": "95440724d7093282a2b87db10c14ca973d8d3bbc9c900c5a95b3b63d99686ed8",
+          "bytes": 100172,
+          "mode": 420,
+          "nlink": 1,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "840f0c09d3132b050847f7256fd3c90949ebf93e2bdbf473c72049d6466188f7",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        },
+        {
+          "path": "harness/scripts/verify.mjs",
+          "sha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+          "bytes": 122965,
+          "mode": 420,
+          "nlink": 2,
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "853d20d3b8ab3c90219ed84f4ce101978e3d37c63c5941e8dfe21b25153c526d",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          }
+        }
+      ],
+      "retainedAssignedProofs": [],
+      "recordedRemaining": "Bind full actual wiring-enumerated ungoverned/declined/governed suite; source presence and old334 probe are not current native closure.",
+      "nextActions": [
+        "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure."
+      ],
+      "acceptance": false,
+      "SourceEdits": 0,
+      "pendingSourceComparison": [
+        {
+          "canonicalPath": "harness/verify-suites.json",
+          "actualMain": {
+            "path": "harness/verify-suites.json",
+            "sha256": "95440724d7093282a2b87db10c14ca973d8d3bbc9c900c5a95b3b63d99686ed8",
+            "bytes": 100172,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pendingSource": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/harness/verify-suites.json",
+            "sha256": "b220d0c4cc91691e4218941a088ee8265adb1e3bc9495553c317c93d2a25a139",
+            "bytes": 112089,
+            "mode": 420,
+            "nlink": 1
+          },
+          "applied": false,
+          "qualification": "not inferred; pending protected generation"
+        }
+      ],
+      "proofStatus": "no current whole-item acceptance"
+    }
+  ],
+  "conservation": {
+    "readObservedSources": 33,
+    "observedSourcesConserved": true
+  },
+  "limits": {
+    "businessRuns": 0,
+    "testRuns": 0,
+    "MainAuditWrites": 0,
+    "newCritics": 0,
+    "stagePromotions": 0,
+    "nativeClaims": 0,
+    "excluded": "Nightwing/Batman/deferred remain excluded; M1 host-first/M2-M3 report-only and review budget/two-signature happy chat unchanged"
+  },
+  "assessmentParent": {
+    "path": "legacy-origin:alfred-unknown02-current-main-assessment-20261011/matrix.json",
+    "sha256": "f634b7102dbbb1c3c8f575f41aab6653ef7ca893f7ca6cfe5587e0a057479f62",
+    "bytes": 98750,
+    "mode": 420,
+    "nlink": 1
+  },
+  "pendingProtectedLocator": {
+    "path": "legacy-origin:alfred-final-candidate-verify-protected-union-preparation-20261011/pending-protected-source-locator-index/index.json",
+    "sha256": "3ea154f09c41784bc870d97dc6ba831d8132f713f54a078edb8743250d8f68b5",
+    "bytes": 32039,
+    "mode": 384,
+    "nlink": 1
+  },
+  "pendingProtectedComparison": [
+    {
+      "canonicalPath": "harness/verify-suites.json",
+      "actualMain": {
+        "path": "harness/verify-suites.json",
+        "sha256": "95440724d7093282a2b87db10c14ca973d8d3bbc9c900c5a95b3b63d99686ed8",
+        "bytes": 100172,
+        "mode": 420,
+        "nlink": 1
+      },
+      "pendingSource": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/harness/verify-suites.json",
+        "sha256": "b220d0c4cc91691e4218941a088ee8265adb1e3bc9495553c317c93d2a25a139",
+        "bytes": 112089,
+        "mode": 420,
+        "nlink": 1
+      },
+      "applied": false,
+      "qualification": "not inferred; pending protected generation"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/hooks.json",
+      "actualMain": {
+        "path": "plugins/pipeline-core/hooks/hooks.json",
+        "sha256": "65dec57031b859906087bcd0669390c2d1eb0a9409ae6a93890eab32950f983d",
+        "bytes": 16642,
+        "mode": 420,
+        "nlink": 2
+      },
+      "pendingSource": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/hooks.json",
+        "sha256": "04c639abbb518be5430dec02ee504ff0cc443c3873c320d19a1684073565e50d",
+        "bytes": 16658,
+        "mode": 420,
+        "nlink": 1
+      },
+      "applied": false,
+      "qualification": "not inferred; pending protected generation"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "actualMain": {
+        "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+        "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+        "bytes": 32556,
+        "mode": 420,
+        "nlink": 2
+      },
+      "pendingSource": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+        "sha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+        "bytes": 32926,
+        "mode": 420,
+        "nlink": 1
+      },
+      "applied": false,
+      "qualification": "not inferred; pending protected generation"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+      "actualMain": {
+        "path": "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+        "sha256": "e9cc3e9f59985057b00d9abc6295f41361dcbc95b9d0feff53fbfe59837002e8",
+        "bytes": 22633,
+        "mode": 420,
+        "nlink": 2
+      },
+      "pendingSource": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+        "sha256": "708049b8d29d200cdee333fbb36c0061839990ac26eeb5f3f21c726fae41bfc1",
+        "bytes": 22914,
+        "mode": 420,
+        "nlink": 1
+      },
+      "applied": false,
+      "qualification": "not inferred; pending protected generation"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "actualMain": {
+        "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e",
+        "bytes": 65092,
+        "mode": 420,
+        "nlink": 2
+      },
+      "pendingSource": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "sha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+        "bytes": 67834,
+        "mode": 420,
+        "nlink": 1
+      },
+      "applied": false,
+      "qualification": "not inferred; pending protected generation"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "actualMain": {
+        "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+        "bytes": 706707,
+        "mode": 420,
+        "nlink": 2
+      },
+      "pendingSource": {
+        "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "c28fe82ee90f6b61632fede4cbda7e3248401225b8d2c594264d2d74226eff3a",
+        "bytes": 809796,
+        "mode": 420,
+        "nlink": 1
+      },
+      "applied": false,
+      "qualification": "not inferred; pending protected generation"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+      "actualMain": {
+        "path": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+        "sha256": "b474b7c7e8124556466aec0e0273225fb0cefd523c59920f4ea70572f2de2bf3",
+        "bytes": 12838,
+        "mode": 420,
+        "nlink": 2
+      },
+      "pendingSource": {
+        "path": "legacy-origin:alfred-landed-dispatch-ownership-source-20261010/postimages/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+        "sha256": "c90e1be45723b44bfe8fa7a0276004e93aea2b43172f806b39ee70d7bf1174b7",
+        "bytes": 28107,
+        "mode": 420,
+        "nlink": 1
+      },
+      "applied": false,
+      "qualification": "not inferred; pending protected generation"
+    }
+  ],
+  "exactOriginalBodiesNowRead": 12,
+  "parallelBodyDriftPreserved": true,
+  "privateFollowthrough": {
+    "path": "legacy-origin:alfred-unknown02-current-main-assessment-20261011/private-followthrough/manifest.json",
+    "sha256": "0976baa6bb0cd4daa5613a94f6290186500ef2c9552642783b98ad42fc8b3c4d",
+    "bytes": 1797,
+    "mode": 420,
+    "nlink": 1
+  },
+  "pendingLimits": [
+    "Pending evaluate still preserves preflight-only receipt write and first-write gate; step0 source proposal is not a gate waiver.",
+    "Pending shell grammar still rejects --check --reverse as option-like operand; actual native engine remains unavailable.",
+    "Pending dispatchc90 preserves owner commit-to-checkpoint and adds landed witness; group03 successor separately owned, no duplicate code here.",
+    "Pending Statec28 keeps stale/unavailable recovery guidance; no actual foreign-worktree consumer failure established.",
+    "Pending installer CMO locator requested from Intake before implementing staged classification; no duplicate installer post.",
+    "Protected source stages/qualification and Main physical observations remain separate."
+  ]
+}

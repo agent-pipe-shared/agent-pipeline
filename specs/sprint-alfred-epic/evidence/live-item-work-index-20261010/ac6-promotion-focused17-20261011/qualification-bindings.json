@@ -1,0 +1,69 @@
+{
+  "schema": "alfred.ac6.public-qualification-bindings.v1",
+  "sourceProposal": {
+    "manifest": "scratch/alfred-ac6-promotion-record-source-20261011/manifest.json",
+    "manifestSha256": "7f24c8e68b64957d20cd3c65285b3a40680636d64437746451b1084f5743057b",
+    "dependencies": {
+      "path": "scratch/alfred-ac6-promotion-record-source-20261011/dependency-supplement.json",
+      "sha256": "4810012b19c94d6e75449d167eeb40c1a5cb35324aa0ee6063e54c6d497cff4e"
+    },
+    "reportDispatcher": {
+      "path": "scratch/alfred-ac6-promotion-record-source-20261011/report-dispatcher-integration-supplement.json",
+      "sha256": "705c30dade3d612eb3a73ae72559b5b63e0a4fbef96080211c4ac0347290c1d6"
+    }
+  },
+  "originalPromotion": {
+    "initialReceipt": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/execution.json",
+      "sha256": "bc8e45e421335b7f38162597200e3c72efa5db11428eefe2857f2b155346b19e"
+    },
+    "correctedAcp012Receipt": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/acp012-execution.json",
+      "sha256": "30053c2d0702b297fe76232bcbab5a777bd9a96c962443aa035e6abdd6fb3b69"
+    },
+    "assertionFreeze": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/assertion-freeze.json",
+      "sha256": "8d72170bd28a133d3dff32a95109a5cc51dc698ca1ff02bc6d1f7d9b8fb1382f"
+    }
+  },
+  "reportRoute": {
+    "receipt": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/report-route/execution.json",
+      "sha256": "a923d96b4dbad1665c2e24d0d1e146b4f0af2748808d938438fd9e88653d7c84"
+    },
+    "normativeContract": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/report-route/normative-contract.json",
+      "sha256": "0257cc8692da9cc1b01d650621951f2e9bef8f7ff5401ba7f3e6ff9eefe2b273"
+    },
+    "readyManifest": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/report-route/ready-manifest.json",
+      "sha256": "55907932a02a8be6d7c5875b4cf57247d3c81669ada93731debc4d58753ac0b9"
+    }
+  },
+  "officialIntegration": {
+    "manifest": {
+      "path": "scratch/alfred-ac6-ordinary-main-integration-preparation-20261011/manifest.json",
+      "sha256": "b286991136109749ea627085a27e8feb5ad0f08b16d5dcdd317d1eef9c433ff1"
+    },
+    "classification": {
+      "path": "scratch/alfred-ac6-ordinary-main-integration-preparation-20261011/official-classification/actual-classification.json",
+      "sha256": "5c4f2fa7d25b27e4fffc0fcfac13dab5f9d4ca04e27704a3654bfcae5f9f6ad6"
+    },
+    "actualReceipt": {
+      "path": "scratch/alfred-ac6-ordinary-main-integration-preparation-20261011/actual-integration-ca7-successor-receipt.json",
+      "sha256": "3644b2cd1ed40acb5773df257d9d7d98fa1b09a133d406d67d52ed710344b101",
+      "planSha256": "af78424186fbf62206c05aebc22f6bd6c8974bce0f2d13b6a4f03dda7b86407a"
+    },
+    "status": "exact seven-file source application complete; semantic qualification remains separate"
+  },
+  "publication": {
+    "destination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/ac6-promotion-focused17-20261011",
+    "files": [
+      "actual-public-proof.json",
+      "qualification-bindings.json",
+      "README.md"
+    ],
+    "RootOnly": true,
+    "publisherExecution": "not-run"
+  }
+}

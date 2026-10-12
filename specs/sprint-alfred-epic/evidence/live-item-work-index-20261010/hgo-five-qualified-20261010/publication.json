@@ -1,0 +1,41 @@
+{
+  "schema": "alfred.public-hgo-five-publication.v1",
+  "files": [
+    {
+      "name": "receipt.json",
+      "sha256": "87367908fb61e5b872f2d4e32bc5aa46e4a466a285ac87589f33da7caae1a05d",
+      "bytes": 2820
+    },
+    {
+      "name": "completion.fd3.jsonl",
+      "sha256": "86c782262810b0058f28061b931e420428c44ef55d734b740a11a9338ee77929",
+      "bytes": 1155
+    },
+    {
+      "name": "policy.json",
+      "sha256": "e5c66bfd5fedf13e8454a2620c2a1bdc974f308c3ca99355ba8dd035e785b33f",
+      "bytes": 170
+    },
+    {
+      "name": "case-associations.json",
+      "sha256": "4d35cdc354871f8523f517b0f87a935a2a9bb5c324c84eb4a50ca6e2dae9dcb0",
+      "bytes": 1193
+    },
+    {
+      "name": "history.json",
+      "sha256": "9ce8fcb9ded5343415867b36f9121ecf33dfacfb5297032993f5b93040169bf8",
+      "bytes": 1929
+    },
+    {
+      "name": "report.md",
+      "sha256": "91910dd224357dff2c13ef441b7225537983245eafdb646aff766fd4eeb8e60b",
+      "bytes": 967
+    }
+  ],
+  "actualExecutionSha256": "3023acae467da1474f7c1c69b83c13873ce50947c8f4d82a52847eae97db9fca",
+  "sourceApplied": false,
+  "itemStagePromotions": [],
+  "wholeItemAcceptance": false,
+  "nativeHostAssurance": false,
+  "gitCommitted": false
+}

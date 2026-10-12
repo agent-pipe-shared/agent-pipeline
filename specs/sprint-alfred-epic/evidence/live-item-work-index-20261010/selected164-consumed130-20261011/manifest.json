@@ -1,0 +1,55 @@
+{
+  "schema": "alfred.selected164.consumed130.public-packet.v1",
+  "status": "Root-review-ready; publisher unexecuted",
+  "actualReceiptBindings": [
+    {
+      "group": "R-02",
+      "path": "scratch/alfred-r02-agy-native-model-integration-preparation-20261011/atomic-content-successor/application-root/execution.json",
+      "sha256": "9e9a346c57cde104896ce6d19f1be2082f379fd74fde3a2d77d29b63f9d3bd1e"
+    },
+    {
+      "group": "R-04",
+      "path": "scratch/alfred-selected164-r04-main-integration-preparation-20261011/atomic14-actual-receipt.json",
+      "sha256": "b6d850738cfa1b4df21a546cfe4541a8a86181f96c5d409e97759cd55058a100"
+    },
+    {
+      "group": "R-03",
+      "path": "scratch/alfred-selected164-r03-integration-preparation-20261011/atomic14/r01-r02-r04-bound-successor/apply-once/actual-receipt.json",
+      "sha256": "0bfd9d07df7b0e45c3b896351034648d6bec745ddfc3caab2ab926887a927f9c"
+    },
+    {
+      "group": "R-05",
+      "path": "scratch/alfred-selected164-r05-integration-preparation-20261011/actual-integration.json",
+      "sha256": "1dc78897991cdb52917e0ef02cfaf8b44e9dd3d2755ba67dddb7a87d5d326da0"
+    }
+  ],
+  "publicWhitelist": [
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed130-successor/consumed-inventory.json",
+      "sha256": "9b93259430eb4ad42f9727ba17f80b3720e1bb5fd32ef808f20f282cab489769"
+    },
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed130-successor/remaining-owned-routing.json",
+      "sha256": "4e2c3f78d4144cd066945bc6aab9a9a30fd0ee86ee62898aef294226751638f4"
+    },
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed130-successor/report.md",
+      "sha256": "9df3f919adc87a1fe15f6fd0e871c802aaec3e6651ffd99279ff6bc48faa7a4d"
+    }
+  ],
+  "counts": {
+    "currentOrApplied": 130,
+    "remaining": 34,
+    "runtime": 21,
+    "protectedSelected": 13,
+    "protectedUnion": 14,
+    "outsideDocuments": 2
+  },
+  "privateMaterial": false,
+  "productWrites": 0,
+  "businessRuns": 0,
+  "GitOperations": 0,
+  "fullQualification": false,
+  "nativeAssurance": false,
+  "formalAcceptance": false
+}

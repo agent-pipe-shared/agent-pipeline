@@ -1,0 +1,220 @@
+{
+  "schema": "alfred.native-dispatch-progress.controlled-public-proof.v1",
+  "status": "controlled-regression-green",
+  "scope": "genuine actual Source default host/writer/commit/private-public readback through exclusively owned synthetic fixtures",
+  "source": {
+    "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/postimages/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+    "sha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d",
+    "bytes": 13893
+  },
+  "sourceProposal": {
+    "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/manifest.json",
+    "sha256": "ce867da73782d9e1071d7cbf773ef8d0d67eb98418a11d2ccddc9999e21b6c66",
+    "bytes": 3679
+  },
+  "qualificationManifest": {
+    "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/evidence-parent-successor/manifest.json",
+    "sha256": "3dae06d21d3bf8e112497999156fb814299846282de7afcd9dd176ad7cffb461",
+    "bytes": 5718
+  },
+  "graphFreeze": {
+    "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/evidence-parent-successor/graph-freeze.json",
+    "sha256": "5f5854e46022f4926d1a7a4e0929314a731f5c6ee932616d7b721a0c8713f729",
+    "bytes": 270388
+  },
+  "assertions": {
+    "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/evidence-parent-successor/callbacks.mjs",
+    "sha256": "172cc14ca63cfba933a062bffed31908cfe8af1e1bfd04f86a6ff53af5924714",
+    "bytes": 3929
+  },
+  "actualPilot": {
+    "execution": {
+      "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/evidence-parent-successor/pilot-qualification-root/execution.json",
+      "sha256": "827fac888a0bf3da5a938d9a049402a5639631dece6d36a1a4399b0b2fb45011",
+      "bytes": 2524
+    },
+    "completion": {
+      "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/evidence-parent-successor/pilot-qualification-root/captures/completion.fd3.private.jsonl",
+      "sha256": "88f534e0e524194816aac265fe635a6c0ad5e9794f660ba28e55c9eaac5cad16",
+      "bytes": 635
+    },
+    "parsedCompletion": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "dc0f426c7bde98df34f96ad41cab064879ef83147a3da8414ee47b19c94b1150",
+      "caseSetSha256": "ab7e8bfed865c946f6bc842d3bffd193cfcdfafaaeb45d419e5950aca4c02a9e",
+      "dispositionsSha256": "a75ed67c1f97bf7167afc20b182ce7f00f077461d6db84470e42ad928261d5f1",
+      "declaredCount": 1,
+      "disposedCount": 1,
+      "counts": {
+        "pass": 1,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    },
+    "child": {
+      "status": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null
+    },
+    "sourceAndFixtureConserved": true,
+    "caseDispositions": [
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP001",
+        "ordinal": 0,
+        "disposition": "pass"
+      }
+    ]
+  },
+  "actualTwelve": {
+    "execution": {
+      "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/evidence-parent-successor/qualification-root/execution.json",
+      "sha256": "96483e8dcb72601d5335a0695171bcc4e24838b39365af53e258692fabb40fd4",
+      "bytes": 2691
+    },
+    "completion": {
+      "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/evidence-parent-successor/qualification-root/captures/completion.fd3.private.jsonl",
+      "sha256": "e89c5982a73bd2c88253e357c044dfc1cf824b8b1d81e73b88e0e09f37fbb7d1",
+      "bytes": 2071
+    },
+    "parsedCompletion": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "a153e95faf1f07a3721866bb55889c37d1d897f530ab375dc824bdd7fc5e9cf8",
+      "caseSetSha256": "1084c8a1eddaaa19b47e696cf27e0195bd1502954d5915b8b05afa10d5097c75",
+      "dispositionsSha256": "0ff21a483f577c63cd84efc646c45bba0aa37afb0d01b8cb013ad27b2bcce68e",
+      "declaredCount": 12,
+      "disposedCount": 12,
+      "counts": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    },
+    "child": {
+      "status": 0,
+      "signal": null,
+      "timedOut": false,
+      "spawnError": null
+    },
+    "sourceAndFixtureConserved": true,
+    "caseDispositions": [
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP001",
+        "ordinal": 0,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP002",
+        "ordinal": 1,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP003",
+        "ordinal": 2,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP004",
+        "ordinal": 3,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP005",
+        "ordinal": 4,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP006",
+        "ordinal": 5,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP007",
+        "ordinal": 6,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP008",
+        "ordinal": 7,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP009",
+        "ordinal": 8,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP010",
+        "ordinal": 9,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP011",
+        "ordinal": 10,
+        "disposition": "pass"
+      },
+      {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "DISPOSED",
+        "id": "NHP012",
+        "ordinal": 11,
+        "disposition": "pass"
+      }
+    ]
+  },
+  "preservedFailures": [
+    {
+      "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-successor/qualification-root/execution.json",
+      "sha256": "25c1e447d5d17701603efa74ba91aa17b9c1ef7c5c8b4b32cc2d7225847f27ea",
+      "bytes": 2197
+    },
+    {
+      "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/pilot-qualification-root/execution.json",
+      "sha256": "d704a3cb8fed3560ab3acd0c671af7b14d06fb4e7ae9ce914fed47cf17e6e788",
+      "bytes": 2051
+    },
+    {
+      "path": "scratch/alfred-native-dispatch-progress-carrier-source-20261010/qualification-resource-successor/driver-config-successor/pilot-qualification-root/execution.json",
+      "sha256": "35dc839faae64578975b67cf93c03edbab81465e1a701cf5f78f41e2272ab922",
+      "bytes": 2522
+    }
+  ],
+  "nativeEvidence": false,
+  "installedHostEvidence": false,
+  "independentTechnicalReview": false,
+  "workerPhasesObserved": false,
+  "workerToolCountObserved": false,
+  "wholeItemAcceptance": false,
+  "qualifiedBehavior": "actual prepared+returned host observations preserved as exactly two ordered diagnostic log rows, each host count1; actual identity/return/proof mutation controls remain",
+  "remainingAcceptance": "actual worker phase/count telemetry and installed-native/model authority not qualified by this component",
+  "authorSemanticRuns": 0,
+  "noRepeatedNative12Run": true
+}

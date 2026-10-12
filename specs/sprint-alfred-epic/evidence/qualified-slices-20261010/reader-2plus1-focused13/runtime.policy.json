@@ -1,0 +1,12 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "R2P001",
+    "RBC005",
+    "RBC007",
+    "RBC016",
+    "RBC017",
+    "RBC018"
+  ],
+  "maxBytes": 65536
+}

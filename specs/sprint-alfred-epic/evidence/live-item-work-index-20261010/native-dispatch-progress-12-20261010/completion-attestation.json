@@ -1,0 +1,15 @@
+{
+  "schema": "pipeline.verify-case-completion-attestation.v1",
+  "status": "complete",
+  "policySha256": "a153e95faf1f07a3721866bb55889c37d1d897f530ab375dc824bdd7fc5e9cf8",
+  "caseSetSha256": "1084c8a1eddaaa19b47e696cf27e0195bd1502954d5915b8b05afa10d5097c75",
+  "dispositionsSha256": "0ff21a483f577c63cd84efc646c45bba0aa37afb0d01b8cb013ad27b2bcce68e",
+  "declaredCount": 12,
+  "disposedCount": 12,
+  "counts": {
+    "pass": 12,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  }
+}

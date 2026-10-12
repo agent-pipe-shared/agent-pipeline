@@ -1,0 +1,22 @@
+{
+  "schema": "alfred.pun-functional-source-binding.v1",
+  "canonicalPath": "plugins/pipeline-core/scripts/session-power.mjs",
+  "ancestorSha256": "686365cb4903158691f6759468a2777c352272eb9a979cf7dfe0bfa3964f5e1a",
+  "qualifiedPostSha256": "094c34806199515a2f9c9cd03424bf9deb7836ca627c00a13f880cb0b7189b5d",
+  "beforeSourceNormSha256": "d21d850c151c00ec529e81a72500e53c75b11d702ea39f276defb4f913c00ecd",
+  "independentStaticAlignmentSha256": "ad3e48b9e7d7fc3bb4f298177dc58e099a1b779dae2c3af15470b9ab4362ed9d",
+  "change": "On genuine startup-unavailable only, wait at most10000ms for the already source-owned captured child close; clear grace timer; destroy original FD3 and rethrow same original startup Error. Original ACK5000ms refusal unchanged.",
+  "diagnosticSourcesExcluded": true,
+  "otherProductionProviders": "Requester6d439,Controllerfd9,Power9c27,Lifecycle2de; exact qualification freeze supplies complete bindings",
+  "historicalFailures": [
+    {
+      "scope": "production before bookkeeping",
+      "executionSha256": "9c98966cb44a6b265a5061aa55cad86729ac1c626350cabae55e1830f492dc18"
+    },
+    {
+      "scope": "measured startup/failure-settlement near deadline; genuine member read LOCK-HELD",
+      "executionSha256": "e2cae5f1a3298163916640293ae2ec12a17145e2310cbf96f2b833bc478be10e"
+    }
+  ],
+  "nativeHeldPositiveI08T005": "remains failed; actual native inhibitor refusal is separate from this unavailable control"
+}

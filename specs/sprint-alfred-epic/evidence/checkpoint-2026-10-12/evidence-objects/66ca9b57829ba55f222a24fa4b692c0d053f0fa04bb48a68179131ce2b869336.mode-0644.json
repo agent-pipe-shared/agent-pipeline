@@ -1,0 +1,25 @@
+{
+  "schema": "alfred.merge-policy.qualification-manifest.v1",
+  "status": "portable-policy-fixed20-qualified",
+  "parentPreparedManifestSha256": "b9d854f41d1dae7645bc873640fa1c3cf3ac64d351daff90001b198689ffe158",
+  "executionSha256": "12a6c0a5d927e1802668ed7189fe4d101b9df8c136958e74282b32bb45575543",
+  "qualification": {
+    "path": "qualification.json",
+    "sha256": "40abf3c6015f6e17ec2857cef7c3bcfb30a235ffa4337072570258fb13747e59",
+    "size": 9793
+  },
+  "publicProof": {
+    "path": "public-proof.json",
+    "sha256": "85bf1d1cfb5806fcba40560d5e5eaeddda4d5f73b3d6b7d444f624e1f5576e67",
+    "size": 1231
+  },
+  "report": {
+    "path": "qualification-report.md",
+    "sha256": "fe9b65d86098d3631493c82100f0d8e51996e7e982eb95f647b826dcc017eaff",
+    "size": 2249
+  },
+  "closureHelperSha256": "34abc9126e07a7683b3cbb793bf62ebe05f47fb29dbee5baea7b7b60700969a9",
+  "reruns": 0,
+  "sourceChanges": 0,
+  "assertionChanges": 0
+}

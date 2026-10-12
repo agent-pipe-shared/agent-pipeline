@@ -1,0 +1,293 @@
+{
+  "schema": "alfred.selected164.remaining20.runtime-owner-append.v1",
+  "parent": {
+    "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed135-transfer8-append/remaining-routing-append.json",
+    "sha256": "f66bf5d7fbc7b7c2cc3d55801f2911a61781c34d388dd1bc72b47f28f534454d"
+  },
+  "counts": {
+    "runtime": 7,
+    "protectedSelected": 13,
+    "total": 20
+  },
+  "groups": [
+    {
+      "owner": "r10_reader_budget_fix",
+      "theme": "AFK2",
+      "paths": [
+        "plugins/pipeline-core/lib/afk-ledger.mjs",
+        "plugins/pipeline-core/lib/afk-transaction-host.mjs"
+      ]
+    },
+    {
+      "owner": "agy_greenfield_intake_package",
+      "theme": "Power2",
+      "paths": [
+        "plugins/pipeline-core/lib/session-power.mjs",
+        "plugins/pipeline-core/lib/session-requester-bridge.mjs"
+      ]
+    },
+    {
+      "owner": "alfred_obl013_override_digest_regression",
+      "theme": "finalI03",
+      "paths": [
+        "plugins/pipeline-core/lib/onboarding-continuity.mjs"
+      ]
+    },
+    {
+      "owner": "alfred_optional_advisor_source_followthrough",
+      "theme": "OA2",
+      "paths": [
+        "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+        "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs"
+      ]
+    }
+  ],
+  "runtime": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-ledger.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987",
+        "bytes": 31759,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/21"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "258abe7f1d920426b358c1572609bfd61a58ddd45d67d4ac04380f6aeeef06ad",
+        "bytes": 27235,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "assigned integration preparation; actual application not yet recorded",
+      "currentOwner": "r10_reader_budget_fix",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration.",
+      "assignmentEvidence": "Root exact dispatched mapping delivered 2026-10-11"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+        "sha256": "a8bb9a199c162434721f00fa0e02dc311cbf5c3c3edc5f855db78fe1a8616fac",
+        "bytes": 26894,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "a8bb9a199c162434721f00fa0e02dc311cbf5c3c3edc5f855db78fe1a8616fac"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/34"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "202572a093803bb0b0376377c63e61a08d2dfe6cb453c38ffa10da1c3c284632",
+        "bytes": 11669,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "assigned integration preparation; actual application not yet recorded",
+      "currentOwner": "alfred_optional_advisor_source_followthrough",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration.",
+      "assignmentEvidence": "Root exact dispatched mapping delivered 2026-10-11"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+        "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c",
+        "bytes": 18854,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/35"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "8023c0405eb2dbd42ae80cd6a5d47c9c6c42122afadd4f5888c0ad5dde54a9ee",
+        "bytes": 14803,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "assigned integration preparation; actual application not yet recorded",
+      "currentOwner": "alfred_optional_advisor_source_followthrough",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration.",
+      "assignmentEvidence": "Root exact dispatched mapping delivered 2026-10-11"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "bytes": 539214,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/source-bug-successor/postimages/current-i03-bridge-message-cumulative/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "mode": 384
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/77"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+        "bytes": 425437,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "assigned integration preparation; actual application not yet recorded",
+      "currentOwner": "alfred_obl013_override_digest_regression",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration.",
+      "assignmentEvidence": "Root exact dispatched mapping delivered 2026-10-11"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd",
+        "bytes": 29072,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/97"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "c26890face66f58b93d378979d2bf3f547f4d39abc1e1837c8f95c07e74ffec2",
+        "bytes": 24777,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "assigned integration preparation; actual application not yet recorded",
+      "currentOwner": "agy_greenfield_intake_package",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration.",
+      "assignmentEvidence": "Root exact dispatched mapping delivered 2026-10-11"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+        "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+        "bytes": 39560,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/98"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "assigned integration preparation; actual application not yet recorded",
+      "currentOwner": "agy_greenfield_intake_package",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration.",
+      "assignmentEvidence": "Root exact dispatched mapping delivered 2026-10-11"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0",
+        "bytes": 17521,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/151"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "7ce18941bf4d96c6f04349f00bd46c20414a367a9efea8755d979ab7760f09bf",
+        "bytes": 16311,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "assigned integration preparation; actual application not yet recorded",
+      "currentOwner": "r10_reader_budget_fix",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration.",
+      "assignmentEvidence": "Root exact dispatched mapping delivered 2026-10-11"
+    }
+  ],
+  "protectedMembership": "Exact thirteen parent130 rows unchanged; union14. Final protected State and I03 composition author OBL013, sanctioned transfer Root-only.",
+  "independentAFKQualifier": "alfred_role_fallback_independent; separate from AFK Source/integration owner",
+  "formalAcceptance": false
+}

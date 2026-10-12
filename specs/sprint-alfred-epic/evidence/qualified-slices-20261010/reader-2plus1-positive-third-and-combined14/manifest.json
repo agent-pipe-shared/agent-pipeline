@@ -1,0 +1,57 @@
+{
+  "schema": "alfred.reader-positive-combined14-public-evidence-manifest.v1",
+  "assurance": "controlled-method-unit-not-review-consumption",
+  "actualReaderReview": false,
+  "actualReaderConsumedCourse": false,
+  "nativeAssurance": false,
+  "wholeItemAcceptance": false,
+  "counts": {
+    "pass": 14,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "proofComposition": "immutable original13 plus actual standalone positive RBC015",
+  "originReceiptSha256s": [
+    "8752a6148cc615949519feea9a1458c8c0fca4f9abde1566e14a326326afecee",
+    "5470f723b6e164d743ef105c8fd1f23c12853e759d0b125b6da05d9b120777e4"
+  ],
+  "priorPublic13": {
+    "manifestPath": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-focused13/manifest.json",
+    "manifestSha256": "6b7e63bac2031c6ad7832e7bcba6605793ff7afd600688e16c802dd7217d47fb",
+    "preserved": true
+  },
+  "standalonePositiveRBC015Executed": true,
+  "sourceCountPerQualification": 383,
+  "sourceAndFixtureConservedInBothQualifications": true,
+  "files": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-positive-third-and-combined14/positive-third.completion.fd3.jsonl",
+      "sha256": "192ec6944819475b61c237190899f62f29547eeacb0499c5ff9b10d7cd77effb",
+      "bytes": 635,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-positive-third-and-combined14/positive-third.policy.json",
+      "sha256": "52c39192d34c78ead891ef0a9ce55438e284ed9ba0cdb6c8c5297b3cb22c6495",
+      "bytes": 114,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-positive-third-and-combined14/positive-third-method-receipt.json",
+      "sha256": "7dcbe4e84fac90664ac07862aae638abefbe8d720bf9bf927b0644f0f7773ef7",
+      "bytes": 1800,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/reader-2plus1-positive-third-and-combined14/combined14-method-scope.json",
+      "sha256": "f267bb10e0346ae9e1b8a0c75cf0ffdbc976cf6679ce43e632385667e4a52443",
+      "bytes": 3980,
+      "mode": 420,
+      "nlink": 1
+    }
+  ]
+}

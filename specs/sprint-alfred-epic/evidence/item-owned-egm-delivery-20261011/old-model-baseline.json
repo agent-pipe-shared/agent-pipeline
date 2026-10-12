@@ -1,0 +1,29 @@
+{
+  "schema": "alfred.egm-measured-old-model-subtotal.v1",
+  "baselineArtifact": "scratch/alfred-egm-operating-optimization-20261011/measurement/baseline.json",
+  "baselineSha256": "20cacc395bb2c5dd36efdb37d79cd43386ca633bcda6005898f4df21624a272e",
+  "freshAgentContexts": 2,
+  "activeAgentSeconds": 1215.776,
+  "elapsedToReceiptMtimeSeconds": 2653.535258,
+  "combinedUsage": {
+    "input_tokens": 5197260,
+    "cached_input_tokens": 5027584,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 25326,
+    "reasoning_output_tokens": 4179,
+    "total_tokens": 5222586
+  },
+  "uncachedInputTokens": 169676,
+  "completionStage": "fixture-qualified source applied to Main working tree; no item acceptance",
+  "missingCost": [
+    "parent orchestration",
+    "integration preparation",
+    "root qualification execution",
+    "review",
+    "native acceptance",
+    "PO acceptance"
+  ],
+  "compactionContextResetCount": "UNKNOWN",
+  "newModelResult": "not yet measured",
+  "scopeLimit": "One medium operational installer bugfix at the small end; author subtotal only. Two author sessions partially overlap; this is not a whole-item accepted-stage cost."
+}

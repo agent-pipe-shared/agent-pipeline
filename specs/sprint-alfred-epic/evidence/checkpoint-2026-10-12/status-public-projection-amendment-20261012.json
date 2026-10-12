@@ -1,0 +1,45 @@
+{
+  "schema": "portable.mutable-status-public-projection-amendment.v1",
+  "status": "two-mutable-status-projections-repaired-no-functional-change",
+  "reason": "Installed documentary privacy check reported exactly six machine-local home-path occurrences in new-model-comparison.json and one in progress.json. The gate was not bypassed.",
+  "files": [
+    {
+      "repositoryRelativePath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/new-model-comparison.json",
+      "originalPrivateDocumentSha256": "ea8a846a258ad516b47b3c2896d0977ee2c0a5e3b40564f5f52bbb80879ccb27",
+      "publicProjectionSha256": "f6bf0a611a52ffcb306852ba69b850a5843d2fe0c7a78cea8aab6d90c53ab8de",
+      "excludedMachineLocalPathOccurrences": 6,
+      "projection": "Historical argv uses logical node plus a legacy-origin test-source identifier. Historical result and assembly origins are logical metadata, not active file dependencies. No new execution or executable-version attestation is inferred.",
+      "knownResultExitCodesUnchanged": [1, 1, 0],
+      "testSha256Unchanged": "a20ce57c0379d59360492543037910e883999c1fe2f0bcbdeb0537f8076f1e5a",
+      "rawResultAndTestSourceCanonicalResolution": "not found in closed portable maps; hashes and public measured outcomes retained, raw-record recovery or authorized new reconstruction held"
+    },
+    {
+      "repositoryRelativePath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/progress.json",
+      "originalPrivateDocumentSha256": "04c59b1dfb53c966be0f196eba2629305379f4482716185750543c37b632e355",
+      "publicProjectionSha256": "d3505a9a6d91b0d9442c45a733550553476ff4d8021f4d0c302924c349d5a6af",
+      "excludedMachineLocalPathOccurrences": 1,
+      "projection": "The historical installation source is plugins/pipeline-core relative to the new repository root. Historical scratch/worktree locators remain provenance only, not current readiness or installation permission.",
+      "historicalRecordedAtUnchanged": "2026-10-11T20:31:08.600451+00:00",
+      "historicalIntegrationAndQualificationClaimsUnchanged": true
+    }
+  ],
+  "dependencyReadback": {
+    "exactTargetsFoundInCurrentMatrixOrClosedPortableManifestMap": false,
+    "exactTargetsFoundInImmutablePreparedCustody": false,
+    "method": "Exact item-owned-egm-delivery-20261011 target-prefix reference search over current postinstall matrix, closed portable manifest/map and immutable prepared-custody returned exit 1 with no matches. Similar progress.jsonl references are unrelated and unchanged.",
+    "immutableCustodyObjectsChanged": false,
+    "closedPortableManifestMapChanged": false,
+    "existingTenAssessmentBasisArtifactsChanged": false,
+    "mutablePublicStatusLinksRequiringHashAdjustmentFound": false
+  },
+  "privateOriginalRetention": "Original document digests only; no private machine-local original bytes, transcript, key/proof body or environment dump copied.",
+  "claims": {
+    "functionalTestsRun": 0,
+    "SourceApplied": false,
+    "signaturesWritten": false,
+    "acceptanceChanged": false,
+    "committedByCustody": false,
+    "pushedByCustody": false
+  },
+  "commitDisposition": "Root stages the two mutable projections and this independent amendment, then runs the installed documentary privacy gate normally. Historical immutable custody and authorization flags remain unchanged."
+}

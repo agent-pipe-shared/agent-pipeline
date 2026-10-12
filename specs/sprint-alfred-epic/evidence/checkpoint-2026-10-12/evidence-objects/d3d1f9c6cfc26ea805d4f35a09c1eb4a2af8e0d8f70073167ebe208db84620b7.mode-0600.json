@@ -1,0 +1,492 @@
+{
+  "schema": "alfred.role1-unprotected-atomic-transfer.actual.v1",
+  "mode": "--apply",
+  "status": "applied",
+  "operations": [
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+      "effect": "noop",
+      "sha256": "d6976e58e598cd8188674bb6f0d2e82d116eebce4792afb7cdb8273a76c80c56"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+      "effect": "replace",
+      "sha256": "d6976e58e598cd8188674bb6f0d2e82d116eebce4792afb7cdb8273a76c80c56",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "91fb06ca77fbcaa44cc99968ae88ae1f1c247e91a0cba7f0c5c00ebbf81752bf",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "23414",
+        "mtimeNs": "1791670136030433929",
+        "ctimeNs": "1791670136034213683",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "da4528ec81d39052484ffecf8434369dd192e0cecfa7b580bd632e858fbc46ea",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "74252ec35e7b9808b96b2ab0a559d2446c672d87bc918f3b2b1c79b1b152a67b",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "15628",
+          "mtimeNs": "1790938622000000000",
+          "ctimeNs": "1791569417497480737"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/role1-atomic-preparation/apply-once/backups/0.before.bin"
+    }
+  ],
+  "noProductImports": true,
+  "businessRuns": 0,
+  "protectedTargets": 0,
+  "dependencyCaptures": [
+    {
+      "path": "plugins/pipeline-core/lib/dispatch-policy.mjs",
+      "sha256": "e260facd903e878acfacf17d2b8afcef7a6e3c896c1c822038c925d233143bef",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "9e142d21654f0474840a2ed943614f56abf251be9c536929db358edaae18f3ec",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "21124",
+        "mtimeNs": "1791534747276742844",
+        "ctimeNs": "1791569417494730593",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/lib/successful-spawn.mjs",
+      "sha256": "55c4e49b46d1e9543bb068ca4d5a86070354f023a2522c5d1bc826fe7189387e",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "08daac3e08c5e6958505433be06005c24315b4a8e30bed4442422177eb89c58e",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "906",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417497480737",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/lib/model-role-route-source.mjs",
+      "sha256": "768d8f5800d96ff33e4a7e75e03782ffa581e967cd3952912c0e602607942182",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "3ec87d63b8bf849e408dad1e3987c6982dd45e36e944acb2ae6ab253cd6e9e3e",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "8003",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417497480737",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
+      "sha256": "80630023a8f1da0a89a35f4a79a7836bd5533a0c049bdb33ec7594ee45dfd644",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "4f0438900f871966cf1871d053d36db5caf210954f17a6a3c7d2f01fec33f6f8",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "20436",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417497480737",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/lib/human-role-labels.mjs",
+      "sha256": "d11646434708392ec2d0501c4a9a6b1875d70c5f12029d75f360665be5b24dfe",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "76030b5a0580b4f23261d76f29d540237766d5310b33244db7f0402a47aaad2e",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "4273",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417494730593",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/lib/dispatch-budget-binding.mjs",
+      "sha256": "4eed0fb986c953fac948ffb64d62c502b6c9753eb7f9c36f6788f0b2df4f74c3",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "4404389198d320f6d74f5f6d91f259e5e3d4d8a18f80c0b9539981fbcaacb63e",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "12370",
+        "mtimeNs": "1791534747272743012",
+        "ctimeNs": "1791569417497480737",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/lib/dispatch-budget-core.mjs",
+      "sha256": "38b4124ee6bfdf31815593c3a29024b0e669dbf59435a830ab7c9544d7e65b25",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "a07a6896061f509f07c82ff7cc844077486120032a56104e46b896ea04e2c907",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "12322",
+        "mtimeNs": "1791534747272743012",
+        "ctimeNs": "1791569417497480737",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/config/runner-profiles-v3.json",
+      "sha256": "c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "7c6243e324f4844f87cb8df2845751ecd2d78cfab1e5768ef695326849bd3544",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "14561",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417490483186",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-user-v3.schema.json",
+      "sha256": "7bccf1d741be5855b590aefec8424695ac29e49519d172472adb830d8d1ce646",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "9890e1b3965bee3f70f169c966961ba6a0e9c10704ad4095a45c62ad71694309",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "4845",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417512712644",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "sha256": "d463b1b92fb7329b3515e47640b2e8e85f85f866c126c137cc716702d1af7f3e",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "a333513a84a22af3b92070920362df80030649d8025575f6388efcc4a2545136",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "43361",
+        "mtimeNs": "1791534747324740821",
+        "ctimeNs": "1791569417523590954",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "sha256": "095f1c24ef174a404984dcfefcc27bcd41d995e4017e2758546f5623e3f2d213",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "047974033bd21ea5c7c4100a307037edcf245ef19260f72d878be2506b5cf371",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "54530",
+        "mtimeNs": "1791534747324740821",
+        "ctimeNs": "1791569417523590954",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+      "sha256": "2b593b872a69d0d02c42eaace9db650fd16ca1e05c3f509614a045597ba50335",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "b45854afa793b8390c4d441c2d4931e0968d28e5ed36c504d81e1bc2d6d58e9c",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "7838",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417517480108",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/agents/critic.md",
+      "sha256": "59c6a1ead83b0b570956920d74a6a078c94dd3602a5beff152726779a974710b",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "20d49a27eaaaf04a68586278c8504216352c8b1c7078d9adb49c16569a8bd24d",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "16037",
+        "mtimeNs": "1791562239604688220",
+        "ctimeNs": "1791569417490144971",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/agents/goldfish-deep.md",
+      "sha256": "3a7790713cabc573dffb36ccbf58f10ff4243ab93a702f48428c05af64512217",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "f6b705f3c674b155ea5303857d097e25920387ea041beaa2a3c2efe1facb751f",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "12415",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417490144971",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/agents/goldfish-implementor.md",
+      "sha256": "caa4c05c3cbf79ba524329811dc41a5e0190aa1630f95212e7ce2589d1d05a9a",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "0d6a7c4c81e918d0e5b63f283cc7ae2ac33ceb2a9e73eb7d06324f992d5b52a4",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "9982",
+        "mtimeNs": "1790938622000000000",
+        "ctimeNs": "1791569417490144971",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    },
+    {
+      "path": "plugins/pipeline-core/agents/goldfish-mechanic.md",
+      "sha256": "162d4261abb87d7c45039b34ce4a1be82a5f1d58b22e7f84ba899d7bf472f79b",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "af44dbfe9c19402b9418eea1be31eea4857bd099d60eec38ac250ecdd54e202f",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 2,
+        "bytes": "11408",
+        "mtimeNs": "1791562239604858360",
+        "ctimeNs": "1791569417490144971",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      }
+    }
+  ],
+  "conservation": {
+    "AuditSourceTargets": 1,
+    "MainNamedDependencies": 16,
+    "allExactPhysicalCAS": true,
+    "consumedPathsExcluded": 25
+  },
+  "createdDirectories": []
+}

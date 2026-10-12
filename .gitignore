@@ -104,10 +104,8 @@ project/resume-hint.json
 
 # Durable evidence under the approved evidence locations is transferred with
 # the repository, unlike scratch, arbitrary logs, and regenerated root evidence.
-!specs/**/evidence/**/*.log
-!specs/**/evidence/**/*.jsonl
-!backlog/evidence/**/*.log
-!backlog/evidence/**/*.jsonl
+!specs/**/evidence/**
+!backlog/evidence/**
 
 # NVA-A8 benchmark workload runtime output: each fixed workload's task.mjs
 # overwrites this on every run (nova-a8-benchmark-runner.mjs); regenerated,

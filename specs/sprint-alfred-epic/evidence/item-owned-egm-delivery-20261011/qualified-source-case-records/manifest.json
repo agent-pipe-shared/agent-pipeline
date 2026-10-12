@@ -1,0 +1,818 @@
+{
+  "schema": "alfred.qualified-source-case-record-custody.v1",
+  "status": "exact-owner-record-copies",
+  "validationSourceSha256": "93cd33d6028ccf630800ecea7a262768caa532acc486c85fc27821be3926994f",
+  "inputsSourceSha256": "32fedaad1badaf73315fc2f2dad101af5919acbfe1f6f84fb62524cc73b73302",
+  "records": [
+    {
+      "suite": "critic-generic-batch-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/critic-generic-batch-tests.jsonl",
+      "recordSha256": "9734b6ce616d0c7eb7d8deb6fd825bc006c94fd113c221bf28435a73d9bcc885",
+      "bytes": 1940,
+      "sourcePath": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "qualifiedSourceSha256": "8992c0d298d1c05b563d411e45f33ac7c8ebf27d3c10bbebac4aaead72151340",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CGB001",
+          "CGB002",
+          "CGB003",
+          "CGB004",
+          "CGB005",
+          "CGB006",
+          "CGB007",
+          "CGB008",
+          "CGB009",
+          "CGB010",
+          "CGB011"
+        ],
+        "maxBytes": 8192
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "8e24b1150f3bda16cfd9abeb1b86793a1c5fe2582d5cdf10560ea6c5976b4a21",
+        "caseSetSha256": "053bf0955814cf82090173df6883cc5b425a9e77919833450fd9342a32db92e3",
+        "dispositionsSha256": "fb5b029c54a74b3a135e1903e02e5cb7298751e260af1153a0d4bd61603f918e",
+        "declaredCount": 11,
+        "disposedCount": 11,
+        "counts": {
+          "pass": 11,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "verify-case-completion-augmentation-policy-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/verify-case-completion-augmentation-policy-tests.jsonl",
+      "recordSha256": "95213037d990e34162de5ca3376e672e6070c70aeef1668a2e88ce85b056ad0d",
+      "bytes": 1521,
+      "sourcePath": "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
+      "qualifiedSourceSha256": "e6a5d390d2d1a72e875785653447ad1d0b9bbc26abde43bd0ec6ce8691a06c6f",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "BCP01",
+          "BCP02",
+          "BCP03",
+          "BCP04",
+          "BCP05",
+          "BCP06",
+          "BCP07",
+          "BCP08"
+        ],
+        "maxBytes": 8192
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "426dc71200c09394d367e9b1f93de4ad052ab908acb0b2dfba083207b5d705ee",
+        "caseSetSha256": "160a25248e257d9d0368c0d0e0c94eb69fde5710dbcd325a4438facded62c721",
+        "dispositionsSha256": "4b8516f080165ff622dbce9de6db26d09c332a87d6099da09700501a6a5783ca",
+        "declaredCount": 8,
+        "disposedCount": 8,
+        "counts": {
+          "pass": 8,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "darwin-native-process-observer-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/darwin-native-process-observer-tests.jsonl",
+      "recordSha256": "0c2da2f4841c7a4c40feee1c547c6a1e6394afb8b3e318736c458d7c845f7f5a",
+      "bytes": 1025,
+      "sourcePath": "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+      "qualifiedSourceSha256": "3f6c46fcd7d879a5327a6a0a152dd353de8edb8c396d594b34acc7b7220d5128",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DNO001",
+          "DNO002",
+          "DNO003",
+          "DNO004"
+        ],
+        "maxBytes": 16384
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "c7171fcc521ac6e772b060a8d2eae0a62c62028c16ee5bed5a5b14b7757120d1",
+        "caseSetSha256": "82b8823ca8f49a47b9ae9b67737b75221b67942daf3f2415f9c567463cdbf928",
+        "dispositionsSha256": "84af92cc7c65ca543d3fa03ef33264f73d782245d8011aa8d4a312f2fabaea34",
+        "declaredCount": 4,
+        "disposedCount": 4,
+        "counts": {
+          "pass": 3,
+          "fail": 0,
+          "skip": 1,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "native-platform-process-observer-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/native-platform-process-observer-tests.jsonl",
+      "recordSha256": "536fd53469e2430dc3356f98c837a2159f33ec21992efd7eae60cb53f40bf0f8",
+      "bytes": 1155,
+      "sourcePath": "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+      "qualifiedSourceSha256": "b623dd91e4f1ce9f4fa4fc27d97bd56db248870c42b566551bb33efb917d248a",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NPO001",
+          "NPO002",
+          "NPO003",
+          "NPO004",
+          "NPO005"
+        ],
+        "maxBytes": 16384
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "b49bcc1d4b0e52094accc153546c4d464d65d7f1fcb3e8baac008de56ec255d1",
+        "caseSetSha256": "b52098d93e2e6283dbc29ec0c5f248a6004ca013ef85ed6ff8c5c20acb4d8ae5",
+        "dispositionsSha256": "e70be65473fb97c7c4f19409345b84eacb3582c40d82ddba1a76f804b8fc0ce9",
+        "declaredCount": 5,
+        "disposedCount": 5,
+        "counts": {
+          "pass": 4,
+          "fail": 0,
+          "skip": 1,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "darwin-requester-integration-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/darwin-requester-integration-tests.jsonl",
+      "recordSha256": "90d314d4d01f251a88665c07b3ee0c81abef9fb5ef056bd564f0f554caeb8840",
+      "bytes": 1285,
+      "sourcePath": "plugins/pipeline-core/lib/darwin-requester-integration.test.mjs",
+      "qualifiedSourceSha256": "8bee4a76bce2f845f975472b80a22a623fc54720f08beda3be8e29d782f2f1a5",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DRI001",
+          "DRI002",
+          "DRI003",
+          "DRI004",
+          "DRI005",
+          "DRI006"
+        ],
+        "maxBytes": 16384
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "df3187550321ed54e9a53ba0bf3479cf80f8becce82f7e930d5ed1a34977c66a",
+        "caseSetSha256": "05b251830dea5b65d01a40c5448c06151d8c807f269482b13487e6c540a7aadd",
+        "dispositionsSha256": "580b594e57c36615b3f3593f00e6ff8864d5b4f9f67bbcae4f3672cb44b16eeb",
+        "declaredCount": 6,
+        "disposedCount": 6,
+        "counts": {
+          "pass": 6,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "critic-course-admission-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/critic-course-admission-tests.jsonl",
+      "recordSha256": "964327ec278e655463112ab2f32d6db60da44942530c1852e239989a18d21bb8",
+      "bytes": 2857,
+      "sourcePath": "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+      "qualifiedSourceSha256": "439aade945d0781d44d910e2a7521746836c57a43842456d9289a9beb02066fe",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CCA001",
+          "CCA002",
+          "CCA003",
+          "CCA004",
+          "CCA005",
+          "CCA006",
+          "CCA007",
+          "CCA008",
+          "CCA009",
+          "CCA010",
+          "CCA011",
+          "CCA012",
+          "CCA013",
+          "CCA014",
+          "CCA015",
+          "CCA016",
+          "CCA017",
+          "CCA018"
+        ],
+        "maxBytes": 16384
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "979dfb9aa7af40ac9594ab5103f2c90b3a50b5938981250320d360a9dc849549",
+        "caseSetSha256": "e5ba16221702c9fcf4ed9eb545677025b680874e8fddb0ede14edd4d05dce441",
+        "dispositionsSha256": "8435c2c8c7904672030603d33825e5c2983e6c9b5b9f22e9a5026bfa928cbc13",
+        "declaredCount": 18,
+        "disposedCount": 18,
+        "counts": {
+          "pass": 18,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "critic-dispatch-preflight-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/critic-dispatch-preflight-tests.jsonl",
+      "recordSha256": "481143d611e7ffb155198a50596507c6864a2c65f1ae3cfd2a17b43f8ad44076",
+      "bytes": 6663,
+      "sourcePath": "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs",
+      "qualifiedSourceSha256": "83783db4a1bd5e01037389c1b13c9d97255ae851b7242e32c26a8668603693fe",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CDPF001",
+          "CDPF002",
+          "CDPF003",
+          "CDPF004",
+          "CDPF005",
+          "CDPF006",
+          "CDPF007",
+          "CDPF008",
+          "CDPF009",
+          "CDPF010",
+          "CDPF011",
+          "CDPF012",
+          "CDPF013",
+          "CDPF014",
+          "CDPF015",
+          "CDPF016",
+          "CDPF017",
+          "CDPF018",
+          "CDPF019",
+          "CDPF020",
+          "CDPF021",
+          "CDPF022",
+          "CDPF023",
+          "CDPF024",
+          "CDPF025",
+          "CDPF026",
+          "CDPF027",
+          "CDPF028",
+          "CDPF029",
+          "CDPF030",
+          "CDPF031",
+          "CDPF032",
+          "CDPF033",
+          "CDPF034",
+          "CDPF035",
+          "CDPF036",
+          "CDPF037",
+          "CDPF038",
+          "CDPF039",
+          "CDPF040",
+          "CDPF041",
+          "CDPF042",
+          "CDPF043",
+          "CDPF044",
+          "CDPF045",
+          "CDPF046"
+        ],
+        "maxBytes": 32768
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "6a4edcfaabd72399d3b47913d592525eeb64345f899e2b2b5cc6d93dbfe4c9c2",
+        "caseSetSha256": "e80843422e145801636bfe4c2237a0841451d1c266dd542e4ae9c6db1d6f4219",
+        "dispositionsSha256": "42fca94ee4d10f6143a9b78e18cca2391eba3903903d7ba592f2b2c62e57c1b2",
+        "declaredCount": 46,
+        "disposedCount": 46,
+        "counts": {
+          "pass": 46,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "review-economy-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/review-economy-tests.jsonl",
+      "recordSha256": "e1407a6122e7dd80d2d813a1b0778730e78197d6e079ef5183318d37deda7a28",
+      "bytes": 635,
+      "sourcePath": "plugins/pipeline-core/lib/review-economy.test.mjs",
+      "qualifiedSourceSha256": "4a8891b3b9f90af8e3607634b22937e9f8bc18fdef98b6b2e8f68197d07eb7e3",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "REC001"
+        ],
+        "maxBytes": 8192
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "289f6fcd9d48d43fe651d986d04b89723687cc8f43013a664cca4d1bb88a71a8",
+        "caseSetSha256": "1f19f23c948d5864467d23d08b4e0741fd32b551039941d8cf98c3b443a8d030",
+        "dispositionsSha256": "ab313c3246180dc70405f64ef782769a626f428ed86e7afa94e784ba91417fe4",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "slice-queue-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/slice-queue-tests.jsonl",
+      "recordSha256": "ed85cfcab0d7dc791f1f8ca3d7a03f39c788b100a263c5e00ddec1bb2ac07c47",
+      "bytes": 5124,
+      "sourcePath": "plugins/pipeline-core/lib/slice-queue.test.mjs",
+      "qualifiedSourceSha256": "1ab281bb4049e1b87315eeb545a4ca707722dc78f168cc6174de9619ed4ba2ec",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SQ01",
+          "SQ02",
+          "SQ03",
+          "SQ04",
+          "SQ05",
+          "SQ06",
+          "SQ07",
+          "SQ08",
+          "SQ09",
+          "SQ10",
+          "SQ11",
+          "SQ12",
+          "SQ13",
+          "SQ14",
+          "SQ15",
+          "SQ16",
+          "SQ17",
+          "SQ18",
+          "SQ19",
+          "SQ20",
+          "SQ21",
+          "SQ22",
+          "SQ23",
+          "SQ24",
+          "SQ25",
+          "SQ26",
+          "SQ27",
+          "SQ28",
+          "SQ29",
+          "SQ30",
+          "SQ31",
+          "SQ32",
+          "SQ33",
+          "SQ34",
+          "SQ35",
+          "SQ36",
+          "SQ37"
+        ],
+        "maxBytes": 65536
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "524a79097d2fb180e6bd92b7f0a31e520d1b1464d0849076715ce2f6affaaa17",
+        "caseSetSha256": "e2736723609e1d048450a88766251c17cc2efcc946f9864c89aae1df10b7d2c7",
+        "dispositionsSha256": "b32db27bd8c47f77b55b8f54779ac20041496a51de42d610a08288fe3a8756e6",
+        "declaredCount": 37,
+        "disposedCount": 37,
+        "counts": {
+          "pass": 37,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "native-goldfish-host-state-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/native-goldfish-host-state-tests.jsonl",
+      "recordSha256": "4a255d2d691c0140aaeb9e7fef95d2d33a824961e7c2753373c1c33f0ce297a9",
+      "bytes": 2857,
+      "sourcePath": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+      "qualifiedSourceSha256": "055fe40149e3f9a975b533f363a40ef9ccb69426b4825e95374c5e3d9c7b49a0",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHS01",
+          "NGHS02",
+          "NGHS03",
+          "NGHS04",
+          "NGHS05",
+          "NGHS06",
+          "NGHS07",
+          "NGHS08",
+          "NGHS09",
+          "NGHS10",
+          "NGHS11",
+          "NGHS12",
+          "NGHS13",
+          "NGHS14",
+          "NGHS15",
+          "NGHS16",
+          "NGHS17",
+          "NGHS18"
+        ],
+        "maxBytes": 65536
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "4202df74f6d00f65b7a7e5fe154ef45c4cd5d53003bcaf1d33e20508ea646413",
+        "caseSetSha256": "b8097eecc474ebbf49567fdfbe02a3e67039f6994902d154b1a3b3f295a9fc7b",
+        "dispositionsSha256": "a5c5e16b9afd7922c75841e4cca7b5948fb4140f978278303564d39b6085e038",
+        "declaredCount": 18,
+        "disposedCount": 18,
+        "counts": {
+          "pass": 18,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "agy-item-delivery-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/agy-item-delivery-tests.jsonl",
+      "recordSha256": "0b648ccf2af949fe399b98df8b5f4225eb0adc6ffdcd5f2787b76ddb19700063",
+      "bytes": 1303,
+      "sourcePath": "plugins/pipeline-core/lib/agy-item-delivery.test.mjs",
+      "qualifiedSourceSha256": "14105aec6fc8f30beaa46f02443bcb803fdd84f73b227a57f676c22d1fa48bbd",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "AGYID01",
+          "AGYID02",
+          "AGYID03",
+          "AGYID04",
+          "AGYID05",
+          "AGYID06"
+        ],
+        "maxBytes": 65536
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "a4bca2643f368acab89f209ea9ce3257b027a1de2686c1d97588fdb007d7c2ca",
+        "caseSetSha256": "17e991ac18db001fc9c4e6e0172336619a00b8e88032229e1d0c6684d8b0db9c",
+        "dispositionsSha256": "a314c2a4b63849696fe277f6e40f9bfc4d52f6d454ef54cdcbc6ceeaf15da5d7",
+        "declaredCount": 6,
+        "disposedCount": 6,
+        "counts": {
+          "pass": 6,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "installed-bootstrap-import-closure-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/installed-bootstrap-import-closure-tests.jsonl",
+      "recordSha256": "2cae256988abdb50c8270250b11f1314939f5dacb87adda96d44fd9d45c293a9",
+      "bytes": 638,
+      "sourcePath": "plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs",
+      "qualifiedSourceSha256": "22b88fa2ce52eab3bad1aa6c848abcb80dcf14646bbec722fcf3b0f1699fbaa1",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "IBIC001"
+        ],
+        "maxBytes": 8192
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "5073a2ba38931e1d96c6d1806c17cd98599b4e4743e360ca77efafc168bffd53",
+        "caseSetSha256": "b61338e9995b2de23233174e8509c54f45b608d45e2da4f43783ecd9eebcdfb3",
+        "dispositionsSha256": "b2b871af2a455d5ce42d6e8b98be55c0808348043c9467913923e239cea23cf9",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "phoenix-authority-revision-installed-package-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/phoenix-authority-revision-installed-package-tests.jsonl",
+      "recordSha256": "bcfe0f8fadd2cc2b37ebd7df22b81a78c220ceed8f77a26ee982013d7722baed",
+      "bytes": 641,
+      "sourcePath": "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+      "qualifiedSourceSha256": "4894fb06d83b1c3fd2b398d89bc1703f60028a4251ef1d41e75a54b6d678039c",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PHARI001"
+        ],
+        "maxBytes": 4096
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "4ed16a9bddd608b16b44dbfbcc67b41fe77a9f35ee78aca6bd98ea52be43866c",
+        "caseSetSha256": "9239f7b005f20f05c8ca58be94354a63f5232a0b324669c65df6c04c12305de9",
+        "dispositionsSha256": "f6999a67033a556bbb0216b85669d65501b51c7419f8c7b4494d491b7088eb50",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "install-agy-inline-candidate-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/install-agy-inline-candidate-tests.jsonl",
+      "recordSha256": "a0f4931c5db3dcaea751cbbfcfdc375e4bceaa5e7d9b5beaa1bfaf5d3489bf4e",
+      "bytes": 1869,
+      "sourcePath": "plugins/pipeline-core/install-agy.inline-candidate.test.mjs",
+      "qualifiedSourceSha256": "b0d6bb00ba7631c38a534db112eb0ca410aced4538a62677efd66cec796dc64c",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "AGYIC001",
+          "AGYIC002",
+          "AGYIC003",
+          "AGYIC004",
+          "AGYIC005",
+          "AGYIC006",
+          "AGYIC007",
+          "AGYIC008",
+          "AGYIC009",
+          "AGYIC010"
+        ],
+        "maxBytes": 8192
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "ac87fb36884ac744e794d9815e6a665d21fb1f50caa87262eaa86540b7a3318b",
+        "caseSetSha256": "c0dfc64a137201221b6cea99cb071001d712761858c32a372a6b469dc67f82fb",
+        "dispositionsSha256": "b0c5d941a0db6e08aecbed7ec8aa0cfedb3bc6850d6b3f1b547f6f2873eaf25a",
+        "declaredCount": 10,
+        "disposedCount": 10,
+        "counts": {
+          "pass": 10,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "devplan-shell-lane-recovery-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/devplan-shell-lane-recovery-tests.jsonl",
+      "recordSha256": "d4eeaec52c6ebf2f38e65fb16f20ae3247872f2634a897e3a6e2491814f53f9a",
+      "bytes": 2202,
+      "sourcePath": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+      "qualifiedSourceSha256": "588eb92ceb716ac2587c0eae8c2e6079718ba0bbbae22df7a1d25ee87083807e",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DLR001",
+          "DLR002",
+          "DLR003",
+          "DLR004",
+          "DLR005",
+          "DLR006",
+          "DLR007",
+          "DLR008",
+          "DLR009",
+          "DLR010",
+          "DLR011",
+          "DLR012",
+          "DLR013"
+        ],
+        "maxBytes": 16384
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "0d69ccef27e95e65cdc9458bc833bae93abe1330d0a29575677484e399d7aa29",
+        "caseSetSha256": "ac7501dc987a15db253c2fc25cc682c9c7247787b63b8818e2d862ad98b5a7b2",
+        "dispositionsSha256": "ad8529e8d0f4d15a794b5822cef4412bccd4b6a12ce317e5a8adadddf530531f",
+        "declaredCount": 13,
+        "disposedCount": 13,
+        "counts": {
+          "pass": 13,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "project-onboarding-temp-root-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/project-onboarding-temp-root-tests.jsonl",
+      "recordSha256": "8187c7076ff649d8ad190c42ef918207ee11563213b00c75a0beec3c442b0385",
+      "bytes": 1025,
+      "sourcePath": "plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+      "qualifiedSourceSha256": "d799ddb7f9f1d097e7a0a514927f879f21491d0995c8754e1667acb70d7d0e71",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "POTR01",
+          "POTR02",
+          "POTR03",
+          "POTR04"
+        ],
+        "maxBytes": 8192
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "7eaa9d65eb6ef46e143c47b42b9608dc2003bf92319073a16222470ffcefbbc0",
+        "caseSetSha256": "76514f777cf14f8f1e7d194a283d91a02bcbbe533ca7211ee8b2452a766f59b5",
+        "dispositionsSha256": "6496236166bdca6a6598bc6ac2d94e3cb4dcf3925c88794b0557369992f527c3",
+        "declaredCount": 4,
+        "disposedCount": 4,
+        "counts": {
+          "pass": 4,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "devplan-shell-sanctioned-recovery-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/devplan-shell-sanctioned-recovery-tests.jsonl",
+      "recordSha256": "3bc5072450a76e4c2ff6e53743d62a54903f6af9fb647ffed718777e753cc93b",
+      "bytes": 5215,
+      "sourcePath": "plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+      "qualifiedSourceSha256": "c274acd7caa3f44780b50bcdd9bab58d3bbe99642aa0a329166435663cf61ab3",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DLR001",
+          "DLR002",
+          "DLR003",
+          "DLR004",
+          "DLR005",
+          "DLR006",
+          "DLR007",
+          "DLR008",
+          "DLR009",
+          "DLR010",
+          "DLR011",
+          "DLR012",
+          "DLR013",
+          "DLR014",
+          "DLR015",
+          "DLR016",
+          "DLR017",
+          "DLR018",
+          "DLR019",
+          "DLR020",
+          "DLR021",
+          "DLR022",
+          "DLR023",
+          "DLR024",
+          "DLR025",
+          "DLR026",
+          "DLR027",
+          "DLR028",
+          "DLR029",
+          "DLR030",
+          "DLR031",
+          "DLR032",
+          "DLR033",
+          "DLR034",
+          "DLR035",
+          "DLR036"
+        ],
+        "maxBytes": 16384
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "b82edbe08298bcdb6a16a041046a7eb4d12ef2366dc5c1b0ba2987423bdfeff3",
+        "caseSetSha256": "74129e8d3c7b583452c6219af5797bce83ce04d92431b89ed803684610f142a4",
+        "dispositionsSha256": "0c53b93f370345e0963e1342622378c801457e061dce25b73814333416aab6c7",
+        "declaredCount": 36,
+        "disposedCount": 36,
+        "counts": {
+          "pass": 36,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "architecture-prospective-materialization-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/architecture-prospective-materialization-tests.jsonl",
+      "recordSha256": "b6ebe6838555bfca0513105e0a20273498b3b384f1fac70888c1e107011ca5e1",
+      "bytes": 2857,
+      "sourcePath": "plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs",
+      "qualifiedSourceSha256": "349c371274ac86674f2004916b2afb71fb9e413e58722ae80f3292b4ce010668",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "APM001",
+          "APM002",
+          "APM003",
+          "APM004",
+          "APM005",
+          "APM006",
+          "APM007",
+          "APM008",
+          "APM009",
+          "APM010",
+          "APM011",
+          "APM012",
+          "APM013",
+          "APM014",
+          "APM015",
+          "APM016",
+          "APM017",
+          "APM018"
+        ],
+        "maxBytes": 8192
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "9ffb5f58fc81f9a34b0e6363af6516bf420f74b79cca195c5cab462d3d20a25c",
+        "caseSetSha256": "e93703dc50f038744d4caaf658d694067f1cc19fc4f412761d1e9266d4a78631",
+        "dispositionsSha256": "ecfb68cb8519632bd6e993b337b8da3efd0b1047bdff3685405be4d7767bab3a",
+        "declaredCount": 18,
+        "disposedCount": 18,
+        "counts": {
+          "pass": 18,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    },
+    {
+      "suite": "architecture-prospective-companion-tests",
+      "recordPath": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/qualified-source-case-records/architecture-prospective-companion-tests.jsonl",
+      "recordSha256": "c4e90c0dcfad6458debd6dcf4e155e7c4bcd90e494ea9bb7ba4f41d4ac1d001b",
+      "bytes": 904,
+      "sourcePath": "plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs",
+      "qualifiedSourceSha256": "7bd65028fe3b4c306603f00a8822e6523d2a24fd59ce3bbf4796401e9dcfadc5",
+      "completionPolicy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "APMC001",
+          "APMC002",
+          "APMC003"
+        ],
+        "maxBytes": 8192
+      },
+      "officialProducerAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "e93dacdd31abe9dae9466f4f2b9124f0eaf12375d853558a8d2319a6385d8677",
+        "caseSetSha256": "2ad9937781b594653bf617f20909cd699d45790984e9020ace62386d790fa5c5",
+        "dispositionsSha256": "cb0ca3835adea4516b7c6c4fc7b9063c082a94bf79f457f2a4d5c0ea1a38e80c",
+        "declaredCount": 3,
+        "disposedCount": 3,
+        "counts": {
+          "pass": 3,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      }
+    }
+  ],
+  "counts": {
+    "pass": 244,
+    "fail": 0,
+    "skip": 2,
+    "todo": 0
+  },
+  "scope": "Owner-qualified Source variants; not a single complete candidate execution. Protected and unapplied Source posts may occur. Later impact amendments remain separate.",
+  "testsReplayed": false,
+  "wholeCandidatePassed": false,
+  "wholeItemAccepted": false,
+  "installed": false,
+  "nativeWindowsQualified": false,
+  "nativeMacOSQualified": false
+}

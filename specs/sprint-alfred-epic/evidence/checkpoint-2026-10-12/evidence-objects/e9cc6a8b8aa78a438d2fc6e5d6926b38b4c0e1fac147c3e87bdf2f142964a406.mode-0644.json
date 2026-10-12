@@ -1,0 +1,219 @@
+{
+  "schema": "alfred.unresolved98-partition-manifest.v1",
+  "status": "Seven declarative nonoverlapping groups ready for Root assignment",
+  "source": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/items-trace.json",
+    "sha256": "3b65256d4a0d70a5b307cbacfffa4d4d380d82545eb1e143fa2ba53e77c58a27"
+  },
+  "counts": {
+    "UNKNOWN": 36,
+    "stage25": 62,
+    "total": 98,
+    "groups": 7,
+    "sizes": [
+      12,
+      12,
+      12,
+      15,
+      15,
+      16,
+      16
+    ]
+  },
+  "stageMembershipSha256": "a859a07740a841f81102e58bfce2db1530a55b9857efa7ce55ddc20099199fec",
+  "files": [
+    {
+      "group": "unknown-01",
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-01.json",
+      "sha256": "8bbcda7a60e97acb1cc0a1734b8f42e3f4fc0f347c82272e1cb7b25798f0c976",
+      "bytes": 53513,
+      "stage": "UNKNOWN",
+      "count": 12,
+      "itemIDs": [
+        "pipeline.advertised-git-to-head-pipeline-is-refused",
+        "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+        "pipeline.approval-verification-demands-head-equals-candidate",
+        "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+        "pipeline.capability-inventory-checker-is-red-at-head",
+        "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+        "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+        "pipeline.codex-bootstrap-in-the-typed-next-action",
+        "pipeline.declared-system-skill-read-requires-human-override",
+        "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+        "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+        "pipeline.disjoint-signed-hgo-actions-invalidate-one-another"
+      ]
+    },
+    {
+      "group": "unknown-02",
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-02.json",
+      "sha256": "2d436acd232ed647dbdc5e4b1d8636cceb9249614c7bb50a3fbcdcd4f79c7583",
+      "bytes": 39415,
+      "stage": "UNKNOWN",
+      "count": 12,
+      "itemIDs": [
+        "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+        "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+        "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+        "pipeline.foreign-worktree-closes-the-implementation-gate",
+        "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+        "pipeline.guard-suite-fails-60-tests-on-native-windows",
+        "pipeline.handover-doc-committed-without-governance-classification",
+        "pipeline.hgo-patch-preflight-before-signature",
+        "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+        "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+        "pipeline.parallel-work-in-one-checkout-is-unsafe",
+        "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in"
+      ]
+    },
+    {
+      "group": "unknown-03",
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-03.json",
+      "sha256": "bc7d856db7fc8b7f60df98b48224ff7793c88dbf9341f9e5fd54fc26bd55248a",
+      "bytes": 47755,
+      "stage": "UNKNOWN",
+      "count": 12,
+      "itemIDs": [
+        "pipeline.powershell-bypasses-onboarding-read-boundary",
+        "pipeline.readiness-input-omits-current-advisor-observation",
+        "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+        "pipeline.scratch-has-no-retention-and-no-durability-check",
+        "pipeline.semgrep-console-coverage-note-has-no-test",
+        "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+        "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+        "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+        "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+        "pipeline.windows-greenfield-scratch-write-denied",
+        "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+        "pipeline.windows-pre-push-installer-fsync-and-relative-action"
+      ]
+    },
+    {
+      "group": "partial-01",
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/partial-01.json",
+      "sha256": "e4838f12e3a1b349f40bcc0fc75b4a0b774ec8101f88fdae6536043307e64d8d",
+      "bytes": 76130,
+      "stage": 25,
+      "count": 15,
+      "itemIDs": [
+        "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+        "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+        "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+        "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+        "pipeline.agy-el01-write-authorization-gap",
+        "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+        "pipeline.agy-managed-copy-first-start-lacks-attestation",
+        "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+        "pipeline.auto-install-pre-push-hook-with-the-plugin",
+        "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+        "pipeline.bounded-reader-terminal-binding",
+        "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+        "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+        "pipeline.claude-design-readiness-cannot-start-on-windows",
+        "pipeline.claude-session-start-emits-codex-transcript-recovery-hint"
+      ]
+    },
+    {
+      "group": "partial-02",
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/partial-02.json",
+      "sha256": "3ee1374972aa412bcc96c70a2dd68616ea7dcfe069ce417709233d343b292dc6",
+      "bytes": 92890,
+      "stage": 25,
+      "count": 15,
+      "itemIDs": [
+        "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+        "pipeline.codex-advisor-evidence-fails-after-host-update",
+        "pipeline.codex-design-readiness-child-rejects-valid-review",
+        "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+        "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+        "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+        "pipeline.critic-scratch-notes-write-is-refused-again",
+        "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+        "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+        "pipeline.denial-names-a-diagnosis-it-refuses",
+        "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+        "pipeline.design-generator-repeats-large-source-material",
+        "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+        "pipeline.design-trailer-verifier-lost-after-closure",
+        "pipeline.design-workflow-package-omits-contract"
+      ]
+    },
+    {
+      "group": "partial-03",
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/partial-03.json",
+      "sha256": "aa44cea2e486474b7dc44075a9da91e1d7bf6520872a918bbeb8e7afd4ab2671",
+      "bytes": 87810,
+      "stage": 25,
+      "count": 16,
+      "itemIDs": [
+        "pipeline.desktop-app-support-is-unverified",
+        "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+        "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+        "pipeline.dispatch-records-land-under-specs-evidence",
+        "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+        "pipeline.forensics-and-audit-evidence-not-reconstructable",
+        "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+        "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+        "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+        "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+        "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+        "pipeline.greenfield-design-course-cost-and-proportionality",
+        "pipeline.greenfield-machine-output-and-skill-budget",
+        "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+        "pipeline.implementation-without-dispatch-escapes-review-coverage",
+        "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes"
+      ]
+    },
+    {
+      "group": "partial-04",
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/partial-04.json",
+      "sha256": "d2eed3711c5865b5c12402d9fd0381e4242fdab8dcc1273e9eedaf72c193469e",
+      "bytes": 71545,
+      "stage": 25,
+      "count": 16,
+      "itemIDs": [
+        "pipeline.model-family-approval-with-automatic-version-upgrades",
+        "pipeline.opus-critic-only-batched-for-architecture-and-security",
+        "pipeline.plan-submission-must-not-require-separate-po-approval",
+        "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+        "pipeline.read-only-guard-admits-execution-and-output-options",
+        "pipeline.role-route-preflight-with-self-dispatch-fallback",
+        "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+        "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+        "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+        "pipeline.signing-prompt-prints-the-whole-review-package",
+        "pipeline.signing-toolchain-readiness",
+        "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+        "pipeline.three-runner-happy-path-with-two-po-approvals",
+        "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+        "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+        "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake"
+      ]
+    }
+  ],
+  "validation": {
+    "all98Conserved": true,
+    "unique98": true,
+    "nonoverlapping": true,
+    "allStagesUnchanged": true,
+    "requirementsAndRemaindersExactProjection": true,
+    "sourceAndProofLocatorsExactProjection": true
+  },
+  "integrationContext": {
+    "originalTrace": "actual148/164 retained unchanged",
+    "latestRootObservation": "actual150 per Root; Power receipt prefix1ad",
+    "status": "Root-reported context only; exact new receipt locator/fullSHA not supplied in this task, no receipt binding fabricated"
+  },
+  "preserved": {
+    "activeItemTrace": 174,
+    "originalAC": 37,
+    "originalIR": 4
+  },
+  "sourceWrites": 0,
+  "MainAuditWrites": 0,
+  "businessRuns": 0,
+  "newTests": 0,
+  "newCritic": 0,
+  "stagePromotions": 0,
+  "acceptedItems": 0
+}

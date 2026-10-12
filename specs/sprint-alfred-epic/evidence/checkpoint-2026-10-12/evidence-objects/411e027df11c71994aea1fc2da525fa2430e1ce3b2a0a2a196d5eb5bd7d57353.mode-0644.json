@@ -1,0 +1,84 @@
+{
+  "schema": "alfred.pci-actual-qualification-manifest.v1",
+  "status": "actual-12-of-12-focused-method-qualified",
+  "result": {
+    "exitCode": 0,
+    "pass": 12,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0,
+    "declared": 12,
+    "disposed": 12,
+    "parserError": null,
+    "processError": null,
+    "sourceCount": 347,
+    "sourceConserved": true
+  },
+  "artifacts": [
+    {
+      "path": "qualification/execution.json",
+      "sha256": "a656a0e16e63b60630c06d9198f8b8131a166ea51a62869da5010599bbe7f277"
+    },
+    {
+      "path": "qualification/completion.fd3.jsonl",
+      "sha256": "58b942401f1cdbdd3e1aca38e018de0b9f7d0ceb86289a1c9a494b343bba40cf"
+    },
+    {
+      "path": "qualification/stdout.txt",
+      "sha256": "d06ac367cd04c69a2b68cd506d56fc740cf06bd8fdd49038b12eaa116b7625de"
+    },
+    {
+      "path": "qualification/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "case-associations.json",
+      "sha256": "00f2705efd81593fe5d93269367ea8572f37d0db9dca44eac47ed82844e4fab8"
+    },
+    {
+      "path": "qualification-report.md",
+      "sha256": "c2e18dff3dfe7b4e88b5cd7522fc39fbf5968c7c51ccd19e1555bc945efd35cf"
+    },
+    {
+      "path": "public-proof-proposal/receipt.json",
+      "sha256": "6a43534f443b996746fdc9550d53b9763d356534de73031a1803c32ea827261c"
+    },
+    {
+      "path": "public-proof-proposal/completion.fd3.jsonl",
+      "sha256": "58b942401f1cdbdd3e1aca38e018de0b9f7d0ceb86289a1c9a494b343bba40cf"
+    },
+    {
+      "path": "public-proof-proposal/policy.json",
+      "sha256": "c61d8c295a59b1adadc51f12e6c74e88546066b171ca7f1df9d55bb357968d92"
+    }
+  ],
+  "bindings": {
+    "freezeSha256": "299fe1b5eea374da17eae015e5deb25b6ddc81c58b310dcc53a57af2a6892040",
+    "testSha256": "dfd796218a339a509559771f1cba94828f6577c4f6d5adc1d0897d583fe4f8d8",
+    "fixtureSha256": "59b9587804744f5b9d3cf567e5c4d69cb938ea22c01f5c8bba45f3817f338d1e",
+    "closureSha256": "20ab8e3a2437d92163ecb4509b8ee158395c9fc7fc685679cf3e6c8c2bf532cd",
+    "sourceV3ManifestSha256": "64b7d2ddadcd66df974011357bdde4a34235ac49dc001e52f3b9a2ff883cc3cd",
+    "sourceV3ContractSha256": "3de52234e98a350e81c91056d5f4680b0bdfd7bc7cd1d1529b7c4e4bbf9f908e"
+  },
+  "history": {
+    "originalFreezeSha256": "9f3b8bb229e65c26c48b859e46de31ecd4f46da36c62b143c731ff1c75d7f1c5",
+    "emptyClassificationFreezeSha256": "9c198c33ab30fc5aaca17da20e1cfd81675e10868ad3c9571a04c788c08dae4f",
+    "firstActualRunPass": 10,
+    "firstActualRunFail": 2,
+    "firstActualExecutionSha256": "6710d7599ad475e98175678de08449a6aab240b981d74cde010e2e54fd237b14",
+    "firstActualFd3Sha256": "d29e0ca107c9a5959cce3a759e4a0e065950e05d393c3c83e9da8b625841278c",
+    "allPreserved": true
+  },
+  "lateTails": {
+    "PCI009": "actually executed/pass in corrected run",
+    "PCI010": "private-overlay branch actually executed/pass in corrected run",
+    "firstRun": "tails not fully reached; no backdated PASS"
+  },
+  "publication": "Small sanitized archive proposal only, Root privacy-reviewed tracked integration pending",
+  "limits": [
+    "controlled Linux method proof, not native Windows",
+    "actual VEP dirty/success Git/process integration remains unqualified",
+    "not committed candidate/runtime/fullSource89/original37AC proof",
+    "no fullAUTH/human/Critic/fullVerify/item closure"
+  ]
+}

@@ -1,0 +1,25 @@
+✔ VAC001 exact augmentation fills absent policy without changing any original row or order (2.333176ms)
+✔ VAC002 absent optional file preserves historical rows while present unknown policies cannot remain unconsumed (2.416116ms)
+✔ VAC003 augmentation binds exact existing name and file and refuses ambiguous targets (0.286168ms)
+✔ VAC004 even an equal existing policy cannot be shadowed or rewritten (3.48718ms)
+✔ VAC005 duplicate augmentation IDs are refused before composition (0.248928ms)
+✔ VAC006 closed root and row schemas reject extra or missing keys (0.183589ms)
+✔ VAC007 full canonical completion-policy checks refuse unknown keys and case coverage drift (0.162889ms)
+✔ VAC008 unsafe, path-shaped and wildcard target files never match an existing row (0.214669ms)
+✔ VAC009 physical JSON rejects duplicate keys, malformed bytes, directories and outside aliases (3.777538ms)
+✔ VAC010 actual two-case FD completion cannot be weakened by a one-case supplementary policy (39.213584ms)
+✔ VAC011 actual candidate reads bind augmentation bytes and historical absence despite worktree changes (46.923258ms)
+✔ VAC012 candidate symlink/tree and unbound refs cannot borrow a regular worktree policy (46.967219ms)
+✔ VAC013 exact previous-policy binding permits a strict ordered case-ID superset without mutating source rows (0.406647ms)
+✔ VAC014 removing IDs, adding no new ID, or reducing maxBytes refuses a bound replacement (0.300089ms)
+✔ VAC015 wrong previous-policy preimage digest refuses an otherwise monotone extension (0.135959ms)
+✔ VAC016 existing-policy shadowing remains a conflict without exact binding and binding cannot target an absent policy (0.154569ms)
+✔ VAC017 ordered superset may interleave new IDs while retaining every old ID in order (0.221418ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 196.239504

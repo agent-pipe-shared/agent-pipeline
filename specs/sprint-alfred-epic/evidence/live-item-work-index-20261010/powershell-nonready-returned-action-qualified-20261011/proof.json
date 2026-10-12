@@ -1,0 +1,116 @@
+{
+  "schema": "alfred.powershell.nonready.cumulative-controlled-proof.v1",
+  "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+  "requirement": {
+    "path": "backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+    "sha256": "a2e2fbb3b955625a7758fc320b2bf5d3d4754751de194d82d47f7c8b70ea1775",
+    "clauses": [
+      "17-24",
+      "33-38",
+      "42-47"
+    ]
+  },
+  "scope": "Controlled genuine Source-produced stopped Claude project; actual guard evaluator Bash and literal PowerShell lanes. No native PowerShell process.",
+  "cumulativeCases": [
+    {
+      "id": "PSBN001",
+      "disposition": "pass",
+      "run": "four-case"
+    },
+    {
+      "id": "PSBN002",
+      "disposition": "pass",
+      "run": "four-case"
+    },
+    {
+      "id": "PSBN003",
+      "disposition": "pass",
+      "run": "single-003"
+    },
+    {
+      "id": "PSBN004",
+      "disposition": "pass",
+      "run": "four-case"
+    }
+  ],
+  "jointFourPassRun": false,
+  "runs": [
+    {
+      "label": "four-case",
+      "path": "scratch/alfred-powershell-nonready-qualification-preparation-20261011/node-action-constructor-successor/execution.json",
+      "sha256": "fcfae0425f19b827e01c1e716e634cede8ee71c20dc9857c01264ce17039e861",
+      "counts": {
+        "pass": 3,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      },
+      "failedId": "PSBN003",
+      "cause": "Full action comparison included machine-specific informational pendingAsks; failed before guard admission.",
+      "fd3Sha256": "010586ef857200efc8932e3b3c4c9bd4abc02b6caadb7e5865b4665afcbf9c34",
+      "sourceConserved": true,
+      "removedAssets": 61
+    },
+    {
+      "label": "single-003",
+      "path": "scratch/alfred-powershell-nonready-qualification-preparation-20261011/default-action-single003-successor/execution.json",
+      "sha256": "5c5e5e6aac8778bbca11c509ea583fd70c7dbe69f2fe64984aedb2ceade947ef",
+      "counts": {
+        "pass": 1,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "child": {
+        "status": 0,
+        "signal": null,
+        "errorCode": null
+      },
+      "fd3Sha256": "0f424548c11e6ce2e70a12dd9662c1f7dad9a065f59caa105ebb72fe83931848",
+      "fd3Bytes": 638,
+      "sourceConserved": true,
+      "removedAssets": 61,
+      "priorPassReplayed": false
+    }
+  ],
+  "startupHistory": {
+    "path": "scratch/alfred-powershell-nonready-qualification-preparation-20261011/typed-default-reader-successor/execution.json",
+    "sha256": "9de7e41278706725bd4683927f99b45d27ed52613f0d0423ac47c7e51653eebb",
+    "dispositions": 0,
+    "cause": "Constructor expected absolute process.execPath; Source returned exact literal node.",
+    "parserError": "VERIFY-CASE-COMPLETION-BOUNDS",
+    "productDefectProved": false
+  },
+  "sources": {
+    "graphSha256": "a723553e8327979b97a911455a811d7131ece94a247dc5dcd32d91c3d30b63d3",
+    "originalResources": 518,
+    "temporaryResources": 61,
+    "onboarding": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+    "continuity": "b2886c88cd564b4ba713537e6d109ac69f94e5ed6d446defaf4c1283cb49fcc1",
+    "readyGate": "0a89cde34c0356f6dde78d03acb0723843ab9df78601fb0b384b307ed227c0be",
+    "grammar": "26b4235c90c7c658a7fcf7aec38c930fd2e25d5a33876e597f6f5bc091319267",
+    "powershellDialect": "c16f4ebd8a438fd1ecbb443e5e37738307fc37cd8b69116c6aaaef4a5e997f4b",
+    "evaluate": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+    "state": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9"
+  },
+  "assertions": {
+    "originalBefore": "b1024f91b1bb1e3dc118127207c9494ff18629a338f3f869e7d1da7d77a0acef",
+    "fourCaseCallback": "30e8b748b0e46eec2e9d5c01ca52f6392a1bd71aadfa2f2e431fd7f74f8c6f5a",
+    "singleCallback": "69258614830d6852a0fa6eb9271f63945c88f1db3a0593f1eaae203e5575e392",
+    "singleFreeze": "1c4b719f216f7b10bb874e6485cac60ef6c93ce52bfca94e354b594910a30419",
+    "descriptorClarification": "b7d5394949a1d996e063d4c86edfd39e1b2f8394852c622e5e81f080946de4d1"
+  },
+  "proved": [
+    "Genuine generated/unbound project and physical checkpoint.",
+    "Bash exact lifecycle refusal with bootstrap-binding-required; PowerShell exact write-confinement refusal before lifecycle observation; fixture paths absent from denials.",
+    "Actual default observation matches every execution-bearing returned action field; genuine typed non-ready gate; exact action admitted in Bash and literal PowerShell.",
+    "Foreign same-basename script and unsupported composition refused."
+  ],
+  "holds": [
+    "No native Windows/PowerShell execution or host enforcement.",
+    "Returned action admitted, not executed; no Ready, approved course, PO/Human signature or item acceptance.",
+    "No final assembled candidate full Verify or stage promotion.",
+    "Observed machine trust-anchor guidance remains a separately owned Source concern, not fixed or hidden by this qualifier."
+  ],
+  "privacy": "Receipt/disposition projection only. No raw stdout/stderr, fixture paths, machine public-key metadata, transcript or user key material exported."
+}

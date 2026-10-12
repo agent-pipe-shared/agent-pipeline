@@ -1,0 +1,49 @@
+{
+  "schema": "alfred.prepared-custody-assembly-supplement-readback.v1",
+  "manifest": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.f0e0c29a75af99a42b3d44cbb1cc91ea6191e31e44f8209ca30095326bcfe372.json",
+  "manifestSha256": "f0e0c29a75af99a42b3d44cbb1cc91ea6191e31e44f8209ca30095326bcfe372",
+  "files": [
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-assembly-v2/objects/844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5.json",
+      "sha256": "844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5",
+      "bytes": 175149,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-assembly-v2/objects/907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34.md",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34.md",
+      "sha256": "907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34",
+      "bytes": 4660,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-assembly-v2/objects/10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1.json",
+      "sha256": "10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1",
+      "bytes": 1663,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-assembly-v2/manifest.f0e0c29a75af99a42b3d44cbb1cc91ea6191e31e44f8209ca30095326bcfe372.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.f0e0c29a75af99a42b3d44cbb1cc91ea6191e31e44f8209ca30095326bcfe372.json",
+      "sha256": "f0e0c29a75af99a42b3d44cbb1cc91ea6191e31e44f8209ca30095326bcfe372",
+      "bytes": 4262,
+      "mode": "0644"
+    }
+  ],
+  "physicalContainment": true,
+  "singleLinkCopies": true,
+  "shaBytesModeConserved": true,
+  "gitCheckIgnore": {
+    "exitCode": 1,
+    "stdout": "",
+    "ignored": false
+  },
+  "parentReadbackUnchanged": true,
+  "status": "prepared-only-collision-held",
+  "sourceApplied": false,
+  "testsRun": 0,
+  "criticCalls": 0,
+  "committed": false
+}

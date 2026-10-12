@@ -1,0 +1,37 @@
+{
+  "schema": "alfred.resource-headroom-source-freeze.v1",
+  "manifestSHA256": "106d74bed88adebd9e2c603a8f3a0560c5232968c2da9132efedab3d5b83bff8",
+  "files": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "preimageSHA256": null,
+      "successorParentSHA256": null,
+      "postimagePath": "postimages/plugins/pipeline-core/lib/project-resource-headroom.mjs",
+      "postimageSHA256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2",
+      "bytes": 5369,
+      "additive": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+      "preimageSHA256": null,
+      "successorParentSHA256": null,
+      "postimagePath": "postimages/plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+      "postimageSHA256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801",
+      "bytes": 4790,
+      "additive": true
+    },
+    {
+      "canonicalPath": "templates/prompts/goldfish-task.md",
+      "preimageSHA256": "095f1c24ef174a404984dcfefcc27bcd41d995e4017e2758546f5623e3f2d213",
+      "successorParentSHA256": "18e75f316602aa8667b08523ef2b398a06d892f981549bf42f17ef8736582d56",
+      "postimagePath": "postimages/templates/prompts/goldfish-task.md",
+      "postimageSHA256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "bytes": 57670,
+      "additive": false
+    }
+  ],
+  "independentAssertionsFreezeSHA256": "40509ea5fe168a0bece5aa1f3436c71121dace3c20f01fad42e9f71993fe885d",
+  "semanticRuns": 0,
+  "sourceImports": 0,
+  "independentQualification": "pending-root-checkpoint"
+}

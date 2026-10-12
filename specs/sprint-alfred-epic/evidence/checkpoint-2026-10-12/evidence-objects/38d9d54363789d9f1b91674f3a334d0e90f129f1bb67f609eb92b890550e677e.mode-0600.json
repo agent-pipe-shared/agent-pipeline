@@ -1,0 +1,542 @@
+{
+  "schema": "alfred.tests11-source-content-atomic-transfer.actual.v1",
+  "mode": "--apply",
+  "status": "applied",
+  "operations": [
+    {
+      "tree": "Audit",
+      "path": "harness/scripts/architecture-entry-required-source.test.mjs",
+      "effect": "noop",
+      "sha256": "88b4100248fc868ec592677d85e08c13fe5301c24bb6ef26e112f03bcac22349"
+    },
+    {
+      "tree": "Audit",
+      "path": "harness/scripts/attended-recovery.test.mjs",
+      "effect": "noop",
+      "sha256": "d457c2e0bdc8f996faae86831080d670e0f7f35fb52b30ac2aeb027e32f6caf1"
+    },
+    {
+      "tree": "Audit",
+      "path": "harness/scripts/check-verify-suite-registration.test.mjs",
+      "effect": "noop",
+      "sha256": "cc193228b5eb0acbdfa8eae12f778bfaba7d46323807030233db0fec65fe0bee"
+    },
+    {
+      "tree": "Audit",
+      "path": "harness/scripts/doc-reader-course-budget.test.mjs",
+      "effect": "noop",
+      "sha256": "0ede055126e4d2edc67c93e2d2638241726a5e6e4e4dda8c56c050fb7eb5a4cc"
+    },
+    {
+      "tree": "Audit",
+      "path": "harness/scripts/plan-reopen-current-action.test.mjs",
+      "effect": "noop",
+      "sha256": "a7542fe842bc6c426a97be05da629a4ff5175b64ca57554ae637874b13ad9532"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+      "effect": "noop",
+      "sha256": "2859e0607c781f415faf0be96b26962f040e1f6f808abd55491a7bf3543e185d"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+      "effect": "noop",
+      "sha256": "21f2f72342154e62635b40238674591a3d47514e9bca578342e61c517c0c51ee"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+      "effect": "noop",
+      "sha256": "0bbcc5003762a14b5e3cad2271ba9edfb0080406b0205e4b487feb4d0ba7e60b"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+      "effect": "noop",
+      "sha256": "2998e6474055733ed3140073af22ece8777f7659b94d588283ba6d77105e13c5"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+      "effect": "noop",
+      "sha256": "58c5c88baf7d092daca29e91d5f0a7d9f8ff156d7118768530b5346604d3e743"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+      "effect": "noop",
+      "sha256": "9cd6f5f91527d61f308f48b3e7c35d7b6fb2738757c7d46d4fead49351aa0abc"
+    },
+    {
+      "tree": "Main",
+      "path": "harness/scripts/architecture-entry-required-source.test.mjs",
+      "effect": "add",
+      "sha256": "88b4100248fc868ec592677d85e08c13fe5301c24bb6ef26e112f03bcac22349",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "a2ba22b7f3079f745688ed6332b889ab2ef38577b546df5f35bb20dee621870a",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "6362",
+        "mtimeNs": "1791671422999024375",
+        "ctimeNs": "1791671423046519159",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": null,
+      "backupPath": null
+    },
+    {
+      "tree": "Main",
+      "path": "harness/scripts/attended-recovery.test.mjs",
+      "effect": "replace",
+      "sha256": "d457c2e0bdc8f996faae86831080d670e0f7f35fb52b30ac2aeb027e32f6caf1",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "e7d656684a1b5c3086c8a2479b34b972e575cd67e4d0fcebd781f9004b10bc60",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "38178",
+        "mtimeNs": "1791671423005106019",
+        "ctimeNs": "1791671423048520545",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "96bf50b94aaaf2109868e0c669a9af0166ce5d2c38d612a6856931870afce1ab",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "053c7c2373d9bcfd386044a3f7d401739ca46cf593e8f807393c93b7052e64d6",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "36129",
+          "mtimeNs": "1791534747256743687",
+          "ctimeNs": "1791569417488165426"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/standalone-tests12-inspection-preparation/apply-once/backups/1.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "harness/scripts/check-verify-suite-registration.test.mjs",
+      "effect": "replace",
+      "sha256": "cc193228b5eb0acbdfa8eae12f778bfaba7d46323807030233db0fec65fe0bee",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "0ba66d0ad6f8cd40079f77198e9fcc27179f3063a20ea32c0b35581c7d37444b",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "44296",
+        "mtimeNs": "1791671423010962284",
+        "ctimeNs": "1791671423052520453",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "09efd30c36657e0df244ed354501f3abf7857b6fe4105a490a39033c347c1b90",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "c469261d0cc3936c269a3ecac2c0d21f12474a29b6be49d83f610550432fd038",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "44128",
+          "mtimeNs": "1790949947238760900",
+          "ctimeNs": "1791569417486312860"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/standalone-tests12-inspection-preparation/apply-once/backups/2.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "harness/scripts/doc-reader-course-budget.test.mjs",
+      "effect": "add",
+      "sha256": "0ede055126e4d2edc67c93e2d2638241726a5e6e4e4dda8c56c050fb7eb5a4cc",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "2bb1d5ec979903a4d6d8f077b7301043af02fbded29e3accf0e639c6f136e434",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "14277",
+        "mtimeNs": "1791671423013821122",
+        "ctimeNs": "1791671423056520361",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": null,
+      "backupPath": null
+    },
+    {
+      "tree": "Main",
+      "path": "harness/scripts/plan-reopen-current-action.test.mjs",
+      "effect": "add",
+      "sha256": "a7542fe842bc6c426a97be05da629a4ff5175b64ca57554ae637874b13ad9532",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "e67e24f7667265edf946adaa268edf3556c6f606bf7acac037f61de167f1d13f",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "5175",
+        "mtimeNs": "1791671423016671019",
+        "ctimeNs": "1791671423062435280",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": null,
+      "backupPath": null
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+      "effect": "replace",
+      "sha256": "2859e0607c781f415faf0be96b26962f040e1f6f808abd55491a7bf3543e185d",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "7fe1ebed23c09a3d0b02a8af812ee8343907cddb62543644954da56731179d84",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "28235",
+        "mtimeNs": "1791671423021795167",
+        "ctimeNs": "1791671423062435280",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "9065bd23680a799b2430fd29ca6e0276b43d515b28494ac1aa26cd90e1fea120",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "be2ab2ba2f38771139c8c8ac8710c78b2914c062319b86a236289122566a91ca",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "28158",
+          "mtimeNs": "1791534747260743517",
+          "ctimeNs": "1791569417493339390"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/standalone-tests12-inspection-preparation/apply-once/backups/5.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+      "effect": "add",
+      "sha256": "21f2f72342154e62635b40238674591a3d47514e9bca578342e61c517c0c51ee",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "041d7a58955956f13c07af636beee00f56dfb014975d1b2b7f6cf91dfdcf4e2a",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "8533",
+        "mtimeNs": "1791671423024832744",
+        "ctimeNs": "1791671423064520177",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": null,
+      "backupPath": null
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+      "effect": "add",
+      "sha256": "0bbcc5003762a14b5e3cad2271ba9edfb0080406b0205e4b487feb4d0ba7e60b",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "d95045ec2c02549cdddf41272bae46ca8d8f63b1744e5b51c005761ef2081af8",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "6024",
+        "mtimeNs": "1791671423027797480",
+        "ctimeNs": "1791671423068520085",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": null,
+      "backupPath": null
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+      "effect": "replace",
+      "sha256": "2998e6474055733ed3140073af22ece8777f7659b94d588283ba6d77105e13c5",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "3eff0fa38f19bf24222ad2a36b0b1d4c255e29619cd3773e4812f8ca43eb35e3",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "15961",
+        "mtimeNs": "1791671423033052347",
+        "ctimeNs": "1791671423074517708",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "32593ce27aa0d5feb7f2d92a31ed91075ee47d41d4e52ad05f08b13905276fed",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "06c1ab9e7d5c3f32d8bb172e80d8bce2c225b4ebc4fbb03670cdcf37a857db84",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "15793",
+          "mtimeNs": "1790938622000000000",
+          "ctimeNs": "1791569417497480737"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/standalone-tests12-inspection-preparation/apply-once/backups/8.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+      "effect": "replace",
+      "sha256": "58c5c88baf7d092daca29e91d5f0a7d9f8ff156d7118768530b5346604d3e743",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "0da1ccb2e9a56c919ffa75565780852b644befa8a0fb3ffd9156a6cbc1be2954",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "349546",
+        "mtimeNs": "1791671423039814308",
+        "ctimeNs": "1791671423074517708",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "3ee290571522bff299675250e376322115bd4e4a81cbe5f7cc7af75862439755",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "09e86997e457f4052008f2e14152a4d706c2749b5c4b93e6591f64eb7bdf12f5",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "349533",
+          "mtimeNs": "1791534747316741159",
+          "ctimeNs": "1791569417515720835"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/standalone-tests12-inspection-preparation/apply-once/backups/9.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+      "effect": "replace",
+      "sha256": "9cd6f5f91527d61f308f48b3e7c35d7b6fb2738757c7d46d4fead49351aa0abc",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "39cb2e26fd3f957f976f61f747ac2d70ee0b155e157094246726acfda6697826",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "134335",
+        "mtimeNs": "1791671423046519159",
+        "ctimeNs": "1791671423076519901",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "70fdbefcad9f87a6f08569c1d6c92bee8aefd421490013e3d584d6c6896f6ad1",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "81d41ac7805d647bde40b100e2f3ec52de115251d489d66a435b3a73797d9b32",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "133061",
+          "mtimeNs": "1791534747320740991",
+          "ctimeNs": "1791569417515720835"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/standalone-tests12-inspection-preparation/apply-once/backups/10.before.bin"
+    }
+  ],
+  "noProductImports": true,
+  "businessRuns": 0,
+  "protectedTargets": 0,
+  "conservation": {
+    "AuditSourceTargets": 11,
+    "MainNamedDependencies": 0,
+    "allExactPhysicalCAS": true,
+    "consumedPathsExcluded": 47
+  },
+  "businessQualified": false,
+  "runtimeDependencyQualification": false,
+  "contentTransferOnly": true,
+  "createdDirectories": []
+}

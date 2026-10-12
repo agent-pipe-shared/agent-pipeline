@@ -1,0 +1,54 @@
+{
+  "schema": "alfred.diqa-ordinary-parent-qualification-closure.v1",
+  "status": "closed-controlled-qualification",
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+    "postimagePath": "legacy-origin:alfred-claude-design-input-answers-baseline-source-20261010/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+    "postSha256": "384224a5ceee61c14ae72a50a452863e58b3374294c445761a977087fc5e2290",
+    "parentSha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+    "mode": 420,
+    "sourceManifestSha256": "0722f0e115db5dd1c3bcb2cfe862bee825a226bb1b582d257656dd9d34598194"
+  },
+  "files": [
+    {
+      "path": "qualification.json",
+      "sha256": "fe26899337d3fb5ef09ea90e788e4f4c5e96b0c7df376b48e0e0ad64ca9e0714",
+      "bytes": 2970
+    },
+    {
+      "path": "public-proof.json",
+      "sha256": "1f4ad15f63eb182e930e34151578c315281bac2a8e3abddda8e5484c2ab05927",
+      "bytes": 2044
+    },
+    {
+      "path": "qualification-report.md",
+      "sha256": "fd6a6bcd2c840cc6c0c4d4b4efd4bf4980cd558a1ef0a05215eb8a130719e52b",
+      "bytes": 2725
+    },
+    {
+      "path": "execution.json",
+      "sha256": "34406051eeb11f447c252e5ecba879a9f60a0d295f9ac813a5363085e8a7bf5b",
+      "bytes": 1504
+    },
+    {
+      "path": "close-qualification.mjs",
+      "sha256": "ffba5e57ce77d9cc407a998575df122cf794037d251a80584da083a461f8a360",
+      "bytes": 5854
+    }
+  ],
+  "originalTenPreserved": true,
+  "semanticRuns": 1,
+  "noRerun": true,
+  "history": [
+    {
+      "path": "legacy-origin:alfred-claude-design-input-answers-baseline-independent-20261010/execution.json",
+      "sha256": "8af26878b5e2002f56fc7e2b6cf4b8828d1663c349cdc12e4e3279dbe6041be4",
+      "classification": "initial296 resource omission; zero callbacks; not product RED"
+    },
+    {
+      "path": "legacy-origin:alfred-claude-design-input-answers-independent-20261010/qualification-manifest.json",
+      "sha256": "a7eaf6d9b8e9cabc62952d5b4915b8d2f70c139da18d167f0382aeb46925af50",
+      "classification": "old5aeb/ddc2 parent proof retained; not promoted to ordinary512ee/384"
+    }
+  ]
+}

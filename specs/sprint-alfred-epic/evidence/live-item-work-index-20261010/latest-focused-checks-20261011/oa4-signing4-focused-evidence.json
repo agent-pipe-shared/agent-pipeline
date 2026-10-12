@@ -1,0 +1,258 @@
+{
+  "schema": "alfred.oa4-signing4.public-focused-evidence.v1",
+  "oa4": {
+    "receiptSha256": "7903bbf32b3c26e6a66dc92800a20006402caf7cc203deef2d5984e24e10cae4",
+    "status": "applied-content-only",
+    "sourceManifestSha256": "befbf4030cf805d50e5f6aacfe39c04e47753e9e96d73100b9b95add3764eeeb",
+    "effects": [
+      {
+        "path": "plugins/pipeline-core/scripts/onboarding-init.mjs",
+        "parentSha256": "95334f693f879d43c18903aa57f79c89bc9b8ad6e21ab1fe2ca8755d52752c40",
+        "postSha256": "1b6ee040995c155c173b365ad5ccdbea318089e5e797c1c01814042e3815b1fb",
+        "mode": "0644",
+        "size": 95281,
+        "newInode": true,
+        "nlink": 1,
+        "directorySynced": true,
+        "originalAliasBytesConserved": true
+      },
+      {
+        "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "parentSha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+        "postSha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "mode": "0644",
+        "size": 423673,
+        "newInode": true,
+        "nlink": 1,
+        "directorySynced": true,
+        "originalAliasBytesConserved": true
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "parentSha256": "c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc",
+        "postSha256": "0050f25191b7576df2c52d7f6d82b24e32cbc60f1f75b7fb1547b7ba856776d3",
+        "mode": "0644",
+        "size": 78142,
+        "newInode": true,
+        "nlink": 1,
+        "directorySynced": true,
+        "originalAliasBytesConserved": true
+      },
+      {
+        "path": "plugins/pipeline-core/lib/onboarding-argv-shapes.mjs",
+        "parentSha256": "494955d7dd939f732bffa3b1d5686a16f1b0d4de6371c110e24d8031644a56ff",
+        "postSha256": "0cb8515be69aaff6cd59297de14585cf6ff581342a19b88d7f42583a4ae991e7",
+        "mode": "0644",
+        "size": 9534,
+        "newInode": true,
+        "nlink": 1,
+        "directorySynced": true,
+        "originalAliasBytesConserved": true
+      }
+    ],
+    "inputsConserved": true,
+    "proofHistory": {
+      "originalReceiptSha256": "06a4905f794a7ac972d3e2b6b54dd8d0069293dc43775cfeb91f97479f1c2005",
+      "originalFd3Sha256": "59921419583c5c1ee8fdf1ad841a80e6968747e04ed253d5f617ff935052e3d1",
+      "originalCounts": {
+        "pass": 12,
+        "fail": 3,
+        "skip": 0,
+        "todo": 0
+      },
+      "retainedPassIds": [
+        "EPA001",
+        "EPA002",
+        "EPA003",
+        "EPA004",
+        "EPA005",
+        "EPA006",
+        "EPA007",
+        "EPA008",
+        "EPA009",
+        "EPA010",
+        "EPA013",
+        "EPA014"
+      ],
+      "focusedReceiptSha256": "28be7e6c6e09d04fa2ace18e7c488a26b677ca8e7a16dd7e24d459b907d9e787",
+      "focusedFd3Sha256": "da157c47943c3cbf1e08f9a77a95210b2fecc67bdadcb4192acca564439aa7a9",
+      "focusedCounts": {
+        "pass": 3,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "correctedPassIds": [
+        "EPA011",
+        "EPA012",
+        "EPA015"
+      ],
+      "singleJoint15Run": false,
+      "canonicalSuiteQualified": false
+    }
+  },
+  "signing": [
+    {
+      "label": "SDA2",
+      "receiptSha256": "e163c702dab8366acc21fd5c66eeb55bfa64e16fa40b8f4c164b3ac84219ee99",
+      "caseIds": [
+        "SDA001",
+        "SDA002"
+      ],
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "6c8fcb679d7cf1caac5bf35a65331be16c6f278365b88ae6507364d9965f0235",
+        "caseSetSha256": "73e604fe9f925f3aa566243b6e101332290e36ed92ce9dbca0d6943e7dea3ec9",
+        "dispositionsSha256": "6542c3a2387a903a15f8108878fd0568b0ea6db1c8648a3387cf2dc29315fadd",
+        "declaredCount": 2,
+        "disposedCount": 2,
+        "counts": {
+          "pass": 2,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "cases": [
+        {
+          "id": "SDA001",
+          "disposition": "pass"
+        },
+        {
+          "id": "SDA002",
+          "disposition": "pass"
+        }
+      ],
+      "fd3Sha256": "d5d0b9bae31b9f914a6f3fcae3161a3a7da8919bdc43528d5f834c78b953ef56",
+      "fd3Bytes": 765,
+      "fd3Locator": "qualification-output/fd3.jsonl in the respective owned qualifier; Root-declared and physically hash/byte checked",
+      "stdoutSha256": "f0f7de1bf4a341369ebb51df9a253ea69696b5d4cc965a2138ff378e7ef53732",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "selectedSourceManifestSha256": "48db0eb7e7b62db4d78a39a4800de60bb81c72c0170fc3b443e36e6aa49b2841",
+      "sourceConserved": true,
+      "graphConserved": true,
+      "child": {
+        "status": 0,
+        "signal": null,
+        "errorCode": null
+      },
+      "methodOnly": true,
+      "Human": false,
+      "native": false,
+      "history": {
+        "priorReceiptSha256": "51ae72636bb20f808dea7e18512db02c99563267f077bbc2ef5a303bc4f164c5",
+        "originalSelectedSourceSha256": "4022023ec502416ab15b2134d7059220145bfe1639e5807c77b8b515a69fd6db"
+      },
+      "hgoDuringSha256": "92a0b33602345237a576cac9b5737bd647c150e41d263d0746f980e6bd9f7a94",
+      "fixtureSha256": null,
+      "fixtureScope": "controlled METHOD; actual HGO92 selection restored after run"
+    },
+    {
+      "label": "SDR2",
+      "receiptSha256": "579b5a7cfbb98bc841c77c7dc8ac752b15698350d27616540d5027b31a4be9cc",
+      "caseIds": [
+        "SDR001",
+        "SDR003"
+      ],
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "0b5341eeb57bd302d1b08535880866e7b096533fd61313fb8e136d48a80ad9cb",
+        "caseSetSha256": "3cbe3eef26da13678e0490150173557d10b8a4d19502abffced97636658889d5",
+        "dispositionsSha256": "bddf39d056abb28c4b2956800ccc4310340e157ee30f7e33c2a21fadcd234074",
+        "declaredCount": 2,
+        "disposedCount": 2,
+        "counts": {
+          "pass": 2,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "cases": [
+        {
+          "id": "SDR001",
+          "disposition": "pass"
+        },
+        {
+          "id": "SDR003",
+          "disposition": "pass"
+        }
+      ],
+      "fd3Sha256": "af3e324e200c74b4c189b7c3c683f803a41a6f9e2c6bc96bc20b2c28165285ea",
+      "fd3Bytes": 765,
+      "fd3Locator": "qualification-output/fd3.jsonl in the respective owned qualifier; Root-declared and physically hash/byte checked",
+      "stdoutSha256": "0163aef21d24ebc9c5e5e3d388636447634335eb8e7568e51de7ff34ffc8515e",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "selectedSourceManifestSha256": "4022023ec502416ab15b2134d7059220145bfe1639e5807c77b8b515a69fd6db",
+      "sourceConserved": true,
+      "graphConserved": true,
+      "child": {
+        "status": 0,
+        "signal": null,
+        "errorCode": null
+      },
+      "methodOnly": true,
+      "Human": false,
+      "native": false,
+      "history": {
+        "priorReceiptSha256": "d31d70dde7e670b1b9ac96b7f810580bde4b10eaca1276c7f469d476d5a7c4e8",
+        "originalSelectedSourceSha256": "4022023ec502416ab15b2134d7059220145bfe1639e5807c77b8b515a69fd6db"
+      },
+      "hgoDuringSha256": null,
+      "fixtureSha256": "227ec64b725fcb1d68ede899f4bde84546d3c0e3ad1e6b94bfcffaf237ab0fa1",
+      "fixtureScope": "controlled METHOD; owned tmpdirFn seam"
+    }
+  ],
+  "limits": {
+    "signingSourceIntegrated": true,
+    "HumanAssurance": false,
+    "nativeAssurance": false,
+    "all19Qualified": false,
+    "wholeItemAcceptance": false,
+    "matrix174StagesChanged": false,
+    "rawPrivateReceiptsPublished": false
+  },
+  "signingContentIntegration": {
+    "receiptSha256": "1ce0671acaad1589c4c31b70ccc9576f775c7663dc986f73d45eb2edbd39fc99",
+    "status": "applied-exact-four-new-inodes",
+    "applied": true,
+    "inputsConserved": true,
+    "semanticRuns": 0,
+    "effects": [
+      {
+        "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+        "postSha256": "d571210c743b48aebff152a1cd5c8dd869144b81182864dc7f178ad71b5976a5",
+        "mode": "0755",
+        "size": 190063,
+        "nlink": 1,
+        "newInode": true
+      },
+      {
+        "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "postSha256": "92a0b33602345237a576cac9b5737bd647c150e41d263d0746f980e6bd9f7a94",
+        "mode": "0644",
+        "size": 336183,
+        "nlink": 1,
+        "newInode": true
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "postSha256": "963871389f011f81a90657b0a67c1d13ff5f3f6d9ff702e65d95679a6defb04c",
+        "mode": "0644",
+        "size": 137206,
+        "nlink": 1,
+        "newInode": true
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/guard-human-override.mjs",
+        "postSha256": "91a40900dea8aa87956a7c1cbf657dc4589816b72e76ea2b5091f05510559009",
+        "mode": "0644",
+        "size": 35110,
+        "nlink": 1,
+        "newInode": true
+      }
+    ]
+  }
+}

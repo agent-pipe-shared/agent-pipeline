@@ -1,0 +1,46 @@
+{
+  "schema": "alfred.powershell-remaining-qualification-route.v1",
+  "requirement": {
+    "path": "backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+    "sha256": "a2e2fbb3b955625a7758fc320b2bf5d3d4754751de194d82d47f7c8b70ea1775"
+  },
+  "status": "Proposed finite qualification routes; no runtime outcomes",
+  "routes": [
+    {
+      "criterion": "Unauthorized outside-root read refusal",
+      "evidence": "Corrected four genuine configured credential negatives plus benign positives. Retained original Glob and secret-name/composition controls remain separately evidenced.",
+      "remaining": "Native Windows Bash and PowerShell same-target parity is unqualified."
+    },
+    {
+      "criterion": "Non-ready-phase command refusal",
+      "entry": "Actual installed guard-lifecycle-ready hook and its selected guard evaluator",
+      "fixture": "Create a genuine project with the existing bootstrap producer stopped at actual bootstrap-binding-required; read back the real onboarding result and current lifecycle before invoking both declared shell lanes with the same unrelated command.",
+      "checks": [
+        "No injected ready/phase boolean or fabricated State",
+        "Actual non-ready result and current project identity",
+        "Both shell lane refusals, typed recovery output, physical pre/post conservation"
+      ],
+      "availability": "Exact public non-ready producer and returned recovery payload must be supplied by the existing fixture/source owner; no such constructor is established by the direct read callbacks."
+    },
+    {
+      "criterion": "Legitimate returned onboarding action",
+      "entry": "Actual project-onboarding-v3 inspect result and installed supported shell guard",
+      "fixture": "Obtain a real returned action from the same genuine non-ready project, submit its exact Source-owned command to the explicitly supported guard lane, and distinguish admission from actual action execution.",
+      "checks": [
+        "No caller-authored command relabeled as returned action",
+        "Exact action and owned project binding",
+        "Benign unrelated command remains refused",
+        "Actual action effects require a separate Root-owned authorized invocation"
+      ],
+      "availability": "Held until actual inspector/action producer and supported lane are declared. Do not add signing, host identity or new PO gates."
+    },
+    {
+      "criterion": "Tool/hook registration",
+      "evidence": "Retained PSB009 checks actual registered Bash, PowerShell, Read, Grep and Glob matchers.",
+      "remaining": "Native host invocation, non-ready applicability and manual whole-item acceptance remain open."
+    }
+  ],
+  "qualificationReady": false,
+  "nativeWindowsClaim": false,
+  "wholeItemAcceptance": false
+}

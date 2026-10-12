@@ -1,0 +1,52 @@
+{
+  "schema": "alfred.scratch-ignored-counterpart-public-actual8.v1",
+  "item": "pipeline.scratch-has-no-retention-and-no-durability-check",
+  "criterion": {
+    "path": "backlog/items/2026-10-05-scratch-has-no-retention-and-no-durability-check.md",
+    "sha256": "70c82ba3de815edfca42bdc74dfe66859063e2aa83113a24d76109b7207d5180"
+  },
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+    "parentSha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+    "postSha256": "bde2d769d8e0642a2d57e144c703c882d3a38e4a9417102c06177fb3fc1f55fe"
+  },
+  "independentBeforePostSha256": "b9f356dd8dec452c160c53a45fd8c8f695da3f601c48fdc6ed7b685179068b42",
+  "actualReceiptSha256": "afe9327afc8e06772202351e99740fbbafda5b3ae607c35d508097dc26554ad6",
+  "completionSha256": "dd76e8ac8657edcc3a79b2297f9463b7d6a617a6053891b3a5d4df051d70d3ca",
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "f9eea6a643df55ad1cd76a8f28bfb85b9d65bdde413a77743262c56e40861caa",
+    "caseSetSha256": "bffe65991c4fbdac43a5d2a9091d9e280e356c3ad0a6c6a765d4e71afdaa6e93",
+    "dispositionsSha256": "c98a3fdd397f1ea9f0a4dcb6d8c16844835138770ba42ca1b33a354e70b38e69",
+    "declaredCount": 8,
+    "disposedCount": 8,
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "caseIds": [
+    "SIC001",
+    "SIC002",
+    "SIC003",
+    "SIC004",
+    "SIC005",
+    "SIC006",
+    "SIC007",
+    "SIC008"
+  ],
+  "sourceConserved": true,
+  "provenance": "Source-author controlled assertions; independently frozen before-post contract; Root performed the single actual run.",
+  "limits": {
+    "stagingSweepQualified": false,
+    "currentPushOrHandoverExecuted": false,
+    "nativeOrInstalledProof": false,
+    "independentCritic": false,
+    "wholeItemAccepted": false,
+    "MainIntegrationClaim": false
+  },
+  "disclosure": "Only canonical public references, exact digests and case dispositions; no raw fixture repositories, source bodies, private paths, host metadata or raw logs."
+}

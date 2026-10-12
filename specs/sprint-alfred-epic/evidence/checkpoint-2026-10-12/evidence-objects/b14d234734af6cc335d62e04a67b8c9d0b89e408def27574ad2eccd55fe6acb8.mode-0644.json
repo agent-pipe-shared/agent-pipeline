@@ -1,0 +1,46 @@
+{
+  "schema": "alfred.unknown02.private-followthrough-manifest.v1",
+  "files": [
+    {
+      "path": "legacy-origin:alfred-unknown02-current-main-assessment-20261011/private-followthrough/goldfish-task.parent.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "bytes": 57670,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-unknown02-current-main-assessment-20261011/private-followthrough/goldfish-task.post.md",
+      "sha256": "83541355713146a99e59cfae3f1c5954848a172388cf15e96b3a2bccb61da425",
+      "bytes": 58416,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-unknown02-current-main-assessment-20261011/private-followthrough/goldfish-exact-splice-and-inverse.json",
+      "sha256": "ef2359c31edde3845ef2f38cdda2a3df31e654500f09732f5bc8ec967236e1e6",
+      "bytes": 2587,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-unknown02-current-main-assessment-20261011/private-followthrough/handover-classification-needed.json",
+      "sha256": "8d3b5cd36e769b8f531e69d4f23fc837b6335953c81109f635f5f611a836e72c",
+      "bytes": 2285,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-unknown02-current-main-assessment-20261011/private-followthrough/native-patch-rehearsal-needed.json",
+      "sha256": "28472c2fde1ecbeaab3c0b18a9a6fa63c894a0b42b00b50ca6335d958a1ed43c",
+      "bytes": 2688,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "sourcePostCount": 1,
+  "canonicalWrites": 0,
+  "businessRuns": 0,
+  "SourceParentConserved": true,
+  "approval": "Root narrow original-scope follow-through; roles owner confirms no template postimage conflict",
+  "limits": "Private proposals only; no tests, acceptance or native/runtime claim"
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "HDN001",
+    "HDN002",
+    "HDN003",
+    "HDN004",
+    "HGS003"
+  ],
+  "maxBytes": 32768
+}

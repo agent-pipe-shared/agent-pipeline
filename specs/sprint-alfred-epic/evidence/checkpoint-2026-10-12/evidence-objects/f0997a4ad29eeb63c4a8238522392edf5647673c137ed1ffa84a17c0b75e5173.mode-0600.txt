@@ -1,0 +1,16 @@
+WEL002 FAIL ERR_ASSERTION: Expected values to be strictly equal:
++ actual - expected
+
++ '""C:\\Node With Spaces\\npm.CMD" "test""'
+- '""C:\\Node With Spaces\\npm.cmd" "test""'
+
+WEL004 FAIL ERR_ASSERTION: The expression evaluated to a falsy value:
+
+  assert(!f.observations.some(p=>p.endsWith('npm.CMD')))
+
+WEL005 FAIL ERR_ASSERTION: Expected values to be strictly equal:
++ actual - expected
+
++ `""C:\\Work\\npm.CMD" "with spaces" "Grüße Ω" "" "single'quote" "--" "name=value" "a\\b" "a/b""`
+- `""C:\\Work\\npm.cmd" "with spaces" "Grüße Ω" "" "single'quote" "--" "name=value" "a\\b" "a/b""`
+

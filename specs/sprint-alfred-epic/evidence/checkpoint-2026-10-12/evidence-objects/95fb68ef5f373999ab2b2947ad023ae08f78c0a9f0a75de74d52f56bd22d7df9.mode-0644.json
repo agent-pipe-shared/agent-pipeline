@@ -1,0 +1,244 @@
+{
+  "schema": "alfred.selected164.consumed47.integration-delta.v1",
+  "parent": {
+    "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed26-role1-successor/remaining-delta.json",
+    "sha256": "c135a8e8aff07daece63cba6e8aca0a4eee26c8bd0edc3cebe10b1a68ee0ab9c"
+  },
+  "counts": {
+    "selected": 164,
+    "integratedSelectedPaths": 47,
+    "remaining": 117,
+    "remainingUnprotected": 104,
+    "remainingSelectedProtected": 13,
+    "protectedUnion": 14,
+    "additionalOutsideSelectionDocuments": 2
+  },
+  "consumed": [
+    "plugins/pipeline-core/skills/reader-review/SKILL.md",
+    "harness/reader-review-protocol.md",
+    "plugins/pipeline-core/reader-inputs/reader-review-protocol.md",
+    "plugins/pipeline-core/reader-inputs/manifest.json",
+    "plugins/pipeline-core/scripts/doc-reader-course.mjs",
+    "plugins/pipeline-core/lib/doc-reader-course.mjs",
+    "harness/scripts/check-doc-reader-binding.mjs",
+    "harness/scripts/doc-reader-terminal-binding.mjs",
+    "plugins/pipeline-core/lib/doc-reader-default-observers.mjs",
+    "plugins/pipeline-core/lib/doc-reader-plan-scope.mjs",
+    "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+    "plugins/pipeline-core/reader-inputs/observation-doc-governance.json",
+    "plugins/pipeline-core/reader-inputs/product-capability-inventory.json",
+    "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+    "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+    "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+    "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+    "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+    "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+    "plugins/pipeline-core/lib/report-source-readers.mjs",
+    "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+    "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+    "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+    "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+    "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+    "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+    "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+    "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+    "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+    "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+    "plugins/pipeline-core/lib/governance-scope.mjs",
+    "plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+    "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+    "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+    "plugins/pipeline-core/lib/git-cmd.mjs",
+    "plugins/pipeline-core/lib/passive-read-policy.mjs",
+    "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+    "plugins/pipeline-core/lib/protected-test-paths.mjs",
+    "docs/product-capability-inventory.json",
+    "docs/operating-model.md",
+    "harness/scripts/shell-grammar-capability-placement.test.mjs",
+    "plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+    "plugins/pipeline-core/lib/scratch-custody-report.mjs"
+  ],
+  "actualReceiptBindings": [
+    {
+      "group": "role1",
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/role1-atomic-preparation/apply-once/actual-receipt.json",
+      "sha256": "95ed87ec0c8fb925d8e7210c3d68ff303ce5104fbfd54a94c8e15263a0aca002"
+    },
+    {
+      "group": "CIA4",
+      "path": "legacy-origin:alfred-claude-inline-attestation-integration-group-20261010/actual-integration.json",
+      "sha256": "f195539b6e21e8a5031d27612ffb51dd7462e92d46de6c0506726b29085e416c"
+    },
+    {
+      "group": "CHAT3",
+      "path": "legacy-origin:alfred-architecture-design-chat-main-integration-preparation-20261011/actual-integration.json",
+      "sha256": "44f1c57196f00a4244aa51fcd829e1b06e353d6383fd28c6afac35cb35c4cded"
+    },
+    {
+      "group": "OA6",
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/apply-once/actual-receipt.json",
+      "sha256": "cfe84efbfdf4a9e21a6d3827fc48826ec25197cb9f1086d7150ca1acda0a12d8"
+    },
+    {
+      "group": "Shell10",
+      "path": "legacy-origin:alfred-selected164-shell-readonly-integration-preparation-20261011/atomic10/apply-once/actual-receipt.json",
+      "sha256": "889aa467f77232290ef34c299c584315bad385a073a72d11706ef904806fe12a"
+    }
+  ],
+  "actualMainOverrides": [
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "CIA4"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "sha256": "5d77cb3c8a806f7ccfe1aea7486e9493ca8039c235da7c31828d91d3420a8514",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "CIA4"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "sha256": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "CIA4"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+      "sha256": "5f665b3ccb60c8a5eab3816a90e006222d93eb51da9567cbe5d906fb5014a383",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "CIA4"
+    },
+    {
+      "path": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+      "sha256": "3f6be98c495e7318523987632528584119d3b99b0ddf04a9f7942694a069fb3a",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "CHAT3",
+      "selected164": true
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/elephant-kickoff.md",
+      "sha256": "dd5a8e96303c36eda91eee0ce8d0f42994008fd2daf6b75bf7fab9d91ed281cc",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "CHAT3",
+      "selected164": false
+    },
+    {
+      "path": "templates/prompts/elephant-kickoff.md",
+      "sha256": "dd5a8e96303c36eda91eee0ce8d0f42994008fd2daf6b75bf7fab9d91ed281cc",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "CHAT3",
+      "selected164": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "OA6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "OA6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "OA6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "OA6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "OA6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "OA6"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+      "sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+      "sha256": "696e847de64e5f99fc3c2289f068d9041902d40cd5c3ff7a9b253d7aec3ff049",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-test-paths.mjs",
+      "sha256": "7e6c14b4188d8c54d291be4e331cff489d7c4de63d5d73bb20afa8011333b262",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "docs/product-capability-inventory.json",
+      "sha256": "04c4c2539df5c0a271f68b44cf07d9a3ae78eb7e82c171d85d8bf3f237c38f58",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "docs/operating-model.md",
+      "sha256": "aa98c8477636b590c29edf454ab03b3e29958a15918973089d3ebdeafe99618e",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "harness/scripts/shell-grammar-capability-placement.test.mjs",
+      "sha256": "756de3f9a93c616c1079dc70a62d0f5c0be26e277e64b44747a83dc677f076e5",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+      "sha256": "65275ee4adb9db869bae6fd19c4cbff902d7f717690b6fcff0aa7c1116ea65f9",
+      "receipt": "Shell10"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "sha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+      "receipt": "Shell10"
+    }
+  ],
+  "limits": [
+    "47 is integrated selected path count, not backlog acceptance or test aggregate qualification.",
+    "OA6 preserves current Main journal202572/supervisor8023; selected later a8bb/ddb not overwritten.",
+    "CHAT selected path actual3f6 successor is explicit; historical007e selection remains retained.",
+    "All176 formal backlog items remain OPEN; native/fullVerify/final local stamp/install readiness not established."
+  ]
+}

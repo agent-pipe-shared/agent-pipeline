@@ -1,0 +1,94 @@
+{
+  "schema": "alfred.critic39-current-nine.actual-qualification-manifest.v1",
+  "status": "focused-method-qualified",
+  "executionSHA256": "040644a2173d78eed58f6109323868d00eede649507090136fd4424d0f2be477",
+  "counts": {
+    "pass": 39,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "fab7fef8fbe129503f3f2adb2ee33a8542fd5dc69ff8eed06fdaf63ef6611e7a",
+    "caseSetSha256": "14cdb17734bd7ca84ec9bee87828778f5fb1191512cae90e945f3eba97b73504",
+    "dispositionsSha256": "45cdfaab1c2e8e7a3078e62bc8c075a2c0e4ed1dde849b30b01dcc24d1cfa1c3",
+    "declaredCount": 39,
+    "disposedCount": 39,
+    "counts": {
+      "pass": 39,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "fd3SHA256": "1072b387fa3af8a4bb1e633c3f6d030a2f98584f347cd1450cad02816de853e5",
+  "sourceBindings": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "sha256": "b7d3db64804d3eca85c83c3416ea74112e9abb6a9727de466a3366407b73c8f2",
+      "source": "legacy-origin:alfred-critic-external-stop-observer-source-v2-20261010/postimages/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "provenance": "CRT035-observer"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "sha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+      "source": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "provenance": "CRT035-runtime"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+      "sha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+      "source": "legacy-origin:alfred-critic-s2-course-source-implementation-20261010/postimages/plugins/pipeline-core/lib/critic-review-lineage.mjs",
+      "provenance": "current-S2"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+      "sha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4",
+      "source": "legacy-origin:alfred-critic-s3-runtime-source-implementation-20261010/postimages/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+      "provenance": "current-S3"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+      "sha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216",
+      "source": "legacy-origin:alfred-critic-external-stop-observer-source-v2-20261010/postimages/plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+      "provenance": "CRT035-observer"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/review-economy.mjs",
+      "sha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12",
+      "source": "legacy-origin:alfred-critic-s2-course-source-implementation-20261010/postimages/plugins/pipeline-core/lib/review-economy.mjs",
+      "provenance": "current-S2"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "sha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313",
+      "source": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "provenance": "CRT035-runtime"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "sha256": "0171392c243b0acd2b4a13041ad59c4f167ca478feb6bfe2fb1acc55aa2375d8",
+      "source": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "provenance": "CRT035-runtime"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+      "source": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "provenance": "CRT035-runtime"
+    }
+  ],
+  "graphSHA256": "4057ac0538d982668cef708334cee8a997bff33627fe5d56e7ca5ea7060c2943",
+  "testSHA256": "d758c46a37bd603762f23279d8b747c709abcdc1e98c1b620d32d7f6024aa05c",
+  "fixtureSHA256": "c7885439debe88749c2b837381122550b052f30db0baf9526919aa86ded8828f",
+  "caseAssociationsSHA256": "46ffd8add49525f3ac45b84ce72bd4d2618650a0ab45aa5db129195b53771513",
+  "mirrorSummarySHA256": "5f77847be3068dad4386e558b73e368536d208d4499d88fe189ca50cdd13fcac",
+  "sourceFilesPostCAS": 6603,
+  "earlierFailuresUnchanged": true,
+  "businessReruns": 0,
+  "CRT13Counted": 0,
+  "nativePASS": false,
+  "officialClosure": false
+}

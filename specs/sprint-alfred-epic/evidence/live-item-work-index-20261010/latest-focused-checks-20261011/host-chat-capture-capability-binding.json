@@ -1,0 +1,127 @@
+{
+  "schema": "alfred.host-chat-capture.public-capability-binding.v1",
+  "itemId": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+  "originalBodySha256": "3764e98348ae4ac91010b98c0eed66f81f9af7a0e7070ab02e7d615d643a47c4",
+  "evidenceKind": "bounded static Source interface plus official documentation",
+  "criteria": [
+    {
+      "id": "original-1",
+      "requirement": "host user-message identity, exactUTF8 bytes, scope, expiry and intake consent",
+      "finding": "Claude native capture has genuine hook/session/project/checkpoint/digest bindings and logical stage expiry; separate time-expiry and cross-runner original-turn issuer not proved"
+    },
+    {
+      "id": "original-2",
+      "requirement": "adapters only with reliable host capture API; otherwise typed unavailable",
+      "finding": "Claude capture is already wired. Codex documented read capability exists; inspected managed binding lacks original current-user-turn issuer. Typed unavailable is allowed and distinct from positive proof."
+    },
+    {
+      "id": "original-3",
+      "requirement": "captured bytes and reference digest in existing intake checkpoint; replay/drift/size controls",
+      "finding": "Claude reader validates reference/session/current checkpoint/revision/bytes; coordinator reuses canonical content-addressed capture writer. No new Codex positive path qualified."
+    },
+    {
+      "id": "original-4",
+      "requirement": "actual chat-only greenfield avoids full agent re-emission and retains byte-exact multiline material",
+      "finding": "positive native/cross-runner path remains unmeasured; supplied-file fidelity does not attest original host bytes"
+    }
+  ],
+  "addendum": "Retain original normative bytes/digest in protected custody before sanitized derivatives; original chat fidelity is not inferred from a summary/file",
+  "capability": {
+    "officialDocUrl": "https://learn.chatgpt.com/docs/app-server",
+    "fetchedDate": "2026-10-11",
+    "documentedMethod": "thread/read",
+    "includeTurns": true,
+    "installedExactCliSchemaObserved": false
+  },
+  "singleMissingAssociation": "genuine current owning host user-session/original thread-turn-item identity joined to actual invocation/repository/current consent scope",
+  "managedBindingExactKeys": [
+    "repoFingerprint",
+    "dispatchId",
+    "candidateCommit",
+    "requestSha256"
+  ],
+  "safeFuturePlacement": "original owning app-server submission/event handler, preserving exact user identity/bytes before deriving scoped opaque reference; existing consent and checkpoint writer reused",
+  "sourcePins": [
+    {
+      "path": "plugins/pipeline-core/lib/claude-initial-prompt-pointer.mjs",
+      "sha256": "79c96450088357dc6c414b56df29341c227f2338e05bf5d5a71a33c3508c9c3b",
+      "size": 17152,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/claude-intake-prompt-capture.mjs",
+      "sha256": "e3806a1b6ecb06c3791f98140595ccb0024194dab5046fcbdf6ee1f8b0e106ee",
+      "size": 13181,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "sha256": "ae69d331bed4ba715458ace4ecded3de56897a636a2121875c7b12ace69442c1",
+      "size": 48384,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c",
+      "size": 18854,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-onboarding-app-server.mjs",
+      "sha256": "d9f0b94ac34eb210c5847d66a2ba02b2bb1dbefc94896228df558a0da2622d25",
+      "size": 5939,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+      "sha256": "2d03909b66e940e665bbd684dd02498c27cc32ce1ea22043dbc2e5fa19ea3657",
+      "size": 49200,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/intake-material-reference.mjs",
+      "sha256": "510462c8413350a97fc602f2d0febb4f99b74b48751817cc7eb816583a89e956",
+      "size": 3119,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "b2886c88cd564b4ba713537e6d109ac69f94e5ed6d446defaf4c1283cb49fcc1",
+      "size": 638620,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "size": 423484,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-advisory-app-server-child.mjs",
+      "sha256": "7b782662dd9a35fd51043ca8f047a67dcd3cc3c06f2ece1c8454927666fec0e8",
+      "size": 8718,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-native-critic-preflight.mjs",
+      "sha256": "3f9c2f71074a5a7cecb32cb7b852749cc8e7aed3c25c7360c61e7a2ac65be20e",
+      "size": 21668,
+      "mode": "0644"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-project-runtime-readback-host.mjs",
+      "sha256": "82d3c9a0fa48b2f20a107028c735d6fe945ebad7418aea4b55ed50ba63d80713",
+      "size": 21404,
+      "mode": "0644"
+    }
+  ],
+  "reviewedCapabilityManifestSha256": "0ffef53f5f296e8c832b4a194aba1d54af479b7da5f58c62e3292c6ae1dc857a",
+  "SourcePosts": 0,
+  "businessRuns": 0,
+  "privateConversationReads": 0,
+  "credentialReads": 0,
+  "nativePositive": false,
+  "installedCoverage": false,
+  "backlogStatusChange": false,
+  "wholeItemAcceptance": false
+}

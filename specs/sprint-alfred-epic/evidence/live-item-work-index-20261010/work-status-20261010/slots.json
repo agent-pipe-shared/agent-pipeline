@@ -1,0 +1,124 @@
+{
+  "schema": "alfred.current-work-slots.v2",
+  "snapshotDate": "2026-10-10",
+  "capacity": 16,
+  "runningAtObservation": 12,
+  "returnedAtObservation": 4,
+  "source": "collaboration.list_agents plus direct owner task messages",
+  "assurance": "Methodological observation, no native/item dispatch authority",
+  "itemAssignmentsInferred": false,
+  "slots": [
+    {
+      "owner": "/root",
+      "observation": "running",
+      "workLocation": null,
+      "taskAndNextDependency": "Coordinator actual146 integration/qualification/publication",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/agy_greenfield_acceptance_audit",
+      "observation": "running",
+      "workLocation": "scratch/alfred-controlled-method-bootstrap-trailer-fixture-successor-20261010",
+      "taskAndNextDependency": "CMO fixture trailers; Source METHOD producer/CMO006 transport closure prerequisite",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/agy_greenfield_design_audit",
+      "observation": "running",
+      "workLocation": "scratch/alfred-v3-declared-override-independent-20261010",
+      "taskAndNextDependency": "Independent v3 override cases; baseline writer fixture/API closure pending",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/agy_greenfield_intake_package",
+      "observation": "returned",
+      "workLocation": "scratch/alfred-command-placement-current120-composition-preparation-20261010",
+      "taskAndNextDependency": "Setup-resumption launcher returned; Root qualification",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/agy_greenfield_roles_audit",
+      "observation": "running",
+      "workLocation": "scratch/alfred-176-criterion-closure-reconciliation-20261010",
+      "taskAndNextDependency": "Criterion-level dispatch/log/measurement analysis; no full-item closure",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_obl013_override_digest_regression",
+      "observation": "returned",
+      "workLocation": "scratch/alfred-controlled-method-onboarding-current146-lineage-source-20261010/initializer-successor",
+      "taskAndNextDependency": "Combined onboarding Source returned; Root qualification/integration",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_obl016_heredoc_extractor_regression",
+      "observation": "returned",
+      "workLocation": "scratch/alfred-critic-one-plus-diff-po-decision-source-20261010",
+      "taskAndNextDependency": "Critic cap Source returned; independent qualification pending",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_optional_advisor_source_followthrough",
+      "observation": "running",
+      "workLocation": null,
+      "taskAndNextDependency": "Critic independent fixture task; exact latest location awaiting confirmation",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_r10_integration_inventory",
+      "observation": "running",
+      "workLocation": "scratch/alfred-permanent-work-tracking-publication-successor-20261010",
+      "taskAndNextDependency": "Durable work-status publication preparation",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_reader_2plus1_docs_r2",
+      "observation": "running",
+      "workLocation": null,
+      "taskAndNextDependency": "Root-assigned Critic template cap followthrough; exact latest location awaiting confirmation",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_reader_controller_independent_tests",
+      "observation": "running",
+      "workLocation": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent",
+      "taskAndNextDependency": "Normative14State+12I08 constructors; I03 bridge/genuine review prerequisites",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_role_fallback_independent",
+      "observation": "running",
+      "workLocation": "scratch/alfred-ac07-durable-binding-current122-resource-preparation-20261010/successor6",
+      "taskAndNextDependency": "Resource closure successor; original14 setup failed before cases; Root launch pending",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_state_i08_invariant_assertions",
+      "observation": "running",
+      "workLocation": "scratch/alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis",
+      "taskAndNextDependency": "Persisted-fact repository projection correction; exact combined onboarding parent pending, unqualified",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/alfred_transfer_integrity_source_actor",
+      "observation": "running",
+      "workLocation": "scratch/alfred-current146-final-composition-plan-20261010",
+      "taskAndNextDependency": "Final composition proposal; METHOD writer/trailer/operation bridge source dependencies",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/quality_inline_coordinator_audit",
+      "observation": "running",
+      "workLocation": "scratch/alfred-existing-route-source-followthrough-20261010/i03-owned-operation-source",
+      "taskAndNextDependency": "Genuine I03/State owned constructor Source bridge; freeze/independent14+12 pending",
+      "itemIDsExplicitlyBound": []
+    },
+    {
+      "owner": "/root/r10_reader_budget_fix",
+      "observation": "returned",
+      "workLocation": "scratch/alfred-agy-observed-version-independent-tests-20261010",
+      "taskAndNextDependency": "Corrected22 runner v6 returned/unrun; pure7 proof separate",
+      "itemIDsExplicitlyBound": []
+    }
+  ]
+}

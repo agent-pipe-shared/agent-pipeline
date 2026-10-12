@@ -1,0 +1,81 @@
+{
+  "schema": "alfred.claude-inline-attestation-case-associations.v1",
+  "assertions": {
+    "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/claude-attestation.test.mjs",
+    "sha256": "d59e0f6e106d04b39d6003998f01a2fa33204f5de33330cbf15217f74d4f6e46",
+    "bytes": 4346,
+    "mode": 420,
+    "nlink": 1
+  },
+  "fixture": {
+    "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/claude-attestation.fixture.mjs",
+    "sha256": "f652d317c96ae3e76247d3a984073c6de594abffa184ffcaf8cd76f743875ca3",
+    "bytes": 7528,
+    "mode": 420,
+    "nlink": 1
+  },
+  "sourceSha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+  "completionSha256": "d516c536bf6ca95d9d8e818048e14aa0141a6ab4427811e553a02dbf537eb5b6",
+  "cases": [
+    {
+      "id": "CIA001",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Real copied Claude source/install and opaque governance enrollment produce actual host receipt, independent readback and ordinary verified preflight result; downstream prerequisites remain visible."
+    },
+    {
+      "id": "CIA002",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Existing genuine receipt is read without authority-file byte/mode/inode/mtime rewrite."
+    },
+    {
+      "id": "CIA003",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Missing, disabled or duplicate actual registry entries publish no attestation."
+    },
+    {
+      "id": "CIA004",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Wrong version or loaded-root registry binding cannot publish."
+    },
+    {
+      "id": "CIA005",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Fresh actual registry disablement and foreign physical marketplace-source mapping remain unavailable."
+    },
+    {
+      "id": "CIA006",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Actual installed protected-byte drift rejects source observation."
+    },
+    {
+      "id": "CIA007",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Tampering a genuinely produced owned receipt before independent readback prevents continuation."
+    },
+    {
+      "id": "CIA008",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Unsafe physical mode on a genuinely produced owned receipt prevents independent readback."
+    },
+    {
+      "id": "CIA009",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Actual inactive project remains inactive and performs no pipeline work; attestation is not install consent."
+    },
+    {
+      "id": "CIA010",
+      "disposition": "pass",
+      "scope": "controlled physical preflight boundary",
+      "claim": "Actual registered direct-directory topology retains not-required receipt semantics."
+    }
+  ]
+}

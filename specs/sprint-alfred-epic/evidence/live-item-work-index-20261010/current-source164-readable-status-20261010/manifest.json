@@ -1,0 +1,73 @@
+{
+  "schema": "alfred.source164-status-publication.v1",
+  "inputs": [
+    {
+      "path": "scratch/alfred-current146-final-composition-update-20261010/actual-source-manifest.json",
+      "sha256": "aba63c5cac17b0f7c33557b7581d010f0e803454c45713879f9ecdf3ec8b967f",
+      "bytes": 122258
+    },
+    {
+      "path": "scratch/alfred-current146-final-composition-update-20261010/actual-receipt.json",
+      "sha256": "ac3fcfbefbc51fa4c801943969659b13fead9595966dda4b11c95a3c032799ed",
+      "bytes": 4765
+    },
+    {
+      "path": "scratch/alfred-ac07-omitted-eight-genuine-writer-preparation-20261010/official-verify/constructor-successor/qualification/runtime/two-generations/execution.json",
+      "sha256": "9ea7ef72ab7b600a8960ef796db40b3e436c87b945cec1433da75c93a7ebb62b",
+      "bytes": 4114
+    },
+    {
+      "path": "specs/sprint-alfred-epic/WORK-STATUS.md",
+      "sha256": "29eebc62a56a27ef19c6e7de80e7d83f92cc13249dae779a24a75ed4c3304f47",
+      "bytes": 4947
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/handover-2026-10-10-live-work-index.md",
+      "sha256": "9d6a0a2f76d22206982f4d8ffb44868b737d684dce0953c48181e46150f811df",
+      "bytes": 24501
+    }
+  ],
+  "files": [
+    {
+      "path": "assembly164-public-proof.json",
+      "sha256": "f29aac6a9357de92c13a90d94c52d4a72fe01c8b00f7129e67e04765c2cebb29",
+      "bytes": 5751,
+      "mode": 420
+    },
+    {
+      "path": "verify-two-generations-public-proof.json",
+      "sha256": "bd57b14332a8cc56cc7d76b12a9b1197e88aba6aebe65d4c91be49f5394e72c4",
+      "bytes": 2900,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "55cc860287eeb1e2cdd65159197cae668ed45135a32690d719659dc35a046440",
+      "bytes": 1552,
+      "mode": 420
+    },
+    {
+      "path": "WORK-STATUS.snapshot.md",
+      "sha256": "29eebc62a56a27ef19c6e7de80e7d83f92cc13249dae779a24a75ed4c3304f47",
+      "bytes": 4947,
+      "mode": 420
+    },
+    {
+      "path": "handover.snapshot.md",
+      "sha256": "9d6a0a2f76d22206982f4d8ffb44868b737d684dce0953c48181e46150f811df",
+      "bytes": 24501,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "cfd47e6f6582682f221a3810849563f9f73be85ec0bdeebf5f866a6f78b069e0",
+      "bytes": 795,
+      "mode": 420
+    }
+  ],
+  "liveMetadataWrites": 2,
+  "productWrites": 0,
+  "gitWrites": 0,
+  "businessRuns": 0,
+  "archiveRuns": 0
+}

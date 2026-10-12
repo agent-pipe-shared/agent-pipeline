@@ -1,0 +1,106 @@
+{
+  "schema": "alfred.selected164.consumed144.runtime9-append.v1",
+  "parent": {
+    "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed135-transfer8-append/integration-delta.json",
+    "sha256": "5ccc4ba8b114e8d32ac4687c0f8344f45f97a758295aa0ea3ec3eb48f22da3a0"
+  },
+  "actualReceipts": [
+    {
+      "path": "legacy-origin:alfred-runtime-model-dispatch-control5-integration-preparation-20261011/atomic5/apply-once/actual-receipt.json",
+      "sha256": "60f233423f9746d87ef2cf4d35f2ee9f89487f4581a91a4106c585e833a9f5d5"
+    },
+    {
+      "path": "legacy-origin:alfred-selected164-four-runtime-content-preparation-20261011/actual-integration.json",
+      "sha256": "6a969187f4a26b46d059a3886c52ba0b9381ea040faee653bde7e97a5ed86617"
+    }
+  ],
+  "counts": {
+    "selected": 164,
+    "currentOrAppliedSelectedPaths": 144,
+    "remaining": 20,
+    "runtimeRemaining": 7,
+    "protectedSelected": 13,
+    "protectedUnion": 14,
+    "outsideSelectionLeaves": 5
+  },
+  "selectedCoverageAppend": [
+    {
+      "path": "plugins/pipeline-core/lib/agent-model-registry.mjs",
+      "sha256": "f4be134fd94736c919fdfc75ab0cfb05c83145d8651dbbe74c47ef22bbd1cedc",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Runtime5"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+      "sha256": "1ff95b3af2924d876a771ea01fe2e888c582f72b7c42f36835c3d42108ef5533",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Runtime5"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+      "sha256": "b1de1f345667578caacc23958dc2055b9881743f576d4ea7442dc8aef27ade1d",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Runtime5"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/local-supervisor-state.mjs",
+      "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Runtime5"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "sha256": "71b0d56fbafa91d239773e5872f3a28c51d3a4f78f8f77bf0b6b3d0c0eaae926",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Runtime5"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Acceptance4"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Acceptance4"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Acceptance4"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "mode": 420,
+      "nlink": 1,
+      "group": "Acceptance4"
+    }
+  ],
+  "futureFinalTrackingProof": {
+    "path": "legacy-origin:alfred-state-two-repair-qualification-20261010/actual443-diagnosis/lock-ticket-controls-qualification-preparation/source5-authenticated-catch-six-qualification-successor/execution.json",
+    "sha256": "ba4a8a6e1bb1c8db2f390046f585e13de327e9091f76977f122e9502831d850d",
+    "status": "Root-reported actual Source5 Lock6 PASS; exact locator received; not reread by this metadata author",
+    "scope": "Focused Source5 controls only; not current Main qualification or engineering-stage promotion"
+  },
+  "fullQualification": false,
+  "nativeClaim": false,
+  "formalAcceptance": false,
+  "limits": [
+    "Selected164 content coverage is separate from approved newer Source successor integration and final candidate qualification.",
+    "Outside five = prior two Elephant documents plus three aggregate leaves; excluded from selected164 counts.",
+    "Protected thirteen membership retained unchanged; actual content union/final authorization remains Root-owned.",
+    "All176 formalOPEN/37AC4IR remain unchanged."
+  ]
+}

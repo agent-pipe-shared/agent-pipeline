@@ -1,0 +1,6 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["NGHF01","NGHF02","NGHF03","NGHF04"],"caseCount":4,"caseSetSha256":"3dca8581dc5e54a82e1feab4178a8426adfe164ebc365d050cd2a7ece6d0f72e"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"NGHF01","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"NGHF02","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"NGHF03","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"NGHF04","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":4,"disposedCount":4,"caseIds":["NGHF01","NGHF02","NGHF03","NGHF04"],"caseSetSha256":"3dca8581dc5e54a82e1feab4178a8426adfe164ebc365d050cd2a7ece6d0f72e","dispositionsSha256":"9cdf7978324e7b3b04662fe1b66eb7611a27a3459fac361112eaa9a6d9504657","counts":{"pass":4,"fail":0,"skip":0,"todo":0}}

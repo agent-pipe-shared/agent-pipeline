@@ -1,0 +1,113 @@
+{
+  "schema": "alfred.critic-cap.controlled-execution.v1",
+  "status": "controlled-complete-non-green",
+  "semanticChildCount": 1,
+  "qualification": false,
+  "nativeEvidence": false,
+  "externalCriticReview": false,
+  "assurance": "actual controlled synthetic API/protocol execution only",
+  "sourceResourceCount": 2152,
+  "policy": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "CCD001",
+      "CCD002",
+      "CCD003",
+      "CCD004",
+      "CCD005",
+      "CCD006",
+      "CCD007",
+      "CCD008"
+    ],
+    "maxBytes": 32768
+  },
+  "inheritedExecArgv": [],
+  "environmentContract": "All inherited HOME/USERPROFILE/XDG/Git config/hooks/signing/PO/model policy/preloads retained. Only owned TMP/TEMP/TMPDIR and explicit FD3 signal supplied.",
+  "sourceAndFixtureConserved": true,
+  "inheritedProtectedSelectorNames": [],
+  "argv": {
+    "executable": "<outside-repository-host-path-excluded>",
+    "args": [
+      "<repository>/legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/graph/plugins/pipeline-core/scripts/critic-one-plus-diff.independent.test.mjs"
+    ],
+    "cwd": "<repository>/legacy-origin:alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/qualification-root-mode-only-sha-successor-20261010"
+  },
+  "child": {
+    "status": 1,
+    "signal": null,
+    "timedOut": false,
+    "spawnError": null,
+    "elapsedMs": 5645
+  },
+  "captures": {
+    "stdout.private.log": {
+      "sha256": "53ca5f2e4ab75418136655dbb733f8477d558802b2e791a74c07008e2b95bc1a",
+      "bytes": 15695,
+      "mode": 384,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "c587fd0a338794521538e4801e92a5f0c7c084fea2f1126721e7a21a64282a39",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    "stderr.private.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": 384,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "b7119709c3fe910d949471e63aee69778661fd31242dfd6ec1a238938953f5ab",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    },
+    "completion.fd3.private.jsonl": {
+      "sha256": "62f32a5453a5f62e324e26830ba4e7d11e919138429fb19e6e87311c65b1358c",
+      "bytes": 1545,
+      "mode": 384,
+      "nlink": 1,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "811d095e303eb79fb5b6e6141815876849634b8508cb4545e086ff4e0f92ee4a",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      }
+    }
+  },
+  "parsedCompletion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "379a2b2ee697ed9c61d779a6700a8fdff2c5f9c93ae5cbc352d3a17e4254cb24",
+    "caseSetSha256": "48f9794ce9b2c247d2589b94b87b3f608a5f7b327a0901eb263b20fc3d35effc",
+    "dispositionsSha256": "3cf2c050cd7382c81ca17ee5f46bcb2dd09a19f23e02c8f78f4dd046c5d0d952",
+    "declaredCount": 8,
+    "disposedCount": 8,
+    "counts": {
+      "pass": 1,
+      "fail": 7,
+      "skip": 0,
+      "todo": 0
+    }
+  }
+}

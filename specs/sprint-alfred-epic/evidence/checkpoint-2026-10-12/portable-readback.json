@@ -1,0 +1,155 @@
+{
+  "schema": "portable.relative-checkpoint-readback.v1",
+  "manifest": {
+    "path": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-evidence-manifest.json",
+    "sha256": "bcc30c772962ace7ca82bd4f24eb0e7efc40f0bf08202feac45dcd3807f931bb",
+    "bytes": 402604,
+    "mode": "0644"
+  },
+  "indexes": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-evidence-map.json",
+      "sha256": "b5e7e85e0135d06d3906fa3b43d32f54699996c723317d78244be3ba5a51cec4",
+      "bytes": 833359,
+      "mode": "0644"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-source-evidence-map.json",
+      "sha256": "f54fd0b08231d13421b43d05db65fd5064ef097b425ebde3f9efde19976b6e41",
+      "bytes": 127945,
+      "mode": "0644"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-original-requirements.json",
+      "sha256": "52db41108f8061572561e9eafed39f3f4a946b8571ef36153dc816b54d2c58f2",
+      "bytes": 126836,
+      "mode": "0644"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-prerequisites.json",
+      "sha256": "508a73645612d4d6ff8a05cfe375a7c9541b4f00babb7ad7d533080e26758bd5",
+      "bytes": 1018731,
+      "mode": "0644"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-command-metadata.json",
+      "sha256": "47a2b3faf690b76f7663642f951e1de9fa799cce77e2bde01b2a00dc03f7e2ce",
+      "bytes": 4971,
+      "mode": "0644"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-evidence-manifest.json",
+      "sha256": "bcc30c772962ace7ca82bd4f24eb0e7efc40f0bf08202feac45dcd3807f931bb",
+      "bytes": 402604,
+      "mode": "0644"
+    }
+  ],
+  "prior499Conserved": true,
+  "newEvidenceRecordCount": 248,
+  "uniqueEvidenceObjects": 230,
+  "all174BasisResolved": true,
+  "SourcePackage48ByteModeSingleLinkConserved": true,
+  "sourceMetadata": [
+    {
+      "path": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/manifest.json",
+      "sha256": "85146beab4370ddd9a9e1b4739c53eed830cdb6e40f639d326fc2943d5b62289",
+      "bytes": 84361,
+      "mode": "0644"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/restore-plan.md",
+      "sha256": "73cc1401a7aee7d27e3762bc350371305aef0ab3ecf48e5e733be35ac9dee321",
+      "bytes": 1721,
+      "mode": "0644"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/packaging-receipt.json",
+      "sha256": "6526e9685dc01b03a74c8b1017606641c6f43065fdcfafbdb8ddfba8429b4a66",
+      "bytes": 2133,
+      "mode": "0644"
+    }
+  ],
+  "sourcePackagingIgnoreProof": "Assembler root-directory check-ignore exit1 empty; separate finite51 child interrupted130, no successful per-file subprocess claim; Root final Git membership check remains separate",
+  "physicalContainment": true,
+  "singleLink": true,
+  "SHABytesModesConserved": true,
+  "gitCheckIgnore": {
+    "exitCode": 1,
+    "stdout": "",
+    "ignored": false
+  },
+  "modePortability": "Historical physical0600/0644 modes are retained as custody metadata; Git preserves executable bit, not all POSIX permission bits.48 public Source proposal modes remain explicitly bound, no native private-mode freshness claim.",
+  "publicOriginalAssociations": 162,
+  "unresolvedPublicOriginals": 12,
+  "genuineRequiredInputs": [
+    {
+      "id": "runtime-entry",
+      "kind": "outside-repository-runtime-input",
+      "status": "held",
+      "fact": "Fresh Claude runtime must perform sanctioned pipeline-start re-entry; this checkpoint transfers no installed runtime, model binding or native host enforcement",
+      "rulesetSha256": "9aa0551222ad682fb7fa40af9aa6b8e7ff52ecaa98143fd35657f9c053e5b3a3",
+      "requestedRoleModel": "functional Goldfish; gpt-6-luna/high requested, effective binding not observed"
+    },
+    {
+      "id": "critic-adoption",
+      "kind": "genuine-authority-input",
+      "status": "held",
+      "fact": "Actual accepted mapping/adoption policy, exact M4 debt and SAME original budget/ownership not supplied; positive publication/registration/admission and correction carrier remain unqualified; architecture proposed/not effective"
+    },
+    {
+      "id": "kernel-runtime",
+      "kind": "genuine-authority-native-input",
+      "status": "held",
+      "fact": "12 component cases do not satisfy three owner/consumed-packet/native groups; no stage/child/FD3 PASS"
+    },
+    {
+      "id": "MainVerify",
+      "kind": "physical-safety-input",
+      "status": "held",
+      "fact": "One current Main Verify physical hold and TP-3 diagnostic refusal; no boolean or safe alias inferred, no content reread"
+    },
+    {
+      "id": "help-process-native",
+      "kind": "qualification-input",
+      "status": "held",
+      "fact": "Help12/common4/three runner-labelled Source result envelopes are controlled Source facts; real process-entry cleanup/host/native outputs and actual Main help integration remain unqualified"
+    },
+    {
+      "id": "patch-check",
+      "kind": "guard-refusal-input",
+      "status": "held",
+      "fact": "Cumulative v6 patch strict check refused before execution twice; no apply/idempotence/post-index/stale-preimage result"
+    },
+    {
+      "id": "signatures-and-acceptance",
+      "kind": "private-human-input",
+      "status": "held-not-exported",
+      "fact": "No key/proof body/session authority/approval is exported; Source admission/application/signatures/coherent review/FullVerify/manual acceptance remain separate gates"
+    },
+    {
+      "id": "public-originals",
+      "kind": "scope-custody-input",
+      "status": "partly-associated",
+      "unresolvedItemIds": [
+        "pipeline.agy-el01-write-authorization-gap",
+        "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+        "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+        "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+        "pipeline.design-intake-generator-omits-question-answers",
+        "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+        "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+        "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+        "pipeline.implementation-without-dispatch-escapes-review-coverage",
+        "pipeline.merge-commit-message-skips-conventional-type-check",
+        "pipeline.project-calibration-retains-new-project-placeholder",
+        "pipeline.project-resource-budget-headroom-is-not-reported"
+      ],
+      "fact": "162 existing public original associations plus seven approved-prefix/suffix associations; no private original bodies exported or authority silently rewritten"
+    }
+  ],
+  "functionalTestsRun": 0,
+  "SourceApplied": false,
+  "signaturesWritten": false,
+  "commitOwnedByRoot": true,
+  "pushed": false
+}

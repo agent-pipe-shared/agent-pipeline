@@ -1,0 +1,112 @@
+{
+  "schema": "alfred.pre-push-installer-durability-controlled-public-proof.v1",
+  "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+  "originalBodySha256": "3e0fb5d931a0d04fb4750fd53cba39c35c49e66244b2e6c3788ad5dc9f38cb75",
+  "status": "controlled-method-component-qualified",
+  "actual": {
+    "exitCode": 0,
+    "signal": null,
+    "spawnError": null,
+    "timeout": false,
+    "completionError": null,
+    "SourceConserved": true,
+    "counts": {
+      "pass": 16,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "caseIds": [
+      "PPD001",
+      "PPD002",
+      "PPD003",
+      "PPD004",
+      "PPD005",
+      "PPD006",
+      "PPD007",
+      "PPD008",
+      "PPD009",
+      "PPD010",
+      "PPD011",
+      "PPD012",
+      "PPD013",
+      "PPD014",
+      "PPD015",
+      "PPD016"
+    ]
+  },
+  "receiptSha256": "aa590826ef54ee697fe959a527db7309f5396e80f82c83e2083307b8d5aaeb79",
+  "completionSha256": "b332d87db0d431af310484cb67867da70d807030112d975056fe95e50c8e6303",
+  "Source": [
+    {
+      "path": "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+      "sha256": "952d25835426316bd0791d885b728f1c9de0d9884a94d139e78170218db842ac"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "sha256": "c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc"
+    }
+  ],
+  "beforeControlsContractSha256": "f52877ce1613507ea60021e962407ee81baac14a04feac277eb501d36c6d4fa2",
+  "assertionsSha256": "935b71f392ec6bcc873b1f768bde20afd594611c000a5cb509a70dab42b82904",
+  "launcherSha256": "767330548d19492542312c5661f9f219a50ce159ed5477428d2af33cf279e8e0",
+  "resourceManifestSha256": "da322df610afc8e0b39ead7d470b11208cc2d8597fe47a89bea6391730fdc94f",
+  "resourceCount": 580,
+  "scopes": [
+    {
+      "caseIds": [
+        "PPD001",
+        "PPD002",
+        "PPD003",
+        "PPD004",
+        "PPD005",
+        "PPD006",
+        "PPD007",
+        "PPD008",
+        "PPD009"
+      ],
+      "proof": "Real final-artifact writable descriptors at write/fsync/read are closed before the original syscall; actual EBADF reaches typed durability refusal, prior artifacts conserved and uncertain target retained."
+    },
+    {
+      "caseIds": [
+        "PPD010",
+        "PPD011",
+        "PPD012"
+      ],
+      "proof": "Actual fsync precedes a physical one-byte artifact change; original same-FD readback rejects mismatched bytes with typed durability refusal."
+    },
+    {
+      "caseIds": [
+        "PPD013"
+      ],
+      "proof": "Owned marker-bound removal deletes exactly the three installed artifacts and preserves a separate foreign hook-directory file."
+    },
+    {
+      "caseIds": [
+        "PPD014"
+      ],
+      "proof": "Modified installed shim refuses removal and preserves all artifacts."
+    },
+    {
+      "caseIds": [
+        "PPD015"
+      ],
+      "proof": "Altered marker digest refuses reinstall and conserves artifacts."
+    },
+    {
+      "caseIds": [
+        "PPD016"
+      ],
+      "proof": "Actual Source-issued absolute executable/installer/cwd runs from a real consumer repository, retains confirmation metadata, verifies marker digests and executes the actual Unix shim."
+    }
+  ],
+  "limits": [
+    "Controlled Unix method, not native Windows assurance.",
+    "No native Windows install, marker/readback, blocking-push or removal proof.",
+    "No macOS smoke or actual blocking-push policy proof.",
+    "No Human approval, native model or whole-item acceptance claim."
+  ],
+  "originalItemStatus": "OPEN/manual",
+  "nativeClaim": false,
+  "wholeItemClosed": false
+}

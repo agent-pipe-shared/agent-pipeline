@@ -1,0 +1,568 @@
+{
+  "schema": "alfred.selected164.remaining29.transfer8-routing-append.v1",
+  "parent": {
+    "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed130-successor/remaining-owned-routing.json",
+    "sha256": "4e2c3f78d4144cd066945bc6aab9a9a30fd0ee86ee62898aef294226751638f4"
+  },
+  "removedSelectedPaths": [
+    "plugins/pipeline-core/lib/architecture-design.mjs",
+    "plugins/pipeline-core/lib/model-family-host-store.mjs",
+    "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+    "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+    "plugins/pipeline-core/lib/session-authority-registry.mjs"
+  ],
+  "runtimeRemaining": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-ledger.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987",
+        "bytes": 31759,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/21"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "258abe7f1d920426b358c1572609bfd61a58ddd45d67d4ac04380f6aeeef06ad",
+        "bytes": 27235,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+        "sha256": "a8bb9a199c162434721f00fa0e02dc311cbf5c3c3edc5f855db78fe1a8616fac",
+        "bytes": 26894,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "a8bb9a199c162434721f00fa0e02dc311cbf5c3c3edc5f855db78fe1a8616fac"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/34"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "202572a093803bb0b0376377c63e61a08d2dfe6cb453c38ffa10da1c3c284632",
+        "bytes": 11669,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+        "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c",
+        "bytes": 18854,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/35"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "8023c0405eb2dbd42ae80cd6a5d47c9c6c42122afadd4f5888c0ad5dde54a9ee",
+        "bytes": 14803,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+        "bytes": 49461,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-critic-one-plus-diff-po-decision-source-20261010/postimages/plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/41"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "0bc159856bb1001e0a1dd011075c629705d3d54377418f90a7f7afcd36a28bb6",
+        "bytes": 15989,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+        "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+        "bytes": 301059,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/67"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "34aa1bd5a1bd1ed6509cb383c423a05bdd382ce429bb16753a5a01bae9b0e362",
+        "bytes": 245178,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-supervisor-state.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351",
+        "bytes": 16936,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/68"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "016f17e4e793f620176a25608a44ebfa003b3aae591ada2d77bcd65feac2e29a",
+        "bytes": 16449,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "sha256": "7983a552e66c86d1e81c16cd29dfa709cc88236cfa4a5e4a3b21894344f2f0d3",
+        "bytes": 74069,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "7983a552e66c86d1e81c16cd29dfa709cc88236cfa4a5e4a3b21894344f2f0d3"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "sha256": "7983a552e66c86d1e81c16cd29dfa709cc88236cfa4a5e4a3b21894344f2f0d3",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/69"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "e74c95581f117d03f06b233bae0a8a83bb822ef7726134ba620a30c46dfba8e8",
+        "bytes": 62885,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "bytes": 539214,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/source-bug-successor/postimages/current-i03-bridge-message-cumulative/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "mode": 384
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/77"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+        "bytes": 425437,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+        "bytes": 423484,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "PCI-actual12",
+        "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/83"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51",
+        "bytes": 422907,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd",
+        "bytes": 29072,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/97"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "c26890face66f58b93d378979d2bf3f547f4d39abc1e1837c8f95c07e74ffec2",
+        "bytes": 24777,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+        "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+        "bytes": 39560,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/98"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+        "bytes": 32208,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "CURRENT9",
+        "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/133"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "cd5ed934902daa3668ccab9791ee905afd826e80ebd876fa465c3e8f050965b7",
+        "bytes": 29937,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0",
+        "bytes": 17521,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/151"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "7ce18941bf4d96c6f04349f00bd46c20414a367a9efea8755d979ab7760f09bf",
+        "bytes": 16311,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agent-model-registry.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agent-model-registry.mjs",
+        "sha256": "f4be134fd94736c919fdfc75ab0cfb05c83145d8651dbbe74c47ef22bbd1cedc",
+        "bytes": 10769,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "f4be134fd94736c919fdfc75ab0cfb05c83145d8651dbbe74c47ef22bbd1cedc"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-existing-route-source-followthrough-20261010/v3-declared-override-source/postimages/plugins/pipeline-core/lib/agent-model-registry.mjs",
+        "sha256": "f4be134fd94736c919fdfc75ab0cfb05c83145d8651dbbe74c47ef22bbd1cedc",
+        "mode": 384
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/152"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "ccf974295061eb40ad2fc23b0c0d04adfccdb5310c9cdd60ff2f1f9b36f80e3a",
+        "bytes": 10165,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+        "sha256": "1ff95b3af2924d876a771ea01fe2e888c582f72b7c42f36835c3d42108ef5533",
+        "bytes": 13261,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "1ff95b3af2924d876a771ea01fe2e888c582f72b7c42f36835c3d42108ef5533"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-controlled-method-registration-trailer-source-20261010/postimages/plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+        "sha256": "1ff95b3af2924d876a771ea01fe2e888c582f72b7c42f36835c3d42108ef5533",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/154"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+        "sha256": "b1de1f345667578caacc23958dc2055b9881743f576d4ea7442dc8aef27ade1d",
+        "bytes": 15027,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "b1de1f345667578caacc23958dc2055b9881743f576d4ea7442dc8aef27ade1d"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i03-controlled-method-observation-adapter-source-20261010/postimages/plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+        "sha256": "b1de1f345667578caacc23958dc2055b9881743f576d4ea7442dc8aef27ade1d",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/155"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    }
+  ],
+  "protectedMembership": "Retain exact thirteen parent rows unchanged; union14 remains held.",
+  "counts": {
+    "runtime": 16,
+    "protectedSelected": 13,
+    "total": 29
+  },
+  "newRuntimeDispatchOwnership": "Root latest assignments supersede historical generic coordination labels; exact actor map not yet provided to this author. Do not invent row-level owners.",
+  "limits": [
+    "Physical inspection or atomic preparation is not application.",
+    "Missing green case association stays open, not missing implementation.",
+    "Current runtime tuples/protected surfaces retain original owners."
+  ]
+}

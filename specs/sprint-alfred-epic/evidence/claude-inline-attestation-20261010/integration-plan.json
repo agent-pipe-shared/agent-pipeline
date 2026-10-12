@@ -1,0 +1,93 @@
+{
+  "schema": "alfred.claude-inline-attestation-integration-plan.v1",
+  "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+  "postimage": {
+    "path": "scratch/alfred-claude-inline-attestation-receipt-store-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+    "bytes": 115016,
+    "mode": 420,
+    "nlink": 1
+  },
+  "sourceManifest": {
+    "path": "scratch/alfred-claude-inline-attestation-receipt-store-source-20261010/manifest.json",
+    "sha256": "2297ae15a2fcc4174f8ea328434a27e84f18e4b3130c589090a22ae327c91155",
+    "bytes": 6032,
+    "mode": 420,
+    "nlink": 1
+  },
+  "targets": [
+    {
+      "repository": "Audit",
+      "preimage": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+        "bytes": 111990,
+        "mode": 420,
+        "nlink": 1
+      },
+      "disposition": "exact-qualified-parent; Root may select only through current aggregate integration custody",
+      "directLeafReplacementCompatible": true
+    },
+    {
+      "repository": "Main",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "sha256": "6a89acd711265e7b86e38cfcca84accf811fabbc154ff63f85bd1a0cf568c65b",
+        "bytes": 111646,
+        "mode": 420,
+        "nlink": 2
+      },
+      "disposition": "different-historical-source-generation; do not blindly overwrite; Root must use complete composed candidate integration or exact reviewed rebase",
+      "directLeafReplacementCompatible": false
+    }
+  ],
+  "dependencies": {
+    "qualifiedHost": {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "sha256": "5d77cb3c8a806f7ccfe1aea7486e9493ca8039c235da7c31828d91d3420a8514",
+      "bytes": 31767,
+      "mode": 420,
+      "nlink": 1
+    },
+    "mainHost": {
+      "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "sha256": "d6495ab13e2d3d87c60fca73cb30cc112fb0ec2dea399e5a1ebd0ce31c8cea24",
+      "bytes": 31767,
+      "mode": 420,
+      "nlink": 2
+    },
+    "mainHostMatchesQualified": false,
+    "qualifiedResourceClosure": {
+      "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/source-closure.json",
+      "sha256": "85c3f5f7571e45b894aec92118ffd3658bcad6d2c758932ba98c531f21ccd8da",
+      "bytes": 885808,
+      "mode": 420,
+      "nlink": 1
+    },
+    "resourceCount": 2165,
+    "entryAPI": "observePipelineStartPreflight",
+    "optionalPhysicalInput": "attestationReceiptDirectory",
+    "defaultProductionInput": "omitted; unchanged HOME-backed actual host store",
+    "hostExports": [
+      "resolveClaudeRegistryBinding",
+      "writeClaudeRegistryInstalledPluginReceipt",
+      "readInstalledPluginAttestationSetup",
+      "verifyLocalDevelopmentInstalledPluginReceipt"
+    ],
+    "resultEnvelopeChanged": false
+  },
+  "protection": {
+    "planningRoster": "scratch/alfred-hgo-protected-path-readiness-20261010/protected-change-map.json",
+    "planningRosterSha256": "fd24069bc454d3c96530c2d4690c6fd5a8479d7e5f0de0c8af4c8cfd50f19551",
+    "selectedLeafInPlanningProtected14": false,
+    "classificationLimit": "Historical exact14 roster only; Root must rederive actual operation/current candidate classification. Absence from this roster is not authorization to bypass lifecycle/custody guards.",
+    "writer": "Root only; no worker Main/Audit write or automatic activation"
+  },
+  "integrationStatus": "not-applied-by-this-qualification; Main source family not qualified by this receipt",
+  "requiredBeforeClaim": [
+    "Root exact parent CAS and sanctioned current composition/source membership",
+    "Keep unchanged qualified host APIs and source dependencies coherent",
+    "Actual postintegration byte readback/receipt in integration inventory",
+    "Applicable final candidate review/Verify/install/native acceptance separately"
+  ]
+}

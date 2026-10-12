@@ -1,0 +1,90 @@
+{
+  "schema": "alfred.hgo.denial-reason-validation-source-manifest.v1",
+  "status": "SOURCE-ONLY-FROZEN; Root independent semantic qualification pending",
+  "sourceParent": {
+    "path": "legacy-origin:alfred-hgo-yaml-manifest-policy-binding-source-20261010/postimages/plugins/pipeline-core/lib/human-guard-override.mjs",
+    "sha256": "335b849edc6b4936e9bae49ed95ba72ec96f58630cc34e9d93dfd92dd3802a5e"
+  },
+  "postimage": "postimages/plugins/pipeline-core/lib/human-guard-override.mjs",
+  "postSha256": "13e022b43fb4000fe3e1e353ecef3e9169dbf8d09727c1d744de7dce6189552c",
+  "independentNorm": {
+    "path": "legacy-origin:alfred-hgo-native-action-preparation-independent-20261010/hgs003-denial-field-causal-assessment/malformed-denial-normative-freeze.json",
+    "sha256": "f727c11cf475eb4f8088bb6cc701ba695a68acaafcce8e72461a7ac6dc8a52b9"
+  },
+  "artifacts": [
+    {
+      "path": "api-contract.json",
+      "sha256": "10aee0005042274a7cf69f6a3b6ba1b7dfa646e8335e78b752085e2c2d636790",
+      "size": 2285,
+      "mode": "0o644",
+      "nlink": 1
+    },
+    {
+      "path": "prepare.py",
+      "sha256": "27bca393ec03fbbef285189d2e609c20863db585b0e3965c804ac792e70dd627",
+      "size": 5401,
+      "mode": "0o644",
+      "nlink": 1
+    },
+    {
+      "path": "report.md",
+      "sha256": "87bec51c752fbbf068b953832d9ce6b85aba49734c15d4c1ade1b0b5f8d50a07",
+      "size": 3591,
+      "mode": "0o644",
+      "nlink": 1
+    },
+    {
+      "path": "forward.patch",
+      "sha256": "65d505f07a700029770b4a734f49f193a21be437151c32ec2e5d244c55694962",
+      "size": 3768,
+      "mode": "0o644",
+      "nlink": 1
+    },
+    {
+      "path": "inverse.patch",
+      "sha256": "7fc01128c2b4268bcffc7d974fffeb2a50747db2346e4ee27d280226eb78f314",
+      "size": 3768,
+      "mode": "0o644",
+      "nlink": 1
+    },
+    {
+      "path": "exact-transformations.json",
+      "sha256": "263af02159303bfdbb4894f6bd6d82c8447fb946bf0283d02ace5ebaa2707665",
+      "size": 2605,
+      "mode": "0o644",
+      "nlink": 1
+    },
+    {
+      "path": "source-freeze.json",
+      "sha256": "c6f5efafe0c275326f1e76e30e5f75788647a64253b56d6019ffaade349b959d",
+      "size": 701,
+      "mode": "0o644",
+      "nlink": 1
+    },
+    {
+      "path": "postimages/plugins/pipeline-core/lib/human-guard-override.mjs",
+      "sha256": "13e022b43fb4000fe3e1e353ecef3e9169dbf8d09727c1d744de7dce6189552c",
+      "size": 321109,
+      "mode": "0o644",
+      "nlink": 1
+    }
+  ],
+  "checks": {
+    "nodeCheckExitCode": 0,
+    "inverseExact": true,
+    "outsideExactTransformationsConserved": true,
+    "parentConserved": true,
+    "physicalModeConserved": true,
+    "singleLink": true
+  },
+  "businessRuns": 0,
+  "productImports": 0,
+  "gitActions": 0,
+  "sourceApplied": false,
+  "nativeQualification": false,
+  "wholeItemAcceptance": false,
+  "residuals": [
+    "Root meaningful HGS003 and HDN qualification",
+    "raw reason not retained; no retrospective malformed-literal hash inference"
+  ]
+}

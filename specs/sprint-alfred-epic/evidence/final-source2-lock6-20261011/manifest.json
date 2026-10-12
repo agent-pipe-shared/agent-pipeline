@@ -1,0 +1,29 @@
+{
+  "schema": "alfred.final-source2-lock6.public-transfer.v1",
+  "files": [
+    {
+      "path": "proof.json",
+      "sha256": "eb0356e26e80d58966e20b81435814a3e4a9ad47e899ee4cc59abfa0287ae8a6",
+      "bytes": 3174,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "report.md",
+      "sha256": "9df5bff11a718378f4bb31ec97e441fe46a61b2be9baef2f1a16c67f5c437feb",
+      "bytes": 548,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "targeted75-next-actions.json",
+      "sha256": "ecc3d5d5e2718d741c8cf68cce3fc52af5b7f25503ec4e30898921fc217abf79",
+      "bytes": 22409,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "destination": "specs/sprint-alfred-epic/evidence/final-source2-lock6-20261011",
+  "RootOnlyPublication": true,
+  "sourceApply": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalPath": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+  "parentSha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+  "postSha256": "83541355713146a99e59cfae3f1c5954848a172388cf15e96b3a2bccb61da425",
+  "forward": {
+    "before": "First output line (compact bootstrap confirmation, verbatim canonical format,\nwith the ruleset SHA from field 6):\n",
+    "after": "**Step 0 — fresh dispatch entry, before the opening record or any other write:**\n\nAt an actual session start or runtime re-entry, invoke\n`pipeline-core:pipeline-start` and complete its required reading/preflight\nsequence before the first Edit, Write or NotebookEdit. Use only the sanctioned\npreflight invocation and exact loaded plugin root returned by that entry; do\nnot wait for a missing-receipt refusal and then retry as the normal sequence.\nA receipt belongs to this dispatch process: never copy the parent receipt or\nclaim native/model authority from methodological entry. An ordinary new task\nin the same ready session does not repeat entry. If entry fails, report the\ntyped result and stop before creating the opening dispatch record.\n\nFirst output line (compact bootstrap confirmation, verbatim canonical format,\nwith the ruleset SHA from field 6):\n"
+  },
+  "inverse": {
+    "before": "**Step 0 — fresh dispatch entry, before the opening record or any other write:**\n\nAt an actual session start or runtime re-entry, invoke\n`pipeline-core:pipeline-start` and complete its required reading/preflight\nsequence before the first Edit, Write or NotebookEdit. Use only the sanctioned\npreflight invocation and exact loaded plugin root returned by that entry; do\nnot wait for a missing-receipt refusal and then retry as the normal sequence.\nA receipt belongs to this dispatch process: never copy the parent receipt or\nclaim native/model authority from methodological entry. An ordinary new task\nin the same ready session does not repeat entry. If entry fails, report the\ntyped result and stop before creating the opening dispatch record.\n\nFirst output line (compact bootstrap confirmation, verbatim canonical format,\nwith the ruleset SHA from field 6):\n",
+    "after": "First output line (compact bootstrap confirmation, verbatim canonical format,\nwith the ruleset SHA from field 6):\n"
+  },
+  "forwardAndInverse": true,
+  "retainedTargetedQuickFiveClosingAndNativeRules": true,
+  "authorBusinessRuns": 0,
+  "qualification": "genuine dispatched preflight-before-first-Write receipt pending; no template marker PASS or native/model grant"
+}

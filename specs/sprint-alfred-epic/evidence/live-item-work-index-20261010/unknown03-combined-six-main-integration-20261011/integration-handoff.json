@@ -1,0 +1,37 @@
+{
+  "schema": "alfred.unknown03.combined-six-public-integration-handoff.v1",
+  "integration": {
+    "status": "applied-exact-six-new-inodes",
+    "executionSha256": "14ff43906f53314a2b216df9e708a9f28ac3f73b8e417cf01d49e420dad24fa1",
+    "planSha256": "a848a9ddc72c406ddab9b29067136a23d1b66e136091a8eabc830fc9497acde7",
+    "sourceManifestSha256": "9cff6e06321f48a19643dc7c32b26875789ff5e6d50c6c02b9099bc3407d04ad",
+    "appliedCount": 6,
+    "inputsConserved": true,
+    "boundMainPeersConserved": 58,
+    "semanticRuns": 0
+  },
+  "targets": [
+    {"canonicalPath":"plugins/pipeline-core/scripts/po-human-approval.mjs","sha256":"7470262a0a7ab188465d77dfdaf6dc15c7ba2aee92c80d36cd522b88c2e76f85","bytes":179475,"mode":"0755","nlink":1},
+    {"canonicalPath":"plugins/pipeline-core/lib/signed-quality-package.mjs","sha256":"d6d7c7ece9a82d50772e9b210f35f7c45ff99298ad301e2a295407d671c363bc","bytes":27239,"mode":"0644","nlink":1},
+    {"canonicalPath":"plugins/pipeline-core/scripts/pre-push-hook-install.mjs","sha256":"952d25835426316bd0791d885b728f1c9de0d9884a94d139e78170218db842ac","bytes":44445,"mode":"0644","nlink":1},
+    {"canonicalPath":"plugins/pipeline-core/lib/windows-process-identity.mjs","sha256":"1641060677e797b87ef4b4adecb299c184e4f14c5e267f0692dc3bf0468a8b0b","bytes":3123,"mode":"0644","nlink":1},
+    {"canonicalPath":"plugins/pipeline-core/lib/human-guard-override.mjs","sha256":"13e022b43fb4000fe3e1e353ecef3e9169dbf8d09727c1d744de7dce6189552c","bytes":321109,"mode":"0644","nlink":1},
+    {"canonicalPath":"plugins/pipeline-core/scripts/guard-human-override.mjs","sha256":"d81c0046f521f07cdb6d465217ef6a0a7c1aacfec718967fdd9fec605ae62d67","bytes":34710,"mode":"0644","nlink":1}
+  ],
+  "separateConsumerQualification": {
+    "executionSha256": "dd37103939383c0a3f75a744561a8f29c32cdcd891d6dd87955f5860ee7fea1b",
+    "completionSha256": "3707f598f88ee7d37d54d8af4ca62bb87cdd1d6d44a66bb52bb7a126bf66330c",
+    "caseIds": ["U03I001", "U03I002", "U03Q001", "U03Q002"],
+    "counts": {"pass":4,"fail":0,"skip":0,"todo":0},
+    "sourceConserved": true,
+    "secureAncestryConserved": true,
+    "scope": "Descriptor intent/refusals and public installer operation, physical readback and foreign-hook controls."
+  },
+  "providerResolution": "The applied HGO provider and Windows identity dependency resolve the previous missing-export/file content hold for the selected CLI. Module loading and content integration do not establish authentic index publication acceptance.",
+  "remainingHeldCases": ["U03P001", "U03P002", "U03H001"],
+  "nativeEngineRehearsalQualified": false,
+  "genuineSigningEmitterCourseQualified": false,
+  "itemAcceptance": false,
+  "pushPerformed": false,
+  "hookInstallationPerformedByIntegration": false
+}

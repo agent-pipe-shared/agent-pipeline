@@ -1,0 +1,16 @@
+node:fs:2776
+      const stats = binding.lstat(base, true, undefined, true /* throwIfNoEntry */);
+                            ^
+
+Error: ENOENT: no such file or directory, lstat '<repository>/scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/resource_headroom/route-graph/plugins/pipeline-core/scripts/fixtures'
+    at realpathSync (node:fs:2776:29)
+    at file://<repository>/scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/resource_headroom/route-graph/plugins/pipeline-core/lib/local-worker-supervisor.mjs:66:24
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async file://<repository>/scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/resource_headroom/current-route-cases.mjs:12:59 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'lstat',
+  path: '<repository>/scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/resource_headroom/route-graph/plugins/pipeline-core/scripts/fixtures'
+}
+
+Node.js v24.15.0

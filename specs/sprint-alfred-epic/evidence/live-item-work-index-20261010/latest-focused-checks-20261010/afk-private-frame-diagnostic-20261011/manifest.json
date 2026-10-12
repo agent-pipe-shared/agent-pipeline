@@ -1,0 +1,13 @@
+{
+  "schema": "alfred.afk-private-frame-diagnostic-public-manifest.v1",
+  "files": [
+    {
+      "name": "diagnostic-proof.json",
+      "sha256": "a1284b3fd0db0c9dde7d59016a7be786f65d06b9d702da42826e0c4dd4a29688",
+      "bytes": 4386
+    }
+  ],
+  "actualExecutionSha256": "4d8359f38ebe4a32dd75d9462695d64ffd40b75f4bca9ed35e28ff52adc270ff",
+  "businessQualification": false,
+  "wholeAFKQualified": false
+}

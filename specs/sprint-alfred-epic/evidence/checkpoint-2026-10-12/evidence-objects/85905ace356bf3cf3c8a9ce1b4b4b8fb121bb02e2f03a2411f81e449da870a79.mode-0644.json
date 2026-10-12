@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.rigor-journal-entry.v1",
+  "title": "Report-only lifecycle rigor journal entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "previousEntrySha256",
+    "entrySha256",
+    "body"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.rigor-journal-entry.v1"
+    },
+    "previousEntrySha256": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "entrySha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "featureId",
+        "planPath",
+        "boundary",
+        "observedAt",
+        "candidate",
+        "baselineCandidate",
+        "inputs",
+        "observation",
+        "bindings",
+        "fitnessProjection"
+      ],
+      "properties": {
+        "featureId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$"
+        },
+        "planPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundary": {
+          "enum": [
+            "plan-submission",
+            "pre-close"
+          ]
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "baselineCandidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "plannedPaths",
+            "actualPaths",
+            "protectedTouches",
+            "contractDeltas",
+            "reversibility",
+            "diffStats",
+            "selectedProfile",
+            "protectedIdentity",
+            "architectureProfile",
+            "fitnessOutcomes",
+            "interruptionLineage"
+          ],
+          "properties": {
+            "plannedPaths": {
+              "$ref": "#/$defs/envelope"
+            },
+            "actualPaths": {
+              "$ref": "#/$defs/envelope"
+            },
+            "protectedTouches": {
+              "$ref": "#/$defs/envelope"
+            },
+            "contractDeltas": {
+              "$ref": "#/$defs/envelope"
+            },
+            "reversibility": {
+              "$ref": "#/$defs/envelope"
+            },
+            "diffStats": {
+              "$ref": "#/$defs/envelope"
+            },
+            "selectedProfile": {
+              "$ref": "#/$defs/envelope"
+            },
+            "protectedIdentity": {
+              "$ref": "#/$defs/envelope"
+            },
+            "architectureProfile": {
+              "$ref": "#/$defs/envelope"
+            },
+            "fitnessOutcomes": {
+              "$ref": "#/$defs/envelope"
+            },
+            "interruptionLineage": {
+              "$ref": "#/$defs/envelope"
+            }
+          }
+        },
+        "observation": {
+          "type": "object",
+          "required": [
+            "schema",
+            "mode",
+            "boundary",
+            "featureId",
+            "candidate",
+            "derivation",
+            "retainedProfile",
+            "previousInputDigest",
+            "disagreement",
+            "reauthorization",
+            "promotionAuthority"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "schema": {
+              "enum": [
+                "pipeline.rigor-lifecycle-observation.v1",
+                "pipeline.rigor-lifecycle-unavailable.v1"
+              ]
+            },
+            "mode": {
+              "const": "report-only"
+            },
+            "boundary": {
+              "enum": [
+                "plan-submission",
+                "pre-close"
+              ]
+            },
+            "featureId": {
+              "type": "string"
+            },
+            "candidate": {
+              "$ref": "#/$defs/candidate"
+            },
+            "derivation": {
+              "type": "object"
+            },
+            "retainedProfile": {
+              "enum": [
+                "mini",
+                "feature",
+                "epic"
+              ]
+            },
+            "previousInputDigest": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              ]
+            },
+            "disagreement": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "reauthorization": {
+              "type": "string"
+            },
+            "promotionAuthority": {
+              "const": "unavailable-no-threshold-promotion-granted"
+            }
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "protected",
+            "architectureProfile",
+            "fitnessModel",
+            "architectureBaseline",
+            "architectureMap",
+            "interruptionSnapshot",
+            "candidateStable",
+            "baselineAncestry"
+          ],
+          "properties": {
+            "protected": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "architectureProfile": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "fitnessModel": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "architectureBaseline": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "architectureMap": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "interruptionSnapshot": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "candidateStable": {
+              "type": "boolean"
+            },
+            "baselineAncestry": {
+              "enum": [
+                "established",
+                "unavailable"
+              ]
+            }
+          }
+        },
+        "fitnessProjection": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "commit",
+            "tree"
+          ],
+          "properties": {
+            "commit": {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            },
+            "tree": {
+              "type": "string",
+              "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+            }
+          }
+        }
+      ]
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "status",
+        "sourceContract"
+      ],
+      "properties": {
+        "value": {},
+        "status": {
+          "enum": [
+            "available",
+            "unavailable",
+            "unknown",
+            "unsupported"
+          ]
+        },
+        "sourceContract": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    }
+  }
+}

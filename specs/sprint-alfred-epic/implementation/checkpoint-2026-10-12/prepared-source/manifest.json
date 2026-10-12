@@ -1,0 +1,1755 @@
+{
+  "schema": "alfred.portable-prepared-source-checkpoint.v1",
+  "status": "PREPARED ONLY; NOT ACTIVATED",
+  "sourceApplied": false,
+  "accepted": false,
+  "localCommitOwnedByRoot": true,
+  "pushAuthorized": false,
+  "sourceCount": 48,
+  "assemblyV7Count": 41,
+  "criticAdoptionCount": 7,
+  "directOverlapCount": 0,
+  "custodyCopiesReused": 38,
+  "originManifests": [
+    {
+      "role": "immutable selection origin",
+      "historicalPath": "scratch/alfred-postinstall-whole-items-20261011/prepared-batch-assembly/manifest-v7.json",
+      "sha256": "0479a701e0f9d0dbb99e34acf65f6572f4aa6eca5767074c7c96afc10c68262e"
+    },
+    {
+      "role": "latest critic private checkpoint",
+      "historicalPath": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/checkpoint-manifest.json",
+      "sha256": "aa1bb39809ea9ee5b42ab8c52ece6fb637eea8952cad6a9760f7eb451dbdfe84"
+    }
+  ],
+  "portableEvidenceManifest": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-evidence-manifest.json",
+  "restorationRequiresScratch": false,
+  "allSelectedPostimageLinksRelative": true,
+  "sourceRows": [
+    {
+      "sourcePath": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/postimages/plugins/pipeline-core/hooks/guard-push.mjs",
+      "preimage": {
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 150958
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/hooks/guard-push.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 150958,
+        "symlink": false,
+        "contained": true,
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 150958,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "sha256": "95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-git_grep/postimages/plugins/pipeline-core/lib/git-cmd.mjs",
+      "preimage": {
+        "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 78973
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/git-cmd.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 83723,
+        "symlink": false,
+        "contained": true,
+        "sha256": "95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 78973,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/verify-journal.mjs",
+      "sha256": "151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-verify_journal/snapshot/plugins/pipeline-core/scripts/verify-journal.mjs",
+      "preimage": {
+        "sha256": "6e4cde624280bfe16fcb5be76ab1656fef57f069cc182fed3b3b3523d38ca4a0",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 83860
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/verify-journal.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 83773,
+        "symlink": false,
+        "contained": true,
+        "sha256": "151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "6e4cde624280bfe16fcb5be76ab1656fef57f069cc182fed3b3b3523d38ca4a0",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 83860,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "86e2cf95eda105d0402c4a022fa7987f77747934f6c9d61498d7ce2402e50c65",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/kernel-producer-contract-audit/postimages-v13/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "preimage": {
+        "sha256": "6077ccde87ec104c3e1689ea187ac917edf24c35f2592f6771a29ce21e42fa6e",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 661528
+      },
+      "selection": "assembly-v7",
+      "qualification": "NEW COMPONENT CASES ONLY; REAL STAGE OWNER/PACKET/NATIVE HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/86e2cf95eda105d0402c4a022fa7987f77747934f6c9d61498d7ce2402e50c65.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 674367,
+        "symlink": false,
+        "contained": true,
+        "sha256": "86e2cf95eda105d0402c4a022fa7987f77747934f6c9d61498d7ce2402e50c65",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "6077ccde87ec104c3e1689ea187ac917edf24c35f2592f6771a29ce21e42fa6e",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 661528,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "preimage": {
+        "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 423673
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 423673,
+        "symlink": false,
+        "contained": true,
+        "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 423673,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "sha256": "263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "preimage": {
+        "sha256": "0050f25191b7576df2c52d7f6d82b24e32cbc60f1f75b7fb1547b7ba856776d3",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 78142
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 81206,
+        "symlink": false,
+        "contained": true,
+        "sha256": "263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "0050f25191b7576df2c52d7f6d82b24e32cbc60f1f75b7fb1547b7ba856776d3",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 78142,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "sha256": "2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-design_material/source/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "preimage": {
+        "sha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 26630
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 26666,
+        "symlink": false,
+        "contained": true,
+        "sha256": "2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 26630,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "sha256": "ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "preimage": {
+        "sha256": "3f0ea6b0a1e560ae30f3c6f10b8df08abf56b7938d9583291d8f7fd5bd5b60fd",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 39004
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 40810,
+        "symlink": false,
+        "contained": true,
+        "sha256": "ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "3f0ea6b0a1e560ae30f3c6f10b8df08abf56b7938d9583291d8f7fd5bd5b60fd",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 39004,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "sha256": "8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "preimage": {
+        "sha256": "b0ec85c5ba52a0a42aa7be1f7bc04c2eb07b88f3876071ad0729f512da1c4fc1",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 121945
+      },
+      "selection": "assembly-v7",
+      "qualification": "SEPARATE PARTIAL RED HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 126057,
+        "symlink": false,
+        "contained": true,
+        "sha256": "8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "b0ec85c5ba52a0a42aa7be1f7bc04c2eb07b88f3876071ad0729f512da1c4fc1",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 121945,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "sha256": "0630175411eafe54a3590ce8ea10a1261f5b5943db48f6e95346e93e27257410",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/kernel-producer-contract-audit/postimages-v13/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "preimage": {
+        "sha256": "f0a897d5fe38e7f54bfe7bd812f997a75c647f0d92a5e8eccd970bed471cc933",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 50258
+      },
+      "selection": "assembly-v7",
+      "qualification": "NEW COMPONENT CASES ONLY; REAL STAGE OWNER/PACKET/NATIVE HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0630175411eafe54a3590ce8ea10a1261f5b5943db48f6e95346e93e27257410.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 52511,
+        "symlink": false,
+        "contained": true,
+        "sha256": "0630175411eafe54a3590ce8ea10a1261f5b5943db48f6e95346e93e27257410",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "f0a897d5fe38e7f54bfe7bd812f997a75c647f0d92a5e8eccd970bed471cc933",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 50258,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "docs/guard-maintenance-window-threat-model.md",
+      "sha256": "0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/docs/guard-maintenance-window-threat-model.md",
+      "preimage": {
+        "sha256": "fb68cb9a6071a0a5730fa509ef0eaea283b82589ebede4e4c905e7bbd765eab0",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 38647
+      },
+      "selection": "assembly-v7",
+      "qualification": "SEPARATE PARTIAL RED HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/docs/guard-maintenance-window-threat-model.md",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/postimages/docs/guard-maintenance-window-threat-model.md",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 43025,
+        "symlink": false,
+        "contained": true,
+        "sha256": "0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "fb68cb9a6071a0a5730fa509ef0eaea283b82589ebede4e4c905e7bbd765eab0",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 38647,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "harness/scripts/verify.mjs",
+      "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/full-verify-registration-repair/postimages/harness/scripts/verify.mjs",
+      "preimage": {
+        "sha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 122965
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/harness/scripts/verify.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 123685,
+        "symlink": false,
+        "contained": true,
+        "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "historical-custody-only",
+        "sha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+        "mode": "0644",
+        "hold": "Main physical safety check failed; later diagnostic refused TP-3; contents not read in packaging"
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/git-hook-footprint.mjs",
+      "sha256": "2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/git-hook-footprint.mjs",
+      "preimage": {
+        "sha256": "f82b5e4c12d9b13b065f62ce8f6c4bb67e56151f96de85318473b611cf29f65d",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 8484
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/git-hook-footprint.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 9275,
+        "symlink": false,
+        "contained": true,
+        "sha256": "2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "f82b5e4c12d9b13b065f62ce8f6c4bb67e56151f96de85318473b611cf29f65d",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 8484,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/project-uninstall.mjs",
+      "sha256": "4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/project-uninstall.mjs",
+      "preimage": {
+        "sha256": "0148a294b9fe2223fe72ae1f34ad7940dd1c44eb0c27014e7dd58db209186ca8",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 15860
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/project-uninstall.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 16017,
+        "symlink": false,
+        "contained": true,
+        "sha256": "4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "0148a294b9fe2223fe72ae1f34ad7940dd1c44eb0c27014e7dd58db209186ca8",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 15860,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "sha256": "3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/passive-read-consumer-delivery/postimages/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "preimage": {
+        "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+        "shaMatched": true,
+        "mode": "0644",
+        "modeAssurance": "exact prior physical custody mode; fresh formatted stat command refused; not refreshed",
+        "bytes": 19968
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 21131,
+        "symlink": false,
+        "contained": true,
+        "sha256": "3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 19968,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "sha256": "ea175d7246454c503bc5accf42b1950b1a58661262991842a367fb40d206f680",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/item-8/postimages/plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "preimage": {
+        "sha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58",
+        "shaMatched": true,
+        "mode": "100644",
+        "modeAssurance": "Git index mode only; physical mode unverified"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/item-8/postimages/plugins/pipeline-core/templates/prompts/goldfish-task.md",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 58900,
+        "symlink": false,
+        "contained": true,
+        "sha256": "ea175d7246454c503bc5accf42b1950b1a58661262991842a367fb40d206f680",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 58251,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "templates/prompts/goldfish-task.md",
+      "sha256": "ea175d7246454c503bc5accf42b1950b1a58661262991842a367fb40d206f680",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/item-8/postimages/templates/prompts/goldfish-task.md",
+      "preimage": {
+        "sha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58",
+        "shaMatched": true,
+        "mode": "100644",
+        "modeAssurance": "Git index mode only; physical mode unverified"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED ONLY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/templates/prompts/goldfish-task.md",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/item-8/postimages/templates/prompts/goldfish-task.md",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 58900,
+        "symlink": false,
+        "contained": true,
+        "sha256": "ea175d7246454c503bc5accf42b1950b1a58661262991842a367fb40d206f680",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 58251,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "sha256": "8286ec55f906d52ffcf22e85651dc9414fcbcd2cd2b5610dba4f452333eb9f59",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/proposed/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+        "sha256": "b18dd62149c2be993b1801d79aa4df1dac04419ebe9394d2c0f0f8f65a725a62",
+        "expectedSha256": "b18dd62149c2be993b1801d79aa4df1dac04419ebe9394d2c0f0f8f65a725a62",
+        "shaMatched": true,
+        "bytes": 124950,
+        "mode": "0644",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED TARGETED READY; ALL APPLICATION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8286ec55f906d52ffcf22e85651dc9414fcbcd2cd2b5610dba4f452333eb9f59.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 127099,
+        "symlink": false,
+        "contained": true,
+        "sha256": "8286ec55f906d52ffcf22e85651dc9414fcbcd2cd2b5610dba4f452333eb9f59",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "b18dd62149c2be993b1801d79aa4df1dac04419ebe9394d2c0f0f8f65a725a62",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 124950,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+      "sha256": "3a7b31c04877fed1c88236280604cf564eff20ae2d47af84d8cb86a94ececd9a",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/proposed/plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+        "sha256": "cd10c75b11d0f1b61c93bcda210c196614ed90b964033d237941bafbda6b8946",
+        "expectedSha256": "cd10c75b11d0f1b61c93bcda210c196614ed90b964033d237941bafbda6b8946",
+        "shaMatched": true,
+        "bytes": 9138,
+        "mode": "0644",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED TARGETED READY; ALL APPLICATION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3a7b31c04877fed1c88236280604cf564eff20ae2d47af84d8cb86a94ececd9a.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 9868,
+        "symlink": false,
+        "contained": true,
+        "sha256": "3a7b31c04877fed1c88236280604cf564eff20ae2d47af84d8cb86a94ececd9a",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "cd10c75b11d0f1b61c93bcda210c196614ed90b964033d237941bafbda6b8946",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 9138,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+      "sha256": "588ebed768b336ef7d9a14b294dce5472b51c5869d2ae0a7fea0480d732f7278",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/proposed/plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+        "sha256": "412fddb4b951bb43db07e62c85abbae3480835a4724509207fa8ecb9a6b0395a",
+        "expectedSha256": "412fddb4b951bb43db07e62c85abbae3480835a4724509207fa8ecb9a6b0395a",
+        "shaMatched": true,
+        "bytes": 6904,
+        "mode": "0644",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED TARGETED READY; ALL APPLICATION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/588ebed768b336ef7d9a14b294dce5472b51c5869d2ae0a7fea0480d732f7278.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 7491,
+        "symlink": false,
+        "contained": true,
+        "sha256": "588ebed768b336ef7d9a14b294dce5472b51c5869d2ae0a7fea0480d732f7278",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "412fddb4b951bb43db07e62c85abbae3480835a4724509207fa8ecb9a6b0395a",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 6904,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+      "sha256": "76ec8f99886c9456c07e51d58cda4c4eccc60dc528b334f15077fb0fb1708f9f",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/proposed/plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+        "sha256": "ed8b29eb1d121e5bf9b374e286b8cdd9f70ee11dfc88e8b0538f71ac34ab39c3",
+        "expectedSha256": "ed8b29eb1d121e5bf9b374e286b8cdd9f70ee11dfc88e8b0538f71ac34ab39c3",
+        "shaMatched": true,
+        "bytes": 4652,
+        "mode": "0644",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED TARGETED READY; ALL APPLICATION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/76ec8f99886c9456c07e51d58cda4c4eccc60dc528b334f15077fb0fb1708f9f.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 4676,
+        "symlink": false,
+        "contained": true,
+        "sha256": "76ec8f99886c9456c07e51d58cda4c4eccc60dc528b334f15077fb0fb1708f9f",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "ed8b29eb1d121e5bf9b374e286b8cdd9f70ee11dfc88e8b0538f71ac34ab39c3",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 4652,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+      "sha256": "893cef04835bc29fb41a291bcdf52851f3bc2288c0b831b2f930b3199f66e8ad",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/proposed/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+        "sha256": "3e9922b327791479ab4c61fab22589b48708877d561e1909298f0379ff597be7",
+        "expectedSha256": "3e9922b327791479ab4c61fab22589b48708877d561e1909298f0379ff597be7",
+        "shaMatched": true,
+        "bytes": 7490,
+        "mode": "0644",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED TARGETED READY; ALL APPLICATION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/893cef04835bc29fb41a291bcdf52851f3bc2288c0b831b2f930b3199f66e8ad.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 8030,
+        "symlink": false,
+        "contained": true,
+        "sha256": "893cef04835bc29fb41a291bcdf52851f3bc2288c0b831b2f930b3199f66e8ad",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "3e9922b327791479ab4c61fab22589b48708877d561e1909298f0379ff597be7",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 7490,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/hooks/guard-dispatch-budget-platform-owner.test.mjs",
+      "sha256": "97d70a95d5360df0de219778b4ca9f6bb08b72145cbc2175b46060eaef232bbe",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/proposed/plugins/pipeline-core/hooks/guard-dispatch-budget-platform-owner.test.mjs",
+      "preimage": {
+        "exists": false,
+        "sha256": null,
+        "mode": null,
+        "absenceAssurance": "physical sha256sum ENOENT and empty Git index result"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED TARGETED READY; ALL APPLICATION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/hooks/guard-dispatch-budget-platform-owner.test.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/97d70a95d5360df0de219778b4ca9f6bb08b72145cbc2175b46060eaef232bbe.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 8121,
+        "symlink": false,
+        "contained": true,
+        "sha256": "97d70a95d5360df0de219778b4ca9f6bb08b72145cbc2175b46060eaef232bbe",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "ABSENT"
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/native-platform-process-observer-deadlines.test.mjs",
+      "sha256": "e498b3b9419f08b52d27326ee810264b665949ca27876b043c652b2aa561faa8",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/proposed/plugins/pipeline-core/lib/native-platform-process-observer-deadlines.test.mjs",
+      "preimage": {
+        "exists": false,
+        "sha256": null,
+        "mode": null,
+        "absenceAssurance": "physical sha256sum ENOENT and empty Git index result"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED TARGETED READY; ALL APPLICATION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/native-platform-process-observer-deadlines.test.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e498b3b9419f08b52d27326ee810264b665949ca27876b043c652b2aa561faa8.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 7308,
+        "symlink": false,
+        "contained": true,
+        "sha256": "e498b3b9419f08b52d27326ee810264b665949ca27876b043c652b2aa561faa8",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "ABSENT"
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "03359828983168df6cef360b0b12906db1a107740cfd91aafd1f7a4ece1e0268",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/passive-read-batch-correction/postimages/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "sha256": "6a711bdb8a5db034007920808d36ef260873603b4a54364552f4e9f6d408ddcd",
+        "expectedSha256": "6a711bdb8a5db034007920808d36ef260873603b4a54364552f4e9f6d408ddcd",
+        "shaMatched": true,
+        "bytes": 68944,
+        "mode": "0644",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "PREPARED TARGETED READY; ALL APPLICATION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/03359828983168df6cef360b0b12906db1a107740cfd91aafd1f7a4ece1e0268.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 70644,
+        "symlink": false,
+        "contained": true,
+        "sha256": "03359828983168df6cef360b0b12906db1a107740cfd91aafd1f7a4ece1e0268",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "6a711bdb8a5db034007920808d36ef260873603b4a54364552f4e9f6d408ddcd",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 68944,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+      "sha256": "e84c7079c3f5335825093adfc7a550af82e863ba9260866e2c0cd680d91a8761",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/items/public_comparison/postimages/plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+        "sha256": "9ce8b654233a97a7ce63ded8a40c54fb398983939aa9ef0d121fc4381a12c44d",
+        "expectedSha256": "9ce8b654233a97a7ce63ded8a40c54fb398983939aa9ef0d121fc4381a12c44d",
+        "shaMatched": true,
+        "bytes": 11927,
+        "mode": "0644",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "TARGETED PARENT FIX READY; WHOLE CRITERION PARTIAL HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e84c7079c3f5335825093adfc7a550af82e863ba9260866e2c0cd680d91a8761.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 11943,
+        "symlink": false,
+        "contained": true,
+        "sha256": "e84c7079c3f5335825093adfc7a550af82e863ba9260866e2c0cd680d91a8761",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "9ce8b654233a97a7ce63ded8a40c54fb398983939aa9ef0d121fc4381a12c44d",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 11927,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+      "sha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/items/public_comparison/postimages/plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+        "sha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+        "expectedSha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+        "shaMatched": true,
+        "bytes": 1222,
+        "mode": "0755",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "UNCHANGED DEPENDENCY",
+      "mode": 493,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563.mjs",
+        "mode": 493,
+        "nlink": 1,
+        "bytes": 1222,
+        "symlink": false,
+        "contained": true,
+        "sha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+        "mode": 493,
+        "nlink": 1,
+        "bytes": 1222,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "sha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/items/public_comparison/postimages/plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+        "sha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+        "expectedSha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+        "shaMatched": true,
+        "bytes": 7532,
+        "mode": "0644",
+        "modeAssurance": "producer physical custody; fresh stat withheld after prior refusal"
+      },
+      "selection": "assembly-v7",
+      "qualification": "UNCHANGED DEPENDENCY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 7532,
+        "symlink": false,
+        "contained": true,
+        "sha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 7532,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/owned-continuity-verification.mjs",
+      "sha256": "76aa8738c13e3449b6e20cb4a86229da6bc40398284efcfb6c37385e82fd37ec",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/kernel-producer-contract-audit/postimages-v13/plugins/pipeline-core/lib/owned-continuity-verification.mjs",
+      "preimage": {
+        "sha256": "affbbaec382b8a84bc1506057321b92d9cacec113c7cd12021aeecbe2d539d17",
+        "expectedSha256": "affbbaec382b8a84bc1506057321b92d9cacec113c7cd12021aeecbe2d539d17",
+        "shaMatched": true,
+        "bytes": 26463,
+        "mode": "0644",
+        "modeAssurance": "exact earlier producer Source custody; nofreshstat"
+      },
+      "selection": "assembly-v7",
+      "qualification": "NEW COMPONENT CASES ONLY; REAL STAGE OWNER/PACKET/NATIVE HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/owned-continuity-verification.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/76aa8738c13e3449b6e20cb4a86229da6bc40398284efcfb6c37385e82fd37ec.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 43338,
+        "symlink": false,
+        "contained": true,
+        "sha256": "76aa8738c13e3449b6e20cb4a86229da6bc40398284efcfb6c37385e82fd37ec",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "affbbaec382b8a84bc1506057321b92d9cacec113c7cd12021aeecbe2d539d17",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 26463,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs",
+      "sha256": "0ccaa009d2a04eb5158c8d160be704a9b24bda4bfd1fd14a29228b0dfbd7b7d6",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/kernel-producer-contract-audit/postimages-v13/plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs",
+      "preimage": {
+        "sha256": "8f57cf3c8117d9120423487ac6f500655a2cb5560f556863438c28edba9f7e67",
+        "expectedSha256": "8f57cf3c8117d9120423487ac6f500655a2cb5560f556863438c28edba9f7e67",
+        "shaMatched": true,
+        "bytes": 18581,
+        "mode": "0644",
+        "modeAssurance": "exact earlier producer Source custody; nofreshstat"
+      },
+      "selection": "assembly-v7",
+      "qualification": "NEW COMPONENT CASES ONLY; REAL STAGE OWNER/PACKET/NATIVE HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0ccaa009d2a04eb5158c8d160be704a9b24bda4bfd1fd14a29228b0dfbd7b7d6.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 18581,
+        "symlink": false,
+        "contained": true,
+        "sha256": "0ccaa009d2a04eb5158c8d160be704a9b24bda4bfd1fd14a29228b0dfbd7b7d6",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "8f57cf3c8117d9120423487ac6f500655a2cb5560f556863438c28edba9f7e67",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 18581,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "sha256": "802f0dda175a2e719a198a9c98c4c0f07338f292cf26d2270800cf5ae3102f41",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/source/lib/guard/command-catalogue.mjs",
+      "preimage": {
+        "sha256": "a2e453a0929022f8cf94b82f1b73a8c20243e16d594fed6419f544ca7027a300",
+        "expectedSha256": "a2e453a0929022f8cf94b82f1b73a8c20243e16d594fed6419f544ca7027a300",
+        "shaMatched": true,
+        "bytes": null,
+        "mode": null,
+        "modeAssurance": "producer omitted mode; fresh metadata held"
+      },
+      "selection": "assembly-v7",
+      "qualification": "TWO TARGETED CASES READY; ORIGINAL LITERAL/PROVISIONING PARTIAL HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/802f0dda175a2e719a198a9c98c4c0f07338f292cf26d2270800cf5ae3102f41.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 39506,
+        "symlink": false,
+        "contained": true,
+        "sha256": "802f0dda175a2e719a198a9c98c4c0f07338f292cf26d2270800cf5ae3102f41",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "a2e453a0929022f8cf94b82f1b73a8c20243e16d594fed6419f544ca7027a300",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 39154,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "sha256": "cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/source/lib/guard/devplan-shell-lane.mjs",
+      "preimage": {
+        "sha256": "cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39",
+        "expectedSha256": "cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39",
+        "shaMatched": true,
+        "bytes": null,
+        "mode": null,
+        "modeAssurance": "producer omitted mode; fresh metadata held"
+      },
+      "selection": "assembly-v7",
+      "qualification": "UNCHANGED DEPENDENCY",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 16196,
+        "symlink": false,
+        "contained": true,
+        "sha256": "cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 16196,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "sha256": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/literal-bootstrap-item-delivery/source/scripts/pipeline-start-preflight.mjs",
+      "preimage": {
+        "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+        "expectedSha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+        "shaMatched": true,
+        "bytes": null,
+        "mode": null,
+        "modeAssurance": "producer omitted mode; fresh metadata held"
+      },
+      "selection": "assembly-v7",
+      "qualification": "TWO TARGETED CASES READY; ORIGINAL LITERAL/PROVISIONING PARTIAL HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 115330,
+        "symlink": false,
+        "contained": true,
+        "sha256": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 115016,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+      "sha256": "a2a75ec07d4c686fd64b986756127fd8ebe4ec4b436f2277ab66f05d8efb7ae0",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v3/items/calibration_identity/execution-consistency-v2/postimages/plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+      "preimage": {
+        "sha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364",
+        "expectedSha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364",
+        "shaMatched": true,
+        "bytes": 3702,
+        "mode": "0644",
+        "modeAssurance": "exact independent owner parent custody; no fresh stat"
+      },
+      "selection": "assembly-v7",
+      "qualification": "20 FINITE METHOD +2 REAL NORMAL QUALIFIED; NATIVE ERROR/WHOLE ACCEPTANCE HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a2a75ec07d4c686fd64b986756127fd8ebe4ec4b436f2277ab66f05d8efb7ae0.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 3891,
+        "symlink": false,
+        "contained": true,
+        "sha256": "a2a75ec07d4c686fd64b986756127fd8ebe4ec4b436f2277ab66f05d8efb7ae0",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 3702,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard/grammar-denials.mjs",
+      "sha256": "b68a323c68b3769e9c799c5f4395ff7cb7b52140167339cfdfa25b8e1ffe5235",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v4/items/read_diagnostics/successor/plugins/pipeline-core/lib/guard/grammar-denials.mjs",
+      "preimage": {
+        "sha256": "63bedd368650b400a9dc4fc9eddf5a65460daba562e78ca56a8b42302f442fd6",
+        "expectedSha256": "63bedd368650b400a9dc4fc9eddf5a65460daba562e78ca56a8b42302f442fd6",
+        "shaMatched": true,
+        "bytes": 9930,
+        "mode": "0644",
+        "modeAssurance": "exact diagnostic owner preimage custody; no fresh stat"
+      },
+      "selection": "assembly-v7",
+      "qualification": "SINGLE/PIPELINE CONFIG DIAGNOSTICS16GREEN; VERDICT/CODE/RETRY/HGO CONSERVED; WHOLEITEM HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/grammar-denials.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b68a323c68b3769e9c799c5f4395ff7cb7b52140167339cfdfa25b8e1ffe5235.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 10106,
+        "symlink": false,
+        "contained": true,
+        "sha256": "b68a323c68b3769e9c799c5f4395ff7cb7b52140167339cfdfa25b8e1ffe5235",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "63bedd368650b400a9dc4fc9eddf5a65460daba562e78ca56a8b42302f442fd6",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 9930,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "sha256": "b2f14defd0d5bfce96735a788df10261ab242c5f0f4a42949df4a0a30376ac61",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v4/items/read_diagnostics/successor/plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "preimage": {
+        "sha256": "0b868b292765847d59a943c2bfb0ece9829dc2076f0ab5a0103ada273f5553b9",
+        "expectedSha256": "0b868b292765847d59a943c2bfb0ece9829dc2076f0ab5a0103ada273f5553b9",
+        "shaMatched": true,
+        "bytes": 34468,
+        "mode": "0644",
+        "modeAssurance": "exact diagnostic owner preimage custody; no fresh stat"
+      },
+      "selection": "assembly-v7",
+      "qualification": "SINGLE/PIPELINE CONFIG DIAGNOSTICS16GREEN; VERDICT/CODE/RETRY/HGO CONSERVED; WHOLEITEM HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b2f14defd0d5bfce96735a788df10261ab242c5f0f4a42949df4a0a30376ac61.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 35701,
+        "symlink": false,
+        "contained": true,
+        "sha256": "b2f14defd0d5bfce96735a788df10261ab242c5f0f4a42949df4a0a30376ac61",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "0b868b292765847d59a943c2bfb0ece9829dc2076f0ab5a0103ada273f5553b9",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 34468,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "sha256": "40f8102a6bdc09724e93320772348f99e04f106642808b8fabae080aab822831",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/kernel-producer-contract-audit/postimages-v13/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+        "sha256": "ef1467d638ad52660a9b358ad70b2eab599529cb5465727cb496396380dcde0e",
+        "bytes": 137821,
+        "mode": "0644",
+        "modeAssurance": "exact v13 Source CAS custody; fresh sha256 matches",
+        "expectedSha256": "ef1467d638ad52660a9b358ad70b2eab599529cb5465727cb496396380dcde0e",
+        "shaMatched": true
+      },
+      "selection": "assembly-v7",
+      "qualification": "NEW SOURCE BRIDGE COMPONENT PREPARED; FORMAL OWNER/PACKET/NATIVE HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/40f8102a6bdc09724e93320772348f99e04f106642808b8fabae080aab822831.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 143981,
+        "symlink": false,
+        "contained": true,
+        "sha256": "40f8102a6bdc09724e93320772348f99e04f106642808b8fabae080aab822831",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "ef1467d638ad52660a9b358ad70b2eab599529cb5465727cb496396380dcde0e",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 137821,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard/denial-route.mjs",
+      "sha256": "13a0861644d718ae5640dbd83bbc0a42c0b72734cb73c17d776097cccf856ab7",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/bounded-denial-help-whole-item/runtime/plugins/pipeline-core/lib/guard/denial-route.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/guard/denial-route.mjs",
+        "sha256": "87b1fd7eab69fac513eb399b1371b36bbe05d9dba6ab3f2f1e89c3e82b33ff13",
+        "bytes": 20183,
+        "mode": "0644",
+        "nlink": 1,
+        "symlink": false,
+        "physicalPath": "plugins/pipeline-core/lib/guard/denial-route.mjs",
+        "modeAssurance": "fresh exact Root-admitted finite lstat collector; previous unsupported stat spelling refusal retained",
+        "shaMatched": true
+      },
+      "selection": "assembly-v7",
+      "qualification": "PRIVATE FINITE HELP CASES QUALIFIED; WHOLE CRITERION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/denial-route.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/13a0861644d718ae5640dbd83bbc0a42c0b72734cb73c17d776097cccf856ab7.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 19227,
+        "symlink": false,
+        "contained": true,
+        "sha256": "13a0861644d718ae5640dbd83bbc0a42c0b72734cb73c17d776097cccf856ab7",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "87b1fd7eab69fac513eb399b1371b36bbe05d9dba6ab3f2f1e89c3e82b33ff13",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 20183,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/guard-human-override.mjs",
+      "sha256": "8cc1da6eee34416da53275fad831e0bd11903ba607fb48f4f84529099ede7cc5",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/bounded-denial-help-whole-item/runtime/plugins/pipeline-core/scripts/guard-human-override.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/guard-human-override.mjs",
+        "sha256": "91a40900dea8aa87956a7c1cbf657dc4589816b72e76ea2b5091f05510559009",
+        "bytes": 35110,
+        "mode": "0644",
+        "nlink": 1,
+        "symlink": false,
+        "physicalPath": "plugins/pipeline-core/scripts/guard-human-override.mjs",
+        "modeAssurance": "fresh exact Root-admitted finite lstat collector; previous unsupported stat spelling refusal retained",
+        "shaMatched": true
+      },
+      "selection": "assembly-v7",
+      "qualification": "PRIVATE FINITE HELP CASES QUALIFIED; WHOLE CRITERION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/guard-human-override.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8cc1da6eee34416da53275fad831e0bd11903ba607fb48f4f84529099ede7cc5.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 37602,
+        "symlink": false,
+        "contained": true,
+        "sha256": "8cc1da6eee34416da53275fad831e0bd11903ba607fb48f4f84529099ede7cc5",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "91a40900dea8aa87956a7c1cbf657dc4589816b72e76ea2b5091f05510559009",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 35110,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "sha256": "da0b7d2fa847d7e1cbbe0a3816b39f89c4df83918c364433090e9b4992ba055a",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/bounded-denial-help-whole-item/runtime/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+        "sha256": "1437a8fd954424076192550a0070db274962930be65479be2c6c7427a4fb4133",
+        "bytes": 40594,
+        "mode": "0644",
+        "nlink": 1,
+        "symlink": false,
+        "physicalPath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+        "modeAssurance": "fresh exact Root-admitted finite lstat collector; previous unsupported stat spelling refusal retained",
+        "shaMatched": true
+      },
+      "selection": "assembly-v7",
+      "qualification": "PRIVATE FINITE HELP CASES QUALIFIED; WHOLE CRITERION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/da0b7d2fa847d7e1cbbe0a3816b39f89c4df83918c364433090e9b4992ba055a.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 40773,
+        "symlink": false,
+        "contained": true,
+        "sha256": "da0b7d2fa847d7e1cbbe0a3816b39f89c4df83918c364433090e9b4992ba055a",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "1437a8fd954424076192550a0070db274962930be65479be2c6c7427a4fb4133",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 40594,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "sha256": "dd7955c62295a9353664e46634a6d4c05b81ae4cfc35738613479fd3d9e5f338",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/bounded-denial-help-whole-item/runtime/plugins/pipeline-core/lib/human-guard-override.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "sha256": "92a0b33602345237a576cac9b5737bd647c150e41d263d0746f980e6bd9f7a94",
+        "bytes": 336183,
+        "mode": "0644",
+        "nlink": 1,
+        "symlink": false,
+        "physicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "modeAssurance": "fresh exact Root-admitted finite lstat collector; previous unsupported stat spelling refusal retained",
+        "shaMatched": true
+      },
+      "selection": "assembly-v7",
+      "qualification": "PRIVATE FINITE HELP CASES QUALIFIED; WHOLE CRITERION HELD",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/human-guard-override.mjs",
+      "copyInput": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/dd7955c62295a9353664e46634a6d4c05b81ae4cfc35738613479fd3d9e5f338.mode-0644.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 338084,
+        "symlink": false,
+        "contained": true,
+        "sha256": "dd7955c62295a9353664e46634a6d4c05b81ae4cfc35738613479fd3d9e5f338",
+        "custodyReused": true
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "92a0b33602345237a576cac9b5737bd647c150e41d263d0746f980e6bd9f7a94",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 336183,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/critic-course-adoption.mjs",
+      "sha256": "001968575edfb06ee6542745e06f96581b9f912bfcd28bf4ca05dd1cb9fd2524",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/lib/critic-course-adoption.mjs",
+      "preimage": null,
+      "selection": "critic-adoption-private-checkpoint",
+      "qualification": "private-code-checkpoint-unqualified",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/critic-course-adoption.mjs",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/lib/critic-course-adoption.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 18043,
+        "symlink": false,
+        "contained": true,
+        "sha256": "001968575edfb06ee6542745e06f96581b9f912bfcd28bf4ca05dd1cb9fd2524",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "ABSENT"
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/critic-course-adoption.mjs",
+      "sha256": "8042430b8378bc61e760617b6c7f7f5ec17af943130cf8a9a51b21075a028b94",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/critic-course-adoption.mjs",
+      "preimage": null,
+      "selection": "critic-adoption-private-checkpoint",
+      "qualification": "private-code-checkpoint-unqualified",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/critic-course-adoption.mjs",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/critic-course-adoption.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 1826,
+        "symlink": false,
+        "contained": true,
+        "sha256": "8042430b8378bc61e760617b6c7f7f5ec17af943130cf8a9a51b21075a028b94",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "ABSENT"
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "sha256": "55facac4f93b53b18344a67ede21d0d2a03ed823469ef4bf3f590f8ec606d216",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+        "sha256": "27145a72a140f1c56aad17a292041352a8911892f22c4235d27206a667c73886",
+        "mode": 420,
+        "bytes": 43729
+      },
+      "selection": "critic-adoption-private-checkpoint",
+      "qualification": "private-code-checkpoint-unqualified",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/lib/critic-generic-batch.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 50913,
+        "symlink": false,
+        "contained": true,
+        "sha256": "55facac4f93b53b18344a67ede21d0d2a03ed823469ef4bf3f590f8ec606d216",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "27145a72a140f1c56aad17a292041352a8911892f22c4235d27206a667c73886",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 43729,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "sha256": "fdadc5589f99436e65de084c507aa25bd72dd65768c229b75f7fde529edbfb8c",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+        "sha256": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91",
+        "mode": 420,
+        "bytes": 60667
+      },
+      "selection": "critic-adoption-private-checkpoint",
+      "qualification": "private-code-checkpoint-unqualified",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 62667,
+        "symlink": false,
+        "contained": true,
+        "sha256": "fdadc5589f99436e65de084c507aa25bd72dd65768c229b75f7fde529edbfb8c",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 60667,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "sha256": "cb3d91941fb002d3b978dcc5e5db6d83a887e24cc7579c087287a632e5bd13e6",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "sha256": "8aa3b98ec54545d966dd1a45f66902630e0b11ca11d441d6d0b1aa9840b4cb86",
+        "mode": 420,
+        "bytes": 31074
+      },
+      "selection": "critic-adoption-private-checkpoint",
+      "qualification": "private-code-checkpoint-unqualified",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 32448,
+        "symlink": false,
+        "contained": true,
+        "sha256": "cb3d91941fb002d3b978dcc5e5db6d83a887e24cc7579c087287a632e5bd13e6",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "8aa3b98ec54545d966dd1a45f66902630e0b11ca11d441d6d0b1aa9840b4cb86",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 31074,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "sha256": "abfb029ba786ae2241919871900d9a8a1fc5f32825fa1f610c3e8944ca70b678",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "sha256": "d07ffe67a485be83e00462457a1abf51b363bf40bebb2b589eddba9c10ac2168",
+        "mode": 420,
+        "bytes": 39127
+      },
+      "selection": "critic-adoption-private-checkpoint",
+      "qualification": "private-code-checkpoint-unqualified",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 41467,
+        "symlink": false,
+        "contained": true,
+        "sha256": "abfb029ba786ae2241919871900d9a8a1fc5f32825fa1f610c3e8944ca70b678",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "d07ffe67a485be83e00462457a1abf51b363bf40bebb2b589eddba9c10ac2168",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 39127,
+        "symlink": false,
+        "contained": true
+      }
+    },
+    {
+      "sourcePath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "sha256": "00719df8e353903e502961dc20f1b931b31294f46fc3ae9b028427d79a72084d",
+      "privateOriginal": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "preimage": {
+        "path": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+        "sha256": "54e9abd562c1b41d18d6f5a598d84942b5aecb7efb667c92672847bc355a9534",
+        "mode": 420,
+        "bytes": 57731
+      },
+      "selection": "critic-adoption-private-checkpoint",
+      "qualification": "private-code-checkpoint-unqualified",
+      "mode": 420,
+      "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "copyInput": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/candidate/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 59238,
+        "symlink": false,
+        "contained": true,
+        "sha256": "00719df8e353903e502961dc20f1b931b31294f46fc3ae9b028427d79a72084d",
+        "custodyReused": false
+      },
+      "currentSource": {
+        "status": "current-byte-CAS-matched",
+        "sha256": "54e9abd562c1b41d18d6f5a598d84942b5aecb7efb667c92672847bc355a9534",
+        "mode": 420,
+        "nlink": 1,
+        "bytes": 57731,
+        "symlink": false,
+        "contained": true
+      }
+    }
+  ],
+  "publicCodeTokenClassifications": [
+    {
+      "path": "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "line": 52,
+      "category": "credential-shaped public code token",
+      "classification": "inert sanitizer pattern; executable public code bytes preserved",
+      "rawValuePrinted": false,
+      "structuralCodeKind": "string predicate recognizing forbidden credential-shaped input"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "line": 1875,
+      "category": "credential-shaped public code token",
+      "classification": "inert sanitizer pattern; executable public code bytes preserved",
+      "rawValuePrinted": false,
+      "structuralCodeKind": "string predicate recognizing forbidden credential-shaped input"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "line": 5038,
+      "category": "credential-shaped public code token",
+      "classification": "inert sanitizer pattern; executable public code bytes preserved",
+      "rawValuePrinted": false,
+      "structuralCodeKind": "regular-expression literal recognizing forbidden credential-shaped input"
+    }
+  ],
+  "holds": [
+    "productive SQ admission unavailable",
+    "signed protected-source authorization and source application pending",
+    "final exact candidate registry/completion configuration binding",
+    "affected integrated qualification and whole candidate Verify pending",
+    "independent coherent batch FULL1 + maximum 3 DIFF review pending; existing history unchanged",
+    "native runner Windows/macOS/Claude/Codex/Agy assurance unresolved as stated in original reports",
+    "PO acceptance open",
+    "Kernel closure generated producer/import authority remains RED",
+    "Signing requests/proofs/human keys are excluded; PO AFK authorization remains prepared-only",
+    "Design independent reader usability, same-input native budget and latency proofs remain held",
+    "genuine-accepted-mapping-policy-and-original-budget-unavailable",
+    "positive-source-publication-registration-admission-unqualified",
+    "adopted-correction-carrier-unimplemented",
+    "full-verify-and-independent-critic-not-run",
+    "no-native-installed-qualification",
+    "Main Verify fresh physical safety hold; no current content read",
+    "No actual assembled Source graph, FullVerify, independent review, signature, native or manual acceptance",
+    "Critic checkpoint remains unqualified/proposed architecture; old review admission and budgets unchanged"
+  ],
+  "testsRun": 0,
+  "reviewsRun": 0,
+  "physicalMetadataPathNormalization": "Repository-contained observed absolute metadata paths expressed as repository-relative paths; immutable raw predecessor facts remain bound by their original manifest/evidence SHA."
+}

@@ -1,0 +1,37 @@
+{
+  "schema": "alfred.m5-fixed-qualification-artifact-manifest.v1",
+  "status": "focused-method-qualified",
+  "sourceWriterSHA256": "19c1c563ca8fbb231a8d2ef36a25a0dba620eeb80d008eef8ae70cf38af72f29",
+  "sourceFinalizerSHA256": "e2ddc79983e334e98a92bfbf54747bdaf1a412589225375a8c8f05447270566e",
+  "sourceClosureSHA256": "57db9e3189872fae2bdfba7c1136cc5c006d4ba528af396c7720efab06ccc779",
+  "freezeSHA256": "618f9d277bfe26aafb790cf9f8b9c2ef1281450b5977b3b6e9f50cb4d45d1fad",
+  "captureRefs": [
+    {
+      "path": "independent/qualification/execution.json",
+      "sha256": "79244bcd4a19e405a781edf99398c64a8fb17f685308581c47dd7878e280bbb2",
+      "bytes": 1493
+    },
+    {
+      "path": "independent/qualification/stdout.txt",
+      "sha256": "2d4074f2c688c03f086a17ad0803b908723758bbfcac27228c0941ae80a1f770",
+      "bytes": 2049
+    },
+    {
+      "path": "independent/qualification/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "independent/qualification/completion.fd3.jsonl",
+      "sha256": "8de8c9835773044ffacaea00e2b44982a71bf39292cdaec2469be90c5cc7d666",
+      "bytes": 2857
+    }
+  ],
+  "caseReceiptSHA256": "552e90f19b1d7171300644335f6bab9bba17f489df89cf8029debeca9954d6b4",
+  "publicProofProposal": "public-proof-proposal/focused-method-receipt.json",
+  "publication": "proposal-only privacy/integration review open",
+  "additionalRuns": 0,
+  "nativeProof": false,
+  "humanApproval": false,
+  "officialClosure": false
+}

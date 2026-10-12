@@ -1,0 +1,13 @@
+{
+  "schema": "alfred.afk-four-content-provenance-public.v1",
+  "qualificationScope": "Final b288 originalAFX009S only; exact Rootcontrolled test assurance",
+  "qualificationExecutionSha256": "bea724734d2ddc3ce9b3fd3bc4f5cf9ef943739e66e7b572bf2851e6fc66803e",
+  "sourceManifestSha256": "eaf02ed6c89599d44b2a0b418b37b056946154ae80b25cec2f75d3dab9f7cba9",
+  "integrationPreparationManifestSha256": "04c18c9b09b70f356b6ff04910f9437e0d1304a78ab38c57cb2c514ede98411c",
+  "postintegrationPhysicalReadbackSha256": "66a8be9a13400db6c66334b6681156a6700013ec5726b84c45cfaba91179cb56",
+  "ancestry": "Registry/Host exact approved splice roundtrips to current Main; I03 current Main before transfer equaled historical512ee; full adoption diff retained with historical lineage limit",
+  "predecessorFailuresRetained": true,
+  "privateCapturesExported": false,
+  "nativeAssurance": false,
+  "wholeItemAccepted": false
+}

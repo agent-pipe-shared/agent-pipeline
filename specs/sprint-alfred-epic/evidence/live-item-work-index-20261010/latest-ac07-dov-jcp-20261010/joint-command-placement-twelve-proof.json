@@ -1,0 +1,35 @@
+{
+  "schema": "alfred.sanitized-focused-proof.v1",
+  "id": "joint-command-placement-twelve",
+  "input": {
+    "path": "scratch/alfred-jcp-resource-reason-successor-20261010/runtime/execution.json",
+    "sha256": "a14aa07653a5c69c3e07d924904ad7c70c822ba3aba6289d8f138ec03443f3c7",
+    "bytes": 9309
+  },
+  "child": {
+    "status": 0,
+    "signal": null
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "db68e87b4068a76c76dd68a5e5126b1f259e17dcefe32c980fbaaf4fcbed23df",
+    "caseSetSha256": "cfdf1747a8930caf817357d3381faa64bdd876642729a9675150701d808ccaf6",
+    "dispositionsSha256": "e50a88b68be68900d2c536e94a9a1e76ad3db5aaabf5de0ffecd803f0937ca4f",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 12,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "parserError": null,
+  "sourceConserved": true,
+  "sourceFreezeSha256": null,
+  "assurance": "joint command-placement focused controlled fixture; no native host READY or whole candidate assurance",
+  "nativeAuthority": false,
+  "wholeItemAccepted": false,
+  "rawCapturesExcluded": true
+}

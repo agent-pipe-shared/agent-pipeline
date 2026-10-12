@@ -1,0 +1,75 @@
+{
+  "schema": "alfred.cmol-five.public-proof-manifest.v1",
+  "files": [
+    {
+      "path": "focused-method-proof.json",
+      "sha256": "2c5fce00ca9a5a2be1f251d245d8d8c4092207877e7e8658672e0ecbcb00afe1",
+      "bytes": 5060,
+      "mode": 420,
+      "nlink": 1,
+      "identity": {
+        "dev": "2096",
+        "ino": "4338473"
+      }
+    },
+    {
+      "path": "completion.fd3.jsonl",
+      "sha256": "d4903c36cc891c625f441729d3bd2d51f902e9dd9e3ddbf83c0b924ed808126a",
+      "bytes": 1170,
+      "mode": 420,
+      "nlink": 1,
+      "identity": {
+        "dev": "2096",
+        "ino": "4338474"
+      }
+    },
+    {
+      "path": "policy.json",
+      "sha256": "b07e526da59942cab054b388190e779fad9ee7b935b9398b04b92ade05c988da",
+      "bytes": 175,
+      "mode": 420,
+      "nlink": 1,
+      "identity": {
+        "dev": "2096",
+        "ino": "4338475"
+      }
+    },
+    {
+      "path": "case-associations.json",
+      "sha256": "4697bc6c3b452275dbfbc34f03b45b9deb14741183424a93c99c299a86871c49",
+      "bytes": 1072,
+      "mode": 420,
+      "nlink": 1,
+      "identity": {
+        "dev": "2096",
+        "ino": "4338476"
+      }
+    },
+    {
+      "path": "report.md",
+      "sha256": "117d0ab713306d4ac448b916b8b25d89b58f0d4fe17591b103c489bf9d024dc3",
+      "bytes": 1010,
+      "mode": 420,
+      "nlink": 1,
+      "identity": {
+        "dev": "2096",
+        "ino": "4338477"
+      }
+    }
+  ],
+  "totalBytes": 8487,
+  "actualExecutionSha256": "91711c25ebe72549ff5519fefa8532492c27611028fb8f46093a80fb299caa64",
+  "actualFd3Sha256": "d4903c36cc891c625f441729d3bd2d51f902e9dd9e3ddbf83c0b924ed808126a",
+  "caseIds": [
+    "CMOL001",
+    "CMOL003",
+    "CMOL004",
+    "CMOL005",
+    "CMOL006"
+  ],
+  "privacyReviewed": true,
+  "rawExecutionCopied": false,
+  "rawStdoutCopied": false,
+  "originalEmptyFd3HistoryRetained": true,
+  "sourceIntegrationClaim": false
+}

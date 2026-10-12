@@ -1,0 +1,3027 @@
+{
+  "schema": "alfred.selected164.remaining92.current-owned-routing.v1",
+  "parent": {
+    "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed47-partition-successor/remaining-partition.json",
+    "sha256": "c956d6da67edc852cadd546489ae144eb852dd09582aa34471c10d126e5a9c35"
+  },
+  "counts": {
+    "remaining": 92,
+    "protected": 13,
+    "currentHeldRuntimeTuplesIncludingTransferSplit": 21,
+    "currentDispatchedBatchPaths": 58
+  },
+  "groups": [
+    {
+      "batchId": "R-02",
+      "theme": "Agy topology/authority and native managed/model runtime compatibility",
+      "proposedSlot": "alfred_obl013_override_digest_regression",
+      "paths": [
+        "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+        "plugins/pipeline-core/lib/agy-session-authority.mjs",
+        "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+        "plugins/pipeline-core/install-agy.mjs",
+        "plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+        "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+        "plugins/pipeline-core/lib/antigravity-json-spans.mjs",
+        "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+        "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+        "plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+        "plugins/pipeline-core/lib/model-family-invocation.mjs",
+        "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+        "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+        "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs"
+      ],
+      "status": "Root-physical-inspection-complete; not-applied",
+      "currentOwner": "alfred_optional_advisor_source_followthrough",
+      "rows": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+            "sha256": "33057d57247a103ba9b739d9c42f0e145ad8f5e7775b9fc16bb5183a28e75b99",
+            "bytes": 26973,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "33057d57247a103ba9b739d9c42f0e145ad8f5e7775b9fc16bb5183a28e75b99"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/22"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "2880f2d57a8621876156f143bc34ac00c137ebb01e1b703b41365b453b1f1ef6",
+            "bytes": 7128,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/agy-session-authority.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-session-authority.mjs",
+            "sha256": "e1c576f78629a5fdc87137d8ec190ba2118e77b0e9379022dc9b182400ba63b0",
+            "bytes": 36376,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "e1c576f78629a5fdc87137d8ec190ba2118e77b0e9379022dc9b182400ba63b0"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/23"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "f93f53aed13588b52814d3b374b2e94f0668097a8c808ee1298ced353c9745c5",
+            "bytes": 23310,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+            "sha256": "4d82954f182b8e21ed6711efcca335284f2d6aac15f2af1d36d9e681d0edb20f",
+            "bytes": 51174,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "4d82954f182b8e21ed6711efcca335284f2d6aac15f2af1d36d9e681d0edb20f"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/24"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "b1b17fc00d86df857ecf70f82ef485a73414a330117e6d3cbcf830242c04a7eb",
+            "bytes": 35509,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/install-agy.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/install-agy.mjs",
+            "sha256": "c91fd55dade9dfbb75257f13b4df6c432fc5895b1cd22b7f21b98f26a478923c",
+            "bytes": 20575,
+            "mode": 493
+          },
+          "selectedSourceParent": {
+            "selection": "AGY-EXISTING-RUNTIME-CLOSURE",
+            "sha256": "c91fd55dade9dfbb75257f13b4df6c432fc5895b1cd22b7f21b98f26a478923c"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/142"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "c91fd55dade9dfbb75257f13b4df6c432fc5895b1cd22b7f21b98f26a478923c",
+            "bytes": 20575,
+            "mode": 493,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+            "sha256": "ded1a614d7f8af94c2e2fc8ed102c8b571222fae232be3274d43de05d7367336",
+            "bytes": 12903,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "AGY-PURE-VERSION7-QUALIFIED",
+            "sha256": "ded1a614d7f8af94c2e2fc8ed102c8b571222fae232be3274d43de05d7367336"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/143"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "5e4549cd81bc654d7257040bd045cc30ffc95ecf10f258a05851b171e6c54cdb",
+            "bytes": 12813,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+            "sha256": "62343bc64ef38b74355b069a8a5c19825b1df8a345fcc68be4715b5d13f180fe",
+            "bytes": 19825,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "AGY-EXISTING-RUNTIME-CLOSURE",
+            "sha256": "62343bc64ef38b74355b069a8a5c19825b1df8a345fcc68be4715b5d13f180fe"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/144"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "62343bc64ef38b74355b069a8a5c19825b1df8a345fcc68be4715b5d13f180fe",
+            "bytes": 19825,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/antigravity-json-spans.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/antigravity-json-spans.mjs",
+            "sha256": "2316b295cb2290d428e7d8d1193672bf020cc125b0206212a938d4b78cb7eec4",
+            "bytes": 3485,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "AGY-EXISTING-RUNTIME-CLOSURE",
+            "sha256": "2316b295cb2290d428e7d8d1193672bf020cc125b0206212a938d4b78cb7eec4"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/145"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "2316b295cb2290d428e7d8d1193672bf020cc125b0206212a938d4b78cb7eec4",
+            "bytes": 3485,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+            "sha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d",
+            "bytes": 13893,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "Root-final-composition-exact-target",
+            "sha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d"
+          },
+          "sourceOrigin": {
+            "path": "legacy-origin:alfred-native-dispatch-progress-carrier-source-20261010/postimages/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+            "sha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d",
+            "mode": 420
+          },
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/74"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "a3d3d0083ef6d1c4be5db4a0bfc112c12e381f4ba1f87b397a10eacd86331001",
+            "bytes": 7186,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+            "sha256": "880dfaca2300c0ec16669edcddb824a5627b5ebe32216b1ed0c29ca51649cbcd",
+            "bytes": 29615,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "880dfaca2300c0ec16669edcddb824a5627b5ebe32216b1ed0c29ca51649cbcd"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/75"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "b1eb62d7f167995744d843557df7cf9471a7e719a4252b7561d94e15f4c0dcef",
+            "bytes": 14870,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+            "sha256": "124dd2f01ea47f788fe0dd71a8b20d4454d6cbb5bd8d1e47115f0c2ea3625a0f",
+            "bytes": 6940,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "124dd2f01ea47f788fe0dd71a8b20d4454d6cbb5bd8d1e47115f0c2ea3625a0f"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/76"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/model-family-invocation.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-invocation.mjs",
+            "sha256": "7600193f6a35670859861ab9f5bb807565951d0ac55ce20197130d4f5a256d8a",
+            "bytes": 15676,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "Root-final-composition-exact-target",
+            "sha256": "7600193f6a35670859861ab9f5bb807565951d0ac55ce20197130d4f5a256d8a"
+          },
+          "sourceOrigin": {
+            "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/model-family-invocation.mjs",
+            "sha256": "7600193f6a35670859861ab9f5bb807565951d0ac55ce20197130d4f5a256d8a",
+            "mode": 420
+          },
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/72"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "d4d398eb2303b51d791d710dda7d1448787296d9bb32e49b6d048b7d9cfd35d2",
+            "bytes": 14525,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+            "sha256": "a4421692e9a835dc2ce8b4b394adf832a6522b1a1df48117b198f3dd6e197699",
+            "bytes": 13184,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "Root-final-composition-exact-target",
+            "sha256": "a4421692e9a835dc2ce8b4b394adf832a6522b1a1df48117b198f3dd6e197699"
+          },
+          "sourceOrigin": {
+            "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+            "sha256": "a4421692e9a835dc2ce8b4b394adf832a6522b1a1df48117b198f3dd6e197699",
+            "mode": 420
+          },
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/73"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "78e2ef73537498b459d9a77acb1b9bf8e9e515a21c5ed580429e0592837d8853",
+            "bytes": 12789,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+            "sha256": "2d03909b66e940e665bbd684dd02498c27cc32ce1ea22043dbc2e5fa19ea3657",
+            "bytes": 49200,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "2d03909b66e940e665bbd684dd02498c27cc32ce1ea22043dbc2e5fa19ea3657"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/36"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "a2bddc0027cd30f0ed9f55460bce46b2306ff03b6ed9d677f85ad02c4cca8d56",
+            "bytes": 48969,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+            "sha256": "31053d205a6de028d8d585a447fb0d6c394f89a2ebe1b0d9c9a425b0bba81b18",
+            "bytes": 76336,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "PCI-actual12",
+            "sha256": "31053d205a6de028d8d585a447fb0d6c394f89a2ebe1b0d9c9a425b0bba81b18"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/91"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "1b36005298a13b0eb78b5602572f26ffa09ddd67d6cb96a7648df579d6ba232f",
+            "bytes": 75560,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        }
+      ],
+      "nextAction": "Full-read exact Source/ancestry; derive minimum literal import/resource closure; prepare fixed physical inspector and atomic content transfer with actual CAS. Missing green cases remain open; Root alone applies/tests.",
+      "workLocation": "legacy-origin:alfred-r02-agy-native-model-integration-preparation-20261011",
+      "historicalProposalOnly": true,
+      "applied": false
+    },
+    {
+      "batchId": "R-03",
+      "theme": "Security, own-session export and verification/evidence CLI surfaces",
+      "proposedSlot": "alfred_obl016_heredoc_extractor_regression",
+      "paths": [
+        "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+        "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+        "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+        "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+        "plugins/pipeline-core/scripts/capture-evidence.mjs",
+        "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+        "plugins/pipeline-core/lib/consumer-verify.mjs",
+        "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+        "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+        "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+        "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+        "plugins/pipeline-core/scripts/po-human-approval.mjs",
+        "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs"
+      ],
+      "status": "atomic-preparation; exact-R01-dependency-rebind-pending",
+      "currentOwner": "alfred_obl016_heredoc_extractor_regression",
+      "rows": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+            "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+            "bytes": 7902,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "OSE22 qualified source",
+            "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c"
+          },
+          "sourceOrigin": "legacy-origin:alfred-uninstall-export-followthrough-20261010/source/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/90"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+            "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+            "bytes": 15099,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "OSE22 qualified source",
+            "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc"
+          },
+          "sourceOrigin": "legacy-origin:alfred-uninstall-export-followthrough-20261010/source/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/128"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "fcce222b8ef54cc8f64f18f6bb9e105e84df9b471ea6c7adae0a8176996ac0c6",
+            "bytes": 14328,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+            "sha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+            "bytes": 33602,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "gitleaks-cumulative-recompute-and-malformed-report-privacy-finite10",
+            "sha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7"
+          },
+          "sourceOrigin": "legacy-origin:alfred-gitleaks-malformed-report-privacy-source-20261010/postimages/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/130"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "9d60fdcbb310d533248741a581945fddcc7fc54d275e97c8f263af4858001159",
+            "bytes": 32792,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+            "sha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+            "bytes": 11185,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "gitleaks-cumulative-recompute-and-malformed-report-privacy-finite10",
+            "sha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b"
+          },
+          "sourceOrigin": "legacy-origin:alfred-gitleaks-recomputed-ignore-entry-source-20261010/postimages/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/116"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "bdd0b171eb02375893b7f2c0416ef8824086bcc219bc91627cc10081bfd7be82",
+            "bytes": 9503,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/capture-evidence.mjs",
+            "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+            "bytes": 31343,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "WEL12",
+            "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/109"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "b44f0c1f6114f664e3033981dfafd8c6391f10a65cfff0d2441d54e86184a33e",
+            "bytes": 24182,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+            "sha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364",
+            "bytes": 3702,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "PCI-actual12",
+            "sha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/111"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "32bb3728ffb6423b317efc1edd0a68f7730e38d4abc060e8c43e40833dd7eb77",
+            "bytes": 3213,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/consumer-verify.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/consumer-verify.mjs",
+            "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85",
+            "bytes": 6738,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "PCI-actual12",
+            "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/39"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "590e02cdca84869e7c658fca13514024dae7a2819882afbfa6a7b1679e6b387f",
+            "bytes": 6256,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+            "sha256": "08634960b03c7b4bbf8dab60d5796b6b5e31b179c32949570851661ec6fc07b4",
+            "bytes": 33950,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "Root-final-composition-exact-target",
+            "sha256": "08634960b03c7b4bbf8dab60d5796b6b5e31b179c32949570851661ec6fc07b4"
+          },
+          "sourceOrigin": {
+            "path": "legacy-origin:alfred-ac07-omitted-eight-genuine-writer-preparation-20261010/official-verify/postimages/plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+            "sha256": "08634960b03c7b4bbf8dab60d5796b6b5e31b179c32949570851661ec6fc07b4",
+            "mode": 420
+          },
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/135"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "a0269e2af2323f408973f15f9a8015eeba41e32d56625ef7d3bda342ea0e9381",
+            "bytes": 33463,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+            "sha256": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91",
+            "bytes": 60667,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "Root-final-composition-exact-target",
+            "sha256": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91"
+          },
+          "sourceOrigin": {
+            "path": "legacy-origin:alfred-i03-controlled-method-observation-adapter-source-20261010/postimages/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+            "sha256": "491ac5dae8ce53dda6be9133defab75c372538f38b7012c803477e79be0fab91",
+            "mode": 420
+          },
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/110"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "549e26230caf3a5a76f9560c87ead0d3bca2f5724de2ab9000a2c6db2e7caadf",
+            "bytes": 55134,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+            "sha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29",
+            "bytes": 30862,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "Root-final-composition-exact-target",
+            "sha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29"
+          },
+          "sourceOrigin": {
+            "path": "legacy-origin:alfred-critic-one-plus-diff-po-decision-source-20261010/postimages/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+            "sha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29",
+            "mode": 420
+          },
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/112"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "1082c2318149ed50b7a5210b7ea1fbef1401157b712cb3fa7368f23e10b903a4",
+            "bytes": 25941,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+            "sha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+            "bytes": 57419,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "M4",
+            "sha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/113"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "a6152f4313e1e72da519f135107faf7af5dc9e8e82b4caae9356f27a41306502",
+            "bytes": 47088,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+            "sha256": "c6bcf57a93093af9bdd0307ff9df91d71edaa9059d997bba8061ebf003022bc8",
+            "bytes": 34029,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "Root-final-composition-exact-target",
+            "sha256": "c6bcf57a93093af9bdd0307ff9df91d71edaa9059d997bba8061ebf003022bc8"
+          },
+          "sourceOrigin": {
+            "path": "legacy-origin:alfred-method-v3-writer-combined-source-20261010/postimages/plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+            "sha256": "c6bcf57a93093af9bdd0307ff9df91d71edaa9059d997bba8061ebf003022bc8",
+            "mode": 420
+          },
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/114"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "87ab6f1c47f529191929b341f24d82cc50994132fc07ad7a75d2d0b067eb8368",
+            "bytes": 19054,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+            "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+            "bytes": 178532,
+            "mode": 493
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/124"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "107766ea18455f8a37084c8684b446bc4b77a91436f3b16277aa57d12ce02cc5",
+            "bytes": 166078,
+            "mode": 493,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+            "sha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca",
+            "bytes": 59864,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "P16-actual16",
+            "sha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/126"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "7a705a110535a937e552caa3f34485959046f242cf0884ce830d874446db4200",
+            "bytes": 58733,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        }
+      ],
+      "nextAction": "Full-read exact Source/ancestry; derive minimum literal import/resource closure; prepare fixed physical inspector and atomic content transfer with actual CAS. Missing green cases remain open; Root alone applies/tests.",
+      "workLocation": "legacy-origin:alfred-selected164-r03-integration-preparation-20261011",
+      "historicalProposalOnly": true,
+      "applied": false
+    },
+    {
+      "batchId": "R-04",
+      "theme": "Architecture/plan/review and cleanup standalone library surfaces",
+      "proposedSlot": null,
+      "paths": [
+        "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+        "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+        "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+        "plugins/pipeline-core/lib/commit-message-policy.mjs",
+        "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+        "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+        "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+        "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+        "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+        "plugins/pipeline-core/lib/review-economy.mjs",
+        "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+        "plugins/pipeline-core/lib/signed-quality-package.mjs",
+        "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+        "plugins/pipeline-core/lib/session-authority-observers.mjs"
+      ],
+      "status": "Root-physical-inspection-complete; atomic14 preparation",
+      "currentOwner": "quality_inline_coordinator_audit",
+      "rows": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+            "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+            "bytes": 25281,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/26"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "1e57ea83138686779172a9e34feb643af8e35e4a1be855edff23aee94ab8cffa",
+            "bytes": 24319,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+            "sha256": "354bd5fc754d08577d5a2a91b4b2ed1a9656484eabff77207d03a5017674f1d1",
+            "bytes": 14364,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "P16-actual16",
+            "sha256": "354bd5fc754d08577d5a2a91b4b2ed1a9656484eabff77207d03a5017674f1d1"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/28"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+            "sha256": "2dff589e957ae9b2de059b35b57888232a2a18e3f28ffb39832c8f64a0bc0fc6",
+            "bytes": 28714,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "2dff589e957ae9b2de059b35b57888232a2a18e3f28ffb39832c8f64a0bc0fc6"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/30"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "22e23a1099f2344f8d16b0cc06ffda461e7aee9becfb07b09be4067e60ffff57",
+            "bytes": 7566,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/commit-message-policy.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/commit-message-policy.mjs",
+            "sha256": "3a319ce909f6872e158629d6eb29c485d581e64455b8ff5b48e2b8e136a89d8b",
+            "bytes": 23791,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "MERGE20",
+            "sha256": "3a319ce909f6872e158629d6eb29c485d581e64455b8ff5b48e2b8e136a89d8b"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/38"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "25ce22101bd584f957723b7b4096f797652ee5e518673e257ba5454ed9fe3008",
+            "bytes": 21130,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+            "sha256": "e36c1e06fbe8917e276420348ba0620f991fc2d5252f9db7a37599ae04d10c03",
+            "bytes": 28404,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "CLAUSE",
+            "sha256": "e36c1e06fbe8917e276420348ba0620f991fc2d5252f9db7a37599ae04d10c03"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/40"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-review-lineage.mjs",
+            "sha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+            "bytes": 46763,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "CURRENT9",
+            "sha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/42"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "21b7d9f6875cd0e90d281a8abe52c7824b2c09c6bbe8d03a12b779cb9dab99a3",
+            "bytes": 36138,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+            "sha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4",
+            "bytes": 32310,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "CURRENT9",
+            "sha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/43"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "586be2bdd47da335416e707357e27cd63a7f189661014aa7b834c21a92bdf461",
+            "bytes": 19681,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+            "sha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+            "bytes": 20127,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "M4",
+            "sha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/66"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-calibration-identity.mjs",
+            "sha256": "bdeee4983ef2c76ff6e57b96f52f45ff96749b99ddca7caa8075dcfde51046bc",
+            "bytes": 8555,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "PCI-actual12",
+            "sha256": "bdeee4983ef2c76ff6e57b96f52f45ff96749b99ddca7caa8075dcfde51046bc"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/81"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/review-economy.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/review-economy.mjs",
+            "sha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9",
+            "bytes": 52643,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "Root-final-composition-exact-target",
+            "sha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9"
+          },
+          "sourceOrigin": {
+            "path": "legacy-origin:alfred-critic-one-plus-diff-po-decision-source-20261010/postimages/plugins/pipeline-core/lib/review-economy.mjs",
+            "sha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9",
+            "mode": 420
+          },
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/88"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "0820196d0427988d12932a855a4afb168271a26efb9b7f971d98d8e3d98820b4",
+            "bytes": 51805,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+            "sha256": "90d173880447fdd17507e438d5227d09cd0d7e20f2e94e8067df5cda6b9cbad0",
+            "bytes": 149878,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "90d173880447fdd17507e438d5227d09cd0d7e20f2e94e8067df5cda6b9cbad0"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/96"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "b6918047beb20748a58b0625efdb2135fe0a5063e96f39ba85d7518805dadf00",
+            "bytes": 118470,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/signed-quality-package.mjs",
+            "sha256": "c81bddab38440a69014a26dfd21c1788a8fbe9d7c1f63c63afbf0655d7ebcee3",
+            "bytes": 25033,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "c81bddab38440a69014a26dfd21c1788a8fbe9d7c1f63c63afbf0655d7ebcee3"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/100"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00",
+            "bytes": 25013,
+            "mode": 420,
+            "nlinkObserved": 1
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+            "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+            "bytes": 117511,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/102"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "a02336e0483d0590d625be7a8030ba8734d5ab6e4c5817df90db6268e4d21640",
+            "bytes": 96570,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/session-authority-observers.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-observers.mjs",
+            "sha256": "2df8489463e3e63a24e55904738b8a9f2e10a648804e9c12815caa281866b819",
+            "bytes": 3165,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "qualified-HGL12-current-parent-adoption",
+            "sha256": "2df8489463e3e63a24e55904738b8a9f2e10a648804e9c12815caa281866b819"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/94"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        }
+      ],
+      "nextAction": "Full-read exact Source/ancestry; derive minimum literal import/resource closure; prepare fixed physical inspector and atomic content transfer with actual CAS. Missing green cases remain open; Root alone applies/tests.",
+      "workLocation": "legacy-origin:alfred-selected164-r04-main-integration-preparation-20261011",
+      "historicalProposalOnly": true,
+      "applied": false
+    },
+    {
+      "batchId": "R-05",
+      "theme": "Hook/workflow and remaining standalone integration regression tests",
+      "proposedSlot": null,
+      "paths": [
+        ".github/workflows/verify.yml",
+        "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+        "plugins/pipeline-core/hooks/codex-hooks.json",
+        "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+        "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+        "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+        "plugins/pipeline-core/hooks/guard-push.mjs",
+        "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+        "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+        "plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+        "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
+        "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+        "plugins/pipeline-core/scripts/session-cleanup.mjs",
+        "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs"
+      ],
+      "status": "Root-physical-inspection-complete; atomic16 preparation",
+      "currentOwner": "agy_greenfield_acceptance_audit",
+      "rows": [
+        {
+          "canonicalPath": ".github/workflows/verify.yml",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/.github/workflows/verify.yml",
+            "sha256": "73837987b4490cc67086f5fbeb97cd655a3c1966a5d31483806609b0e2140bcb",
+            "bytes": 7351,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "73837987b4490cc67086f5fbeb97cd655a3c1966a5d31483806609b0e2140bcb"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/0"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "275b8c07b4655c793ddfeebc8569bda7bc10f2b17d33f8c088cebbaec9cae989",
+            "bytes": 7186,
+            "mode": 420,
+            "nlinkObserved": 1
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+            "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+            "bytes": 46463,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/11"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "2daf949f896b7f44bfec74c55ca334a742df3594ef2c5619ca54d1ad0e556cbf",
+            "bytes": 46357,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/codex-hooks.json",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-hooks.json",
+            "sha256": "6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34",
+            "bytes": 3949,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/12"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "dcc23075e81a254603c9b7ab96bc6e2bc046830532b1cc0535934e6af67aa010",
+            "bytes": 3919,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+            "sha256": "65291378f05fe1c894d856d4696d8ce0677e6c898ae0958b166643aaa5caa913",
+            "bytes": 36796,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "65291378f05fe1c894d856d4696d8ce0677e6c898ae0958b166643aaa5caa913"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/13"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "9d1ea7d2b3e644622a8761d88e79c313267f6e942c613353d062a2461f1abc91",
+            "bytes": 36411,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+            "sha256": "46b8d4be8ac5449e3e83060c2be75ad8ea395047b6fdf3f4c2b2a861d631a85f",
+            "bytes": 15265,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "46b8d4be8ac5449e3e83060c2be75ad8ea395047b6fdf3f4c2b2a861d631a85f"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/14"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "a956864a3a4550d51f20fbb177c15247fda975b44e2860c350e75374a51d882f",
+            "bytes": 14816,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+            "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+            "bytes": 118731,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "CLR",
+            "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/17"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "360a645e4b77f32bd18971d8a94463a02cd49536e12f966bd4d03cb5018f7a33",
+            "bytes": 90377,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+            "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+            "bytes": 150958,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "scratch-custody-qualified-helper-and-WARN-only-integration",
+            "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe"
+          },
+          "sourceOrigin": "legacy-origin:alfred-scratch-durability-current-guard-rebase-source-20261010/postimages/plugins/pipeline-core/hooks/guard-push.mjs",
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/18"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "9686bbec296411e480a72bc4f0ae49600e452b413370f88ecc8319b3b5dfee49",
+            "bytes": 149849,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+            "sha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216",
+            "bytes": 340,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "CURRENT9",
+            "sha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/47"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+            "sha256": "04dae36b9d168c20155ff95e06a4d5b42919dc9a7523e02b42e7130ce8c6d8ea",
+            "bytes": 25106,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "04dae36b9d168c20155ff95e06a4d5b42919dc9a7523e02b42e7130ce8c6d8ea"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/70"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "0f30c44188cd76c864f785b0fe915089c2ee9b94092886f02a0e4e9dc1bf0393",
+            "bytes": 25106,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+            "sha256": "e506c151c9be0c389eb4028d7df62e1044b43f101ce13a74d05f9b9f7a1e757c",
+            "bytes": 5141,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "e506c151c9be0c389eb4028d7df62e1044b43f101ce13a74d05f9b9f7a1e757c"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/82"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+            "sha256": "f6b827cd56383996ed1e5c7fe78fd4199e9ceb42e3dfa1a8d9fa1839badf5536",
+            "bytes": 573921,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "f6b827cd56383996ed1e5c7fe78fd4199e9ceb42e3dfa1a8d9fa1839badf5536"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/84"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "8af97f8b6026234575184c8ebfcebc2c1594a6944b3fef37cca98147e86bbd0f",
+            "bytes": 573828,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+            "sha256": "c41e6a9d260d264ebc4a9017e5c6b8ec14b85b0f9f3a259c81c84072aeb52ba0",
+            "bytes": 9745,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "c41e6a9d260d264ebc4a9017e5c6b8ec14b85b0f9f3a259c81c84072aeb52ba0"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/120"
+          },
+          "MainHistoricalPreimage": {
+            "present": false
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
+            "sha256": "bffcd1419e14fdaa3cf83b00cda47fae80b20efcb0d80d609dbaae48d00c391d",
+            "bytes": 28115,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "bffcd1419e14fdaa3cf83b00cda47fae80b20efcb0d80d609dbaae48d00c391d"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/121"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "91e36ae14666db1a6aca9c9ebf4372c7b6605efafbc85a8232c3fdf25f7cbe15",
+            "bytes": 28036,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
+            "sha256": "96e0e5457d691a8af566fe296b43a96a810acb62f4174ce169c0ea2ac294f56b",
+            "bytes": 133755,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "96e0e5457d691a8af566fe296b43a96a810acb62f4174ce169c0ea2ac294f56b"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/131"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "6d3c4b8a0f1d58c04174f3a46b8b12b6486eb466ae198e50c88318f0fca3517d",
+            "bytes": 131443,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/session-cleanup.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/session-cleanup.mjs",
+            "sha256": "3f7c68b622a6f9ab756ce4b7dbefed315890081883b7f26a8f86fb866ce48d4d",
+            "bytes": 46798,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "3f7c68b622a6f9ab756ce4b7dbefed315890081883b7f26a8f86fb866ce48d4d"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/132"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "1084009c790f7c8f0884f3cd6c0ec5a7303aabde478340dd112f45fa916ada36",
+            "bytes": 43158,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+          "source": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+            "sha256": "aeb99faca3653bb51c42a8a74c147d7ba0aa6c7c084e80b23870e48979956287",
+            "bytes": 56950,
+            "mode": 420
+          },
+          "selectedSourceParent": {
+            "selection": "BASE73",
+            "sha256": "aeb99faca3653bb51c42a8a74c147d7ba0aa6c7c084e80b23870e48979956287"
+          },
+          "sourceOrigin": null,
+          "sourceMapLocator": {
+            "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+            "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+            "jsonPointer": "/rows/134"
+          },
+          "MainHistoricalPreimage": {
+            "present": true,
+            "sha256": "d06b295a1991269c2e8ae883172f67860ce7c4163bd7151f87dc1d63b9b2d2c8",
+            "bytes": 56568,
+            "mode": 420,
+            "nlinkObserved": 2
+          },
+          "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+          "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+          "protectedRules": []
+        }
+      ],
+      "nextAction": "Full-read exact Source/ancestry; derive minimum literal import/resource closure; prepare fixed physical inspector and atomic content transfer with actual CAS. Missing green cases remain open; Root alone applies/tests.",
+      "workLocation": "legacy-origin:alfred-selected164-r05-integration-preparation-20261011",
+      "historicalProposalOnly": true,
+      "applied": false
+    }
+  ],
+  "currentHeldOrActiveTuples": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-ledger.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987",
+        "bytes": 31759,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "457a5010eecc559bcc5e4df9e654d33b11bc894071794744fb2172c1bd46d987",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/21"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "258abe7f1d920426b358c1572609bfd61a58ddd45d67d4ac04380f6aeeef06ad",
+        "bytes": 27235,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+        "sha256": "a8bb9a199c162434721f00fa0e02dc311cbf5c3c3edc5f855db78fe1a8616fac",
+        "bytes": 26894,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "a8bb9a199c162434721f00fa0e02dc311cbf5c3c3edc5f855db78fe1a8616fac"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/34"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "202572a093803bb0b0376377c63e61a08d2dfe6cb453c38ffa10da1c3c284632",
+        "bytes": 11669,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+        "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c",
+        "bytes": 18854,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/35"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "8023c0405eb2dbd42ae80cd6a5d47c9c6c42122afadd4f5888c0ad5dde54a9ee",
+        "bytes": 14803,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+        "bytes": 49461,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-critic-one-plus-diff-po-decision-source-20261010/postimages/plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/41"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "0bc159856bb1001e0a1dd011075c629705d3d54377418f90a7f7afcd36a28bb6",
+        "bytes": 15989,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+        "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+        "bytes": 301059,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/67"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "34aa1bd5a1bd1ed6509cb383c423a05bdd382ce429bb16753a5a01bae9b0e362",
+        "bytes": 245178,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-supervisor-state.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351",
+        "bytes": 16936,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/68"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "016f17e4e793f620176a25608a44ebfa003b3aae591ada2d77bcd65feac2e29a",
+        "bytes": 16449,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "sha256": "7983a552e66c86d1e81c16cd29dfa709cc88236cfa4a5e4a3b21894344f2f0d3",
+        "bytes": 74069,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "7983a552e66c86d1e81c16cd29dfa709cc88236cfa4a5e4a3b21894344f2f0d3"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "sha256": "7983a552e66c86d1e81c16cd29dfa709cc88236cfa4a5e4a3b21894344f2f0d3",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/69"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "e74c95581f117d03f06b233bae0a8a83bb822ef7726134ba620a30c46dfba8e8",
+        "bytes": 62885,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "sha256": "ef11c9b2daa8298979c802dd9df69c8572fa322ba6a6af72d1b7071229f72ced",
+        "bytes": 71220,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "ef11c9b2daa8298979c802dd9df69c8572fa322ba6a6af72d1b7071229f72ced"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "sha256": "ef11c9b2daa8298979c802dd9df69c8572fa322ba6a6af72d1b7071229f72ced",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/71"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "0e5bd3554720a34c96f8a49f8ebe1962776cb448b06b54d4719ca7703ce80bec",
+        "bytes": 62084,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "bytes": 539214,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/source-bug-successor/postimages/current-i03-bridge-message-cumulative/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "mode": 384
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/77"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+        "bytes": 425437,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+        "bytes": 423484,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "PCI-actual12",
+        "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/83"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51",
+        "bytes": 422907,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+        "sha256": "ebe09528a07a24e7c0635dbb5ca3f9ac599d5f93dd14a87978527abe464d60bb",
+        "bytes": 30884,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "ebe09528a07a24e7c0635dbb5ca3f9ac599d5f93dd14a87978527abe464d60bb"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+        "sha256": "ebe09528a07a24e7c0635dbb5ca3f9ac599d5f93dd14a87978527abe464d60bb",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/93"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "sha256": "af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9",
+        "bytes": 122649,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "sha256": "af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/95"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd",
+        "bytes": 29072,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "c201d8b2a4df84c606c7de24fbad5125dab9a5526fe5d1e530da055846af02bd",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/97"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "c26890face66f58b93d378979d2bf3f547f4d39abc1e1837c8f95c07e74ffec2",
+        "bytes": 24777,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+        "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+        "bytes": 39560,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "qualified-HGL12-current-parent-adoption",
+        "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/98"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+        "bytes": 32208,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "CURRENT9",
+        "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/133"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "cd5ed934902daa3668ccab9791ee905afd826e80ebd876fa465c3e8f050965b7",
+        "bytes": 29937,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0",
+        "bytes": 17521,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i08-current146-accepted-transition-composition-source-20261010/postimages/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "sha256": "26f1c1a912a0602e51729e68b906e90aafc703d5d03d0736aea87b2a1833f8f0",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/151"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "7ce18941bf4d96c6f04349f00bd46c20414a367a9efea8755d979ab7760f09bf",
+        "bytes": 16311,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agent-model-registry.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agent-model-registry.mjs",
+        "sha256": "f4be134fd94736c919fdfc75ab0cfb05c83145d8651dbbe74c47ef22bbd1cedc",
+        "bytes": 10769,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "f4be134fd94736c919fdfc75ab0cfb05c83145d8651dbbe74c47ef22bbd1cedc"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-existing-route-source-followthrough-20261010/v3-declared-override-source/postimages/plugins/pipeline-core/lib/agent-model-registry.mjs",
+        "sha256": "f4be134fd94736c919fdfc75ab0cfb05c83145d8651dbbe74c47ef22bbd1cedc",
+        "mode": 384
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/152"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "ccf974295061eb40ad2fc23b0c0d04adfccdb5310c9cdd60ff2f1f9b36f80e3a",
+        "bytes": 10165,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+        "sha256": "1ff95b3af2924d876a771ea01fe2e888c582f72b7c42f36835c3d42108ef5533",
+        "bytes": 13261,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "1ff95b3af2924d876a771ea01fe2e888c582f72b7c42f36835c3d42108ef5533"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-controlled-method-registration-trailer-source-20261010/postimages/plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+        "sha256": "1ff95b3af2924d876a771ea01fe2e888c582f72b7c42f36835c3d42108ef5533",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/154"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+        "sha256": "b1de1f345667578caacc23958dc2055b9881743f576d4ea7442dc8aef27ade1d",
+        "bytes": 15027,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "b1de1f345667578caacc23958dc2055b9881743f576d4ea7442dc8aef27ade1d"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-i03-controlled-method-observation-adapter-source-20261010/postimages/plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+        "sha256": "b1de1f345667578caacc23958dc2055b9881743f576d4ea7442dc8aef27ade1d",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/155"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "existing owned runtime tuple; no fresh duplicate assignment",
+      "currentOwner": "Root coordinates existing source owner",
+      "nextAction": "Preserve current cumulative runtime Source generation; use existing owner/joint qualification and exact new declaration before integration."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+        "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+        "bytes": 29652,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/25"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6",
+        "bytes": 27987,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "Root-transferred-to-coherent-final-Aggregate5-composition",
+      "currentOwner": "alfred_transfer_integrity_source_actor",
+      "nextAction": "Select coherent final cumulative Source with final aggregate tuple, exact Main preimages and Root-only apply; do not copy historical leaf blindly."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+        "sha256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333",
+        "bytes": 75585,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "e64307abff95d83f66d1018fb44e944333c2e67ace62b5275a6c3d84df667333"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/80"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f",
+        "bytes": 74598,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [],
+      "status": "Root-transferred-to-coherent-final-Aggregate5-composition",
+      "currentOwner": "alfred_transfer_integrity_source_actor",
+      "nextAction": "Select coherent final cumulative Source with final aggregate tuple, exact Main preimages and Root-only apply; do not copy historical leaf blindly."
+    }
+  ],
+  "protected": [
+    {
+      "canonicalPath": "harness/verify-suites.json",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/harness/verify-suites.json",
+        "sha256": "b220d0c4cc91691e4218941a088ee8265adb1e3bc9495553c317c93d2a25a139",
+        "bytes": 112089,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "b220d0c4cc91691e4218941a088ee8265adb1e3bc9495553c317c93d2a25a139"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/postimages/harness/verify-suites.json",
+        "sha256": "b220d0c4cc91691e4218941a088ee8265adb1e3bc9495553c317c93d2a25a139",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/10"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "95440724d7093282a2b87db10c14ca973d8d3bbc9c900c5a95b3b63d99686ed8",
+        "bytes": 100172,
+        "mode": 420,
+        "nlinkObserved": 1
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-VERIFY-REGISTRATION",
+          "pattern": "(?:harness/verify-suites\\.json|harness/scripts/check-verify-suite-registration\\.mjs|plugins/pipeline-core/scripts/check-protected-delta\\.mjs)$"
+        },
+        {
+          "id": "TP-13",
+          "pattern": "harness/verify-suites\\.json$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/hooks.json",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/hooks.json",
+        "sha256": "04c639abbb518be5430dec02ee504ff0cc443c3873c320d19a1684073565e50d",
+        "bytes": 16658,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "04c639abbb518be5430dec02ee504ff0cc443c3873c320d19a1684073565e50d"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/19"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "65dec57031b859906087bcd0669390c2d1eb0a9409ae6a93890eab32950f983d",
+        "bytes": 16642,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "TP-4",
+          "pattern": "plugins/pipeline-core/hooks/hooks\\.json$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+        "sha256": "66ded1749b49a6725044704b4e96cbcffa78b1dd8db6f76041088e6f02fae4b9",
+        "bytes": 31179,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "66ded1749b49a6725044704b4e96cbcffa78b1dd8db6f76041088e6f02fae4b9"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/postimages/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+        "sha256": "66ded1749b49a6725044704b4e96cbcffa78b1dd8db6f76041088e6f02fae4b9",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/56"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed",
+        "bytes": 27574,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/constants.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/constants.mjs",
+        "sha256": "800dfe7041ba4b045a0f773ad0ad71e401fa893e73dec4cc27170042fd3aa1ba",
+        "bytes": 17492,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "800dfe7041ba4b045a0f773ad0ad71e401fa893e73dec4cc27170042fd3aa1ba"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/57"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "052998e5dcad8161628dd8a4435d89149eb4e183ea8a0aecacc38c89629f05b6",
+        "bytes": 17234,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+        "sha256": "dfb3e9f7e944e9c1e9ebf69f1cc17a8bd14e4470c694f2e6378432a384197301",
+        "bytes": 15851,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "dfb3e9f7e944e9c1e9ebf69f1cc17a8bd14e4470c694f2e6378432a384197301"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-command-placement-current120-composition-preparation-20261010/postimages/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+        "sha256": "dfb3e9f7e944e9c1e9ebf69f1cc17a8bd14e4470c694f2e6378432a384197301",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/58"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4",
+        "bytes": 13825,
+        "mode": 420,
+        "nlinkObserved": 1
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+        "sha256": "e870bf1616030bd18468c1c535737a7ea7509ad13d77f027c0b88fb1130af881",
+        "bytes": 10296,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "e870bf1616030bd18468c1c535737a7ea7509ad13d77f027c0b88fb1130af881"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/59"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+        "sha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+        "bytes": 32926,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/60"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+        "bytes": 32556,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+        "sha256": "5cabbe9346574b40a6978bf602ae713706c6b4d0728a843fa64eb817156ec465",
+        "bytes": 3305,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "5cabbe9346574b40a6978bf602ae713706c6b4d0728a843fa64eb817156ec465"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/61"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+        "sha256": "708049b8d29d200cdee333fbb36c0061839990ac26eeb5f3f21c726fae41bfc1",
+        "bytes": 22914,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "708049b8d29d200cdee333fbb36c0061839990ac26eeb5f3f21c726fae41bfc1"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/62"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "e9cc3e9f59985057b00d9abc6295f41361dcbc95b9d0feff53fbfe59837002e8",
+        "bytes": 22633,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+        "sha256": "39639eca721081f36fca88e29bac91baa4fa0fa26872d7b65183cb53f0586544",
+        "bytes": 5826,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "BASE73",
+        "sha256": "39639eca721081f36fca88e29bac91baa4fa0fa26872d7b65183cb53f0586544"
+      },
+      "sourceOrigin": null,
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/63"
+      },
+      "MainHistoricalPreimage": {
+        "present": false
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+        "sha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+        "bytes": 39861,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "OSE22 qualified source",
+        "sha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe"
+      },
+      "sourceOrigin": "legacy-origin:alfred-own-session-export-actual104-guard-successor-20261010/source/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/64"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "49d3ab05d33e1e4c4440f945234ae70c575b52c543e597dd16fee38be0e931af",
+        "bytes": 35029,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "sha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+        "bytes": 67834,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "root-selected-commit-hint-qualified-replacement",
+        "sha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f"
+      },
+      "sourceOrigin": "legacy-origin:alfred-commit-hint-protocol-independent-20261010/graph/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/65"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e",
+        "bytes": 65092,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-GUARD-HOOKS",
+          "pattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$|plugins/pipeline-core/lib/guard/[^/]+\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "source": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+        "bytes": 796531,
+        "mode": 420
+      },
+      "selectedSourceParent": {
+        "selection": "Root-final-composition-exact-target",
+        "sha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47"
+      },
+      "sourceOrigin": {
+        "path": "legacy-origin:alfred-ac07-state-current142-source-composition-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+        "mode": 420
+      },
+      "sourceMapLocator": {
+        "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/selected164-current-remaining-map.json",
+        "sha256": "81f8c81d5615e13d16bebe0912b2feb3086a9205a644340f44b91b5585bd4d76",
+        "jsonPointer": "/rows/123"
+      },
+      "MainHistoricalPreimage": {
+        "present": true,
+        "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+        "bytes": 706707,
+        "mode": 420,
+        "nlinkObserved": 2
+      },
+      "MainFreshPhysicalCAS": "required before Root apply; historical preimage is not fresh absence evidence",
+      "proofStatus": "Exact Source selection/origin retained; case-level receipt join not inferred from source count",
+      "protectedRules": [
+        {
+          "id": "PB-SANCTIONED-WRITER",
+          "pattern": "plugins/pipeline-core/scripts/pipeline-state\\.mjs$"
+        }
+      ],
+      "status": "protected final HGO union scope held",
+      "currentOwner": "Root",
+      "nextAction": "Final contributor composition and sanctioned authorization before protected transfer."
+    }
+  ],
+  "currentTipCorrections": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+      "historicalSelectedTip": "354bd5fc754d08577d5a2a91b4b2ed1a9656484eabff77207d03a5017674f1d1",
+      "requiredCumulativeTip": "current411 Source branch exactfullpin/manifest must be bound by owner; no prefix-to-fullhash inference",
+      "owner": "quality_inline_coordinator_audit",
+      "status": "compose-cumulative411-not-historical354"
+    }
+  ],
+  "consumedRemoved": {
+    "tests11": 11,
+    "R01": 14
+  },
+  "coverage": {
+    "uniqueRemaining": 92,
+    "duplicates": 0,
+    "omissions": 0
+  },
+  "limits": [
+    "Physical inspection or atomic preparation is not application.",
+    "Missing green case association stays open, not missing implementation.",
+    "Current runtime tuples/protected surfaces retain original owners."
+  ]
+}

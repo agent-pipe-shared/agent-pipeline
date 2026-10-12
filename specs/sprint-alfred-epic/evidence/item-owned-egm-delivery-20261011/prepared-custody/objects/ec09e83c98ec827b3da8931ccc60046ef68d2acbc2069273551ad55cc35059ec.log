@@ -1,0 +1,78 @@
+✖ explicitly declined sibling: conflict-free plan, owned hooks retired, content and sibling preserved (535.884993ms)
+✖ unknown sibling refuses planning, retains owned hooks (385.143377ms)
+✔ active sibling refuses planning, retains content and hooks (669.312119ms)
+✖ additional declined sibling after journal is topology drift, journal and hooks unchanged (593.112071ms)
+✔ modified user hook remains untouched and prevents retirement (432.054254ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 2
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2818.984595
+
+✖ failing tests:
+
+test at scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/shared.test.mjs:11:1
+✖ explicitly declined sibling: conflict-free plan, owned hooks retired, content and sibling preserved (535.884993ms)
+  Error: PU-HOOK-SHARED
+      at footprintFail (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/git-hook-footprint.mjs:11:57)
+      at removeManagedGitHook (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/git-hook-footprint.mjs:33:130)
+      at run (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/project-uninstall.mjs:53:167)
+      at Object.apply (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/project-uninstall.mjs:64:1237)
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/shared.test.mjs:13:61)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    code: 'PU-HOOK-SHARED'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/shared.test.mjs:18:1
+✖ unknown sibling refuses planning, retains owned hooks (385.143377ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/shared.test.mjs:19:57)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/shared.test.mjs:25:1
+✖ additional declined sibling after journal is topology drift, journal and hooks unchanged (593.112071ms)
+  AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+  
+  Caught error:
+  
+  Error: PU-HOOK-SHARED
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/shared.test.mjs:27:126)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PU-HOOK-SHARED
+        at footprintFail (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/git-hook-footprint.mjs:11:57)
+        at removeManagedGitHook (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/git-hook-footprint.mjs:33:130)
+        at run (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/project-uninstall.mjs:53:167)
+        at Object.resume (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/candidate/plugins/pipeline-core/lib/project-uninstall.mjs:73:10)
+        at file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/shared.test.mjs:27:150
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/uninstall-shared-hook-delivery/shared.test.mjs:27:126)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25),
+    operator: 'throws',
+    diff: 'simple'
+  }

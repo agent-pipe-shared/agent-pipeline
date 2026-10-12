@@ -1,0 +1,41 @@
+{
+  "schema": "alfred.source164-status-event.v1",
+  "currentAuditSelectedPaths": 164,
+  "inventory": {
+    "path": "scratch/alfred-current146-final-composition-update-20261010/actual-source-manifest.json",
+    "sha256": "aba63c5cac17b0f7c33557b7581d010f0e803454c45713879f9ecdf3ec8b967f",
+    "bytes": 122258
+  },
+  "actualIntegration": {
+    "path": "scratch/alfred-current146-final-composition-update-20261010/actual-receipt.json",
+    "sha256": "ac3fcfbefbc51fa4c801943969659b13fead9595966dda4b11c95a3c032799ed",
+    "bytes": 4765
+  },
+  "mainProductIntegrated": false,
+  "officialItemsOpen": 176,
+  "AC": 37,
+  "IR": 4,
+  "allBodiesAllocatedRead": true,
+  "individualCriterionReconciled": 55,
+  "remainingCriterionReconciliation": 121,
+  "wholeItemAcceptanceUnchanged": true,
+  "stageChanges": [],
+  "proofs": {
+    "State24": "scoped original24 PASS",
+    "onboardingOriginalFour": "STB003–006 PASS across retained separate runs, not full26",
+    "Agy22": "original13+9 FD3 PASS plus supplemental current readback; original v9 failure historical",
+    "AC07": "independent14 and source-author4 distinct runs",
+    "DOV20": "controlled writer/comparator20 PASS",
+    "JCP12": "joint focused12 PASS",
+    "Verify2": "corrected2 PASS, expected baseline1 PASS/1 FAIL"
+  },
+  "remaining": [
+    "full26 lawful lifecycle constructors",
+    "native/METHOD runtime proof",
+    "aggregate Source164 qualification",
+    "Main product integration",
+    "signing/stamping"
+  ],
+  "currentResponsible": "Root",
+  "sourceAuthorsNotAutomaticItemOwners": true
+}

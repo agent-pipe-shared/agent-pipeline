@@ -1,0 +1,227 @@
+{
+  "schema": "alfred.fixed10-unprotected-atomic-transfer.actual.v1",
+  "mode": "--apply-hil-gre",
+  "status": "applied",
+  "operations": [
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+      "effect": "replace",
+      "sha256": "a40947944d52f0c817780c752633911caa1f79ae2cec3bc76e6105efa48d754a",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "e4f974f10e7d1c845647bece0d46bd68277439b504c4b6230248d08feb4fd1f9",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "12240",
+        "mtimeNs": "1791666618751632732",
+        "ctimeNs": "1791666618773000008",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "7e781dd0c3e9b48488891b4fbe477d36afb341c71e0ef769bc05c2a13c7f3a8d",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "cd1bbd0b367e7f869a3cd7bde03ac22c32bb8fe0c97d1b96cc2ecadf234934e9",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 1,
+          "bytes": "11818",
+          "mtimeNs": "1791648394753622427",
+          "ctimeNs": "1791648394753622427",
+          "regular": true,
+          "directory": false,
+          "symlink": false
+        }
+      },
+      "backupPath": "legacy-origin:alfred-c0-model010-reader-candidate-apply-plan-20261010/fixed10-atomic-integration-preparation/apply-once/backups/0.before.bin"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+      "effect": "replace",
+      "sha256": "6bd26c6fcfa10d6cffe0705914cbfaca181ec8a0ed2bd0ef279498ff95a1b13e",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "9317ac437bb2acb8d2b4a3d2fe524f37b4a64133d2ef6121d311374a5ef356ff",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "46972",
+        "mtimeNs": "1791666618761702418",
+        "ctimeNs": "1791666618775632174",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "a891dc26214b7e4c3cb25043cc4fc9c494c2469fc48a6e24366fb18dfd91c9fe",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "8412a430e7ba7392b2f92111942d483067cc5f0f439003694cabf992708cdb9f",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 1,
+          "bytes": "46972",
+          "mtimeNs": "1791617715216844990",
+          "ctimeNs": "1791617715216960408",
+          "regular": true,
+          "directory": false,
+          "symlink": false
+        }
+      },
+      "backupPath": "legacy-origin:alfred-c0-model010-reader-candidate-apply-plan-20261010/fixed10-atomic-integration-preparation/apply-once/backups/1.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+      "effect": "replace",
+      "sha256": "a40947944d52f0c817780c752633911caa1f79ae2cec3bc76e6105efa48d754a",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "57af5b4f85ee7696a96bd3bd4a5b9e227363dc203462431165a797d1ad4a68ce",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "12240",
+        "mtimeNs": "1791666618763632452",
+        "ctimeNs": "1791666618779632080",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "440d180c700bcb4c299ca13a00906d732018a0f4ee8049f862578f6805d2f218",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "1ce41270b9faf03c35e6bf9e8a0dd0ff8bc695369a4977733ea52f09196b82cd",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "7651",
+          "mtimeNs": "1790938622000000000",
+          "ctimeNs": "1791569417494730593",
+          "regular": true,
+          "directory": false,
+          "symlink": false
+        }
+      },
+      "backupPath": "legacy-origin:alfred-c0-model010-reader-candidate-apply-plan-20261010/fixed10-atomic-integration-preparation/apply-once/backups/2.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+      "effect": "replace",
+      "sha256": "6bd26c6fcfa10d6cffe0705914cbfaca181ec8a0ed2bd0ef279498ff95a1b13e",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "fb9afb0b752d013f91e7bfa56c7aeba9f885663c2df1a377b36adb8cc417473d",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "46972",
+        "mtimeNs": "1791666618773000008",
+        "ctimeNs": "1791666618783631989",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "953d2da8b2ab2117041a293dd5048455c7ac17feba1d6b785803f9765eee9227",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "0d2a901c7b0a9eb0d6de3a6e73604691748c84c0c88f6f30c7f7fcac33c58f02",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "46897",
+          "mtimeNs": "1791562239606615179",
+          "ctimeNs": "1791569417497480737",
+          "regular": true,
+          "directory": false,
+          "symlink": false
+        }
+      },
+      "backupPath": "legacy-origin:alfred-c0-model010-reader-candidate-apply-plan-20261010/fixed10-atomic-integration-preparation/apply-once/backups/3.before.bin"
+    }
+  ],
+  "noProductImports": true,
+  "businessRuns": 0,
+  "protectedTargets": 0,
+  "createdDirectories": []
+}

@@ -1,0 +1,375 @@
+{
+  "schema": "alfred.selected164.consumed72.integration-delta.v1",
+  "parent": {
+    "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed47-partition-successor/consumed-inventory.json",
+    "sha256": "c5b8571e106f22872318256f12f130c30354d7632a1f6b87b458b9c257f5ea9a"
+  },
+  "counts": {
+    "selected": 164,
+    "integratedSelectedPaths": 72,
+    "remaining": 92,
+    "remainingUnprotected": 79,
+    "remainingSelectedProtected": 13,
+    "protectedUnion": 14,
+    "additionalOutsideSelectionDocuments": 2
+  },
+  "consumed": [
+    "plugins/pipeline-core/skills/reader-review/SKILL.md",
+    "harness/reader-review-protocol.md",
+    "plugins/pipeline-core/reader-inputs/reader-review-protocol.md",
+    "plugins/pipeline-core/reader-inputs/manifest.json",
+    "plugins/pipeline-core/scripts/doc-reader-course.mjs",
+    "plugins/pipeline-core/lib/doc-reader-course.mjs",
+    "harness/scripts/check-doc-reader-binding.mjs",
+    "harness/scripts/doc-reader-terminal-binding.mjs",
+    "plugins/pipeline-core/lib/doc-reader-default-observers.mjs",
+    "plugins/pipeline-core/lib/doc-reader-plan-scope.mjs",
+    "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+    "plugins/pipeline-core/reader-inputs/observation-doc-governance.json",
+    "plugins/pipeline-core/reader-inputs/product-capability-inventory.json",
+    "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+    "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
+    "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+    "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+    "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+    "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+    "plugins/pipeline-core/lib/report-source-readers.mjs",
+    "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+    "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+    "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+    "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+    "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+    "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+    "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+    "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+    "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+    "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+    "plugins/pipeline-core/lib/governance-scope.mjs",
+    "plugins/pipeline-core/scripts/governance-scope-diagnose.mjs",
+    "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+    "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+    "plugins/pipeline-core/lib/git-cmd.mjs",
+    "plugins/pipeline-core/lib/passive-read-policy.mjs",
+    "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+    "plugins/pipeline-core/lib/protected-test-paths.mjs",
+    "docs/product-capability-inventory.json",
+    "docs/operating-model.md",
+    "harness/scripts/shell-grammar-capability-placement.test.mjs",
+    "plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+    "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+    "harness/scripts/architecture-entry-required-source.test.mjs",
+    "harness/scripts/attended-recovery.test.mjs",
+    "harness/scripts/check-verify-suite-registration.test.mjs",
+    "harness/scripts/doc-reader-course-budget.test.mjs",
+    "harness/scripts/plan-reopen-current-action.test.mjs",
+    "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+    "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+    "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+    "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+    "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+    "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+    "plugins/pipeline-core/skills/close-block/SKILL.md",
+    "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+    "plugins/pipeline-core/agents/critic.md",
+    "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+    "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+    "plugins/pipeline-core/scripts/rigor-floor.mjs",
+    "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+    "plugins/pipeline-core/skills/critic-review/SKILL.md",
+    "plugins/pipeline-core/templates/prompts/critic-review.md",
+    "templates/prompts/goldfish-task.md",
+    "architecture/map/harness.md",
+    "architecture/map/pipeline-core.md",
+    "schemas/pipeline.rigor-journal-entry.v1.json",
+    "templates/prompts/critic-review.md"
+  ],
+  "newConsumed": [
+    "harness/scripts/architecture-entry-required-source.test.mjs",
+    "harness/scripts/attended-recovery.test.mjs",
+    "harness/scripts/check-verify-suite-registration.test.mjs",
+    "harness/scripts/doc-reader-course-budget.test.mjs",
+    "harness/scripts/plan-reopen-current-action.test.mjs",
+    "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+    "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+    "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+    "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+    "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+    "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+    "plugins/pipeline-core/skills/close-block/SKILL.md",
+    "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+    "plugins/pipeline-core/agents/critic.md",
+    "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+    "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+    "plugins/pipeline-core/scripts/rigor-floor.mjs",
+    "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+    "plugins/pipeline-core/skills/critic-review/SKILL.md",
+    "plugins/pipeline-core/templates/prompts/critic-review.md",
+    "templates/prompts/goldfish-task.md",
+    "architecture/map/harness.md",
+    "architecture/map/pipeline-core.md",
+    "schemas/pipeline.rigor-journal-entry.v1.json",
+    "templates/prompts/critic-review.md"
+  ],
+  "actualReceiptBindings": [
+    {
+      "group": "tests11",
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/standalone-tests12-inspection-preparation/apply-once/actual-receipt.json",
+      "sha256": "66d6032df5f91f136b975d619478c5db6384eb127a8624c4ea435bd11fa79603"
+    },
+    {
+      "group": "R-01",
+      "path": "legacy-origin:alfred-r01-content-integration-preparation-20261011/application-receipt.json",
+      "sha256": "27393b07dc08564a150b48b46b7309a9e1c3e1c9d46d78b5c24d553db07f86fe"
+    },
+    {
+      "group": "R-01-ledger",
+      "path": "legacy-origin:alfred-r01-content-integration-preparation-20261011/application-ledger.jsonl",
+      "sha256": "983228582abda484f4e1b35459640b60cdddbb6759b77b484183f1b7d26d0121"
+    },
+    {
+      "group": "R-01-readback",
+      "path": "legacy-origin:alfred-r01-content-integration-preparation-20261011/post-readback-receipt.json",
+      "sha256": "9970deb1f358fc07888a6be52b7f6b62d6ce63748b09111180516a22e9a9bf70"
+    }
+  ],
+  "actualMainSourceAppend": [
+    {
+      "path": "harness/scripts/architecture-entry-required-source.test.mjs",
+      "sha256": "88b4100248fc868ec592677d85e08c13fe5301c24bb6ef26e112f03bcac22349",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "add",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "harness/scripts/attended-recovery.test.mjs",
+      "sha256": "d457c2e0bdc8f996faae86831080d670e0f7f35fb52b30ac2aeb027e32f6caf1",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "replace",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "harness/scripts/check-verify-suite-registration.test.mjs",
+      "sha256": "cc193228b5eb0acbdfa8eae12f778bfaba7d46323807030233db0fec65fe0bee",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "replace",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "harness/scripts/doc-reader-course-budget.test.mjs",
+      "sha256": "0ede055126e4d2edc67c93e2d2638241726a5e6e4e4dda8c56c050fb7eb5a4cc",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "add",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "harness/scripts/plan-reopen-current-action.test.mjs",
+      "sha256": "a7542fe842bc6c426a97be05da629a4ff5175b64ca57554ae637874b13ad9532",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "add",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs",
+      "sha256": "2859e0607c781f415faf0be96b26962f040e1f6f808abd55491a7bf3543e185d",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "replace",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+      "sha256": "21f2f72342154e62635b40238674591a3d47514e9bca578342e61c517c0c51ee",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "add",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+      "sha256": "0bbcc5003762a14b5e3cad2271ba9edfb0080406b0205e4b487feb4d0ba7e60b",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "add",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+      "sha256": "2998e6474055733ed3140073af22ece8777f7659b94d588283ba6d77105e13c5",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "replace",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+      "sha256": "58c5c88baf7d092daca29e91d5f0a7d9f8ff156d7118768530b5346604d3e743",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "replace",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+      "sha256": "9cd6f5f91527d61f308f48b3e7c35d7b6fb2738757c7d46d4fead49351aa0abc",
+      "mode": 420,
+      "nlink": 1,
+      "effect": "replace",
+      "receipt": "tests11",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+      "sha256": "e6101c86ceda0458930a7c27bf1a27212d12c67a138aa32854f4ff9012908333",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/agents/critic.md",
+      "sha256": "849c8b5bfd9b1908839d2e22e3f56c71b9b91ca8e0aab2f03722f574b9d836cc",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+      "sha256": "3079d7df467553be6466068c1606f94297ce4d074bfdea309c0216cbec06d682",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+      "sha256": "85905ace356bf3cf3c8a9ce1b4b4b8fb121bb02e2f03a2411f81e449da870a79",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/rigor-floor.mjs",
+      "sha256": "5e1e3d43ccc655d47e6a8f42d06b11dab9cd0c60e567d1063de3dde6bb6e375a",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+      "sha256": "981f3e2ba9bbe0f7cbba35c6beacecca998abe2deabca1cdf424db91a397818d",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "sha256": "f5abdb6ea08d913c5f858fd4fa41ae6ab8b077d0cff13928fda2694833ffc5d1",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "templates/prompts/goldfish-task.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "architecture/map/harness.md",
+      "sha256": "152321fb726495702cd435ba87d477ee57d0f94d79f5d2fa6e89b5c2a08fb92b",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "architecture/map/pipeline-core.md",
+      "sha256": "f59cff2d1a314db45384f52274703000e0ee5f9d6e2c0e4491cfe17cdaaa92a0",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "schemas/pipeline.rigor-journal-entry.v1.json",
+      "sha256": "85905ace356bf3cf3c8a9ce1b4b4b8fb121bb02e2f03a2411f81e449da870a79",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    },
+    {
+      "path": "templates/prompts/critic-review.md",
+      "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+      "mode": 420,
+      "nlink": 1,
+      "receipt": "R-01-readback",
+      "contentTransferOnly": true
+    }
+  ],
+  "actualScopes": {
+    "tests11": {
+      "MainReplace": 6,
+      "MainAdd": 5,
+      "AuditNoop": 11,
+      "businessQualified": false,
+      "runtimeDependencyQualified": false
+    },
+    "R01": {
+      "published14": 14,
+      "conservedNonTargetDependencies": 101,
+      "atomicPerLeaf": true,
+      "wholeBatchAtomic": false,
+      "testsRun": 0,
+      "semanticClaims": false
+    }
+  },
+  "limits": [
+    "Source-path integration counts do not mean backlog completion, item stage promotion or test PASS.",
+    "All original176 backlog items remain formally OPEN; original37AC/4IR scope preserved.",
+    "Protected union, active cumulative runtime tuples and real installed/native/course/fullVerify/stamp remain Root gates.",
+    "Two outside164 Elephant documents remain separate and unchanged from consumed47 parent."
+  ]
+}

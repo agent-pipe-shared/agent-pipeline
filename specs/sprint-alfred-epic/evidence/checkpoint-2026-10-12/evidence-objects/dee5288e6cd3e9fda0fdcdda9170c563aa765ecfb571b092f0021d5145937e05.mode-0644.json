@@ -1,0 +1,169 @@
+{
+  "schema": "alfred.critic-one-plus-diff-source-manifest.v1",
+  "status": "frozen-source-proposal-unqualified",
+  "sources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/review-economy.mjs",
+      "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/review-economy.mjs",
+      "parentSha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12",
+      "postSha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9",
+      "beforeBytes": 53492,
+      "postBytes": 52643,
+      "mode": 420,
+      "nlink": 1,
+      "preimage": {
+        "path": "preimages/plugins/pipeline-core/lib/review-economy.mjs",
+        "sha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12",
+        "bytes": 53492,
+        "mode": 420,
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "postimages/plugins/pipeline-core/lib/review-economy.mjs",
+        "sha256": "89f8519f82626f9f94d594cef89fec44a09c5b33971003e77b06e9bc475585b9",
+        "bytes": 52643,
+        "mode": 420,
+        "nlink": 1
+      }
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "parentSha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+      "postSha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+      "beforeBytes": 49423,
+      "postBytes": 49461,
+      "mode": 420,
+      "nlink": 1,
+      "preimage": {
+        "path": "preimages/plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "sha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+        "bytes": 49423,
+        "mode": 420,
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "postimages/plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+        "bytes": 49461,
+        "mode": 420,
+        "nlink": 1
+      }
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "sourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "parentSha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313",
+      "postSha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29",
+      "beforeBytes": 30045,
+      "postBytes": 30862,
+      "mode": 420,
+      "nlink": 1,
+      "preimage": {
+        "path": "preimages/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "sha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313",
+        "bytes": 30045,
+        "mode": 420,
+        "nlink": 1
+      },
+      "postimage": {
+        "path": "postimages/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "sha256": "39c3a62ae0870efc63669f51ea0d4a4c256af58cbaf5e138a7b7fa0c400aed29",
+        "bytes": 30862,
+        "mode": 420,
+        "nlink": 1
+      }
+    }
+  ],
+  "sourceFreeze": {
+    "path": "source-freeze.json",
+    "sha256": "02ee6e34a2cd60d11ecd1f0f105f6528c5a0b7013ae856d80219d4a6efb57b57",
+    "bytes": 7342,
+    "mode": 420,
+    "nlink": 1
+  },
+  "api": {
+    "path": "api-contract.json",
+    "sha256": "c4fd5cdb23fcdf180524e8baffc38e8de3e4e7dd10603a25e252a887c65d43b1",
+    "bytes": 3014,
+    "mode": 420,
+    "nlink": 1
+  },
+  "qualificationContract": {
+    "path": "qualification-contract.json",
+    "sha256": "2ac0e9bfe86c83cdc06787c7e18695a13ff779c816fa4bd3c455c7eeeff76d3c",
+    "bytes": 1976,
+    "mode": 420,
+    "nlink": 1
+  },
+  "decisionProposal": {
+    "schema": "alfred.adr0014-amendment-proposal.v1",
+    "status": "draft-unadopted",
+    "date": "2026-10-10",
+    "numberAssigned": false,
+    "supersedes": "0014-critic-contract",
+    "inheritedOriginal": {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/adr/0014-critic-contract.md",
+      "sha256": "c9710854fb690790f7c24bf4e06e115278bbe9ca036e8032ad01eaed4d7f6beb",
+      "bytes": 10625,
+      "mode": 420,
+      "nlink": 1
+    },
+    "markdown": {
+      "path": "decision-proposal/adr-0014-one-plus-diff.md",
+      "sha256": "bce8297d23275fc21e7a2e3ecc80e21759dfe2c291ebc6941196cd9372587ff0",
+      "bytes": 3941,
+      "mode": 420,
+      "nlink": 1
+    },
+    "humanDirection": "Each finished work batch: one full plus at most one correction-diff; no QG-13 additional-round exception",
+    "humanSignatureVerified": false,
+    "architectureSummaryCompiled": false,
+    "originalADRMutated": false
+  },
+  "staticChecks": {
+    "path": "static-checks.json",
+    "sha256": "30ee6ace3ae40e0e2b1c6bb3b7fc32e20abe9d91d754ea27aa8069984ba9f7ee",
+    "bytes": 819,
+    "mode": 420,
+    "nlink": 1
+  },
+  "report": {
+    "path": "report.md",
+    "sha256": "04353bcd776867d2ffe64c5cd8cc2f9bef4ec08401ad2c7055a373147616cc55",
+    "bytes": 2613,
+    "mode": 420,
+    "nlink": 1
+  },
+  "inputBindings": [
+    {
+      "path": "legacy-origin:alfred-hgl-current114-coherent-source-preparation-20261010/current122-assembly-proposal/actual-source-manifest.json",
+      "sha256": "4dd5b4b8a7738acfd0920a45c1b91b43aafc87b504ae099bc305d5d7d628e6fd",
+      "bytes": 97606,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current122-integration-and-po-decisions-20261010/critic-budget-source-resolution.json",
+      "sha256": "65751e93e253681a064489bcb2b638ebca0e58de248f6372832cf304717aa8db",
+      "bytes": 5139,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/adr/0014-critic-contract.md",
+      "sha256": "c9710854fb690790f7c24bf4e06e115278bbe9ca036e8032ad01eaed4d7f6beb",
+      "bytes": 10625,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "historicalValidationUnchanged": true,
+  "genericUnregisteredAccountingGap": true,
+  "canonicalWrites": 0,
+  "GitOperations": 0,
+  "productImports": 0,
+  "semanticRuns": 0,
+  "nativeClaim": false,
+  "itemClosure": false
+}

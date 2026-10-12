@@ -1,0 +1,43 @@
+{
+  "schema": "alfred.native-progress12.public-provenance.v1",
+  "actualTwelveExecutionSha256": "96483e8dcb72601d5335a0695171bcc4e24838b39365af53e258692fabb40fd4",
+  "actualPilotExecutionSha256": "827fac888a0bf3da5a938d9a049402a5639631dece6d36a1a4399b0b2fb45011",
+  "actualFD3Sha256": "e89c5982a73bd2c88253e357c044dfc1cf824b8b1d81e73b88e0e09f37fbb7d1",
+  "sourceSha256": "c3492d30bf144b48a9b54e34e276e651439a6b11edbbb39b513b73da4e226c9d",
+  "sourceProposalSha256": "ce867da73782d9e1071d7cbf773ef8d0d67eb98418a11d2ccddc9999e21b6c66",
+  "assertionSha256": "172cc14ca63cfba933a062bffed31908cfe8af1e1bfd04f86a6ff53af5924714",
+  "qualificationManifestSha256": "3dae06d21d3bf8e112497999156fb814299846282de7afcd9dd176ad7cffb461",
+  "graphFreezeSha256": "5f5854e46022f4926d1a7a4e0929314a731f5c6ee932616d7b721a0c8713f729",
+  "counts": {
+    "pass": 12,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "retainedFailures": [
+    {
+      "sha256": "25c1e447d5d17701603efa74ba91aa17b9c1ef7c5c8b4b32cc2d7225847f27ea",
+      "bytes": 2197,
+      "cause": "missing computed worker before case declaration",
+      "retained": true
+    },
+    {
+      "sha256": "d704a3cb8fed3560ab3acd0c671af7b14d06fb4e7ae9ce914fed47cf17e6e788",
+      "bytes": 2051,
+      "cause": "missing closed FD3 registration before declaration",
+      "retained": true
+    },
+    {
+      "sha256": "35dc839faae64578975b67cf93c03edbab81465e1a701cf5f78f41e2272ab922",
+      "bytes": 2522,
+      "cause": "missing physical evidence publication parent after actual commit",
+      "retained": true
+    }
+  ],
+  "sourceAndFixtureConserved": true,
+  "nativeEvidence": false,
+  "wholeItemAcceptance": false,
+  "workerPhaseTelemetryQualified": false,
+  "privateStdoutStderrOrHostPathsExported": false,
+  "noRepeatRun": true
+}

@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: docs/old.md
+@@
++ordinary
+*** Rename File: docs/new.md
+*** End Patch

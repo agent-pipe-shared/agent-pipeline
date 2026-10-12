@@ -1,0 +1,18 @@
+{
+  "schema": "alfred.r01.publication-manifest.v1",
+  "destination": "specs/sprint-alfred-epic/evidence/qualified-slices-20261011/r01-content-actual14",
+  "files": [
+    {
+      "path": "proof.json",
+      "sha256": "71a1522a9baecb8deec54aef5e91db5fe2e55ff7ec46c8148b3bf73c03a3afac",
+      "size": 6243
+    },
+    {
+      "path": "report.md",
+      "sha256": "af6ea51e8b73084d5f749aa0bac277b6c623a055d921c84b89132af4fa7df9c9",
+      "size": 713
+    }
+  ],
+  "rootOnly": true,
+  "noOverwrite": true
+}

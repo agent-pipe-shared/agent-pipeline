@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: specs/old.md
+@@
++<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->
+*** Move to: specs/new.md
+*** End Patch

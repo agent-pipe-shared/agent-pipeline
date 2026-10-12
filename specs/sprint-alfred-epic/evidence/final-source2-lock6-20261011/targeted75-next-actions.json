@@ -1,0 +1,468 @@
+{
+  "schema": "alfred.targeted75.next-actions.v1",
+  "input": {
+    "path": "scratch/alfred-item-closure-trace-preparation-20261011/current75-and-criteria/stage75-current-matrix.json",
+    "sha256": "2facf53141ae1b12b6911c5be0f5fa8ae755bcda8a637843950ff893a8865cb1"
+  },
+  "stagePromotions": 0,
+  "rows": [
+    {
+      "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+      "retainedStage": 75,
+      "responsibleCoordinator": "/root",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-capture-evidence-does-not-normalize-windows-npm-launch.md",
+          "sha256": "b74012aa04ab1605ce3cf8d1a48f32a40b9077437394afcdfcc8a9b80876ee69"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "name": "WEL12",
+          "proof": {
+            "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/wel12/actual-qualification-proof.json",
+            "sha256": "56f7d91010bd8175eb77d92bae73f5ee1a513f019288ea24ca0127f4ce77c90b"
+          },
+          "pass": 12,
+          "caseEvidence": null,
+          "canonicalPaths": [
+            "plugins/pipeline-core/scripts/capture-evidence.mjs"
+          ],
+          "backlogIds": [
+            "pipeline.capture-evidence-does-not-normalize-windows-npm-launch"
+          ],
+          "relatedCriteria": [
+            "AC-29",
+            "AC-32"
+          ],
+          "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+          "limits": [
+            "Portable Windows metadata and Linux children; native Windows cmd/npm acceptance unverified; original9/3 preserved."
+          ],
+          "sourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+              "currentAuditSha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5"
+            }
+          ],
+          "officialClosure": false
+        }
+      ],
+      "nextAction": "Bind the assembled capture-evidence source to retained WEL12. For the native Windows clause, obtain an actual Windows npm launch and artifact capture only when a Windows host is available; startup resource failures are preparation evidence, not product failures.",
+      "condition": "Resolve source ancestry first; reuse compatible actual consumer receipts before scheduling a missing scenario.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.codex-own-session-audit-export-missing",
+      "retainedStage": 75,
+      "responsibleCoordinator": "/root",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+          "canonicalPath": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+          "sha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+          "bytes": 1295,
+          "parentSha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-own-session-audit-export-missing::19.1",
+            "lineStart": 21,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "proofPath": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22/case-associations.json",
+          "proofSha256": "ea27c7d6dc8bc57dd91cb7c542dbdfd9a3af56ccfc481faa102560713c6114ed",
+          "assertionsPath": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22/assertions.mjs",
+          "assertionsSha256": "c01e40cab9437f9ad889970ef7fe6d52428c05e80016775eb53590195b2f7aaf",
+          "caseIds": [
+            "OSE001",
+            "OSE002",
+            "OSE003",
+            "OSE004",
+            "OSE005",
+            "OSE006",
+            "OSE007",
+            "OSE008",
+            "OSE009",
+            "OSE010",
+            "OSE011",
+            "OSE012",
+            "OSE013",
+            "OSE014",
+            "OSE015",
+            "OSE016",
+            "OSE017",
+            "OSE018",
+            "OSE019",
+            "OSE020",
+            "OSE021",
+            "OSE022"
+          ],
+          "actualCounts": {
+            "pass": 22,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "scope": "Controlled synthetic current-host identity, CLI/guard, consent, physical bounds, privacy and reconnect; native/real host identity unqualified."
+        }
+      ],
+      "nextAction": "Keep OSE22 closed. Check assembled export source ancestry; exercise real own-session carrier/reconnect and content/path grant only through an actual host-owned constructor. Keep uninstall acceptance on its separately assigned lane.",
+      "condition": "Resolve source ancestry first; reuse compatible actual consumer receipts before scheduling a missing scenario.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+      "retainedStage": 75,
+      "responsibleCoordinator": "/root",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-configure-verify-output-lacks-a-walkable-commit-route.md",
+          "sha256": "4de5a17c0d61b4059366356a0a521a86ebcf008eeb4c576bea8664ab650d3dd9"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.configure-verify-output-lacks-a-walkable-commit-route::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.configure-verify-output-lacks-a-walkable-commit-route::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "proofPath": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p16-actual16/actual-qualification-proof.json",
+          "proofSha256": "6de31c75a81ee135ca8bffa4190307566739e2cd46669fae574a8048ad65e0be",
+          "cases": [
+            {
+              "id": "VCR001",
+              "disposition": "pass",
+              "behavior": "Genuine approved implementing lifecycle with ignored, untracked, HEAD-absent private State; actual configure route and fresh installed hook permit ordinary paired configuration commit without changing State."
+            },
+            {
+              "id": "VCR002",
+              "disposition": "pass",
+              "behavior": "Unchanged predecessor hook refuses the same actual private-State paired configuration commit; HEAD and State remain unchanged."
+            },
+            {
+              "id": "VCR003",
+              "disposition": "pass",
+              "behavior": "Forged or missing retained approval proof refuses preparation without altering State or twins."
+            },
+            {
+              "id": "VCR004",
+              "disposition": "pass",
+              "behavior": "Supported configured chat approval remains eligible and commits through the ordinary fresh hook without a new signature requirement."
+            },
+            {
+              "id": "VCR005",
+              "disposition": "pass",
+              "behavior": "Opaque-handle provenance, real prepare/write/complete lifecycle, exact index inspection and consumed-handle refusal."
+            },
+            {
+              "id": "VCR006",
+              "disposition": "pass",
+              "behavior": "Actual HEAD drift invalidates the sealed transition."
+            },
+            {
+              "id": "VCR007",
+              "disposition": "pass",
+              "behavior": "Private State raw-byte or continuity-revision drift invalidates the transition."
+            },
+            {
+              "id": "VCR008",
+              "disposition": "pass",
+              "behavior": "Actual public approval trust-policy drift invalidates approval and transition."
+            },
+            {
+              "id": "VCR009",
+              "disposition": "pass",
+              "behavior": "One-twin staging and extra real staged paths refuse even when caller presents the expected twin list."
+            },
+            {
+              "id": "VCR010",
+              "disposition": "pass",
+              "behavior": "Changed command, extra configuration key or divergent twins refuse the exact transition."
+            },
+            {
+              "id": "VCR011",
+              "disposition": "pass",
+              "behavior": "Independent protected gate modifications refuse inspection and actual ordinary commit."
+            },
+            {
+              "id": "VCR012",
+              "disposition": "pass",
+              "behavior": "Actual twin hardlink or symlink, executable index mode and unsafe ready-record mode refuse."
+            },
+            {
+              "id": "VCR013",
+              "disposition": "pass",
+              "behavior": "Missing, partial, noncanonical or extra-key ready records cannot grant commit authority."
+            },
+            {
+              "id": "VCR014",
+              "disposition": "pass",
+              "behavior": "Partial twin publication retains the genuine held preparation and refuses completion or implicit reclaim."
+            },
+            {
+              "id": "VCR015",
+              "disposition": "pass",
+              "behavior": "Post-commit identical configuration replay performs no writes; a changed command cannot reuse the old seal."
+            },
+            {
+              "id": "VCR016",
+              "disposition": "pass",
+              "behavior": "Genuinely produced approved implementing State tracked in HEAD remains accepted by the separate legacy route."
+            }
+          ],
+          "actualCounts": {
+            "pass": 16,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "scope": [
+            "Method fixtures use actual source approval writers, committed synthetic public trust anchors and memory-only synthetic signing keys; this is not an attended human signature certificate.",
+            "The configure CLI handler and real installed ordinary Git hook are qualified for this bounded source graph; no native runtime or model claim is made.",
+            "No full Verify, Alfred acceptance-criterion closure, backlog-item closure or overall release certification is claimed.",
+            "No live canonical source, user repository, host configuration or original frozen assertion was modified during qualification."
+          ]
+        }
+      ],
+      "nextAction": "Keep P16 evidence closed. Perform one genuine consuming-project configure-verify to walkable final commit route with current evidence and ordinary inherited hooks, if no source-compatible consumer receipt already exists.",
+      "condition": "Resolve source ancestry first; reuse compatible actual consumer receipts before scheduling a missing scenario.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.design-intake-generator-omits-question-answers",
+      "retainedStage": 75,
+      "responsibleCoordinator": "/root",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-design-intake-generator-omits-question-answers.md",
+          "sha256": "914a10b2eba32003c39677b2a6b80204684640cb10fb2437b9b1eaecfecba099"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-intake-generator-omits-question-answers::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.design-intake-generator-omits-question-answers::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "proofPath": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p7-ordinary10/public-proof.json",
+          "proofSha256": "1f4ad15f63eb182e930e34151578c315281bac2a8e3abddda8e5484c2ab05927",
+          "declaredCount": 10,
+          "caseSetSha256": "3fd8e01be2096fab6e3f49e0edc53ca7027127dda8b351ba0ae852a408bd7bf6",
+          "actualCounts": {
+            "pass": 10,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "scope": "Actual consent/capture/answers/plan/apply generators on synthetic host-managed physical intake; no human/native/full-I03 authority claim",
+          "caseIdAssociation": "Original ten DIQA callbacks as recorded in the declared qualification report; individual IDs not guessed; per-assertion current native authority not inferred."
+        }
+      ],
+      "nextAction": "Keep ordinary P7 ten-case proof closed. Bind current generator ancestry and actual PRD/spec outputs; delegate only missing all-runner/I03 consumer authority coverage to the existing authority owners, without replaying unchanged ten.",
+      "condition": "Resolve source ancestry first; reuse compatible actual consumer receipts before scheduling a missing scenario.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.gh-delivery-classifier-is-not-wired",
+      "retainedStage": 75,
+      "responsibleCoordinator": "/root",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-gh-delivery-classifier-is-not-wired.md",
+          "canonicalPath": "backlog/items/2026-10-08-gh-delivery-classifier-is-not-wired.md",
+          "sha256": "293f5636a4e7b8129700dc831f1a4de00f3689162cf25f886427e32ca0bcc79a",
+          "bytes": 1164,
+          "parentSha256": "293f5636a4e7b8129700dc831f1a4de00f3689162cf25f886427e32ca0bcc79a",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.gh-delivery-classifier-is-not-wired::16.1",
+            "lineStart": 18,
+            "lineEnd": 19
+          },
+          {
+            "id": "pipeline.gh-delivery-classifier-is-not-wired::30.1",
+            "lineStart": 32,
+            "lineEnd": 33
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "path": "scratch/alfred-current-overview-20261010/overview.json",
+          "jsonPointer": "/latestContinuationStatus/actualAdapterFixed",
+          "qualificationManifestSha256": "cb5a606f861d8530243f6ff4a62cd7c56f7ababaa999c9e25630f056aca73712",
+          "executionSha256": "cbe2cd552e3bd984911dbd23744ca128b862344e0fb7f1f2594322258da6c837",
+          "FD3Sha256": "dfe6a04384fdca4fdcaf4280efa3cd5c4f66ed77eb98299f1990c2a08eeac18b",
+          "scope": "retained actual default-method-ready adapter12; nativeReadyProven:false; exact original receipt location not rebound"
+        }
+      ],
+      "nextAction": "Retain sharedGh10/two-hook12. Bind current classifier/hooks and capture the actual installed signed delivery lineage on the required topology; no forged delivery receipt or broad rerun.",
+      "condition": "Resolve source ancestry first; reuse compatible actual consumer receipts before scheduling a missing scenario.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.merge-commit-message-skips-conventional-type-check",
+      "retainedStage": 75,
+      "responsibleCoordinator": "/root",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-merge-commit-message-skips-conventional-type-check.md",
+          "sha256": "915f249d3665f2c4f11cd941375e67f51928dc5f60afba8ba8bcc2681f96148a"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.merge-commit-message-skips-conventional-type-check::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.merge-commit-message-skips-conventional-type-check::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "name": "Merge20",
+          "reference": {
+            "path": "scratch/alfred-claude-merge-message-policy-independent-20261010/qualification-manifest.json",
+            "sha256": "66ca9b57829ba55f222a24fa4b692c0d053f0fa04bb48a68179131ce2b869336"
+          },
+          "pass": 20,
+          "limits": [
+            "Portable policy seam; actual guard containment, native hook, real fast-forward and signed integration remain outside proof."
+          ]
+        }
+      ],
+      "nextAction": "Retain Merge20. Bind current commit-message guard and exercise the genuine required merge topology through installed hooks if no compatible receipt exists; preserve conventional type and trailers.",
+      "condition": "Resolve source ancestry first; reuse compatible actual consumer receipts before scheduling a missing scenario.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+      "retainedStage": 75,
+      "responsibleCoordinator": "/root",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+          "canonicalPath": "backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+          "sha256": "68433f8d12cbea149864924df9134bb5bc7c0361c10df99c036ee869360b40eb",
+          "bytes": 2046,
+          "parentSha256": "68433f8d12cbea149864924df9134bb5bc7c0361c10df99c036ee869360b40eb",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow::15.2",
+            "lineStart": 19,
+            "lineEnd": 28
+          },
+          {
+            "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow::30.1",
+            "lineStart": 32,
+            "lineEnd": 37
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "path": "scratch/alfred-passive-credential-follow-source-fix-20261010/report.md",
+          "sha256": "4d57d27e347740da428dbdcf30a1c0734a7ef2576d3c4d44d60d8b60597f0cd9",
+          "scope": "actual36 focused fixed credential/follow cases retained in original41 audit"
+        }
+      ],
+      "nextAction": "Retain original PCF36 plus actual current702019 boundary4/policy3 and replay FD3 proof. Bind actual Main selected source after integration, then address only explicitly required installed/native credential/follow coverage; do not repeat the passed43 controls.",
+      "condition": "Resolve source ancestry first; reuse compatible actual consumer receipts before scheduling a missing scenario.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.project-calibration-retains-new-project-placeholder",
+      "retainedStage": 75,
+      "responsibleCoordinator": "/root",
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-project-calibration-retains-new-project-placeholder.md",
+          "sha256": "f4ab876dec60efc9cdd776b2d90540d70733a79763f245d8c770e7845712ad94"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.project-calibration-retains-new-project-placeholder::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.project-calibration-retains-new-project-placeholder::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "name": "PCI-actual12",
+          "reference": {
+            "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/qualification-manifest.json",
+            "sha256": "bc4832257dbc1e8fbbb97c07f02a15ce52de072cd2b85d13481a0af52f07743d"
+          },
+          "pass": 12,
+          "limits": [
+            "Original10/2 preserved; exact role-intent fixture erratum conserves final6 source and all12 callbacks. Native and actual VEP dirty/success consumer proof remain unqualified."
+          ]
+        }
+      ],
+      "nextAction": "Retain PCI12. Bind current calibration identity source lineage, then obtain genuine VEP dirty/success consumer results and actual platform-root evidence where required. Do not treat identity tests as AC6 calibrated promotion evidence.",
+      "condition": "Resolve source ancestry first; reuse compatible actual consumer receipts before scheduling a missing scenario.",
+      "accepted": false
+    }
+  ]
+}

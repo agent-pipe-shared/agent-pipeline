@@ -1,0 +1,54 @@
+{
+  "schema": "alfred.critic-one-plus-diff-independent-case-contract.v1",
+  "status": "independent-expectations-fixed; genuine-runtime-constructor-ports-pending",
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "authority": "PO clarified one full plus at most one diff for each batch, no exceptions; Root operational task record, no native dispatch authority",
+  "calibration": "SourceProposal; independent assertion author",
+  "route": "methodology-only; model-native-unverified",
+  "cases": [
+    {
+      "id": "CCD001",
+      "requirement": "Pure first round admits full and pure second round admits only a fully bound delta; outcomes remain pure projections, not spawn authority."
+    },
+    {
+      "id": "CCD002",
+      "requirement": "Genuine registered runtime genesis admits round1 full from actual candidate/course/diagnostic constructors; caller counters or omitted registered history cannot reset its course."
+    },
+    {
+      "id": "CCD003",
+      "requirement": "Genuine consumed and registered round1 plus exact source-produced correction/delta request admits round2 delta with original strict candidate/receipt/digest/invariant bindings."
+    },
+    {
+      "id": "CCD004",
+      "requirement": "Round2 full refuses through both pure and actual runtime API, including actual accepted QG13 PASS criterion; no escalation to another full."
+    },
+    {
+      "id": "CCD005",
+      "requirement": "Round3 and round4 refuse through pure and registered runtime APIs even with authentic accepted QG13 PASS; no per-batch exception or counter normalization grants launch."
+    },
+    {
+      "id": "CCD006",
+      "requirement": "Valid historical round3/4 lineage receipt bytes remain format-readable without granting new launch; legacy format validation and current runtime admission have separate outcomes."
+    },
+    {
+      "id": "CCD007",
+      "requirement": "Wrong course, candidate drift and reused delta request refuse actual runtime readback without modifying retained registrations or candidate bytes."
+    },
+    {
+      "id": "CCD008",
+      "requirement": "A consumed completed PASS stops the course and replayed review/delta or removed-history reset cannot create another admission; no native response or private receipt is fabricated."
+    }
+  ],
+  "constructorRequirements": [
+    "Exact existing public registered course/candidate constructor ports in an exclusive synthetic owned repository",
+    "Exact existing private packet prepare/claim/finalize/consume constructors or already-defined independent fixture module; no handcrafted consumed receipt",
+    "Exact accepted QG13 contract producer/readback for original historical criterion fixture; no caller-provided accepted=true launch grant",
+    "Original historical3/4 format fixtures or prior public constructor context retained unchanged",
+    "Inherited Git/config/hooks/signing/preload/PO environment preserved; Root-only actual constructor execution"
+  ],
+  "caseBudget": 8,
+  "workerBusinessRuns": 0,
+  "productImports": 0,
+  "sourceEdits": 0,
+  "qualification": false
+}

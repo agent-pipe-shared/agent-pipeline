@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "EFC001",
+    "EFC002",
+    "EFC003",
+    "EFC004",
+    "EFC005",
+    "EFC006",
+    "EFC007",
+    "EFC008"
+  ],
+  "maxBytes": 65536
+}

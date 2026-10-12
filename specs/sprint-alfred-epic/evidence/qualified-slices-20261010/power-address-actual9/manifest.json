@@ -1,0 +1,19 @@
+{
+  "schema": "alfred.power-address-publication.v1",
+  "destination": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/power-address-actual9",
+  "files": [
+    {
+      "path": "proof.json",
+      "sha256": "92caa3e954f18ad8c19b65b20035252d7665d5610d9166a1bf82b27662dd2ae9",
+      "size": 2734
+    },
+    {
+      "path": "report.md",
+      "sha256": "7360689fd2af24df49eaaa932dcad35f145ef32438493a2d0a45afcd4f72cbdd",
+      "size": 970
+    }
+  ],
+  "proofScope": "exact nine address controls only",
+  "rootOnly": true,
+  "noOverwrite": true
+}

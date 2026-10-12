@@ -1,0 +1,54 @@
+{
+  "schema": "alfred.landed-dispatch-ownership.publication-preview.v1",
+  "status": "PREVIEW-ONLY-ROOT-PUBLICATION-PENDING",
+  "publicWhitelist": [
+    {
+      "path": "scratch/alfred-landed-dispatch-ownership-independent-20261010/publication-preparation/proof.json",
+      "sha256": "bffe61d0504540b54ab88bf1f1683e42ef5b5719c28f888c93fbe4d06c0b34d5",
+      "bytes": 5266
+    },
+    {
+      "path": "scratch/alfred-landed-dispatch-ownership-independent-20261010/publication-preparation/completion.fd3.jsonl",
+      "sha256": "7b4376a4d94098e1a2cdbe6d50543926757b72fe8089fc3cf689187ddd225ba3",
+      "bytes": 2071
+    },
+    {
+      "path": "scratch/alfred-landed-dispatch-ownership-independent-20261010/publication-preparation/report.md",
+      "sha256": "3ee87d67df54b53c54ca0d5c9e98bd6df99385acb89c15e27c60fb009173db6a",
+      "bytes": 2232
+    }
+  ],
+  "manifestIsPublic": true,
+  "actualExecution": {
+    "path": "scratch/alfred-landed-dispatch-ownership-independent-20261010/qualification-preparation/environment-successor/qualification-root/execution.json",
+    "sha256": "c53b5997fadfe0c206f5923fef8177bce0ad2b4102db7234c3c762da6bbad670",
+    "bytes": 1954
+  },
+  "sourceManifest": {
+    "path": "scratch/alfred-landed-dispatch-ownership-source-20261010/manifest.json",
+    "sha256": "ce7a59b43901a08f4298ebae1520a2d840594a4af48265358f8ce26e9eb5942e",
+    "bytes": 7179
+  },
+  "sourceBindings": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+      "source": {
+        "path": "scratch/alfred-landed-dispatch-ownership-source-20261010/postimages/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+        "sha256": "c90e1be45723b44bfe8fa7a0276004e93aea2b43172f806b39ee70d7bf1174b7",
+        "bytes": 28107
+      }
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "source": {
+        "path": "scratch/alfred-landed-dispatch-ownership-source-20261010/postimages/plugins/pipeline-core/lib/guard/evaluate.mjs",
+        "sha256": "e87ee9b834c2f17cfbfbda90400e9962bbb197abf50fe1dcd93c61303b429e91",
+        "bytes": 32938
+      }
+    }
+  ],
+  "nativeProof": false,
+  "wholeItemAcceptance": false,
+  "businessRunsByAuthor": 0,
+  "externalWritesByAuthor": 0
+}

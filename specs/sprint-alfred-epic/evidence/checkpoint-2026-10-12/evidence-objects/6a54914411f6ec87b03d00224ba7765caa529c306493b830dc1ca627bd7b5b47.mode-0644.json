@@ -1,0 +1,1093 @@
+{
+  "schema": "alfred.stage75.current150.reconciliation.v1",
+  "inputs": [
+    {
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-76/targeted-proof-75.json",
+      "sha256": "915e59d73c0040848cd5c551c52e9b6309c3062a18dcad6a4e7fb89a7362381a",
+      "bytes": 62441
+    },
+    {
+      "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-76/original-criteria-explicit-mapping.json",
+      "sha256": "f3f79d386b12cc361f1f3dc2e8ad4ce1b3f685f986173346159fcebdc820e94c",
+      "bytes": 237496
+    },
+    {
+      "path": "legacy-origin:alfred-final-candidate-verify-protected-union-preparation-20261011/pending-protected-source-locator-index/index.json",
+      "sha256": "3ea154f09c41784bc870d97dc6ba831d8132f713f54a078edb8743250d8f68b5",
+      "bytes": 32039
+    },
+    {
+      "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed150-power2-append/integration-delta.json",
+      "sha256": "d24f4d3b47ca289093f343c819aea777f4f5bee57990e1bceb2874f40351d931",
+      "bytes": 4127
+    },
+    {
+      "path": "legacy-origin:alfred-ac01-13-current-completion-20261010/matrix.json",
+      "sha256": "1be3c7adeda5ecec4f58e9c6ab06a383b7a684344a4ede8a09099e9bbaaaa3f3",
+      "bytes": 20852
+    }
+  ],
+  "sourceContext": {
+    "selected": 164,
+    "currentOrApplied": 150,
+    "remaining": 14,
+    "runtime": 1,
+    "protectedSelected": 13,
+    "protectedUnion": 14,
+    "outsideNewApprovedContent": 8
+  },
+  "rows": [
+    {
+      "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+      "stage": 75,
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-capture-evidence-does-not-normalize-windows-npm-launch.md",
+          "sha256": "b74012aa04ab1605ce3cf8d1a48f32a40b9077437394afcdfcc8a9b80876ee69"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "name": "WEL12",
+          "proof": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/wel12/actual-qualification-proof.json",
+            "sha256": "56f7d91010bd8175eb77d92bae73f5ee1a513f019288ea24ca0127f4ce77c90b"
+          },
+          "pass": 12,
+          "caseEvidence": null,
+          "canonicalPaths": [
+            "plugins/pipeline-core/scripts/capture-evidence.mjs"
+          ],
+          "backlogIds": [
+            "pipeline.capture-evidence-does-not-normalize-windows-npm-launch"
+          ],
+          "relatedCriteria": [
+            "AC-29",
+            "AC-32"
+          ],
+          "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+          "limits": [
+            "Portable Windows metadata and Linux children; native Windows cmd/npm acceptance unverified; original9/3 preserved."
+          ],
+          "sourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+              "currentAuditSha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5"
+            }
+          ],
+          "officialClosure": false
+        }
+      ],
+      "originalProofCeiling": "Reuse WEL12 receipts and qualify the native Windows cmd/npm acceptance; do not rerun completed qualification as preparation.",
+      "actualSource": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+            "status": "physical-source-only",
+            "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+            "bytes": 31343,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+              "selected146": {
+                "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+                "bytes": 31343,
+                "mode": 420,
+                "selection": "WEL12",
+                "currentMatchesInventory": true
+              },
+              "currentAuditPhysical": {
+                "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/capture-evidence.mjs",
+                "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+                "bytes": 31343,
+                "mode": 420,
+                "nlink": 1
+              },
+              "bindingScope": "selected146-bound"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        }
+      ],
+      "currentOwner": "/root",
+      "engineeringDisposition": "Targeted existing proof retained; exact current assembly/source ancestry and original consumer/native requirements remain. No repeated passing tests merely because OPEN.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.codex-own-session-audit-export-missing",
+      "stage": 75,
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+          "canonicalPath": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+          "sha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+          "bytes": 1295,
+          "parentSha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.codex-own-session-audit-export-missing::19.1",
+            "lineStart": 21,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "proofPath": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22/case-associations.json",
+          "proofSha256": "ea27c7d6dc8bc57dd91cb7c542dbdfd9a3af56ccfc481faa102560713c6114ed",
+          "assertionsPath": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22/assertions.mjs",
+          "assertionsSha256": "c01e40cab9437f9ad889970ef7fe6d52428c05e80016775eb53590195b2f7aaf",
+          "caseIds": [
+            "OSE001",
+            "OSE002",
+            "OSE003",
+            "OSE004",
+            "OSE005",
+            "OSE006",
+            "OSE007",
+            "OSE008",
+            "OSE009",
+            "OSE010",
+            "OSE011",
+            "OSE012",
+            "OSE013",
+            "OSE014",
+            "OSE015",
+            "OSE016",
+            "OSE017",
+            "OSE018",
+            "OSE019",
+            "OSE020",
+            "OSE021",
+            "OSE022"
+          ],
+          "actualCounts": {
+            "pass": 22,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "scope": "Controlled synthetic current-host identity, CLI/guard, consent, physical bounds, privacy and reconnect; native/real host identity unqualified."
+        }
+      ],
+      "originalProofCeiling": "Tracking owner: correct stale assignment remainingWork (104→106) using applied146 selection without changing item acceptance. Host qualification owner: capture actual selected Codex own-session metadata/reconnect behavior only if needed for native acceptance; no repeat OSE22 merely because status is open.",
+      "actualSource": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+            "status": "physical-source-only",
+            "sha256": "49d3ab05d33e1e4c4440f945234ae70c575b52c543e597dd16fee38be0e931af",
+            "bytes": 35029,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pending": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+            "status": "physical-source-only",
+            "sha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+            "bytes": 39861,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pendingDeclaredPin": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+            "sha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+            "bytes": 39861,
+            "mode": 420
+          },
+          "matchesRetainedSelector": false,
+          "retainedOriginalSourceBindings": [],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+            "status": "physical-source-only",
+            "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+            "bytes": 7902,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+              "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+              "bytes": 7902,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+                "selection": "OSE22 qualified source",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+            "status": "physical-source-only",
+            "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+            "bytes": 15099,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+              "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+              "bytes": 15099,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+                "selection": "OSE22 qualified source",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        }
+      ],
+      "currentOwner": "/root",
+      "engineeringDisposition": "Targeted existing proof retained; exact current assembly/source ancestry and original consumer/native requirements remain. No repeated passing tests merely because OPEN.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+      "stage": 75,
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-configure-verify-output-lacks-a-walkable-commit-route.md",
+          "sha256": "4de5a17c0d61b4059366356a0a521a86ebcf008eeb4c576bea8664ab650d3dd9"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.configure-verify-output-lacks-a-walkable-commit-route::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.configure-verify-output-lacks-a-walkable-commit-route::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "proofPath": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p16-actual16/actual-qualification-proof.json",
+          "proofSha256": "6de31c75a81ee135ca8bffa4190307566739e2cd46669fae574a8048ad65e0be",
+          "cases": [
+            {
+              "id": "VCR001",
+              "disposition": "pass",
+              "behavior": "Genuine approved implementing lifecycle with ignored, untracked, HEAD-absent private State; actual configure route and fresh installed hook permit ordinary paired configuration commit without changing State."
+            },
+            {
+              "id": "VCR002",
+              "disposition": "pass",
+              "behavior": "Unchanged predecessor hook refuses the same actual private-State paired configuration commit; HEAD and State remain unchanged."
+            },
+            {
+              "id": "VCR003",
+              "disposition": "pass",
+              "behavior": "Forged or missing retained approval proof refuses preparation without altering State or twins."
+            },
+            {
+              "id": "VCR004",
+              "disposition": "pass",
+              "behavior": "Supported configured chat approval remains eligible and commits through the ordinary fresh hook without a new signature requirement."
+            },
+            {
+              "id": "VCR005",
+              "disposition": "pass",
+              "behavior": "Opaque-handle provenance, real prepare/write/complete lifecycle, exact index inspection and consumed-handle refusal."
+            },
+            {
+              "id": "VCR006",
+              "disposition": "pass",
+              "behavior": "Actual HEAD drift invalidates the sealed transition."
+            },
+            {
+              "id": "VCR007",
+              "disposition": "pass",
+              "behavior": "Private State raw-byte or continuity-revision drift invalidates the transition."
+            },
+            {
+              "id": "VCR008",
+              "disposition": "pass",
+              "behavior": "Actual public approval trust-policy drift invalidates approval and transition."
+            },
+            {
+              "id": "VCR009",
+              "disposition": "pass",
+              "behavior": "One-twin staging and extra real staged paths refuse even when caller presents the expected twin list."
+            },
+            {
+              "id": "VCR010",
+              "disposition": "pass",
+              "behavior": "Changed command, extra configuration key or divergent twins refuse the exact transition."
+            },
+            {
+              "id": "VCR011",
+              "disposition": "pass",
+              "behavior": "Independent protected gate modifications refuse inspection and actual ordinary commit."
+            },
+            {
+              "id": "VCR012",
+              "disposition": "pass",
+              "behavior": "Actual twin hardlink or symlink, executable index mode and unsafe ready-record mode refuse."
+            },
+            {
+              "id": "VCR013",
+              "disposition": "pass",
+              "behavior": "Missing, partial, noncanonical or extra-key ready records cannot grant commit authority."
+            },
+            {
+              "id": "VCR014",
+              "disposition": "pass",
+              "behavior": "Partial twin publication retains the genuine held preparation and refuses completion or implicit reclaim."
+            },
+            {
+              "id": "VCR015",
+              "disposition": "pass",
+              "behavior": "Post-commit identical configuration replay performs no writes; a changed command cannot reuse the old seal."
+            },
+            {
+              "id": "VCR016",
+              "disposition": "pass",
+              "behavior": "Genuinely produced approved implementing State tracked in HEAD remains accepted by the separate legacy route."
+            }
+          ],
+          "actualCounts": {
+            "pass": 16,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "scope": [
+            "Method fixtures use actual source approval writers, committed synthetic public trust anchors and memory-only synthetic signing keys; this is not an attended human signature certificate.",
+            "The configure CLI handler and real installed ordinary Git hook are qualified for this bounded source graph; no native runtime or model claim is made.",
+            "No full Verify, Alfred acceptance-criterion closure, backlog-item closure or overall release certification is claimed.",
+            "No live canonical source, user repository, host configuration or original frozen assertion was modified during qualification."
+          ]
+        }
+      ],
+      "originalProofCeiling": "Root integration owner: retain exact P16 sixteen-case evidence with this six-span byte conservation and exact354b helper. Consumer/native whole Verify/hook walk remains a separate finite checklist; no repeat of unchanged seam solely for OPEN status.",
+      "actualSource": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+            "status": "physical-source-only",
+            "sha256": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+            "bytes": 16811,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": false,
+          "retainedOriginalSourceBindings": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs",
+              "sha256": "354bd5fc754d08577d5a2a91b4b2ed1a9656484eabff77207d03a5017674f1d1",
+              "bytes": 14364,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "354bd5fc754d08577d5a2a91b4b2ed1a9656484eabff77207d03a5017674f1d1",
+                "selection": "P16-actual16",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+            "status": "physical-source-only",
+            "sha256": "12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538",
+            "bytes": 706707,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pending": {
+            "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+            "status": "physical-source-only",
+            "sha256": "c28fe82ee90f6b61632fede4cbda7e3248401225b8d2c594264d2d74226eff3a",
+            "bytes": 809796,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pendingDeclaredPin": {
+            "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+            "sha256": "c28fe82ee90f6b61632fede4cbda7e3248401225b8d2c594264d2d74226eff3a",
+            "size": 809796,
+            "mode": "0644",
+            "nlink": 1
+          },
+          "matchesRetainedSelector": false,
+          "retainedOriginalSourceBindings": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+              "sha256": "a52fec798a5c83966d70d830633a74e97ba77d9fee8b3c279750b495dd17f4db",
+              "bytes": 794431,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "a52fec798a5c83966d70d830633a74e97ba77d9fee8b3c279750b495dd17f4db",
+                "selection": "qualified-HGL12-current-parent-adoption",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+            "status": "physical-source-only",
+            "sha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca",
+            "bytes": 59864,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        }
+      ],
+      "currentOwner": "/root",
+      "engineeringDisposition": "Targeted existing proof retained; exact current assembly/source ancestry and original consumer/native requirements remain. No repeated passing tests merely because OPEN.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.design-intake-generator-omits-question-answers",
+      "stage": 75,
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-design-intake-generator-omits-question-answers.md",
+          "sha256": "914a10b2eba32003c39677b2a6b80204684640cb10fb2437b9b1eaecfecba099"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.design-intake-generator-omits-question-answers::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.design-intake-generator-omits-question-answers::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "proofPath": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p7-ordinary10/public-proof.json",
+          "proofSha256": "1f4ad15f63eb182e930e34151578c315281bac2a8e3abddda8e5484c2ab05927",
+          "declaredCount": 10,
+          "caseSetSha256": "3fd8e01be2096fab6e3f49e0edc53ca7027127dda8b351ba0ae852a408bd7bf6",
+          "actualCounts": {
+            "pass": 10,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "scope": "Actual consent/capture/answers/plan/apply generators on synthetic host-managed physical intake; no human/native/full-I03 authority claim",
+          "caseIdAssociation": "Original ten DIQA callbacks as recorded in the declared qualification report; individual IDs not guessed; per-assertion current native authority not inferred."
+        }
+      ],
+      "originalProofCeiling": "Root tracking/integration owner: retain P7 ordinary ten actual proof with this eight-function textual conservation. Wider all-runner/I03 authority producers/native qualification remains separate; no rerun of unchanged ten callbacks solely for OPEN status.",
+      "actualSource": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "status": "physical-source-only",
+            "sha256": "512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d",
+            "bytes": 425437,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pending": {
+            "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "status": "physical-source-only",
+            "sha256": "dc31dfd69eec652e603a5a0654faa32f95dd48e4ebeba7eacaf3ef181a0d7b50",
+            "bytes": 616784,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pendingDeclaredPin": {
+            "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "sha256": "dc31dfd69eec652e603a5a0654faa32f95dd48e4ebeba7eacaf3ef181a0d7b50",
+            "size": 616784,
+            "mode": "0644",
+            "nlink": 1
+          },
+          "matchesRetainedSelector": false,
+          "retainedOriginalSourceBindings": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+              "sha256": "b0aa73f591bd3043c55703830d095fc64e5326a91145910d3fdb3922684060a6",
+              "bytes": 523449,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": {
+                "sha256": "b0aa73f591bd3043c55703830d095fc64e5326a91145910d3fdb3922684060a6",
+                "selection": "qualified-HGL12-current-parent-adoption",
+                "exact": true
+              },
+              "authority": "146-selected-overlay"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+            "status": "physical-source-only",
+            "sha256": "c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc",
+            "bytes": 76269,
+            "mode": 420,
+            "nlink": 2
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": false,
+          "retainedOriginalSourceBindings": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+              "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+              "sha256": "c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc",
+              "bytes": 76269,
+              "mode": 420,
+              "nlink": 1,
+              "applied146Selection": null,
+              "authority": "physical-assembly-base-not-listed-in-146-overlay"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        }
+      ],
+      "currentOwner": "/root",
+      "engineeringDisposition": "Targeted existing proof retained; exact current assembly/source ancestry and original consumer/native requirements remain. No repeated passing tests merely because OPEN.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.gh-delivery-classifier-is-not-wired",
+      "stage": 75,
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-gh-delivery-classifier-is-not-wired.md",
+          "canonicalPath": "backlog/items/2026-10-08-gh-delivery-classifier-is-not-wired.md",
+          "sha256": "293f5636a4e7b8129700dc831f1a4de00f3689162cf25f886427e32ca0bcc79a",
+          "bytes": 1164,
+          "parentSha256": "293f5636a4e7b8129700dc831f1a4de00f3689162cf25f886427e32ca0bcc79a",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.gh-delivery-classifier-is-not-wired::16.1",
+            "lineStart": 18,
+            "lineEnd": 19
+          },
+          {
+            "id": "pipeline.gh-delivery-classifier-is-not-wired::30.1",
+            "lineStart": 32,
+            "lineEnd": 33
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "path": "legacy-origin:alfred-current-overview-20261010/overview.json",
+          "jsonPointer": "/latestContinuationStatus/actualAdapterFixed",
+          "qualificationManifestSha256": "cb5a606f861d8530243f6ff4a62cd7c56f7ababaa999c9e25630f056aca73712",
+          "executionSha256": "cbe2cd552e3bd984911dbd23744ca128b862344e0fb7f1f2594322258da6c837",
+          "FD3Sha256": "dfe6a04384fdca4fdcaf4280efa3cd5c4f66ed77eb98299f1990c2a08eeac18b",
+          "scope": "retained actual default-method-ready adapter12; nativeReadyProven:false; exact original receipt location not rebound"
+        }
+      ],
+      "originalProofCeiling": [
+        "Bind gh classifier-to-guard wiring and exact ready-session gh pr merge refusal plus safe read controls, protected signed-package lineage and native runner hook observation. No gh operation is executed here.",
+        "Historical unwired source gap superseded by sharedGh10 and actualTwoHook12; exact selected Codex/Agy hook source controls, final candidate and native remain."
+      ],
+      "actualSource": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+            "status": "physical-source-only",
+            "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+            "bytes": 46463,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+              "current164Sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+                "currentSha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+                "retained142Sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+            "status": "physical-source-only",
+            "sha256": "65291378f05fe1c894d856d4696d8ce0677e6c898ae0958b166643aaa5caa913",
+            "bytes": 36796,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "path": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+              "current164Sha256": "65291378f05fe1c894d856d4696d8ce0677e6c898ae0958b166643aaa5caa913",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+                "currentSha256": "65291378f05fe1c894d856d4696d8ce0677e6c898ae0958b166643aaa5caa913",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+                "retained142Sha256": "65291378f05fe1c894d856d4696d8ce0677e6c898ae0958b166643aaa5caa913",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+            "status": "physical-source-only",
+            "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+            "bytes": 150958,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+              "current164Sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+                "currentSha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+                "retained142Sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "selected142-successor-requires-exact-case-rebinding"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        }
+      ],
+      "currentOwner": "/root",
+      "engineeringDisposition": "Targeted existing proof retained; exact current assembly/source ancestry and original consumer/native requirements remain. No repeated passing tests merely because OPEN.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.merge-commit-message-skips-conventional-type-check",
+      "stage": 75,
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-merge-commit-message-skips-conventional-type-check.md",
+          "sha256": "915f249d3665f2c4f11cd941375e67f51928dc5f60afba8ba8bcc2681f96148a"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.merge-commit-message-skips-conventional-type-check::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.merge-commit-message-skips-conventional-type-check::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "name": "Merge20",
+          "reference": {
+            "path": "legacy-origin:alfred-claude-merge-message-policy-independent-20261010/qualification-manifest.json",
+            "sha256": "66ca9b57829ba55f222a24fa4b692c0d053f0fa04bb48a68179131ce2b869336"
+          },
+          "pass": 20,
+          "limits": [
+            "Portable policy seam; actual guard containment, native hook, real fast-forward and signed integration remain outside proof."
+          ]
+        }
+      ],
+      "originalProofCeiling": "Bind actual source integration and real consumer scope before whole-item disposition.",
+      "actualSource": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/commit-message-policy.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/commit-message-policy.mjs",
+            "status": "physical-source-only",
+            "sha256": "3a319ce909f6872e158629d6eb29c485d581e64455b8ff5b48e2b8e136a89d8b",
+            "bytes": 23791,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "path": "plugins/pipeline-core/lib/commit-message-policy.mjs",
+              "sha256": "3a319ce909f6872e158629d6eb29c485d581e64455b8ff5b48e2b8e136a89d8b"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        }
+      ],
+      "currentOwner": "/root",
+      "engineeringDisposition": "Targeted existing proof retained; exact current assembly/source ancestry and original consumer/native requirements remain. No repeated passing tests merely because OPEN.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+      "stage": 75,
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+          "canonicalPath": "backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+          "sha256": "68433f8d12cbea149864924df9134bb5bc7c0361c10df99c036ee869360b40eb",
+          "bytes": 2046,
+          "parentSha256": "68433f8d12cbea149864924df9134bb5bc7c0361c10df99c036ee869360b40eb",
+          "assignmentChanged": false
+        },
+        "clauses": [
+          {
+            "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow::15.2",
+            "lineStart": 19,
+            "lineEnd": 28
+          },
+          {
+            "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow::30.1",
+            "lineStart": 32,
+            "lineEnd": 37
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "path": "legacy-origin:alfred-passive-credential-follow-source-fix-20261010/report.md",
+          "sha256": "4d57d27e347740da428dbdcf30a1c0734a7ef2576d3c4d44d60d8b60597f0cd9",
+          "scope": "actual36 focused fixed credential/follow cases retained in original41 audit"
+        }
+      ],
+      "originalProofCeiling": [
+        {
+          "owner": {
+            "functionalRole": "Coordinator-or-assigned-agent",
+            "historicalActorExcluded": true
+          },
+          "activeRouting": [],
+          "nextAction": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed.",
+          "exactReceiptGap": "No exact actual current receipt/case binding retained; unknown is not an unimplemented fix",
+          "review": "official independent Critic not established for whole item",
+          "acceptance": "open; no closure inferred"
+        },
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "actualSource": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+            "status": "physical-source-only",
+            "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+            "bytes": 19968,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+              "current164Sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+                "currentSha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+                "retained142Sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+            "status": "physical-source-only",
+            "sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+            "bytes": 9965,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+              "current164Sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+              "retained": {
+                "canonicalPath": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+                "currentSha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+                "physicalSourcePath": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/passive-read-policy.mjs",
+                "retained142Sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+                "source146Correspondence": "same-selected-source",
+                "focusedCaseBinding": "retained-binding-equals-selected142"
+              },
+              "currentSemanticProof": "not inferred from membership/count"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        }
+      ],
+      "currentOwner": "/root",
+      "engineeringDisposition": "Targeted existing proof retained; exact current assembly/source ancestry and original consumer/native requirements remain. No repeated passing tests merely because OPEN.",
+      "accepted": false
+    },
+    {
+      "id": "pipeline.project-calibration-retains-new-project-placeholder",
+      "stage": 75,
+      "originalRequirement": {
+        "index": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+        "body": {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-project-calibration-retains-new-project-placeholder.md",
+          "sha256": "f4ab876dec60efc9cdd776b2d90540d70733a79763f245d8c770e7845712ad94"
+        },
+        "clauses": [
+          {
+            "id": "pipeline.project-calibration-retains-new-project-placeholder::15.1",
+            "lineStart": 17,
+            "lineEnd": 17
+          },
+          {
+            "id": "pipeline.project-calibration-retains-new-project-placeholder::23.1",
+            "lineStart": 25,
+            "lineEnd": 28
+          }
+        ]
+      },
+      "existingProofs": [
+        {
+          "name": "PCI-actual12",
+          "reference": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/qualification-manifest.json",
+            "sha256": "bc4832257dbc1e8fbbb97c07f02a15ce52de072cd2b85d13481a0af52f07743d"
+          },
+          "pass": 12,
+          "limits": [
+            "Original10/2 preserved; exact role-intent fixture erratum conserves final6 source and all12 callbacks. Native and actual VEP dirty/success consumer proof remain unqualified."
+          ]
+        }
+      ],
+      "originalProofCeiling": "Bind initial/resume/alias/missing/substituted-root PCI cases and all receipt consumers to selected current bytes; existing Source delivery not whole-item acceptance.",
+      "actualSource": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/consumer-verify.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/consumer-verify.mjs",
+            "status": "physical-source-only",
+            "sha256": "e11a60d64712a7c6b5e052c58510f297d791f30c1d1bdeedbf8107ba17d07b85",
+            "bytes": 6738,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+            "status": "physical-source-only",
+            "sha256": "bdeee4983ef2c76ff6e57b96f52f45ff96749b99ddca7caa8075dcfde51046bc",
+            "bytes": 8555,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [
+            {
+              "path": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+              "sha256": "bdeee4983ef2c76ff6e57b96f52f45ff96749b99ddca7caa8075dcfde51046bc"
+            }
+          ],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+            "status": "physical-source-only",
+            "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+            "bytes": 423484,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+            "status": "physical-source-only",
+            "sha256": "31053d205a6de028d8d585a447fb0d6c394f89a2ebe1b0d9c9a425b0bba81b18",
+            "bytes": 76336,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+            "status": "physical-source-only",
+            "sha256": "1bc2cb0656828720ba2c83c8f038e56aed4f20c5471de0e94cddd6b3e7a19364",
+            "bytes": 3702,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+          "main": {
+            "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+            "status": "physical-source-only",
+            "sha256": "08634960b03c7b4bbf8dab60d5796b6b5e31b179c32949570851661ec6fc07b4",
+            "bytes": 33950,
+            "mode": 420,
+            "nlink": 1
+          },
+          "pending": null,
+          "pendingDeclaredPin": null,
+          "matchesRetainedSelector": true,
+          "retainedOriginalSourceBindings": [],
+          "meaning": "Leaf byte equality or drift only; no whole import graph, original case compatibility or native claim inferred."
+        }
+      ],
+      "currentOwner": "/root",
+      "engineeringDisposition": "Targeted existing proof retained; exact current assembly/source ancestry and original consumer/native requirements remain. No repeated passing tests merely because OPEN.",
+      "accepted": false
+    }
+  ],
+  "scope": "Only original8stage75; stages unchanged",
+  "MainWrites": 0,
+  "businessRuns": 0
+}

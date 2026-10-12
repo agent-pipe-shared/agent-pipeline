@@ -1,0 +1,106 @@
+{
+  "schema": "pipeline.claude-inline-attestation-receipt-store-source-manifest.v1",
+  "task": "alfred-claude-inline-attestation-receipt-store-source-20261010",
+  "status": "source-proposal-frozen-syntax-valid-independent-agreement-pending",
+  "ownership": "legacy-origin:alfred-claude-inline-attestation-receipt-store-source-20261010",
+  "parents": [
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "sha256": "50ccfc2b816f03a473aa438f60f8273ad30594f27bac5011b53249169255582e",
+      "bytes": 114361,
+      "mode": "100644",
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "sha256": "5d77cb3c8a806f7ccfe1aea7486e9493ca8039c235da7c31828d91d3420a8514",
+      "bytes": 31767,
+      "mode": "100644",
+      "nlink": 1,
+      "role": "unchanged actual writer, host readback and receipt verifier API"
+    }
+  ],
+  "postimages": [
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-receipt-store-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+      "bytes": 115016,
+      "mode": "100644",
+      "nlink": 1,
+      "parentPath": "legacy-origin:alfred-claude-inline-attestation-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "parentSha256": "50ccfc2b816f03a473aa438f60f8273ad30594f27bac5011b53249169255582e"
+    }
+  ],
+  "patches": {
+    "forward": {
+      "path": "legacy-origin:alfred-claude-inline-attestation-receipt-store-source-20261010/forward.patch",
+      "sha256": "e683e5ef2b3070884d8a5699b5e91361f93c47d0f7820c6826132488416410cb"
+    },
+    "inverse": {
+      "path": "legacy-origin:alfred-claude-inline-attestation-receipt-store-source-20261010/inverse.patch",
+      "sha256": "8d77162825c99b8905e5b22a2556d0e83d58d9a72bb1250f8cb055572fded472"
+    },
+    "exactRoundTripCheck": {
+      "path": "legacy-origin:alfred-claude-inline-attestation-receipt-store-source-20261010/prepare-successor.mjs",
+      "sha256": "9f38ced5e191d9b4865cbd26f8209a8c0c6ec1970406fd8e5972f2ae6edf8c3d",
+      "result": "parent CAS, exact forward splices, exact inverse splices and byte equality to the frozen post all passed"
+    }
+  },
+  "normativeInputs": [
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/normative.json",
+      "sha256": "f55f2a3c28e6ca1f17e21af084806591736b585b93336d3166b5290d805d1d57"
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/mechanical-agreement.json",
+      "sha256": "98d7f5dc877db981b08ed76d1fd09c8886c759c96f6e960847c496b0c0e03cad"
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/inherited-environment-corridor.json",
+      "sha256": "86744067cc9d23d2381e56e0132dd473377de9a0d36a078925a5d1185538fe79"
+    }
+  ],
+  "delta": {
+    "surface": "One optional physical receipt-store parameter on observePipelineStartPreflight; no new result/envelope fields, host source, CLI action, receipt schema, observer/status callback or approval path.",
+    "parameter": "attestationReceiptDirectory; omitted by production callers, and the existing HOME-derived default is preserved. If explicitly supplied, only an absolute canonical string is forwarded; other explicit values become a host-refused null directory.",
+    "sequence": [
+      "The initial ordinary Claude verifier reads the same explicit store, so an absent receipt remains unavailable before inline work.",
+      "Fresh plugin-list and marketplace readers rederive the actual binding and preserve the original loaded-root/source-root equality checks.",
+      "The actual Claude host writer receives the same receiptDirectory through its existing dependencies argument.",
+      "The independent setup readback receives the same directory and fresh registry readers.",
+      "The unchanged ordinary receipt verifier receives the same directory and existing verified-result schema/status gate."
+    ],
+    "noninterference": "When the parameter is omitted, existing default HOME store behavior is unchanged. Codex, Antigravity, direct-directory, governance, bootstrap, and public-result behavior are untouched."
+  },
+  "heldArtifacts": [
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/ready-manifest.json",
+      "sha256": "db260ebc19c3205be0527f38b79d0406371272c291f89843363791bc356ef0cd",
+      "status": "preserved-unrun; previous launcher changed HOME and is not reused"
+    },
+    {
+      "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/assertion-freeze.json",
+      "sha256": "3d40b078a9a4138cbdb532e8e84792b52b3acba63efc10af81925dad1a8a2ea1",
+      "status": "all ten callback bodies retained unchanged"
+    }
+  ],
+  "validation": {
+    "sourcePostimageSyntax": {
+      "command": "node --check legacy-origin:alfred-claude-inline-attestation-receipt-store-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "exitCode": 0
+    },
+    "sourceImportsOrExecution": false,
+    "businessExecution": false,
+    "testCallbacksRun": false,
+    "mainOrAuditMutation": false,
+    "rootQualification": "pending; only Root may run the frozen independent ten-case fixture"
+  },
+  "limits": [
+    "The optional physical path is a storage-location input, not verification evidence. The unchanged host APIs still require a safe external directory, actual source-to-copy observation, physical receipt readback, registry binding and ordinary receipt verification.",
+    "This source packet is not accepted or qualified until the independent owner agrees the exact physical-store corridor and Root performs its authorized one-use run.",
+    "No actual plugin install, signature or native host claim is made."
+  ],
+  "businessRuns": 0,
+  "mainAuditWrites": 0,
+  "nativeAssurance": false
+}

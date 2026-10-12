@@ -1,0 +1,42 @@
+{
+  "schema": "alfred.evidence-custody-gap.v1",
+  "historicalManifestSha256": "e2f4400d7cf8d3e2cb76288c429706ff6a1bf5514878966cfa955c2c90e5adf8",
+  "missingArtifacts": [
+    {
+      "name": "finalizer-fixtures-dependency-before.json",
+      "expectedSha256": "466f318705a348aead4b43c2f60a73c03dbd64ce45347e3963302a8a28f7772f"
+    },
+    {
+      "name": "finalizer-fixtures-native-goldfish-host-finalizer.machine-result.json",
+      "expectedSha256": "d19b2c8b3babb23375416cf15494f644080b31bd771d0221f4b039fbab719c3f"
+    },
+    {
+      "name": "finalizer-fixtures-dependency-after.json",
+      "expectedSha256": "466f318705a348aead4b43c2f60a73c03dbd64ce45347e3963302a8a28f7772f"
+    },
+    {
+      "name": "finalizer-fixtures-targeted-results.json",
+      "expectedSha256": "7ee7505025f6d9ee41e90b338ee31bd3e6dbd4e74a3142d687eb44d86c779a12"
+    },
+    {
+      "name": "finalizer-fixtures-native-goldfish-host-finalizer-regression.machine-result.json",
+      "expectedSha256": "2b39fcb0f7beb345e4c9d39071bfd3a48b54676d8ed4f04201f2e6538f1ee8aa"
+    }
+  ],
+  "retainedCaseRecords": [
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/admission/legacy-adapters-native-goldfish-host-finalizer-regression.case-completion.jsonl",
+      "sha256": "4c2c8bba60abf1a00c4e19aef8bd2f4eee971a3902f4a6ad1767fa5b56b8c380"
+    },
+    {
+      "path": "scratch/alfred-egm-operating-optimization-20261011/admission/legacy-adapters-native-goldfish-host-finalizer.case-completion.jsonl",
+      "sha256": "9a6d5a62d48f2573f21c638e0851130c61547d10d40ad5319186c3b28fd83db6"
+    }
+  ],
+  "completeHistoricalRunCustody": false,
+  "cause": "Later driver captures reused five result filenames and overwrote historical bytes.",
+  "reconstructionClaim": false,
+  "remediation": "Future captures use immutable per-run directories; current GREEN fifteen-file custody separately retained.",
+  "currentGreenCustodyPath": "scratch/alfred-egm-operating-optimization-20261011/root-bound-codex-route-9e5a-historical/custody.json",
+  "acceptanceClaim": false
+}

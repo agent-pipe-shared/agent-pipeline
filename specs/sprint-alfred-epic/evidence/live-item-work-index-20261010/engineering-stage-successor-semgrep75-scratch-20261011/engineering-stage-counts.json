@@ -1,0 +1,39 @@
+{
+  "schema": "alfred.current-engineering-stage-successor.v1",
+  "baseCanonical174": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/coordinator-actionable-status-20261011/actionable-status-matrix.json",
+    "sha256": "c22589089e2b6a8650981f578998e9451f0979c26064adad4d44046181de609b"
+  },
+  "eventFile": "stage-event.json",
+  "activeItems": 174,
+  "excludedWholeOriginalItems": 2,
+  "originalInventory": 176,
+  "previousCounts": {
+    "25": 62,
+    "50": 68,
+    "75": 8,
+    "UNKNOWN": 36
+  },
+  "currentEngineeringStageCounts": {
+    "25": 62,
+    "50": 68,
+    "75": 9,
+    "UNKNOWN": 35
+  },
+  "changedItems": 1,
+  "stageEvent": "pipeline.semgrep-console-coverage-note-has-no-test",
+  "UNKNOWNMeaning": "35 retain UNKNOWN engineering stage; all174 already assessed. This does not mean35 missing fixes or unassessed items.",
+  "formalOriginalStatuses": "All original176 formal OPEN retained;174 active selected scope.",
+  "accepted": 0,
+  "originalAcceptanceCriteria": 37,
+  "originalIntegrationRequirements": 4,
+  "selectedContentMembership": {
+    "covered": 151,
+    "total": 164,
+    "remainingSelectedProtected": 13,
+    "protectedUnion": 14,
+    "fileCountsAreNotItemCounts": true
+  },
+  "fullCandidateVerified": false,
+  "nativeCandidateClaim": false
+}

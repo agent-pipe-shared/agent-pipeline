@@ -1,0 +1,97 @@
+{
+  "schema": "alfred.unknown03.hgo-index-one-public-proof.v1",
+  "status": "actual-controlled-PASS",
+  "caseIds": [
+    "U03H001"
+  ],
+  "counts": {
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "execution": {
+    "path": "scratch/alfred-unknown03-consumer-qualification-preparation-20261011/hgo-ac6-current-generation-qualification/execution.json",
+    "sha256": "7437d89ddf29b695a981579b9ef4f346855fc56c7da823ab9cb01a3c928c2863"
+  },
+  "qualificationFreezeSha256": "ec6de595468c119b55cfd17bcf49ee7230d980f85c5f88a4c299d46c554e4eed",
+  "captures": {
+    "stdout": {
+      "sha256": "4e1bf9657a37b6ab7ddb2cf1c89aaa7803bad8285681502130c615c776141cd4",
+      "bytes": 31
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "fd3": {
+      "sha256": "70e68d37aa113eb6aed1ad7b9dac5d4bc9b9f04a5ca4911fd06f711eb8c85732",
+      "bytes": 638
+    }
+  },
+  "source": {
+    "HGO": "13e022b43fb4000fe3e1e353ecef3e9169dbf8d09727c1d744de7dce6189552c",
+    "CLI": "d81c0046f521f07cdb6d465217ef6a0a7c1aacfec718967fdd9fec605ae62d67",
+    "integratedAC6ReceiptSha256": "3644b2cd1ed40acb5773df257d9d7d98fa1b09a133d406d67d52ed710344b101",
+    "sevenIntegratedLeaves": [
+      {
+        "path": "plugins/pipeline-core/config/interruption-registry.v1.json",
+        "sha256": "a37b5ab200f0b88cae6e45adb8befa4e273a8949494197d2958d01df094e23e9"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
+        "sha256": "7c7501e5ce8715469df503d4ec6e400db025327fb624e89ded4a6841e08c74e3"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/interruption-receipt-store.mjs",
+        "sha256": "cd68275ea86691a68102691e2f919601e3f60b9df7b07e9647e50a03541df98f"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/interruption-promotion.mjs",
+        "sha256": "e94e859a091887823a2825fc0aee29e99bae1faf29366b9891b1a105060e4586"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+        "sha256": "8d50ebbc5f6fb83c595a9e1a8c0d39920066fbf6091af91fe88e6b30529b792f"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/report-interruptions.mjs",
+        "sha256": "1e74db1ba61962db51a4cd0d4587fdb00fd4c1cb018a5118bc6ea604a139218e"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/interruption-promotion.mjs",
+        "sha256": "cf26ce9a6a1ba8460032daef6aad0694f9d896d8cac274d0f19632572f3f93a3"
+      }
+    ],
+    "resourcesDuringChild": 372,
+    "originalResourcesRestored": 369,
+    "MainConserved": true,
+    "selectedSourcesConserved": true,
+    "secureAncestryConserved": true
+  },
+  "covered": [
+    "Actual public request, plan and fixed signature-intent producers in an exclusively owned synthetic Git repository; no host-issued denial asserted.",
+    "Actual direct Node emit-signature-digest CLI returns matching schema/request/plan/intent and publishes authenticated digest-index data.",
+    "Second genuine library publication binds its distinct real intent. Actual indexed disclosure resolves the original source path with one index open, without request/plan enumeration or plugin reads, and conserves private file physical bytes/identity.",
+    "Absent, corrupted, expired and hardlinked owned index artifacts produce exact original refusal without mutation of the other indexed request. Original owned test artifacts are explicitly restored; no production rollback claim."
+  ],
+  "history": {
+    "priorEmitterFailure": {
+      "sha256": "caf8f40e19531b385dfe766f3f6d890d9a119a0923cf93c44d21e8478e4a2264",
+      "firstCause": "ERR_MODULE_NOT_FOUND in the stale-donor CLI child"
+    },
+    "correction": "Existing integrated AC6 generation selected. No new Main/product Source change was needed for this qualification; original callback and fixture unchanged.",
+    "originalCallbackSha256": "c7cb4a9c9275bc857f8269036768804c970c626cfe209cab8b64ded95123e4fe",
+    "originalFixtureSha256": "865ec173bcd2ec1d3934858b823ae8d2e207bc8195dc0a3ec05ba58b615a91e1"
+  },
+  "limits": [
+    "Controlled METHOD/unit fixture with ephemeral memory signer and explicit synthetic denial, not native host evidence or Human authorization.",
+    "No native engine rehearsal or hook execution, attended terminal/passphrase observation, Windows latency measurement, signing acceptance, capability arming/consumption, bound-all12 course or whole-item acceptance.",
+    "Indexed missing/corrupt/expired refusal does not establish the separately required sanctioned consumed/expired cleanup sweep.",
+    "Earlier consumer4 and PO2 passes retain their separate Source generations and are not rerun or relabelled as current AC6 ceremony proof."
+  ],
+  "nativeClaims": false,
+  "humanAuthorization": false,
+  "itemAcceptance": false,
+  "authorBusinessRuns": 0
+}

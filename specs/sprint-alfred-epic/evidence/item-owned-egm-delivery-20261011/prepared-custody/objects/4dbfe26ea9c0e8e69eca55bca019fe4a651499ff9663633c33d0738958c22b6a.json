@@ -1,0 +1,150 @@
+{
+  "schema": "scratch.full-verify-registration-repair.v1",
+  "coverage": "focused-registration-only",
+  "checks": [
+    {
+      "name": "RED genuine Main consumer rejects slice-queue augmentation",
+      "status": "PASS"
+    },
+    {
+      "name": "RED genuine clean stamped C2 consumer rejects same augmentation",
+      "status": "PASS"
+    },
+    {
+      "name": "GREEN exact proposed actual consumer consumes every augmentation",
+      "status": "PASS"
+    },
+    {
+      "name": "GREEN C2 actual declarations consume every augmentation",
+      "status": "PASS"
+    },
+    {
+      "name": "all original builtin/declarative identities and properties preserved in order",
+      "status": "PASS"
+    },
+    {
+      "name": "SQ01–SQ37 actual declaration and original SQ01–SQ34 baseline bound",
+      "status": "PASS"
+    },
+    {
+      "name": "alias target rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "missing exact target rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "duplicate actual target rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "file identity drift rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "previous policy drift rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "case omission rejected as nonmonotone",
+      "status": "PASS"
+    },
+    {
+      "name": "original canonical augmentation protocol suite",
+      "status": "FAILED",
+      "counts": {
+        "pass": 16,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      },
+      "failedCaseIds": [
+        "VAC010"
+      ],
+      "attempts": 2,
+      "stop": "two-failed-same-approach"
+    }
+  ],
+  "red": {
+    "main": {
+      "ok": false,
+      "code": "AUG-TARGET",
+      "error": "augmentation slice-queue-tests must match one existing name and exact file",
+      "exists": true
+    },
+    "c2": {
+      "ok": false,
+      "code": "AUG-TARGET",
+      "error": "augmentation slice-queue-tests must match one existing name and exact file",
+      "exists": true
+    }
+  },
+  "green": {
+    "builtinCount": 633,
+    "declarativeCount": 184,
+    "totalRegistrationCount": 823,
+    "augmentationCount": 19
+  },
+  "bindings": [
+    {
+      "path": "harness/scripts/verify.mjs",
+      "mainSha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+      "c2Sha256": "a529db9579987b1d48fb27402f79a290f83170ffd80a79063d8e242965caab23",
+      "same": true
+    },
+    {
+      "path": "harness/config/verify-case-completion-augmentations.v1.json",
+      "mainSha256": "aa3cb5d21609e2412ef6e2d392f1e21af3383fb0c09426c3532fe2779b4f8448",
+      "c2Sha256": "aa3cb5d21609e2412ef6e2d392f1e21af3383fb0c09426c3532fe2779b4f8448",
+      "same": true
+    },
+    {
+      "path": "harness/config/verify-case-completion.v1.json",
+      "mainSha256": "43c168b8c7d034a18ae575279bf5be97b28725420062861d7f67efe0596904b5",
+      "c2Sha256": "eabcf74f4afd831b72a9af7b1b18cdddb11b22632fa8f0ee3d9263f7e30417cf",
+      "same": false
+    },
+    {
+      "path": "harness/scripts/verify-case-completion-augmentation.mjs",
+      "mainSha256": "a2e5fb9b228f5824bbb9586e3e20fa1615ae468ee535d4a08351c04d42d67d32",
+      "c2Sha256": "a2e5fb9b228f5824bbb9586e3e20fa1615ae468ee535d4a08351c04d42d67d32",
+      "same": true
+    },
+    {
+      "path": "harness/verify-suites.json",
+      "mainSha256": "95440724d7093282a2b87db10c14ca973d8d3bbc9c900c5a95b3b63d99686ed8",
+      "c2Sha256": "30fe8058fb6a9ca3e74bc21b09091750f6a58ee84e744958dbadd882e7951b0e",
+      "same": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/slice-queue.test.mjs",
+      "mainSha256": "1ab281bb4049e1b87315eeb545a4ca707722dc78f168cc6174de9619ed4ba2ec",
+      "c2Sha256": "1ab281bb4049e1b87315eeb545a4ca707722dc78f168cc6174de9619ed4ba2ec",
+      "same": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/slice-queue.test.mjs",
+      "mainSha256": "14d4fe03486df04380bfa10fd2d8fda7e17b4047094d8cf1b8bb2915a120f959",
+      "c2Sha256": "14d4fe03486df04380bfa10fd2d8fda7e17b4047094d8cf1b8bb2915a120f959",
+      "same": true
+    }
+  ],
+  "postimages": [
+    {
+      "path": "harness/scripts/verify.mjs",
+      "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+      "changed": true
+    },
+    {
+      "path": "harness/config/verify-case-completion-augmentations.v1.json",
+      "sha256": "aa3cb5d21609e2412ef6e2d392f1e21af3383fb0c09426c3532fe2779b4f8448",
+      "changed": false
+    },
+    {
+      "path": "harness/config/verify-case-completion.v1.json",
+      "sha256": "43c168b8c7d034a18ae575279bf5be97b28725420062861d7f67efe0596904b5",
+      "changed": false
+    }
+  ]
+}

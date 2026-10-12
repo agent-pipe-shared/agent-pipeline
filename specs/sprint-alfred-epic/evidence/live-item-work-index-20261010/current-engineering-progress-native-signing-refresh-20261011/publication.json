@@ -1,0 +1,85 @@
+{
+  "schema": "alfred.progress-native-signing174.snapshot-metadata.v1",
+  "status": "ASSESSED-CURRENT-EVIDENCE-SNAPSHOT",
+  "parent": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-engineering-progress-refresh-20261011/current-engineering-matrix.json",
+    "sha256": "b980dfc0ec3baa4f4e37c3a90b1cbc3d63a8c72613b490a786e89b09843ce732",
+    "bytes": 377842
+  },
+  "progressParent": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/CURRENT-PROGRESS.md",
+    "sha256": "3f7de6d8977eb4e35953b3b8dfff3761577543489b75fe8e3856fa8caa083fd8",
+    "bytes": 55580
+  },
+  "evidence": [
+    {
+      "path": "scratch/alfred-po-human-approval-lazy-critic-main-transfer-preparation-20261011/application.json",
+      "sha256": "fca003ad89edf5da31358b2b94d307b038edda4bd934a5298a903bb3a7fb51a0",
+      "bytes": 1655
+    },
+    {
+      "path": "scratch/alfred-windows-native-backend-qualification-preparation-20261011/execution.json",
+      "sha256": "3c7e18d36138de269ff47b06195c0ecf098c7c3284b8199356c4c6e74e0d4fb1",
+      "bytes": 4961
+    },
+    {
+      "path": "scratch/alfred-quality-package-full-disclosure-source-20261011/direct-nine-successor/execution-root/execution.json",
+      "sha256": "203b2996d99c2ff03c2481701018d58f649a5e1f9597863e6ec86e528f763370",
+      "bytes": 1411
+    },
+    {
+      "path": "scratch/alfred-po-lazy-activation-independent-20261011/execution.json",
+      "sha256": "372da12a668bb8a2e5616c6a4d47938e08faa55f2acf2a02430823f1c0f28c0a",
+      "bytes": 1449
+    }
+  ],
+  "matrix": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-engineering-progress-native-signing-refresh-20261011/current-engineering-matrix.json",
+    "sha256": "becd89282284b08a5a38ae31b709cbf25ba3ff8742be81d164b4c5af136399b4"
+  },
+  "report": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-engineering-progress-native-signing-refresh-20261011/progress-report.md",
+    "sha256": "cb659be14ac5a91461914a314a056ae91e2aeb8baa336bb862c355bcafa2558a"
+  },
+  "changedIDs": [
+    "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+    "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+    "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes"
+  ],
+  "counts": {
+    "25": 58,
+    "50": 73,
+    "75": 8,
+    "100": 0,
+    "UNKNOWN": 35
+  },
+  "original37AC4IR": {
+    "parentSha256": "f3f79d386b12cc361f1f3dc2e8ad4ce1b3f685f986173346159fcebdc820e94c",
+    "unchanged": true
+  },
+  "accepted": 0,
+  "stageChanges": 0,
+  "actualPublication": "Only Root publisher stdout/result establishes public creation and readback",
+  "qualityDisclosureActual": {
+    "declared": 9,
+    "disposed": 9,
+    "counts": {
+      "pass": 9,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "SourceMainIntegration": false
+  },
+  "lazyCliQualification": {
+    "counts": {
+      "pass": 0,
+      "fail": 5,
+      "skip": 0,
+      "todo": 0
+    },
+    "qualified": false,
+    "SourceMainIntegration": true,
+    "cause": "unresolved"
+  }
+}

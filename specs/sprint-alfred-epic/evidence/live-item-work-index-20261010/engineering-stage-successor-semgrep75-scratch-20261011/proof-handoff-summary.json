@@ -1,0 +1,100 @@
+{
+  "schema": "alfred.focused-integrations-stage-successor-summary.v1",
+  "scratch": {
+    "item": "pipeline.scratch-has-no-retention-and-no-durability-check",
+    "sourcePost": "bde2d769d8e0642a2d57e144c703c882d3a38e4a9417102c06177fb3fc1f55fe",
+    "application": {
+      "path": "scratch/alfred-scratch-durable-counterpart-source-20261011/ordinary-main-integration/application-receipt.json",
+      "sha256": "93047ac986769b87f6d9bdfbc4c75bc113d0c4bd3dd0601f1f5dea1c23b5883f"
+    },
+    "postReadback": {
+      "path": "scratch/alfred-scratch-durable-counterpart-source-20261011/ordinary-main-integration/post-readback-receipt.json",
+      "sha256": "1bd96cd94821ff99693505be225820dbe3ab54459e95ef0df5b125e62a577c09"
+    },
+    "contentIntegrated": true,
+    "actualControlledProof": {
+      "path": "scratch/alfred-scratch-durable-counterpart-source-20261011/execution.json",
+      "sha256": "afe9327afc8e06772202351e99740fbbafda5b3ae607c35d508097dc26554ad6"
+    },
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "scope": "Eight controlled Source-author custody assertions; no native/installed or staging-sweep proof.",
+    "remaining": [
+      "Package-commit-bound staging sweep is not implemented by this reporter.",
+      "Native/installed actual handover/push consumption remains separate."
+    ],
+    "engineeringStage": "UNKNOWN retained; no uplift inferred from8PASS/application."
+  },
+  "AFKAndPolicy": [
+    {
+      "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+      "proof": {
+        "path": "scratch/alfred-shared-credential-root-independent-qualification-20261011/runtime-regex-check-successor/module-init-and-direct-fd3-successor/execution.json",
+        "sha256": "39c2c1d49adb6eb63e8ed3358f2225ce65646484c50a0df157b5b49b1110a796"
+      },
+      "application": {
+        "path": "scratch/alfred-shared-credential-root-constant-source-20261011/ordinary-policy-integration-preparation/application.json",
+        "sha256": "78193da3b3cf9149cc8c1c6ceb9bf05093a3674cc9df4bf9cff69bd28771f883"
+      },
+      "contentIntegrated": true,
+      "qualification": "Focused SCR001–005 on policy aec789/grammar26b; prior43 not replayed, no native/whole claim.",
+      "remainingOriginalRequirement": "Protectedgrammar26b remains uninstalled. Root final protected transfer/fullcandidateVerify/actual native-consumer boundaries remain separate."
+    },
+    {
+      "id": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+      "application": {
+        "path": "scratch/alfred-afk-final-four-main-integration-preparation-20261011/apply-once/actual-receipt.json",
+        "sha256": "c1fd441bfbb7b0b4c809801cb6abeb249e5b45b5d5bc724368f92118a7f3141a"
+      },
+      "contentIntegrated": true,
+      "qualification": "AFK4 content receipt; earlier AFX009S/AFR2/Lock6 proof scopes retained separately, not a new whole corpus.",
+      "remainingOriginalRequirement": "No complete original recovery/backlog corridor or whole item acceptance inferred from this family handoff."
+    }
+  ],
+  "HGO": {
+    "proof": {
+      "path": "scratch/alfred-unknown03-consumer-qualification-preparation-20261011/hgo-ac6-current-generation-qualification/execution.json",
+      "sha256": "7437d89ddf29b695a981579b9ef4f346855fc56c7da823ab9cb01a3c928c2863"
+    },
+    "actualPass": 1,
+    "controlledUnitInvocation": true,
+    "MainConserved": true,
+    "sourceConserved": true,
+    "held": [
+      "actual-host-native-denial",
+      "actual-attended-Human-design-and-push"
+    ],
+    "canonical174ItemId": null,
+    "associationLimit": "No exact per-item original clause association established by this one-case receipt; no stage uplift."
+  },
+  "retainedSemgrep": {
+    "stageAudit": {
+      "path": "scratch/alfred-semgrep-original-completion-stage-successor-20261011/stage-successor.json",
+      "sha256": "81d7a9b1f7cfda154fe215fe8c4de5acaa685687fd112371de35a8b87c36092b"
+    },
+    "existing159Proof": {
+      "path": "specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/SCANNER-PROV-V-20261009/security-scan.txt",
+      "sha256": "f15091431d023d550c0cbfa02cdf25e65414d45dfe33dc898b64d9146471d57c",
+      "bytes": 13415
+    },
+    "noRerun": true,
+    "nativeSemgrepNotOriginalGate": true
+  },
+  "publicationReportedByRoot": {
+    "AFKContent3": "DONE",
+    "SCRPolicy6": "DONE",
+    "HGO3": "DONE",
+    "HGOandSCR9IgnoreObservation": "Root exit1/nooutput; unignored. Public byte paths/hashes not invented here."
+  },
+  "limits": {
+    "formalAcceptance": false,
+    "fullCandidateVerified": false,
+    "nativeClaim": false,
+    "protected14Installed": false,
+    "finalFreezePending": "PUN latency/settlement Source followthrough and NativeWindows decision remain pending; Root final coherent content/fullVerify/signature/stamp sequence separate."
+  }
+}

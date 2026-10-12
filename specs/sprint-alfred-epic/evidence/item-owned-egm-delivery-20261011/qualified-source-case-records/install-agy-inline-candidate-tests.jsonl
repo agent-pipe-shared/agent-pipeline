@@ -1,0 +1,12 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["AGYIC001","AGYIC002","AGYIC003","AGYIC004","AGYIC005","AGYIC006","AGYIC007","AGYIC008","AGYIC009","AGYIC010"],"caseCount":10,"caseSetSha256":"c0dfc64a137201221b6cea99cb071001d712761858c32a372a6b469dc67f82fb"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC003","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC004","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC005","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC006","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC007","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC008","ordinal":7,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC009","ordinal":8,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYIC010","ordinal":9,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":10,"disposedCount":10,"caseIds":["AGYIC001","AGYIC002","AGYIC003","AGYIC004","AGYIC005","AGYIC006","AGYIC007","AGYIC008","AGYIC009","AGYIC010"],"caseSetSha256":"c0dfc64a137201221b6cea99cb071001d712761858c32a372a6b469dc67f82fb","dispositionsSha256":"b0c5d941a0db6e08aecbed7ec8aa0cfedb3bc6850d6b3f1b547f6f2873eaf25a","counts":{"pass":10,"fail":0,"skip":0,"todo":0}}

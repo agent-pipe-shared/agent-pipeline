@@ -1,0 +1,68 @@
+{
+  "schema": "alfred.focused-checks.Root-publication-plan.v1",
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "status": "reviewable-previews-frozen-unpublished",
+  "publisher": {
+    "path": "publish-once.mjs",
+    "sha256": "c1ca73faa2f3a91d54576b3081317d01afac0d90c238e1b124cc105db74fc799",
+    "fullRead": true,
+    "nodeCheckExitCode": 0
+  },
+  "preparationHelper": {
+    "path": "prepare-previews.mjs",
+    "sha256": "6bc6a8b6bc3d3e30f675a23754ad443d6b216193e84cc1332ee3636b75c0c957",
+    "purpose": "actual receipt and FD3 metadata validation and explicit allowlist projection only"
+  },
+  "previewFreeze": {
+    "path": "preview-freeze.json",
+    "sha256": "e2f394655cf575dac0fbae7fd592c4ec66d35297c7cc759489a6df3b93e7e574"
+  },
+  "files": [
+    {
+      "preview": "previews/checks.json",
+      "output": "checks.json",
+      "sha256": "1ad3c7218738bc1714a9714bd703ab3c199975f53d13f6948459bf99c04bcb3c",
+      "bytes": 14254,
+      "fullRead": true
+    },
+    {
+      "preview": "previews/README.md",
+      "output": "README.md",
+      "sha256": "50903c8abbad8215cd6f2deae0089ddf51f354a882b1a43c8591bbb20a5c4449",
+      "bytes": 1843,
+      "fullRead": true
+    },
+    {
+      "preview": "previews/receipt-bindings.json",
+      "output": "receipt-bindings.json",
+      "sha256": "153ab79558b4449e701799216ba13da3a916b869fd033f8a74b75e8b7d9191b4",
+      "bytes": 5980,
+      "fullRead": true
+    }
+  ],
+  "rootCommand": "node specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/publish-once.mjs",
+  "rootOnly": true,
+  "singleUse": true,
+  "writeScope": "only this latest-focused-checks-20261010 directory",
+  "checks": {
+    "Model4": "4 PASS / 0 FAIL, model25ba controlled terminal only",
+    "CCD8": "8 PASS / 0 FAIL, FeatureV2 controlled protocol only",
+    "GRE008": "1 PASS / 0 FAIL, targeted retained historical graph",
+    "HIL006": "1 PASS / 0 FAIL, controlled both-adapter refusal only",
+    "State11": "9 PASS / 2 FAIL, genuine callbacks remain not qualified"
+  },
+  "physicalEvidenceRead": "all five actual execution JSONs and actual regular FD3 bytes, plus retained historical receipts and scoped preparation declarations",
+  "sanitization": "explicit public field projection; no raw private runtime directories, executable/home locators, key material, private handles, stacks or arbitrary error messages",
+  "sourceGenerationsRemainDistinct": true,
+  "historicalFailuresRetained": true,
+  "noForestCopies": true,
+  "currentProgressPagesTouched": false,
+  "itemProgressEstimateTouched": false,
+  "workerSemanticRuns": 0,
+  "workerProductImports": 0,
+  "workerGitCommands": 0,
+  "nativeClaim": false,
+  "itemAcceptanceClaim": false,
+  "full26Claim": false,
+  "note": "The preview author-helper first refused a mistyped State11 FD3 hash. The retained actual terminal/capture digest corrected that transcription; no guard denial, semantic run or weakened hash comparison occurred."
+}

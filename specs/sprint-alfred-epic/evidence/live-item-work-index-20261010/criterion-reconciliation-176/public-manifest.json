@@ -1,0 +1,31 @@
+{
+  "schema": "alfred.public176-reconciliation-custody.v1",
+  "parentCheckpointSha256": "7261ffc019fd0cb91ef98c4c72291c97bb717fd642ca4e40c81ddfcbad5e31fc",
+  "source164Sha256": "aba63c5cac17b0f7c33557b7581d010f0e803454c45713879f9ecdf3ec8b967f",
+  "files": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/criterion-reconciliation-176/public-lookup.json",
+      "sha256": "d04a51d233844828f13ecefb8fd60bf1e9903c03b65f04b1dd7aacd1ef9aa9f9"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/criterion-reconciliation-176/public-lookup.tsv",
+      "sha256": "250ac30ed04cdd851f57ebc7230e88ec6d27d770f388c65779810b3eaec920b5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/criterion-reconciliation-176/source-bindings.json",
+      "sha256": "ecbf9785233d232c4f47bee81618d6644f98c25541366841087b96c795ef72b9"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/criterion-reconciliation-176/reader-item18-correction.json",
+      "sha256": "229b4e117e959eede7d6e2ea603c97c2694afacd0134f30b4158bc4338d67fdc"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/criterion-reconciliation-176/report.md",
+      "sha256": "fff657ab6034ff90c94d266ca6c1c6069eaca1b29c95aef3e4090ca51135babe"
+    }
+  ],
+  "all176Conserved": true,
+  "wholeItemAcceptance": false,
+  "sourceChanges": false,
+  "readerCorrectionPending": false
+}

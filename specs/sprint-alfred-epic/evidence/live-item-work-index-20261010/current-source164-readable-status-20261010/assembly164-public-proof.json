@@ -1,0 +1,192 @@
+{
+  "schema": "alfred.audit-source164-materialization.v1",
+  "inventory": {
+    "path": "scratch/alfred-current146-final-composition-update-20261010/actual-source-manifest.json",
+    "sha256": "aba63c5cac17b0f7c33557b7581d010f0e803454c45713879f9ecdf3ec8b967f",
+    "bytes": 122258
+  },
+  "receipt": {
+    "path": "scratch/alfred-current146-final-composition-update-20261010/actual-receipt.json",
+    "sha256": "ac3fcfbefbc51fa4c801943969659b13fead9595966dda4b11c95a3c032799ed",
+    "bytes": 4765
+  },
+  "actual": {
+    "schema": "alfred.final-source-composition.actual-receipt.v1",
+    "status": "applied",
+    "baselineCount": 146,
+    "targetCount": 40,
+    "unionCount": 164,
+    "planSha256": "dcb8a761f6ca5c11b39ceb906f9240d13027557362c3285d7cbd5a7562a22f33",
+    "inventorySha256": "aba63c5cac17b0f7c33557b7581d010f0e803454c45713879f9ecdf3ec8b967f",
+    "completed": [
+      {
+        "path": "architecture/map/harness.md",
+        "effect": "replace"
+      },
+      {
+        "path": "architecture/map/pipeline-core.md",
+        "effect": "replace"
+      },
+      {
+        "path": "docs/operating-model.md",
+        "effect": "replace"
+      },
+      {
+        "path": "docs/product-capability-inventory.json",
+        "effect": "replace"
+      },
+      {
+        "path": "harness/scripts/shell-grammar-capability-placement.test.mjs",
+        "effect": "add"
+      },
+      {
+        "path": "harness/verify-suites.json",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/agents/critic.md",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/afk-ledger.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agent-model-registry.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs",
+        "effect": "add"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs",
+        "effect": "add"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "effect": "selection-only"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/model-family-invocation.mjs",
+        "effect": "selection-only"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+        "effect": "selection-only"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/review-economy.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+        "effect": "add"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/session-power.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+        "effect": "add"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/rigor-floor.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+        "effect": "replace"
+      },
+      {
+        "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+        "effect": "replace"
+      },
+      {
+        "path": "schemas/pipeline.rigor-journal-entry.v1.json",
+        "effect": "add"
+      },
+      {
+        "path": "templates/prompts/critic-review.md",
+        "effect": "replace"
+      }
+    ],
+    "allUntargeted146RowsConserved": true,
+    "sourceOnly": true,
+    "businessRuns": 0,
+    "nativeAcceptance": false,
+    "wholeItemAcceptance": false
+  },
+  "mainProduct": "d794 unchanged by this Audit materialization",
+  "aggregateQualified": false,
+  "installReady": false
+}

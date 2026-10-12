@@ -1,0 +1,89 @@
+{
+  "schema": "alfred.final-lock-afk-source-join-contract.v1",
+  "status": "normative preparation; AFK causal successor not yet authored",
+  "lockQualifiedGeneration": {
+    "sourceManifest": {
+      "path": "legacy-origin:alfred-approval-lock-same-provider-catch-source-20261011/manifest.json",
+      "sha256": "fce87b10a339d69721c7380dbacbc3f22d1c7b664a02a8c1480001a9713d4343",
+      "bytes": 5050,
+      "mode": 420,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "a84d8f5391ef397f82392d22fb3a1f3bd282e4202b6f0a0f35bd710299c39488",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1
+    },
+    "execution": {
+      "path": "legacy-origin:alfred-state-two-repair-qualification-20261010/actual443-diagnosis/lock-ticket-controls-qualification-preparation/source5-authenticated-catch-six-qualification-successor/execution.json",
+      "sha256": "ba4a8a6e1bb1c8db2f390046f585e13de327e9091f76977f122e9502831d850d",
+      "bytes": 4967,
+      "mode": 384,
+      "dev": {
+        "excluded": true,
+        "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "ino": {
+        "excluded": true,
+        "rawSha256": "f07598f212d126d0b5b6ae7bd0a16e2f146bc971f7c94a33a392b996f2b30df6",
+        "bytes": 7,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "uid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "gid": {
+        "excluded": true,
+        "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+        "bytes": 4,
+        "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+      },
+      "nlink": 1
+    },
+    "registrySha256": "5827757549f06da7c9f11f12fedf115479ee50cb5d2818a58460dfdeb4143da4",
+    "i03Sha256": "0609c893126b35df0a7a4b7bdb926ba15ab7e0ddf056b057ab9bbadecb9a297c",
+    "stateSha256": "beea4f37baa9e8bc0210c3b66f02e2eb9935f1f63982d72ae2d9e25f04ba4d60",
+    "custodySha256": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c"
+  },
+  "requirements": [
+    "Root requires the new causal AFK fix to derive from this exact Source5 State beea/I03 0609/Registry5827/custody205 generation. Historical AFK State26c/I036a338 is not a replacement parent.",
+    "Declare immutable actual AFK functional parent manifest, full post paths, hashes and exact common ancestry before any composition.",
+    "Compose exact nonoverlapping hunks or explicitly resolve overlapping authenticated frame/catch/finally and lock witness sites; never overlay an older whole winner.",
+    "Preserve authentic ticket member record reads, complete physical Registry closure, published-prefix certificate check, original ordinary inspectors and original private checkpoint authentication.",
+    "Preserve pre-gate actual lock assertion, original captured UID/GID/inode/mode/nlink/bytes lock fact, repeated cleanup ownership comparisons and unconditional original finally/clear behavior.",
+    "Preserve same-provider KickoffError identity catch only inside genuine owning approval frame, original exception object and ordinary CLI integer2 behavior.",
+    "Preserve AFK original operation admission, sanctioned physical projection and genuine source custody; no caller callback/enum/JSON authority or new METHOD target class.",
+    "Require literal/named import closure against the selected composed providers, exact forward/inverse reconstruction and outside-hunk conservation before Root-only business qualification.",
+    "Retain separate existing ticket5 and lock6 receipts; composition static equivalence alone is not a new actual outcome. Select meaningful affected original cases explicitly, do not infer whole26/AFK acceptance from lock6."
+  ],
+  "peerSourceBindingPending": true,
+  "sourcePosts": 0,
+  "businessRuns": 0,
+  "productionWrites": 0,
+  "nativeAssurance": false,
+  "whole26Qualified": false
+}

@@ -1,0 +1,63 @@
+{
+  "schema": "alfred.critic-adoption-frozen-cases.v1",
+  "frozenBeforeCode": true,
+  "cases": [
+    {
+      "id": "ACA001",
+      "criterion": "Genuine accepted course/membership/current candidate produces truthful read-only plan",
+      "positive": "held-real-source-inputs-unavailable"
+    },
+    {
+      "id": "ACA002",
+      "criterion": "Missing/stale/foreign original contract/authority refuses"
+    },
+    {
+      "id": "ACA003",
+      "criterion": "Wrong candidate/tree/parent/provenance refuses; stamp-only unchanged"
+    },
+    {
+      "id": "ACA004",
+      "criterion": "Unbound/tampered/caller membership cannot become Source authority"
+    },
+    {
+      "id": "ACA005",
+      "criterion": "Missing/spent/conflicting old budget refuses; no fresh ownership"
+    },
+    {
+      "id": "ACA006",
+      "criterion": "M4 debt remains exact and unknown; no generic exception"
+    },
+    {
+      "id": "ACA007",
+      "criterion": "Opaque handle forgery/cross-root/replay cannot reserve or publish"
+    },
+    {
+      "id": "ACA008",
+      "criterion": "Physical/source/candidate CAS drift invalidates live handle"
+    },
+    {
+      "id": "ACA009",
+      "criterion": "Not-integrated observation grants no Main acceptance"
+    },
+    {
+      "id": "ACA010",
+      "criterion": "Missing fresh evidence remains hold; private postimage not candidate"
+    },
+    {
+      "id": "ACA011",
+      "criterion": "Old strict paths unchanged outside optional new lane"
+    },
+    {
+      "id": "ACA012",
+      "criterion": "Plan never returns packet-ready/admitted/spawn; publication held"
+    },
+    {
+      "id": "ACA013",
+      "criterion": "Closed CLI/path bounds reject caller authority and arbitrary flags"
+    },
+    {
+      "id": "ACA014",
+      "criterion": "Verify six-selector and reserved surfaces unchanged"
+    }
+  ]
+}

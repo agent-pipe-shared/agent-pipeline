@@ -1,0 +1,18 @@
+✔ CIA001 real copied Claude install attests inline and retains downstream prerequisites (701.655329ms)
+✔ CIA002 existing genuine receipt is consumed without authority rewrite (903.536388ms)
+✔ CIA003 missing disabled and duplicate registry entries never gain attestation (1602.697541ms)
+✔ CIA004 wrong version and loaded-root registry crosschecks cannot publish (682.354845ms)
+✔ CIA005 actual fresh registry and source-mapping drift remain unavailable (987.481802ms)
+✔ CIA006 real installed protected-byte drift is rejected by actual source observer (345.769483ms)
+✔ CIA007 physical receipt tamper between real writer and independent readback never continues (427.326685ms)
+✔ CIA008 unsafe physical receipt mode fails independent readback (427.845433ms)
+✔ CIA009 inactive project cannot use inline receipt preparation as install consent (66.213642ms)
+✔ CIA010 registered direct directory keeps not-required copied-install receipt semantics (534.136544ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6683.58552

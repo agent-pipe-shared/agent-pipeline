@@ -1,0 +1,121 @@
+{
+  "description": "Codex safety bridge for dispatch packets, shell commands, and write-path policy.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\" --runner codex",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\" --runner codex",
+            "timeout": 3,
+            "statusMessage": "Checking Agent-Pipeline session onboarding"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "spawn_agent|update_plan",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
+            "timeout": 3,
+            "statusMessage": "Evaluating optional task slicing"
+          }
+        ]
+      },
+      {
+        "matcher": "spawn_agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+            "timeout": 3,
+            "statusMessage": "Checking dispatch packet"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+            "timeout": 45,
+            "statusMessage": "Checking Agent-Pipeline command policy"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+            "timeout": 45,
+            "statusMessage": "Checking Agent-Pipeline write policy"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
+            "timeout": 300,
+            "statusMessage": "Binding Goldfish host-commit dispatch"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
+            "timeout": 3,
+            "statusMessage": "Tracking native subagent lifecycle"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
+            "timeout": 300,
+            "statusMessage": "Finalizing validated Goldfish host commit"
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
+            "timeout": 3,
+            "statusMessage": "Tracking native subagent lifecycle"
+          }
+        ]
+      }
+    ]
+  }
+}

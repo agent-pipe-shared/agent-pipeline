@@ -1,0 +1,15 @@
+✔ explicitly declined sibling: conflict-free plan, owned hooks retired, content and sibling preserved (1137.060256ms)
+✔ unknown sibling refuses planning, retains owned hooks (399.473847ms)
+✔ active sibling refuses planning, retains content and hooks (643.540881ms)
+✔ additional declined sibling after journal is topology drift, journal and hooks unchanged (564.093363ms)
+✔ modified user hook remains untouched and prevents retirement (422.073455ms)
+✔ declined sibling reenrollment after journal refuses before hook mutation (792.609046ms)
+✔ declined sibling partial shim interruption resumes exact owned objects (1222.304721ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5410.10191

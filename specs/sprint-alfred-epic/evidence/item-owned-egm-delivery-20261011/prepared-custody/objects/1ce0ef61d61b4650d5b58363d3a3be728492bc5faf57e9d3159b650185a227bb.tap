@@ -1,0 +1,14 @@
+✔ actual Verify consumer diagnostic retains the cause, DrvFs limit and Linux-home workaround (1.273063ms)
+✔ real Linux private directories permit registration and keep record 0600 (4.258477ms)
+✔ real Linux permissive parent remains refused with cause and remedy; no record written (1.129184ms)
+✔ real Linux symlink parent remains unsafe without misleading filesystem hint (1.469382ms)
+✔ not-private failure keeps the outer code, preserves the cause and names the DrvFs hint (0.620447ms)
+✔ another inner failure keeps its cause and carries no hint (0.394457ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 224.358728

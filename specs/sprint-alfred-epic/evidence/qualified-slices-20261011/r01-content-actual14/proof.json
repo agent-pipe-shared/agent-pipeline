@@ -1,0 +1,153 @@
+{
+  "schema": "alfred.r01.applied-content-public-proof.v1",
+  "date": "2026-10-11",
+  "batchId": "R-01",
+  "scope": "Exact14 Critic/Goldfish instruction mirrors, lifecycle/schema and architecture navigation content integration",
+  "status": "applied-and-readback-conserved",
+  "targets": [
+    {
+      "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+      "parentSha256": "82299c1ae805bc890e47b750c88369593a1aad6e4f7a03c68f808ffc3b9f4316",
+      "selectedPostSha256": "e6101c86ceda0458930a7c27bf1a27212d12c67a138aa32854f4ff9012908333",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "parentSha256": "095f1c24ef174a404984dcfefcc27bcd41d995e4017e2758546f5623e3f2d213",
+      "selectedPostSha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/agents/critic.md",
+      "parentSha256": "59c6a1ead83b0b570956920d74a6a078c94dd3602a5beff152726779a974710b",
+      "selectedPostSha256": "849c8b5bfd9b1908839d2e22e3f56c71b9b91ca8e0aab2f03722f574b9d836cc",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+      "parentSha256": null,
+      "selectedPostSha256": "3079d7df467553be6466068c1606f94297ce4d074bfdea309c0216cbec06d682",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/schemas/pipeline.rigor-journal-entry.v1.json",
+      "parentSha256": null,
+      "selectedPostSha256": "85905ace356bf3cf3c8a9ce1b4b4b8fb121bb02e2f03a2411f81e449da870a79",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/rigor-floor.mjs",
+      "parentSha256": "2962994fec8c556a180edccdaef141a78d8d779b8107ebcb1fc3b716d3c15269",
+      "selectedPostSha256": "5e1e3d43ccc655d47e6a8f42d06b11dab9cd0c60e567d1063de3dde6bb6e375a",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-evidence.schema.json",
+      "parentSha256": "b18d0ca8ff65ef413ee002497b8c504e0e6d679426b48d5031219df28941fc62",
+      "selectedPostSha256": "981f3e2ba9bbe0f7cbba35c6beacecca998abe2deabca1cdf424db91a397818d",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "parentSha256": "7286eccd7712e6023cc252766a0b5c1e6f2f4db77c77903af4b4d582f7c31066",
+      "selectedPostSha256": "f5abdb6ea08d913c5f858fd4fa41ae6ab8b077d0cff13928fda2694833ffc5d1",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "parentSha256": "d463b1b92fb7329b3515e47640b2e8e85f85f866c126c137cc716702d1af7f3e",
+      "selectedPostSha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "templates/prompts/goldfish-task.md",
+      "parentSha256": "095f1c24ef174a404984dcfefcc27bcd41d995e4017e2758546f5623e3f2d213",
+      "selectedPostSha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "architecture/map/harness.md",
+      "parentSha256": "0395313492a87366912318206f95f1e169ae471048d211a005adf4a39f606bac",
+      "selectedPostSha256": "152321fb726495702cd435ba87d477ee57d0f94d79f5d2fa6e89b5c2a08fb92b",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "architecture/map/pipeline-core.md",
+      "parentSha256": "8d036fe8d64812cd600c0e58a51fb617f330f55dc91b43b03ff2aaaff4b6b8d8",
+      "selectedPostSha256": "f59cff2d1a314db45384f52274703000e0ee5f9d6e2c0e4491cfe17cdaaa92a0",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "schemas/pipeline.rigor-journal-entry.v1.json",
+      "parentSha256": null,
+      "selectedPostSha256": "85905ace356bf3cf3c8a9ce1b4b4b8fb121bb02e2f03a2411f81e449da870a79",
+      "postMode": 420,
+      "postNlink": 1
+    },
+    {
+      "path": "templates/prompts/critic-review.md",
+      "parentSha256": "d463b1b92fb7329b3515e47640b2e8e85f85f866c126c137cc716702d1af7f3e",
+      "selectedPostSha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+      "postMode": 420,
+      "postNlink": 1
+    }
+  ],
+  "nonTargetDependenciesConserved": 101,
+  "carriers": [
+    {
+      "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "sha256": "2b73ad3cfa8e4e7266cb85319f73f59206e3c0238aa467b76d88e0f064edebc1",
+      "size": 44110,
+      "mode": 420,
+      "nlink": 1,
+      "scope": "Current Main file only; no installed/native evidence"
+    },
+    {
+      "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+      "size": 57670,
+      "mode": 420,
+      "nlink": 1,
+      "scope": "Current Main file only; no installed/native evidence"
+    },
+    {
+      "path": "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+      "sha256": "2b593b872a69d0d02c42eaace9db650fd16ca1e05c3f509614a045597ba50335",
+      "size": 7838,
+      "mode": 420,
+      "nlink": 2,
+      "scope": "Current Main file only; no installed/native evidence"
+    }
+  ],
+  "evidenceDigests": {
+    "partitionSha256": "c956d6da67edc852cadd546489ae144eb852dd09582aa34471c10d126e5a9c35",
+    "planSha256": "31e484ccb01971f4658088e5048bffee60a812764a9a9757cae2ea0b85229c3c",
+    "inspectionSha256": "0b88ea76da116592fce2d897afa5eadb7da7db60d47a37cfda909be618e442e0",
+    "applicationSha256": "27393b07dc08564a150b48b46b7309a9e1c3e1c9d46d78b5c24d553db07f86fe",
+    "ledgerSha256": "983228582abda484f4e1b35459640b60cdddbb6759b77b484183f1b7d26d0121",
+    "postReadbackSha256": "9970deb1f358fc07888a6be52b7f6b62d6ce63748b09111180516a22e9a9bf70"
+  },
+  "atomicPerLeaf": true,
+  "wholeBatchAtomic": false,
+  "testsRun": 0,
+  "newReviewSessions": 0,
+  "claims": {
+    "nativeRuntime": false,
+    "installedCarriers": false,
+    "wholeAcceptance": false,
+    "newBusinessQualification": false
+  },
+  "privacy": "No raw private runtime records or installed paths included."
+}

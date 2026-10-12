@@ -1,0 +1,27 @@
+--- a/plugins/pipeline-core/scripts/consumer-verify-check.mjs
++++ b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+@@ -3,6 +3,7 @@
+ import { readFileSync } from "node:fs";
+ import { createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
++import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { readProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
+ import { loadManifest } from "../lib/manifest.mjs";
+@@ -41,7 +42,7 @@
+       const selected = commands.find((entry) => entry.id === commandId);
+       if (!selected) throw new Error("unknown configured Verify command id");
+       const result = spawnSync(selected.command, { cwd: root, shell: true, stdio: "inherit" });
+-      return result.status ?? 1;
++      return isSuccessfulSpawn(result) ? 0 : (result.status === 0 ? 1 : (result.status ?? 1));
+     }
+     const contract = checkVerifyContractConfigured(root);
+     if (!contract.ok && check === "contract" && contract.status === "missing") {
+@@ -55,6 +56,6 @@
+     // Run the project command exactly as configured. Inherit diagnostics into the
+     // journal's bounded private pipe; never buffer product output a second time.
+     const result = spawnSync(calibration.verify, { cwd: root, shell: true, stdio: "inherit" });
+-    return result.status ?? 1;
++    return isSuccessfulSpawn(result) ? 0 : (result.status === 0 ? 1 : (result.status ?? 1));
+   } catch (error) { console.error(error.message); return 1; }
+ }

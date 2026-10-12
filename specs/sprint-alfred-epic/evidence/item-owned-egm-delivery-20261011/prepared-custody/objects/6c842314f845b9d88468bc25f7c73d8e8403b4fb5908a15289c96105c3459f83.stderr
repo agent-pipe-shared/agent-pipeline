@@ -1,0 +1,19 @@
+FAIL GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports: AssertionError [ERR_ASSERTION]: NEVER_LIFTABLE_KERNEL_PATHS is not transitively closed (3 violation(s)):
+plugins/pipeline-core/lib/onboarding-continuity.mjs contains a dynamic import() the static scanner cannot classify -- this shape must be resolved by hand (name the target module and add it to DYNAMIC_IMPORT_EDGES, and to NEVER_LIFTABLE_KERNEL_PATHS if first-party), not silently skipped.
+plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs imports "./actual-support.mjs" -> plugins/pipeline-core/scripts/actual-support.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/actual-support.mjs is listed in NEVER_LIFTABLE_KERNEL_PATHS but does not exist on disk.
+
+3 !== 0
+
+    at assertKernelClosed (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-fixture/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:513:10)
+    at file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-fixture/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:521:3
+    at check (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-fixture/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:463:5)
+    at file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-fixture/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:520:1
+FAIL GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry: AssertionError [ERR_ASSERTION]: 1 NEVER_LIFTABLE_KERNEL_PATHS entry is not mentioned in docs/guard-maintenance-window-threat-model.md's "Protected assets" section:
+plugins/pipeline-core/config/interruption-registry.v1.json
+
+1 !== 0
+
+    at file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-fixture/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:748:10
+    at check (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-fixture/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:463:5)
+    at file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-kernel_violations/scope-v2-fixture/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:731:1

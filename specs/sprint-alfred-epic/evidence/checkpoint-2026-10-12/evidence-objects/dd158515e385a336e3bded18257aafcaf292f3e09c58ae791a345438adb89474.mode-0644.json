@@ -1,0 +1,12 @@
+{
+  "schema": "pipeline.architecture-decision.v2",
+  "id": "draft-authenticated-critic-course-adoption",
+  "title": "Authenticated current-course Critic candidate adoption",
+  "status": "proposed",
+  "digest": "5fa6f9f40c7b48928207bab18aab07b1bf8848bfb29a8b691f8db2cf0ce011d0",
+  "scope": "module",
+  "moduleIds": [
+    "pipeline-core"
+  ],
+  "date": "2026-10-12"
+}

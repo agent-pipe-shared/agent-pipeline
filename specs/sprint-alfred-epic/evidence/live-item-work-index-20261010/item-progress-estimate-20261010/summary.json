@@ -1,0 +1,144 @@
+{
+  "schema": "alfred.merged-item-engineering-progress.v1",
+  "date": "2026-10-10",
+  "totalItems": 176,
+  "wholeDeferredExcluded": 2,
+  "excludedIds": [
+    "pipeline.machine-wide-key-directory-resolution",
+    "pipeline.typed-plugin-update-next-action"
+  ],
+  "activeItems": 174,
+  "counts": {
+    "0": 0,
+    "25": 61,
+    "50": 68,
+    "75": 8,
+    "100": 0,
+    "UNKNOWN": 37
+  },
+  "knownStagePoints": 5525,
+  "unknownItems": 37,
+  "engineeringProgressPlanningBracketPercent": {
+    "lowerUnknown0": 31.75287356321839,
+    "upperUnknown75": 47.701149425287355
+  },
+  "weighting": "Each active original item has equal weight; no measured effort/time weighting.",
+  "interpretation": "UNKNOWN 0–75 is a planning bracket, not statistical confidence. UNKNOWN does not mean not started. Neither endpoint is acceptance or native certification.",
+  "acceptedItems": 0,
+  "globalEta": null,
+  "globalEtaReason": "Partition estimates use incompatible assumptions and units, and throughput is unmeasured. Parallel partition estimates cannot be summed or promoted to a global ETA.",
+  "conditionalPartitionEstimates": [
+    {
+      "partition": 55,
+      "estimate": {
+        "duration": null,
+        "reason": "no retained measured throughput per remaining whole item; native/PO attendance and current failures make hour/date prediction unsupported",
+        "nextCriticalPath": [
+          "complete current State/model/CCD/Windows and focused source corrections",
+          "final coherent integration and full Verify",
+          "one whole Critic plus at most one correction delta",
+          "local signing/stamp and separately attended host/native acceptance"
+        ]
+      }
+    },
+    {
+      "partition": 60,
+      "estimate": {
+        "engineeringWorkingDays": [
+          8,
+          15
+        ],
+        "basis": [
+          "Complete-source rows: targeted route checks and source integration, approximately 2–4 days with available hosts.",
+          "Partial security/custody routes: independent constructor/contracts and negative tests, approximately 5–10 days in parallel.",
+          "Installed Windows/Agy/desktop matrix: approximately 3–7 days after suitable hosts and permissions are available."
+        ],
+        "criticalPath": "Native/host availability, missing ownership and source capture interfaces, then coherent integration and final review.",
+        "calendarAcceptance": "Unknown: host availability and human final acceptance are not scheduled.",
+        "scope": "This 60-item partition only; not an Epic ETA or sum of per-item effort."
+      }
+    },
+    {
+      "partition": 61,
+      "estimate": {
+        "kind": "conditional planning range, not a committed completion time",
+        "activeCodeAndFocusedQualificationCriticalPathHours": [
+          8,
+          16
+        ],
+        "candidateIntegrationAndFinalReviewHours": [
+          2,
+          4
+        ],
+        "installedThreeRunnerAcceptanceElapsedHoursExcludingHumanWait": [
+          3,
+          8
+        ],
+        "nativeIssuerOrDecisionWait": "unbounded until actual capability/decision available",
+        "basis": [
+          {
+            "work": "concrete partial functionality/adoption across retained25 items",
+            "allowancePerBoundedGroupHours": [
+              1,
+              2
+            ],
+            "parallelLanesAssumed": [
+              4,
+              6
+            ]
+          },
+          {
+            "work": "unknown-source incidence triage without whole61 re-audit",
+            "allowancePerItemMinutes": [
+              15,
+              45
+            ],
+            "followupFixDurationUnknown": true
+          },
+          {
+            "work": "focused disposable regression receipt/source custody",
+            "allowancePerGroupMinutes": [
+              10,
+              30
+            ]
+          },
+          {
+            "work": "one coherent candidate composition plus one final batched review/diff followup",
+            "serialHours": [
+              2,
+              4
+            ]
+          }
+        ],
+        "limits": "Ranges are engineering allowances, not measured per-item speed or evidence of native readiness. They overlap across176 and must not be added to other partitions as independent elapsed time."
+      }
+    }
+  ],
+  "criticalPath": [
+    "Resolve genuine remaining functional/source-custody defects and unavailable producer/carrier interfaces.",
+    "Complete meaningful targeted checks and coherent source integration.",
+    "Complete final Verify and independent review under the current review policy.",
+    "Perform separately required human signing and installed/native acceptance when available."
+  ],
+  "inputs": [
+    {
+      "partition": 55,
+      "path": "scratch/alfred-item-progress-estimate-20261010/partition-55/estimate.json",
+      "sha256": "330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f"
+    },
+    {
+      "partition": 60,
+      "path": "scratch/alfred-item-progress-estimate-20261010/partition-60/assessment.json",
+      "sha256": "041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e"
+    },
+    {
+      "partition": 61,
+      "path": "scratch/alfred-item-progress-estimate-20261010/partition-61/progress-final.json",
+      "sha256": "804a9396dfb72803bf0317136bfaf2da05ec8bbcc455073309c5f3466c53409a"
+    }
+  ],
+  "lookup": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/criterion-reconciliation-176/public-lookup.json",
+    "sha256": "d04a51d233844828f13ecefb8fd60bf1e9903c03b65f04b1dd7aacd1ef9aa9f9"
+  }
+}

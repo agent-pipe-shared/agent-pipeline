@@ -1,0 +1,16 @@
+{
+  "schema": "alfred.critic-adoption-private-execution-hold.v1",
+  "command": "node legacy-origin:alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/tests.mjs",
+  "toolChunk": {
+    "excluded": true,
+    "rawSha256": "3f95917e772db5ca61ac7dbdf34be699f34ec3fff81c79a5c86f5ea7399eaade",
+    "bytes": 6,
+    "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+  },
+  "exitCode": 1,
+  "stage": "controlled disposable Git fixture initialization",
+  "errorCode": "EPERM",
+  "productCasesExecuted": 0,
+  "qualification": "unavailable",
+  "fixturePreserved": true
+}

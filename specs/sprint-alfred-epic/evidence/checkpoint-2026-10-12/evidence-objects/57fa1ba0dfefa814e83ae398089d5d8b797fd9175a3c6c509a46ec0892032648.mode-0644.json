@@ -1,0 +1,38 @@
+{
+  "schema": "alfred.claude-inline-attestation-inherited-environment-corridor.v1",
+  "status": "mechanical-port-pending-not-run",
+  "heldPacket": {
+    "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/ready-manifest.json",
+    "sha256": "db260ebc19c3205be0527f38b79d0406371272c291f89843363791bc356ef0cd",
+    "reason": "Launcher changes HOME and consequently Git global-config lookup; must remain unrun."
+  },
+  "preservedAssertions": {
+    "path": "legacy-origin:alfred-claude-inline-attestation-independent-20261010/assertion-freeze.json",
+    "sha256": "3d40b078a9a4138cbdb532e8e84792b52b3acba63efc10af81925dad1a8a2ea1",
+    "callbackBodyChangeAuthorized": false
+  },
+  "existingPhysicalPorts": [
+    "writeClaudeRegistryInstalledPluginReceipt(input, dependencies) forwards receiptDirectory to actual writeLocalDevelopmentInstalledPluginReceipt",
+    "readInstalledPluginAttestationSetup(input, dependencies) forwards receiptDirectory to actual verifyLocalDevelopmentInstalledPluginReceipt",
+    "verifyLocalDevelopmentInstalledPluginReceipt(input, {receiptDirectory}) reads that actual external physical store"
+  ],
+  "missingTransport": "Selected preflight 50cc creates private registryReads containing only readPluginList/readKnownMarketplaces. Its imported inline writer and readback therefore use default HOME store, even if the initial/final ordinary verifier is wrapped around an explicit owned receiptDirectory. No existing scoped preflight receipt-store transport has been established.",
+  "sourceOwner": "/root/r10_reader_budget_fix",
+  "requiredSuccessor": {
+    "environment": "HOME, XDG, Git configuration, hooks, signing and protected environment inherited unchanged; only owned fixture/temp/FD3 variables",
+    "fixtureWiring": "One actual owned physical receipt directory shared by genuine inline writer, independent host readback and ordinary verifier through a source-owned admitted test subject or explicitly supported physical parameter. No result callback injection.",
+    "inverse": "Exact fixture wiring inverse restores original 7c8ffe27 fixture; original ten callback bodies remain byte-exact.",
+    "prohibited": [
+      "HOME mutation",
+      "global config writes",
+      "symlink replacement of real host receipt directory",
+      "fake verification status",
+      "writer/result callback substitution",
+      "hook/signing disable flags"
+    ]
+  },
+  "execution": {
+    "authorBusinessRuns": 0,
+    "rootQualification": "not-authorized-for-held-packet"
+  }
+}

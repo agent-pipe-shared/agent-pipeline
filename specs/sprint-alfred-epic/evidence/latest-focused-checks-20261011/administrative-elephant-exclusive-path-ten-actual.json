@@ -1,0 +1,214 @@
+{
+  "schema": "alfred.public.administrative-elephant-original-eight-plus-two.method-observation.v1",
+  "status": "qualified-for-ten-source-method-cases",
+  "executor": "Root",
+  "rawReceiptSha256": "bbab34b91f1ff238d30ed8a4a25674d228e1461a63266107d3c20c773f4a1de1",
+  "rawReceiptBytes": 5086,
+  "caseIds": [
+    "ADM001",
+    "ADM002",
+    "ADM003",
+    "ADM004",
+    "ADM005",
+    "ADM006",
+    "ADM007",
+    "ADM008",
+    "ASV001",
+    "ASV002"
+  ],
+  "caseScopes": [
+    {
+      "id": "ADM001",
+      "scope": "administrative planning exceeds both stage-0 caps honestly"
+    },
+    {
+      "id": "ADM002",
+      "scope": "mixed production changes refuse while exact exclusive pathspec preserves peers"
+    },
+    {
+      "id": "ADM003",
+      "scope": "body-only duplicate and extended admin claims require exact final evidence"
+    },
+    {
+      "id": "ADM004",
+      "scope": "projection content is derived from real source ledger, never caller assertion"
+    },
+    {
+      "id": "ADM005",
+      "scope": "item-first precheck followed by real commit and official reconciliation stays strict"
+    },
+    {
+      "id": "ADM006",
+      "scope": "registration mode cannot conceal active work closures or existing-item changes"
+    },
+    {
+      "id": "ADM007",
+      "scope": "unrelated baseline drift staged ledger and unstaged mismatch remain blocking"
+    },
+    {
+      "id": "ADM008",
+      "scope": "actual committed content has admin provenance without a fictitious dispatch record"
+    },
+    {
+      "id": "ASV001",
+      "scope": "exclusive commit must not attest staged item bytes after selected worktree became malformed"
+    },
+    {
+      "id": "ASV002",
+      "scope": "exclusive administrative selection retains unrelated staged production changes"
+    }
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "79eec19d0582de5970077e68077deeb100c7b1232bb4b92e9124c16759e235f7",
+    "caseSetSha256": "c7206958b65dd847b983480b7ff1dd622fd2bd15ab82ef452da096582bb898f8",
+    "dispositionsSha256": "1711d64c00c0e15509dd84038776263e78689ef7d4bb4d2207048b7e9966fa74",
+    "declaredCount": 10,
+    "disposedCount": 10,
+    "counts": {
+      "pass": 10,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "ae8571b7f421690cc79edd5430e678d98f0895bdf3dcc056e3788f13d3a6b234",
+  "completionBytes": 1809,
+  "outcome": {
+    "code": 0,
+    "signal": null
+  },
+  "errors": {
+    "childError": null,
+    "parserError": null,
+    "conservationError": null
+  },
+  "timedOut": false,
+  "sourceConserved": true,
+  "invocation": {
+    "kind": "genuine private Git Source METHOD regressions",
+    "readySha256": "a040643bf64e470f8068c4ae7330465d0ae1074106fb1b60d88fbaacec32ef94",
+    "freezeSha256": "a071c9879817e317f47dc5f217fb13bbd04314cc182eb5305519e113d8aa8610",
+    "launcherSha256": "34d294bb7b6e4730e6ec3f182fb578c9639b5c0e2f70a879bf34dedd37aa8a72",
+    "resourceManifestSha256": "e38720b0d1dfa57004df21cd104f8a94d99974f852dde275494231801125f156"
+  },
+  "sourceManifestSha256": "4d3e66baf330e5158daf4ab7cae63dcea9c83e5f7292b4ba7715c129c5ade1bc",
+  "selectedSources": [
+    {
+      "canonicalPath": "docs/operating-model.md",
+      "sha256": "3bebd4b76ed03d7de4f5860d08ddaee2e021b6fe73fb74c664108b972c8d2cc9",
+      "bytes": 64732
+    },
+    {
+      "canonicalPath": "guardrails/git.md",
+      "sha256": "a0188af416a4c8ef60f5986b01988f53b2b4baad81c8e3aefdf3201210195146",
+      "bytes": 35463
+    },
+    {
+      "canonicalPath": "harness/scripts/check-dispatch-provenance.mjs",
+      "sha256": "4aa79409ee6d247485449abcb84dd06a6c7fe013dc1b71356b1701bc11848e61",
+      "bytes": 32061
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/docs/operating-model.md",
+      "sha256": "67e7ae9e8409f55127dd8469d0aa2bee5f306e7d862d53b4ff11e031128b0df3",
+      "bytes": 63905
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/guardrails/git.md",
+      "sha256": "a0188af416a4c8ef60f5986b01988f53b2b4baad81c8e3aefdf3201210195146",
+      "bytes": 35463
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-git.mjs",
+      "sha256": "3f425534f040195aad377f8e1b6cf2582c9574db0e4f05f461ac3e0342645a6a",
+      "bytes": 90597
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/administrative-commit-policy.mjs",
+      "sha256": "5686c6169a02b29e0727beba94b3a583f44e29440ef95b3e9e8645141ae69b0e",
+      "bytes": 11192
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/commit-message-policy.mjs",
+      "sha256": "cbb375ed0b495f5c0c2bb2cc13439636911b002c20a353ac0ecea1fdbda1ef4a",
+      "bytes": 24638
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/roles/elephant.md",
+      "sha256": "d3fe1bab5dd07c5f31df7a38d2f6d75f3fd0c8e0434c47002e384913ef620b12",
+      "bytes": 74273
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/check-backlog-state.mjs",
+      "sha256": "a773799e49b6ebf5bb549816be29dfea1da1c97c8686f0451bdb32e33df8e36f",
+      "bytes": 81773
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs",
+      "sha256": "f9b9d285d4ca23cf44c6c4a80c58d3cd81943038d63c2374552314258b4fa054",
+      "bytes": 25366
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+      "sha256": "9f853f3b50def281bb62302e5f1df7ada70206cce8e16d131ce5337f83ce5425",
+      "bytes": 47154
+    },
+    {
+      "canonicalPath": "roles/elephant.md",
+      "sha256": "d3fe1bab5dd07c5f31df7a38d2f6d75f3fd0c8e0434c47002e384913ef620b12",
+      "bytes": 74273
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/administrative-commit-policy.test.mjs",
+      "sha256": "d2220469bd8658f79559b5eda2a5ff8e92fc74569484b10b6034452ac793f16d",
+      "bytes": 11225
+    }
+  ],
+  "selectedSourceModuleAndTestChanges": 2,
+  "conservedOtherSourceRows": 12,
+  "coherentStateDependency": {
+    "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "sha256": "b522a46fed19ed6c471ef44b7ea45ecff9146e9a0f211bc1c35b99d07c53ab94",
+    "scope": "Explicit qualifying Source dependency; no installed/Main equivalence"
+  },
+  "history": {
+    "publishedOriginalEightProof": "administrative-elephant-original-eight-actual.json",
+    "publishedOriginalEightCompletion": "administrative-elephant-original-eight-completion.ndjson",
+    "priorPublicationReceiptSha256": "a9479469adfb1d182b41e66ba1472d1c0244d49441916fdccd3a5f61607d8836",
+    "historicalReceiptDigests": [
+      {
+        "sha256": "d9d3f74a140a211d6ac4b72122d01e047e076ac9cffe6882fc15f45089629cff",
+        "bytes": 2720
+      },
+      {
+        "sha256": "006b11ace65ddc64f25ec1cb686e69472dcc0be00bc3f755a7149c858240124d",
+        "bytes": 18146
+      },
+      {
+        "sha256": "5c4cf0a5ee022c4a72b1345c5b900dfde54fc545686d3e6f4917a11928df71dc",
+        "bytes": 4329
+      },
+      {
+        "sha256": "655a2fd6a4603899107771bb3bbfe1191786d1465cf31772caf8a88d008a8ad8",
+        "bytes": 4211
+      }
+    ],
+    "earlierSourceAndFailureHistoryPreserved": true
+  },
+  "scope": "Original ADM001\u2013008 plus actual ASV001/002 callback bodies, same genuine private Git fixture; only selected helper changed. No installed hook/Human/provider/native/full backlog/provenance acceptance or Main transfer.",
+  "limits": {
+    "installedHookQualified": false,
+    "nativeQualified": false,
+    "attendedHumanSigningQualified": false,
+    "wholeProviderSourceSurfaceQualified": false,
+    "fullBacklogQualified": false,
+    "wholeProvenanceRouteQualified": false,
+    "MainOrC0TransferredByThisEvidence": false,
+    "itemAccepted": false,
+    "wholeItemClosed": false
+  },
+  "privateForensicsRetained": true,
+  "rawHostPathsIdentitiesKeysOrLogsIncluded": false
+}

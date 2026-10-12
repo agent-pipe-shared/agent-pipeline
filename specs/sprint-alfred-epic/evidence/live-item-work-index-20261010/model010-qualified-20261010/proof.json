@@ -1,0 +1,54 @@
+{
+  "schema": "alfred.model010.public-actual-proof.v1",
+  "status": "qualified-controlled-real-process-method",
+  "caseId": "I08T010",
+  "caseCount": 1,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "d5ff4862119064dfcd22cb79b40187f8c286bd46a2441e13c4280b1c100a0730",
+    "caseSetSha256": "eca4e83cedd9972fd29b3e11a35de89b8d85a3fb2697d5909ffacaaab5682456",
+    "dispositionsSha256": "d2a38c7e58bb65f6c262d834085f288234e14f2c9620df2c2c63f12f68c7c957",
+    "declaredCount": 1,
+    "disposedCount": 1,
+    "counts": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "observation": {
+    "caseId": "I08T010",
+    "branch": "foreign-live-mutable-owner",
+    "diagnosticLocation": "source-private-pre-reservation-veto",
+    "refusal": {
+      "name": "SessionAuthorityError",
+      "code": "SDC-AUTHORITY-HELD",
+      "reason": "domain-transition-foreign-or-lost-mutable-owner"
+    },
+    "originalModelAndProtectedHistoryConserved": true,
+    "assurance": "controlled-real-process-method",
+    "nativeAssurance": false,
+    "oldTransitionBranchCovered": false
+  },
+  "childStatus": 0,
+  "signal": null,
+  "timeoutTriggered": false,
+  "originalGraphFileCount": 1705,
+  "restoredOriginalGraph": true,
+  "executionReceiptSha256": "6319117b127caa95b685bc28febf8d5939c9d30bf953f93b61bfb2005d51ac82",
+  "stdout": {
+    "sha256": "fce5ea960c6375a2eb034ca1e0ca67274e7b594893a05068ea18f5030418170d",
+    "byteLength": 453
+  },
+  "fd3": {
+    "sha256": "135bad3127ba8d8a4a671218b1b1bca3633e4f8d32636938ec8bf6fc81948efc",
+    "byteLength": 638
+  },
+  "nativeAssurance": false,
+  "humanApproval": false,
+  "full26": false,
+  "oldTransitionBranchCovered": false,
+  "adoptionStatus": "proposal-only"
+}

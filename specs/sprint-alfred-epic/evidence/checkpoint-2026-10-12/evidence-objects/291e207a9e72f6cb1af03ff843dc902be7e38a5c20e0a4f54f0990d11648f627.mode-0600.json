@@ -1,0 +1,117 @@
+{
+  "schema": "alfred.power-preconfig-diagnostic.execution.v1",
+  "status": "diagnostic-complete-not-product-qualified",
+  "childPid": 646550,
+  "childStatus": 1,
+  "signal": null,
+  "timedOut": false,
+  "preparationError": null,
+  "spawnError": null,
+  "parserError": null,
+  "graphError": null,
+  "parentError": null,
+  "diagnosticError": null,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "0ceba1d06f958a9ac43aa345b15ad18693ee8b0e005f08364f11a73bf3f30a00",
+    "caseSetSha256": "b5ac2b002f3881c4c3674bc18a95fd360a6ff4f2f330d559e825605de1c49a27",
+    "dispositionsSha256": "8b1cb9be30f3e8a735be5591e629e8f14bfa0f5f12b7d505a06522f1fef4defb",
+    "declaredCount": 1,
+    "disposedCount": 1,
+    "counts": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "observations": [
+    {
+      "schema": "alfred.power.source-child-failure-diagnostic.v1",
+      "stage": "owned-inhibitor-settlement",
+      "code": "SP-CONTROLLER",
+      "reason": "OWNED-INHIBITOR-EARLY-EXIT",
+      "childCreated": true,
+      "childTerminal": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "schema": "alfred.power.source-child-failure-diagnostic.v1",
+      "stage": "controller-owned-lifetime",
+      "code": "SP-CONTROLLER",
+      "reason": "SOURCE-REFUSAL",
+      "childCreated": true,
+      "childTerminal": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "schema": "alfred.power.source-child-failure-diagnostic.v1",
+      "stage": "ack-frame-read",
+      "code": "UNCLASSIFIED",
+      "reason": "ACK-TIMEOUT",
+      "childCreated": true,
+      "childTerminal": {
+        "status": "unobserved"
+      }
+    },
+    {
+      "schema": "alfred.power.source-child-failure-diagnostic.v1",
+      "stage": "own-child-terminal",
+      "code": "UNCLASSIFIED",
+      "reason": "UNCLASSIFIED",
+      "childCreated": true,
+      "childTerminal": {
+        "status": "closed",
+        "exitCode": null,
+        "signal": "SIGTERM",
+        "spawnError": null
+      }
+    }
+  ],
+  "inhibitorObservations": [
+    {
+      "schema": "alfred.power.inhibitor-child-diagnostic.v1",
+      "stage": "owned-inhibitor-terminal",
+      "code": "UNCLASSIFIED",
+      "reason": "NATIVE-CHILD-CLOSE",
+      "inhibitorTerminal": {
+        "status": "closed",
+        "exitCode": 1,
+        "signal": null,
+        "spawnError": null
+      },
+      "stderrObservation": {
+        "status": "bounded",
+        "classification": "INHIBIT-REFUSAL-MESSAGE"
+      }
+    }
+  ],
+  "captures": [
+    {
+      "path": "legacy-origin:alfred-power-isolated-single-close-qualification-20261010/inhibitor-diagnostic-successor/qualification-output/stdout.txt",
+      "sha256": "5e2260969b8327d2ebec2ce59b6eb14f95b380718029093d80ac561592a734b6",
+      "size": 2224
+    },
+    {
+      "path": "legacy-origin:alfred-power-isolated-single-close-qualification-20261010/inhibitor-diagnostic-successor/qualification-output/stderr.txt",
+      "sha256": "5dd7e2bb485da56aafd4ebbe1e57dd056b340bb6168f05edc1e51882e55895c8",
+      "size": 1173
+    },
+    {
+      "path": "legacy-origin:alfred-power-isolated-single-close-qualification-20261010/inhibitor-diagnostic-successor/qualification-output/completion.ndjson",
+      "sha256": "fcef54a15443c7f2bf43a73ee62cc45d1d4f84e0edb590631e9a708320f30e3c",
+      "size": 638
+    }
+  ],
+  "oldProviderReads": 0,
+  "oldProviderWrites": 0,
+  "authorityReleaseProven": false,
+  "wholeFamilyTerminalProven": false,
+  "diagnosticOnlyNotCandidate": true,
+  "nativeAssurance": false,
+  "wholePowerFive": false,
+  "wholeFull26": false
+}

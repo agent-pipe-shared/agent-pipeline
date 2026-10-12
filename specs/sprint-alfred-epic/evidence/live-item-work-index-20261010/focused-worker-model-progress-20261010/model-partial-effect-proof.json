@@ -1,0 +1,63 @@
+{
+  "schema": "alfred.model012.public-actual-proof.v1",
+  "status": "focused-controlled-method-qualified",
+  "execution": {
+    "path": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/dependency-coherent-successor/execution-terminal.json",
+    "sha256": "81ca012cd7ec33c3af3e75c4cc9594071cf4c1fcf66540b127e4953f7a23046f",
+    "size": 1731
+  },
+  "caseId": "I08T012",
+  "caseSha256": "e7d2e74cbf25309d84e13e41b40f60dbd332311d1511595650f1b4d04cd51147",
+  "normSha256": "48b60a74672092daa336859e595a5622b7139c248b7dba86be4375f0c92a881c",
+  "sourceSha256": "7207549184fa1e1debad0e8cee86271ff99cbd5a6c99fb99f4b396e4f9debce8",
+  "architectureProviders": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "sha256": "e1c30e4d7662a0b0dc5b4f5fbd178dada5349bd2cdff37969a379f37964eb226"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "sha256": "f9ab78f6cacda4aa7555163b6f1d72bbbff0633bf83cd690ddfee83c0af170c8"
+    }
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "c3f9a72a30386b9cb420a67c1db86c4a69793c5064125170c06af9c75ee03391",
+    "caseSetSha256": "0cdf459f34b184eea6657032938fec2bc00b5e65af650673f858ca34f4d3a06e",
+    "dispositionsSha256": "ead91c1182914e83ae07b3450ea0b365f61adcc563629781138fcfeb0294f00b",
+    "declaredCount": 1,
+    "disposedCount": 1,
+    "counts": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "fd3": {
+    "path": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/dependency-coherent-successor/public-completion.ndjson",
+    "sha256": "1b80a31a5ff2bc49cd3ee09cd8377ba89c25648c02c03b2aff120e2b6d382404",
+    "size": 638
+  },
+  "graph": {
+    "files": 1705,
+    "restoredOriginalOverlays": 2,
+    "restored": true,
+    "conservationErrors": null
+  },
+  "priorStartupFailure": {
+    "execution": {
+      "path": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/execution-terminal.json",
+      "sha256": "d94f3b56d8d60bd6e8181b037cb83313ebb4bffd39ab9b9650f0f45329db9bb6",
+      "size": 1140
+    },
+    "businessDisposition": false,
+    "retained": true
+  },
+  "nativeAssurance": false,
+  "humanApproval": false,
+  "full26": false,
+  "aggregateGenerationQualified": false,
+  "officialAcceptance": false
+}

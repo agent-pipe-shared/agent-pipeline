@@ -1,0 +1,24 @@
+{
+  "schema": "alfred.wel12-qualification-terminal.v1",
+  "status": 1,
+  "signal": null,
+  "spawnError": null,
+  "error": null,
+  "conservationError": null,
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "9b895f6710c7f0e58b7c49ae57d58843cb17781e01052b996f83178ee57b3811",
+    "caseSetSha256": "bc865c323c865dc29a6fc9241aa56acc33d49bcc9d94bcc30a8801edb30263d7",
+    "dispositionsSha256": "8a9449a2951edc0d20971b1c30503940d873a66b89ffcb1b1fd1318f9a613c66",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 9,
+      "fail": 3,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "nativeWindows": "unavailable-not-executed"
+}

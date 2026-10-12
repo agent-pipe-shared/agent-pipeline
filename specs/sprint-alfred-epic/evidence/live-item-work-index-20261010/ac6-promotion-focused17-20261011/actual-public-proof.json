@@ -1,0 +1,77 @@
+{
+  "schema": "alfred.ac6.focused-public-proof.v1",
+  "status": "focused-method-qualified-source-integrated",
+  "counts": {
+    "originalPromotionCases": { "pass": 11, "fail": 0, "scope": "ACP001-ACP011" },
+    "correctedTransportCase": { "pass": 1, "fail": 0, "scope": "ACP012" },
+    "reportRouteCases": { "pass": 5, "fail": 0, "scope": "ACPR001-ACPR005" },
+    "combinedFocusedCases": { "pass": 17, "fail": 0, "skipped": 0, "unexecuted": 0 }
+  },
+  "evidence": {
+    "originalPromotionRun": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/execution.json",
+      "sha256": "bc8e45e421335b7f38162597200e3c72efa5db11428eefe2857f2b155346b19e",
+      "reportedCounts": { "tests": 12, "pass": 11, "fail": 1 },
+      "interpretation": "The sole failure was the ACP012 test transport expectation; ACP001-ACP011 passed. The initial receipt remains unchanged and is not represented as a clean 12-case run."
+    },
+    "correctedAcp012Run": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/acp012-execution.json",
+      "sha256": "30053c2d0702b297fe76232bcbab5a777bd9a96c962443aa035e6abdd6fb3b69",
+      "stdoutSha256": "03e704fcc2acf3e90135d53b8598ef115acf22446812df9443a631e2c41d26dc",
+      "reportedCounts": { "tests": 1, "pass": 1, "fail": 0 },
+      "scope": "Transport-only correction; ACP012 assertion body and source graph were retained."
+    },
+    "reportRouteRun": {
+      "path": "scratch/alfred-ac06-signed-interruption-promotion-independent-20261011/report-route/execution.json",
+      "sha256": "a923d96b4dbad1665c2e24d0d1e146b4f0af2748808d938438fd9e88653d7c84",
+      "stdoutSha256": "81841b2eed9d6a3245c7c619f5ae53efaa525d9639ce818d0fb575d65f8c03d7",
+      "reportedCounts": { "tests": 5, "pass": 5, "fail": 0 },
+      "scope": "Separate report-route qualification; original promotion callbacks were not changed."
+    }
+  },
+  "sourceState": {
+    "proposalManifest": {
+      "path": "scratch/alfred-ac6-promotion-record-source-20261011/manifest.json",
+      "sha256": "7f24c8e68b64957d20cd3c65285b3a40680636d64437746451b1084f5743057b",
+      "status": "prepared-unqualified"
+    },
+    "preIntegrationMainPoCaller": {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "7470262a0a7ab188465d77dfdaf6dc15c7ba2aee92c80d36cd522b88c2e76f85",
+      "status": "exact parent before the seven-file integration"
+    },
+    "integratedPoCaller": {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "8d50ebbc5f6fb83c595a9e1a8c0d39920066fbf6091af91fe88e6b30529b792f",
+      "status": "selected and applied by the linked integration receipt; not semantically exercised after integration by these receipts"
+    },
+    "integratedReportDispatcher": {
+      "canonicalPath": "plugins/pipeline-core/scripts/report-interruptions.mjs",
+      "sha256": "1e74db1ba61962db51a4cd0d4587fdb00fd4c1cb018a5118bc6ea604a139218e",
+      "status": "selected and applied by the linked integration receipt; report-route tests remain separately scoped"
+    },
+    "integrationPreparation": {
+      "path": "scratch/alfred-ac6-ordinary-main-integration-preparation-20261011/manifest.json",
+      "sha256": "b286991136109749ea627085a27e8feb5ad0f08b16d5dcdd317d1eef9c433ff1",
+      "status": "preparation manifest; superseded for application by the exact final plan in the integration receipt"
+    },
+    "actualMainIntegration": {
+      "path": "scratch/alfred-ac6-ordinary-main-integration-preparation-20261011/actual-integration-ca7-successor-receipt.json",
+      "sha256": "3644b2cd1ed40acb5773df257d9d7d98fa1b09a133d406d67d52ed710344b101",
+      "planSha256": "af78424186fbf62206c05aebc22f6bd6c8974bce0f2d13b6a4f03dda7b86407a",
+      "status": "applied-exact-seven-new-inodes; all seven target bytes match their frozen Source postimages; inputs conserved; semantic runs 0"
+    }
+  },
+  "limits": [
+    "Method-level synthetic-key qualification only; no human or native assurance.",
+    "No signing ceremony was run and no approval is claimed.",
+    "The report-route cases do not qualify ordinary report collection or baseline-writing behavior.",
+    "Seven Source postimages are integrated into Main, but no post-integration semantic run or full Verify is represented here.",
+    "No full Verify, full-item acceptance, or product release is asserted."
+  ],
+  "humanApproval": false,
+  "nativeAssurance": false,
+  "sourceIntegration": true,
+  "postIntegrationSemanticQualification": false,
+  "fullItemAcceptance": false
+}

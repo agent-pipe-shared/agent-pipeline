@@ -1,0 +1,11 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "CMOL001",
+    "CMOL003",
+    "CMOL004",
+    "CMOL005",
+    "CMOL006"
+  ],
+  "maxBytes": 32768
+}

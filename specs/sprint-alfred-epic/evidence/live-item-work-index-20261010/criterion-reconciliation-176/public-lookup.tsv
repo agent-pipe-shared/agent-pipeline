@@ -1,0 +1,177 @@
+id	disposition	accepted
+pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript	prior-assessment-retained	false
+pipeline.advertised-git-to-head-pipeline-is-refused	prior-assessment-retained	false
+pipeline.advisor-demand-reuse-has-no-design-course-bound	prior-assessment-retained	false
+pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write	deferred	false
+pipeline.advisor-question-contract-and-final-source-binding-conflict	prior-assessment-retained	false
+pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses	prior-assessment-retained	false
+pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments	prior-assessment-retained	false
+pipeline.agy-driver-dispatch-and-design-routes-incomplete	qualification-gap	false
+pipeline.agy-el01-write-authorization-gap	qualification-gap	false
+pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin	qualification-gap	false
+pipeline.agy-managed-copy-first-start-lacks-attestation	qualification-gap	false
+pipeline.antigravity-1-2-13-blocks-managed-refresh	qualification-gap	false
+pipeline.approval-bound-design-package-lives-in-an-ignored-directory	prior-assessment-retained	false
+pipeline.approval-verification-demands-head-equals-candidate	qualification-gap	false
+pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes	prior-assessment-retained	false
+pipeline.auto-install-pre-push-hook-with-the-plugin	source-present	false
+pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated	qualification-gap	false
+pipeline.bounded-reader-terminal-binding	source-present	false
+pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block	source-present	false
+pipeline.budget-checkpoint-fires-below-the-briefed-cap	prior-assessment-retained	false
+pipeline.capability-inventory-checker-is-red-at-head	deferred	false
+pipeline.catalogue-admit-prescribed-lifecycle-verbs	prior-assessment-retained	false
+pipeline.claude-design-readiness-cannot-start-on-windows	deferred	false
+pipeline.claude-greenfield-seeds-unselected-codex-targets	qualification-gap	false
+pipeline.claude-session-start-emits-codex-transcript-recovery-hint	source-present	false
+pipeline.claude-windows-greenfield-lifecycle-not-walkable	qualification-gap	false
+pipeline.claude-windows-guard-refuses-every-in-repo-read	prior-assessment-retained	false
+pipeline.codex-advisor-evidence-fails-after-host-update	partial-source-present-focused-and-installed-qualification-gap	false
+pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity	source-present	false
+pipeline.codex-bootstrap-in-the-typed-next-action	deferred	false
+pipeline.codex-design-readiness-child-rejects-valid-review	ordinary-policy-retired; retained-host-qualification-gap	false
+pipeline.codex-own-session-audit-export-missing	source-present; controlled-OSE22-qualified; native-gap	false
+pipeline.codex-readiness-private-receipt-omits-output-custody	retained-security-source-present; end-to-end-custody-qualification-gap	false
+pipeline.codex-wsl-required-advisor-has-no-completable-route	prior-assessment-retained	false
+pipeline.commit-grammar-hint-still-requires-scratch-message-file	prior-assessment-retained	false
+pipeline.commit-producer-path-order-failures-count-against-the-tool-cap	source-present; route-qualification-gap	false
+pipeline.completion-fd-suites-cannot-run-as-single-files	prior-assessment-retained	false
+pipeline.concurrent-session-warning-never-fires-on-native-windows	source-present; native-Windows-qualification-gap	false
+pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard	prior-assessment-retained	false
+pipeline.critic-round-cap-and-delta-scope-are-not-enforced	genuine-current-146-cap-gap; proposed-successor-not-applied	false
+pipeline.critic-scratch-name-randomness-has-no-admitted-command	source-changed-alternative; fresh-create-contract-qualification-gap	false
+pipeline.critic-scratch-notes-write-is-refused-again	static-own-directory-confinement-gap; create-append-host-gap	false
+pipeline.cross-runner-chat-intake-reference-needs-host-capture	typed-host-capture-unavailable; original-byte-fidelity-gap	false
+pipeline.declared-product-criteria-need-matching-acceptance-evidence	prior-assessment-retained	false
+pipeline.declared-system-skill-read-requires-human-override	prior-assessment-retained	false
+pipeline.denial-names-a-diagnosis-it-refuses	prior-assessment-retained	false
+pipeline.design-approval-validator-rejects-json-key-reordering	source-present; retained-request-default-validator-qualification-gap	false
+pipeline.design-bootstrap-verify-state-contradicts-deferred-contract	original-policy-vs-intentional-baseline-conflict; exact-gate-gap	false
+pipeline.design-course-run-v2-refuses-its-own-documented-routes	prior-assessment-retained	false
+pipeline.design-generator-repeats-large-source-material	summary-route-source-present; measured-current-host-budget-gap	false
+pipeline.design-package-parent-metadata-false-drift	source-present; historic-21-proof-rebinding-gap	false
+pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review	ordinary-policy-and-writer-present; exact-one-review-qualification-gap	false
+pipeline.design-trailer-verifier-lost-after-closure	verifier-route-or-removal-gap; forensic-history-not-read	false
+pipeline.design-workflow-package-omits-contract	ordinary-ceremony-retired; retained-contract-and-original-five-source-gap	false
+pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows	measured-static-Linux-prerequisite; explicit-Windows-skip-coverage-gap	false
+pipeline.desktop-app-support-is-unverified	documentation-present; native-Desktop-qualification-gap	false
+pipeline.disjoint-signed-hgo-actions-invalidate-one-another	missing-functional	false
+pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows	qualification-gap	false
+pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types	present-source-qualification-gap	false
+pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries	prior-assessment-retained	false
+pipeline.dispatch-record-ownership-binds-an-attempted-creation	missing-functional	false
+pipeline.dispatch-records-land-under-specs-evidence	qualification-gap	false
+pipeline.domain-scanner-findings-need-reproduction-before-remedy	qualification-gap	false
+pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight	prior-assessment-retained	false
+pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads	qualification-gap	false
+pipeline.every-dispatch-pays-a-bootstrap-receipt-detour	qualification-gap	false
+pipeline.evidence-artifacts-carry-no-commit-identity	present-source-qualification-gap	false
+pipeline.existing-signing-key-reuse-deadlocks-onboarding	qualification-gap	false
+pipeline.feature-branch-push-admitted-without-signature-approval	prior-assessment-retained	false
+pipeline.first-enrollment-enters-retirement-before-consent	present-source-qualification-gap	false
+pipeline.foreign-worktree-closes-the-implementation-gate	qualification-gap	false
+pipeline.forensics-and-audit-evidence-not-reconstructable	original-body-provenance-gap	false
+pipeline.gh-delivery-classifier-is-not-wired	prior-assessment-retained	false
+pipeline.git-for-windows-2-56-rejects-git-config-global-nul	qualification-gap	false
+pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog	present-source-qualification-gap	false
+pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes	qualification-gap	false
+pipeline.git-push-classifier-misses-env-s-and-editor-bang	prior-assessment-retained	false
+pipeline.git-stash-list-classified-as-working-tree-write	prior-assessment-retained	false
+pipeline.gitleaks-content-suppression-does-not-match-on-windows	present-source-qualification-gap	false
+pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one	present-source-qualification-gap	false
+pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows	present-source-qualification-gap	false
+pipeline.goldfish-budgets-omit-the-closing-ceremony	prior-assessment-retained	false
+pipeline.goldfish-bugfix-module-conflicts-with-qg-04	present-source-qualification-gap	false
+pipeline.governance-scope-rejects-readonly-host-git-control	prior-assessment-retained	false
+pipeline.greenfield-approval-policy-applies-after-intake-transition	conditional-offered-action-mismatch-policy-boundary	false
+pipeline.greenfield-comparisons-need-reproducible-public-evidence	partial-components-qualified-original-data-unavailable	false
+pipeline.greenfield-design-course-cost-and-proportionality	clause-amended-source-present-measurement-gap	false
+pipeline.greenfield-machine-output-and-skill-budget	present-output-channel-native-budget-gap	false
+pipeline.guard-override-request-digest-drifts-after-arming	present-source-qualification-gap	false
+pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target	prior-assessment-retained	false
+pipeline.guard-push-refuses-read-only-git-without-push	prior-assessment-retained	false
+pipeline.guard-push-treats-gitleaks-as-a-git-command	prior-assessment-retained	false
+pipeline.guard-suite-fails-60-tests-on-native-windows	historical-suite-qualification-gap	false
+pipeline.handover-doc-committed-without-governance-classification	consumer-chain-qualification-unknown	false
+pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier	prior-assessment-retained	false
+pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows	partial-source-original-native-identity-gap	false
+pipeline.hgo-patch-preflight-before-signature	source-chain-and-native-qualification-unknown	false
+pipeline.hgo-stale-capability-shadows-current-authorization	present-source-qualification-gap	false
+pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear	present-bounded-source-resource-proof-gap	false
+pipeline.implementation-without-dispatch-escapes-review-coverage	partial-report-only	false
+pipeline.installed-design-trailer-example-is-rejected-by-git-guard	prior-assessment-retained	false
+pipeline.kernel-closure-check-masks-violations-after-the-first	present-source-qualification-and-stamp-gap	false
+pipeline.lifecycle-coordination-commands-refused-as-implementation-writes	prior-assessment-retained	false
+pipeline.lifecycle-inspect-omits-current-plan-spec-digests	prior-assessment-retained	false
+pipeline.lifecycle-read-scope-blocks-host-declared-system-skill	prior-assessment-retained	false
+pipeline.machine-wide-key-directory-resolution	authoritatively-deferred-whole-item	false
+pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback	present-source-qualification-gap	false
+pipeline.model-family-approval-with-automatic-version-upgrades	partial-pure-selection-native-owner-gap	false
+pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows	present-source-native-proof-gap	false
+pipeline.model-role-confirmation-prompt-obscures-required-digest	present-source-qualification-gap	false
+pipeline.native-patch-rename-drops-protected-content-markers	prior-assessment-retained	false
+pipeline.no-uninstall-path-for-a-repository-that-once-opted-in	present-bounded-source-broader-proof-gap	false
+pipeline.node-v24-on-windows-creates-a-real-nul-file	historical-correction-ratchet-proof-gap	false
+pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper	present-source-qualification-gap	false
+pipeline.onboarding-home-override-does-not-bind-machine-plane	present-source-qualification-gap	false
+pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow	measurement-and-source-review-pending	false
+pipeline.onboarding-test-runner-reports-async-pass-before-settlement	present-source-final-corpus-gap	false
+pipeline.opus-critic-only-batched-for-architecture-and-security	partial-routing-source-mechanical-proof-gap	false
+pipeline.outside-root-read-label-skips-option-value-file-tokens	prior-assessment-retained	false
+pipeline.parallel-work-in-one-checkout-is-unsafe	multi-cause-current-source-and-integration-gap	false
+pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow	prior-assessment-retained	false
+pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in	present-scope-components-full-wiring-proof-gap	false
+pipeline.plan-submission-must-not-require-separate-po-approval	partial-source-governed-order-amendment	false
+pipeline.powershell-bypasses-onboarding-read-boundary	prior-assessment-retained	false
+pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable	present-source-qualification-gap	false
+pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt	present-separator-source-case-policy-qualified-separately	false
+pipeline.private-temp-root-not-secure-branch-has-no-test-seam	prior-assessment-retained	false
+pipeline.protected-baseline-rejects-canonical-discarded-idle-state	present-source-qualification-gap	false
+pipeline.push-classifier-deny-list-does-not-converge	prior-assessment-retained	false
+pipeline.push-classifier-does-not-model-powershell-backtick-escapes	prior-assessment-retained	false
+pipeline.push-classifier-misreads-backslash-escaped-quotes	prior-assessment-retained	false
+pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push	prior-assessment-retained	false
+pipeline.read-blocks-and-misleading-denial-texts-across-runners	prior-assessment-retained	false
+pipeline.read-only-guard-admits-execution-and-output-options	prior-assessment-retained	false
+pipeline.readiness-input-omits-current-advisor-observation	ordinary-clause-retired-retained-supplemental-source-gap	false
+pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap	present-source-transport-proof-gap	false
+pipeline.retirement-reader-masks-typed-unsafe-layout-inspection	present-source-qualification-gap	false
+pipeline.revised-native-design-cannot-reach-a-new-advisor-course	ordinary-course-retired-native-revision-qualification-gap	false
+pipeline.role-route-preflight-with-self-dispatch-fallback	unresolved-role-fallback-provider-gap	false
+pipeline.scratch-has-no-retention-and-no-durability-check	source-owner-and-proof-unknown	false
+pipeline.scratch-must-remain-writable-across-lifecycle-states	prior-assessment-retained	false
+pipeline.script-mediated-writes-bypass-protected-test-paths	prior-assessment-retained	false
+pipeline.security-scanner-failure-provenance	prior-assessment-retained	false
+pipeline.semgrep-console-coverage-note-has-no-test	prior-assessment-retained	false
+pipeline.semgrep-offline-default-version-check	present-qualification-binding-pending	false
+pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan	present-qualification-binding-pending	false
+pipeline.session-readiness-drops-to-partial-after-bootstrap-ready	present-cause-diagnostic-concurrency-proof-gap	false
+pipeline.shell-classifier-faults-on-heredoc-body-text	prior-assessment-retained	false
+pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement	prior-assessment-retained	false
+pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows	retained-required-reader-proof-unavailable	false
+pipeline.sign-intent-disclosure-scan-blocks-for-minutes	retained-measurement-and-reader-proof-unavailable	false
+pipeline.signature-ceremony-requires-operator-work-and-breaks	historical-focused-signer-proof-current-source-conservation-gap	false
+pipeline.signed-quality-package-route-is-not-agent-operable-on-windows	partial-component-broader-operability-gap	false
+pipeline.signing-default-test-fixture-root-escapes-the-repository	present-fixture-correction-proof-gap	false
+pipeline.signing-prompt-prints-the-whole-review-package	qualification-and-reader-chain-unknown	false
+pipeline.signing-toolchain-readiness	partial-deferred-original-active-addendum	false
+pipeline.source-agent-definition-change-locks-that-agent-until-install	partial-source-qualification-gap	false
+pipeline.three-runner-happy-path-with-two-po-approvals	required-native-acceptance-proof-gap	false
+pipeline.transfer-redaction-alters-digest-bound-files	present-component-only	false
+pipeline.typed-plugin-update-next-action	authoritatively-deferred-whole-item	false
+pipeline.unasked-advisor-export-consent-in-fresh-seed	present-declined-default-atomic-proof-gap	false
+pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason	present-source-native-proof-gap	false
+pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier	prior-assessment-retained	false
+pipeline.windows-greenfield-scratch-write-denied	required-current-command-consumer-proof-gap	false
+pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures	present-component-only	false
+pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error	present-rollback-and-driver-source-native-proof-gap	false
+pipeline.windows-pre-push-installer-fsync-and-relative-action	present-installer-source-native-durability-chain-gap	false
+pipeline.worktree-process-start-parser-misreads-spaced-comm	present-qualification-binding-pending	false
+pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake	present-selected-root-components-migration-proof-gap	false
+pipeline.design-intake-generator-omits-question-answers	source-present; P7-ten-qualified-functions-conserved; wider-authority-gap	false
+pipeline.merge-commit-message-skips-conventional-type-check	present-focused-qualification	false
+pipeline.capture-evidence-does-not-normalize-windows-npm-launch	source-present	false
+pipeline.configure-verify-output-lacks-a-walkable-commit-route	source-present; P16-qualified-seam-conserved; consumer-native-gap	false
+pipeline.project-calibration-retains-new-project-placeholder	present-source-consumer-proof-gap	false
+pipeline.project-resource-budget-headroom-is-not-reported	prior-assessment-retained	false
+pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes	prior-assessment-retained	false

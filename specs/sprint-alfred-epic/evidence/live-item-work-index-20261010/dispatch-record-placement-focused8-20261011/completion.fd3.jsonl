@@ -1,0 +1,10 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["DLP001","DLP002","DLP003","DLP004","DLP005","LDO003","LDO008","LDO010"],"caseCount":8,"caseSetSha256":"954df80bc07f2752a9a97bfa5626a5ac848028f90e726e9d8d250a6fcca82e97"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLP001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLP002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLP003","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLP004","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLP005","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO003","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO008","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LDO010","ordinal":7,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":8,"disposedCount":8,"caseIds":["DLP001","DLP002","DLP003","DLP004","DLP005","LDO003","LDO008","LDO010"],"caseSetSha256":"954df80bc07f2752a9a97bfa5626a5ac848028f90e726e9d8d250a6fcca82e97","dispositionsSha256":"869435f1e54bf0de9f7f6236e8b93bdc1c25891e876bc6dc046a1d924e5c9aef","counts":{"pass":8,"fail":0,"skip":0,"todo":0}}

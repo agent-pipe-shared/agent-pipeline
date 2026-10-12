@@ -1,0 +1,92 @@
+{
+  "currentManifestSha256": "aba63c5cac17b0f7c33557b7581d010f0e803454c45713879f9ecdf3ec8b967f",
+  "files": [
+    {
+      "canonicalPath": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+      "sha256": "007e65c57b15a4216358371289158c16b5b7491396f81907c403678e94612bc8",
+      "selected164Sha256": "007e65c57b15a4216358371289158c16b5b7491396f81907c403678e94612bc8",
+      "selectionMatch": true,
+      "physicalPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+      "scope": "bounded observed source; full acceptance not inferred"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "selected164Sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "selectionMatch": true,
+      "physicalPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "scope": "bounded observed source; full acceptance not inferred"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/git-null-device.mjs",
+      "sha256": "89be7dc2c32544c5a1a0159de3515c25fc773d9a7d112689558f9e52dd1a65eb",
+      "selected164Sha256": null,
+      "selectionMatch": null,
+      "physicalPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-null-device.mjs",
+      "scope": "bounded observed source; full acceptance not inferred"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/config/runner-mappings.json",
+      "sha256": "cbc1315e7f410f6ba6a13ac97f3c6407f5de431ce8784765efd764186f5a7963",
+      "selected164Sha256": null,
+      "selectionMatch": null,
+      "physicalPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/config/runner-mappings.json",
+      "scope": "bounded observed source; full acceptance not inferred"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "sha256": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+      "selected164Sha256": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+      "selectionMatch": true,
+      "physicalPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/governance-scope.mjs",
+      "scope": "bounded observed source; full acceptance not inferred"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+      "sha256": "4ed5c3250eef668a06a384461ded32ab5f43882603a18b4e0f141f037eb18046",
+      "selected164Sha256": null,
+      "selectionMatch": null,
+      "physicalPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+      "scope": "bounded observed source; full acceptance not inferred"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+      "selected164Sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+      "selectionMatch": true,
+      "physicalPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "scope": "bounded observed source; full acceptance not inferred"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+      "sha256": "392ffb2abc3bf68318bf85c36d95978c51d983684cc6ea5c89bf5a56418c6a00",
+      "selected164Sha256": null,
+      "selectionMatch": null,
+      "physicalPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+      "scope": "bounded observed source; full acceptance not inferred"
+    }
+  ],
+  "proofs": [
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/csr27/execution.json",
+      "sha256": "4c0d4a86f3ee73a3417c29da3d0c0a62cae9fb5da6acf21797a5ccbbce6c9452"
+    },
+    {
+      "path": "scratch/alfred-r10-toolchain-redaction-fixture-r2-20261009/postimage-suite.json",
+      "sha256": "a1f4a5d1e593f4f56f9dde8d701309841a8e571711caca933690674a447384d7"
+    }
+  ],
+  "toolchainHistorical": {
+    "exit": 0,
+    "targetSha256": "aeb99faca3653bb51c42a8a74c147d7ba0aa6c7c084e80b23870e48979956287",
+    "scope": "44 fixture correction, not actual sign-intent executable/native environment"
+  },
+  "csr27SourceCompatibility": {
+    "proofName": "CSR27",
+    "historicalProofSourceSha256": "955053b189da72353c19c0a476213b684856ef61549f152d534900d951c74610",
+    "current164SourceSha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+    "byteEquality": false,
+    "currentSourceQualificationNotEstablished": true,
+    "action": "Bind declared unchanged-function/control conservation or exact focused current-source qualification; no automatic rerun or whole-item PASS."
+  }
+}

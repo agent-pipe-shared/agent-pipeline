@@ -1,0 +1,24 @@
+{
+  "schema": "alfred.176-item-current-source-correction.v1",
+  "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+  "originalBody": {
+    "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+    "sha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8"
+  },
+  "historicalReport": {
+    "path": "scratch/alfred-176-next-reader-budget-audit-20261010/criterion-dispositions-v2.json",
+    "sha256": "7757220dcf22849576c154fffec0ac167142f1117837006186e7ef2e2173e122",
+    "inventoryGeneration": "applied146 inventory 2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381"
+  },
+  "correction": {
+    "criterion": "22.1",
+    "historicalDisposition": "missing-functional for bounded first-failing-subcheck diagnostic",
+    "currentSourceDisposition": "source-present; later current146 reconciliation identifies the helper, record/store path, and package projection as selected and hash-bound.",
+    "remainingQualification": "Existing focused proof and installed replay remain separately unbound; this correction does not claim runtime qualification or acceptance.",
+    "sourceAuditReference": "scratch/alfred-advisor-first-failing-subcheck-source-20261010/manifest.json (independent full-read report supplied by the Source auditor; no new test or product import performed here)."
+  },
+  "laterComposition": "The source164 composition inventory is a distinct generation and does not rewrite or supersede the historical146 observations in the base report.",
+  "businessExecution": false,
+  "productImport": false,
+  "gitOperations": false
+}

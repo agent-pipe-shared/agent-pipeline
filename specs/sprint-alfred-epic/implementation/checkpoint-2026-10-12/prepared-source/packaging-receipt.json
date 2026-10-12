@@ -1,0 +1,57 @@
+{
+  "schema": "alfred.portable-source-packaging-receipt.v1",
+  "status": "PREPARED ONLY",
+  "count": 48,
+  "assembly41Conserved": true,
+  "critic7Conserved": true,
+  "custodyReused": 38,
+  "byteExactCopies": 48,
+  "modesMatched": 48,
+  "containedSingleLinkCopies": 48,
+  "currentSourceCASMatched": 43,
+  "newSourceParentsAbsent": 4,
+  "mainHistoricalPhysicalHold": 1,
+  "manifest": {
+    "path": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/manifest.json",
+    "sha256": "85146beab4370ddd9a9e1b4739c53eed830cdb6e40f639d326fc2943d5b62289"
+  },
+  "restorePlan": {
+    "path": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/restore-plan.md",
+    "sha256": "73cc1401a7aee7d27e3762bc350371305aef0ab3ecf48e5e733be35ac9dee321"
+  },
+  "gitCheckIgnore": {
+    "path": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source",
+    "exitCode": 1,
+    "stdout": "",
+    "meaning": "checkpoint directory is not ignored",
+    "finiteMemberCheck": {
+      "members": 51,
+      "status": "INTERRUPTED",
+      "exitCode": 130,
+      "stdout": "",
+      "meaning": "Child git check-ignore --stdin returned no output before interruption; no successful per-file ignore claim and no retry. Root owns final tracked membership/local commit."
+    }
+  },
+  "administrativeFailures": [
+    {
+      "action": "initial finite collector",
+      "failure": "template prompt outside preliminary prefix allowlist",
+      "resolution": "Exact frozen V7 templates/prompts/goldfish-task.md added; no Source writes occurred before corrected pass"
+    },
+    {
+      "action": "initial redacted static classification diagnostic",
+      "failure": "JavaScript closing-parenthesis syntax error before reading",
+      "resolution": "corrected standalone administrative classifier produced only path/line/structural booleans"
+    }
+  ],
+  "secretInspection": {
+    "actualPrivateKeyBodiesFound": 0,
+    "publicSanitizerPatternMembers": 3,
+    "rawMatchesPrinted": false,
+    "keyStoresRead": false
+  },
+  "sourceApplied": false,
+  "testsRun": 0,
+  "reviewsRun": 0,
+  "pushed": false
+}

@@ -1,0 +1,135 @@
+{
+  "schema": "alfred.local-stamp14-sanitized-method-receipt.v1",
+  "status": "qualified-controlled-method",
+  "originExecutionSha256": "0bb71386175e5f258fc8441b0ebd968dc8fdc4e38068ab1e673bc880622feb37",
+  "actualCounts": {
+    "pass": 14,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "child": {
+    "status": 0,
+    "signal": null,
+    "timedOut": false,
+    "spawnError": null
+  },
+  "semanticChildCount": 1,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "a0bfbea2d3b69fb59bdb45e2db9c7c14dec335a179a1807e636d1a4157939992",
+    "caseSetSha256": "870990007d1ebe707a5cd214087c98256743422beabb40b33ea5f46854d2453a",
+    "dispositionsSha256": "11e11996664b10d7f0b553462620d41dcb8381bb32368a584180dbf6754475bb",
+    "declaredCount": 14,
+    "disposedCount": 14,
+    "counts": {
+      "pass": 14,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "sourceAndFixtureConserved": true,
+  "conservedResourceCount": 22,
+  "source": {
+    "helperSha256": "b6f02c79d4d6314fa91ae721d2f0730d889989760ae45a95e70f1ca6a5b08165",
+    "sourceManifestSha256": "7f3002ac21bf7337513461c8ab37d930417fbb3f5e1a7b97e7fd04d8f4cb3507"
+  },
+  "assertions": {
+    "testSha256": "2f60fc77959b21ca436035dab672884cb9f47dab12ff07f5d762593fcfcf7cc8",
+    "originalTestSha256": "4d047a8339dd7e6a3f80a514018685eb50d00a1e12447731b5089fca385fcf66",
+    "original14CallbacksByteExact": true,
+    "caseVectorsSha256": "8cdc4056b5d6811f40c3ecd858d3957fbbd294947678a30e4e7ef573349bb921"
+  },
+  "norm": {
+    "manifestSha256": "6a122ded901071f480241c7d3a351513fec9d53c60867e7ceb9bf8aefd19cbc1",
+    "contractSha256": "c41d28c0a8dc621109333cc4cea4dc1cae22a9106d7ee15f04dca517b531b1b5",
+    "schemaSha256": "03c4346423b4d29adfc55ed208dc0eda51a5988fdfb22422faf133540b50a0d1"
+  },
+  "captures": {
+    "stdoutSha256": "b1d02da63601f893ce9a0dd94a05425ef9b77e4735a2bfe7e2d4c3b088bc3cd8",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fd3Sha256": "52a0eadea4aa2146d7cb4f98a1834b6828f60756a59600e2b25fc90d947df417"
+  },
+  "cases": [
+    {
+      "id": "LSP001",
+      "name": "three exact runner proposals bind actual commit/tree and preserve inputs",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP002",
+      "name": "only top-level version token changes including CRLF Unicode nested fields",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP003",
+      "name": "current prior runner stamps are replaced without historical literals",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP004",
+      "name": "wrong full commit/tree and blob-as-commit selectors refuse",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP005",
+      "name": "CURRENT VERSION malformed drift and byte bounds refuse",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP006",
+      "name": "one canonical UTC leap instant allowed malformed instants refused",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP007",
+      "name": "malformed duplicate escaped keys foreign versions and invalid bytes refuse",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP008",
+      "name": "non-version functional field divergence from committed blob refuses",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP009",
+      "name": "known public hardlinks allowed while ancestry aliases and permissions refuse",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP010",
+      "name": "real alias write and link-count drift refuse through held descriptor CAS",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP011",
+      "name": "output collision outside selection and physical partial failure are truthful",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP012",
+      "name": "actual repository permission failure is bounded without inherited policy suppression",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP013",
+      "name": "successful plan grants no protected application review signature install or readiness",
+      "disposition": "pass"
+    },
+    {
+      "id": "LSP014",
+      "name": "ignored unrelated scratch is neither exported nor a global clean-tree prerequisite",
+      "disposition": "pass"
+    }
+  ],
+  "assurance": "controlled-genuine-Git-preparation-method-only",
+  "nativeAssurance": false,
+  "actualProductionStamp": false,
+  "actualReviewOrVerify": false,
+  "candidateReadiness": false,
+  "itemAcceptance": false,
+  "wholeCandidateQualification": false,
+  "protectedProductionWrites": 0
+}

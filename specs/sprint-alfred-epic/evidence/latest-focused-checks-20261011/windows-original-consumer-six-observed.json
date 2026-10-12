@@ -1,0 +1,172 @@
+{
+  "schema": "alfred.public.native-windows-original-consumer-six.observation.v1",
+  "status": "complete-native-observation-with-failure",
+  "qualified": false,
+  "rawReceiptSha256": "e55351923a23c11fc4e3042a8bbd753aef35816d6b5287d349b6559fac0e9ccd",
+  "rawReceiptBytes": 14121,
+  "privateForensicsRetained": true,
+  "caseIds": [
+    "MFH001",
+    "MFH002",
+    "MFH003",
+    "MFH004",
+    "MFH005",
+    "TEMP-SEAM-T"
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "4ce151d3638c393d4091ef7f34297225829b3c387802fd861d4a12a1037183b1",
+    "caseSetSha256": "c263b51af5ae237b49f03a2ed61d668b1a18cbec13e6e3cef58bb17e41ad5607",
+    "dispositionsSha256": "b9e860e557fef6aa2422db810035da4633c1e9a25832026467b3d7483451ae78",
+    "declaredCount": 6,
+    "disposedCount": 6,
+    "counts": {
+      "pass": 5,
+      "fail": 1,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "63d8979792efa7eb25270d649a9e33209a3ce7c2f39b6c901118d6c35b3828a4",
+  "completionBytes": 1300,
+  "outcomes": [
+    {
+      "id": "MFH001",
+      "disposition": "pass",
+      "source": "original-MFH-FD3"
+    },
+    {
+      "id": "MFH002",
+      "disposition": "fail",
+      "source": "original-MFH-FD3"
+    },
+    {
+      "id": "MFH003",
+      "disposition": "pass",
+      "source": "original-MFH-FD3"
+    },
+    {
+      "id": "MFH004",
+      "disposition": "pass",
+      "source": "original-MFH-FD3"
+    },
+    {
+      "id": "MFH005",
+      "disposition": "pass",
+      "source": "original-MFH-FD3"
+    },
+    {
+      "id": "TEMP-SEAM-T",
+      "disposition": "pass",
+      "source": "original-native-Node-test-TAP"
+    }
+  ],
+  "failure": {
+    "caseId": "MFH002",
+    "disposition": "fail",
+    "category": "STATE-UNCERTAIN",
+    "observedAssertionMessage": "MODEL-FAMILY-STATE-UNCERTAIN",
+    "rootCauseEstablishedByThisRecord": false
+  },
+  "invocation": {
+    "executor": "Root",
+    "runtime": "actual native Windows PowerShell and Node",
+    "readySha256": "6dcea937a4540af78ef8fc1f5f7319ab1bf88d395461275b8bb79906efd3daef",
+    "bindingSha256": "4fe3a16fb7e3c496968b0cdf6f67bfe217dbdf704aba4899a7fcae5b5975ea3b",
+    "launcherSha256": "0526e3f4aa31ee4b63d7c5793c861a6f9b21ee9c7c4ee0ed467d309b9a992d70"
+  },
+  "sourceInventorySha256": "935a78866275d0c55396d4d74c2f39cc187e93f4a7d477860eb3edc8a9b13f42",
+  "sourceFiles": 303,
+  "selectedRelevantSources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "sha256": "cbbff713e8aa32f74a80fed17f0a2861cf0bce1ef6e94f135906c7b74f04d3a1",
+      "bytes": 90985
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+      "sha256": "a4421692e9a835dc2ce8b4b394adf832a6522b1a1df48117b198f3dd6e197699",
+      "bytes": 13184
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-runtime-host.test.mjs",
+      "sha256": "10602c9bfd729db936bea08b933edef886c32daf9b2295e39871db6ac9d8d89c",
+      "bytes": 11050
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/test-case-completion.mjs",
+      "sha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "bytes": 10816
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+      "sha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+      "bytes": 5517
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+      "sha256": "3e9922b327791479ab4c61fab22589b48708877d561e1909298f0379ff597be7",
+      "bytes": 7490
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-owned-authority-native.ps1",
+      "sha256": "66865ee9c17f83cd1fe9bb68f9acd593e06b8064257f1b10b84c224e9cd4d720",
+      "bytes": 18539
+    }
+  ],
+  "sourceManifests": {
+    "storeSha256": "8f52121cd6047c00f6ddd85e68dfa40d29809548e5eb51c08dbd3376737697c4",
+    "fixtureSha256": "9ea5a83143856d96b5278075e0f62915d34fc15c3c4f1c65d38d988898c1217a"
+  },
+  "observed": {
+    "harnessChildStatus": 0,
+    "nativeCourseChildStatus": 1,
+    "originalModelChildStatus": 1,
+    "originalTempChildStatus": 0,
+    "readerStatus": 0,
+    "readerSettled": true,
+    "jobSettled": true,
+    "readbackVerified": true,
+    "inputsConserved": true,
+    "sourceConserved": true,
+    "toolsConserved": true,
+    "timedOut": false,
+    "originalAssertionsUnchanged": true,
+    "originalNativeFlagsUnchanged": true
+  },
+  "originalModelCompletion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "9ce4ab0b9df115b9a8ffcec39bb2bdf56ce59a040bda06afc31376bd96529cf7",
+    "caseSetSha256": "ec80cdf605c828866cebf34d9d8ad451786d93cd0479978510e4ebff03e61a04",
+    "dispositionsSha256": "48c5f81e0bb8657e8718f34782d9f9bd4519f13dbc0bcb15a20b7cab1e07abc8",
+    "declaredCount": 5,
+    "disposedCount": 5,
+    "counts": {
+      "pass": 4,
+      "fail": 1,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionProvenance": "MFH001-005 dispositions come from actual original model FD3; TEMP-SEAM-T comes from actual original native Node test TAP; six-case FD3 transport preserves all dispositions.",
+  "scope": {
+    "genuineDefaultInactiveCase": "MFH005",
+    "activeCaseAssuranceAsRecorded": "MFH002 raw physical marker and injected trustedSources unit; no Source-owned active authority claim",
+    "modelStoreWholeModuleQualified": false,
+    "activeAuthorityCourseQualified": false,
+    "nativeDabQualified": false,
+    "nativeInstallerQualified": false,
+    "productionReadinessGranted": false,
+    "MainOrC0IntegrationClaimed": false,
+    "wholeItemClosed": false,
+    "allSixPassed": false
+  },
+  "limits": [
+    "MFH002 failed; the native six-case course is not qualified.",
+    "Five passing dispositions do not qualify every model-store producer or the whole Windows platform.",
+    "Physical observations and preparation do not issue active model authority or a READY/Human grant.",
+    "Historical failures, private native fixture and logs are retained; this projection contains no host paths, account identifiers, keys or raw logs."
+  ]
+}

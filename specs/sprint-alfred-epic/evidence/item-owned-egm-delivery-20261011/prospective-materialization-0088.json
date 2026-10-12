@@ -1,0 +1,44 @@
+{
+  "schema": "pipeline.architecture-prospective-materialization.v1",
+  "decisions": [
+    {
+      "id": "0088-item-owned-egm-retained-quality-gates",
+      "proposedMarkdown": {
+        "path": "docs/adr/draft-item-owned-egm-retained-quality-gates.md",
+        "sha256": "385f657e2e33f7c71a8b4f5179e87184557b0e862445a647184de2a9e047e71f"
+      },
+      "proposedSidecar": {
+        "path": "docs/adr/draft-item-owned-egm-retained-quality-gates.json",
+        "sha256": "adc2d840b5f50befc8221655f341f6285a7d9f24e089e099c92c7d889065b8d9"
+      },
+      "chatSelection": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prospective-chat-selection.json",
+        "sha256": "7e9fa154d35efe219e8370e67b544bbaa61702706d7c09f3ebd9495f94f93c5b"
+      },
+      "predecessor": {
+        "markdown": {
+          "path": "docs/adr/0005-quality-gates-dod.md",
+          "sha256": "827a5128a0d6ac49a2b66bb40528b41bd89617edbb020970779ab3e1897d75ac"
+        },
+        "sidecar": {
+          "path": "docs/adr/0005-quality-gates-dod.json",
+          "sha256": "f07ab678e83fe1009bb2fe2ca694afef32d7e63137c5d1885cde1ae1b6b4a434"
+        }
+      },
+      "outputs": {
+        "markdown": {
+          "path": "docs/adr/0088-item-owned-egm-retained-quality-gates.md",
+          "sha256": "ebab63e6b8ea838e532bb7c97a98ab7e3b0d64afeeab5bfcdfe5c662e6e79791"
+        },
+        "sidecar": {
+          "path": "docs/adr/0088-item-owned-egm-retained-quality-gates.json",
+          "sha256": "b7aa023da57dcab58ab5b4528965808949a60c957dfcb1f367b92b525649c46b"
+        },
+        "chatSelection": {
+          "path": "project/architecture-chat-selections/0088-item-owned-egm-retained-quality-gates.json",
+          "sha256": "4e0e9cec867c484aa4c4b5b698082dcb86e593c502e539e975b019d2d291e13c"
+        }
+      }
+    }
+  ]
+}

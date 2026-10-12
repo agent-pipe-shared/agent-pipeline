@@ -1,0 +1,61 @@
+{
+  "schema": "alfred.work-status-publication-plan.v1",
+  "rows": [
+    {
+      "canonicalPath": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/work-status-20261010/item-status.json",
+      "postimage": {
+        "path": "postimages/specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/work-status-20261010/item-status.json",
+        "sha256": "6233384f8c48c8cd8f95583c432aa69a51a4f541859a1134ab3cfc0d6b5af56c",
+        "bytes": 713282,
+        "mode": 420
+      },
+      "expectedMainPreSha256": null,
+      "expectedAuditPreSha256": null
+    },
+    {
+      "canonicalPath": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/work-status-20261010/items.md",
+      "postimage": {
+        "path": "postimages/specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/work-status-20261010/items.md",
+        "sha256": "672c54fb6c21789c6786e6a5aeda203d07e9887a42a8d2e1abe861b3df7e9cbe",
+        "bytes": 84641,
+        "mode": 420
+      },
+      "expectedMainPreSha256": null,
+      "expectedAuditPreSha256": null
+    },
+    {
+      "canonicalPath": "specs/sprint-alfred-epic/WORK-STATUS.md",
+      "postimage": {
+        "path": "postimages/specs/sprint-alfred-epic/WORK-STATUS.md",
+        "sha256": "f315a5056f6f22e9bb3f7f000af4c02828a752b6bf3ac10ae14670c2485f18dd",
+        "bytes": 3015,
+        "mode": 420
+      },
+      "expectedMainPreSha256": null,
+      "expectedAuditPreSha256": null
+    },
+    {
+      "canonicalPath": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/work-status-20261010/slots.json",
+      "postimage": {
+        "path": "postimages/specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/work-status-20261010/slots.json",
+        "sha256": "5f8b3215b6bd1e072def356dc85bfeaa05a992f13418039da47d0c35d81cdb4e",
+        "bytes": 5707,
+        "mode": 420
+      },
+      "expectedMainPreSha256": null,
+      "expectedAuditPreSha256": null
+    }
+  ],
+  "archiveDestination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/work-status-publication146-20261010",
+  "auditRelativeRoot": "scratch/alfred-greenfield-agy-audit-20261009",
+  "sourceInventoryGuard": {
+    "path": "scratch/alfred-agy-managed-topology-row-boundary-successor-20261010/actual-source-manifest.json",
+    "sha256": "2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381"
+  },
+  "noOverwrite": true,
+  "publicProvenanceFiles": [
+    "publication-plan.json",
+    "manifest.json",
+    "report.md"
+  ]
+}

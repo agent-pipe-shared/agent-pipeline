@@ -1,0 +1,5 @@
+Five original CMOL001/003/004/005/006 callbacks are actually method-qualified: complete production FD3, five PASS, no skip/todo or parser/operation/conservation/spawn/signal error, and all2169 source files conserved.
+
+The first run had Node stdout five PASS but no FD3 and remains unqualified. A before-post constructor norm allowed only announcing the allocated descriptor3 and separating successor outputs; the actual correction run now emits genuine recorder dispositions. No assertions or product sources were changed, and original CMO001 was not repeated.
+
+This proves the five mapped singleton/layout/refusal/replay controls against standalone Source9 e5f/fc9/411/99 with the exact packaged interruption policy Source5. The latest cumulative AFK/State/onboarding caller tuple is a separate generation and is not qualified by this receipt. CMOL002 real legacy twins and other subvariants remain held. Native/Human approval, full State/I08, whole Verify, integration and official closure are not inferred.

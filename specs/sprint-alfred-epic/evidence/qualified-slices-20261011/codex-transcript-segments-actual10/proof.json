@@ -1,0 +1,73 @@
+{
+  "schema": "alfred.codex-transcript-segments.actual-proof.v1",
+  "requirementId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+  "method": "Root direct Node import of actual Source graph and unchanged controlled ten-case module",
+  "caseIds": [
+    "CSR001",
+    "CSR002",
+    "CSR003",
+    "CSR004",
+    "CSR005",
+    "CSR006",
+    "CSR007",
+    "CSR008",
+    "CSR009",
+    "CSR010"
+  ],
+  "counts": {
+    "pass": 10,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "execution": {
+    "path": "scratch/alfred-item-closure-group03-current-source-assessment-20261011/controlled-segment-tests/import-diagnosis/execution.json",
+    "sha256": "aaa56c726c7ee3bdc6d7adcfb10e9a6b0e41960a2b5580ca4bd438718e7137bd",
+    "childStatus": 0,
+    "signal": null,
+    "error": null,
+    "sourceConserved": true,
+    "stdoutSha256": "d15ea1f7e8793e98864a2010eb6823c2d7571b5a86d40626cf5902437cfffe9e",
+    "stderrSha256": "d47adfb398485c7dd601691cc9fcd11873821c8f89153adb2127c9c32ff25992"
+  },
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+    "parentSha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+    "postSha256": "30a07617ec8a07f19db157393f7635457618fe3ed02b0fe077ad98eee970e2e1",
+    "testSha256": "38ef29151cb4c47301681045a23a2188312ca7bd350f9a85ba65a7a69a53f78b",
+    "graphManifestSha256": "2c06e741ffdd43aeea369736d5a783bab1cf76da6801105b8f168cb15b6adf9b"
+  },
+  "integration": {
+    "receiptPath": "scratch/alfred-item-closure-group03-current-source-assessment-20261011/integration-preparation/actual-receipt.json",
+    "receiptSha256": "1671414e63406213645f80bce632c793daec8c630181eb027db8aea5d8cea72f",
+    "status": "applied-byte-exact",
+    "sourceReadback": true,
+    "newInode": true
+  },
+  "history": [
+    {
+      "RootToolChunk": "d99287",
+      "route": "node --test original1a06",
+      "reportedTests": 1,
+      "tenCallbackEvidence": false
+    },
+    {
+      "RootToolChunk": "8e2b48",
+      "route": "node --test standalone38ef",
+      "reportedTests": 1,
+      "tenCallbackEvidence": false
+    }
+  ],
+  "assurance": "Source-author controlled synthetic filesystem tests; no independent Critic/native-host assurance",
+  "remaining": [
+    "Claude/Agy genuine adapter/schema/consent contracts",
+    "Child-session linkage and complete turn/usage projection",
+    "Live concurrent membership/byte interleavings",
+    "Unresolved node --test child file-only behavior",
+    "Full-candidate official Verify and item acceptance"
+  ],
+  "nativeClaims": false,
+  "wholeItemAcceptance": false,
+  "stagePromotion": false,
+  "rawPrivateExports": false
+}

@@ -1,0 +1,70 @@
+{
+  "schema": "alfred.powershell-corrected-four.focused-proof.v1",
+  "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+  "actual": {
+    "execution": {
+      "path": "scratch/alfred-powershell-coherent-four-qualification-20261011/execution.json",
+      "sha256": "4eee059d4c3ef455146c10843c7bcdf87f7ccd0ecabfd934ae741f6a5e39d3d1"
+    },
+    "child": {
+      "status": 0,
+      "signal": null,
+      "errorCode": null
+    },
+    "completion": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "9c866fbbcf64b047fb82258ac3cb463e8b4952b050c0df6753c909bd37e9d4bb",
+      "caseSetSha256": "09cc1366ded0694b55ae518bed22c4cce2c45498740b5703af62164e7d2fad24",
+      "dispositionsSha256": "9c2d0ef8a817fe78b02086ff70f429fc69f229a6cad9ab75d7d3ddb0575a2c92",
+      "declaredCount": 4,
+      "disposedCount": 4,
+      "counts": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    },
+    "cases": [
+      {
+        "id": "PSBC001",
+        "disposition": "pass"
+      },
+      {
+        "id": "PSBC002",
+        "disposition": "pass"
+      },
+      {
+        "id": "PSBC003",
+        "disposition": "pass"
+      },
+      {
+        "id": "PSBC004",
+        "disposition": "pass"
+      }
+    ],
+    "fd3": {
+      "sha256": "cdeeeb584b2a7dedc6522f7372a5036d8a57fc8bdad225a0c8a4808c4aeb408b",
+      "bytes": 1037
+    },
+    "stderrEmpty": true,
+    "sourceConserved": true,
+    "sourceRestored": true,
+    "temporaryAssetsRemoved": 12,
+    "originalResources": 518,
+    "resourcesDuringChild": 530,
+    "sourceOverlay": false
+  },
+  "selectedSource": {
+    "policySha256": "aec789df087f685e231cfc9517ae21b1ed635d425a5183fbab0181452c7d361f",
+    "grammarSha256": "26b4235c90c7c658a7fcf7aec38c930fd2e25d5a33876e597f6f5bc091319267",
+    "stateSha256": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9"
+  },
+  "originalNineReplayed": false,
+  "originalFivePassingReplayed": false,
+  "sourceChanges": 0,
+  "nativeWindowsClaim": false,
+  "wholeItemAcceptance": false,
+  "formalStagePromotion": false
+}

@@ -1,0 +1,230 @@
+{
+  "schema": "alfred.reader-2plus1-public-focused-method-receipt.v1",
+  "originReceiptSha256": "8752a6148cc615949519feea9a1458c8c0fca4f9abde1566e14a326326afecee",
+  "status": "focused-method-qualified",
+  "actualCounts": {
+    "pass": 13,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "semanticChildCount": 3,
+  "sourceCount": 383,
+  "sourceAndFixtureConserved": true,
+  "assurance": "controlled-method-unit-not-review-consumption",
+  "actualReaderReview": false,
+  "actualReaderConsumedCourse": false,
+  "nativeAssurance": false,
+  "wholeItemAcceptance": false,
+  "readerTuple": [
+    {
+      "canonicalPath": "plugins/pipeline-core/skills/reader-review/SKILL.md",
+      "sha256": "314e137abe661db2d7ac09f8552daff01aba4c9d7fc7343f8274362e3e48aa6f"
+    },
+    {
+      "canonicalPath": "harness/reader-review-protocol.md",
+      "sha256": "3e1217a3ab7994a2fa9ac2986e61a803f1a3fbeba21f6c25f41bd7ad1a6057d0"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/reader-inputs/reader-review-protocol.md",
+      "sha256": "3e1217a3ab7994a2fa9ac2986e61a803f1a3fbeba21f6c25f41bd7ad1a6057d0"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/reader-inputs/manifest.json",
+      "sha256": "1039fe3be4dc6351d3c5a9f6b07ade1f1852432e8d11d66ef1c0cdef4165ab78"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/doc-reader-course.mjs",
+      "sha256": "af57753157b6da6d223de085096d3132f7b64bf47f6b92a2ee30ab7f257eff53"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/doc-reader-course.mjs",
+      "sha256": "a8a43a799a7f4aeb92bde83d9b8078bcdde2b5bc272f97578d71366e2955161f"
+    },
+    {
+      "canonicalPath": "harness/scripts/check-doc-reader-binding.mjs",
+      "sha256": "9108b0f70264a8e00f0495f9adce95dfe191ee19e7423589f651fb832c084a0b"
+    },
+    {
+      "canonicalPath": "harness/scripts/doc-reader-terminal-binding.mjs",
+      "sha256": "5f9aa17c130d1c2c942e27dcb866dd8a47dc045c9002752f719d8c1aa098ad94"
+    }
+  ],
+  "suites": [
+    {
+      "suite": "runtime",
+      "caseAssociations": [
+        {
+          "id": "R2P001",
+          "name": "physical consumed failure survives restart and refuses a relabeled same-scope course"
+        },
+        {
+          "id": "RBC005",
+          "name": "durable B restart resumes original confirmed handle"
+        },
+        {
+          "id": "RBC007",
+          "name": "executed failure permanently consumes stage and refuses replacement pair"
+        },
+        {
+          "id": "RBC016",
+          "name": "missing or late third reason and corrections-only third refuse"
+        },
+        {
+          "id": "RBC017",
+          "name": "fourth pair or batch cannot reset using another course ID"
+        },
+        {
+          "id": "RBC018",
+          "name": "multiple correction commits append within one batch and preserve findings"
+        }
+      ],
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "b653b4f20808c2cf8ca7b1d01cd8fc2c127f43b87e5fa42981749bd3b49b00d5",
+        "caseSetSha256": "c435ddd5afd220d6782dad34216b63271dd050bf493ea068aa728ee1a2bb9a8d",
+        "dispositionsSha256": "bb5e2ea96df254ef5f4a9f594aee8455db96b7cf10a7d7de2e3cd926dde3bdd4",
+        "declaredCount": 6,
+        "disposedCount": 6,
+        "counts": {
+          "pass": 6,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "child": {
+        "status": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null
+      },
+      "FD3": {
+        "path": "runtime.completion.fd3.jsonl",
+        "sha256": "0f2a99748d47424688e8f265aa0bb435bce5bb00f8764d9831d1922f854b3b77"
+      },
+      "policy": {
+        "path": "runtime.policy.json",
+        "sha256": "8de24957bc36bd7d2e401cc6c0a318f769c4220aa4221cd5b60f609672e6ac9e"
+      }
+    },
+    {
+      "suite": "v2",
+      "caseAssociations": [
+        {
+          "id": "RC02C001",
+          "name": "two paired rounds close after final correction without a third reader"
+        },
+        {
+          "id": "RC02C002",
+          "name": "third complete paired round closes with digest-bound prelaunch escalation"
+        },
+        {
+          "id": "RC02C006",
+          "name": "third round without justification cannot close"
+        },
+        {
+          "id": "RC02C007",
+          "name": "justification first published after third reviewed state cannot close"
+        },
+        {
+          "id": "RC02C009",
+          "name": "four paired rounds are forbidden by the v2 record"
+        },
+        {
+          "id": "RC02C011",
+          "name": "round IDs and course ID relabeling cannot erase historical evidence"
+        }
+      ],
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "af8f56d9e7fe7f482921c325a62bfac1d7ef8106a3d6e3aa1d4ec72ffdf94252",
+        "caseSetSha256": "4f10e39cf28e2766847ca863fc3704f9c69e415fe8d068a0b2a09dce9225562a",
+        "dispositionsSha256": "7736600e83278c7feec7dbdde56613e4dd774ea144c8c44b52db41b0d1a6be76",
+        "declaredCount": 6,
+        "disposedCount": 6,
+        "counts": {
+          "pass": 6,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "child": {
+        "status": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null
+      },
+      "FD3": {
+        "path": "v2.completion.fd3.jsonl",
+        "sha256": "e606d5a296885f878fafddbfe985b7b292089bfb4c7c4e95a11b24c8b5d83bd9"
+      },
+      "policy": {
+        "path": "v2.policy.json",
+        "sha256": "362d406852922b2045732abc66a93ac0bc8aacf8a4a1af19e55c5af7cae298cb"
+      }
+    },
+    {
+      "suite": "v1",
+      "caseAssociations": [
+        {
+          "id": "RC01C001",
+          "name": "four real committed fixture rounds close after terminal correction without fifth reader"
+        }
+      ],
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "05cbfe523c9e7d4de45fc04048e1f503ce3ced59ecee5c0f0acd3084bc037613",
+        "caseSetSha256": "0b62a4636f9ca27d45154f214918112094067c3d3bc26f17eedbe69fa6f85689",
+        "dispositionsSha256": "9726c273cce6998b90e1d7bf3756e3dee979f61314a2de172b9b97648d27abd7",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "child": {
+        "status": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null
+      },
+      "FD3": {
+        "path": "v1.completion.fd3.jsonl",
+        "sha256": "1f9229f856d296424cf9134447df4a1c0f28d18c1a07bf5d63b34d70f6da7f1c"
+      },
+      "policy": {
+        "path": "v1.policy.json",
+        "sha256": "a6a41543c92c7dcd40bcfc5febbb816327009acb503b12bac82b1db8b97bd2d7"
+      }
+    }
+  ],
+  "correctedIdMapping": [
+    {
+      "id": "RBC015",
+      "name": "justified complete third pair after second closed batch is available"
+    },
+    {
+      "id": "RBC016",
+      "name": "missing or late third reason and corrections-only third refuse"
+    },
+    {
+      "id": "RBC017",
+      "name": "fourth pair or batch cannot reset using another course ID"
+    },
+    {
+      "id": "RBC018",
+      "name": "multiple correction commits append within one batch and preserve findings"
+    }
+  ],
+  "standalonePositiveRBC015Executed": false,
+  "supplementQualificationPending": true,
+  "scopeNote": "Actual13 preserved. Historical v1 is compatibility only; synthetic METHOD results grant no native or actual Reader evidence. RBC017 admitted its third pair during fourth-refusal setup; standalone RBC015 remains a separate pending supplement."
+}

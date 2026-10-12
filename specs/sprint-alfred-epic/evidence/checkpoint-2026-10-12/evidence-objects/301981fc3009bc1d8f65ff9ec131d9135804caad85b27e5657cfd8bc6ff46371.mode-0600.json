@@ -1,0 +1,156 @@
+{
+  "schema": "alfred.wel12-expectation-successor-preparation-manifest.v1",
+  "status": "prepared-awaiting-root-reviewed-second-qualification",
+  "artifacts": [
+    {
+      "path": "cases.mjs",
+      "sha256": "136f1ef0e5b3b1f2837417361d6275e0d905c8fb74d9d57557f48a318fc1e543",
+      "bytes": 14099,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "argv-child.mjs",
+      "sha256": "7f0ccd07819b350954d33569e985db3b445cb3dbf643221643aec601abebcd5b",
+      "bytes": 912,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "run.mjs",
+      "sha256": "d530ed3179d268c50175ee76627e2c01c2791635a64617eabb4336f0743ab112",
+      "bytes": 640,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "completion-policy.json",
+      "sha256": "2ecf74d6ad8529b10c6733b7e2994fa45d360b6b0b6ebf9a612b9bfa3d9dbab1",
+      "bytes": 192,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "launch-once.mjs",
+      "sha256": "80f17516b2ad9b43e754798d8dd545ecdd5c683e481281f9c016cbd8702f400f",
+      "bytes": 4247,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "prepare-successor.mjs",
+      "sha256": "5a984be28d72d0bb85b3989cece4cd42a5fa35c7173ab39e798709dc76d64757",
+      "bytes": 5349,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "freeze-successor.mjs",
+      "sha256": "74243514068c5c8e8ab8a5d054d59f84608b48e42b370d56868942e730f4bec2",
+      "bytes": 4147,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "assertion-splices.json",
+      "sha256": "7de42f8a3d81adeb928cfa9d5276b5c0f49beaa4037cde3238cd3f873f93f7c2",
+      "bytes": 2631,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "assertions-freeze.json",
+      "sha256": "a5839e04572abddd0ed07779feb93df3d138ff9a43727adc164b7bd17c73442b",
+      "bytes": 2332,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "graph-manifest.json",
+      "sha256": "e52f20d098d17a8572f0029ee57da180a49b3852edec3647defceb8016f48736",
+      "bytes": 1957,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "report.md",
+      "sha256": "53dd670d3ddce13773dd062ca8ba4925597867f1f2cd854511e65801e05c6f74",
+      "bytes": 2510,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "../cases.mjs",
+      "sha256": "4abab416aabbc90d898f9a8babe8f678e3a79b3aac5dab7c9f1b8cdec36e59a6",
+      "bytes": 13949,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "../assertions-freeze.json",
+      "sha256": "4158b8b93d95d83c4f7436423579cf52c651a50ee72a309419f381f170adf116",
+      "bytes": 3239,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "../execution-freeze.json",
+      "sha256": "09418a9a195a728078b1a9c5857422b8d2af99e3d041c6ccfa2b1eb4991c9860",
+      "bytes": 4133,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "../preparation-manifest.json",
+      "sha256": "0b51b4ea414c5e1053b4378be8517e37aa8821ff88db76497d47730d538dade4",
+      "bytes": 2460,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "../execution-terminal.json",
+      "sha256": "aab80ee2ac8ba7a461d869b7116a3b391821ba0cad73d4889a0966b84902e96e",
+      "bytes": 729,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "../execution-reservation.json",
+      "sha256": "ce5c6ba66bec2a14a4f901dba8c36a40b10fc5feea5fbe672d12e99113323672",
+      "bytes": 97,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "../qualification-output/stdout.txt",
+      "sha256": "922887ab6d862fec73e28470cbee7b678c17f6ae2a7b147aa3b8f18bc66b2aa0",
+      "bytes": 108,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "../qualification-output/stderr.txt",
+      "sha256": "f0997a4ad29eeb63c4a8238522392edf5647673c137ed1ffa84a17c0b75e5173",
+      "bytes": 597,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "../qualification-output/completion.ndjson",
+      "sha256": "2dc55e6a5ee04eacca8f56e3606d9a38588889428dc30184f800ec0a4bce7fc7",
+      "bytes": 2070,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "execution-freeze.json",
+      "sha256": "24be79b601df5381c495ef2e470d81485fe94f3adbc70ec131128b8fa2ddda58"
+    }
+  ],
+  "sourceSha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+  "graphManifestSha256": "e52f20d098d17a8572f0029ee57da180a49b3852edec3647defceb8016f48736",
+  "patchSha256": "7de42f8a3d81adeb928cfa9d5276b5c0f49beaa4037cde3238cd3f873f93f7c2",
+  "assertionsSha256": "136f1ef0e5b3b1f2837417361d6275e0d905c8fb74d9d57557f48a318fc1e543",
+  "semanticRuns": 0,
+  "nativeRuns": 0
+}

@@ -1,0 +1,52 @@
+{
+  "schema": "alfred.dispatch-placement.actual-qualification.v1",
+  "manifestSha256": "212ef1bf19f4711e48a1e1954beb7ac15a816f398d2a49684e1e195920231ffc",
+  "graphSha256": "be9016af244cb0aea22ca52658d53587cfcce621fc828c00eda10b8355ec04e3",
+  "graphFiles": 609,
+  "sourceBeforeSha256": "c90e1be45723b44bfe8fa7a0276004e93aea2b43172f806b39ee70d7bf1174b7",
+  "sourceSelectedSha256": "da07ae3df3663af4b8ec1a85189eb4f5ba3b7e5be4c8295862bfe0e42f40b9d3",
+  "caseIds": [
+    "DLP001",
+    "DLP002",
+    "DLP003",
+    "DLP004",
+    "DLP005",
+    "LDO003",
+    "LDO008",
+    "LDO010"
+  ],
+  "actualChild": {
+    "status": 0,
+    "signal": null,
+    "errorCode": null
+  },
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "15fd5fa3c2a70ebbfc96fdef052d219ecd32b67dd9823cb2f8820c2b80f77900",
+    "caseSetSha256": "954df80bc07f2752a9a97bfa5626a5ac848028f90e726e9d8d250a6fcca82e97",
+    "dispositionsSha256": "869435f1e54bf0de9f7f6236e8b93bdc1c25891e876bc6dc046a1d924e5c9aef",
+    "declaredCount": 8,
+    "disposedCount": 8,
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "4b0df316cff3181b4ce2a9adcd8de53b2f94955290c37b9699ea6cbbca541048",
+  "completionBytes": 1545,
+  "completionError": null,
+  "preparationError": null,
+  "restorationError": null,
+  "conservationError": null,
+  "sourceRestored": true,
+  "sourceAndFixtureCAS": true,
+  "pass": true,
+  "methodOnly": true,
+  "nativeHostClaim": false,
+  "topLevelGovernedDirectWriteProven": false,
+  "wholeItemAcceptance": false,
+  "priorLDO12Replayed": false
+}

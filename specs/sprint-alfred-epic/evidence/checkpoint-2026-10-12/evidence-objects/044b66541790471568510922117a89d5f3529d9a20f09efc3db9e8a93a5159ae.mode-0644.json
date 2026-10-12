@@ -1,0 +1,91 @@
+{
+  "schema": "alfred.project-resource-headroom.independent-assertions.v1",
+  "status": "frozen-before-source-authoring",
+  "authority": "Accepted Alfred resource-headroom item and Root report-only API disposition; source-owner closed data interface",
+  "apiContract": {
+    "path": "legacy-origin:alfred-claude-resource-headroom-source-20261010/api-contract.json",
+    "sha256": "c2eb4361f9ee8e6dc08c57b2606e3426a4e9eda31eb58526b2ce91230ccdcfa4"
+  },
+  "test": {
+    "path": "resource-headroom.test.mjs",
+    "sha256": "55fd352dc0455cd48f2d27f2c521616108bbe352cefdccf034d47a4a43a25d2a",
+    "caseCount": 11,
+    "declarationOrder": [
+      "RHH001",
+      "RHH002",
+      "RHH003",
+      "RHH004",
+      "RHH005",
+      "RHH006",
+      "RHH007",
+      "RHH008",
+      "RHH011",
+      "RHH009",
+      "RHH010"
+    ],
+    "cases": [
+      {
+        "id": "RHH001",
+        "criterion": "Real arithmetic and candidate/provenance fields remain declared observations, not certified compliance"
+      },
+      {
+        "id": "RHH002",
+        "criterion": "Exact/zero boundaries and exceeded values preserve signed subtraction"
+      },
+      {
+        "id": "RHH003",
+        "criterion": "Fractional and large finite values remain supported without rounding, conversion or an invented resource cap"
+      },
+      {
+        "id": "RHH004",
+        "criterion": "Missing limit/measurement produce unknown with null headroom"
+      },
+      {
+        "id": "RHH005",
+        "criterion": "Candidate commit/tree and limit digest drift win before unit/failure classification"
+      },
+      {
+        "id": "RHH006",
+        "criterion": "Incompatible units are not converted and failed measurement never supplies headroom"
+      },
+      {
+        "id": "RHH007",
+        "criterion": "Malformed finite/type/schema/digest/path/command observations cause typed whole-input rejection"
+      },
+      {
+        "id": "RHH008",
+        "criterion": "Frozen inputs stay unchanged; independent output references and correlated multiple rows preserve data ownership"
+      },
+      {
+        "id": "RHH011",
+        "criterion": "Actual exported file-input main reads its fixture without mutation and rejects symlink, hardlink, oversized or absent observation input"
+      },
+      {
+        "id": "RHH009",
+        "criterion": "Actual CLI parser admits the closed route and rejects missing/unknown/duplicate/absolute/traversal/private input paths"
+      },
+      {
+        "id": "RHH010",
+        "criterion": "Actual exported main emits successful report-only diagnostics for exceeded/unknown but typed exit2 with no stdout for malformed JSON/bindings"
+      }
+    ]
+  },
+  "plannedSubjectGraph": [
+    "graph/plugins/pipeline-core/lib/project-resource-headroom.mjs",
+    "graph/plugins/pipeline-core/scripts/report-resource-headroom.mjs"
+  ],
+  "closureRule": "Copy only physically verified source-owner-declared postimages and exact public imports after their manifest exists; no whole repository graph or guessed dependency search.",
+  "syntax": {
+    "nodeCheckExitCode": 0,
+    "fullTestRead": true,
+    "actualProductImports": 0
+  },
+  "runtimeFixture": "RHH011 creates and removes only an exclusively named directory beneath this owned package fixture-runtime/ during a future approved qualification. No real project files, Git or measurement commands are used.",
+  "semanticRuns": 0,
+  "businessChildren": 0,
+  "nativeProof": false,
+  "actualMeasurementAuthentication": false,
+  "sourceIntegration": false,
+  "officialItemClosure": false,
+  "futureLaunch": "Root checkpoint after minimal frozen subject import closure and production FD3 parser/driver preparation; no launch is authorized by this freeze alone."
+}

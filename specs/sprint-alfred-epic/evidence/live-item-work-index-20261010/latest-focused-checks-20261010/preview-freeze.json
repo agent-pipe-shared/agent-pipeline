@@ -1,0 +1,159 @@
+{
+  "schema": "alfred.focused-checks.public-preview-freeze.v1",
+  "files": [
+    {
+      "name": "checks.json",
+      "sha256": "1ad3c7218738bc1714a9714bd703ab3c199975f53d13f6948459bf99c04bcb3c",
+      "bytes": 14254
+    },
+    {
+      "name": "README.md",
+      "sha256": "50903c8abbad8215cd6f2deae0089ddf51f354a882b1a43c8591bbb20a5c4449",
+      "bytes": 1843
+    },
+    {
+      "name": "receipt-bindings.json",
+      "sha256": "153ab79558b4449e701799216ba13da3a916b869fd033f8a74b75e8b7d9191b4",
+      "bytes": 5980
+    }
+  ],
+  "sourceReceipts": [
+    {
+      "path": "scratch/alfred-model-terminal-receipt-lookup-independent-20261010/qualification-preparation/execution.json",
+      "sha256": "8b58991f5cbcf1bfce990334bff96031be7e123d7f8b8c8d29f23ca7e3d88391",
+      "bytes": 2963,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-model-terminal-receipt-lookup-independent-20261010/qualification-preparation/qualification-output/completion.ndjson",
+      "sha256": "6605be194097e03daf4905c2251ddcec84d0b2e0545be9b91fd06c6bca8641a7",
+      "bytes": 1025,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-model-terminal-receipt-lookup-independent-20261010/qualification-preparation/ready-run-manifest.json",
+      "sha256": "58eb3b34e9b89a0913995a839aec3535305cf7f615ea48e788268b0cf54b4655",
+      "bytes": 7746,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/runtime/execution.json",
+      "sha256": "a21ff73d3a2fc3cfa25c4688d6cda11499c79119bca00b7ef6c5515e9eaa304b",
+      "bytes": 2758,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/runtime/captures/completion.fd3.private.jsonl",
+      "sha256": "4b748d07ac645c6d34f5eea8454d1baa88c28c0b734660e61cef50c55fd10d03",
+      "bytes": 1545,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-critic-original-mirror-mode-independent-diagnosis-20261010/qualification-successor/manifest.json",
+      "sha256": "46b9aa0c15397d80834c507fa57180e6cd525373ac4271b819cce36028a099ba",
+      "bytes": 6139,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-critic-one-plus-diff-independent-tests-20261010/qualification-successor-20261010/qualification-root-mode-only-sha-successor-20261010/execution.json",
+      "sha256": "532b81a6eb91aa48fac0a8022c7369425854ee46b75ef5a43bc71d092cc503c8",
+      "bytes": 2757,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-governance-record-exemption-gre008-fixture-successor-20261010/runtime/execution.json",
+      "sha256": "cffa1ce29a6bbc60edabe428f819a2222f6c703597b2174e8fa5e570f72505b7",
+      "bytes": 1188,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-governance-record-exemption-gre008-fixture-successor-20261010/runtime/completion.fd3.jsonl",
+      "sha256": "6399634bf81ff3022bf5791cfb7b1fe029bfa7f3da68d8ce2936a27b91fd9fa9",
+      "bytes": 635,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-governance-record-exemption-gre008-fixture-successor-20261010/manifest.json",
+      "sha256": "a8c44eb22d2514e79d5e33a90c452261d18e17427fa4d66be5271f36d5bffb6c",
+      "bytes": 2039,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-governance-record-exemption-resource-successor-20261010/runtime/execution.json",
+      "sha256": "9c5406bacb2a871b1861967d9602f46f9258e4c7819c049cad203e5615fe293b",
+      "bytes": 2867,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-host-index-lock-full12-failure-source-successor-20261010/hil006-qualification-preparation/execution.json",
+      "sha256": "5bfe2dff3df309becdf29fa0de5c3b1d914058a62037db04443f712f7411443b",
+      "bytes": 1148,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-host-index-lock-full12-failure-source-successor-20261010/hil006-qualification-preparation/operation/completion.private.jsonl",
+      "sha256": "2b0b6f429fccb499449937ade2cfc887298ee2d1b74494cbcb5a1e1cb214cbf7",
+      "bytes": 635,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-host-index-lock-full12-failure-source-successor-20261010/hil006-qualification-preparation/manifest.json",
+      "sha256": "3b9c6e93af98fa751f2f6a9d54be9067188959e8edd6fcbff7e107b6af79d472",
+      "bytes": 1176,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-host-index-lock-full12-git-capture-successor-20261010/full12-execution.json",
+      "sha256": "254ba2e3a2d94209789b625cb1a8313ee7ed9576365f95572d731a7e9d471ffd",
+      "bytes": 1007,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/eleven-source-preparation/actual-failure-diagnosis/state11-canonical-successor/execution-terminal.json",
+      "sha256": "f0eb476c39814285f5745bcf3f5ecdb2ba1da0a2fd35b1e28a6a28e55622fade",
+      "bytes": 2634,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/eleven-source-preparation/actual-failure-diagnosis/state11-canonical-successor/qualification-output/completion.ndjson",
+      "sha256": "e2332568b51afad10ae7e359356f5fa8453a40f585269c67f07926b1e6d06501",
+      "bytes": 2137,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/eleven-source-preparation/actual-failure-diagnosis/state11-canonical-successor/qualification-output/stdout.txt",
+      "sha256": "f895eb155d41a95f1e29dbdd20a06231afbf8e6816562f007ee4af4e03190e07",
+      "bytes": 3903,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/eleven-source-preparation/actual-failure-diagnosis/remaining-two-diagnosis/manifest.json",
+      "sha256": "e03da947ea5ca301564a24265e303acba9e2c8a64e4b5f71c6517002621c8f62",
+      "bytes": 1102,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "workerSemanticRuns": 0,
+  "workerGitCommands": 0,
+  "rootSolePublisher": true,
+  "published": false
+}

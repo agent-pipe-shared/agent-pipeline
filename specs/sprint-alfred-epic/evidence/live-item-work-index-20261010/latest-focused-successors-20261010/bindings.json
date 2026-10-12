@@ -1,0 +1,66 @@
+{
+  "schema": "alfred.focused-proof-public-bindings.v1",
+  "subjects": [
+    {
+      "path": "scratch/alfred-host-index-lock-readonly-retry-fourcase-qualification-20261010/execution.json",
+      "sha256": "615c2cfb78e4a4273436d650cbfab352808a59e38f038f6e8ec8bd6ebfb1bd68",
+      "bytes": 1606
+    },
+    {
+      "path": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/qualification-root/execution.json",
+      "sha256": "1146cba5a1379511e0bf602c9f43ff37f419240e268e2b659f2b5a0b837fc61d",
+      "bytes": 2756
+    },
+    {
+      "path": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/foreign-owner-probe-diagnosis/one-case-preparation/qualification-root/execution.json",
+      "sha256": "7a6f28b50c8891b4c699c1d2e2579de27216fb8895a7ce9aef49e6843fd411b2",
+      "bytes": 2449
+    },
+    {
+      "path": "scratch/alfred-controlled-method-design-materialization-admission-independent-20261010/qualification-successor/negative-execution.json",
+      "sha256": "e14fb81686021e83837ffc55567ac561cdf51654774371f71c6500ce8c9a8012",
+      "bytes": 1449
+    },
+    {
+      "path": "scratch/alfred-host-index-lock-readonly-retry-fourcase-qualification-20261010/freeze.json",
+      "sha256": "7ba5817c70e7d9e1630affca2410c490ff9ed5494b3b3fc33df23db8c0b10d89",
+      "bytes": 2919
+    },
+    {
+      "path": "scratch/alfred-host-index-lock-readonly-retry-fourcase-qualification-20261010/launcher-freeze.json",
+      "sha256": "401d81f1c64704162ffd53ec8b561bdd02140d1583a8350e797caf44e061b447",
+      "bytes": 245
+    },
+    {
+      "path": "scratch/alfred-host-index-lock-readonly-retry-fourcase-qualification-20261010/resource-bindings.json",
+      "sha256": "f06190042290a1569c2b32ae12172cdc091d1fb7ef60416bc2c48bc6df6c8c01",
+      "bytes": 128637
+    },
+    {
+      "path": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/foreign-owner-probe-diagnosis/one-case-preparation/qualification-freeze.json",
+      "sha256": "46270fc0fc798ece635554c65cec1ff1b1835ce02cfa455b0b4a01bdd3f6cd35",
+      "bytes": 2361
+    },
+    {
+      "path": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/foreign-owner-probe-diagnosis/one-case-preparation/ready-run-manifest.json",
+      "sha256": "5279592de9b06fd0059cc93f88d6d27f9b622cc898d4a1c81ee95ba714e943a9",
+      "bytes": 5252
+    },
+    {
+      "path": "scratch/alfred-windows-hgo-process-start-independent-20261010/qualification-preparation/constructor-contract-successor/resource-init-successor/registration-wiring-successor/graph-freeze.json",
+      "sha256": "bb6f30ccf96f9ccba725ee3755c62ef182791f484558b3d56674478587badd8b",
+      "bytes": 1054525
+    },
+    {
+      "path": "scratch/alfred-controlled-method-design-materialization-admission-independent-20261010/qualification-successor/negative-freeze.json",
+      "sha256": "c718fa94b77f91e4ac05ed4b2c2c3808e3ed9532489bbce87d1ff2616111add8",
+      "bytes": 820
+    },
+    {
+      "path": "scratch/alfred-controlled-method-design-materialization-admission-independent-20261010/qualification-successor/source-closure.json",
+      "sha256": "eeb2daf7515f5fa629d982637bbacf835f4077cf42f39ce09c8c7186c497743b",
+      "bytes": 1506889
+    }
+  ],
+  "rawCapturePublication": false
+}

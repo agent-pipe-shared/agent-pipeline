@@ -1,0 +1,80 @@
+{
+  "schema": "alfred.worker-authenticity-eight.public-actual-proof.v1",
+  "qualification": "actual-eight-pass",
+  "caseIds": [
+    "WIE001",
+    "WIE002",
+    "WIE003",
+    "WIE004",
+    "WIE005",
+    "WIE006",
+    "WIE007",
+    "WIE008"
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "9c4ec5fef9206bfd214c49f7b68762a0de4c6afd5e7f36d53e8f0184b0d57b84",
+    "caseSetSha256": "11483f57eab125214f9ce3331d3df22837c22041eef6552e1298615ee58c3260",
+    "dispositionsSha256": "71971817f33a19dddb380c2c248f405e61a9e7468c8364c952a9875bef8f7253",
+    "declaredCount": 8,
+    "disposedCount": 8,
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "child": {
+    "status": 0,
+    "signal": null
+  },
+  "errors": {
+    "preparation": null,
+    "spawn": null,
+    "parser": null,
+    "graph": null,
+    "parent": null,
+    "restore": null
+  },
+  "conservation": {
+    "original1700": true,
+    "originalTwoInodesModesBytesRestored": true
+  },
+  "sourceBindings": [
+    {
+      "path": "graph/plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "originalSha256": "ebe09528a07a24e7c0635dbb5ca3f9ac599d5f93dd14a87978527abe464d60bb",
+      "sha256": "84fa7a500b2aa809a8405d177d58aa03e814fb12cd7f4d5652cb4e2ca6b8a4cc"
+    },
+    {
+      "path": "graph/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "originalSha256": "7983a552e66c86d1e81c16cd29dfa709cc88236cfa4a5e4a3b21894344f2f0d3",
+      "sha256": "71b0d56fbafa91d239773e5872f3a28c51d3a4f78f8f77bf0b6b3d0c0eaae926"
+    }
+  ],
+  "productionRegistrySha256": "af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9",
+  "assertionBindings": {
+    "rawCallbacksSha256": "f0e19b32fd49061600a275e368f6e7148a7773920dba6c53e64a8bb914840632",
+    "assertionFreezeSha256": "914e06c390f77763ee54b2561b93a0a7126eb79afa2795a84d0b25490c4a6c4a",
+    "timingSha256": "088893a996e7366597e6e8282dde79fbeaf82e0e9f86af1fafef37eeabac070e",
+    "qualificationFreezeSha256": "ac3be501f13dbe3e7f95b3a80f205f7bb8cafe7b4d822f2fc257537c8468424d"
+  },
+  "actualRawTerminalSha256": "aab2e4d7c95065aff421a33a6473c96a965e9bd0607dfbdd9589b967913cf8fe",
+  "rawTerminalTransfer": false,
+  "completionBinding": {
+    "path": "public-worker-eight-completion.ndjson",
+    "sha256": "8f3205c3972b2d719e0e251b0d3710eecdd1ededf14fa68b88094f96f5424798",
+    "size": 1545
+  },
+  "timing": "Physical fault after actual armed-member effects readback, before next zero-root registration scan; no claim that fault preceded first scan.",
+  "history": "Original Worker3 qualification and prior failures remain separately immutable; original3 is not rerun by these eight controls.",
+  "scope": {
+    "full26": false,
+    "nativeAssurance": false,
+    "humanApproval": false,
+    "wholeItemClosure": false,
+    "afkQualified": false
+  }
+}

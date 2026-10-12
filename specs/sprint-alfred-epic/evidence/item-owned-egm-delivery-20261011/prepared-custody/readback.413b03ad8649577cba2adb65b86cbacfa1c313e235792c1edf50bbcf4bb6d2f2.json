@@ -1,0 +1,166 @@
+{
+  "schema": "alfred.prepared-evidence-custody-readback.v1",
+  "status": "canonical-local-prepared-only",
+  "manifest": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd.json",
+  "manifestSha256": "5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd",
+  "artifactCount": 22,
+  "files": [
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/7c9b2f7571f93d9a328a46d5fda88e23d416b1fb69dd3d6566f7fb8caefe7a6c.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7c9b2f7571f93d9a328a46d5fda88e23d416b1fb69dd3d6566f7fb8caefe7a6c.json",
+      "sha256": "7c9b2f7571f93d9a328a46d5fda88e23d416b1fb69dd3d6566f7fb8caefe7a6c",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/858e299d0efca393f27a74472430710e573adb3818b3833d2e8817c10b20c773.md",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/858e299d0efca393f27a74472430710e573adb3818b3833d2e8817c10b20c773.md",
+      "sha256": "858e299d0efca393f27a74472430710e573adb3818b3833d2e8817c10b20c773",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/d0eba07ca25362b9d1c6346bf49a986ccf8f9ef81e1b1b027d8c044561f828e1.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d0eba07ca25362b9d1c6346bf49a986ccf8f9ef81e1b1b027d8c044561f828e1.json",
+      "sha256": "d0eba07ca25362b9d1c6346bf49a986ccf8f9ef81e1b1b027d8c044561f828e1",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/af3c92c6757cbaa6850c62c3adaf5ebe0099eb5152444957b88c7fd5b017c1d9.md",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/af3c92c6757cbaa6850c62c3adaf5ebe0099eb5152444957b88c7fd5b017c1d9.md",
+      "sha256": "af3c92c6757cbaa6850c62c3adaf5ebe0099eb5152444957b88c7fd5b017c1d9",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/270a8ebf49659b39038990b67db08c4539ec6cea0e8f175cd0367b8042c34683.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/270a8ebf49659b39038990b67db08c4539ec6cea0e8f175cd0367b8042c34683.json",
+      "sha256": "270a8ebf49659b39038990b67db08c4539ec6cea0e8f175cd0367b8042c34683",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/9fff6ed971e82fa63fafb868ee2e3246dd4a0e3bf0ee4552c9c6da93fbde8b48.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9fff6ed971e82fa63fafb868ee2e3246dd4a0e3bf0ee4552c9c6da93fbde8b48.json",
+      "sha256": "9fff6ed971e82fa63fafb868ee2e3246dd4a0e3bf0ee4552c9c6da93fbde8b48",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/4dbfe26ea9c0e8e69eca55bca019fe4a651499ff9663633c33d0738958c22b6a.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4dbfe26ea9c0e8e69eca55bca019fe4a651499ff9663633c33d0738958c22b6a.json",
+      "sha256": "4dbfe26ea9c0e8e69eca55bca019fe4a651499ff9663633c33d0738958c22b6a",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/d1d7598ea24b312b9901b30b02fcc4a60002de370e35e63401a3d06d51e8673c.md",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d1d7598ea24b312b9901b30b02fcc4a60002de370e35e63401a3d06d51e8673c.md",
+      "sha256": "d1d7598ea24b312b9901b30b02fcc4a60002de370e35e63401a3d06d51e8673c",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/5d7ba717d05d093460c14e7aaca472f2bab544ddf4b020fb118a26f1265ee757.fd",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5d7ba717d05d093460c14e7aaca472f2bab544ddf4b020fb118a26f1265ee757.fd",
+      "sha256": "5d7ba717d05d093460c14e7aaca472f2bab544ddf4b020fb118a26f1265ee757",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/f2c8d6762cabf86ee1ff489b5d7974722bb80959c28e4e7f06ef74803dbf35cd.log",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f2c8d6762cabf86ee1ff489b5d7974722bb80959c28e4e7f06ef74803dbf35cd.log",
+      "sha256": "f2c8d6762cabf86ee1ff489b5d7974722bb80959c28e4e7f06ef74803dbf35cd",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/8bd10e0dfce87ad3469f345d574f332365cb7fa3f845c597b88334755b550090.mjs",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8bd10e0dfce87ad3469f345d574f332365cb7fa3f845c597b88334755b550090.mjs",
+      "sha256": "8bd10e0dfce87ad3469f345d574f332365cb7fa3f845c597b88334755b550090",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/ec09e83c98ec827b3da8931ccc60046ef68d2acbc2069273551ad55cc35059ec.log",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ec09e83c98ec827b3da8931ccc60046ef68d2acbc2069273551ad55cc35059ec.log",
+      "sha256": "ec09e83c98ec827b3da8931ccc60046ef68d2acbc2069273551ad55cc35059ec",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/d3ed1730bed506298f2c1f89a369a7710b20ad31dc1717bcc99b55e2c74b15c6.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d3ed1730bed506298f2c1f89a369a7710b20ad31dc1717bcc99b55e2c74b15c6.json",
+      "sha256": "d3ed1730bed506298f2c1f89a369a7710b20ad31dc1717bcc99b55e2c74b15c6",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/feb2cb106c0736a308a0c30ac299e7c4774a193ba86242acd25ad401e27a7e7b.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/feb2cb106c0736a308a0c30ac299e7c4774a193ba86242acd25ad401e27a7e7b.json",
+      "sha256": "feb2cb106c0736a308a0c30ac299e7c4774a193ba86242acd25ad401e27a7e7b",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/1998721753f19221ecd5771fa88d9bddc74de24ed9a0d46b5679cd14937f14b6.mjs",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1998721753f19221ecd5771fa88d9bddc74de24ed9a0d46b5679cd14937f14b6.mjs",
+      "sha256": "1998721753f19221ecd5771fa88d9bddc74de24ed9a0d46b5679cd14937f14b6",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/f5fec6d56804a30b217a2874196dc7809c21f80f396a274417b9eed980551ee1.fd",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f5fec6d56804a30b217a2874196dc7809c21f80f396a274417b9eed980551ee1.fd",
+      "sha256": "f5fec6d56804a30b217a2874196dc7809c21f80f396a274417b9eed980551ee1",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/7dd818d78cc92937c743f1839060ed7fc47ce3b2f0bb2449786c6e94556a17c2.stdout",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7dd818d78cc92937c743f1839060ed7fc47ce3b2f0bb2449786c6e94556a17c2.stdout",
+      "sha256": "7dd818d78cc92937c743f1839060ed7fc47ce3b2f0bb2449786c6e94556a17c2",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/e676e125ac205c26613f4913feef2ca77be158e9d3af7b56775f183ac1f3d729.stdout",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e676e125ac205c26613f4913feef2ca77be158e9d3af7b56775f183ac1f3d729.stdout",
+      "sha256": "e676e125ac205c26613f4913feef2ca77be158e9d3af7b56775f183ac1f3d729",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2.mjs",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2.mjs",
+      "sha256": "2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b.mjs",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b.mjs",
+      "sha256": "4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6.mjs",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6.mjs",
+      "sha256": "3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/objects/a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f.mjs",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f.mjs",
+      "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready/manifest.5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd.json",
+      "sha256": "5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd",
+      "mode": "0644"
+    }
+  ],
+  "physicalContainment": true,
+  "singleLinkCopies": true,
+  "exactPreparedToCopySha256Conservation": true,
+  "currentSourceCAS": true,
+  "sourceVerifyNlink": 2,
+  "gitCheckIgnore": {
+    "exitCode": 1,
+    "stdout": "",
+    "ignored": false
+  },
+  "readme": {
+    "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/README.md",
+    "sha256": "80f80f542aa4d5b48c57931d2d9914680814052123e6b1fb9176224c9c35258d",
+    "mode": "0644"
+  },
+  "testsRun": 0,
+  "criticCalls": 0,
+  "sourceApplied": false,
+  "committed": false
+}

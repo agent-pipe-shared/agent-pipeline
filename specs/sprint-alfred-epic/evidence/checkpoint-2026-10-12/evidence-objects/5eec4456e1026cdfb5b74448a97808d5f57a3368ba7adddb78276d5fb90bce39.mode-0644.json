@@ -1,0 +1,42 @@
+{
+  "schema": "alfred.source-proposal.before-post-contract.v1",
+  "item": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+  "status": "Private routine defect proposal; no execution or integration",
+  "normativeOrigin": {
+    "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+    "sha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c4",
+    "requirement": "Befund 3: a genuine same-session resume must not require the PO to touch an expired bootstrap proof lock manually."
+  },
+  "actualSource": {
+    "helper": "plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+    "caller": "plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+    "observer": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "existingRegression": "plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs"
+  },
+  "sourceCause": "The native-identity/Git-validated hook calls armAntigravityBootstrapSession, whose same-build already-armed branch leaves lock mtime untouched. The observer requires a same-build lock no older than 30 minutes. Existing ordinary-ready regression deliberately requires a fresh repeated invocation not to rewrite its proof lock.",
+  "requiredChange": [
+    "On the existing same-build locked branch, retain fresh nonfuture regular proof locks without a write.",
+    "Only a regular same-build proof lock older than the existing 30-minute observation window is refreshed by this existing hook owner.",
+    "Refresh uses exactly the existing hook-authored lock payload; it does not create or rewrite requires-bootstrap.pending.",
+    "A future timestamp is not treated as an expired lock or valid freshness proof. Inspection/write failure propagates to the existing caller failure boundary.",
+    "The new result truthfully states wrote:true only for an actual expired-lock refresh; ordinary already-armed wrote:false is preserved.",
+    "Missing/malformed/different-build locks retain their existing arm-and-pending behavior."
+  ],
+  "boundary": "No session identity, readiness, role-route, signature, registry, tool-enforcement or provider authority is minted by this helper. Its existing caller validates native session identity and initialized Git before the call. No public barrier, caller boolean or manual touch is introduced.",
+  "futureQualification": [
+    "Genuine hook-authored same-build regular lock older than 30 minutes: repeat validated hook refreshes proof, observer can see freshness, consumed pending barrier remains absent.",
+    "Fresh same-build regular lock: original repeated-ready test retains identical mtime and no pending re-arm.",
+    "Future mtime and nonregular lock: remain unavailable/refused through the existing failure path, not freshness evidence.",
+    "Different build/malformed/missing lock: original new bootstrap barrier behavior remains."
+  ],
+  "limits": [
+    "This proposal repairs only Befund 3, not the AGY umbrella happy path.",
+    "No regression has been run by this author.",
+    "No Main/Audit/canonical write, Git command, product import, native execution or Critic invocation."
+  ],
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "calibration": "SourceProposal",
+  "duty": "UNKNOWN01 source assessment and narrowly scoped private proposal",
+  "method": "Methodology only; model/native route unverified",
+  "operationalBrief": "This record is not runtime authority."
+}

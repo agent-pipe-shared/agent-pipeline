@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.architecture-chat-attribution.v1",
+  "decisionId": "ADR-0086",
+  "date": "2026-10-11",
+  "decisionMarkdown": {
+    "path": "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.md",
+    "sha256": "349069ecba027f79f569456536f7c7843a652cad14cecb448db0ae6f9eb599e6"
+  },
+  "approval": {
+    "authority": "human-po",
+    "basis": "chat-attributed-unattested",
+    "message": "- Neuen Flow testen; alte APIs separat prüfen (empfohlen) - Controller-Testkanal umsetzen (empfohlen) // beies so",
+    "messageSha256": "7a411c1fb634b6b7dec242ca4794a735641f82d1cffab1007129ba969dd8635b"
+  },
+  "selection": "New flow testing; retained old APIs separately",
+  "limits": {
+    "hgoGrant": false,
+    "planSignature": false,
+    "protectedWriteAuthorization": false,
+    "nativeProof": false,
+    "itemAccepted": false
+  },
+  "companionReference": "This durable record is the companion approval attribution for ADR-0086. The immutable Markdown reference to its approval preview resolves to this decision-ID record; the private preview is retained as lineage.",
+  "assurance": "Attribution of the explicit PO chat choice; no independent identity, host, device, terminal or cryptographic attestation. This record is not a HGO grant, planSignature, protected-write executor, native proof or item acceptance."
+}

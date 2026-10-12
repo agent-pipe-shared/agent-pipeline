@@ -1,0 +1,37 @@
+{
+  "schema": "alfred.selected164.actual148.remaining16.v1",
+  "parent144": {
+    "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed144-runtime9-append/remaining-owned-routing.json",
+    "sha256": "444d8433370001bf214f1b91d88d61a17ed91fed8eb71581ab6050bcb80ee506"
+  },
+  "runtime": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "owner": "alfred_obl013_override_digest_regression",
+      "status": "Root-assigned preparation; not applied"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "owner": "agy_greenfield_intake_package",
+      "status": "Root-assigned preparation; not applied"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "owner": "agy_greenfield_intake_package",
+      "status": "Root-assigned preparation; not applied"
+    }
+  ],
+  "protected": {
+    "count": 13,
+    "union": 14,
+    "source": "Exact parent130 protected rows retained unchanged",
+    "transferOwner": "Root",
+    "finalStateI03CompositionOwner": "alfred_obl013_override_digest_regression"
+  },
+  "outside": {
+    "count": 5,
+    "ElephantDocuments": 2,
+    "aggregateLeaves": 3
+  },
+  "formalAcceptance": false
+}

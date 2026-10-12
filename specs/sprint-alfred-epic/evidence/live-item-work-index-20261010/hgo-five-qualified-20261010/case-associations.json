@@ -1,0 +1,30 @@
+{
+  "schema": "alfred.hgo.case-associations.v1",
+  "cases": [
+    {
+      "id": "HDN001",
+      "disposition": "pass",
+      "observed": "Six malformed reason shapes refuse HGO-DENIAL at actual record admission; private HGO namespace remains absent."
+    },
+    {
+      "id": "HDN002",
+      "disposition": "pass",
+      "observed": "Six malformed reason shapes refuse HGO-DENIAL at actual consume; genuinely armed capability and audit bytes remain unchanged."
+    },
+    {
+      "id": "HDN003",
+      "disposition": "pass",
+      "observed": "Literal reason undefined remains supported; actual memory-signed Edit v4 and Bash v3 producer/arm/consume routes succeed. Bash input remains inert."
+    },
+    {
+      "id": "HDN004",
+      "disposition": "pass",
+      "observed": "Four unsigned malformed request projections refuse actual HGO-REQUEST readback and publish no plan; no signed plan/capability negative qualification claimed."
+    },
+    {
+      "id": "HGS003",
+      "disposition": "pass",
+      "observed": "All five iterations reach actual consumption refusal for policy, State, plugin, input and canonical reason drift; approved reason-field fixture erratum retained."
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schema": "alfred.public.signed-intermediate-525.application-readback.v1",
+  "rawReceiptSha256": "c030da0c9e42b1adbc97f3fcfc3a4e3e43c341e4bfd28ea4006c7104b7a7c83c",
+  "rawReceiptBytes": 876,
+  "privateForensicsRetained": true,
+  "observedAt": "2026-10-11T08:54:56.117298+00:00",
+  "status": "applied-and-independent-readback-matched",
+  "officialApplication": {
+    "exitCode": 0,
+    "code": "QUALITY-PACKAGE-APPLIED"
+  },
+  "independentReadback": {
+    "expectedPaths": 525,
+    "failureCount": 0,
+    "failures": [],
+    "selectedModesChecked": 525
+  },
+  "intentSha256": "14814ad7e9afc07806f7ccd5287cd5b4c1d3179edcbcf6530a6615c5556d0da1",
+  "requestSha256": "5bb803cf15266a7582512355d2cdd0e8b35e7c470aa3955dfac19e713ca0877c",
+  "proofSha256": "dc3df3c2ebd3714944d4f35ef1d0ef75388c1b016fa8b2b78a59377125f5ceef",
+  "indexSha256After": "008fb372848cffd9d9180ac01a0170be4d3def6f4e54f6b7b10ca179ae830dfd",
+  "stagedNames": [],
+  "limits": {
+    "committed": false,
+    "pushed": false,
+    "installed": false,
+    "finalCandidateStamped": false,
+    "commitC0Established": false,
+    "inventoryC1Established": false,
+    "itemAcceptanceEstablished": false,
+    "nativeQualificationEstablished": false,
+    "finalSourceGenerationQualified": false
+  },
+  "scope": "Historical signed intermediate application and 525-path content/mode readback; no later candidate, commit or current working-tree equivalence claim."
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "alfred.powershell.nonready.public-proof-manifest.v1",
+  "scope": "Cumulative controlled PSBN001-004, separate actual runs; no native or acceptance",
+  "files": [
+    {
+      "path": "proof.json",
+      "sha256": "7a4e7bb1641f2ff8c53644f3240bcc61b57009215d86dff8c09a801241aa386d"
+    },
+    {
+      "path": "report.md",
+      "sha256": "70f0e6e823bd7188c0ad4ec9babd91b2c7465e7aa3146e0e796146d00fb9e5fd"
+    }
+  ],
+  "destination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/powershell-nonready-returned-action-qualified-20261011",
+  "rawCapturesExcluded": true,
+  "wholeItemAcceptance": false
+}

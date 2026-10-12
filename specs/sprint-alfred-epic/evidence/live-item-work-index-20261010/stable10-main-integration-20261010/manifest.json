@@ -1,0 +1,28 @@
+{
+  "schema": "alfred.stable10.actual-publication.manifest.v1",
+  "status": "actual-integration-complete-publication-proposed",
+  "files": [
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed25-successor/public-proof.json",
+      "sha256": "1e385d1a736784b19e34d58b188ae0cfdd4c52ad3eff4386f0372e2d0f884c1c"
+    },
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed25-successor/remaining-delta.json",
+      "sha256": "ea3967b75a04e4cc0d1226591d7525dd00a0c879f8172c13192bd1185e11b7d2"
+    },
+    {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed25-successor/report.md",
+      "sha256": "c1692bb26209e7131a12dd3aec1b85046795a02fe6f93d4969755bcb44761d87"
+    }
+  ],
+  "actualReceiptSha256": "784379ffb6ccf54892a44a24c5db131e6e020d802dd979eee2fd88e779d2f2a8",
+  "publicWhitelist": [
+    "public-proof.json",
+    "remaining-delta.json",
+    "report.md",
+    "manifest.json"
+  ],
+  "candidateStage": "25selectedpaths-integrated; not accepted/native/fullVerify",
+  "RootOnly": true,
+  "authorArchiveRuns": 0
+}

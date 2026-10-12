@@ -1,0 +1,80 @@
+{
+  "schema": "alfred.item-engineering-stage-event.v1",
+  "id": "pipeline.semgrep-console-coverage-note-has-no-test",
+  "previousStage": "UNKNOWN",
+  "engineeringStage": 75,
+  "classification": "implemented-and-original-focused-proof-bound",
+  "authorityBasis": "Root selected original-clause completion audit; engineering stage only.",
+  "stageAudit": {
+    "path": "scratch/alfred-semgrep-original-completion-stage-successor-20261011/stage-successor.json",
+    "sha256": "81d7a9b1f7cfda154fe215fe8c4de5acaa685687fd112371de35a8b87c36092b"
+  },
+  "originalBody": {
+    "path": "backlog/items/2026-10-07-semgrep-console-coverage-note-has-no-test.md",
+    "sha256": "3488e8ae6dca2cd8a365177a446e36b2eccd41411a7aae7df7ddef9fcf87cf0d",
+    "bytes": 1715
+  },
+  "originalClauses": [
+    {
+      "id": "SEM-CONSOLE",
+      "originalLines": "18–22",
+      "requirement": "Warn-level PartialParsing produces the human-visible degraded-coverage suffix on the scanner summary.",
+      "implementation": "formatScannerLine1111–1117 adds exact file count; printSummary1119–1124 calls it; main1167 calls printSummary.",
+      "proof": "Real fake-Semgrep result passed runSecurityScan, then actual entry formatter equals the two-file summary; three-file and clean controls also passed.",
+      "covered": true
+    },
+    {
+      "id": "SEM-TEST-SEAM",
+      "originalLines": "34–36",
+      "requirement": "Prefer fake Semgrep CLI path; otherwise export a pure formatter and pin it.",
+      "implementation": "Exported real formatter is present and used by the CLI; focused fake executable emits warn-level PartialParsing through runSecurityScan.",
+      "proof": "Original allowed formatter seam fallback exercised with actual adapter result, not a manually supplied verified success.",
+      "covered": true
+    },
+    {
+      "id": "SEM-OWNER-DUE",
+      "originalLines": "36",
+      "requirement": "Pipeline owns the fix before the release candidate.",
+      "implementation": "Existing implementation and meaningful proof present; Root retains candidate and acceptance coordination.",
+      "proof": "No new dispatch/source repair is needed for this original missing-test item.",
+      "covered": true
+    }
+  ],
+  "proof": {
+    "path": "specs/sprint-alfred-epic/evidence/handover-2026-10-09/evidence/SCANNER-PROV-V-20261009/security-scan.txt",
+    "sha256": "f15091431d023d550c0cbfa02cdf25e65414d45dfe33dc898b64d9146471d57c",
+    "bytes": 13415
+  },
+  "currentSource": {
+    "source": {
+      "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+      "sha256": "4f7718a9145bb599cc20b23a0b9e8d7000b84ca208e51a89ec9c345ecd3cb303",
+      "bytes": 61118
+    },
+    "test": {
+      "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+      "sha256": "f036f3864e8db57752c942297cb35b1e9a7887673649e42a200384b4e6fcb459",
+      "bytes": 90688
+    },
+    "adapter": {
+      "path": "plugins/pipeline-core/scripts/security-adapters/semgrep.mjs",
+      "gitBlobAtProofHead": "79148455e02136ada4ca6ab7a5ffe95856c660f5",
+      "currentGitBlob": "79148455e02136ada4ca6ab7a5ffe95856c660f5"
+    },
+    "originalReceiptHead": "63ba0c32cb3e6cf960b0ea9a615c5081c1fb2c72",
+    "originalReceiptTree": "7ace42f8b46b4caf3b8e93d8a15571a35bc4824e",
+    "sourceTestAdapterBlobEquality": "The current source, test, and relevant Semgrep adapter Git blobs equal their blobs at the receipt's HEAD."
+  },
+  "remaining": {
+    "substantiveOriginalImplementationGaps": [],
+    "finalCandidateVerify": "Required on the final assembled candidate; existing focused tests need not rerun merely because OPEN.",
+    "finalReview": "Remaining final batch review/closure evidence, no new Critic invocation here.",
+    "POAcceptance": "Not performed; official manual item acceptance and sanctioned writer/ledger/checker/projection are Root-owned.",
+    "nativeSemgrep": "Not an original completion gate: original explicitly permits fake CLI/formatter. No native success claimed."
+  },
+  "formalStatus": "OPEN",
+  "accepted": false,
+  "stage100": false,
+  "nativeSemgrepOriginalGate": false,
+  "newBusinessRuns": 0
+}

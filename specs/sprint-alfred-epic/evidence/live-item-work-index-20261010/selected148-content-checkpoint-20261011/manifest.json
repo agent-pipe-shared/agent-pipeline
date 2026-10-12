@@ -1,0 +1,71 @@
+{
+  "schema": "alfred.public148.progress-publication.packet.v1",
+  "status": "Root review ready; publisher unexecuted",
+  "counts": {
+    "currentOrAppliedSelected": 148,
+    "remaining": 16,
+    "runtime": 3,
+    "protectedSelected": 13,
+    "protectedUnion": 14,
+    "outside": 5
+  },
+  "receiptBindings": [
+    {
+      "path": "scratch/alfred-afk-main-content-transfer-20261011/main-writer-v3/applied-ledger.json",
+      "sha256": "2603173c691f51fd4c3af57822ebf34b8e4915589b6207d8615decc1138dd0c0"
+    },
+    {
+      "path": "scratch/alfred-afk-main-content-transfer-20261011/main-writer-v3/applied-host.json",
+      "sha256": "1ce47a68fcca718b2641f92ccbd786fe30d316513b557f3ff352147dcb80a09e"
+    },
+    {
+      "path": "scratch/alfred-runtime-journal-supervisor-integration-preparation-20261011/functional-source-successor/atomic-content-successor/application-root/execution.json",
+      "sha256": "49a392460b53c477ed891a31e2399a73b01cc4291d8f53ffcf09535b91179e89"
+    }
+  ],
+  "files": [
+    {
+      "sha256": "36f18277b8385cc0ad869380961070272938a98f537b0e32f0f42259f5d1111a",
+      "path": "scratch/alfred-current144-public-progress-preparation-20261011/public148-freeze/afr-locator-successor/lock-proof-locator-successor/integration-delta.json"
+    },
+    {
+      "sha256": "e5ab4f9deccc99f9cff11ae933a35bb793dc2da734178c222b6dcef50c4b1a76",
+      "path": "scratch/alfred-current144-public-progress-preparation-20261011/public148-freeze/afr-locator-successor/lock-proof-locator-successor/remaining-owned-routing.json"
+    },
+    {
+      "sha256": "525892efce2112166e76ace606f6b18e44390b227fa8ef3db7f4f3e2f8d19258",
+      "path": "scratch/alfred-current144-public-progress-preparation-20261011/public148-freeze/afr-locator-successor/lock-proof-locator-successor/report.md"
+    },
+    {
+      "sha256": "c30692e79092ad13412fb03161123b1aed099666706f221f4ab8525e5cc67172",
+      "path": "scratch/alfred-current144-public-progress-preparation-20261011/public148-freeze/afr-locator-successor/lock-proof-locator-successor/postimages/CURRENT-PROGRESS.md"
+    },
+    {
+      "sha256": "f1edcb1299002c1ece4abe318d9d774f06f02ad339a16bee5df337f39c43171a",
+      "path": "scratch/alfred-current144-public-progress-preparation-20261011/public148-freeze/afr-locator-successor/lock-proof-locator-successor/postimages/handover-2026-10-10-live-work-index.md"
+    }
+  ],
+  "parents": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/CURRENT-PROGRESS.md",
+      "sha256": "0d2dd49e5b8083590e12caf38eaf43f945ec8fad68bb243a760b06baba872908"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/handover-2026-10-10-live-work-index.md",
+      "sha256": "e5a234ce8157f0624140efd6cd5d4680d24dafef32efc2ab8db876713cfaadff"
+    }
+  ],
+  "publicArchiveWhitelist": [
+    "integration-delta.json",
+    "remaining-owned-routing.json",
+    "report.md",
+    "manifest.json"
+  ],
+  "rootVerifiedProofPins": true,
+  "engineeringStagesChanged": false,
+  "formalAcceptance": false,
+  "nativeClaim": false,
+  "productWrites": 0,
+  "businessRuns": 0,
+  "GitOperations": 0
+}

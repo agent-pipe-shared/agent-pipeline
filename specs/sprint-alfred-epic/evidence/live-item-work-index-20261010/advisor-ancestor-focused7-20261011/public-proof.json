@@ -1,0 +1,113 @@
+{
+  "schema": "alfred.advisor-ancestor-focused-seven.public.v1",
+  "item": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+  "target": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+  "source": {
+    "parentSha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+    "postSha256": "e6abbc7369e16bf9620213df7f875b893dfe1c01dc8fbe88e6cfd2a115b20bfc",
+    "manifestSha256": "1d163d165eba2a9c45046403b3c4b5df878939d9d1c6bf6d7cfc1773e573f231"
+  },
+  "evidence": {
+    "executionSha256": "da5be556f385a20d5662815567df0152228b05acaf01969aaa7f80c63242583a",
+    "completionSha256": "cd7bd479a277eff1e471cf49c66ee96823861d13b9dc324a1be31ed135d18239",
+    "independentContractSha256": "8ff82ab655c6ea42ec0f64e986d21dc5415cad7f69100c6e00115e63992dae50",
+    "independentFreezeSha256": "dab7cc312f27fdd9588e7062e93b60a7e060e471e4bb3022c3dbb1cbf8d95c73",
+    "beforePostNormSha256": "e51435ac5f6d281c9915d951c930026a8187d74e4feaa76908ff627fec99956d"
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "aeb8c2191522df49d343520b8d00d23e6d1018a92e030b4523dd47cf435be127",
+    "caseSetSha256": "33b46c168cdb1c32f54a2c24ecb62db037a34eb6c33c0296f0bade846736ecc1",
+    "dispositionsSha256": "eccdeec3c4902ae2034c95d75a2c6678a4016f568eb65fabad28a67bf126e810",
+    "declaredCount": 7,
+    "disposedCount": 7,
+    "counts": {
+      "pass": 7,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "cases": [
+    {
+      "id": "DAPC001",
+      "name": "real sibling file and subdirectory churn preserves canonical parent and exact target",
+      "disposition": "pass",
+      "rules": [
+        "DAPDIR001"
+      ]
+    },
+    {
+      "id": "DAPC002",
+      "name": "persistent actual ancestor inode replacement is refused after all default retries",
+      "disposition": "pass",
+      "rules": [
+        "DAPDIR002"
+      ]
+    },
+    {
+      "id": "DAPC003",
+      "name": "ancestor mode drift symlink and nondirectory remain refused",
+      "disposition": "pass",
+      "rules": [
+        "DAPDIR003"
+      ]
+    },
+    {
+      "id": "DAPC004",
+      "name": "real target byte inode mode and link-count mutations retain strict descriptor refusal",
+      "disposition": "pass",
+      "rules": [
+        "DAPDIR004",
+        "DAPDIR005"
+      ]
+    },
+    {
+      "id": "DAPC005",
+      "name": "preexisting aliases invalid UTF8 unsafe paths and file bounds remain refused",
+      "disposition": "pass",
+      "rules": [
+        "DAPDIR004",
+        "DAPDIR005"
+      ]
+    },
+    {
+      "id": "DAPC006",
+      "name": "read-only baseline bytes and exact parent drift retry contract remain genuine",
+      "disposition": "pass",
+      "rules": [
+        "DAPDIR006"
+      ]
+    },
+    {
+      "id": "DAPC007",
+      "name": "physical exact read detects target replacement by symlink after opening without a success shim",
+      "disposition": "pass",
+      "rules": [
+        "DAPDIR004",
+        "DAPDIR005"
+      ]
+    }
+  ],
+  "independentAssertions": true,
+  "instrumentation": "cases.mjs temporarily wraps Buffer.alloc only at MAX+1. It performs real owned mutations after the unmodified reader has opened and observed the descriptor, delegates actual allocation unchanged, and restores the wrapper in finally. Production stat, read, path observations and return values are not replaced.",
+  "scope": "Exact Source two-splice inverse conserves file identity checks, Git/candidate/revision/digest validation, exports and implementationAuthority:false. Runtime cases qualify physical reader/retry only, not complete Git/Advisor-course producers.",
+  "raceLimit": "No continuous directory anchoring or transient replacement-and-restoration detection claim.",
+  "mainApplication": {
+    "status": "applied-content-only",
+    "receiptSha256": "b042d302427d4871fe46abac19dc6c91808f27342433467aaeb0d4c6dea0443d",
+    "target": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+    "parentSha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+    "postSha256": "e6abbc7369e16bf9620213df7f875b893dfe1c01dc8fbe88e6cfd2a115b20bfc",
+    "newInode": true,
+    "sourceAndAuthorityConserved": true,
+    "strictFilePredicatesPreserved": true,
+    "scope": "Content transfer only; qualification remains the separate seven-case receipt"
+  },
+  "nativeEvidence": false,
+  "wholeItemAcceptance": false,
+  "readiness": false,
+  "implementationAuthority": false,
+  "businessReruns": 0
+}

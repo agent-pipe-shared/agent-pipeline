@@ -1,0 +1,45 @@
+{
+  "schema": "alfred.unknown02.native-patch-rehearsal-capability-needed.v1",
+  "originalBody": {
+    "excluded": true,
+    "rawSha256": "d7c60192ae6b6324a3a7a563fd60221a01bdd013816668c8053565624ca1970b",
+    "bytes": 64,
+    "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+  },
+  "originalSha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+  "originalClauses": "Required behavior and final physical native-engine hunk-order/postimage-digest clause; in-memory replay insufficient",
+  "actualPrepare": {
+    "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+    "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+    "lines": [
+      3709,
+      3788
+    ],
+    "publicAPI": "prepareHumanGuardOverrideForSignature(options)"
+  },
+  "currentDryRunGrammar": {
+    "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+    "lines": [
+      1005,
+      1020
+    ],
+    "admitted": "git apply --check [--] <one-or-more.diff-or.patch>",
+    "limit": "--reverse is rejected as an option-like operand; Git apply grammar does not validate native apply_patch or authorize caller engine PASS."
+  },
+  "neededPrivateAdapter": {
+    "ownership": "Actual product source-owned host engine producer, private synchronous execution scope; never caller receipt/PASS.",
+    "closedInput": "Exact current authenticated request, strict known native patch syntax/target paths, actual noalias physical HEAD/worktree target preimages, bounded engine binary/API identity and private isolated scratch rehearsal roots.",
+    "actualEffect": "Actual same native engine executes exact patch on private exact preimage copies, retains physical hunk order and validates every expected postimage SHA; original repository untouched.",
+    "output": {
+      "excluded": true,
+      "rawSha256": "c139b5103affce69c6abcbaff8b6d924291434f278b24d15c1c158f64b67712b",
+      "bytes": 184,
+      "reason": "Raw stream excluded; finite structured outcomes retained"
+    },
+    "gate": "Before signable intent require current genuine observation. At redemption revalidate exact patch/preimages/current policy/plugin/state/expiry/replay/audit CAS. Native unavailable remains typed prerequisite, no signable PASS.",
+    "hostGap": "No installed product-authenticated engine/API supplied by Root; Root caller apply_patch tool is not a source-authenticatable engine carrier.",
+    "legacy": "Legacy/Bash/plugin/whole freshness unchanged; no weakening grammar/authority or ignored/private export"
+  },
+  "status": "original scope held finite engine-producer/ownership prerequisite, not deferred and not completed",
+  "nextOwner": "Root resolves actual host engine/private adapter architectural ownership; existing guard span owners coordinate pre-sign caller and typed readonly --check --reverse separately"
+}

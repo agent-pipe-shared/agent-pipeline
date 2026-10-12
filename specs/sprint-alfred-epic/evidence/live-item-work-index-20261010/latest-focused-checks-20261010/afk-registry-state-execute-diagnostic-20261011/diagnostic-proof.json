@@ -1,0 +1,101 @@
+{
+  "schema": "alfred.afk-registry-call-diagnostic-public-proof.v1",
+  "caseId": "AFR001",
+  "actualExecutionSha256": "c11084a9574fd6155047df4cc166809b782e8b70825ca88ade5db512e4861e9c",
+  "actual": {
+    "complete": true,
+    "exitCode": 1,
+    "counts": {
+      "pass": 0,
+      "fail": 1,
+      "skip": 0,
+      "todo": 0
+    },
+    "sourceFiles": 454,
+    "sourceConserved": true,
+    "runtimeConserved": true,
+    "environmentConserved": true,
+    "timedOut": false,
+    "parserError": null
+  },
+  "observedRegistryDiagnostic": {
+    "schema": "alfred.companion-registry-call-diagnostic.v1",
+    "stage": "state-execute",
+    "errorKind": "REFERENCE_ERROR"
+  },
+  "observedStateDiagnostic": {
+    "schema": "alfred.afk-private-frame-causal-diagnostic.v1",
+    "stage": "registry-dispatch",
+    "code": "OTHER",
+    "errorKind": "OTHER",
+    "reason": "OTHER",
+    "privateFrameMarked": true
+  },
+  "observedHostOutcome": {
+    "status": "unavailable",
+    "code": "SDC-AUTHORITY-HELD",
+    "attempted": true,
+    "hostEffects": "retained",
+    "stateDisposition": "unchanged"
+  },
+  "physicalStateMemberConservation": {
+    "state": {
+      "sha256": "15ec8749d087054c92680c5300c562acc6b84ef78a472d0c55d93902758e9b45",
+      "size": 13586
+    },
+    "member": {
+      "sha256": "7c9b140af2e5ad6b14e93c7ff91ff729a837d2c960fa91180ecdd05e73e01391",
+      "size": 2148
+    }
+  },
+  "captureDigests": {
+    "stdout": {
+      "sha256": "4149193f7f8f82a47318833843d810134d30c4f750c7eb860286290d51144514",
+      "bytes": 1528
+    },
+    "stderr": {
+      "sha256": "3a6040db2412098e0e9d59adeb25f7b5cc27aedd83a034af2c88fba8519235ff",
+      "bytes": 1079
+    },
+    "fd3": {
+      "sha256": "1c5192f04c4875d36b3ae2bb70b75b39ce2a368be40df25284af810f0c90e62a",
+      "bytes": 635
+    }
+  },
+  "sourcePins": {
+    "plugins/pipeline-core/lib/afk-ledger.mjs": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+    "plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs": "411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+    "plugins/pipeline-core/lib/interruption-receipt-store.mjs": "cd68275ea86691a68102691e2f919601e3f60b9df7b07e9647e50a03541df98f",
+    "plugins/pipeline-core/lib/onboarding-continuity.mjs": "dc31dfd69eec652e603a5a0654faa32f95dd48e4ebeba7eacaf3ef181a0d7b50",
+    "plugins/pipeline-core/lib/session-authority-registry.mjs": "ea584c44f545e145482b71f08726d3faed428008e343c9d1cfe355056db8288f",
+    "plugins/pipeline-core/scripts/pipeline-state.mjs": "557cae2a18a7dd68076a66f07d60f47dd035203594ebe1b7017440b182f5e541",
+    "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": "99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4",
+    "plugins/pipeline-core/scripts/report-interruptions.mjs": "fdcc6fe6d707303fdc7a9758715248bad62ed2b4eb9879dfe901c37f4da931c4",
+    "plugins/pipeline-core/lib/afk-transaction-host.mjs": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+    "plugins/pipeline-core/scripts/check-vendored-template-sync.mjs": "b9dd50c6dba7be991d4d40eac48846ac94c1f39687ab2d07d257e02c613d4b43",
+    "plugins/pipeline-core/config/interruption-registry.v1.json": "a37b5ab200f0b88cae6e45adb8befa4e273a8949494197d2958d01df094e23e9",
+    "plugins/pipeline-core/scripts/sync-interruption-registry-asset.mjs": "7b583a8f1a9d842f71249bd30e3d55269822750e14473550ed51df65643f0e7c",
+    "plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c"
+  },
+  "independentContractSha256": "0190d24bc1cfa0d10876c78299bde416c78faee45fe91f361c1884469da2eba1",
+  "independentManifestSha256": "c1ea1d11c3b41d2b146891349d79be049b78f331297a73e9ffeda455a881edeb",
+  "causalBoundary": {
+    "observed": "Original Registry reached its actual State execution call region and classified the caught error as ReferenceError; original State private frame was marked.",
+    "unresolved": "The undefined identifier or deeper exact State predicate is not observed by this closed diagnostic. A Source worker must identify it separately; no raw exception text was collected.",
+    "staticInference": null
+  },
+  "limits": {
+    "originalAssertionFailed": true,
+    "functionalSuccess": false,
+    "wholeAFKQualified": false,
+    "wholeItemAccepted": false,
+    "nativeAssurance": false,
+    "diagnosticSourceIsIntegrationCandidate": false
+  },
+  "history": {
+    "priorActualFailuresPreserved": true,
+    "noEquivalentRerun": true,
+    "noGateRelaxation": true,
+    "noOriginalAssertionsChanged": true
+  }
+}

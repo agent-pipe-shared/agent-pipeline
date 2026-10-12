@@ -1,0 +1,5 @@
+{"schema":"alfred.power.inhibitor-child-diagnostic.v1","stage":"owned-inhibitor-terminal","code":"UNCLASSIFIED","reason":"NATIVE-CHILD-CLOSE","inhibitorTerminal":{"status":"closed","exitCode":1,"signal":null,"spawnError":null},"stderrObservation":{"status":"bounded","classification":"INHIBIT-REFUSAL-MESSAGE"}}
+{"schema":"alfred.power.source-child-failure-diagnostic.v1","stage":"owned-inhibitor-settlement","code":"SP-CONTROLLER","reason":"OWNED-INHIBITOR-EARLY-EXIT","childCreated":true,"childTerminal":{"status":"unobserved"}}
+{"schema":"alfred.power.source-child-failure-diagnostic.v1","stage":"controller-owned-lifetime","code":"SP-CONTROLLER","reason":"SOURCE-REFUSAL","childCreated":true,"childTerminal":{"status":"unobserved"}}
+{"schema":"alfred.power.source-child-failure-diagnostic.v1","stage":"ack-frame-read","code":"UNCLASSIFIED","reason":"ACK-TIMEOUT","childCreated":true,"childTerminal":{"status":"unobserved"}}
+{"schema":"alfred.power.source-child-failure-diagnostic.v1","stage":"own-child-terminal","code":"UNCLASSIFIED","reason":"UNCLASSIFIED","childCreated":true,"childTerminal":{"status":"closed","exitCode":null,"signal":"SIGTERM","spawnError":null}}

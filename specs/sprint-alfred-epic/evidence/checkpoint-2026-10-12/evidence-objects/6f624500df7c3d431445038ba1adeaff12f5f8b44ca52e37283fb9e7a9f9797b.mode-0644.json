@@ -1,0 +1,80 @@
+{
+  "schema": "alfred.critic-adoption-private-results.v1",
+  "results": [
+    {
+      "id": "ACA001",
+      "status": "held-positive",
+      "reason": "No genuine accepted aggregate mapping/original batch/M4 source inputs supplied. No injected positive issuer."
+    },
+    {
+      "id": "ACA002",
+      "name": "actual two-commit Git root without accepted approval holds without writes",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA003",
+      "name": "real candidate and real parent observations reject substitutions",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA004",
+      "name": "caller PASS/membership/dependency injection cannot issue authority",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA005",
+      "name": "missing original Source registration never creates a new budget",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA006",
+      "status": "held-positive",
+      "reason": "Exact signed M4 debt inventory fixture not supplied; original validator conserved by package CAS."
+    },
+    {
+      "id": "ACA007",
+      "name": "forged, cloned, cross-root and replayed handles cannot publish",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA008",
+      "name": "physical selection digest/alias/tamper observation stays closed",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA009",
+      "status": "held-positive",
+      "reason": "Real not-integrated ancestry was observed for C2; authenticated adopted positive remains unavailable, no Main claim."
+    },
+    {
+      "id": "ACA010",
+      "name": "absent fresh evidence is a typed Source preflight hold",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA011",
+      "name": "strict old target validators remain real default consumers",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA012",
+      "name": "raw descriptor and reference never confer source-bound/admitted state",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA013",
+      "name": "closed CLI refuses selectors, extra authority, apply and relative roots",
+      "status": "passed-controlled-private"
+    },
+    {
+      "id": "ACA014",
+      "name": "reserved Source Verify/control surfaces conserved by exact snapshot",
+      "status": "passed-controlled-private"
+    }
+  ],
+  "positiveNativeOrLive": false,
+  "fullVerify": "not-run",
+  "reviewBudgetConsumed": 0,
+  "privateFixtureExcluded": true,
+  "syntheticFixtureRecreationRequired": true
+}

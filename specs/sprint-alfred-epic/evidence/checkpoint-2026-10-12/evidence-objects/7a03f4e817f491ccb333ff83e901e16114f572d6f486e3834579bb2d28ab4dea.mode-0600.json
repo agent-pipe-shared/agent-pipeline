@@ -1,0 +1,29 @@
+{
+  "schema": "alfred.generator-compaction.execution.v1",
+  "startedAt": "2026-10-10T12:44:36.027Z",
+  "runtimeRoot": "/var/tmp/alfred-generator-compaction-fT0JWG",
+  "status": 0,
+  "signal": null,
+  "spawnError": null,
+  "preparationError": null,
+  "parserError": null,
+  "graphError": null,
+  "parentError": null,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "0317c17814b43687f87d3faa6bee02be264ec2f646b8d2c9f60f9e15cdb3e1f0",
+    "caseSetSha256": "49d1674c699dddac4114837531ba66fd06419a5965f16db875cced25266f718f",
+    "dispositionsSha256": "0110401bf0281913d2b3f2b2feba574057efed99f816c9fa5b08d87fc237dd73",
+    "declaredCount": 21,
+    "disposedCount": 21,
+    "counts": {
+      "pass": 21,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa",
+  "finishedAt": "2026-10-10T12:45:54.361Z"
+}

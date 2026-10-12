@@ -1,0 +1,118 @@
+{
+  "schema": "alfred.egm-new-model-comparison.v1",
+  "status": "fixture-qualified",
+  "taskId": "egm_new_model_baseline_item",
+  "freshAgentContexts": 1,
+  "model": "gpt-6-luna",
+  "effort": "high",
+  "routeReceiptSha256": "6c608b23751a5871c85b9e7873635bd6e1afe204ff7e8734f7575a1eb3ffc2b6",
+  "assurance": "requested-route; no provider attestation",
+  "bootstrap": {
+    "hostReadback": "ready/CAS-READY",
+    "optionalDiagnostic": "MODEL-ROLE-SESSION-IDENTITY-CONFLICT",
+    "sandboxObservation": "GS-RETIREMENT-READBACK-EMPTY; recovered via exact host action"
+  },
+  "sourceAnalysis": "Original installer had no inline clean-worktree discovery and verified dirty Main as its own provenance. Repair discovers real clean worktrees, retains selected installation root, verifies original public identity and physical custody, compares file modes, and refuses invalid candidates before effects.",
+  "criteria": "Original frozen 10 real-Git cases and assertions unchanged; test hash a20ce57c0379d59360492543037910e883999c1fe2f0bcbdeb0537f8076f1e5a",
+  "results": [
+    {
+      "artifact": "legacy-origin:alfred-egm-operating-optimization-20261011/new-model-comparison/red.json",
+      "sha256": "bb6f8120d0dff29113d44a66bae1175c9eeb69c680ddd7fa531bf83ba21ad234",
+      "command": [
+        "node",
+        "--test",
+        "legacy-origin:alfred-egm-operating-optimization-20261011/new-model-comparison/package/pipeline-core/install-agy.inline-candidate.test.mjs"
+      ],
+      "exitCode": 1,
+      "elapsedSeconds": 0.9,
+      "sourceSha256": "c91fd55dade9dfbb75257f13b4df6c432fc5895b1cd22b7f21b98f26a478923c",
+      "testSha256": "a20ce57c0379d59360492543037910e883999c1fe2f0bcbdeb0537f8076f1e5a"
+    },
+    {
+      "artifact": "legacy-origin:alfred-egm-operating-optimization-20261011/new-model-comparison/green.json",
+      "sha256": "f71cd6cb2fd9552e39c8b4b84641dd30f6e31c7e76c8a97450ea733d7c515480",
+      "command": [
+        "node",
+        "--test",
+        "legacy-origin:alfred-egm-operating-optimization-20261011/new-model-comparison/package/pipeline-core/install-agy.inline-candidate.test.mjs"
+      ],
+      "exitCode": 1,
+      "elapsedSeconds": 1.243,
+      "sourceSha256": "512b7b55d585ddd252170de94c5964db4dd486a0b0b268a62c17c37c0e48d8be",
+      "testSha256": "a20ce57c0379d59360492543037910e883999c1fe2f0bcbdeb0537f8076f1e5a"
+    },
+    {
+      "artifact": "legacy-origin:alfred-egm-operating-optimization-20261011/new-model-comparison/green2.json",
+      "sha256": "d4fc8d5129dd6bcdf432096d89a518b5db1562172080c0cbab67a022a2af7c7c",
+      "command": [
+        "node",
+        "--test",
+        "legacy-origin:alfred-egm-operating-optimization-20261011/new-model-comparison/package/pipeline-core/install-agy.inline-candidate.test.mjs"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 1.748,
+      "sourceSha256": "149a6388c88e8629e872cecfe430edf389d8554827e02417215efc7a4ab80b33",
+      "testSha256": "a20ce57c0379d59360492543037910e883999c1fe2f0bcbdeb0537f8076f1e5a"
+    }
+  ],
+  "dependencyEvidence": {
+    "assemblyArtifact": "legacy-origin:alfred-egm-operating-optimization-20261011/new-model-comparison/assembly.json",
+    "assemblySha256": "af279e80abcc6d567e72409bc5df01c5f0638e75ae3591c887706cd722afac40",
+    "originalAssemblySha256": "4abb83164ba10219ae8b214774668aaa63f44d330eb24897a2d51533db431114",
+    "donorManifestSha256": "6bc99a622b46dad22b1ec6071f6554967d7d647f7ddd978fcda0f2d59bb135a1",
+    "exactOriginalInventorySha256": "547e0d3587a80ac20e149546eebba9bfe868fe802c09b1f4aec4d346705e58dd",
+    "custodyConserved": true
+  },
+  "measurement": {
+    "fixturePreparationStartUtc": "2026-10-11T20:43:10.971Z",
+    "fixtureQualifiedUtc": "2026-10-11T20:44:33.416Z",
+    "fixturePreparationToReportWallSeconds": 82.445,
+    "activeAgentSeconds": "UNKNOWN",
+    "fullDispatchWallSeconds": "UNKNOWN",
+    "usage": "UNKNOWN",
+    "uncachedInputTokens": "UNKNOWN",
+    "outputTokens": "UNKNOWN",
+    "reason": "No actual current runner usage or complete dispatch start/active-span observation available; fixture timestamps are directly observed, not agent-active time."
+  },
+  "oldBaseline": {
+    "activeAgentSeconds": 1215.776,
+    "elapsedProxySeconds": 2653.535258,
+    "uncachedInputTokens": 169676,
+    "outputTokens": 25326,
+    "freshAgentContexts": 2,
+    "model": "gpt-6.1-sol",
+    "effort": "medium",
+    "completionStage": "fixture-qualified source applied to Main working tree"
+  },
+  "comparison": {
+    "sameStageObserved": "Original acceptance fixture qualification reached in one retained context; old same-stage timing/usage subtotal is unavailable separately from integration.",
+    "stageDifference": "New scratch fixture-qualified source only; old subtotal includes applying source to Main. Main integration forbidden for replay.",
+    "confounds": [
+      "Workflow plus model/effort route changed: gpt-6.1-sol/medium to gpt-6-luna/high",
+      "Prior frozen test/prerequisite artifacts reused; this is replay, not independent original test authoring",
+      "Bootstrap boundary recovery and shell-read refusals occurred",
+      "No current token measurements; no token-saving percentage can be established"
+    ],
+    "performanceClaim": "No causal workflow-only or 20-percent saving claim justified."
+  },
+  "claims": {
+    "productionChanges": false,
+    "installedCacheChanges": false,
+    "gitIndexChanges": false,
+    "criticRun": false,
+    "nativeInteractiveQualification": false,
+    "backlogAcceptance": false
+  },
+  "retention": "The historical raw result records included complete stdout/stderr and exact dependency inventory. Their logical origins and exact digests are retained; this public projection does not export private raw streams or require the old scratch namespace. Tests cleaned their own synthetic fixtures; no cleanup interception.",
+  "publicProjection": {
+    "originalDocumentSha256": "ea8a846a258ad516b47b3c2896d0977ee2c0a5e3b40564f5f52bbb80879ccb27",
+    "privateOriginalRetainedByDigestOnly": true,
+    "excludedMachineLocalPathOccurrences": 6,
+    "commandRepresentation": "Historical invocation metadata using a logical Node executable and logical test-source origin; not an executable retry or newly observed command.",
+    "historicalNodeReleaseLabel": "v24.15.0 from the original executable path label; no executable digest or current-runtime attestation is inferred.",
+    "legacyOriginResolution": "No canonical raw result/test-source mapping was found in the closed portable maps. Exact result, test and assembly hashes remain known; raw-record recovery or a new authorized fixture reconstruction is held.",
+    "qualificationAndMeasurementClaimsUnchanged": true,
+    "testsRerun": false,
+    "effectiveProviderAttestationClaim": false
+  }
+}

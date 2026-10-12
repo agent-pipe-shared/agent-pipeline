@@ -1,0 +1,70 @@
+{
+  "schema": "alfred.afk-main-single-file-atomic-apply.v1",
+  "status": "applied-one-file",
+  "component": "host",
+  "canonicalPath": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+  "preimage": {
+    "path": "<repository>/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+    "sha256": "7ce18941bf4d96c6f04349f00bd46c20414a367a9efea8755d979ab7760f09bf",
+    "bytes": 16311,
+    "mode": 420,
+    "nlink": 2,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "917ebdee6f1bca87221face493254fd35b50265b6cf43d878f85dd94b4845152",
+      "bytes": 6,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "postimage": {
+    "path": "<repository>/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+    "sha256": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+    "bytes": 29103,
+    "mode": 420,
+    "nlink": 1,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "1fc46090dd762fde88f69409455306f4e7e97737056cdb43d175e7d85cc62efe",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "inverseRetained": "legacy-origin:alfred-afk-main-content-transfer-20261011/main-writer-v3/preflight/inverse/plugins/pipeline-core/lib/afk-transaction-host.mjs",
+  "captureManifestSha256": "87d1ae0b8bce7561d4baac3cac603e91be404b11fcae6c8c96dd3160dc218670"
+}

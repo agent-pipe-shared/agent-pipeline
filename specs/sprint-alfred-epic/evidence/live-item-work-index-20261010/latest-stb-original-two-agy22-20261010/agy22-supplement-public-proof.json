@@ -1,0 +1,127 @@
+{
+  "schema": "alfred.sanitized-agy-readback-supplement.v1",
+  "input": {
+    "path": "scratch/alfred-agy-observed-version-independent-tests-20261010/refresh-integration-readback-supplement-v2.json",
+    "sha256": "404af06fe1790e72c557beadf1926d2dc3009798039ad929246b7d4241312e1f",
+    "bytes": 326256
+  },
+  "status": "supplemental-readback-passed",
+  "observedAt": "2026-10-10T15:44:53.821Z",
+  "observationTimeMeaning": "current supplemental readback time; does not revise or imply a historical timestamp for the original v9 execution",
+  "originalReceipt": {
+    "path": "scratch/alfred-agy-observed-version-independent-tests-20261010/refresh-integration-execution-v9.json",
+    "sha256": "cce878598ac08974051351cf2dce85a9d36b59329acb77ba2f14f9c6b5688058",
+    "originalStatus": "post-run-source-cas-failed",
+    "originalPostRunSourceCASValid": false
+  },
+  "selectedInventory": {
+    "path": "scratch/alfred-agy-managed-topology-row-boundary-successor-20261010/actual-source-manifest.json",
+    "sha256": "2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381",
+    "rows": 146
+  },
+  "sourceReadback": {
+    "checkedRows": 523,
+    "same": 523,
+    "changed": 0,
+    "unreadable": 0
+  },
+  "callbackReadback": {
+    "checkedRows": 4,
+    "same": 4,
+    "basis": "all four source/staged callback rows in actual supplement"
+  },
+  "fd3ProductionParserReparse": [
+    {
+      "suite": "refresh",
+      "fd3Bytes": 2280,
+      "fd3Sha256": "2aebbc0933ccba13954fad12df07fa324e7b5de954c76324c7f26253383ec292",
+      "fd3ExactToReceipt": true,
+      "productionParserSha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+      "policy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC05C001",
+          "RC05C002",
+          "RC05C003",
+          "RC05C004",
+          "RC05C005",
+          "RC05C006",
+          "RC05C007",
+          "RC05C008",
+          "RC05C009",
+          "RC05C010",
+          "RC05C011",
+          "RC05C012",
+          "RC05C013"
+        ],
+        "maxBytes": 65536
+      },
+      "parsedAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "ba352a4054efbeb6630bb8c7adbec225301b59bfaa21ae45d1d9396e660d1933",
+        "caseSetSha256": "0e21a6359acb922433fd8a86bfd121f8dffe2051822a004ae7166a5930a514c0",
+        "dispositionsSha256": "8c96f71f15832f4ae75072bd5f4af00a2935f5f4714133707f2fc1224a6a2967",
+        "declaredCount": 13,
+        "disposedCount": 13,
+        "counts": {
+          "pass": 13,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "parsedMatchesOriginalAttestation": true,
+      "status": "same"
+    },
+    {
+      "suite": "integration",
+      "fd3Bytes": 1729,
+      "fd3Sha256": "57da5d2e134be362e3be605570a5f79d3c3b4cc77419920fb62c601e39d4c3d2",
+      "fd3ExactToReceipt": true,
+      "productionParserSha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+      "policy": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RC19C001",
+          "RC19C002",
+          "RC19C003",
+          "RC19C004",
+          "RC19C005",
+          "RC19C006",
+          "RC19C007",
+          "RC19C008",
+          "RC19C009"
+        ],
+        "maxBytes": 65536
+      },
+      "parsedAttestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "eb3383ef3ab40745a1aa1c2b571f0feb2d206fad5bb44615aa5555f170f6c48d",
+        "caseSetSha256": "6039b3cab4c3fd742dc682ca1f9f49c8ea50db1ad821658bfceb0db285c387d8",
+        "dispositionsSha256": "d63692543021709288ca3782a689bdc6341842360d7d817d56b0b7e11516e8ce",
+        "declaredCount": 9,
+        "disposedCount": 9,
+        "counts": {
+          "pass": 9,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "parsedMatchesOriginalAttestation": true,
+      "status": "same"
+    }
+  ],
+  "executionClaims": {
+    "childProcessesLaunched": false,
+    "callbacksRerun": false,
+    "productTestsExecuted": false,
+    "originalCaseOutcomesReparsedFromFD3": true,
+    "globalSourceClosureCompletenessClaimed": false,
+    "nativeHostBehaviorClaimed": false
+  },
+  "nativeAuthority": false,
+  "limitation": "supplemental current readback and original FD3 reparse; original v9 post-run-source-cas-failed remains immutable"
+}

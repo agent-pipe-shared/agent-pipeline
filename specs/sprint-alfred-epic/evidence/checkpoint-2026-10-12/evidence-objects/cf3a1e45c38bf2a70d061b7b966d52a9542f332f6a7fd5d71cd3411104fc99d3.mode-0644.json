@@ -1,0 +1,71 @@
+{
+  "schema": "alfred.public148.progress-publication.packet.v1",
+  "status": "Root review ready; publisher unexecuted",
+  "counts": {
+    "currentOrAppliedSelected": 148,
+    "remaining": 16,
+    "runtime": 3,
+    "protectedSelected": 13,
+    "protectedUnion": 14,
+    "outside": 5
+  },
+  "receiptBindings": [
+    {
+      "path": "legacy-origin:alfred-afk-main-content-transfer-20261011/main-writer-v3/applied-ledger.json",
+      "sha256": "2603173c691f51fd4c3af57822ebf34b8e4915589b6207d8615decc1138dd0c0"
+    },
+    {
+      "path": "legacy-origin:alfred-afk-main-content-transfer-20261011/main-writer-v3/applied-host.json",
+      "sha256": "1ce47a68fcca718b2641f92ccbd786fe30d316513b557f3ff352147dcb80a09e"
+    },
+    {
+      "path": "legacy-origin:alfred-runtime-journal-supervisor-integration-preparation-20261011/functional-source-successor/atomic-content-successor/application-root/execution.json",
+      "sha256": "49a392460b53c477ed891a31e2399a73b01cc4291d8f53ffcf09535b91179e89"
+    }
+  ],
+  "files": [
+    {
+      "sha256": "96db4799fa9c3fdeab67f671da62b8a2fd5a90185a108e5e0452af5821034f79",
+      "path": "legacy-origin:alfred-current144-public-progress-preparation-20261011/public148-freeze/integration-delta.json"
+    },
+    {
+      "sha256": "e5ab4f9deccc99f9cff11ae933a35bb793dc2da734178c222b6dcef50c4b1a76",
+      "path": "legacy-origin:alfred-current144-public-progress-preparation-20261011/public148-freeze/remaining-owned-routing.json"
+    },
+    {
+      "sha256": "5c836e3298abfe506aae92986595d2e96a06240460efb1c1aab990cb73a20162",
+      "path": "legacy-origin:alfred-current144-public-progress-preparation-20261011/public148-freeze/report.md"
+    },
+    {
+      "sha256": "dce3011bdbcf4a8a8977a869c08c29836014c233b31afd8f4843b3834e8efcf2",
+      "path": "legacy-origin:alfred-current144-public-progress-preparation-20261011/public148-freeze/postimages/CURRENT-PROGRESS.md"
+    },
+    {
+      "sha256": "bbaac9a3f4c265b7a1318f6fa900f532f46e169615fac23cc094e8cde94ef365",
+      "path": "legacy-origin:alfred-current144-public-progress-preparation-20261011/public148-freeze/postimages/handover-2026-10-10-live-work-index.md"
+    }
+  ],
+  "parents": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/CURRENT-PROGRESS.md",
+      "sha256": "0d2dd49e5b8083590e12caf38eaf43f945ec8fad68bb243a760b06baba872908"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/handover-2026-10-10-live-work-index.md",
+      "sha256": "e5a234ce8157f0624140efd6cd5d4680d24dafef32efc2ab8db876713cfaadff"
+    }
+  ],
+  "publicArchiveWhitelist": [
+    "integration-delta.json",
+    "remaining-owned-routing.json",
+    "report.md",
+    "manifest.json"
+  ],
+  "rootVerifiedProofPins": true,
+  "engineeringStagesChanged": false,
+  "formalAcceptance": false,
+  "nativeClaim": false,
+  "productWrites": 0,
+  "businessRuns": 0,
+  "GitOperations": 0
+}

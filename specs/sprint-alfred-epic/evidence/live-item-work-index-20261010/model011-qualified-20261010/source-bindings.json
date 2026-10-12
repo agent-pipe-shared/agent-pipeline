@@ -1,0 +1,70 @@
+{
+  "schema": "alfred.model011.source-dependency-binding-proposal.v1",
+  "sourceManifestSha256": "d01135d140335d24fb1fd66de8fc201c49f49660b146f67b88634826170f6c49",
+  "powerDependencyManifestSha256": "c4d1b954aaf0114bba60f284da44bf54b96cde9be5d80615b5ac5c08a1927ab8",
+  "qualificationFreezeSha256": "876a259f7079efdd99d194bd39638672a4218ef62bae38553ba26627cac1b6c6",
+  "sourceBindings": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "sha256": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f",
+      "byteLength": 79837,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "sha256": "50b724f89bb71916b16aa57053c3cb8f081590fd9078645d090364208c706e3a",
+      "byteLength": 52169,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "sha256": "f8bf0785ba9393c0ddd3c48ca0b54aab9b51a8977eddfda1a0a3ad5caa3013b0",
+      "byteLength": 124892,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+      "sha256": "e1c30e4d7662a0b0dc5b4f5fbd178dada5349bd2cdff37969a379f37964eb226",
+      "byteLength": 12852,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "sha256": "f9ab78f6cacda4aa7555163b6f1d72bbbff0633bf83cd690ddfee83c0af170c8",
+      "byteLength": 30051,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "sha256": "3c4ce04052abe17812140b98d55123e87195eb1f37db18f593fb51ed43630830",
+      "byteLength": 34142,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-power-controller.mjs",
+      "sha256": "fd9f8b837acd6b9008a40bed98b95eb40cc4c4006e8719539b92b7e8ed75921e",
+      "byteLength": 10774,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "sha256": "fda05d645a23c8187f19faad2419d9a916d1a4db13ac8c1c9938276384e9c711",
+      "byteLength": 67380,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "sha256": "ae69d331bed4ba715458ace4ecded3de56897a636a2121875c7b12ace69442c1",
+      "byteLength": 48384,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",
+      "sha256": "37679586821c8b4cd17630645f9adb6be8581f046cc07fe4d36ab9f683e5f5ae",
+      "byteLength": 28911,
+      "mode": 420
+    }
+  ],
+  "scope": "One original I08T011 with six actual refusal observations; dependency presence is not separate Power or aggregate qualification.",
+  "adoptionStatus": "Root-owned-pending"
+}

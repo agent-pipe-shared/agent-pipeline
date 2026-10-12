@@ -1,0 +1,100 @@
+{
+  "schema": "alfred.shared-credential-focused.public-proof.v1",
+  "result": "focused-five-pass-complete",
+  "actualExecution": {
+    "path": "scratch/alfred-shared-credential-root-independent-qualification-20261011/runtime-regex-check-successor/module-init-and-direct-fd3-successor/execution.json",
+    "sha256": "39c2c1d49adb6eb63e8ed3358f2225ce65646484c50a0df157b5b49b1110a796",
+    "bytes": 3128
+  },
+  "completionReceipt": {
+    "path": "scratch/alfred-shared-credential-root-independent-qualification-20261011/runtime-regex-check-successor/module-init-and-direct-fd3-successor/qualification-output/completion.fd3.jsonl",
+    "sha256": "0a4d31df38e4cd3d5234dace831dc9becb2c437a18c6a90fb9f176b0524cfe01",
+    "bytes": 1155
+  },
+  "qualificationReady": {
+    "path": "scratch/alfred-shared-credential-root-independent-qualification-20261011/runtime-regex-check-successor/module-init-and-direct-fd3-successor/ready-manifest.json",
+    "sha256": "c53d69f0a2b31cdfdf91ca34886b90e21ac6ba2d2171b8387a2ba3e92e2d1048",
+    "bytes": 3835
+  },
+  "freeze": {
+    "path": "scratch/alfred-shared-credential-root-independent-qualification-20261011/runtime-regex-check-successor/module-init-and-direct-fd3-successor/qualification-freeze.json",
+    "sha256": "c10f935dce898e27268258f2f5d1b7d6b4188cbab6bc708e3172fd5150daae89",
+    "bytes": 11589
+  },
+  "callbacks": {
+    "path": "scratch/alfred-shared-credential-root-independent-qualification-20261011/runtime-regex-check-successor/callbacks.mjs",
+    "sha256": "7528d0df4e07607d9a92d7483fd58015a5691783839c3060acfed1fb9d27bd0e",
+    "bytes": 8873
+  },
+  "child": {
+    "status": 0,
+    "signal": null,
+    "errorCode": null
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "1e6b144003a0edaeff21f41519d91357119ce2b12f7dd3f5f0b3306f43a04a69",
+    "caseSetSha256": "02176ae52fbb4081981210fefab3247f39fa0d7718f2679b9730ee72c7692470",
+    "dispositionsSha256": "2e35625e5a4bcc9c5683fb52f71b5bdaa0009732fb1cc56775978c8df9f53d70",
+    "declaredCount": 5,
+    "disposedCount": 5,
+    "counts": {
+      "pass": 5,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "cases": [
+    {
+      "id": "SCR001",
+      "disposition": "pass"
+    },
+    {
+      "id": "SCR002",
+      "disposition": "pass"
+    },
+    {
+      "id": "SCR003",
+      "disposition": "pass"
+    },
+    {
+      "id": "SCR004",
+      "disposition": "pass"
+    },
+    {
+      "id": "SCR005",
+      "disposition": "pass"
+    }
+  ],
+  "selectedPolicySha256": "aec789df087f685e231cfc9517ae21b1ed635d425a5183fbab0181452c7d361f",
+  "selectedGrammarSha256": "26b4235c90c7c658a7fcf7aec38c930fd2e25d5a33876e597f6f5bc091319267",
+  "originalResources": 518,
+  "resourcesDuringChild": 520,
+  "sourceConserved": true,
+  "sourceRestored": true,
+  "temporaryAssetsRemoved": true,
+  "temporaryAssetAdditions": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-launcher.mjs",
+      "sha256": "34e4c85b3ffb3243d77ea643cc76f75d33b77f809b7852e82b0d44749b644f4f"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-exec-worker.mjs",
+      "sha256": "da64eddced054475606fdf98ae36513c856723e1a0e404c8e1e4de399f07e7b0"
+    }
+  ],
+  "transport": "direct-node-announced-fd3",
+  "stdoutSha256": "a8e7962cce9b5514d7e4c7b8e46cbbbb70ed8564e192c1b08814f1ddeddad508",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "limits": {
+    "original43Replayed": false,
+    "nativeWindowsOrWSLClaim": false,
+    "globalHostEnforcementClaim": false,
+    "wholeItemAcceptance": false,
+    "MainIntegrationClaim": false,
+    "HumanApprovalOrSignature": false,
+    "otherLifecycleCoverage": false
+  }
+}

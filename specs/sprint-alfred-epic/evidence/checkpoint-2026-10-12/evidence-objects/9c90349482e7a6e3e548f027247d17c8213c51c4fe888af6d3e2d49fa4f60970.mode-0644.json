@@ -1,0 +1,84 @@
+{
+  "schema": "alfred.selected164.actual148.public-checkpoint.v1",
+  "parent144": {
+    "path": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/consumed144-runtime9-append/integration-delta.json",
+    "sha256": "e32726b96d0227d7c5a549db077d840f11a7b1ab419b8d16d148edec5a2e8079"
+  },
+  "counts": {
+    "selected": 164,
+    "currentOrApplied": 148,
+    "remaining": 16,
+    "runtime": 3,
+    "protectedSelected": 13,
+    "protectedUnion": 14,
+    "outside": 5
+  },
+  "receiptBindings": [
+    {
+      "path": "legacy-origin:alfred-afk-main-content-transfer-20261011/main-writer-v3/applied-ledger.json",
+      "sha256": "2603173c691f51fd4c3af57822ebf34b8e4915589b6207d8615decc1138dd0c0"
+    },
+    {
+      "path": "legacy-origin:alfred-afk-main-content-transfer-20261011/main-writer-v3/applied-host.json",
+      "sha256": "1ce47a68fcca718b2641f92ccbd786fe30d316513b557f3ff352147dcb80a09e"
+    },
+    {
+      "path": "legacy-origin:alfred-runtime-journal-supervisor-integration-preparation-20261011/functional-source-successor/atomic-content-successor/application-root/execution.json",
+      "sha256": "49a392460b53c477ed891a31e2399a73b01cc4291d8f53ffcf09535b91179e89"
+    }
+  ],
+  "coverageAppend": [
+    {
+      "path": "plugins/pipeline-core/lib/afk-ledger.mjs",
+      "sha256": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/afk-transaction-host.mjs",
+      "sha256": "a49856526c8b37b418ddf70f2af852c723921ee3854acfee780d300407a46250",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "sha256": "ae69d331bed4ba715458ace4ecded3de56897a636a2121875c7b12ace69442c1",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c",
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "helper124dd": "Already R02-covered; third physical Journal row no-op adds zero.",
+  "proofBindings": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-checks-20261010/approval-lock-source5-six-pass-20261011/proof.json",
+      "sha256": "304cae187870b86e314053ddaa62636ea36c6e467b3986d70a88282734603e5c",
+      "result": "Root-verified6PASS Source5Lock6"
+    },
+    {
+      "path": "legacy-origin:alfred-power-isolated-single-close-qualification-20261010/startup-unavailable-qualification/execution-terminal.json",
+      "sha256": "93b08c11fc6c965df4e4f5e49ce9d66c0eb4ee60b02e6f6b67c244dba55e54da",
+      "scope": "1FAIL; missing unavailable record; repair preparation"
+    },
+    {
+      "path": "legacy-origin:alfred-power-isolated-single-close-qualification-20261010/inhibitor-diagnostic-successor/execution-terminal.json",
+      "sha256": "d0dd000cf4fd57b98a8e22ff219f134815e633c1ea2fac4b7e50f5c068051301",
+      "result": "original native005 FAIL"
+    },
+    {
+      "sha256": "7a8bc8cad6bdb94193462e802f18af3c2ddd4813983454720f9da11bda910f99",
+      "scope": "complete1FAIL;453conserved; registry-plan/SDC-AUTHORITY-UNAVAILABLE; inner cause unproven",
+      "path": "legacy-origin:alfred-afk-posthost-state-handoff-independent-20261010/diagnostic-successor/root-one-case-preparation-20261011/execution.json"
+    }
+  ],
+  "AFKCause": "Root source-owned static finding: afk-project missing from whitelist in c991 and5827. Minimal correction owner OBL013 preparing independent norm; no green runtime outcome.",
+  "fullQualification": false,
+  "nativeClaim": false,
+  "formalAcceptance": false,
+  "engineeringStagesChanged": false
+}

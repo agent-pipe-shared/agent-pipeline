@@ -1,0 +1,97 @@
+{
+  "schema": "alfred.clr12-actual-qualified-evidence.v1",
+  "status": "focused-CLR12-GREEN",
+  "actualCounts": {
+    "pass": 12,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "exitCode": 0,
+  "node": "v24.15.0",
+  "platform": "linux",
+  "signal": null,
+  "childError": null,
+  "parserError": null,
+  "graphConservationError": null,
+  "files": [
+    {
+      "path": "execution.json",
+      "sha256": "e32db62929f5f71c61a1578d3829013583340784dd6c60fff3a408688bce28af",
+      "bytes": 1661,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "case-completion.ndjson",
+      "sha256": "bd422b9644782d08225e115e558220f0e648b926e580310e22459dd4039fb312",
+      "bytes": 2071,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "completion-policy.json",
+      "sha256": "e9d4f7e94056c8cb651d427df1a5891298b9758269245e3123a2b94356cae14c",
+      "bytes": 268,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "production-attestation.json",
+      "sha256": "94c993021398c8e20a38f81a8e2ba1cc0ce9ddfc88f05a9799fdaf57cd42779b",
+      "bytes": 479,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "qualification-case-associations.json",
+      "sha256": "aeef86495740f6f0daf366f3846b59c55f4a309c08a0b7fa864913f04f8471b4",
+      "bytes": 2080,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "qualification-source-bindings.json",
+      "sha256": "c3b6ee961d12e5e7013bdbb2188f04136cd17999182522668586009868e81468",
+      "bytes": 1245,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "original11pass1fixtureFailureRetained": {
+    "executionSHA256": "1d199c836cb296cf6308f15d45f5efc379f537237954ff481e66ba12ee345555",
+    "cause": "trailing-slash pluginRoot passed to normalized physical opaque-owner constructor",
+    "assessment": {
+      "path": "original-proof/assessment.json",
+      "sha256": "44fef7647ab2dbfc7213af3d180faf81381d1737a9a5f1a3b8e69531bf0fbbc9",
+      "bytes": 1442,
+      "mode": 420,
+      "nlink": 1
+    }
+  },
+  "sourceBindings": {
+    "guardCanonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+    "guardSourceSHA256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+    "writerCanonicalPath": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+    "writerContextSHA256": "19c1c563ca8fbb231a8d2ef36a25a0dba620eeb80d008eef8ae70cf38af72f29",
+    "testCanonicalPath": "plugins/pipeline-core/scripts/fixtures/closing-record/closing-record.test.mjs",
+    "testSHA256": "a5da1fbf9ca5b41e7412fdb00b90532d986c5ed2911c0d42edc6cd66b346b90a",
+    "fixtureCanonicalPath": "plugins/pipeline-core/scripts/fixtures/closing-record/closing-record.fixture.mjs",
+    "fixturePreSHA256": "19fafd89ec2c4e22b684aeb419eccff6c8da11383bd5f72d5d3a3723136e550b",
+    "fixturePostSHA256": "32d25d4d69fb6b0a0ce7578363912e00337de6a140733bb5a5c126645ee09d61",
+    "launcherSHA256": "f3ef766d1cb995671a57b05f7a40284f36193657044915d52a111583332fae38",
+    "sourceGraphSHA256": "9305a33b9eb5e5cf91efde81f3cbf5b73fa99d534f6e32ec952b3d3f1eba22e2",
+    "freezeSHA256": "94c92a6a8ef3279d3dd0821d04123a29d3769b73eba3c717394de423b9dd8b47"
+  },
+  "businessExecutions": {
+    "original": 1,
+    "fixtureSuccessor": 1,
+    "metadataClosure": 0
+  },
+  "scope": "12 physical unit case groups; no whole Critic or native hook qualification",
+  "M5Status": "Separate Root-reported18/18; no aggregate count",
+  "review": "open",
+  "nativeQualification": "absent",
+  "officialItemClosure": false,
+  "integration": "not applied"
+}

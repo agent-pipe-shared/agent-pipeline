@@ -1,0 +1,97 @@
+{
+  "schema": "alfred.scratch-package-staging.seven-actual-public-proof.v1",
+  "date": "2026-10-11",
+  "scope": "Seven grouped real-Git committed-package registration, physical refusal, sweep and partial-effect controls against private Source3.",
+  "actual": {
+    "qualified": true,
+    "status": 0,
+    "error": null,
+    "signal": null,
+    "timedOut": false,
+    "completionError": null,
+    "conservationError": null,
+    "sourcesConserved": true,
+    "resourcesConserved": true,
+    "directoryMembershipsConserved": true
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "53fd419995abe8cc3196a0a7a5b96eec9ea22df2f5bc5b07078c6e2dcc199f10",
+    "caseSetSha256": "4aaa7a241da1b5ba20c85227098317d1e20f948a5a7ac90c92099e1a9c57dbe1",
+    "dispositionsSha256": "ed1169857763fcbf4af29dc8c956afcd4c690c5ff44e8dddace2a828ed0aefa5",
+    "declaredCount": 7,
+    "disposedCount": 7,
+    "counts": {
+      "pass": 7,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "cases": [
+    {
+      "id": "SPC001",
+      "disposition": "pass"
+    },
+    {
+      "id": "SPC002",
+      "disposition": "pass"
+    },
+    {
+      "id": "SPC003",
+      "disposition": "pass"
+    },
+    {
+      "id": "SPC004",
+      "disposition": "pass"
+    },
+    {
+      "id": "SPC005",
+      "disposition": "pass"
+    },
+    {
+      "id": "SPC006",
+      "disposition": "pass"
+    },
+    {
+      "id": "SPC007",
+      "disposition": "pass"
+    }
+  ],
+  "sourceManifestSha256": "f1a3bba376c4128b6ae56f57074cd97cd0411026e5aacc7285afd1c9431c3798",
+  "sources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-retention.mjs",
+      "parentSha256": "01baa676983f1a93e617cb2f3e334af0cddbc8b386ade534f9e5b7f7e43f9601",
+      "postSha256": "0fa925d7dd40b18c52f383514d23de99752748aa3b9d2af0457da0b3599d2ca3"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/scratch-sweep.mjs",
+      "parentSha256": "5a7507fb85b9dc7f17640eb1ac7347a4b9938dec08e9d9e1a712d68abd2e0a4f",
+      "postSha256": "78be835d3e2e92a923aa447fafd9313adf018cedc87e3b977f0375546da1dfc6"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-package-staging.mjs",
+      "parentSha256": null,
+      "postSha256": "31ae427807af0bd37484290c0db40532153df8926287cc89b186b925d849fc64"
+    }
+  ],
+  "actualExecutionSha256": "8d2cbefde182030fe82d96627b4b2ae8f9b0045f5a05de16b4e705586034a943",
+  "actualCompletionSha256": "2426fe1424409894bcf2adc63290efcfec2c1ff10483b56076050a62058d8266",
+  "stdoutSha256": "36e7a32a616af432dffaa4f844e01e4225282ed7a6edb2cb5f0f641dd1e59b82",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "qualificationFreezeSha256": "5a5d11884444b6d9f81b8fad67188fa7de56e3725d2cd1d91e9e8b5234eafb22",
+  "officialParserSha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+  "canonicalTest": {
+    "canonicalPath": "plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+    "postSha256": "8c0e69313f0bec42b787c36bf0adee731306a57365f27f02f9e8cec2f1917f24",
+    "status": "PRIVATE-PREPARED; exact import/CLI prefix rewrite only; callback body inverse byte-exact. Main integration and actual suite registration remain separate."
+  },
+  "limits": [
+    "No native host or native Windows custody/durability acceptance",
+    "No Human signature, installation, push or whole original70c82 item closure",
+    "Root executed once; publication performs no tests",
+    "This receipt does not claim future canonical registry membership or Main source application"
+  ]
+}

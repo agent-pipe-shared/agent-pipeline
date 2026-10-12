@@ -1,0 +1,36 @@
+{
+  "schema": "alfred.pun-main-starter-actual-content-integration.v1",
+  "canonicalPath": "plugins/pipeline-core/scripts/session-power.mjs",
+  "status": "applied-content-only",
+  "oldSha256": "686365cb4903158691f6759468a2777c352272eb9a979cf7dfe0bfa3964f5e1a",
+  "postSha256": "094c34806199515a2f9c9cd03424bf9deb7836ca627c00a13f880cb0b7189b5d",
+  "bytes": 14747,
+  "mode": "0644",
+  "newInodeReadback": true,
+  "RootApplicationReceiptSha256": "d360ac8371198f4e277b37f43314b49ab98841d4bd5c9309bf2e2a7ee7ad3de7",
+  "RootWriterSha256": "4c25c70f4c141c1f4da0267ffc25d7dd2cecc1794462d90bec8c56f30e8e18f1",
+  "officialClassification": {
+    "classification": "noRule",
+    "receiptSha256": "4e61ea1a7d097b4b62c74e0d4c4b5a20e465f627300e1948ed9d17ed57718947"
+  },
+  "RootReportedFourPeersAndClassifierInputsConserved": true,
+  "actualIsolatedQualification": {
+    "caseId": "PUN001",
+    "pass": 1,
+    "complete": true,
+    "executionSha256": "4fb18a921ab2467eef04048996658042f6e669c9503b9a6c8d706ffc668fa9be",
+    "completionSha256": "d8be2a7082d1c3fb553693e7147e1ffcdb2ca5f0a74b4efe993e537405662e93",
+    "scope": "genuine startup-unavailable controlled case;441 conserved"
+  },
+  "laterMetadataPhysicalReadback": {
+    "postMatchesActualRootReceipt": true,
+    "unchangedDuringRead": true
+  },
+  "nativePositive": false,
+  "MainConsumerExecution": false,
+  "wholeFamilyTerminal": false,
+  "full26": false,
+  "wholeItemAcceptance": false,
+  "historicalFailedRunsPreserved": true,
+  "previousPublicQualificationUnchanged": true
+}

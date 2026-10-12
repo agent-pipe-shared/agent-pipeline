@@ -1,0 +1,46 @@
+{
+  "schema": "alfred.progress-refresh.publication.v1",
+  "status": "published",
+  "parent": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-engineering-progress-20261011/current-engineering-matrix.json",
+    "sha256": "25475c0c5cd674da56bc92d64caf39a442de04aa38d1b343af6a4fb9f6c5568d",
+    "bytes": 355996
+  },
+  "privateProposal": {
+    "path": "scratch/alfred-progress-refresh-20261011/current-engineering-matrix-successor.json",
+    "sha256": "2b359fba4b2dc503c6735364e3df5d36f401e9cb1451a4ee9ba0f8a4799a1164",
+    "bytes": 376220
+  },
+  "changedIDs": [
+    "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+    "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+    "pipeline.sign-intent-disclosure-scan-blocks-for-minutes"
+  ],
+  "counts": {
+    "25": 58,
+    "50": 73,
+    "75": 8,
+    "100": 0,
+    "UNKNOWN": 35
+  },
+  "stageChanges": 0,
+  "accepted": 0,
+  "originalRowsConserved": true,
+  "original37AC4IR": {
+    "parentSha256": "f3f79d386b12cc361f1f3dc2e8ad4ce1b3f685f986173346159fcebdc820e94c",
+    "unchanged": true
+  },
+  "outputs": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-engineering-progress-refresh-20261011/current-engineering-matrix.json",
+      "sha256": "b980dfc0ec3baa4f4e37c3a90b1cbc3d63a8c72613b490a786e89b09843ce732",
+      "bytes": 377842
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-engineering-progress-refresh-20261011/progress-report.md",
+      "sha256": "7ad16b9da8072c5a28ab3098ebcef713a563f6afe32a39cb6db7a41b2d8540d5",
+      "bytes": 815
+    }
+  ],
+  "productRuns": 0
+}

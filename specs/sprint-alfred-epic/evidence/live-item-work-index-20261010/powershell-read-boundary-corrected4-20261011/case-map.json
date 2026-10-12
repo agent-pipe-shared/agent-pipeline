@@ -1,0 +1,30 @@
+{
+  "schema": "alfred.powershell-corrected-four.case-map.v1",
+  "contract": {
+    "path": "scratch/alfred-powershell-onboarding-read-boundary-assessment-20261011/corrected-four-contract.json",
+    "sha256": "e63f5347c1c06165c3dbfce24d3ee226a4561549b15fa0df77a976c3a397f59a"
+  },
+  "cases": [
+    {
+      "id": "PSBC001",
+      "replacesPremise": "PSB-Read",
+      "scope": "Read: benign exact host file allowed; configured synthetic credential file refused"
+    },
+    {
+      "id": "PSBC002",
+      "replacesPremise": "PSB-Grep",
+      "scope": "Grep: benign exact host file allowed; configured synthetic credential file refused"
+    },
+    {
+      "id": "PSBC003",
+      "replacesPremise": "PSB003",
+      "scope": "Literal PowerShell Get-Content: benign exact host file allowed; configured synthetic credential file refused"
+    },
+    {
+      "id": "PSBC004",
+      "replacesPremise": "PSB002",
+      "scope": "Literal PowerShell names-only directory listing: benign directory allowed; configured synthetic credential directory and physical alias refused"
+    }
+  ],
+  "constructor": "Real inherited-environment Git initialization, exclusive synthetic repository and closed legacy credential-pointer metadata, actual source reader asserts valid directory identity. No signer setup, machine-plane replacement, key material, HOME rewrite or authority grant."
+}

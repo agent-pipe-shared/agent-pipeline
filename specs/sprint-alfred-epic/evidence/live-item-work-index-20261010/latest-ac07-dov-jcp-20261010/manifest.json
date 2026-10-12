@@ -1,0 +1,94 @@
+{
+  "schema": "alfred.focused-proof-publication-preparation.v1",
+  "inputs": [
+    {
+      "path": "scratch/alfred-ac07-durable-binding-current122-resource-preparation-20261010/successor6/qualification/runtime/execution.json",
+      "sha256": "83fbbe26f3f5ebef2703816e14aa33fb594bd6b8ac11842fd40b89ea61cd7017",
+      "bytes": 1906
+    },
+    {
+      "path": "scratch/alfred-ac07-omitted-eight-genuine-writer-preparation-20261010/qualification/runtime/execution.json",
+      "sha256": "664410d72281497ff2169991a733aefc4f0b667ced6ca050298a4fecadbf7c1f",
+      "bytes": 1923
+    },
+    {
+      "path": "scratch/alfred-v3-declared-override-inherited-home-runner-20261010/execution.json",
+      "sha256": "442815e251bedeffd0ebd8fff22d86ab54e0bac9a6bef956915e9990415d347a",
+      "bytes": 1031
+    },
+    {
+      "path": "scratch/alfred-jcp-resource-reason-successor-20261010/runtime/execution.json",
+      "sha256": "a14aa07653a5c69c3e07d924904ad7c70c822ba3aba6289d8f138ec03443f3c7",
+      "bytes": 9309
+    },
+    {
+      "path": "scratch/alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/execution-terminal.json",
+      "sha256": "9a7141c0cce33bc45de68dad7f846d4774b0e926b87d64abf926d23aa8d2e35c",
+      "bytes": 1328
+    },
+    {
+      "path": "scratch/alfred-stb-onboarding-parent-current146-source-and20-replay-preparation-20261010/actual-failure-diagnosis/projection-contract-successor/one-case-diagnostic/source-bug-successor/execution-terminal.json",
+      "sha256": "b90d0360660d9957a782e5cde9bcee2bcd8631e23c8027ecf56f69db11434087",
+      "bytes": 1327
+    },
+    {
+      "path": "scratch/alfred-agy-observed-version-independent-tests-20261010/refresh-integration-execution-v8.json",
+      "sha256": "24e48415a2141b40ecfa6c91fce73875b6936915c583a542bab7b8fe994cb9a7",
+      "bytes": 315
+    }
+  ],
+  "files": [
+    {
+      "path": "ac07-fourteen-proof.json",
+      "sha256": "f292d97b68412500c669c817d92bb4c3ca77cc497baed5c01aeed075296a4fec",
+      "bytes": 1259,
+      "mode": 420
+    },
+    {
+      "path": "ac07-additional-four-proof.json",
+      "sha256": "1f7d93959789d70952d503e0777cded0f71f3b56fd4f7b2af4baaf54ba7cac37",
+      "bytes": 1227,
+      "mode": 420
+    },
+    {
+      "path": "declared-override-twenty-proof.json",
+      "sha256": "de85d1845f9f71b39c61e5599689aaf8231e6477efe34545ba79713b69e4b51f",
+      "bytes": 1143,
+      "mode": 420
+    },
+    {
+      "path": "joint-command-placement-twelve-proof.json",
+      "sha256": "07e3bd008771dd9e3af89e6089c948c4ddaa2ef98eda3452c0b3b01b99ed9dbf",
+      "bytes": 1171,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "b49d4e3c95778e80d461cfa1e098a11835d19f63100e6f365849852da94a666f",
+      "bytes": 3407,
+      "mode": 420
+    },
+    {
+      "path": "handover-update.md",
+      "sha256": "3eee0889c6974793a7c6b27b8b710a6ac7d276c11bd3c53042bf8446157a49cf",
+      "bytes": 1072,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "c057f2ab1d3d850b4eab449a160c4c5c6d0665fea040e4f815dc97f03c94bbf1",
+      "bytes": 767,
+      "mode": 420
+    },
+    {
+      "path": "late-checkpoint.json",
+      "sha256": "3f75cb5d1aa897f04e05902b2514e27573e306b76e3c305e65f048b826c7a062",
+      "bytes": 4492,
+      "mode": 420
+    }
+  ],
+  "businessRuns": 0,
+  "gitWrites": 0,
+  "archiveExecutions": 0,
+  "privacy": "allowlisted receipt fields only; raw streams, host paths, environments, runtime graphs and keys excluded"
+}

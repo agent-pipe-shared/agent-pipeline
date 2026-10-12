@@ -1,0 +1,338 @@
+{
+  "schema": "alfred.oa6-unprotected-atomic-transfer.actual.v1",
+  "mode": "--apply",
+  "status": "applied",
+  "operations": [
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "effect": "noop",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "effect": "noop",
+      "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "effect": "noop",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "effect": "noop",
+      "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "effect": "noop",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488"
+    },
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "effect": "noop",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "effect": "add",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "3e9f9f6f3866914eeaea781ec213031e3d11e036c1393b2d213d10cec19b0c00",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "3622",
+        "mtimeNs": "1791670859333487653",
+        "ctimeNs": "1791670859362585889",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": null,
+      "backupPath": null
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "effect": "replace",
+      "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "83a2e667c534769e256e37e222cd94d581f1b5ba4690d9a68991757c1e543706",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "17680",
+        "mtimeNs": "1791670859341230001",
+        "ctimeNs": "1791670859365486918",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "6a2c33073813368eff1bf4a28d8d41a5a74d8c92c09e2f92721bc760be1fbce0",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "d5c76af43f9294ceb77876da88d35519f308077e816f6d031e6ab60a8386b6c4",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "16184",
+          "mtimeNs": "1790938622000000000",
+          "ctimeNs": "1791569417494730593"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/apply-once/backups/1.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "effect": "replace",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "cb4265dfdea1550831e4cd427307419c69bdb8436fe825e78ce86b309a3b1749",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "8734",
+        "mtimeNs": "1791670859346375309",
+        "ctimeNs": "1791670859369486826",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "2997328b06173126f0e8a51d1df831cece1d2dcabdee52832948482666d600c7",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "18504ee509f74d621c0f1c2961b93ef5415399c8325486a0318aecac80b274c9",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "7149",
+          "mtimeNs": "1790938622000000000",
+          "ctimeNs": "1791569417494730593"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/apply-once/backups/2.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "effect": "replace",
+      "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "562794b958085def59b8664be7eeb491e0e4c7191beebf729528612f963e8d92",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "6494",
+        "mtimeNs": "1791670859351730355",
+        "ctimeNs": "1791670859373486734",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "4624d591383a8435621d69adafa96be97a436cca513bb4ac94ebdb6db29d1b00",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "13ef2a3793b8989540e619019ed565a11db3a80e0dd738f6b8593c3ed92d826e",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "5302",
+          "mtimeNs": "1790938622000000000",
+          "ctimeNs": "1791569417494730593"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/apply-once/backups/3.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "effect": "replace",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "b7204ec2adec6b409a39a77ba155a2fd71be4e4edf93bb7a20ef72ae5f86a3c6",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "8306",
+        "mtimeNs": "1791670859357143123",
+        "ctimeNs": "1791670859377486642",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "8514119600f4ad7da165335d5be27df8c56de97fcc4dafaf28e529f9876d7e52",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "af5df09d9ded2a02c17a327fb9f174223f56e35bcfe5fb33d6a3263b6fe30426",
+            "bytes": 6,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 2,
+          "bytes": "8245",
+          "mtimeNs": "1791534747272743012",
+          "ctimeNs": "1791569417494730593"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/apply-once/backups/4.before.bin"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "effect": "replace",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "physical": {
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "00f30608d80e900770318ea3aade4075cad50d0a6d558307688f7febd9d81fa8",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "mode": 420,
+        "nlink": 1,
+        "bytes": "31644",
+        "mtimeNs": "1791670859362585889",
+        "ctimeNs": "1791670859381486550",
+        "regular": true,
+        "directory": false,
+        "symlink": false
+      },
+      "preimage": {
+        "sha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+        "physical": {
+          "dev": {
+            "excluded": true,
+            "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+            "bytes": 4,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "ino": {
+            "excluded": true,
+            "rawSha256": "555e0f978b54028219875618474e3eafcf22ec784f7eeb44bbac8966588a3379",
+            "bytes": 7,
+            "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+          },
+          "mode": 420,
+          "nlink": 1,
+          "bytes": "31090",
+          "mtimeNs": "1791571845132017111",
+          "ctimeNs": "1791571845132017111"
+        }
+      },
+      "backupPath": "legacy-origin:alfred-current-selected164-remaining-integration-inventory-20261010/oa6-dependency-preparation/apply-once/backups/5.before.bin"
+    }
+  ],
+  "noProductImports": true,
+  "businessRuns": 0,
+  "protectedTargets": 0,
+  "conservation": {
+    "AuditSourceTargets": 6,
+    "MainNamedDependencies": 53,
+    "allExactPhysicalCAS": true,
+    "consumedPathsExcluded": 26
+  },
+  "createdDirectories": []
+}

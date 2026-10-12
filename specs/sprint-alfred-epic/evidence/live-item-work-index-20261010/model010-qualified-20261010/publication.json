@@ -1,0 +1,26 @@
+{
+  "schema": "alfred.model010.root-publication.v1",
+  "status": "copied-and-read-back",
+  "files": [
+    {
+      "path": "proof.json",
+      "sha256": "7222658e358b4084ffe01e9ef44486d4f6df63b6ddc3a2045267c04e68c4703c",
+      "bytes": 1796
+    },
+    {
+      "path": "source-bindings.json",
+      "sha256": "9d8a5390d6b3e4caafa1cfcad46475276670d0be5471d5d3583da36a8c211594",
+      "bytes": 2304
+    },
+    {
+      "path": "completion.ndjson",
+      "sha256": "135bad3127ba8d8a4a671218b1b1bca3633e4f8d32636938ec8bf6fc81948efc",
+      "bytes": 638
+    }
+  ],
+  "sourceApplied": false,
+  "itemStagePromotion": false,
+  "itemAccepted": false,
+  "businessReruns": 0,
+  "scope": "One original I08T010, genuine foreign-child pre-reservation refusal and original Model/history conservation; controlled real-process method only. No older transition, native, Power behavior or full26 qualification."
+}

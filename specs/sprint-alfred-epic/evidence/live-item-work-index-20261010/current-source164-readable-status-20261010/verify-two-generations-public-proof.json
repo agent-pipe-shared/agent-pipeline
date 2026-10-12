@@ -1,0 +1,82 @@
+{
+  "schema": "alfred.sanitized-official-verify-generations.v1",
+  "input": {
+    "path": "scratch/alfred-ac07-omitted-eight-genuine-writer-preparation-20261010/official-verify/constructor-successor/qualification/runtime/two-generations/execution.json",
+    "sha256": "9ea7ef72ab7b600a8960ef796db40b3e436c87b945cec1433da75c93a7ebb62b",
+    "bytes": 4114
+  },
+  "status": "corrected-qualified-with-baseline-refusal-observed",
+  "sourceFreezeSha256": "501528efd76cd0de8d235a58227f2b2be006f804ea1d64877a3adae7bbb311ae",
+  "stages": [
+    {
+      "variant": "baseline",
+      "child": {
+        "status": 1,
+        "signal": null,
+        "error": null
+      },
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "95babcffc6ff75fed1e6f02aaafd163477a7122e58f79ed6ad2728d4b07935e6",
+        "caseSetSha256": "fe5b81593fcad6e52e332c81a4a3ebb89043bfd9a592a79ebf0fdd885f8dafc8",
+        "dispositionsSha256": "c28b397d6693b2b7268d3351fa2b562fec30c3803e08ca3b7d495cc8d68ed8a0",
+        "declaredCount": 2,
+        "disposedCount": 2,
+        "counts": {
+          "pass": 1,
+          "fail": 1,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "parserError": null,
+      "graphConserved": true,
+      "expectedResultObserved": true,
+      "baselineGenericDriftDiagnostic": true,
+      "fd3": {
+        "path": "runtime/two-generations/baseline/completion.fd3.jsonl",
+        "sha256": "f22a0823be09bc217722452c6b10c6096e0a1dc931240e0d979ce50b0725ae03",
+        "bytes": 765
+      }
+    },
+    {
+      "variant": "complete",
+      "child": {
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "95babcffc6ff75fed1e6f02aaafd163477a7122e58f79ed6ad2728d4b07935e6",
+        "caseSetSha256": "fe5b81593fcad6e52e332c81a4a3ebb89043bfd9a592a79ebf0fdd885f8dafc8",
+        "dispositionsSha256": "1264737e9cea8a83d9dd1bd7988e997340874be6efda897df109a724d076df6e",
+        "declaredCount": 2,
+        "disposedCount": 2,
+        "counts": {
+          "pass": 2,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "parserError": null,
+      "graphConserved": true,
+      "expectedResultObserved": true,
+      "baselineGenericDriftDiagnostic": null,
+      "fd3": {
+        "path": "runtime/two-generations/complete/completion.fd3.jsonl",
+        "sha256": "1ae952ff81176110aea38c0efa2457d28d7ee18e4f1c7c6c05109bf664fc01d0",
+        "bytes": 765
+      }
+    }
+  ],
+  "graphConserved": true,
+  "environmentConserved": true,
+  "assurance": "Source-author focused component qualification, not fresh independent review",
+  "wholeAC7": false,
+  "nativeAuthority": false,
+  "sanctionedStateWriterQualified": false
+}

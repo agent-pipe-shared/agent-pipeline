@@ -1,0 +1,40 @@
+{
+  "schema": "alfred.pun-startup-unavailable-actual-one.v1",
+  "caseId": "PUN001",
+  "result": "PASS",
+  "declared": 1,
+  "disposed": 1,
+  "counts": {
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "executionSha256": "4fb18a921ab2467eef04048996658042f6e669c9503b9a6c8d706ffc668fa9be",
+  "completionSha256": "d8be2a7082d1c3fb553693e7147e1ffcdb2ca5f0a74b4efe993e537405662e93",
+  "sourceGenerationManifestSha256": "8df5af7e9f1aebe57bb34c9c543ba54528435c10f0994aaa4f7a8b768b11f406",
+  "resourceFreezeSha256": "e0840c79072c7b8e16a55c298c349c45d532161bc11a9014f891811620747d40",
+  "resourceCount": 441,
+  "resourceConserved": true,
+  "errorFieldsAllNull": true,
+  "startupResult": {
+    "code": "SP-START",
+    "status": "unavailable",
+    "failureClass": "startup-failed",
+    "readOnlyStatusExit": 3
+  },
+  "assertionScope": [
+    "actual Source-owned unavailable record",
+    "exact context join and null native fields",
+    "physical endpoint absence",
+    "exact original Power member phase released",
+    "Source-produced releaseRef and reopened releaseRecord",
+    "read-only unavailable status preserves record and members"
+  ],
+  "nativePositive": false,
+  "wholeFamilyTerminal": false,
+  "wholeFull26": false,
+  "wholeItemAcceptance": false,
+  "MainIntegration": "pending separate Root atomic content transfer",
+  "historicalFailuresPreserved": true
+}

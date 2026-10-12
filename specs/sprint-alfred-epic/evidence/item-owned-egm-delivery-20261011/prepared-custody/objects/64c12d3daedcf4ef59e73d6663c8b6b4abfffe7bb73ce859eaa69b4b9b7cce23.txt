@@ -1,0 +1,19 @@
+✔ Darwin cold SDK/build/query stages clamp to one shared deadline (controlled) (3.318692ms)
+✔ Darwin cold build exhausts remaining deadline; no query starts (controlled) (1.835709ms)
+✔ Darwin default callers keep original stage limits (controlled) (1.562962ms)
+✔ Darwin expired deadline starts no compiler/SDK/query (controlled) (1.053515ms)
+✔ Windows custody/native/custody stages consume shared remaining deadline (controlled) (3.288762ms)
+✔ Windows custody read exhaustion forbids next native child (controlled) (1.82604ms)
+✔ Windows default custody/native limits and principal refusal stay unchanged (controlled) (4.735053ms)
+✔ Windows expired deadline starts no custody/native child (controlled) (1.289333ms)
+(node:2) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23.589857
+

@@ -1,0 +1,55 @@
+{
+  "schema": "alfred.role1.sanitized-integration-proof.v1",
+  "status": "actual-applied",
+  "receipt": {
+    "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/role1-atomic-preparation/apply-once/actual-receipt.json",
+    "sha256": "95ed87ec0c8fb925d8e7210c3d68ff303ce5104fbfd54a94c8e15263a0aca002"
+  },
+  "operations": [
+    {
+      "tree": "Audit",
+      "path": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+      "effect": "noop",
+      "sha256": "d6976e58e598cd8188674bb6f0d2e82d116eebce4792afb7cdb8273a76c80c56"
+    },
+    {
+      "tree": "Main",
+      "path": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+      "effect": "replace",
+      "sha256": "d6976e58e598cd8188674bb6f0d2e82d116eebce4792afb7cdb8273a76c80c56",
+      "mode": 420,
+      "nlink": 1,
+      "preimageSha256": "da4528ec81d39052484ffecf8434369dd192e0cecfa7b580bd632e858fbc46ea"
+    }
+  ],
+  "conservation": {
+    "AuditSourceTargets": 1,
+    "MainNamedDependencies": 16,
+    "allExactPhysicalCAS": true,
+    "consumedPathsExcluded": 25
+  },
+  "sourceManifest": {
+    "path": "scratch/alfred-role-route-fallback-runtime-source-20261010/manifest.json",
+    "sha256": "9b5f7ae72a5cf3c34466cf2fb79e7586dda07c17a94b0463efd805eeb5ad91fa"
+  },
+  "qualification": [
+    {
+      "path": "scratch/alfred-role-fallback-independent-20261010/execution.json",
+      "sha256": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d"
+    }
+  ],
+  "noProductImports": true,
+  "businessRuns": 0,
+  "protectedTargets": 0,
+  "limits": [
+    "Three runtime fallback carriers remain nlink2 typed-unavailable; no actual fallback availability claimed.",
+    "Scoped actual8 METHOD proof retained; no native, installed replay or whole-item acceptance."
+  ],
+  "previousPublicArchive": {
+    "receipt": {
+      "path": "scratch/alfred-current-selected164-remaining-integration-inventory-20261010/consumed25-successor/publication-once/actual-receipt.json",
+      "sha256": "2de1edf85c6efb83a3992550f9f97686552b288278df7c8ac4a18e3caf415cd0"
+    },
+    "status": "Root-actual-published-Main-and-Audit"
+  }
+}

@@ -1,0 +1,196 @@
+{
+  "schema": "pipeline.isolated-source-proposal.v1",
+  "actor": "alfred_transfer_integrity_source_actor",
+  "itemIds": [
+    "pipeline.transfer-redaction-alters-digest-bound-files"
+  ],
+  "status": "frozen-source-proposal-semantics-unexecuted",
+  "rootFeature": "sprint-alfred-epic",
+  "planRevisionFromBriefing": 32,
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "bootstrap": {
+    "actualFreshPreflight": "ready",
+    "identitiesMatched": true,
+    "executionBoundary": "host-authorized-wsl",
+    "runtimeManifestSha256": "4c287d572f49806e587e0c1264e33b1c1b6fcde64bc634b2d7b3bdbf6b93e086",
+    "observationGovernance": "passed",
+    "role": "Goldfish",
+    "stateCarrier": "briefing 20261010",
+    "onboardingAction": "validated-not-executed-as-Goldfish",
+    "sharedStateWrite": false,
+    "optionalModelRoleBootstrap": "unavailable/MODEL-ROLE-SESSION-IDENTITY-CONFLICT",
+    "architectureOrientation": "decision-recorded/deferred/po-0.7.0-release-defer-2026-09-20"
+  },
+  "files": [
+    {
+      "target": "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "operation": "create",
+      "parent": null,
+      "parentSha256": null,
+      "parentBytes": 0,
+      "postimage": "legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "postimageSha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+      "postimageBytes": 7532,
+      "fullRead": true,
+      "inverse": {
+        "operation": "delete",
+        "expectedSha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549"
+      }
+    },
+    {
+      "target": "plugins/pipeline-core/lib/bound-artifact-transfer.test.mjs",
+      "operation": "create",
+      "parent": null,
+      "parentSha256": null,
+      "parentBytes": 0,
+      "postimage": "legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/lib/bound-artifact-transfer.test.mjs",
+      "postimageSha256": "9125bc77151422cafd31cabde4f64a8d6b03f36012bfe6495abf78a2a720ed43",
+      "postimageBytes": 7584,
+      "fullRead": true,
+      "inverse": {
+        "operation": "delete",
+        "expectedSha256": "9125bc77151422cafd31cabde4f64a8d6b03f36012bfe6495abf78a2a720ed43"
+      }
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+      "operation": "create",
+      "parent": null,
+      "parentSha256": null,
+      "parentBytes": 0,
+      "postimage": "legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+      "postimageSha256": "430024295fdd8d8b0be553b570bc7fe56652ebd22ecf336176e3f042bc5675aa",
+      "postimageBytes": 6570,
+      "fullRead": true,
+      "inverse": {
+        "operation": "delete",
+        "expectedSha256": "430024295fdd8d8b0be553b570bc7fe56652ebd22ecf336176e3f042bc5675aa"
+      }
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/bound-artifact-transfer.test.mjs",
+      "operation": "create",
+      "parent": null,
+      "parentSha256": null,
+      "parentBytes": 0,
+      "postimage": "legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/scripts/bound-artifact-transfer.test.mjs",
+      "postimageSha256": "12441e1c9a4c80f81b778585e3fcabc9f73fac9af615d316b173f3662365b2c4",
+      "postimageBytes": 4490,
+      "fullRead": true,
+      "inverse": {
+        "operation": "delete",
+        "expectedSha256": "12441e1c9a4c80f81b778585e3fcabc9f73fac9af615d316b173f3662365b2c4"
+      }
+    },
+    {
+      "target": "plugins/pipeline-core/skills/close-block/SKILL.md",
+      "operation": "replace",
+      "parent": "legacy-origin:alfred-transfer-integrity-source-actor-20261010/parents/plugins/pipeline-core/skills/close-block/SKILL.md",
+      "parentSha256": "82299c1ae805bc890e47b750c88369593a1aad6e4f7a03c68f808ffc3b9f4316",
+      "parentBytes": 40303,
+      "postimage": "legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/skills/close-block/SKILL.md",
+      "postimageSha256": "3e7261662db99dbe65035b405a2800e08593f7e024dfb9015ef372498f5590cf",
+      "postimageBytes": 42531,
+      "fullRead": true,
+      "inverse": {
+        "operation": "restore",
+        "source": "legacy-origin:alfred-transfer-integrity-source-actor-20261010/parents/plugins/pipeline-core/skills/close-block/SKILL.md",
+        "expectedCurrentSha256": "3e7261662db99dbe65035b405a2800e08593f7e024dfb9015ef372498f5590cf",
+        "restoredSha256": "82299c1ae805bc890e47b750c88369593a1aad6e4f7a03c68f808ffc3b9f4316"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "88993c07d0261ab26c4123cceacfc4465b3f41b63043f61813bb6ee03b52e335",
+      "bytes": 1434,
+      "fullRead": true
+    },
+    {
+      "path": "architecture/map/index.md",
+      "sha256": "0be55fea783854a105d1f7d6a1cd34d85734b96bba10a605455d3d8b270a4117",
+      "bytes": 1916,
+      "fullRead": true
+    },
+    {
+      "path": "architecture/map/pipeline-core.md",
+      "sha256": "8d036fe8d64812cd600c0e58a51fb617f330f55dc91b43b03ff2aaaff4b6b8d8",
+      "bytes": 58642,
+      "fullRead": true
+    },
+    {
+      "path": "architecture/map/governance.md",
+      "sha256": "92ae242409b2d3595e73e4fc4f3bda39cd26567718c1ef276f18d14eb15f77aa",
+      "bytes": 1838,
+      "fullRead": true
+    },
+    {
+      "path": "project/architecture-decisions.compiled.json",
+      "sha256": "74a92f967e10620570d3f40b77b95341d409cb4b50c5009ec34192de4de44e2c",
+      "bytes": 45727,
+      "fullRead": true
+    },
+    {
+      "path": "docs/operating-model.md",
+      "sha256": "d31e3fa85a6967e4b9703cc5abbd090de40944a99de62684dfa0036917fc959b",
+      "bytes": 63323,
+      "fullRead": true
+    },
+    {
+      "path": ".claude/pipeline.json",
+      "sha256": "5e1154a70e0352e6eaabdca4477af798168851da44543546910c786977229aa5",
+      "bytes": 1628,
+      "fullRead": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+      "bytes": 3329793,
+      "fullRead": true
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-transfer-redaction-alters-digest-bound-files.md",
+      "sha256": "f6967fa71d3b483650269fc178c32441c6f071dd00124c74e94be4fce1cb58a3",
+      "bytes": 1707,
+      "fullRead": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/transfer-2026-10-08/bundle-evidence.json",
+      "sha256": "74c87727334ecb38f94003b0562baf69668c570627fead645ec4c53564f99d32",
+      "bytes": 5695829,
+      "fullRead": true
+    }
+  ],
+  "syntaxChecks": [
+    {
+      "command": "node --check legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "exitCode": 0,
+      "class": "syntax-only",
+      "productImport": false
+    },
+    {
+      "command": "node --check legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/lib/bound-artifact-transfer.test.mjs",
+      "exitCode": 0,
+      "class": "syntax-only",
+      "productImport": false
+    },
+    {
+      "command": "node --check legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+      "exitCode": 0,
+      "class": "syntax-only",
+      "productImport": false
+    },
+    {
+      "command": "node --check legacy-origin:alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/scripts/bound-artifact-transfer.test.mjs",
+      "exitCode": 0,
+      "class": "syntax-only",
+      "productImport": false
+    }
+  ],
+  "semanticExecution": "not-run-root-owned",
+  "regressionBrief": "legacy-origin:alfred-transfer-integrity-source-actor-20261010/regression-brief.md",
+  "independentCritic": "pending-root-final",
+  "originalCustody": "retained-unmodified",
+  "currentItemClosure": "not-performed"
+}

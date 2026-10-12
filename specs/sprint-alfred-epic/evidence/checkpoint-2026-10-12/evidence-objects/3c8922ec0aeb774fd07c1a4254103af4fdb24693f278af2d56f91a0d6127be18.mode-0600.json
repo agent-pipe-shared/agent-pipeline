@@ -1,0 +1,96 @@
+{
+  "schema": "alfred.m4.independent15.actual-source-conservation.v1",
+  "graphManifest": {
+    "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/graph-manifest.json",
+    "sha256": "56d65b25af07cd11d59208d9fb2a40bc8bf20aeba62b37e9d2d8fe3097502430",
+    "bytes": 364807,
+    "mode": 384,
+    "nlink": 1
+  },
+  "originalGraphManifest": {
+    "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/graph-manifest.json",
+    "sha256": "ed82e47c424ddeba48b6527581bb463daf73aea16f0cf277684205d5f1bdbe18",
+    "bytes": 343571,
+    "mode": 384,
+    "nlink": 1
+  },
+  "aggregateSha256": "276ed86ab248ad45d6735821b087a429e30ed55179e49f703d488c0a51d2fe7e",
+  "graphFiles": 359,
+  "original320Retained": true,
+  "addedPublicDataFiles": 39,
+  "allPhysicalOrdinaryOneLink": true,
+  "actualPermissionBitsConserved": true,
+  "m4SourceManifest": {
+    "path": "legacy-origin:alfred-m4-fresh-review-source-20261010/source-manifest.json",
+    "sha256": "8ea3161d6467ba8aab16282881458896f67d28f8396d1ac14b66c4ff11455152"
+  },
+  "m4Postimages": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+      "sha256": "6f10035fd29072a97384fdfa904ab5e927f8477cc01c6839f88c3aa0b2b82c56",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "sha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "542d31ab35cbdb6351dedf28d2126399afae8701859696dd31f61468f607b02e",
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+      "sha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "unchangedFrozenInputs": [
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/hfr.test.mjs",
+      "sha256": "fbf539b7afe83befdec100500632938126a42273e05585e0d3f8e9cbbc215f49",
+      "bytes": 8499,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/hfr.fixture.mjs",
+      "sha256": "0dfff9cad1bd6638e31e27f815db847ad3f8f4151a40a4ce114e2332db959a09",
+      "bytes": 8903,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/run.mjs",
+      "sha256": "ed9deb28e8da702784dbac180807201072993daf1d13380a90ea5487fe0fb3c8",
+      "bytes": 5062,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/report.md",
+      "sha256": "6f086205169538d599cd60651e2b259820723d0eaaab3c8f3b76c54de777ce13",
+      "bytes": 2727,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/qualification-contract.json",
+      "sha256": "75e4be82e61cfbafca8bb41d3201767ba8119e5285ae20b05a881032d19a4eb6",
+      "bytes": 4063,
+      "mode": 384,
+      "nlink": 1
+    }
+  ],
+  "syntheticFixtureKeyFilesExported": 0,
+  "productionSourceEdits": 0,
+  "limits": [
+    "359-file checks are actual physical custody for these exercised15 methods, not arbitrary runtime completeness.",
+    "No owned fixture repository or signature/private key material is needed in the compact transfer."
+  ]
+}

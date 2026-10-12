@@ -1,0 +1,35 @@
+{
+  "schema": "alfred.sanitized-focused-proof.v1",
+  "id": "ac07-additional-four",
+  "input": {
+    "path": "scratch/alfred-ac07-omitted-eight-genuine-writer-preparation-20261010/qualification/runtime/execution.json",
+    "sha256": "664410d72281497ff2169991a733aefc4f0b667ced6ca050298a4fecadbf7c1f",
+    "bytes": 1923
+  },
+  "child": {
+    "status": 0,
+    "signal": null
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "33feb2d4acd817abfd9bbc336b31dc7ef1b92e9a457aad7f15fcd3a56b15b3c2",
+    "caseSetSha256": "9037502845305b09675ec530f8d59495a85aa1e72312de786d0ead7842a71db9",
+    "dispositionsSha256": "cd1d7ff7736c28de49df8d4c1bede0c749a4f9ffbc72f9f4d80145fa8dbc1cee",
+    "declaredCount": 4,
+    "disposedCount": 4,
+    "counts": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "parserError": null,
+  "sourceConserved": true,
+  "sourceFreezeSha256": "0571c1881adc5f85a2bb09cdf9cce3aedb7578b98a3316d29cdc94722ccb10e3",
+  "assurance": "source-author controlled focused test; RDJ019–022 and whole AC07 remain open",
+  "nativeAuthority": false,
+  "wholeItemAccepted": false,
+  "rawCapturesExcluded": true
+}

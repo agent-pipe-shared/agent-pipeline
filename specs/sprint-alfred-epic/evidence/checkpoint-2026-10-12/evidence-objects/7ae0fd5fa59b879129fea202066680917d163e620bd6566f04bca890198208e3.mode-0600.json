@@ -1,0 +1,2188 @@
+{
+  "schema": "alfred.176-next-reader-budget-dispositions.v1",
+  "generatedAt": "2026-10-10T15:54:03.410Z",
+  "assignment": {
+    "path": "legacy-origin:alfred-176-remaining-fanout-20261010/r10_reader_budget_fix.json",
+    "sha256": "0e15920e8d9360bfe8e6a0eef91e20c45ca2bb70ce38e11f709149e78ff6604c",
+    "manifestPath": "legacy-origin:alfred-176-remaining-fanout-20261010/manifest.json",
+    "manifestSha256": "4e85b301264242c142e0d25cd7d9e7a253c173038062e159d177d0580c7ae300"
+  },
+  "appliedInventory": {
+    "path": "legacy-origin:alfred-agy-managed-topology-row-boundary-successor-20261010/actual-source-manifest.json",
+    "sha256": "2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381",
+    "proposed164Integrated": false
+  },
+  "reconciliation": {
+    "path": "legacy-origin:alfred-176-next-reader-budget-audit-20261010/source-body-reconciliation-v2.json",
+    "sha256": "00f9a3df838f85e5ac242aa003265a4e14604c380f26600627eb5933bde9e6f1",
+    "bodyMatches": 20,
+    "criterionLineSlicesMatch": 69,
+    "items": 20,
+    "criteria": 69
+  },
+  "limits": [
+    "This is a read-only evidence reconciliation, not implementation, qualification, acceptance, or closure.",
+    "A selected146 inventory is a changed-source union; absence from it is not evidence that a source file is absent.",
+    "Proof gaps are reported separately from source defects.",
+    "Full-body assessment includes requirements outside extracted Acceptance-heading rows; zero criterion rows do not remove item scope.",
+    "Deferred or excluded criteria retain only the authority stated in the original body/owner routing."
+  ],
+  "items": [
+    {
+      "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-advisor-provenance-ancestor-check-fails-on-any-sibling-write.md",
+        "canonicalPath": "backlog/items/2026-10-05-advisor-provenance-ancestor-check-fails-on-any-sibling-write.md",
+        "sha256": "0b452ee003de2dd268f3b841bbeddc1dc65ed8a496eaa6c829553d063c998f26",
+        "bytes": 2430,
+        "parentSha256": "0b452ee003de2dd268f3b841bbeddc1dc65ed8a496eaa6c829553d063c998f26",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Current selected source contains the described ancestor identity checks over dev/ino/mode/nlink/size/mtimeNs and three bounded retries. The requested predicate narrowing is a security-predicate change; the original body explicitly requires PO decision and architecture/security Critic. Cause preservation is a separate diagnostics clause.",
+      "disposition": "deferred",
+      "nextMeaningfulAction": "Obtain the specified PO/security decision and Critic review, then qualify retained/on-demand caller reachability; handle cause preservation with the existing diagnostics work item.",
+      "originalTriage": [
+        {
+          "line": 53,
+          "text": {
+            "excluded": true,
+            "rawSha256": "2180105d3ab8eb033c8e9e221d431978a58aede86844c4a58760f714c93c38a8",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 24,
+          "text": "`readAdvisorPhysicalBytes` in `plugins/pipeline-core/lib/design-advisor-provenance.mjs`\nre-checks every ancestor directory up to the repository root after the read and\ncompares `mtimeNs`, `size` and `nlink`. Any file created or deleted next to an\nancestor (for example a parallel agent writing `evidence/dispatch-record-*.json`)\nchanges those values and throws `DAP-PHYSICAL-PARENT-DRIFT`.\n`design-workflow-package-v2.mjs` relabels it `DWP2-PHYSICAL-OR-GIT`, and the\ndev-plan guard refuses the call as `DAA-DWP2-PHYSICAL-OR-GIT`. Stress probe on\nnative Windows: 10.2 % of reads failed with one sibling write per 5 ms.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [
+            "plugins/pipeline-core/lib/design-advisor-provenance.mjs"
+          ],
+          "evidenceAssessment": "Current selected source contains the described ancestor identity checks over dev/ino/mode/nlink/size/mtimeNs and three bounded retries. The requested predicate narrowing is a security-predicate change; the original body explicitly requires PO decision and architecture/security Critic. Cause preservation is a separate diagnostics clause.",
+          "nextMeaningfulAction": "Obtain the specified PO/security decision and Critic review, then qualify retained/on-demand caller reachability; handle cause preservation with the existing diagnostics work item."
+        },
+        {
+          "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write::15.2",
+          "heading": "Description",
+          "lineStart": 26,
+          "lineEnd": 29,
+          "text": "Commit `92b4e15ce` added a bounded retry (3 attempts) for that exact code, which\ncut the rate to 1.5 % but does not remove the class. Sustained churn still fails.\nOn POSIX, a sibling subdirectory also changes a directory's `nlink`, so the\npredicate is more fragile there.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected source contains the described ancestor identity checks over dev/ino/mode/nlink/size/mtimeNs and three bounded retries. The requested predicate narrowing is a security-predicate change; the original body explicitly requires PO decision and architecture/security Critic. Cause preservation is a separate diagnostics clause.",
+          "nextMeaningfulAction": "Obtain the specified PO/security decision and Critic review, then qualify retained/on-demand caller reachability; handle cause preservation with the existing diagnostics work item."
+        },
+        {
+          "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write::43.1",
+          "heading": "Proposal",
+          "lineStart": 45,
+          "lineEnd": 51,
+          "text": "Narrow the ancestor identity to `dev`/`ino`/`mode` plus the existing realpath,\n`isDirectory` and not-symlink checks. Those values detect a swapped or replaced\nancestor, which is the threat the check exists for. Drop `mtimeNs`/`size`/`nlink`\nfor ancestors. This is a security-predicate change and needs a PO decision and an\narchitecture/security Critic. Separately, keep the original cause as a\nnon-authoritative `cause` field instead of discarding it at\n`design-workflow-package-v2.mjs:142`.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected source contains the described ancestor identity checks over dev/ino/mode/nlink/size/mtimeNs and three bounded retries. The requested predicate narrowing is a security-predicate change; the original body explicitly requires PO decision and architecture/security Critic. Cause preservation is a separate diagnostics clause.",
+          "nextMeaningfulAction": "Obtain the specified PO/security decision and Critic review, then qualify retained/on-demand caller reachability; handle cause preservation with the existing diagnostics work item."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+          "selected146": {
+            "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+            "bytes": 8306,
+            "mode": 420,
+            "selection": "optional-advisor-finite-diagnostics-and-typed-decoder-correction",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+            "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+            "bytes": 8306,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        }
+      ],
+      "ownerRemainingWork": "Establish retained/on-demand caller reachability and threat model before narrowing ancestor predicate; merge sanitized original-cause handling with existing diagnostics item.",
+      "ownerRoutingRemaining": [
+        "Retain original criterion and bind current full-item proof before promotion.",
+        "Establish retained/on-demand caller reachability and threat model before narrowing ancestor predicate; merge sanitized original-cause handling with existing diagnostics item."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+        "canonicalPath": "backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+        "sha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+        "bytes": 4086,
+        "parentSha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "No exact source/test association was supplied for this umbrella item. Related EL01 and missing-dispatch items already own overlapping obligations; a new duplicate implementation is not justified.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Reuse the existing EL01/missing-dispatch work and bind actual current native/CLI worker routing plus loaded hashes.",
+      "originalTriage": [
+        {
+          "line": 57,
+          "text": {
+            "excluded": true,
+            "rawSha256": "2180105d3ab8eb033c8e9e221d431978a58aede86844c4a58760f714c93c38a8",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 17,
+          "text": "PO observations from the Antigravity greenfield run:",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "No exact source/test association was supplied for this umbrella item. Related EL01 and missing-dispatch items already own overlapping obligations; a new duplicate implementation is not justified.",
+          "nextMeaningfulAction": "Reuse the existing EL01/missing-dispatch work and bind actual current native/CLI worker routing plus loaded hashes."
+        },
+        {
+          "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.2",
+          "heading": "Description",
+          "lineStart": 19,
+          "lineEnd": 22,
+          "text": "- The onboarding/lifecycle driver does not handle Antigravity sufficiently;\n  dispatches did not run cleanly.\n- The runner could not produce the design at all, because elementary paths for\n  the Critic, the Advisor and the build check (Verify) are missing on AGY.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "No exact source/test association was supplied for this umbrella item. Related EL01 and missing-dispatch items already own overlapping obligations; a new duplicate implementation is not justified.",
+          "nextMeaningfulAction": "Reuse the existing EL01/missing-dispatch work and bind actual current native/CLI worker routing plus loaded hashes."
+        },
+        {
+          "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.3",
+          "heading": "Description",
+          "lineStart": 24,
+          "lineEnd": 25,
+          "text": "Findings from the Antigravity analysis (`0.7.0+antigravity.20261003105506.1bd1d7bf`).\nEach one must be verified against the source before it is fixed:",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "No exact source/test association was supplied for this umbrella item. Related EL01 and missing-dispatch items already own overlapping obligations; a new duplicate implementation is not justified.",
+          "nextMeaningfulAction": "Reuse the existing EL01/missing-dispatch work and bind actual current native/CLI worker routing plus loaded hashes."
+        },
+        {
+          "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::15.4",
+          "heading": "Description",
+          "lineStart": 27,
+          "lineEnd": 47,
+          "text": "- **Befund 2, subagent bootstrap deadlock:** native subagents (`invoke_subagent`)\n  inherit `session-<id>/requires-bootstrap.pending`. Every CLI tool call then fails\n  with \"Mandatory Session Bootstrap\" (`hooks/antigravity-pretool-guard.mjs:505-514`).\n  Both dispatched subagents were paralysed.\n- **Befund 3, stale bootstrap lock after resume:** `armAntigravityBootstrapSession`\n  returns `already-armed` without refreshing the lock's mtime, while the preflight\n  requires an mtime within 30 minutes\n  (`scripts/pipeline-start-preflight.mjs:422`). After a 2 h pause the PO had to\n  `touch` the lock manually.\n- **Befund 4, mandatory roles unavailable:** profile `feature` requires\n  `readiness` and `critic_normal`, but onboarding generates both as\n  `unavailable` for Antigravity. `runner-design-readiness-bootstrap.mjs:287`\n  stops with `DESIGN-READINESS-ROUTE-UNAVAILABLE`.\n- **Befund 5:** a signed override of the routes was undone by the registry\n  projection (see `2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md`).\n- **Befund 6, scaffold commit circularity:** `resolveV3DutyRoute` reads\n  `HEAD:pipeline.user.yaml`, while the draft gate refuses committing that file.\n  The PO broke the deadlock with `git commit --no-verify`. See\n  `2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md`.\n- **Befund 7:** trailer `Dispatch: design (elephant)` documented but rejected (see\n  `2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md`).",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "No exact source/test association was supplied for this umbrella item. Related EL01 and missing-dispatch items already own overlapping obligations; a new duplicate implementation is not justified.",
+          "nextMeaningfulAction": "Reuse the existing EL01/missing-dispatch work and bind actual current native/CLI worker routing plus loaded hashes."
+        },
+        {
+          "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete::49.1",
+          "heading": "Acceptance",
+          "lineStart": 51,
+          "lineEnd": 55,
+          "text": "- The AGY runner completes the same greenfield happy path as Claude and Codex\n  (`2026-10-03-three-runner-happy-path-with-two-po-approvals.md`).\n- Critic, Advisor and Verify routes exist for AGY or degrade through the\n  recorded self-dispatch fallback\n  (`2026-10-03-role-route-preflight-with-self-dispatch-fallback.md`).",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "No exact source/test association was supplied for this umbrella item. Related EL01 and missing-dispatch items already own overlapping obligations; a new duplicate implementation is not justified.",
+          "nextMeaningfulAction": "Reuse the existing EL01/missing-dispatch work and bind actual current native/CLI worker routing plus loaded hashes."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [],
+      "ownerRemainingWork": "Reuse Oct9 EL01/missing-dispatch items; qualify actual current native/CLI worker routing and loaded hashes. Do not create duplicate readiness obligation.",
+      "ownerRoutingRemaining": [
+        "Native Agy/current loaded source and worker routing proof absent; coordinate existing EL01 and driver obligations without duplicate readiness scope.",
+        "Reuse Oct9 EL01/missing-dispatch items; qualify actual current native/CLI worker routing and loaded hashes. Do not create duplicate readiness obligation."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.agy-el01-write-authorization-gap",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-09-agy-el01-write-authorization-gap.md",
+        "canonicalPath": "backlog/items/2026-10-09-agy-el01-write-authorization-gap.md",
+        "sha256": "33c44104accb1d446f2b093e37e84cc845da212ac894974f3cfb273bbee88f8f",
+        "bytes": 3280,
+        "parentSha256": "33c44104accb1d446f2b093e37e84cc845da212ac894974f3cfb273bbee88f8f",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "The selected pretool hook implements normalized Edit/Write handling and invokes guards, but the reviewed hook does not establish the item-specific EL01 worker-scope/current-call authorization. Existing gh-merge12 GREEN does not cover EL01; current native normalized Edit/Write carrier proof is absent.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Bind the existing EL01 item to current authenticated native Edit/Write carrier evidence; do not infer a new source defect from missing proof.",
+      "originalTriage": [
+        {
+          "line": 46,
+          "text": {
+            "excluded": true,
+            "rawSha256": "261b146a18d11a95ecad3dc88997780065f179188307d2e61b07fe801c95a86d",
+            "bytes": 415,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.agy-el01-write-authorization-gap::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 17,
+          "text": "Current Agy normalized Edit/Write dispatch omits the existing EL-01 tripwire. The tripwire also permits unresolved/non-high-risk specs and an open matching record without current-session binding. This successor covers Agy registration and ordinary-risk/current-call authorization; historical hook-registration closure remains intact.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected pretool hook implements normalized Edit/Write handling and invokes guards, but the reviewed hook does not establish the item-specific EL01 worker-scope/current-call authorization. Existing gh-merge12 GREEN does not cover EL01; current native normalized Edit/Write carrier proof is absent.",
+          "nextMeaningfulAction": "Bind the existing EL01 item to current authenticated native Edit/Write carrier evidence; do not infer a new source defect from missing proof."
+        },
+        {
+          "id": "pipeline.agy-el01-write-authorization-gap::29.1",
+          "heading": "Proposal",
+          "lineStart": 31,
+          "lineEnd": 31,
+          "text": "Wire the policy-equivalent write authorization into Agy normalization and bind authorization to the actual current tool-call/session and admitted worker scope. Resolve unreadable authority through a typed safe route; a prompt role string or another session's open record must not authorize an Elephant source write. Preserve documented legitimate mini/T0/document authoring cases.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected pretool hook implements normalized Edit/Write handling and invokes guards, but the reviewed hook does not establish the item-specific EL01 worker-scope/current-call authorization. Existing gh-merge12 GREEN does not cover EL01; current native normalized Edit/Write carrier proof is absent.",
+          "nextMeaningfulAction": "Bind the existing EL01 item to current authenticated native Edit/Write carrier evidence; do not infer a new source defect from missing proof."
+        },
+        {
+          "id": "pipeline.agy-el01-write-authorization-gap::33.1",
+          "heading": "Acceptance",
+          "lineStart": 35,
+          "lineEnd": 38,
+          "text": "- Version/content-bound Agy feature ordinary-risk and high-risk Elephant source writes without an admitted worker are refused before modification.\n- An admitted Goldfish can write only its owned scope; wrong-session/stale/missing records and unreadable authority cannot silently authorize production writes.\n- Focused break/restore controls cover native normalized Edit/Write and relevant write carriers; fixture-only results remain distinct from native qualification.\n- Historical closed pipeline.el-01-has-no-in-session-tripwire and instruction-based consumer dispatch item stay closed; integrate with open Agy route and imported snapshot work.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected pretool hook implements normalized Edit/Write handling and invokes guards, but the reviewed hook does not establish the item-specific EL01 worker-scope/current-call authorization. Existing gh-merge12 GREEN does not cover EL01; current native normalized Edit/Write carrier proof is absent.",
+          "nextMeaningfulAction": "Bind the existing EL01 item to current authenticated native Edit/Write carrier evidence; do not infer a new source defect from missing proof."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        }
+      ],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "selected146": {
+            "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+            "bytes": 46463,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+            "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+            "bytes": 46463,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        }
+      ],
+      "ownerRemainingWork": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Registered P0 historical authorization gap; current gh-merge12 GREEN does not cover EL01; native carrier unavailable.. Preserve existing implementation; do not assume another source fix is needed.",
+      "ownerRoutingRemaining": [
+        "Current Agy adapter source bound, but gh-merge12 is not EL01 coverage. Actual native normalized Edit/Write and write-carrier proof remains unbound.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Registered P0 historical authorization gap; current gh-merge12 GREEN does not cover EL01; native carrier unavailable.. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md",
+        "canonicalPath": "backlog/items/2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md",
+        "sha256": "8ded99a2f2096edb0d737c40f4bd7d3baf88316483a330a550bf867205e72df6",
+        "bytes": 19921,
+        "parentSha256": "8ded99a2f2096edb0d737c40f4bd7d3baf88316483a330a550bf867205e72df6",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback.",
+      "originalTriage": [
+        {
+          "line": 313,
+          "text": {
+            "excluded": true,
+            "rawSha256": "bcd49ffb08e10f595d531ca5c2b73b4dd70f7114e8e9d540db1ae6913e77f766",
+            "bytes": 667,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::17.1",
+          "heading": "Description and independent verification",
+          "lineStart": 19,
+          "lineEnd": 25,
+          "text": "Read-only physical readback confirms a managed/imported Pipeline copy at\n`~/.gemini/config/plugins/agent-pipeline-core` with version\n`0.6.2+antigravity.20260913103423.c1e799c`. The import manifest records\nsource `antigravity`, importedAt `2026-09-15T20:18:50Z`, and components\n`skills`, `agents`, `hooks`. At the same time the user-global path registry\nnames `~/agent-pipeline-local-marketplace/plugins/pipeline-core`, whose three\nrunner manifests carry `0.7.0+…20260927174722.15c963ef`.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::17.2",
+          "heading": "Description and independent verification",
+          "lineStart": 27,
+          "lineEnd": 31,
+          "text": "The current installer updates the selected registry, optional settings and\nattestation; it has no imported-copy lifecycle or discovery. A marketplace-only\nrefresh likewise leaves the separate managed copy untouched. Thus duplicate/stale\ntopology is confirmed, and registry-only repair cannot retire that copy. Actual\nCLI precedence and which sources a new session loads still require the spike.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::17.3",
+          "heading": "Description and independent verification",
+          "lineStart": 33,
+          "lineEnd": 42,
+          "text": "| Independently read fact | Result |\n| --- | --- |\n| Global registry | One Pipeline entry, current marketplace directory |\n| Managed/imported copy | 0.6.2; three runner manifests physically present |\n| Marketplace manifests | 0.7.0; mtime 2026-09-27T17:47:22.624Z |\n| Global hook wiring | Two absolute marketplace commands; authoring origin unverified |\n| Snapshot hooks.json | Relative Antigravity start/pretool/stop/slicing commands |\n| Fixture .agents/plugins.json | Absent |\n| Fixture session-47742919-… lock | locked=true, version=0.6.2; current mtime 2026-09-27T19:27:27.928Z |\n| Fixture session-dummy lock | version=0.7.0, missing locked; current mtime 2026-09-27T18:43:03.346Z |",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::17.4",
+          "heading": "Description and independent verification",
+          "lineStart": 44,
+          "lineEnd": 47,
+          "text": "Evidence: [sanitized physical readback](../evidence/agy-imported-snapshot-20260928-readback.json)\nand [verification scope](../evidence/agy-imported-snapshot-20260928-verification.md).\nOnly Pipeline metadata, file hashes and lock version/shape were projected; no\nfull Claude/Codex settings, credentials or transcripts were read or published.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::120.1",
+          "heading": "0. Spike first (mandatory, before any design is fixed)",
+          "lineStart": 122,
+          "lineEnd": 125,
+          "text": "The fix depends on agy internals we have not verified. Run each question in a\ndisposable isolated account/container with no PO credentials or real config,\nor a documented CLI configuration-root override. Do not repurpose HOME or run\nthese mutation spikes against the PO's real `~/.gemini`:",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::120.2",
+          "heading": "0. Spike first (mandatory, before any design is fixed)",
+          "lineStart": 127,
+          "lineEnd": 149,
+          "text": "- **S1** Does `agy plugin install <absolute local dir>` accept a local path?\n  Where does it copy to? Is the managed directory keyed by folder name or by\n  manifest `name` (`agent-pipeline-core`)? Does `agy plugin list` show it\n  afterwards?\n- **S2** Precedence: when the same plugin name exists both as a managed copy\n  and as a `plugins.json` path entry (global, and separately workspace\n  `.agents/plugins.json`), which one does a new session load? Measure it with\n  the requires-bootstrap lock version, along with independent loaded-source observations; a mutable lock alone is not\n  executed-path proof.\n  `agy plugin list` is not proof.\n- **S3** After CLI 1.2.10, does a `plugins.json` entry that points at a\n  plugin *root* load that plugin, or does agy scan its children as a\n  container? If it scans children, our registry entry is inert, which would\n  fully explain why the snapshot won. The installer's registry format would\n  then have to change.\n- **S4** What does `agy plugin import [source]` do, and what created the\n  `source: \"antigravity\"` import (the onboarding import checkbox, changelog\n  1.1.10)? Can a later onboarding or import re-create a snapshot after we\n  remove it?\n- **S5** Is there a workspace-scoped managed install, or is managed install\n  always global?\n- **S6** Does a running session pick up changes (for example `/skills reload`,\n  1.2.4), or is a full agy restart required for skills, agents, and hooks?",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::120.3",
+          "heading": "0. Spike first (mandatory, before any design is fixed)",
+          "lineStart": 151,
+          "lineEnd": 152,
+          "text": "Record the results under `backlog/evidence/` and pick topology option A or B\n(§1) from them.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::154.1",
+          "heading": "1. One load topology per scope (PO decision after the spike)",
+          "lineStart": 156,
+          "lineEnd": 158,
+          "text": "Two sources for the same plugin name are the root defect class. Whichever\noption is chosen, **exactly one** agy-visible source of `agent-pipeline-core`\nmay exist per effective scope:",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::154.2",
+          "heading": "1. One load topology per scope (PO decision after the spike)",
+          "lineStart": 160,
+          "lineEnd": 170,
+          "text": "- **Option B (recommended, matches the PO's expectation and SETUP.md):**\n  workspace-local only. `.agents/plugins.json` in each consumer project, and\n  **no** global managed copy, no global `plugins.json` entry, and no global\n  `hooks.json` Pipeline wiring. `~/src` and other folders then see no\n  Pipeline at all. This depends on S2/S3 proving that a workspace path entry\n  actually loads.\n- **Option A:** agy-managed install. `agy plugin install <approved source dir>`\n  keeps one global managed copy, updated only through `agy plugin install`\n  (exact replacement, 1.1.28), and there is no `plugins.json` entry. This is\n  simpler for agy, but it is global by construction, which contradicts the\n  PO's stated expectation.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::154.3",
+          "heading": "1. One load topology per scope (PO decision after the spike)",
+          "lineStart": 172,
+          "lineEnd": 174,
+          "text": "Keep the installer's existing workspace-local default. Decide whether to retire\nthe optional \"2) Global\" choice or retain it with stronger explicit topology\nand scope warnings; it is already labelled as applying to all local projects.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::281.1",
+          "heading": "5. Tests (fake `agy` executable + injected fixture configuration root, no real agy)",
+          "lineStart": 283,
+          "lineEnd": 293,
+          "text": "Cover at least these cases. For each, assert the observer verdict, the\npreflight status/reason/nextAction argv, the installer plan and the order of\n`agy` calls, and the readback-failure stop:\n- this incident: global `plugins.json` → current marketplace + stale managed\n  copy + hand-wired global `hooks.json`;\n- stale managed copy only;\n- a correct single source (no-op, idempotent);\n- workspace-local and global sources for the same plugin at once;\n- a malformed or unreadable `import_manifest.json` / `hooks.json` → `unverifiable`, no mutation;\n- a fake `agy plugin uninstall` failure → the partial state is reported and nothing else is deleted;\n- a lock-version mismatch → the distinct preflight reason instead of `hard-enforcement-not-observed`.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin::304.1",
+          "heading": "Not in scope / explicitly not done here",
+          "lineStart": 306,
+          "lineEnd": 311,
+          "text": "The PO's machine was left unchanged (read-only diagnosis). The manual cleanup\nof the current machine should follow the spike results, not precede them.\nThe obvious candidate is `agy plugin uninstall agent-pipeline-core`, then\nremoving the two Pipeline entries from `~/.gemini/config/hooks.json`, then\nbinding per option A/B, restarting agy, and checking the lock. It is still\nunverified, especially S2/S3.",
+          "disposition": "excluded",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected preflight source contains managed-topology handling. Agy22 controlled refresh13/integration9 cases and observed-version checks passed, but installed CLI precedence, selected host root, loaded-source identity, and stale-copy refresh/stamp readback remain unqualified. The body explicitly reserves PO choices for spike/topology clauses; its machine-specific cleanup clause is out of scope.",
+          "nextMeaningfulAction": "Complete the authorized fake-CLI/isolated-config precedence spike and obtain the stated PO decisions before any topology change; separately qualify installed stale-copy refresh and loaded-source readback."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        }
+      ],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "selected146": {
+            "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+            "bytes": 111990,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+            "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+            "bytes": 111990,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        }
+      ],
+      "ownerRemainingWork": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Current installer explicitly handles managed topology; actual loaded precedence/native root remains separate proof. Preserve existing implementation; do not assume another source fix is needed.",
+      "ownerRoutingRemaining": [
+        "Preflight source present; actual Agy precedence/config-root/supported remediation/restart loaded-source proofs still separate. Do not treat plugin list as loaded proof.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Current installer explicitly handles managed topology; actual loaded precedence/native root remains separate proof. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-agy-managed-copy-first-start-lacks-attestation.md",
+        "canonicalPath": "backlog/items/2026-09-29-agy-managed-copy-first-start-lacks-attestation.md",
+        "sha256": "b401f3fd44217f7273ec299a0a2829b9718666300df1189bef7ee0825164ed49",
+        "bytes": 2068,
+        "parentSha256": "56527a4e86ca827101f0c3e980f53e851abf34e862bbc2ca882fc9615fed9cf9",
+        "assignmentChanged": true
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Selected preflight source and controlled Agy22 fixtures cover a matching managed copy and exact source attestation. A clean non-Git first-session/native installed path has not been qualified; the owner manifest calls the selected preflight only an overlap lead.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Bind the original first-start acceptance matrix to a clean non-Git controlled fixture and separately label native installed-path evidence.",
+      "originalTriage": [
+        {
+          "line": 47,
+          "text": {
+            "excluded": true,
+            "rawSha256": "9b53ffa08cb1d618905bd4625645fdabe820ada43a213f8f07b83b8fd8ac59a2",
+            "bytes": 127,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.agy-managed-copy-first-start-lacks-attestation::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 24,
+          "text": "A fresh empty project can load a Gitless managed Antigravity plugin copy.\nPreflight then requires an external source-to-copy receipt and returns\n`plugin-attestation-required` with `IPA-HOST-LOCATOR-UNAVAILABLE`. The existing\ninstaller writes the receipt only during a global refresh, while a workspace\nrefresh can leave a managed copy available for execution. A user following a\nnormal workspace installation therefore encounters a repair step at first\nstart. Running the installer from the copied plugin cannot establish its Git\nsource identity.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Selected preflight source and controlled Agy22 fixtures cover a matching managed copy and exact source attestation. A clean non-Git first-session/native installed path has not been qualified; the owner manifest calls the selected preflight only an overlap lead.",
+          "nextMeaningfulAction": "Bind the original first-start acceptance matrix to a clean non-Git controlled fixture and separately label native installed-path evidence."
+        },
+        {
+          "id": "pipeline.agy-managed-copy-first-start-lacks-attestation::15.2",
+          "heading": "Description",
+          "lineStart": 26,
+          "lineEnd": 28,
+          "text": "The reported repair instruction that selects source option 2 and workspace\noption 1 is inaccurate: source option 2 is the local marketplace, and the old\nworkspace path does not write the receipt.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Selected preflight source and controlled Agy22 fixtures cover a matching managed copy and exact source attestation. A clean non-Git first-session/native installed path has not been qualified; the owner manifest calls the selected preflight only an overlap lead.",
+          "nextMeaningfulAction": "Bind the original first-start acceptance matrix to a clean non-Git controlled fixture and separately label native installed-path evidence."
+        },
+        {
+          "id": "pipeline.agy-managed-copy-first-start-lacks-attestation::36.1",
+          "heading": "Acceptance",
+          "lineStart": 38,
+          "lineEnd": 45,
+          "text": "- A clean Git source installed into an empty non-Git Agy project creates the\n  required receipt before a managed copy can execute.\n- Workspace and global refresh preserve exact source/copy and registry\n  readback; stale copies require an explicit topology update.\n- The first new Agy session passes plugin attestation without a manual repair\n  step. An already affected copy gets one exact host recovery action.\n- Tests cover the installer, receipt verification, preflight, and a native\n  fresh-runner observation. No source or operator identifiers enter evidence.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Selected preflight source and controlled Agy22 fixtures cover a matching managed copy and exact source attestation. A clean non-Git first-session/native installed path has not been qualified; the owner manifest calls the selected preflight only an overlap lead.",
+          "nextMeaningfulAction": "Bind the original first-start acceptance matrix to a clean non-Git controlled fixture and separately label native installed-path evidence."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        }
+      ],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "selected146": {
+            "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+            "bytes": 111990,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+            "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+            "bytes": 111990,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        }
+      ],
+      "ownerRemainingWork": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Accepted first-start managed-copy attestation defect; selected preflight path is only an overlap lead.. Preserve existing implementation; do not assume another source fix is needed.",
+      "ownerRoutingRemaining": [
+        "Preflight overlap bound; actual installer receipt-before-copy and first-start source/case/native readback unbound.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: Accepted first-start managed-copy attestation defect; selected preflight path is only an overlap lead.. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-antigravity-1-2-13-blocks-managed-refresh.md",
+        "canonicalPath": "backlog/items/2026-09-29-antigravity-1-2-13-blocks-managed-refresh.md",
+        "sha256": "a31faebfd202e541189574161b11485687a19f4dbc9fb865d40d6ff872f867b5",
+        "bytes": 1773,
+        "parentSha256": "a31faebfd202e541189574161b11485687a19f4dbc9fb865d40d6ff872f867b5",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Current source fix for version 1.2.13 and the focused 13/9 controlled cases are retained; version checks accept 1.2.13 and refuse future versions. Installed stale-copy refresh, stamp persistence, and loaded-source readback remain open.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Qualify installed refresh/readback against the current candidate; preserve the passing controlled cases.",
+      "originalTriage": [
+        {
+          "line": 37,
+          "text": {
+            "excluded": true,
+            "rawSha256": "9e8dd64e6da05118c6f329b74e2f404c2363528926e4a55c39fd3a0b211a927a",
+            "bytes": 251,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh::20.1",
+          "heading": "Acceptance",
+          "lineStart": 22,
+          "lineEnd": 29,
+          "text": "- Admit the observed 1.2.13 plugin lifecycle at both plan and apply boundaries\n  while retaining a refusal for unobserved future versions.\n- Preserve the physical source, import, registry, hook and installed-attestation\n  readbacks before reporting success.\n- Test 1.2.13 with a stale managed copy and an unknown version that remains\n  blocked; confirm the three-runner manifest build after a fresh stamp.\n- Re-run the actual Agy global update and first greenfield preflight on the\n  newly installed local candidate. A fixture pass alone does not close this.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current source fix for version 1.2.13 and the focused 13/9 controlled cases are retained; version checks accept 1.2.13 and refuse future versions. Installed stale-copy refresh, stamp persistence, and loaded-source readback remain open.",
+          "nextMeaningfulAction": "Qualify installed refresh/readback against the current candidate; preserve the passing controlled cases."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [],
+      "ownerRemainingWork": "Version1.2.13 source fix and13/9/14 retained; installed stale-copy refresh, stamp and loaded-source readback remain.",
+      "ownerRoutingRemaining": [
+        "Historical fixd1a015ff5 and13/9/14 preserved; no current exact source/case/installed stale-copy refresh binding.",
+        "Version1.2.13 source fix and13/9/14 retained; installed stale-copy refresh, stamp and loaded-source readback remain."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.approval-verification-demands-head-equals-candidate",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+        "canonicalPath": "backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+        "sha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+        "bytes": 3710,
+        "parentSha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Current selected architecture approval verifier has a readiness requirement and package/signature checks; the exact old requireCurrentCandidate behavior is not established by this signature. Consumer/host/item coverage and exact positive/negative receipts are not bound.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Trace actual verifier consumers and bind exact candidate-bound positive/negative cases before altering the existing implementation.",
+      "originalTriage": [
+        {
+          "line": 56,
+          "text": {
+            "excluded": true,
+            "rawSha256": "ab00613e9245fd9e79d8146d3cc8ec747f2b9f51a605c71342f61929ddec6fdb",
+            "bytes": 246,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.approval-verification-demands-head-equals-candidate::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 26,
+          "text": "`verifyFinalDesignWorkflowApproval` (`plugins/pipeline-core/lib/architecture-design.mjs`) reads the approved package\nwith `requireCurrentCandidate: false`, because HEAD is expected to move during implementation. For an\n`advisor.status: \"unavailable\"` v2 package, the readiness host verifier (`verifyDesignReadinessHostExecution`,\n`design-readiness-host-evidence.mjs`) re-reads the supplemental Advisor observation through\n`rereadReadinessAdvisorContextV2` → `verifyReadinessAdvisorObservationV2` (`design-workflow-package-v2.mjs`), which\nre-enters `readDesignWorkflowPackageV2FromRepository` without the flag. The default is `true`, so the inline read throws\n`DWP2-CURRENT-CANDIDATE` as soon as HEAD differs from the approved candidate, surfacing as\n`DWP-READINESS-HOST-RECEIPT-INVALID`. Every such approval becomes unverifiable after the first commit past its\ncandidate; the dev-plan guard then refuses every implementation write and every `node` execution, and `inspect` offers\nonly `reopen-design` — whose new approval would lock again at the next commit.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [
+            "plugins/pipeline-core/lib/architecture-design.mjs"
+          ],
+          "evidenceAssessment": "Current selected architecture approval verifier has a readiness requirement and package/signature checks; the exact old requireCurrentCandidate behavior is not established by this signature. Consumer/host/item coverage and exact positive/negative receipts are not bound.",
+          "nextMeaningfulAction": "Trace actual verifier consumers and bind exact candidate-bound positive/negative cases before altering the existing implementation."
+        },
+        {
+          "id": "pipeline.approval-verification-demands-head-equals-candidate::40.1",
+          "heading": "Proposal",
+          "lineStart": 42,
+          "lineEnd": 46,
+          "text": "Forward the caller's `requireCurrentCandidate` through all three functions; the default stays strict (`true`) for\npreparation, presentation and approval. Pins first (QG-04): one case per entry point proving (a) the implementation\nboundary verifies with HEAD past the candidate and (b) presentation/approval still refuse a moved HEAD. The PO hotfix\n`legacy-origin:hotfix-candidate-binding.ps1` (9 anchors in 3 files) is the reference diff; the source fix must replace it and\nthe next stamp must carry it.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected architecture approval verifier has a readiness requirement and package/signature checks; the exact old requireCurrentCandidate behavior is not established by this signature. Consumer/host/item coverage and exact positive/negative receipts are not bound.",
+          "nextMeaningfulAction": "Trace actual verifier consumers and bind exact candidate-bound positive/negative cases before altering the existing implementation."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        }
+      ],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "selected146": {
+            "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+            "bytes": 29652,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+            "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+            "bytes": 29652,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        }
+      ],
+      "ownerRemainingWork": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed.",
+      "ownerRoutingRemaining": [
+        "Architecture source current-bound; other owner path correspondence and each strict/implementation positive-negative case unbound.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-auto-install-pre-push-hook-with-the-plugin.md",
+        "canonicalPath": "backlog/items/2026-10-08-auto-install-pre-push-hook-with-the-plugin.md",
+        "sha256": "b8c658eed4e89c89b136a96d767a4fe873285927ddddf133c9ef338b4af2d784",
+        "bytes": 1456,
+        "parentSha256": "b8c658eed4e89c89b136a96d767a4fe873285927ddddf133c9ef338b4af2d784",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Fresh authenticated onboarding already installs the pre-push hook according to the current owner routing. The retained administrative inventory remains physical source, not a selected146 change. Native/manual scope acceptance remains open.",
+      "disposition": "source-present",
+      "nextMeaningfulAction": "Reuse the existing onboarding qualification; finish only the assigned bootstrap action/inherited-control and native/manual scope review.",
+      "originalTriage": [
+        {
+          "line": 37,
+          "text": {
+            "excluded": true,
+            "rawSha256": "97f367c08a122b1acbef333db7953fabe37e7f4a07acc2e1ee4a0b16bb9d36b9",
+            "bytes": 181,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.auto-install-pre-push-hook-with-the-plugin::16.1",
+          "heading": "Description",
+          "lineStart": 18,
+          "lineEnd": 21,
+          "text": "Admin-step inventory row C3 (\"Install `pre-push` hook: `pre-push-hook-install.mjs --install`\", per host, PO terminal)\nis classified automatable: install it with the plugin or during clone provisioning instead of a hand-run command.\nSource: `docs/admin-steps-inventory.md` row C3, candidate 1; toil T4 (toil log:10);\n`plugins/pipeline-core/scripts/pre-push-hook-install.mjs:800`.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [
+            "docs/admin-steps-inventory.md",
+            "plugins/pipeline-core/scripts/pre-push-hook-install.mjs:800"
+          ],
+          "evidenceAssessment": "Fresh authenticated onboarding already installs the pre-push hook according to the current owner routing. The retained administrative inventory remains physical source, not a selected146 change. Native/manual scope acceptance remains open.",
+          "nextMeaningfulAction": "Reuse the existing onboarding qualification; finish only the assigned bootstrap action/inherited-control and native/manual scope review."
+        },
+        {
+          "id": "pipeline.auto-install-pre-push-hook-with-the-plugin::32.1",
+          "heading": "Proposal",
+          "lineStart": 34,
+          "lineEnd": 35,
+          "text": "Provision the pre-push hook during plugin install or clone provisioning so a fresh host needs no manual command.\nOwner: pipeline; due 2026-10-31.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Fresh authenticated onboarding already installs the pre-push hook according to the current owner routing. The retained administrative inventory remains physical source, not a selected146 change. Native/manual scope acceptance remains open.",
+          "nextMeaningfulAction": "Reuse the existing onboarding qualification; finish only the assigned bootstrap action/inherited-control and native/manual scope review."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "docs/admin-steps-inventory.md",
+          "selected146": null,
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/admin-steps-inventory.md",
+            "sha256": "f5ae2acef9b76b74c73054c4eb22570c71c5b62851340bec863014ba02ea987f",
+            "bytes": 8432,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "physical-present-but-not-in-selected146-row-set"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pre-push-hook-install.mjs:800",
+          "selected146": null,
+          "bindingScope": "no-selected-row-and-no-physical-read",
+          "readError": "Error: ENOENT: no such file or directory, lstat '<repository>/legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pre-push-hook-install.mjs:800'"
+        }
+      ],
+      "ownerRemainingWork": "Root qualifies bootstrap instruction/action conformance and inherited controls; fresh authenticated onboarding already installs pre-push, so do not duplicate reinstatement. Native/manual scope acceptance remains open.",
+      "ownerRoutingRemaining": [
+        "Retained evidence says authenticated onboarding already installs; bind exact installer/bootstrap route and existing cases before assigning new source repair. Native/checklist pending.",
+        "Root qualifies bootstrap instruction/action conformance and inherited controls; fresh authenticated onboarding already installs pre-push, so do not duplicate reinstatement. Native/manual scope acceptance remains open."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-bootstrap-should-refresh-hooks-when-the-plugin-updated.md",
+        "canonicalPath": "backlog/items/2026-10-05-bootstrap-should-refresh-hooks-when-the-plugin-updated.md",
+        "sha256": "60bb24fca0448db604323300345908562b967611fb5a4ea3e68b4b038c43076a",
+        "bytes": 2775,
+        "parentSha256": "60bb24fca0448db604323300345908562b967611fb5a4ea3e68b4b038c43076a",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Typed refresh/detection tests and fresh authenticated hook installation are reported as retained. Current-source binding and fresh admission/native refresh proof are not attached to this item; the onboarding work overlaps the prior hook item.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Bind the retained typed refresh/detection evidence to current source and qualify the actual bootstrap refresh path; do not duplicate hook reinstatement.",
+      "originalTriage": [
+        {
+          "line": 49,
+          "text": {
+            "excluded": true,
+            "rawSha256": "2180105d3ab8eb033c8e9e221d431978a58aede86844c4a58760f714c93c38a8",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 21,
+          "text": "The PO's position (verbatim, German): \"das installieren der hooks sollte aber\neigentlich der agent im bootstrap machen wenn es updates gibt\". In English:\ninstalling the hooks should be done by the agent during bootstrap whenever\nthere are updates, not by the PO. There is also no agent-operable install\nroute overall.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Typed refresh/detection tests and fresh authenticated hook installation are reported as retained. Current-source binding and fresh admission/native refresh proof are not attached to this item; the onboarding work overlaps the prior hook item.",
+          "nextMeaningfulAction": "Bind the retained typed refresh/detection evidence to current source and qualify the actual bootstrap refresh path; do not duplicate hook reinstatement."
+        },
+        {
+          "id": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated::23.1",
+          "heading": "Proposal",
+          "lineStart": 25,
+          "lineEnd": 27,
+          "text": "- Bootstrap detects that the plugin updated and refreshes the installed hooks\n  itself.\n- Provide an agent-operable install route overall.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Typed refresh/detection tests and fresh authenticated hook installation are reported as retained. Current-source binding and fresh admission/native refresh proof are not attached to this item; the onboarding work overlaps the prior hook item.",
+          "nextMeaningfulAction": "Bind the retained typed refresh/detection evidence to current source and qualify the actual bootstrap refresh path; do not duplicate hook reinstatement."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [],
+      "ownerRemainingWork": "Root qualifies bootstrap instruction/action conformance and inherited controls; fresh authenticated onboarding already installs pre-push, so do not duplicate reinstatement. Native/manual scope acceptance remains open.",
+      "ownerRoutingRemaining": [
+        "Typed refresh and detection tests retained but exact current source+receipt+fresh admission/native refresh unbound; detection is not silent activation proof.",
+        "Root qualifies bootstrap instruction/action conformance and inherited controls; fresh authenticated onboarding already installs pre-push, so do not duplicate reinstatement. Native/manual scope acceptance remains open."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.bounded-reader-terminal-binding",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-bounded-reader-terminal-binding.md",
+        "canonicalPath": "backlog/items/2026-09-27-bounded-reader-terminal-binding.md",
+        "sha256": "945803369c365d209df83a06b165aa65b1c327f98817083bfb3ba2b2c421c57e",
+        "bytes": 6671,
+        "parentSha256": "945803369c365d209df83a06b165aa65b1c327f98817083bfb3ba2b2c421c57e",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Current selected reader protocol specifies two paired v2 rounds plus at most one justified complete escalation and preserves legacy v1 four-round validation. Frozen historical evidence reports v2 red cases now addressed and legacy9/9 green, but current end-to-end checker/Git-history and four-report terminal binding are not established in the assigned receipts.",
+      "disposition": "source-present",
+      "nextMeaningfulAction": "Bind the current checker, source and immutable reader reports to the terminal Git-history acceptance; preserve legacy v1 evidence.",
+      "originalTriage": [
+        {
+          "line": 42,
+          "text": {
+            "excluded": true,
+            "rawSha256": "ce9448cf76364c951ccd6be419051dbb7d09f44374d851f7bb0c7d729ca8e6ee",
+            "bytes": 552,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.bounded-reader-terminal-binding::35.1",
+          "heading": "Acceptance",
+          "lineStart": 37,
+          "lineEnd": 40,
+          "text": "A fixture with four rounds and a fourth terminal correction passes without a\nfifth reader; an unresolved finding, fifth round, mismatched commit/digest, or\nchanged covered document fails. The current Alfred course can bind its actual\nfour reports and final correction without fabricating a fresh Reader verdict.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected reader protocol specifies two paired v2 rounds plus at most one justified complete escalation and preserves legacy v1 four-round validation. Frozen historical evidence reports v2 red cases now addressed and legacy9/9 green, but current end-to-end checker/Git-history and four-report terminal binding are not established in the assigned receipts.",
+          "nextMeaningfulAction": "Bind the current checker, source and immutable reader reports to the terminal Git-history acceptance; preserve legacy v1 evidence."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [
+        {
+          "canonicalPath": "harness/reader-review-protocol.md",
+          "sha256": "3e1217a3ab7994a2fa9ac2986e61a803f1a3fbeba21f6c25f41bd7ad1a6057d0",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "harness/reader-review-protocol.md",
+          "sha256": "3e1217a3ab7994a2fa9ac2986e61a803f1a3fbeba21f6c25f41bd7ad1a6057d0",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        }
+      ],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "harness/reader-review-protocol.md",
+          "selected146": {
+            "sha256": "3e1217a3ab7994a2fa9ac2986e61a803f1a3fbeba21f6c25f41bd7ad1a6057d0",
+            "bytes": 11568,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/harness/reader-review-protocol.md",
+            "sha256": "3e1217a3ab7994a2fa9ac2986e61a803f1a3fbeba21f6c25f41bd7ad1a6057d0",
+            "bytes": 11568,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        }
+      ],
+      "ownerRemainingWork": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed.",
+      "ownerRoutingRemaining": [
+        "Current reader protocol bytes bound; actual checker/Git-history nine-case receipt and final four-report Alfred binding unbound.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+        "canonicalPath": "backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+        "sha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+        "bytes": 5074,
+        "parentSha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+      "disposition": "source-present",
+      "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix.",
+      "originalTriage": [
+        {
+          "line": 101,
+          "text": {
+            "excluded": true,
+            "rawSha256": "f8792158647ec7ed4eabfc53c086159216d84ec78b0438693aedf566f55c050d",
+            "bytes": 251,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 21,
+          "text": "After a valid final design-workflow approval, `pipeline-state.mjs set-phase\n--phase implementation` is refused with `ARCHITECTURE-DESIGN-PACKAGE-REQUIRED`\nand `nextAction.kind: \"architecture-design-required\"`, guidance \"Complete the\narchitecture design block in this exact PO-bound PRD, then present and approve\na new final design-workflow package\".",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.2",
+          "heading": "Description",
+          "lineStart": 23,
+          "lineEnd": 27,
+          "text": "The repository is brownfield: it has an existing architecture map rather than\nthe fresh greenfield scaffold, and its architecture adoption is PO-deferred.\nThe demanded block cannot be satisfied there: `parseArchitectureDesign`\nrequires `repositoryKind: \"greenfield\"`. Following the guidance would cost a\nfull design revision cycle plus another PO signature and still fail.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.3",
+          "heading": "Description",
+          "lineStart": 29,
+          "lineEnd": 29,
+          "text": "Source cause:",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.4",
+          "heading": "Description",
+          "lineStart": 31,
+          "lineEnd": 38,
+          "text": "- `inspectArchitectureDesignDraft` (`lib/architecture-design.mjs`) exempts\n  repositories without the byte-exact fresh scaffold (`required: false`), so\n  `submit-plan` accepts a brownfield PRD without the block.\n- `inspectArchitectureDesign` (same file) calls `parseArchitectureDesign(prd)`\n  unconditionally after the approval checks, with no equivalent exemption.\n- `inspectArchitectureEntryReadiness` (`lib/architecture-entry-readiness.mjs`)\n  short-circuits on `ARCHITECTURE-DESIGN-PACKAGE-REQUIRED` before the\n  adoption-disposition path that handles `deferred`.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.5",
+          "heading": "Description",
+          "lineStart": 40,
+          "lineEnd": 41,
+          "text": "Draft time and implementation entry apply different applicability rules to the\nsame PRD. The check arrived with the 0.7.0 test candidate (`1bd1d7bf6`).",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::15.6",
+          "heading": "Description",
+          "lineStart": 43,
+          "lineEnd": 44,
+          "text": "PO direction (2026-10-04, chat): for brownfield repositories architecture\nfitness is optional and is corrected only when the PO asks for it.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::57.1",
+          "heading": "Proposal",
+          "lineStart": 59,
+          "lineEnd": 66,
+          "text": "Apply the draft inspector's greenfield-applicability predicate in\n`inspectArchitectureDesign`: with no materialization receipt and no fresh\nscaffold, return a typed `ok: true` / `status: \"not-required\"` result so entry\nreadiness falls through to the adoption disposition. Greenfield behaviour stays\nunchanged. Positive and negative tests in a consumer-layout fixture on the\nwin32 and POSIX dialects, including the `project-onboarding-v3` consumer\n(which recommends `reopen-design` on any `ok: false` result in the approved\nstate).",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::57.2",
+          "heading": "Proposal",
+          "lineStart": 68,
+          "lineEnd": 69,
+          "text": "Operator hotfix 9 unblocks this repository until the source fix lands; the\nsource fix replaces it (W0-3 port).",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.1",
+          "heading": "Second gate, same class (found after hotfix 9)",
+          "lineStart": 73,
+          "lineEnd": 81,
+          "text": "With hotfix 9 applied, the writer-side `inspectArchitectureEntryReadiness`\nreturned `ready`, but the PreToolUse guard still refused the transition:\n`GUARD-ARCHITECTURE-FITNESS-NON-GREEN: planning architecture fitness is\nblocked` (remedies `authority-effect-ownership:localize-contract`,\n`navigation-currency:restore-navigation-bundle`).\n`architectureFitnessAuthorityVerdict` in `hooks/guard-lifecycle-ready.mjs`\nevaluates fitness itself and ignores a PO deferral, while the library treats a\ndeferral (with valid physical artifacts) as report-only. Two gates for one\ntransition apply two different rules.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.2",
+          "heading": "Second gate, same class (found after hotfix 9)",
+          "lineStart": 83,
+          "lineEnd": 87,
+          "text": "Operator hotfix 10 (2026-10-04) admits findings-bearing fitness only when the\ndisposition is `deferred` AND the library entry gate reports `ready`; missing\nmap, unavailable evaluator, missing surface and every other disposition still\nblock. With hotfixes 9 and 10 applied, `set-phase --phase implementation`\nsucceeded on 2026-10-04.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block::71.3",
+          "heading": "Second gate, same class (found after hotfix 9)",
+          "lineStart": 89,
+          "lineEnd": 90,
+          "text": "The source fix should leave exactly one implementation-entry rule, owned by\nthe library, which the guard calls rather than re-deriving it.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "The selected architecture design and entry-readiness sources contain the implementation-entry gates. The exact retained brownfield/greenfield corpus and consumer coverage are not bound by the current evidence packet.",
+          "nextMeaningfulAction": "Bind the original brownfield positive/negative corpus and exact current consumer receipts; do not infer another source fix."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        }
+      ],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "selected146": {
+            "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+            "bytes": 29652,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-design.mjs",
+            "sha256": "6888e05d40202e42ccd98b9aaf462edff72c82f76cf940a5969089addbbb5eec",
+            "bytes": 29652,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "selected146": {
+            "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+            "bytes": 25281,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+            "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+            "bytes": 25281,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        }
+      ],
+      "ownerRemainingWork": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed.",
+      "ownerRoutingRemaining": [
+        "Architecture design and entry source bound; historical21fee38d1 and AC19 source do not alone prove this exact brownfield/greenfield dialect corpus.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.capability-inventory-checker-is-red-at-head",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+        "canonicalPath": "backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+        "sha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+        "bytes": 887,
+        "parentSha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "No independent current failing case is attached. Owner disposition requires candidate-bound checker qualification and an existing native Windows suppression matrix before any source edit.",
+      "disposition": "deferred",
+      "nextMeaningfulAction": "Reproduce and bind an independent current failing case and the suppression matrix; only then decide whether source repair is needed.",
+      "originalTriage": [
+        {
+          "line": 23,
+          "text": {
+            "excluded": true,
+            "rawSha256": "2180105d3ab8eb033c8e9e221d431978a58aede86844c4a58760f714c93c38a8",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.capability-inventory-checker-is-red-at-head::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 17,
+          "text": "The capability-inventory checker is red at HEAD: 20 findings plus 5 of the same class.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "No independent current failing case is attached. Owner disposition requires candidate-bound checker qualification and an existing native Windows suppression matrix before any source edit.",
+          "nextMeaningfulAction": "Reproduce and bind an independent current failing case and the suppression matrix; only then decide whether source repair is needed."
+        },
+        {
+          "id": "pipeline.capability-inventory-checker-is-red-at-head::19.1",
+          "heading": "Proposal",
+          "lineStart": 21,
+          "lineEnd": 21,
+          "text": "Re-baseline the inventory instead of accepting the findings ad hoc (Elephant decision R1, 2026-10-05). Related: `2026-08-27-registering-a-verify-suite-silently-invalidates-the-capability-inventory.md` and `2026-09-06-registering-a-verify-suite-silently-creates-an-inventory-obligation.md`.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "No independent current failing case is attached. Owner disposition requires candidate-bound checker qualification and an existing native Windows suppression matrix before any source edit.",
+          "nextMeaningfulAction": "Reproduce and bind an independent current failing case and the suppression matrix; only then decide whether source repair is needed."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [],
+      "ownerRemainingWork": "Candidate-bound inventory checker qualification and existing native Windows suppression matrix. Source change only after independent actual failing case.",
+      "ownerRoutingRemaining": [
+        "Current source-count metadata is not inventory acceptance. Candidate-bound inventory checker/native suppression integration receipt is missing; no speculative scanner repair.",
+        "Candidate-bound inventory checker qualification and existing native Windows suppression matrix. Source change only after independent actual failing case."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-capture-evidence-does-not-normalize-windows-npm-launch.md",
+        "sha256": "b74012aa04ab1605ce3cf8d1a48f32a40b9077437394afcdfcc8a9b80876ee69"
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Current selected capture-evidence source contains an explicit Windows npm selector and Windows command spawning path. WEL12 portable focused receipts are retained; actual native Windows cmd/npm argv/output and status0/status7 behavior remain unverified. Original9/3 evidence is preserved.",
+      "disposition": "source-present",
+      "nextMeaningfulAction": "Reuse WEL12 receipts and qualify the native Windows cmd/npm acceptance; do not rerun completed qualification as preparation.",
+      "originalTriage": [],
+      "criteria": [
+        {
+          "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 17,
+          "text": "The report observed npm ENOENT and npm.cmd EINVAL from capture-evidence. Static inspection finds the raw child-process spawn path without Windows npm launcher normalization. This narrow public producer defect is distinct from the deferred sandbox, selected-Critic-lane and T1 fallback packages.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected capture-evidence source contains an explicit Windows npm selector and Windows command spawning path. WEL12 portable focused receipts are retained; actual native Windows cmd/npm argv/output and status0/status7 behavior remain unverified. Original9/3 evidence is preserved.",
+          "nextMeaningfulAction": "Reuse WEL12 receipts and qualify the native Windows cmd/npm acceptance; do not rerun completed qualification as preparation."
+        },
+        {
+          "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch::23.1",
+          "heading": "Acceptance",
+          "lineStart": 25,
+          "lineEnd": 28,
+          "text": "- The sanctioned evidence producer resolves the supported npm launcher on Windows and preserves the original argument vector, working directory, exit status and captured output.\n- Command resolution failures produce bounded typed diagnostics and do not fabricate successful evidence or silently switch to a different command.\n- Linux behavior and the existing source/candidate evidence binding remain intact; no arbitrary shell writer lane is added.\n- Independent platform regressions exercise success, missing launcher, nonzero exit and argument preservation. A genuine attended Windows execution is retained before any native-success claim.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current selected capture-evidence source contains an explicit Windows npm selector and Windows command spawning path. WEL12 portable focused receipts are retained; actual native Windows cmd/npm argv/output and status0/status7 behavior remain unverified. Original9/3 evidence is preserved.",
+          "nextMeaningfulAction": "Reuse WEL12 receipts and qualify the native Windows cmd/npm acceptance; do not rerun completed qualification as preparation."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+          "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+          "selection": "WEL12",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+          "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+          "selection": "WEL12",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+          "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+          "selection": "WEL12",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+          "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+          "selection": "WEL12",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        }
+      ],
+      "existingEvidenceReferences": [
+        {
+          "name": "WEL12",
+          "proof": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/wel12/actual-qualification-proof.json",
+            "sha256": "56f7d91010bd8175eb77d92bae73f5ee1a513f019288ea24ca0127f4ce77c90b"
+          },
+          "pass": 12,
+          "caseEvidence": null,
+          "canonicalPaths": [
+            "plugins/pipeline-core/scripts/capture-evidence.mjs"
+          ],
+          "backlogIds": [
+            "pipeline.capture-evidence-does-not-normalize-windows-npm-launch"
+          ],
+          "relatedCriteria": [
+            "AC-29",
+            "AC-32"
+          ],
+          "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+          "limits": [
+            "Portable Windows metadata and Linux children; native Windows cmd/npm acceptance unverified; original9/3 preserved."
+          ],
+          "sourceBinding": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+              "currentAuditSha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5"
+            }
+          ],
+          "officialClosure": false
+        }
+      ],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+          "selected146": {
+            "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+            "bytes": 31343,
+            "mode": 420,
+            "selection": "WEL12",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/capture-evidence.mjs",
+            "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+            "bytes": 31343,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        }
+      ],
+      "ownerRemainingWork": "Retain completed WEL12 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Portable Windows metadata and Linux children; native Windows cmd/npm acceptance unverified; original9/3 preserved.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step.",
+      "ownerRoutingRemaining": [
+        "WEL001–012 actual portable PASS source8ff391 matches current114; native cmd/npm argv/output/status0/status7 lane remains unexecuted. Keep original9/3 receipts.",
+        "Retain completed WEL12 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Portable Windows metadata and Linux children; native Windows cmd/npm acceptance unverified; original9/3 preserved.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.claude-design-readiness-cannot-start-on-windows",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md",
+        "canonicalPath": "backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md",
+        "sha256": "649a165d68b106c0156500878e4c48cee37f912286ed572cdb51c9c18e4debe4",
+        "bytes": 2435,
+        "parentSha256": "649a165d68b106c0156500878e4c48cee37f912286ed572cdb51c9c18e4debe4",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "ADR0085 retires the former ordinary bootstrap route. Legacy mutation-classifier criteria matter only if the selected host reaches that legacy child; no such reachability proof is supplied.",
+      "disposition": "deferred",
+      "nextMeaningfulAction": "Prove selected-host reachability to the legacy child before considering classifier changes; preserve the retired ordinary-bootstrap behavior.",
+      "originalTriage": [
+        {
+          "line": 44,
+          "text": {
+            "excluded": true,
+            "rawSha256": "2180105d3ab8eb033c8e9e221d431978a58aede86844c4a58760f714c93c38a8",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.claude-design-readiness-cannot-start-on-windows::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 19,
+          "text": "Findings register rows K3-17, K5-10 and K5-12. The independent design readiness review for Claude\nfailed three times in a row, each time for a different cause, before the readiness child could\nrun:",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "ADR0085 retires the former ordinary bootstrap route. Legacy mutation-classifier criteria matter only if the selected host reaches that legacy child; no such reachability proof is supplied.",
+          "nextMeaningfulAction": "Prove selected-host reachability to the legacy child before considering classifier changes; preserve the retired ordinary-bootstrap behavior."
+        },
+        {
+          "id": "pipeline.claude-design-readiness-cannot-start-on-windows::15.2",
+          "heading": "Description",
+          "lineStart": 21,
+          "lineEnd": 34,
+          "text": "- K5-10: `design-course-session.mjs:133` builds the non-Codex readiness argv without `--runner`.\n  `runner-design-readiness-bootstrap.mjs` requires it and exits 64 (usage). The stderr text is\n  dropped. Fixed on the installed copy by operator hotfix 5.\n- K3-17: `resolveTrustedSystemExecutable` never consults `PATH`. On win32 it searches only the\n  system tool roots, so the Claude CLI in the user's `.local\\bin` is \"unavailable\". The POSIX branch\n  already trusts `~/.local/bin`. Fixed on the installed copy by operator hotfix 6 (PO decision:\n  generic, home-derived).\n- K5-12: the model-output schema passed to `claude --json-schema` declares `$schema` draft 2020-12,\n  which the CLI's validator rejects (\"no schema with key or ref\"). The process exits 1 after 0.8 s.\n  Without `$schema`/`$id` the same run exits 0 after 108 s with a valid, correctly bound report.\n  Fixed on the installed copy by operator hotfix 7.\n- In addition, `invokeRunnerReadinessChild` collapses exit code, timeout, stderr, parse failure and\n  binding mismatch into one `DESIGN-READINESS-RUNNER-UNAVAILABLE` and drops stderr. The course\n  reports `stderrBytes: 0`, so every diagnosis needed a separate probe script.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "ADR0085 retires the former ordinary bootstrap route. Legacy mutation-classifier criteria matter only if the selected host reaches that legacy child; no such reachability proof is supplied.",
+          "nextMeaningfulAction": "Prove selected-host reachability to the legacy child before considering classifier changes; preserve the retired ordinary-bootstrap behavior."
+        },
+        {
+          "id": "pipeline.claude-design-readiness-cannot-start-on-windows::36.1",
+          "heading": "Acceptance",
+          "lineStart": 38,
+          "lineEnd": 42,
+          "text": "- Spec §21.4 R4-7, R4-9, R4-10: the readiness producer runs on native Windows without any operator\n  hotfix. Each failure class has its own typed sub-reason with bounded, sanitized stderr. The schema\n  dialect handed to each runner CLI is accepted by that CLI (contract test per runner).\n- The documented runner-CLI install locations are trusted on every platform, without trusting\n  wrappers or non-executables.",
+          "disposition": "excluded",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "ADR0085 retires the former ordinary bootstrap route. Legacy mutation-classifier criteria matter only if the selected host reaches that legacy child; no such reachability proof is supplied.",
+          "nextMeaningfulAction": "Prove selected-host reachability to the legacy child before considering classifier changes; preserve the retired ordinary-bootstrap behavior."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [],
+      "ownerRemainingWork": "Prove selected host reaches legacy child before changing mutation classifier; preserve retired ordinary bootstrap.",
+      "ownerRoutingRemaining": [
+        "ADR0085 retires ordinary mandatory route. Legacy R4-7/9/10 native/schema/trusted-path checks remain explicit unbound, not ordinary bootstrap gate.",
+        "Prove selected host reaches legacy child before changing mutation classifier; preserve retired ordinary bootstrap."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+        "canonicalPath": "backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+        "sha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+        "bytes": 764,
+        "parentSha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "The frozen assigned body has no extracted Acceptance criterion rows; that does not remove its normative body requirements. Current exact-candidate selected-runner writer, consent/activation matrix, and consent export boundary are not bound.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Use a separately authorized exact-candidate execution dispatch to bind selected-runner and consent/activation cases; do not infer completion from zero extracted criteria.",
+      "originalTriage": [],
+      "criteria": [],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [],
+      "ownerRemainingWork": "Run independent exact-candidate cases only in a separately authorized execution dispatch; trace missing consent export boundary and preserved complete matrix coverage before further source repair.",
+      "ownerRoutingRemaining": [
+        "Historical source-fixed assessment has no exact current source/focused receipt here. Bind selected-runner writer and consent/activation matrix, no fake capabilities.",
+        "Run independent exact-candidate cases only in a separately authorized execution dispatch; trace missing consent export boundary and preserved complete matrix coverage before further source repair."
+      ],
+      "zeroAcceptanceRowsCaveat": "No criteria extracted by the source assignment; body requirements still assessed above."
+    },
+    {
+      "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-claude-session-start-emits-codex-transcript-recovery-hint.md",
+        "canonicalPath": "backlog/items/2026-10-03-claude-session-start-emits-codex-transcript-recovery-hint.md",
+        "sha256": "6a14b634a1e207ea7dd6331b54a7890a6c71bcb34fa0c61bb0ba2fc775ecd32b",
+        "bytes": 2173,
+        "parentSha256": "6a14b634a1e207ea7dd6331b54a7890a6c71bcb34fa0c61bb0ba2fc775ecd32b",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Current hooks configuration and Codex session-start hint source are present and selected146-bound; the old “not wired” claim is stale. Runtime Codex config/SSRI binding and the decision whether a Claude-side hint is wanted remain unqualified.",
+      "disposition": "source-present",
+      "nextMeaningfulAction": "Bind the runtime config/SSRI behavior and resolve the retained product decision before changing the hint.",
+      "originalTriage": [
+        {
+          "line": 52,
+          "text": {
+            "excluded": true,
+            "rawSha256": "2180105d3ab8eb033c8e9e221d431978a58aede86844c4a58760f714c93c38a8",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 24,
+          "text": "The Claude plugin's `hooks.json` wires `hooks/codex-session-start-hint.mjs` into\nthe Claude `SessionStart` (`startup|resume|clear`) matcher. In a Claude Code\nsession it injected context instructing the agent to run\n`runner-transcript-recovery.mjs list ... --runner codex`, which lists prior\n**Codex** transcripts, and to never search `$CODEX_HOME`/`~/.codex`. For a Claude\nsession that is the wrong runner. Either the hint is wrongly wired for Claude or\nthe script fails to parameterise the runner. The injected text also embeds\nabsolute host paths of the installed plugin and repository.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current hooks configuration and Codex session-start hint source are present and selected146-bound; the old “not wired” claim is stale. Runtime Codex config/SSRI binding and the decision whether a Claude-side hint is wanted remain unqualified.",
+          "nextMeaningfulAction": "Bind the runtime config/SSRI behavior and resolve the retained product decision before changing the hint."
+        },
+        {
+          "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint::15.2",
+          "heading": "Description",
+          "lineStart": 26,
+          "lineEnd": 28,
+          "text": "Positive part: activation is now detected correctly (\"Agent Pipeline is active\nfor this repository\"). The earlier \"not active in this folder\" message came\nfrom a session that started on a branch without `project/pipeline.json`.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [
+            "project/pipeline.json"
+          ],
+          "evidenceAssessment": "Current hooks configuration and Codex session-start hint source are present and selected146-bound; the old “not wired” claim is stale. Runtime Codex config/SSRI binding and the decision whether a Claude-side hint is wanted remain unqualified.",
+          "nextMeaningfulAction": "Bind the runtime config/SSRI behavior and resolve the retained product decision before changing the hint."
+        },
+        {
+          "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint::15.3",
+          "heading": "Description",
+          "lineStart": 30,
+          "lineEnd": 33,
+          "text": "The adjacent `staleness-check` line reported `ref=refs/heads/main` and\n`reason=timeout` while the checkout is on `feat/sprint-alfred`. Whether that\nref choice is intended for the alpha channel should be checked in the same\npass.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current hooks configuration and Codex session-start hint source are present and selected146-bound; the old “not wired” claim is stale. Runtime Codex config/SSRI binding and the decision whether a Claude-side hint is wanted remain unqualified.",
+          "nextMeaningfulAction": "Bind the runtime config/SSRI behavior and resolve the retained product decision before changing the hint."
+        },
+        {
+          "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint::45.1",
+          "heading": "Proposal",
+          "lineStart": 47,
+          "lineEnd": 50,
+          "text": "Decide whether a Claude-side transcript recovery hint is wanted. If it is,\nderive `--runner` from the hosting runner (or ship a Claude-specific hook). If\nit is not, remove the wiring from the Claude hook set. Add a test asserting\nthat the Claude SessionStart output never names another runner.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current hooks configuration and Codex session-start hint source are present and selected146-bound; the old “not wired” claim is stale. Runtime Codex config/SSRI binding and the decision whether a Claude-side hint is wanted remain unqualified.",
+          "nextMeaningfulAction": "Bind the runtime config/SSRI behavior and resolve the retained product decision before changing the hint."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/hooks.json",
+          "sha256": "04c639abbb518be5430dec02ee504ff0cc443c3873c320d19a1684073565e50d",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/hooks.json",
+          "sha256": "04c639abbb518be5430dec02ee504ff0cc443c3873c320d19a1684073565e50d",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+          "sha256": "46b8d4be8ac5449e3e83060c2be75ad8ea395047b6fdf3f4c2b2a861d631a85f",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+          "sha256": "46b8d4be8ac5449e3e83060c2be75ad8ea395047b6fdf3f4c2b2a861d631a85f",
+          "selection": "BASE73",
+          "proof": "Root-delivered actual142 metadata; no new physical/source behavior read by mapper"
+        }
+      ],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/hooks.json",
+          "selected146": {
+            "sha256": "04c639abbb518be5430dec02ee504ff0cc443c3873c320d19a1684073565e50d",
+            "bytes": 16658,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/hooks.json",
+            "sha256": "04c639abbb518be5430dec02ee504ff0cc443c3873c320d19a1684073565e50d",
+            "bytes": 16658,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+          "selected146": {
+            "sha256": "46b8d4be8ac5449e3e83060c2be75ad8ea395047b6fdf3f4c2b2a861d631a85f",
+            "bytes": 15265,
+            "mode": 420,
+            "selection": "BASE73",
+            "currentMatchesInventory": true
+          },
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+            "sha256": "46b8d4be8ac5449e3e83060c2be75ad8ea395047b6fdf3f4c2b2a861d631a85f",
+            "bytes": 15265,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "selected146-bound"
+        },
+        {
+          "canonicalPath": "project/pipeline.json",
+          "selected146": null,
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/project/pipeline.json",
+            "sha256": "789116b17c71d478e6667670c6f2665cecefc5233f71c4091de1a0b5cbbf80e6",
+            "bytes": 1664,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "physical-present-but-not-in-selected146-row-set"
+        }
+      ],
+      "ownerRemainingWork": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed.",
+      "ownerRoutingRemaining": [
+        "Current hook/config bytes replace old concretebug assessment. Exact SSRI runtime+configuration receipt and Codex config binding still missing from this mapper; preserve original v1/v2 setup history.",
+        "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+        "canonicalPath": "backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+        "sha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+        "bytes": 2524,
+        "parentSha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "This umbrella has partial current source and retained focused cases: WEL12 portable support is qualified, while V9/V12 qualification, V10 original-source binding, V13 snapshot/CAS diagnostics, and native happy path remain separate. It must not be treated as one undifferentiated missing fix.",
+      "disposition": "qualification-gap",
+      "nextMeaningfulAction": "Assign and bind V9/V12 qualification, exact V10 source provenance, V13 snapshot/CAS diagnostic work, and native happy-path evidence as separate cells.",
+      "originalTriage": [
+        {
+          "line": 55,
+          "text": {
+            "excluded": true,
+            "rawSha256": "2180105d3ab8eb033c8e9e221d431978a58aede86844c4a58760f714c93c38a8",
+            "bytes": 78,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 19,
+          "text": "**PO observation:** Claude cannot make all necessary calls under Windows\n(\"CAS missing\" or similar) and therefore fails. The analysis ends in `draft`\nwith zero product code after about 87 minutes and two override signatures.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "This umbrella has partial current source and retained focused cases: WEL12 portable support is qualified, while V9/V12 qualification, V10 original-source binding, V13 snapshot/CAS diagnostics, and native happy path remain separate. It must not be treated as one undifferentiated missing fix.",
+          "nextMeaningfulAction": "Assign and bind V9/V12 qualification, exact V10 source provenance, V13 snapshot/CAS diagnostic work, and native happy-path evidence as separate cells."
+        },
+        {
+          "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.2",
+          "heading": "Description",
+          "lineStart": 21,
+          "lineEnd": 22,
+          "text": "This item collects the Claude/Windows-specific causes. Cross-runner causes\nlive in their own items:",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "This umbrella has partial current source and retained focused cases: WEL12 portable support is qualified, while V9/V12 qualification, V10 original-source binding, V13 snapshot/CAS diagnostics, and native happy path remain separate. It must not be treated as one undifferentiated missing fix.",
+          "nextMeaningfulAction": "Assign and bind V9/V12 qualification, exact V10 source provenance, V13 snapshot/CAS diagnostic work, and native happy-path evidence as separate cells."
+        },
+        {
+          "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.3",
+          "heading": "Description",
+          "lineStart": 24,
+          "lineEnd": 31,
+          "text": "- Coordination commands refused in draft:\n  `2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md`\n  (V-1, V-4, V-6, V-8).\n- Advisor producer fails silently:\n  `2026-10-03-role-route-preflight-with-self-dispatch-fallback.md` (V-2, V-11).\n- Override burnt: `2026-10-03-guard-override-request-digest-drifts-after-arming.md` (V-3).\n- Read blocks: `2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md`,\n  `2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md`.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "This umbrella has partial current source and retained focused cases: WEL12 portable support is qualified, while V9/V12 qualification, V10 original-source binding, V13 snapshot/CAS diagnostics, and native happy path remain separate. It must not be treated as one undifferentiated missing fix.",
+          "nextMeaningfulAction": "Assign and bind V9/V12 qualification, exact V10 source provenance, V13 snapshot/CAS diagnostic work, and native happy-path evidence as separate cells."
+        },
+        {
+          "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.4",
+          "heading": "Description",
+          "lineStart": 33,
+          "lineEnd": 33,
+          "text": "Remaining Claude/Windows-specific frictions:",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "This umbrella has partial current source and retained focused cases: WEL12 portable support is qualified, while V9/V12 qualification, V10 original-source binding, V13 snapshot/CAS diagnostics, and native happy path remain separate. It must not be treated as one undifferentiated missing fix.",
+          "nextMeaningfulAction": "Assign and bind V9/V12 qualification, exact V10 source provenance, V13 snapshot/CAS diagnostic work, and native happy-path evidence as separate cells."
+        },
+        {
+          "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::15.5",
+          "heading": "Description",
+          "lineStart": 35,
+          "lineEnd": 46,
+          "text": "- **V-9:** `--answers-json` in Bash breaks at about 10 KB (`unexpected EOF`,\n  Windows command-line limit), and PowerShell is refused for the flow. Provide\n  `--answers-file` analogous to `--text-file` and document the limit.\n- **V-10:** the dispatch guard demands the full briefing inline, while the\n  continuity route digest binds a briefing file. Derive the digest from the\n  briefing actually sent.\n- **V-12:** language asked twice (onboarding and intake) although supplied as a\n  reviewed default.\n- **V-13:** `docs/state.md` projection stale after design progress. Mark it as a\n  timestamped snapshot or keep the projection current.\n- The CAS/\"missing\" failure named by the PO is not yet located in the report.\n  Reproduce it on the new candidate and record the exact code here.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [
+            "docs/state.md"
+          ],
+          "evidenceAssessment": "This umbrella has partial current source and retained focused cases: WEL12 portable support is qualified, while V9/V12 qualification, V10 original-source binding, V13 snapshot/CAS diagnostics, and native happy path remain separate. It must not be treated as one undifferentiated missing fix.",
+          "nextMeaningfulAction": "Assign and bind V9/V12 qualification, exact V10 source provenance, V13 snapshot/CAS diagnostic work, and native happy-path evidence as separate cells."
+        },
+        {
+          "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable::48.1",
+          "heading": "Acceptance",
+          "lineStart": 50,
+          "lineEnd": 53,
+          "text": "- The Claude/Windows greenfield run reaches implementation and push within the\n  two-approval happy path\n  (`2026-10-03-three-runner-happy-path-with-two-po-approvals.md`).\n- V-9, V-10, V-12 and V-13 are fixed or explicitly dispositioned.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "This umbrella has partial current source and retained focused cases: WEL12 portable support is qualified, while V9/V12 qualification, V10 original-source binding, V13 snapshot/CAS diagnostics, and native happy path remain separate. It must not be treated as one undifferentiated missing fix.",
+          "nextMeaningfulAction": "Assign and bind V9/V12 qualification, exact V10 source provenance, V13 snapshot/CAS diagnostic work, and native happy-path evidence as separate cells."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "docs/state.md",
+          "selected146": null,
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/state.md",
+            "sha256": "88a312f5a35b888fc30e40b30bdb4216d92bce32ed029153a7401d81eb6e792f",
+            "bytes": 29951,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "physical-present-but-not-in-selected146-row-set"
+        }
+      ],
+      "ownerRemainingWork": "Qualify V9/V12 existing source; assign exact V10 binding/V13 snapshot/CAS diagnostic gap separately before fixes.",
+      "ownerRoutingRemaining": [
+        "Umbrella partial source facts are not full native workflow. Bind V9/V12 exact cases, V10 original-source provenance,V13 snapshot/CAS and native happy-path separately.",
+        "Qualify V9/V12 existing source; assign exact V10 binding/V13 snapshot/CAS diagnostic gap separately before fixes."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.codex-advisor-evidence-fails-after-host-update",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+        "canonicalPath": "backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+        "sha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+        "bytes": 1818,
+        "parentSha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Historical executable comparison is reported fixed7/7, but the original acceptance explicitly requires a bounded first-failing-subcheck result that the owner records as undelivered. The installed replay is a separate qualification gap. No additional source defect is inferred beyond that concrete missing diagnostic.",
+      "disposition": "missing-functional",
+      "nextMeaningfulAction": "Deliver the bounded first-failing-subcheck diagnostic, then separately bind installed replay evidence.",
+      "originalTriage": [],
+      "criteria": [
+        {
+          "id": "pipeline.codex-advisor-evidence-fails-after-host-update::22.1",
+          "heading": "Acceptance",
+          "lineStart": 24,
+          "lineEnd": 32,
+          "text": "- Revalidate the historical executable from the sealed private journal and\n  ownership chain without requiring the current CLI binary to have the same\n  path or bytes.\n- Continue to reject altered finalization, request, source, receipt or process\n  ownership evidence; never silently omit the Advisor from the package.\n- Return a bounded first-failing-subcheck code for a rejected private binding,\n  with no private content or path in the output.\n- Cover a changed Codex executable and a tampered journal in targeted tests,\n  then replay the affected greenfield design package with the installed build.",
+          "disposition": "missing-functional",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Historical executable comparison is reported fixed7/7, but the original acceptance explicitly requires a bounded first-failing-subcheck result that the owner records as undelivered. The installed replay is a separate qualification gap. No additional source defect is inferred beyond that concrete missing diagnostic.",
+          "nextMeaningfulAction": "Deliver the bounded first-failing-subcheck diagnostic, then separately bind installed replay evidence."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [],
+      "ownerRemainingWork": "Historical executable comparison fixed7/7; bounded first-failing-subcheck diagnostics remain explicit missing delivery; installed replay separate.",
+      "ownerRoutingRemaining": [
+        "Retain original criterion and bind current full-item proof before promotion.",
+        "Historical executable comparison fixed7/7; bounded first-failing-subcheck diagnostics remain explicit missing delivery; installed replay separate."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+        "canonicalPath": "backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+        "sha256": "c1953268b51ad1659956ce0cd7c521964da365db5ceb8f16b4026dfa4c0746b2",
+        "bytes": 5541,
+        "parentSha256": "fa597b23a60e3c71ff88dc712df2802fe0b466826c0a2b91c12aef85b975dbc3",
+        "assignmentChanged": true
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Current unchanged provider source creates the shared agent-pipeline namespace and enforces a hardened private repository-specific directory. This physical source matches the immutable pinned source-closure row; fresh-repository/private-store ownership producer evidence and productive installed replay remain unqualified.",
+      "disposition": "source-present",
+      "nextMeaningfulAction": "Reuse the current source and qualify fresh-repository/private-store ownership with the controlled source-owned producer; no manual chmod.",
+      "originalTriage": [
+        {
+          "line": 68,
+          "text": {
+            "excluded": true,
+            "rawSha256": "e453c72806442c404a8050d12ad1be4a513d783d83d27c393613bace4d44cda9",
+            "bytes": 251,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::15.1",
+          "heading": "Description",
+          "lineStart": 17,
+          "lineEnd": 24,
+          "text": "The canonical identity writer recursively creates\n`<git-common>/agent-pipeline/governance-events` with mode 0755. On a fresh\nordinary repository this also creates the shared `agent-pipeline` parent as\n0755. The prepared registered Codex Advisor process-root helper requires that\nsame shared parent to be 0700 and refuses it with `host-process-root-unsafe`.\nThus the sanctioned first identity mint and prepared host route cannot compose\nwithout extra provisioning. This is a confirmed preparation defect; the new\nAdvisor route has not been installed or productively invoked.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current unchanged provider source creates the shared agent-pipeline namespace and enforces a hardened private repository-specific directory. This physical source matches the immutable pinned source-closure row; fresh-repository/private-store ownership producer evidence and productive installed replay remain unqualified.",
+          "nextMeaningfulAction": "Reuse the current source and qualify fresh-repository/private-store ownership with the controlled source-owned producer; no manual chmod."
+        },
+        {
+          "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::15.2",
+          "heading": "Description",
+          "lineStart": 26,
+          "lineEnd": 30,
+          "text": "The controlled reproduction minted a genuine fixture identity through the\ncanonical writer, observed parent mode 0755, and received the typed refusal.\nThe binding remained present. Private store positive fixtures explicitly\nprovision the shared parent as 0700 and therefore do not qualify this fresh\nordering. No manual chmod workaround should become an implicit user step.",
+          "disposition": "source-present",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current unchanged provider source creates the shared agent-pipeline namespace and enforces a hardened private repository-specific directory. This physical source matches the immutable pinned source-closure row; fresh-repository/private-store ownership producer evidence and productive installed replay remain unqualified.",
+          "nextMeaningfulAction": "Reuse the current source and qualify fresh-repository/private-store ownership with the controlled source-owned producer; no manual chmod."
+        },
+        {
+          "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::39.1",
+          "heading": "Proposal",
+          "lineStart": 41,
+          "lineEnd": 46,
+          "text": "Define a compatible shared-parent policy and preserve private duty namespaces.\nAn owner-owned physical shared directory without group/world write permissions\ncan coexist with private 0700 Advisor/Readiness descendants; alternatively use\nan explicit sanctioned provisioning/repair contract. Preserve physical alias,\nowner, inode/mode and exact registered namespace checks. Do not silently chmod\nexisting operator directories or admit arbitrary process roots.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current unchanged provider source creates the shared agent-pipeline namespace and enforces a hardened private repository-specific directory. This physical source matches the immutable pinned source-closure row; fresh-repository/private-store ownership producer evidence and productive installed replay remain unqualified.",
+          "nextMeaningfulAction": "Reuse the current source and qualify fresh-repository/private-store ownership with the controlled source-owned producer; no manual chmod."
+        },
+        {
+          "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity::48.1",
+          "heading": "Acceptance",
+          "lineStart": 50,
+          "lineEnd": 58,
+          "text": "- Actual sanctioned first identity mint followed by registered Advisor/store\n  creation succeeds in a controlled ordinary Git repository without extra\n  operator commands or signatures.\n- Group/world writable shared parents, aliases and permissive private duty\n  directories remain refused; linked worktrees retain one common identity.\n- Existing namespace/ownership tests remain valid and the Readiness shared\n  parent policy is verified independently.\n- Productive integration and installed Codex replay are recorded separately;\n  fixture success does not constitute an Advisor receipt or release stamp.",
+          "disposition": "qualification-gap",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Current unchanged provider source creates the shared agent-pipeline namespace and enforces a hardened private repository-specific directory. This physical source matches the immutable pinned source-closure row; fresh-repository/private-store ownership producer evidence and productive installed replay remain unqualified.",
+          "nextMeaningfulAction": "Reuse the current source and qualify fresh-repository/private-store ownership with the controlled source-owned producer; no manual chmod."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [],
+      "ownerRemainingWork": "Reconcile actual shared namespace identity fix and existing directed receipts; qualify fresh-repository/private-store ownership with controlled source-owned producer. No manual chmod.",
+      "ownerRoutingRemaining": [
+        "Historical8b5dcf4fb source fix remains a lead; exact selected identity/store/namespace producer and current directed/installed receipt unbound; no manual chmod.",
+        "Reconcile actual shared namespace identity fix and existing directed receipts; qualify fresh-repository/private-store ownership with controlled source-owned producer. No manual chmod."
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    },
+    {
+      "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "bodyReference": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+        "canonicalPath": "backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+        "sha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+        "bytes": 1579,
+        "parentSha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+        "assignmentChanged": false
+      },
+      "bodyMatchesFrozenAssignment": true,
+      "bodyLineSlicesMatch": true,
+      "fullBodyAssessment": "Existing ENV-DUMP source/protocol qualification is reported. The bootstrap premise is not supported by a verified recurring-toil row; native Desktop and original host control callbacks are also unqualified. A script existing alone does not establish need.",
+      "disposition": "deferred",
+      "nextMeaningfulAction": "Verify the fresh-host/bootstrap premise from recurring-toil evidence and qualify native Desktop/host control callbacks before adding a typed action.",
+      "originalTriage": [
+        {
+          "line": 38,
+          "text": {
+            "excluded": true,
+            "rawSha256": "80b71d81a7eea1444f620b77369bdd43037a39f12ef4596b545f671f078b9601",
+            "bytes": 191,
+            "reason": "Private original requirement text excluded; approved/public associations retained separately"
+          }
+        }
+      ],
+      "criteria": [
+        {
+          "id": "pipeline.codex-bootstrap-in-the-typed-next-action::16.1",
+          "heading": "Description",
+          "lineStart": 18,
+          "lineEnd": 22,
+          "text": "The admin-step inventory row \"Run Codex design-readiness bootstrap script on a fresh host\" (per host, PO terminal) is\nmarked automatable: fold it into the bootstrap typed next action for a fresh host. The inventory marks the premise\nunverified: the row has no toil row and cites only the existing script\n(`plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs`), so the manual step itself is not evidenced\nas recurring toil. Source: `docs/admin-steps-inventory.md` Codex row (line 54), candidate 6.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [
+            "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+            "docs/admin-steps-inventory.md"
+          ],
+          "evidenceAssessment": "Existing ENV-DUMP source/protocol qualification is reported. The bootstrap premise is not supported by a verified recurring-toil row; native Desktop and original host control callbacks are also unqualified. A script existing alone does not establish need.",
+          "nextMeaningfulAction": "Verify the fresh-host/bootstrap premise from recurring-toil evidence and qualify native Desktop/host control callbacks before adding a typed action."
+        },
+        {
+          "id": "pipeline.codex-bootstrap-in-the-typed-next-action::33.1",
+          "heading": "Proposal",
+          "lineStart": 35,
+          "lineEnd": 36,
+          "text": "After verifying the premise, include the design-readiness bootstrap in the fresh-host typed action.\nOwner: pipeline; due 2026-10-31.",
+          "disposition": "deferred",
+          "proofNotEstablished": true,
+          "missingImplementationNotInferred": true,
+          "originalBodyLineSliceMatches": true,
+          "inlineCanonicalPaths": [],
+          "evidenceAssessment": "Existing ENV-DUMP source/protocol qualification is reported. The bootstrap premise is not supported by a verified recurring-toil row; native Desktop and original host control callbacks are also unqualified. A script existing alone does not establish need.",
+          "nextMeaningfulAction": "Verify the fresh-host/bootstrap premise from recurring-toil evidence and qualify native Desktop/host control callbacks before adding a typed action."
+        }
+      ],
+      "sourceAssociationsFromOwnerManifest": [],
+      "existingEvidenceReferences": [],
+      "sourceFacts": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+          "selected146": null,
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+            "sha256": "665b5dc45b621b472c870e04db6950900edfd16a609177bfe7c9a437395933a8",
+            "bytes": 16233,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "physical-present-but-not-in-selected146-row-set"
+        },
+        {
+          "canonicalPath": "docs/admin-steps-inventory.md",
+          "selected146": null,
+          "currentAuditPhysical": {
+            "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/docs/admin-steps-inventory.md",
+            "sha256": "f5ae2acef9b76b74c73054c4eb22570c71c5b62851340bec863014ba02ea987f",
+            "bytes": 8432,
+            "mode": 420,
+            "nlink": 1
+          },
+          "bindingScope": "physical-present-but-not-in-selected146-row-set"
+        }
+      ],
+      "ownerRemainingWork": "Existing ENV-DUMP source/protocol qualification; fresh host bootstrap premise, native Desktop, original host control callbacks",
+      "ownerRoutingRemaining": [
+        {
+          "gap": "Body itself says premise unverified; existence is not recurring toil or integration proof",
+          "nextAction": "Existing ENV-DUMP source/protocol qualification; fresh host bootstrap premise, native Desktop, original host control callbacks",
+          "crosswalkAction": "Bind exact current source/case/actual receipt/integration from retained requirements and original mapper evidence"
+        },
+        "Existing ENV-DUMP source/protocol qualification; fresh host bootstrap premise, native Desktop, original host control callbacks"
+      ],
+      "zeroAcceptanceRowsCaveat": null
+    }
+  ]
+}

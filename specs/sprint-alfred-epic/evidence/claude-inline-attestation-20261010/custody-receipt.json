@@ -1,0 +1,60 @@
+{
+  "schema": "alfred.claude-inline-attestation-public-custody.v1",
+  "repository": "Main",
+  "publicManifestSha256": "8d7cfdd19a6368328e77eac214c623163ee6d471a91b2f54e5639ad3fcac29e9",
+  "files": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/claude-inline-attestation-20261010/public-proof.json",
+      "sha256": "c6ad64ddc8604b4e37581e6362fdc81ea60628a854a759b8b9f12565e40d1f84",
+      "bytes": 5336,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/claude-inline-attestation-20261010/case-associations.json",
+      "sha256": "ae63d50117e73aa716952398f2975ab9eb567c08a2171af1c14ca7b593395caa",
+      "bytes": 3253,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/claude-inline-attestation-20261010/integration-plan.json",
+      "sha256": "35104005537bf713a3dc4eb624b17953467c1a24d408baac6482f59cf5d5bcd8",
+      "bytes": 4214,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/claude-inline-attestation-20261010/completion.fd3.jsonl",
+      "sha256": "d516c536bf6ca95d9d8e818048e14aa0141a6ab4427811e553a02dbf537eb5b6",
+      "bytes": 1809,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/claude-inline-attestation-20261010/stdout.log",
+      "sha256": "ab7f8bd310d0b248a834ea2751ef3c10dc78939edbc43775461ab3f3a8d5f9b3",
+      "bytes": 1091,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/claude-inline-attestation-20261010/report.md",
+      "sha256": "ee8eb29fd950fe5ca185467ab476644cdd4b4e396b1a5fe1572bfe9319f54f12",
+      "bytes": 1014,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/claude-inline-attestation-20261010/public-manifest.json",
+      "sha256": "8d7cfdd19a6368328e77eac214c623163ee6d471a91b2f54e5639ad3fcac29e9",
+      "bytes": 2280,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "status": "created-and-byte-readback-confirmed",
+  "sourceMutations": false,
+  "businessExecution": false,
+  "gitWrites": false
+}

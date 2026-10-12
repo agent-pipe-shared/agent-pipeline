@@ -1,0 +1,35 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import path from 'node:path';
+const inputs=[
+'scratch/alfred-item-progress-estimate-20261010/partition-55/estimate.json',
+'scratch/alfred-item-progress-estimate-20261010/partition-60/assessment.json',
+'scratch/alfred-item-progress-estimate-20261010/partition-61/progress-final.json'];
+const expected=['330b8b89c81017c4d80380ebacfbe8c5d6badf29f89ad5ef53c8f4a51f168a5f','041b55fc2199c69727600913f2b6a790a142fa7c6b904732753b4b181eb6a33e','804a9396dfb72803bf0317136bfaf2da05ec8bbcc455073309c5f3466c53409a'];
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const lookupPath='specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/criterion-reconciliation-176/public-lookup.json';
+const lookupBytes=fs.readFileSync(lookupPath),lookupSha='d04a51d233844828f13ecefb8fd60bf1e9903c03b65f04b1dd7aacd1ef9aa9f9';
+if(sha(lookupBytes)!==lookupSha)throw Error('lookup CAS');
+const lookup=JSON.parse(lookupBytes), lookupRows=new Map(lookup.rows.map(r=>[r.id,r]));
+const inputBindings=[],items=[],conditionalEstimates=[];
+for(let i=0;i<inputs.length;i++){
+ const p=inputs[i],bytes=fs.readFileSync(p);if(sha(bytes)!==expected[i])throw Error('partition CAS '+p);
+ const x=JSON.parse(bytes),rows=x.rows??x.items;if(rows.length!==[55,60,61][i])throw Error('partition count');
+ inputBindings.push({partition:[55,60,61][i],path:p,sha256:sha(bytes)});
+ conditionalEstimates.push({partition:[55,60,61][i],estimate:x.eta??x.summary?.eta??x.conditionalCriticalPath});
+ for(const r of rows){const original=lookupRows.get(r.id);if(!original)throw Error('unknown ID '+r.id);const excluded=original.wholeItemDeferred===true;if(excluded!==(r.active===false||r.excludedWholeDeferred===true||r.wholeItemDeferred===true))throw Error('exclusion mismatch '+r.id);items.push({id:r.id,stage:excluded?'EXCLUDED':r.stage,active:!excluded,rationale:r.rationale,confidence:r.confidence,officialStatus:'OPEN',accepted:false,nativeCertification:false,partition:[55,60,61][i],assessment:{path:p,sha256:sha(bytes),rowId:r.id},requirement:original.requirement,source:r.source??r.sourceBindings??original.sourceEvidence,proof:r.proof??r.proofReferences??original.existingProofReferences,proofCaseAssociations:r.proofCaseAssociations??[],remaining:r.remaining??r.nextAction??original.nextAction});}
+}
+if(items.length!==176||new Set(items.map(r=>r.id)).size!==176||lookupRows.size!==176)throw Error('union membership');
+const active=items.filter(r=>r.active),counts={'0':0,'25':0,'50':0,'75':0,'100':0,UNKNOWN:0};
+for(const r of active){if(!Object.hasOwn(counts,r.stage))throw Error('stage');counts[r.stage]++;}
+const wanted={'0':0,'25':61,'50':68,'75':8,'100':0,UNKNOWN:37};if(JSON.stringify(counts)!==JSON.stringify(wanted)||active.length!==174)throw Error('summary differs from expected frozen partitions');
+const points=active.reduce((n,r)=>n+(typeof r.stage==='number'?r.stage:0),0);if(points!==5525)throw Error('points');
+const summary={schema:'alfred.merged-item-engineering-progress.v1',date:'2026-10-10',totalItems:176,wholeDeferredExcluded:2,excludedIds:items.filter(r=>!r.active).map(r=>r.id),activeItems:174,counts,knownStagePoints:points,unknownItems:37,engineeringProgressPlanningBracketPercent:{lowerUnknown0:points/174,upperUnknown75:(points+37*75)/174},weighting:'Each active original item has equal weight; no measured effort/time weighting.',interpretation:'UNKNOWN 0–75 is a planning bracket, not statistical confidence. UNKNOWN does not mean not started. Neither endpoint is acceptance or native certification.',acceptedItems:0,globalEta:null,globalEtaReason:'Partition estimates use incompatible assumptions and units, and throughput is unmeasured. Parallel partition estimates cannot be summed or promoted to a global ETA.',conditionalPartitionEstimates:conditionalEstimates,criticalPath:['Resolve genuine remaining functional/source-custody defects and unavailable producer/carrier interfaces.','Complete meaningful targeted checks and coherent source integration.','Complete final Verify and independent review under the current review policy.','Perform separately required human signing and installed/native acceptance when available.'],inputs:inputBindings,lookup:{path:lookupPath,sha256:lookupSha}};
+const normalize=v=>typeof v==='string'?v.replaceAll(process.cwd()+'/',''):Array.isArray(v)?v.map(normalize):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,normalize(x)])):v;
+const payload=normalize({schema:'alfred.item-engineering-progress.items.v1',pathBasis:'repository-relative metadata; exact workspace-root prefix projection only',inputs:inputBindings,lookup:{path:lookupPath,sha256:lookupSha},items:items.sort((a,b)=>a.id.localeCompare(b.id))});
+const text=JSON.stringify(payload,null,2)+'\n';if(text.includes('/home/')||text.includes('/Users/'))throw Error('unprojected host path');
+const out=path.dirname(new URL(import.meta.url).pathname);
+fs.writeFileSync(path.join(out,'items.json'),text);
+fs.writeFileSync(path.join(out,'summary.json'),JSON.stringify(summary,null,2)+'\n');
+fs.writeFileSync(path.join(out,'README.md'),'Estimated engineering progress: **31.75–47.70%** across 174 active original items, with equal item weights. The complete inventory has 176 items; two whole-item deferrals are excluded.\n\n61 items have concrete partial implementation (25), 68 have all active functional implementation present with checks/integration open (50), eight additionally have meaningful targeted proof (75), and 37 remain UNKNOWN. None is accepted or marked 100. Source counts and adjacent tests are not completion proxies.\n\nUNKNOWN contributes 0–75 only to this planning bracket. This is not statistical confidence, measured effort completion, native certification, or PO acceptance. See [items.json](items.json) for every item, rationale, requirement and source/proof references, and [summary.json](summary.json) for exact frozen input hashes.\n\nThere is no defensible global ETA from these inputs. Partition55 gives no duration; partition60 estimates 8–15 conditional engineering working days; partition61 gives 8–16 engineering hours plus separate 2–4 integration/review and 3–8 installed-acceptance hours, excluding unbounded native/decision wait. These assumptions and units are incompatible, throughput is unmeasured, and parallel estimates must not be added. All original conditional estimates are retained in summary.json.\n\nThe shared critical path is remaining genuine functionality and source custody, meaningful targeted checks, coherent integration, final Verify/review, then separately required human and installed/native acceptance. Official OPEN status remains distinct from engineering progress. No new tests, reassessment, source changes or acceptance claims were made by this merge.\n');
+console.log(JSON.stringify({total:176,active:174,excluded:summary.excludedIds,counts,points,percent:summary.engineeringProgressPlanningBracketPercent,outputs:['items.json','summary.json','README.md'].map(p=>({path:path.relative(process.cwd(),path.join(out,p)),sha256:sha(fs.readFileSync(path.join(out,p)))}))}));

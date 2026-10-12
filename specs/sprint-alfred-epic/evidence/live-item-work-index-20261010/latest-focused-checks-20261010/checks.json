@@ -1,0 +1,367 @@
+{
+  "schema": "alfred.focused-controlled-checks.public-proof.v1",
+  "snapshotDate": "2026-10-10",
+  "evidenceBasis": "Root actual execution receipts and physically read FD3 dispositions; preparation status is not treated as execution",
+  "checks": [
+    {
+      "id": "Model4",
+      "result": "4 PASS / 0 FAIL",
+      "scope": "Actual Source controlled-unit model terminal receipt/key binding, own lawful lifetime/member/release, and three physical refusal regressions.",
+      "completion": {
+        "sha256": "6605be194097e03daf4905c2251ddcec84d0b2e0545be9b91fd06c6bca8641a7",
+        "bytes": 1025,
+        "status": "complete",
+        "caseSetSha256": "655fadde0b469c1fc631348ea18a440c96626aa3e5726f1891ed0777e22d720a",
+        "dispositionsSha256": "92550a1ced9e9356543f94228ef4d219ad95df98ce41bc2c901e3a34ed4e9557",
+        "declaredCount": 4,
+        "disposedCount": 4,
+        "counts": {
+          "pass": 4,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "dispositions": [
+          {
+            "id": "MTL001",
+            "disposition": "pass"
+          },
+          {
+            "id": "MTL002",
+            "disposition": "pass"
+          },
+          {
+            "id": "MTL003",
+            "disposition": "pass"
+          },
+          {
+            "id": "MTL004",
+            "disposition": "pass"
+          }
+        ]
+      },
+      "receiptSha256": "8b58991f5cbcf1bfce990334bff96031be7e123d7f8b8c8d29f23ca7e3d88391",
+      "conservation": {
+        "source": true,
+        "runtime": true
+      },
+      "sourcePins": {
+        "graph/plugins/pipeline-core/scripts/pipeline-state.mjs": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+        "graph/plugins/pipeline-core/lib/onboarding-continuity.mjs": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "graph/plugins/pipeline-core/lib/session-authority-registry.mjs": "af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9",
+        "graph/plugins/pipeline-core/lib/session-authority-domain-owner.mjs": "138784269c2c38a6ded176c3363c30a26635cfef56136dbef1414c8549dcdd4d",
+        "graph/plugins/pipeline-core/lib/model-family-host-store.mjs": "25ba46d8f97425e0b7a20ac9406edc4bd972c78aa8ee57e73ba6c368c3aaeb83"
+      },
+      "lineage": {
+        "preparationManifestSha256": "58eb3b34e9b89a0913995a839aec3535305cf7f615ea48e788268b0cf54b4655",
+        "sourceParentSha256": "ef11c9b2daa8298979c802dd9df69c8572fa322ba6a6af72d1b7071229f72ced",
+        "sourceSuccessorSha256": "25ba46d8f97425e0b7a20ac9406edc4bd972c78aa8ee57e73ba6c368c3aaeb83",
+        "normativeSha256": "626baac2716710aab7f118c635a649d098125d4db4479606f3cc6a8a16bb1b7e",
+        "assertionsSha256": "7b2dc509f4ee0bb1db32f1d288501b6f7bbdf5af746dfa6d5d9451947df1f48a",
+        "inputsFixtureSha256": "a0e3cc6db9306572b26ef6ea8fc7db7373faacdc4053ebe5eeebb9333d560027"
+      },
+      "history": "Original source lookup defect and pre-run lifetime assertion correction remain separate provenance. This is the actual25ba four-case run; later aggregate model descendants are not qualified by it."
+    },
+    {
+      "id": "CCD8",
+      "result": "8 PASS / 0 FAIL",
+      "scope": "Unchanged FeatureV2 one-full/one-diff controlled synthetic protocol/API callbacks, with the mirror copying the original artifact mode.",
+      "completion": {
+        "sha256": "4b748d07ac645c6d34f5eea8454d1baa88c28c0b734660e61cef50c55fd10d03",
+        "bytes": 1545,
+        "status": "complete",
+        "caseSetSha256": "48f9794ce9b2c247d2589b94b87b3f608a5f7b327a0901eb263b20fc3d35effc",
+        "dispositionsSha256": "0f4024781fc719a6951fab2e258c82f3787e1f07a26bfc1c7a04746a35a600aa",
+        "declaredCount": 8,
+        "disposedCount": 8,
+        "counts": {
+          "pass": 8,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "dispositions": [
+          {
+            "id": "CCD001",
+            "disposition": "pass"
+          },
+          {
+            "id": "CCD002",
+            "disposition": "pass"
+          },
+          {
+            "id": "CCD003",
+            "disposition": "pass"
+          },
+          {
+            "id": "CCD004",
+            "disposition": "pass"
+          },
+          {
+            "id": "CCD005",
+            "disposition": "pass"
+          },
+          {
+            "id": "CCD006",
+            "disposition": "pass"
+          },
+          {
+            "id": "CCD007",
+            "disposition": "pass"
+          },
+          {
+            "id": "CCD008",
+            "disposition": "pass"
+          }
+        ]
+      },
+      "receiptSha256": "a21ff73d3a2fc3cfa25c4688d6cda11499c79119bca00b7ef6c5515e9eaa304b",
+      "conservation": {
+        "parent": true,
+        "activeGraph": true,
+        "overlayRestored": true
+      },
+      "lineage": {
+        "graphFreezeSha256": "d932ec21b69a30a5f80b34d000ca898cc9b59266367e19e0dec995284eebcff9",
+        "assertionsSha256": "e1c35eda591939424fb4b7c52025bab9c4db878ada82c029454db40c61d5d474",
+        "fixtureParentSha256": "0f3f01486109426fd101e5f510aeea4c03ffb9e1468899aca3b48094a74969db",
+        "fixtureSuccessorSha256": "ba04d16a6f2f24b9fa417ff2ebf7ee9a0dd69d295ff7bb6a4c687549e285c743"
+      },
+      "history": {
+        "receiptSha256": "532b81a6eb91aa48fac0a8022c7369425854ee46b75ef5a43bc71d092cc503c8",
+        "counts": {
+          "pass": 1,
+          "fail": 7,
+          "skip": 0,
+          "todo": 0
+        },
+        "cause": "Seven original cases stopped at original0600/mirror0644 fixture mode mismatch; exact same-mode invariant retained by the fixture-only successor."
+      },
+      "exclusions": [
+        "No actual external independent Critic review",
+        "No generic Coordinator batch Option A coverage inferred from FeatureV2"
+      ]
+    },
+    {
+      "id": "GRE008",
+      "result": "1 PASS / 0 FAIL",
+      "scope": "Targeted unchanged governance record-exemption classifier callback on the retained historical dependency graph.",
+      "completion": {
+        "sha256": "6399634bf81ff3022bf5791cfb7b1fe029bfa7f3da68d8ce2936a27b91fd9fa9",
+        "bytes": 635,
+        "status": "complete",
+        "caseSetSha256": "0db2000cce4bd81b2d14773aa26c91d259de60f845fc20ea9376759bdf410c9f",
+        "dispositionsSha256": "b93294f0d7fdea791403597969124aa5dea0093820de86187991c3a2454fae16",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "dispositions": [
+          {
+            "id": "GRE008",
+            "disposition": "pass"
+          }
+        ]
+      },
+      "receiptSha256": "cffa1ce29a6bbc60edabe428f819a2222f6c703597b2174e8fa5e570f72505b7",
+      "conservation": {
+        "source": true
+      },
+      "lineage": {
+        "preparationManifestSha256": "a8c44eb22d2514e79d5e33a90c452261d18e17427fa4d66be5271f36d5bffb6c",
+        "sourceSha256": "6bd26c6fcfa10d6cffe0705914cbfaca181ec8a0ed2bd0ef279498ff95a1b13e",
+        "fixtureParentSha256": "4f67ff0cdbe5cbb452b17563281e24e4bae8bea178ae9edf843bd6bf0d32be10",
+        "fixtureSuccessorSha256": "bdc92fb8d7fa5f3f732b197e82131804bdc042b4ff1367aa8fea63dca21d24a0",
+        "selectedCallbackSha256": "605e9dbe01d81c7932f2c60e98574070d48ced06c86aa974540b23e508a84f8a"
+      },
+      "history": {
+        "receiptSha256": "9c5406bacb2a871b1861967d9602f46f9258e4c7819c049cad203e5615fe293b",
+        "parentCounts": {
+          "pass": 6,
+          "fail": 4,
+          "skip": 0,
+          "todo": 0
+        },
+        "correctedCounts": {
+          "pass": 9,
+          "fail": 1,
+          "skip": 0,
+          "todo": 0
+        },
+        "note": "Nine earlier passes are retained separately. GRE008 successor supplies the missing neutral manifest; classifier assertions and Source remain unchanged. No full-ten rerun or whole-current-candidate claim."
+      }
+    },
+    {
+      "id": "HIL006",
+      "result": "1 PASS / 0 FAIL",
+      "scope": "Unchanged HIL006 controlled-host callback exercises timeout, signal and spawn-error refusal for both adapters.",
+      "completion": {
+        "sha256": "2b0b6f429fccb499449937ade2cfc887298ee2d1b74494cbcb5a1e1cb214cbf7",
+        "bytes": 635,
+        "status": "complete",
+        "caseSetSha256": "8cf3ab901dd639a848a38f4b68ab3b1731b98424de9951e738c7903ba61bcf24",
+        "dispositionsSha256": "e66feba45f559cbfb453ef801904ab29c2c0f34aa3af4f8ce22908d7e543c827",
+        "declaredCount": 1,
+        "disposedCount": 1,
+        "counts": {
+          "pass": 1,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "dispositions": [
+          {
+            "id": "HIL006",
+            "disposition": "pass"
+          }
+        ]
+      },
+      "receiptSha256": "5bfe2dff3df309becdf29fa0de5c3b1d914058a62037db04443f712f7411443b",
+      "conservation": {
+        "overlay": true,
+        "originalRestored": true
+      },
+      "lineage": {
+        "preparationManifestSha256": "3b9c6e93af98fa751f2f6a9d54be9067188959e8edd6fcbff7e107b6af79d472",
+        "sourceParentSha256": "7e781dd0c3e9b48488891b4fbe477d36afb341c71e0ef769bc05c2a13c7f3a8d",
+        "sourceSuccessorSha256": "e70d402eefdcb18de906466af2843733c55b1df458e5eb2eae80b247a4aed6e4",
+        "callbackSha256": "6aec52251eca6b478de53e62ab53fef7e03185d93099c58e080e83880df77264"
+      },
+      "history": {
+        "receiptSha256": "254ba2e3a2d94209789b625cb1a8313ee7ed9576365f95572d731a7e9d471ffd",
+        "counts": {
+          "pass": 9,
+          "fail": 3,
+          "skip": 0,
+          "todo": 0
+        },
+        "note": "Original full12 remains9PASS3FAIL. HIL006 is a separate targeted successor; HIL002/HIL004 remain unresolved, and their later diagnostic is not qualification."
+      },
+      "exclusions": [
+        "No native host attestation",
+        "No ambient repository conservation claim",
+        "No whole12 qualification"
+      ]
+    },
+    {
+      "id": "State11",
+      "result": "9 PASS / 2 FAIL",
+      "scope": "Eleven genuine owned State operation callbacks on State79a/onboardingec34/Registryaf840 and the namespace138784 overlay.",
+      "completion": {
+        "sha256": "e2332568b51afad10ae7e359356f5fa8453a40f585269c67f07926b1e6d06501",
+        "bytes": 2137,
+        "status": "complete",
+        "caseSetSha256": "ef3a891a304860978dbe922824bd294746fc641bbcb5ee06915c56c0e252f30a",
+        "dispositionsSha256": "3d45e5950f5fddfdd97ca13131da09158ca73e8b44e1417cc9bf9400f3ae1f69",
+        "declaredCount": 11,
+        "disposedCount": 11,
+        "counts": {
+          "pass": 9,
+          "fail": 2,
+          "skip": 0,
+          "todo": 0
+        },
+        "dispositions": [
+          {
+            "id": "FULLSTATE001",
+            "disposition": "fail"
+          },
+          {
+            "id": "FULLSTATE002",
+            "disposition": "pass"
+          },
+          {
+            "id": "FULLSTATE003",
+            "disposition": "pass"
+          },
+          {
+            "id": "FULLSTATE004",
+            "disposition": "pass"
+          },
+          {
+            "id": "FULLSTATE005",
+            "disposition": "pass"
+          },
+          {
+            "id": "FULLSTATE006",
+            "disposition": "fail"
+          },
+          {
+            "id": "FULLSTATE007",
+            "disposition": "pass"
+          },
+          {
+            "id": "FULLSTATE008",
+            "disposition": "pass"
+          },
+          {
+            "id": "FULLSTATE009",
+            "disposition": "pass"
+          },
+          {
+            "id": "FULLSTATE010",
+            "disposition": "pass"
+          },
+          {
+            "id": "FULLSTATE011",
+            "disposition": "pass"
+          }
+        ]
+      },
+      "receiptSha256": "f0eb476c39814285f5745bcf3f5ecdb2ba1da0a2fd35b1e28a6a28e55622fade",
+      "qualified": false,
+      "conservation": {
+        "noGraphOrParentError": true,
+        "originalInodeModeBytesRestored": true
+      },
+      "sourcePins": {
+        "plugins/pipeline-core/scripts/pipeline-state.mjs": "79a66db5fddcac6009af198a5d28adc9087389d29fe43b5e7462f051422c2a47",
+        "plugins/pipeline-core/lib/onboarding-continuity.mjs": "ec34a4e9e3dd0c00afcfea918ff03bf6fb2604bc1ba0f1be0c48bdeaea2a6af7",
+        "plugins/pipeline-core/lib/session-authority-registry.mjs": "af840e4db41f0190a1a05d065eac47e8546c1410e658560b09671ff9ed0541f9",
+        "plugins/pipeline-core/lib/session-authority-domain-owner.mjs": "138784269c2c38a6ded176c3363c30a26635cfef56136dbef1414c8549dcdd4d"
+      },
+      "lineage": {
+        "namespaceParentSha256": "ebe09528a07a24e7c0635dbb5ca3f9ac599d5f93dd14a87978527abe464d60bb",
+        "namespaceSuccessorSha256": "138784269c2c38a6ded176c3363c30a26635cfef56136dbef1414c8549dcdd4d",
+        "namespaceManifestSha256": "1b3dd43a44df5f9e46f64c86199bb8d54a446f429bf876779928fe7efdeaa28e",
+        "remainingTwoDiagnosisManifestSha256": "e03da947ea5ca301564a24265e303acba9e2c8a64e4b5f71c6517002621c8f62"
+      },
+      "remainingFailures": [
+        {
+          "id": "FULLSTATE001",
+          "operation": "discard",
+          "observedCode": "SDC-AUTHORITY-CAS"
+        },
+        {
+          "id": "FULLSTATE006",
+          "operation": "signature design approval",
+          "observedCode": "SDC-LOCK-HELD"
+        }
+      ],
+      "history": "These two actual failures remain visible. Namespace restoration succeeded; no setup/parser/graph failure explains either disposition. Repair proposals or later descendants are not covered by this snapshot."
+    }
+  ],
+  "authorityCeiling": {
+    "controlledMethodOnly": true,
+    "nativeAttestation": false,
+    "realHumanApproval": false,
+    "actualExternalCriticReview": false,
+    "fullState14OrI08TwelveLifecycle": false,
+    "itemAcceptance": false,
+    "wholeCurrentCandidateQualification": false
+  },
+  "openPrerequisites": [
+    "State012–014/full-close require the genuine consumed Critic/Verify course and retired descriptor",
+    "Remaining I08 full lifecycle constructors/qualification remain separate",
+    "Generic Coordinator batch and native behavior require their own evidence"
+  ],
+  "publication": {
+    "status": "preview-for-Root-publication",
+    "workerSemanticRuns": 0,
+    "workerGitCommands": 0
+  }
+}

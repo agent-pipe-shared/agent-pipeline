@@ -1,0 +1,71 @@
+{
+  "schema": "alfred.focused-progress-publication.v1",
+  "files": [
+    {
+      "source": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/remaining-domain-fixtures/worker-authenticity-registration-parent-successor/public-worker-eight-proof.json",
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/focused-worker-model-progress-20261010/worker-eight-proof.json",
+      "sha256": "7e2dd6cd427fe8561c159e4081c63e844561f619c501c6a5d217175de44e71e9",
+      "bytes": 2895
+    },
+    {
+      "source": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/remaining-domain-fixtures/worker-authenticity-registration-parent-successor/public-worker-eight-completion.ndjson",
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/focused-worker-model-progress-20261010/worker-eight-completion.ndjson",
+      "sha256": "8f3205c3972b2d719e0e251b0d3710eecdd1ededf14fa68b88094f96f5424798",
+      "bytes": 1545
+    },
+    {
+      "source": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/remaining-domain-fixtures/model-supported-protocol-successor/public-actual-proof.json",
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/focused-worker-model-progress-20261010/model-supported-proof.json",
+      "sha256": "ae2fad05ca18a042ec696fe819a5abf7e4e56542de3ce22b65f9a7ec873982ae",
+      "bytes": 2619
+    },
+    {
+      "source": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/remaining-domain-fixtures/model-supported-protocol-successor/public-completion.ndjson",
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/focused-worker-model-progress-20261010/model-supported-completion.ndjson",
+      "sha256": "05004f67fca1c31208845ae29e4e4411cf2e483482ef1d9d25f2cedd56a7bbf5",
+      "bytes": 955
+    },
+    {
+      "source": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/dependency-coherent-successor/public-actual-proof.json",
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/focused-worker-model-progress-20261010/model-partial-effect-proof.json",
+      "sha256": "326f87dac8cf0d527001923a3d6d96b691e6324f74099c44ea9b93bb1abdeb5e",
+      "bytes": 2413
+    },
+    {
+      "source": "scratch/alfred-model012-partial-effect-independent-preparation-20261010/dependency-coherent-successor/public-completion.ndjson",
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/focused-worker-model-progress-20261010/model-partial-effect-completion.ndjson",
+      "sha256": "1b80a31a5ff2bc49cd3ee09cd8377ba89c25648c02c03b2aff120e2b6d382404",
+      "bytes": 638
+    },
+    {
+      "source": "scratch/alfred-latest-milestone-item-progress-reconciliation-20261010/item-delta.json",
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/focused-worker-model-progress-20261010/item-stage-delta.json",
+      "sha256": "6352fbebbca807c3d171bd8bcc31df8c53fcb6c4a31ff5d3513cfae7ab1fab07",
+      "bytes": 4812
+    }
+  ],
+  "readBack": true,
+  "rawFixtureLogsCopied": false,
+  "sourceApplication": false,
+  "gitCommitted": false,
+  "officialItemAcceptance": false,
+  "stageDelta": {
+    "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+    "from": "UNKNOWN",
+    "to": 25,
+    "authority": "Coordinator engineering assessment only",
+    "activeItems": 174,
+    "counts": {
+      "25": 62,
+      "50": 68,
+      "75": 8,
+      "100": 0,
+      "UNKNOWN": 36
+    },
+    "planningBracketPercent": [
+      31.896551724137932,
+      47.41379310344828
+    ],
+    "basis": "One partial-implementation assessment; the historical assessment and proposed delta are conserved. Component test passes do not promote whole items."
+  }
+}

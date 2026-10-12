@@ -1,0 +1,41 @@
+{
+  "schema": "pipeline.architecture-prospective-chat-selection.v1",
+  "id": "draft-item-owned-egm-retained-quality-gates",
+  "decision": "selected",
+  "markdownSha256": "385f657e2e33f7c71a8b4f5179e87184557b0e862445a647184de2a9e047e71f",
+  "sidecarSha256": "adc2d840b5f50befc8221655f341f6285a7d9f24e089e099c92c7d889065b8d9",
+  "scope": "global",
+  "moduleIds": [],
+  "supersedes": "0005-quality-gates-dod",
+  "attributedTo": "André",
+  "origin": {
+    "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/po-chat-selections.json",
+    "sha256": "5e4995ac4c1b97105b56fee13b11e407c0499597dfffb935d9d10a445c81ddde"
+  },
+  "selections": [
+    {
+      "topic": "complete-item-ownership",
+      "text": "pro AC/Backlog items muss erst analys, dann Testfälle, dann Code dann testen und fixen von einem goldfish bearbeitet werden."
+    },
+    {
+      "topic": "elephant-targeted-checks",
+      "text": "Der gold Fisch macht die Einzeltests und der elephant macht nur am Ende die full verify strecken oder wenn er wegen Konflikten integrieren musste von Hand dann ggf Einzeltests"
+    },
+    {
+      "topic": "critic-budget",
+      "text": "1 Vollreview + höchstens 3 Diffs"
+    },
+    {
+      "topic": "correction-owner",
+      "text": "Ja: eigener Korrektur-Goldfish pro Batch (empfohlen)"
+    },
+    {
+      "topic": "runtime-and-consumer-scope",
+      "text": "Jepp und das ganze in die durchsetzungsschicht für alle 3 runner, windows, Unix, macos und auch für user repos"
+    },
+    {
+      "topic": "formal-doc-contract-update",
+      "text": "Ja das ist gut und ausreichend aber muss mE auch sprachlich formal sowohl in der user Doku wie auch den adrs korrigiert und dort vertraglich angepasst werden auf diese neue Aufgaben Teilung und die von dir gerade beschriebenen Logik"
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "schema": "alfred.public.strict-git-apply-check-four.actual.v1",
+  "rawReceiptSha256": "177378c04df8f56c29b0a2118e0db03e3a9d45b7c0dd3fbd4eb156b8cdb97112",
+  "rawReceiptBytes": 5480,
+  "privateForensicsRetained": true,
+  "result": "PASS",
+  "caseIds": [
+    "GAC001",
+    "GAC002",
+    "GAC003",
+    "GAC004"
+  ],
+  "caseScopes": [
+    {
+      "id": "GAC001",
+      "scope": "strict physical patch check has no write target"
+    },
+    {
+      "id": "GAC002",
+      "scope": "recognized separated whitespace and operand delimiter remain nonmutating"
+    },
+    {
+      "id": "GAC003",
+      "scope": "writes configuration unknown options and stdin stay refused"
+    },
+    {
+      "id": "GAC004",
+      "scope": "unsafe input and composition receive no readonly grant"
+    }
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "6653db67bd020ac5102a4d5950a6493b2be812404f40a6b059514c2d34b0e794",
+    "caseSetSha256": "73abfa4071abc0685c8678fbfb51a84f3f18b848b30f4368b522e30324a47ae7",
+    "dispositionsSha256": "ce8c9bfc389590bd0e9c6c0a230dde160ce3243ee2187bae523541c05e15db33",
+    "declaredCount": 4,
+    "disposedCount": 4,
+    "counts": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "5a396512fddc5b484330466306cfa5f301b2010bf6cc169e181ef8f767434d2b",
+  "invocation": {
+    "executor": "Root",
+    "kind": "isolated production classifier callbacks",
+    "launcherSha256": "e41750c30a8e1de99282dd13879e9c3a79fb88e1b91e33d67a81c817e45e89b2",
+    "readySha256": "6c2b6395aa79b9b78edc5d99ab9e652651178b91ad51e143aa0c2837f92bf7ed",
+    "callbacksSha256": "d730e0530f4e5c48621892d11dcd1748eec068c1c726b6c2c3ef20f5d7c1746c",
+    "graphManifestSha256": "806f2af1afb222d0f06dcf6f94a3e23b28528e3632704f5629ff202bca12c0ec"
+  },
+  "sources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/protected-test-paths.mjs",
+      "sha256": "aedbe86fcb863c67d712da041162e25ea2c4dc5a6ef56b58be65e3eadd64106c",
+      "bytes": 53961
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "c731005a20f313e2f84610732433a1ba8bec7bfb5444465d481fb5d80c5630f5",
+      "bytes": 68604
+    }
+  ],
+  "sourceManifestSha256": "34fc462fb551c2772532857200e193aeba6c00b60c239df7c11fbe813183ff1e",
+  "observed": {
+    "sourceConserved": true,
+    "graphConserved": true,
+    "grammarRestored": true,
+    "fixtureRemoved": true,
+    "timeout": false,
+    "overflow": false
+  },
+  "timestampConservationLimit": "Only overlaid grammar mtime/ctime changed; original inode/dev/mode/uid/gid/nlink/size/bytes restored; other1114 resources conserved with full identity.",
+  "limits": {
+    "formalItemStage": "OPEN",
+    "wholeItemClosed": false,
+    "requesterAuthorityGranted": false,
+    "readyGranted": false,
+    "humanSigningQualified": false,
+    "nativeDabQualified": false,
+    "gitCommitOrPushPerformedByPublication": false,
+    "nativeExecutionQualified": false,
+    "realGitApplyExecuted": false,
+    "hooksExecuted": false,
+    "signingQualified": false,
+    "installedMainAcceptance": false
+  }
+}

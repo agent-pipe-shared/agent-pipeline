@@ -1,0 +1,12 @@
+✔ single command applies stages authorizes without commit and retains exact scope (125.786194ms)
+✔ single command refuses forged-proof without effects (31.085176ms)
+✔ single command refuses dirty-tree without effects (33.625582ms)
+✔ quality disclosure resolves kind and exact digest scope and rejects mismatched intent (20.819763ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 256.165095

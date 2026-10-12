@@ -1,0 +1,67 @@
+{
+  "schema": "portable.command-metadata.v1",
+  "commands": [
+    {
+      "logicalOrigin": "legacy-origin:alfred-postinstall-whole-items-20261011/bounded-denial-help-whole-item/first-run-source-cases.mjs",
+      "canonicalScript": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/9161163cc042f5450aec0ee65a1694cbaf1b82176f81b0bb645b9fdf0b28226a.mode-0644.mjs",
+      "originalCodeSha256": "9161163cc042f5450aec0ee65a1694cbaf1b82176f81b0bb645b9fdf0b28226a",
+      "executableBytesUnmodified": true,
+      "commandKind": "historical Node method/case/support",
+      "directExecutionAuthorized": false,
+      "reconstruction": "Use an authorized new owned fixture/namespace and the logical Source mapping; never require an old scratch directory or execute archived issuer/authority state",
+      "legacyRelativeImportsAreHistoricalCode": true
+    },
+    {
+      "logicalOrigin": "legacy-origin:alfred-postinstall-whole-items-20261011/vim-busybox-whole-item/selected-consumer.test.mjs",
+      "canonicalScript": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/310e927a23b9b0dc947183ad32b875a41066909d269ccb42ad5744f4b95134d4.mode-0644.mjs",
+      "originalCodeSha256": "310e927a23b9b0dc947183ad32b875a41066909d269ccb42ad5744f4b95134d4",
+      "executableBytesUnmodified": true,
+      "commandKind": "historical Node method/case/support",
+      "directExecutionAuthorized": false,
+      "reconstruction": "Use an authorized new owned fixture/namespace and the logical Source mapping; never require an old scratch directory or execute archived issuer/authority state",
+      "legacyRelativeImportsAreHistoricalCode": true
+    },
+    {
+      "logicalOrigin": "legacy-origin:alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/prepare.mjs",
+      "canonicalScript": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ff7fc9cbef39220c90b169ce53783c1295037583d43ea0c81a7c54ccd6b9e7d.mode-0644.mjs",
+      "originalCodeSha256": "6ff7fc9cbef39220c90b169ce53783c1295037583d43ea0c81a7c54ccd6b9e7d",
+      "executableBytesUnmodified": true,
+      "commandKind": "historical Node method/case/support",
+      "directExecutionAuthorized": false,
+      "reconstruction": "Use an authorized new owned fixture/namespace and the logical Source mapping; never require an old scratch directory or execute archived issuer/authority state",
+      "legacyRelativeImportsAreHistoricalCode": true
+    },
+    {
+      "logicalOrigin": "legacy-origin:alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/tests.mjs",
+      "canonicalScript": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/10979eedd6354803424b11c2b469fb3ea10ab5554b049525c055d44af6ebf210.mode-0644.mjs",
+      "originalCodeSha256": "10979eedd6354803424b11c2b469fb3ea10ab5554b049525c055d44af6ebf210",
+      "executableBytesUnmodified": true,
+      "commandKind": "historical Node method/case/support",
+      "directExecutionAuthorized": false,
+      "reconstruction": "Use an authorized new owned fixture/namespace and the logical Source mapping; never require an old scratch directory or execute archived issuer/authority state",
+      "legacyRelativeImportsAreHistoricalCode": true
+    },
+    {
+      "logicalOrigin": "legacy-origin:alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/tests-v2.mjs",
+      "canonicalScript": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/8feac8b0d01c53523fa95a469700430370ad331c33d931d76dbaabd167a70d24.mode-0644.mjs",
+      "originalCodeSha256": "8feac8b0d01c53523fa95a469700430370ad331c33d931d76dbaabd167a70d24",
+      "executableBytesUnmodified": true,
+      "commandKind": "historical Node method/case/support",
+      "directExecutionAuthorized": false,
+      "reconstruction": "Use an authorized new owned fixture/namespace and the logical Source mapping; never require an old scratch directory or execute archived issuer/authority state",
+      "legacyRelativeImportsAreHistoricalCode": true
+    },
+    {
+      "logicalOrigin": "legacy-origin:alfred-postinstall-whole-items-20261011/critic-course-adoption-whole-item/checkpoint.mjs",
+      "canonicalScript": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/b646638c9b13d0c5ab28edeab013dae9f9d40019277384c9d1255f6cb1a8edca.mode-0644.mjs",
+      "originalCodeSha256": "b646638c9b13d0c5ab28edeab013dae9f9d40019277384c9d1255f6cb1a8edca",
+      "executableBytesUnmodified": true,
+      "commandKind": "historical Node method/case/support",
+      "directExecutionAuthorized": false,
+      "reconstruction": "Use an authorized new owned fixture/namespace and the logical Source mapping; never require an old scratch directory or execute archived issuer/authority state",
+      "legacyRelativeImportsAreHistoricalCode": true
+    }
+  ],
+  "historicalCommandsAreNotAdmittedRetryActions": true,
+  "functionalExecutionsDuringCapture": 0
+}

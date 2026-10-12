@@ -1,0 +1,43 @@
+{
+  "schema": "alfred.cmo-calibration-security-layout-preparation.v1",
+  "status": "normative-plan-only-not-executable-or-qualified",
+  "beforePostNormSha256": "7e58991adb07ad527e4a315391040a316dc3de2e799bdfe1961483306f791d58",
+  "actualPositive": {"caseId":"CMO001","executionSha256":"67ad290619e63f4aa2559a848f185b33e48b63a3cffbb59e7cb728b702ca53a0","pass":1,"fail":0,"scope":"Pinned Source9 unchanged original callback"},
+  "sourceTuple": {
+    "i03Manifest":"scratch/alfred-cmo-sanctioned-calibration-order-source-20261010/manifest.json",
+    "i03ManifestSha256":"b3c390e48b71bf883571c625115923a59d4a962f979037247c3365ea5f9159d7",
+    "pairedManifest":"scratch/alfred-cmo-existing-layout-parity-counterpart-source-20261010/manifest.json",
+    "pairedManifestSha256":"6228550b16693545c4e46adc2c18924e3f13f6f591bda6fb9c50c20a42de197b",
+    "helperSha256":"411dfab1cc2846ca2c45b0f1742d9613d20619730913fa13283c2235ebd4de55",
+    "stateSha256":"fc9b78249ca7b366af0cf27c966b7a0e2094cf99cd9ba19ff6b18b2c4e7c7c1d",
+    "installerSha256":"99f5cb7cbc4a9da02e8f7b575bb547ea2161435ab16ca12a14e8ab5a0bed64e4"
+  },
+  "genuineFixtureBoundary": {
+    "neutralBootstrapPath":"scratch/alfred-controlled-method-design-materialization-admission-independent-20261010/qualification-successor/fixture.mjs",
+    "neutralBootstrapSha256":"7f2e85cf9034858ddddf55aff8aeae639ae61ccfece6ed63ab358a3f860f234b",
+    "entry":"bootstrapOwnedNeutralProject({root,machineRoot})",
+    "facts":"Actual v3 onboarding seed, actual consent/intake/questions/generate/bind, committed public signature policy and memory-only independent trust keys. Returns an unapproved design-stage private State, NOT calibration authority.",
+    "approvedStageConstructorPath":"scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-lifecycle26-independent/fixture-only-successor/staged-p16.fixture.mjs",
+    "approvedStageConstructorSha256":"615ad616c4c64b625db5633a56cc8d7efb03494ba913792f710ff2fa613567bf",
+    "approvedStageEntry":"makeFixture('signature',{stage:'approved-unmaterialized'})",
+    "selectionStatus":"Known genuine existing writer recipe; compatibility/full direct dependency closure against Source9 must be bound before executable use. No source-qualified helper receipt is transplanted into another repository.",
+    "requiredApprovalSteps":["Commit actual unchanged signed-source inputs and public trust policy before bind as the genuine recipe requires.","Produce actual submit-plan and present-plan request/receipt; sign its real intent with the in-memory independent unit key and invoke actual approve-plan.","Invoke actual materialize-architecture and set-phase implementation with no verify mutation; inspect actual approval/current source/candidate.","Use actual State configure-verify --verify-command for successful transitions. Never fabricate private ready/prepared JSON, opaque handles or planApproved state."],
+    "unsupported":"The final CMO make() result has already configured calibration; it cannot serve as a fresh baseline-only transition constructor. No lifecycle reset or copied journal/course is allowed."
+  },
+  "cases": [
+    {"id":"CMOL001","clause":"CMOF003/004/006","scenario":"Genuine approved neutral singleton","setup":"Construct a fresh genuine approved baseline-only project with only committed project/pipeline.json; establish the actual implementation lifecycle.","operation":"Actual configure-verify, git stage exactly source-returned calibration path, ordinary generated hook commit.","assertions":["Neutral layout remains singleton; absent legacy stays physically and HEAD/index absent.","Only verify changes; other object fields, modes and private State are conserved.","Actual prepared/ready private source journals derive from current approval; committed blob and physical bytes match.","No actual Verify success is inferred from selecting the command."],"status":"constructor-compatible source closure pending; not run"},
+    {"id":"CMOL002","clause":"CMOF003/004/005","scenario":"Genuine matching committed legacy twins","setup":"Use a genuine supported legacy onboarding/layout producer that establishes both tiers before approval; never create a peer by copying singleton bytes merely to make the test pass.","operation":"Actual configure-verify and ordinary hook commit of both exact returned paths.","assertions":["Both committed and physical tier values agree before and after; all non-verify fields and modes conserved.","Neither present peer is omitted; actual full staged set equals authenticated paths."],"status":"held: exact genuine legacy fixture/producer not yet declared in this packet"},
+    {"id":"CMOL003","clause":"CMOF003/004","scenario":"Layout and physical drift refusal","setup":"Separate fresh genuinely approved projects; perturb only fixture-owned layout with missing required file, untracked optional peer, HEAD/physical mismatch or symlink alias. These are attack inputs, never successful fixture authority.","operation":"Actual inspectCommittedCalibrationVerifyLayout and actual configure-verify.","assertions":["Unavailable/refused before calibration mutation; no silent peer reduction or automatic repair.","No ready authority/commit allowance is created; snapshot public bytes and private transition namespace around refusal."],"status":"neutral constructor closure pending; genuine divergent-twin subcase depends on CMOL002"},
+    {"id":"CMOL004","clause":"CMOF005","scenario":"Mixed staged set refusal","setup":"Genuine singleton completed configure transition with source-owned ready journal; stage calibration plus a distinct fixture-owned suite/unrelated file.","operation":"Actual inspectCalibrationVerifyCommitTransition plus normal installed hook commit attempt.","assertions":["Exact whole-set inspector refuses; ordinary GS10 remains effective.","HEAD is unchanged, no hook suppression, partial unstaging or protected-path exception.","Original pending staged/physical evidence retained after refused commit."],"status":"neutral constructor closure pending; no assertion or hook replacement"},
+    {"id":"CMOL005","clause":"CMOF004/005","scenario":"Missing authority and stale approval/candidate","setup":"Independently approved fresh fixtures. First use correctly configured delta with no genuine completed ready transition; separately complete a genuine transition then advance an unrelated ordinary commit or drift a bound approval source.","operation":"Actual transition inspector/ordinary hook; unowned {} completion handle is separately supplied only as a refusal input.","assertions":["Missing ready, stale HEAD/source or unowned handle cannot authorize calibration.","No invented journal/approval or new METHOD target class; refusal does not report a clean committed transaction."],"status":"neutral constructor closure pending; no synthetic ready-record creation"},
+    {"id":"CMOL006","clause":"CMOF004/006","scenario":"Replay and interrupted transition","setup":"Fresh genuine approved singleton: successful configured-and-committed case for exact replay; separate real prepareCalibrationVerifyCommitTransition handle then stop before complete, without editing its journal.","operation":"Exact configure-verify replay; inspect incomplete transition; complete using genuine original handle with partial fixture write only in a separate attack case.","assertions":["Configured exact replay produces no calibration or private-journal changes.","Incomplete lock/prepared lifetime remains held and grants no commit; partial-write completion fails rather than repairing or resetting.","No TTL/free retry or abandoned-authority deletion."],"status":"neutral constructor closure pending; direct prepare only with real current approval"}
+  ],
+  "nextPreparation":"Bind actual approved-stage constructor full static/literal resource closure against the exact Source9 tuple; author independent six callbacks and FD3 policy before new source changes, then a distinct fresh Root-only one-use launcher. Obtain exact genuine legacy constructor declaration for CMOL002 or preserve its criterion-level hold. Reuse provider only under Root lease/physical CAS/restoration; no worker runtime imports or business children.",
+  "ownership":"Independent preparation belongs to quality_inline_coordinator_audit; Source4 repair owners design_audit/intake_package remain unchanged; Root controls business launch and future candidate merge.",
+  "businessRunsByAuthor":0,
+  "additionalCasesExecuted":0,
+  "candidateIntegrated":false,
+  "native":false,
+  "independentCriticPass":false,
+  "wholeAcceptance":false
+}

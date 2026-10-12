@@ -1,0 +1,29 @@
+{
+  "schema": "alfred.local-egm-human-signing-readiness.v1",
+  "status": "exact-quality-package-ready-for-attended-human-signing",
+  "intentSha256": "1ed119963f4fffe8e6fb65ca38800a53a89fb5d920c2ba78410ccfcebb26e1d0",
+  "requestSha256": "63bc2819fd7aee917a2432e1f80322e1239b93d6ab42894e8637955b03c001d8",
+  "compositionManifestSha256": "ce611e639948f44bae48109d9f6d5e8bd2efdd4ba5f19ac253aff1cee0988f9b",
+  "paths": 144,
+  "baseCommit": "46495b209fb4b447a6c2c8f28f92574a50ba5aea",
+  "helperPlanSha256": "890a176e244367d893b4d1ed4c65cc64275a72414be6a18f510c333131f83f24",
+  "helper": "scratch/alfred-egm-operating-optimization-20261011/attended-local-egm-final-host-tools/run-attended.sh",
+  "actualReadonlyHostCheck": {
+    "exitCode": 0,
+    "status": "strict-check-passed-no-signature-no-application",
+    "sourceInputsConserved": true
+  },
+  "scope": "Maintenance application of exact protected and ordinary package; does not approve design, item acceptance, push or installation.",
+  "automaticEffectsAfterHumanSigning": [
+    "canonical proof verification",
+    "exact signed application to clean C1",
+    "144 exact postimage readbacks"
+  ],
+  "staged": false,
+  "committed": false,
+  "pushed": false,
+  "installed": false,
+  "designApprovalIncluded": false,
+  "fullVerifyDeferredForLocalCandidate": true,
+  "wholeCandidatePassed": false
+}

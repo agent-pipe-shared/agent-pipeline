@@ -1,0 +1,592 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
+
+/**
+ * Read-only admission for a path-only Critic dispatch.
+ *
+ * This intentionally does less than critic-packet-preflight: it never creates
+ * a checkout, packet, child, or receipt.  Its only job is to prove that the
+ * Elephant's proposed request is internally coherent before an independent
+ * Critic is asked to spend a turn on it.  It does not probe or select a
+ * runner, so a packet-ready result is deliberately not a spawn authorization.
+ */
+import { createHash } from "node:crypto";
+import { CRITIC_DIAGNOSTIC_SCHEMA, inspectCriticVerifyDiagnostic, validateCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
+import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
+import { spawnSync } from "node:child_process";
+
+import { parseYaml } from "../lib/yaml-lite.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import {
+  CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
+  deriveCriticPacketGovernance,
+} from "../lib/critic-packet-governance.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import {
+  RequirementTraceabilityError,
+  evaluateRequirementTraceability,
+} from "../lib/requirement-traceability.mjs";
+import { readCriticCourseAdmission } from "../lib/critic-course-admission.mjs";
+import {readPublishedCriticCourseAdoption} from "../lib/critic-course-adoption.mjs";
+import { CRITIC_DISPATCH_LIMITS, sha256Canonical } from "../lib/review-economy.mjs";
+
+export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
+export const EVIDENCE_SWEEP_SCHEMA = "pipeline.critic-dispatch-preflight-evidence-sweep.v1";
+
+/**
+ * The directory kinds ADR-0063 names as candidate homes for evidence: the
+ * ignored, machine-regenerated repo-root directory, and the tracked, durable
+ * citation-target directories (`backlog/evidence/` is fixed; `specs/*\/evidence/`
+ * is one instance per feature package and is discovered at sweep time).
+ */
+const FIXED_EVIDENCE_LOCATIONS = [
+  { dir: "evidence", locationClass: "machine-regenerated (ignored, repo-root evidence/)" },
+  { dir: "backlog/evidence", locationClass: "durable citation target (tracked, backlog/evidence/)" },
+];
+const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const PATH_MAX = 240;
+const EVIDENCE_MAX_BYTES = 1024 * 1024;
+const CANDIDATE_SOURCE_MAX_BYTES = 16 * 1024 * 1024;
+
+export class CriticDispatchPreflightError extends Error {
+  constructor(code, message, details = null) {
+    super(message);
+    this.name = "CriticDispatchPreflightError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
+// Only failures created at this producer's own branches supply typed source codes.
+// A foreign thrown value is rethrown unchanged and observed as CDP-UNEXPECTED.
+const sourceFailureCodes = new WeakMap();
+function fail(code, message, details = null) {
+  const error = new CriticDispatchPreflightError(code, message, details);
+  sourceFailureCodes.set(error, code);
+  throw error;
+}
+
+/** Trusted synchronous callback; its return and failures cannot affect admission. */
+function observeSource(observer, stage, outcome, code, candidate, specSha256) {
+  if (typeof observer !== "function") return;
+  try {
+    observer({
+      schema: "pipeline.critic-preflight-observation.v1",
+      producer: "critic-dispatch-preflight",
+      observationRevision: 1,
+      stage, outcome, code,
+      candidate: candidate === null ? null : { commit: candidate.commit, tree: candidate.tree },
+      specSha256,
+    });
+  } catch {
+    // Observation cannot replace the already chosen producer result/exception.
+  }
+}
+function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+function compare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
+function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
+
+function normalizePath(value, label) {
+  if (typeof value !== "string" || value.length === 0 || value.length > PATH_MAX || value.trim() !== value
+    || value.includes("\\") || value.includes("\0") || isAbsolute(value) || value.startsWith("./") || value.endsWith("/")) {
+    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
+  }
+  if (value.split("/").some((part) => part === "" || part === "." || part === "..")) {
+    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
+  }
+  return value;
+}
+
+function uniquePaths(values, label) {
+  if (!Array.isArray(values)) fail("CDP-PATHS", `${label} must be an array.`);
+  const paths = values.map((path) => normalizePath(path, label)).sort(compare);
+  if (new Set(paths).size !== paths.length) fail("CDP-DUPLICATE-PATH", `${label} contains a duplicate path.`);
+  return paths;
+}
+
+function currentArtifactScope(value) {
+  if (!isObject(value) || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(["kind", "paths"])) {
+    fail("CDP-SCOPE", "Current-artifact review scope must be closed.");
+  }
+  if (value.kind !== "current-artifacts") fail("CDP-SCOPE", "Unsupported current-artifact review scope.");
+  const paths = uniquePaths(value.paths, "current-artifact path");
+  if (paths.length === 0 || paths.length > 128 || JSON.stringify(paths) !== JSON.stringify(value.paths)) {
+    fail("CDP-SCOPE", "Current-artifact paths must be nonempty lexical unique paths.");
+  }
+  return { kind: "current-artifacts", paths };
+}
+
+function gitOrNull(root, args) {
+  const result = spawnSync("git", ["-C", root, ...args], {
+    encoding: "utf8",
+    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (!isSuccessfulSpawn(result)) return null;
+  return String(result.stdout).trim();
+}
+
+function git(root, args) {
+  const value = gitOrNull(root, args);
+  if (value === null) fail("CDP-GIT", `Git observation failed for ${args[0]}.`);
+  return value;
+}
+
+/**
+ * A root commit has no parent, so the base a caller offers it is the empty
+ * tree -- and `^{commit}` peeling of the empty tree fails, because the empty
+ * tree is not a commit. Diffing a commit against the empty tree is ordinary,
+ * well-defined git; only the commit-peel of that one sentinel value is not.
+ * Every other base ref still resolves exactly as before: this is one more
+ * chance given only to a base that already failed commit-peeling, not a
+ * relaxation of what counts as a valid base.
+ */
+function emptyTreeOid(root) {
+  const result = spawnSync("git", ["-C", root, "hash-object", "-t", "tree", "--stdin"], {
+    input: "",
+    encoding: "utf8",
+    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (!isSuccessfulSpawn(result)) fail("CDP-GIT", "Git observation failed for hash-object.");
+  return String(result.stdout).trim();
+}
+
+function resolveBase(root, base) {
+  const baseCommit = gitOrNull(root, ["rev-parse", "--verify", `${base}^{commit}`]);
+  if (baseCommit !== null) return { commit: baseCommit, tree: git(root, ["rev-parse", `${baseCommit}^{tree}`]) };
+  const baseTree = gitOrNull(root, ["rev-parse", "--verify", `${base}^{tree}`]);
+  if (baseTree !== null && baseTree === emptyTreeOid(root)) return { commit: null, tree: baseTree };
+  fail("CDP-GIT", "Git observation failed for rev-parse.");
+}
+
+function candidateInventory(root, candidate) {
+  const rows = git(root, ["ls-tree", "-r", "-z", candidate]);
+  const files = [];
+  for (const row of rows.split("\0")) {
+    if (!row) continue;
+    const match = row.match(/^(\d{6}) (blob) ([a-f0-9]+)\t(.+)$/s);
+    if (!match || !OID.test(match[3])) fail("CDP-TREE", "Candidate tree inventory is malformed.");
+    files.push({ path: normalizePath(match[4], "candidate path"), blobOid: match[3], readable: match[1] !== "120000" });
+  }
+  files.sort((left, right) => compare(left.path, right.path));
+  if (new Set(files.map(({ path }) => path)).size !== files.length) fail("CDP-TREE", "Candidate tree contains duplicate paths.");
+  return files;
+}
+
+function candidateText(root, candidate, path) {
+  const result = spawnSync("git", ["-C", root, "show", `${candidate}:${path}`], {
+    encoding: "utf8",
+    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
+  });
+  if (!isSuccessfulSpawn(result)) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  return String(result.stdout);
+}
+
+function candidateBytes(root, candidate, path) {
+  const result = spawnSync("git", ["-C", root, "show", `${candidate}:${path}`], {
+    encoding: null,
+    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
+  });
+  if (!isSuccessfulSpawn(result)) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  return result.stdout;
+}
+
+function currentArtifactCoverage(root, candidate, byPath, scope) {
+  return scope.paths.map((path) => {
+    const file = byPath.get(path);
+    if (!file || !file.readable) fail("CDP-SCOPE-PATH", `Current artifact is absent or unreadable in the candidate: ${path}`);
+    const row = git(root, ["ls-tree", "-z", candidate, "--", path]);
+    const match = row.match(/^(\d{6}) blob ([a-f0-9]+)\t/s);
+    if (!match || !OID.test(match[2]) || !["100644", "100755"].includes(match[1])) {
+      fail("CDP-SCOPE-MODE", `Current artifact is not a supported regular candidate file: ${path}`);
+    }
+    const bytes = candidateBytes(root, candidate, path);
+    return { path, blobOid: match[2], sha256: sha256(bytes), mode: match[1] };
+  });
+}
+
+function localEvidence(root, path) {
+  const realRoot = realpathSync(root);
+  const absolute = resolve(realRoot, path);
+  const rel = relative(realRoot, absolute);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) fail("CDP-EVIDENCE-PATH", "Evidence path escapes the repository root.");
+  const stat = lstatSync(absolute);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > EVIDENCE_MAX_BYTES) fail("CDP-EVIDENCE-FILE", `Evidence is not a bounded regular file: ${path}`);
+  return readFileSync(absolute);
+}
+
+function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path, root, spec, guardrails) {
+  let value;
+  try { value = JSON.parse(bytes); } catch { fail("CDP-EVIDENCE-JSON", `Evidence is not JSON: ${path}`); }
+  // Verify evidence uses the candidate at its root, whereas Security and gate
+  // evidence nest it below `candidate` with additional observation metadata.
+  // Both forms are valid only when they bind this exact frozen commit/tree.
+  const nested = value?.candidate;
+  const binding = isObject(nested) && typeof nested.commit === "string" && typeof nested.tree === "string"
+    ? nested
+    : value;
+  if (!isObject(binding) || binding.commit !== candidateCommit || binding.tree !== candidateTree) {
+    fail("CDP-EVIDENCE-BINDING", `Evidence is missing or stale for the exact candidate: ${path}`);
+  }
+  let diagnostic;
+  try {
+    const candidate = { commit: candidateCommit, tree: candidateTree };
+    if (value?.schema === "pipeline.verify-evidence.v0") diagnostic = inspectCriticVerifyDiagnostic(value, candidate);
+    else if (value?.schema === CRITIC_DIAGNOSTIC_SCHEMA) diagnostic = validateCriticDiagnostic(value, { root, candidate, spec, guardrails });
+    else fail("CDP-EVIDENCE-SCHEMA", `Unsupported evidence schema: ${path}`);
+  } catch (error) {
+    if (error instanceof CriticDispatchPreflightError) throw error;
+    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode: error.code ?? "CDI-INVALID" });
+  }
+  return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree }, diagnostic };
+}
+
+function requiredCandidateReadback(root, candidate, byPath, paths, label) {
+  return paths.map((path) => {
+    const file = byPath.get(path);
+    if (!file || !file.readable) fail("CDP-CANDIDATE-PATH", `${label} is absent or unreadable in the candidate: ${path}`);
+    const text = candidateText(root, candidate, path);
+    return { path, blobOid: file.blobOid, sha256: sha256(text) };
+  });
+}
+
+/**
+ * Validate a complete Critic request without creating any durable or external
+ * state. Evidence is a local, bounded JSON observation that binds the frozen
+ * candidate; Spec and guardrails are always read from that candidate tree.
+ */
+export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null, adoptionReference = null }, observer = null) {
+  let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
+  try {
+  if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
+    fail("CDP-INPUT", "root and candidate are required.");
+  }
+  const realRoot = realpathSync(root);
+  stage = "paths";
+  const scope = reviewScope === null ? null : currentArtifactScope(reviewScope);
+  if (scope === null && typeof base !== "string") fail("CDP-INPUT", "base is required for an exact-range review.");
+  if (scope !== null && base !== null) fail("CDP-SCOPE-MIXED", "Current-artifact scope cannot include a review base.");
+  stage = "candidate";
+  const rangeBase = scope === null ? resolveBase(realRoot, base) : null;
+  const baseCommit = rangeBase?.commit ?? null;
+  const baseTree = rangeBase?.tree ?? null;
+  const candidateCommit = git(realRoot, ["rev-parse", "--verify", `${candidate}^{commit}`]);
+  const candidateTree = git(realRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
+  if (![candidateCommit, candidateTree, ...(scope === null ? [baseTree] : [])].every((value) => OID.test(value))) fail("CDP-REF", "Git returned an invalid candidate binding.");
+  if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
+  sourceCandidate = { commit: candidateCommit, tree: candidateTree };
+  let adoptedTarget=null;
+  if(adoptionReference!==null){
+    if(scope!==null||courseContext!==null)fail("CDP-ADOPTED-CONTEXT","Adopted targets cannot mix alternate course selectors.");
+    adoptedTarget=readPublishedCriticCourseAdoption({rootDir:realRoot,reference:adoptionReference});
+    if(adoptedTarget.status!=="observed"||adoptedTarget.range.base!==baseCommit||adoptedTarget.range.commit!==candidateCommit||adoptedTarget.range.tree!==candidateTree)fail("CDP-ADOPTED-CONTEXT","Adopted target is unavailable or does not bind the exact candidate.");
+  }
+  if (scope === null && baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
+
+  stage = "paths";
+  const spec = normalizePath(specPath, "spec path");
+  const guardrails = uniquePaths(guardrailPaths, "guardrail path");
+  const evidence = uniquePaths(evidencePaths, "evidence path");
+  if (evidence.length === 0) fail("CDP-EVIDENCE-REQUIRED", "At least one fresh candidate-evidence artifact is required.");
+  const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
+  if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
+
+  stage = "inventory";
+  const files = candidateInventory(realRoot, candidateCommit);
+  const byPath = new Map(files.map((file) => [file.path, file]));
+  stage = "manifest";
+  const manifestFile = byPath.get(".claude/pipeline.yaml");
+  if (!manifestFile?.readable) fail("CDP-MANIFEST", "Candidate manifest is absent or unreadable.");
+  let manifest;
+  try { manifest = parseYaml(candidateText(realRoot, candidateCommit, ".claude/pipeline.yaml")); }
+  catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
+  stage = "governance";
+  const changedPaths = scope === null
+    ? git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
+      .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare)
+    : scope.paths;
+  const governance = deriveCriticPacketGovernance({
+    schema: CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
+    manifest,
+    candidateFiles: files,
+    changedPaths,
+  });
+  const governancePaths = governance.required.map(({ path }) => path);
+  let requirementTraceability;
+  try {
+    requirementTraceability = evaluateRequirementTraceability({
+      specPath: spec,
+      candidate: { commit: candidateCommit, tree: candidateTree },
+      candidateFiles: byPath,
+      readCandidateFile: (path) => candidateBytes(realRoot, candidateCommit, path),
+    });
+  } catch (error) {
+    if (error instanceof RequirementTraceabilityError) {
+      fail("CDP-REQUIREMENT-MAP", `${error.code}: ${error.message}`);
+    }
+    throw error;
+  }
+  if (requirementTraceability.missingCriteria.length > 0) {
+    const names = requirementTraceability.missingCriteria.map(({ id }) => id).join(", ");
+    fail("CDP-REQUIREMENT-ABSENT", `Candidate is missing named requirements: ${names}`, {
+      missingCriteria: requirementTraceability.missingCriteria,
+    });
+  }
+  const requirementPaths = requirementTraceability.mode === "declared" ? [requirementTraceability.map.path] : [];
+  const allGuardrails = [...new Set([...guardrails, ...governancePaths, ...requirementPaths])].sort(compare);
+  stage = "candidate-files";
+  const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
+  sourceSpecSha256 = specReadback.sha256;
+  const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
+  stage = "evidence";
+  const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path, realRoot, specReadback, guardrailReadback));
+  stage = "prior-evidence";
+  const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
+  const sourceCoverage = scope === null ? null : currentArtifactCoverage(realRoot, candidateCommit, byPath, scope);
+
+  // A feature package's retained immutable Critic lineage, not a caller's
+  // declared round number, controls whether another model invocation is due.
+  // Keep this read-only: the later session gate still owns packet/launch.
+  let courseAdmission = null;
+  const featureMatch = /^specs\/([^/]+)\//u.exec(spec);
+  const featureId = featureMatch?.[1] ?? null;
+  if (adoptedTarget===null && featureId !== null && byPath.has(`specs/${featureId}/lifecycle.json`)) {
+    stage = "critic-course";
+    if (scope !== null) fail("CDP-COURSE-SCOPE", "A versioned feature Critic review requires an exact base-to-candidate range.");
+    if (courseContext !== null && (!isObject(courseContext)
+      || Object.keys(courseContext).sort().join() !== ["acceptedReference", "criterionLocator", "deltaRequestPath", "featureId", "registrationCommit"].join()
+      || typeof courseContext.featureId !== "string" || !OID.test(courseContext.registrationCommit ?? ""))) {
+      fail("CDP-COURSE-CONTEXT", "Critic course context must be closed.");
+    }
+    const context = courseContext ?? { featureId, registrationCommit: candidateCommit,
+      acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
+    const admission = readCriticCourseAdmission({ repoRoot: realRoot, featureId: context.featureId,
+      baseCommit: baseCommit ?? baseTree, candidateCommit, registrationCommit: context.registrationCommit,
+      requestedMode: context.deltaRequestPath === null ? "full" : "delta",
+      acceptedReference: context.acceptedReference, criterionLocator: context.criterionLocator,
+      deltaRequestPath: context.deltaRequestPath });
+    if (admission?.decision?.status !== "admitted") {
+      observeSource(observer, stage, "rejected", admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE", sourceCandidate, sourceSpecSha256);
+      return Object.freeze({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+        status: admission?.decision?.status ?? "unavailable", code: admission?.decision?.code ?? "CDP-COURSE-UNAVAILABLE",
+        dispatch: { childCreated: false, packetCreated: false, stateMutated: false, spawnAuthorized: false } });
+    }
+    // Defense at the actual packet preflight: history may remain readable in
+    // the historical four-round format, and the current one-full plus three-DIFF
+    // policy can produce a packet-ready result for this registered batch.
+    const round = admission.budgets?.reviewRound;
+    const expectedMode = round === 1 ? "full" : Number.isSafeInteger(round) && round > 1 ? "delta" : null;
+    if (expectedMode === null || round > CRITIC_DISPATCH_LIMITS.criticRounds
+      || admission.budgets.maxReviewRounds !== CRITIC_DISPATCH_LIMITS.criticRounds
+      || admission.decision.mode !== expectedMode
+      || (context.deltaRequestPath === null ? "full" : "delta") !== expectedMode) {
+      fail("CDP-COURSE-BUDGET", "Critic dispatch is limited to one full review and at most three correction-DIFF reviews per registered batch.");
+    }
+    if (admission.source?.reviewUnit?.specPath !== spec) {
+      fail("CDP-COURSE-CONTEXT", "The registered review unit must bind the requested feature Spec.");
+    }
+    if (admission.courseIdentity.originalFeatureId !== featureId && context.featureId !== featureId) {
+      fail("CDP-COURSE-CONTEXT", "Course identity does not bind the requested feature Spec.");
+    }
+    const { decision, ...subject } = admission;
+    courseAdmission = Object.freeze({ featureId: context.featureId,
+      sourceSha256: sha256Canonical(subject), decisionSha256: sha256Canonical(decision),
+      round: admission.budgets.reviewRound, correctionCommits: admission.budgets.correctionCommitCount });
+  }
+
+  if (courseContext !== null && courseAdmission === null) fail("CDP-COURSE-CONTEXT", "Course context requires a registered feature package.");
+
+  const result = {
+    schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+    // This remains read-only. The ordinary session orchestrator is the next
+    // authority: it launches one fresh Critic and then hands the closed result
+    // to the runner-neutral durable finalizer. Native transports are optional.
+    status: "packet-ready",
+    ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
+    candidate: { commit: candidateCommit, tree: candidateTree },
+    spec: specReadback,
+    guardrails: guardrailReadback,
+    governance,
+    requirementTraceability,
+    evidence: evidenceReadback,
+    coordinatorOnly: { priorCriticEvidence: priorReadback, courseAdmission, ...(adoptedTarget===null?{}:{adoptedTarget}) },
+    dispatch: {
+      mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
+      spawnAuthorized: false, requiredNextGate: "session-critic-dispatch",
+      reviewerInput: {
+        ...(scope === null ? { baseCommit } : { reviewScope: scope }),
+        candidateCommit,
+        candidateTree,
+        rulesetSha: candidateCommit,
+        specPath: specReadback.path,
+        governanceConstraintPaths: governance.governance === null
+          ? []
+          : [governance.governance.guidelinesPath, governance.governance.policiesPath],
+        guardrailPaths: guardrailReadback.map(({ path }) => path),
+        evidencePaths: evidenceReadback.map(({ path }) => path),
+      },
+    },
+  };
+  observeSource(observer, "complete", "packet-ready", null, sourceCandidate, sourceSpecSha256);
+  return result;
+  } catch (error) {
+    observeSource(observer, stage, "rejected", sourceFailureCodes.get(error) ?? "CDP-UNEXPECTED", sourceCandidate, sourceSpecSha256);
+    throw error;
+  }
+}
+
+/**
+ * Advisory, non-failing enumeration of evidence-shaped artifacts for a given
+ * task id, across every location ADR-0063 names as an evidence home. This is
+ * NOT part of `preflightCriticDispatch()` and never affects its pass/fail
+ * outcome: `matchingCandidateEvidence()` still refuses anything that does not
+ * bind the exact candidate, unchanged. This function only answers "what
+ * exists", so a dispatcher can cite it instead of asserting an absence.
+ *
+ * Matching is case-insensitive substring matching of the task id against each
+ * candidate file's basename. Substring matching -- rather than an exact or
+ * anchored match -- is deliberate: the regression case that motivated this
+ * (2026-09-06, NVA-B-DENIALCODE-1) is a file named
+ * `2026-09-06-nva-b-denialcode-1-red.txt`, which carries a date prefix before
+ * the task id and a role suffix after it. Lower-casing both sides absorbs the
+ * case difference; substring containment absorbs the surrounding text. A
+ * task id is never treated as a regular expression.
+ */
+export function enumerateEvidenceArtifacts({ root, taskId }) {
+  if (typeof root !== "string" || root.length === 0) fail("CDP-SWEEP-INPUT", "root is required.");
+  if (typeof taskId !== "string" || taskId.length === 0) fail("CDP-SWEEP-INPUT", "taskId is required.");
+  const realRoot = realpathSync(root);
+  const needle = taskId.toLowerCase();
+
+  const locations = [...FIXED_EVIDENCE_LOCATIONS];
+  const specsDir = resolve(realRoot, "specs");
+  let specEntries = [];
+  try { specEntries = readdirSync(specsDir, { withFileTypes: true }); } catch { specEntries = []; }
+  for (const entry of specEntries) {
+    if (!entry.isDirectory()) continue;
+    const dir = `specs/${entry.name}/evidence`;
+    locations.push({ dir, locationClass: `durable citation target (tracked, ${dir}/)` });
+  }
+
+  const matches = [];
+  for (const { dir, locationClass } of locations) {
+    let entries = [];
+    try { entries = readdirSync(resolve(realRoot, dir), { withFileTypes: true }); } catch { entries = []; }
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!entry.name.toLowerCase().includes(needle)) continue;
+      matches.push({ path: `${dir}/${entry.name}`, locationClass });
+    }
+  }
+  matches.sort((left, right) => compare(left.path, right.path));
+
+  return { schema: EVIDENCE_SWEEP_SCHEMA, taskId, matches };
+}
+
+export function parseCriticDispatchPreflightArgs(argv) {
+  const values = { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null, sweepEvidenceTaskId: null };
+  const selectors = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index];
+    const value = argv[index + 1];
+    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--adopted-course-reference"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
+    if (flag === "--root") values.root = value;
+    else if (flag === "--base") values.base = value;
+    else if (flag === "--candidate") values.candidate = value;
+    else if (flag === "--spec") values.specPath = value;
+    else if (flag === "--guardrail") values.guardrailPaths.push(value);
+    else if (flag === "--evidence") values.evidencePaths.push(value);
+    else if (flag === "--prior-critic") values.priorCriticEvidencePath = value;
+    else if (flag === "--sweep-evidence") values.sweepEvidenceTaskId = value;
+    else if (flag === "--adopted-course-reference") {
+      if(values.adoptionReference!==undefined)fail("CDP-ARGUMENT","Duplicate adopted reference.");
+      const path=normalizePath(value,"adopted reference");
+      if(!path.startsWith("scratch/"))fail("CDP-ARGUMENT","Adopted reference selector must be contained scratch data.");
+      try{values.adoptionReference=JSON.parse(localEvidence(values.root,path));}catch{fail("CDP-ARGUMENT","Adopted reference selector is unavailable.");}
+    }
+    else if (["--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request"].includes(flag)) {
+      if (Object.hasOwn(selectors, flag)) fail("CDP-ARGUMENT", "Duplicate course selector.");
+      selectors[flag] = value;
+    }
+    else fail("CDP-ARGUMENT", `Unknown argument: ${flag}`);
+    index += 1;
+  }
+  if (Object.keys(selectors).length !== 0) {
+    if(values.adoptionReference!==undefined)fail("CDP-ARGUMENT","Adopted target cannot mix course selectors.");
+    if (values.sweepEvidenceTaskId !== null) fail("CDP-ARGUMENT", "Course selectors cannot be mixed with evidence sweep.");
+    if (!OID.test(selectors["--registration-commit"] ?? "")) fail("CDP-ARGUMENT", "An exact registration commit is required.");
+    const match = /^specs\/([^/]+)\//u.exec(values.specPath ?? "");
+    if (!match) fail("CDP-ARGUMENT", "Course selectors require a feature Spec.");
+    const acceptedPath = selectors["--accepted-contract"] === undefined ? null : normalizePath(selectors["--accepted-contract"], "accepted contract");
+    const locatorPath = selectors["--criterion-locator"] === undefined ? null : normalizePath(selectors["--criterion-locator"], "criterion locator");
+    let criterionLocator = null;
+    if (locatorPath !== null) {
+      try { criterionLocator = JSON.parse(localEvidence(values.root, locatorPath)); }
+      catch { fail("CDP-ARGUMENT", "Criterion locator is unavailable."); }
+      if (!isObject(criterionLocator) || Object.keys(criterionLocator).sort().join() !== ["criterionId", "endByte", "excerptSha256", "schema", "sourcePath", "sourceSha256", "startByte"].join()) fail("CDP-ARGUMENT", "Criterion locator must be closed.");
+    }
+    values.courseContext = { featureId: match[1], registrationCommit: selectors["--registration-commit"],
+      acceptedReference: acceptedPath === null ? null : { schema: "pipeline.accepted-delivery-contract-reference.v1", path: acceptedPath,
+        sha256: sha256(candidateBytes(values.root, selectors["--registration-commit"], acceptedPath)) },
+      criterionLocator, deltaRequestPath: selectors["--delta-request"] === undefined ? null : normalizePath(selectors["--delta-request"], "delta request") };
+  }
+  return values;
+}
+
+if (isDirectInvocation(import.meta.url)) {
+  const argv = process.argv.slice(2);
+  try {
+    const args = parseCriticDispatchPreflightArgs(argv);
+    if (args.sweepEvidenceTaskId !== null) {
+      const result = enumerateEvidenceArtifacts({ root: args.root, taskId: args.sweepEvidenceTaskId });
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+    } else {
+      const result = preflightCriticDispatch(args);
+      process.stdout.write(`${JSON.stringify(result)}\n`);
+      if (result.status !== "packet-ready") process.exitCode = 1;
+    }
+  } catch (error) {
+    const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
+    const details = error instanceof CriticDispatchPreflightError ? error.details : null;
+    const sweep = argv.includes("--sweep-evidence");
+    process.stderr.write(`${JSON.stringify({
+      schema: sweep ? EVIDENCE_SWEEP_SCHEMA : CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+      status: "rejected",
+      code,
+      ...(!sweep && details !== null ? details : {}),
+    })}\n`);
+    process.exitCode = 1;
+  }
+}
+
+/** Explicit opaque launch-context entry; no observer or authority injection. */
+export function preflightCriticDispatchWithLaunchContext(input, options) {
+  if (options === undefined || (isObject(options) && Object.keys(options).length === 0)
+    || (isObject(options) && Object.keys(options).length === 1
+      && Object.hasOwn(options, "hostDispatchContext") && options.hostDispatchContext === undefined)) {
+    throw new CriticDispatchPreflightError("DBLO-CURRENT-HOST-UNAVAILABLE", "Launch observation refused.");
+  }
+  if (!isObject(options) || Object.keys(options).length !== 1 || !Object.hasOwn(options, "hostDispatchContext")) {
+    throw new CriticDispatchPreflightError("DBLO-HANDLE-INVALID", "Launch observation refused.");
+  }
+  const observed = readDispatchBudgetLaunchObservation({ rootDir: input?.root,
+    hostDispatchContext: options.hostDispatchContext });
+  if (!observed.ok) throw new CriticDispatchPreflightError(observed.code, "Launch observation refused.");
+  if (observed.value.status !== "working" && observed.value.status !== "not-applicable") {
+    throw new CriticDispatchPreflightError(observed.value.code, "Launch observation refused.");
+  }
+  return preflightCriticDispatch(input);
+}

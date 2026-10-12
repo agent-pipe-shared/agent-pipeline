@@ -1,0 +1,4 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["U03P001","U03P002"],"caseCount":2,"caseSetSha256":"a2f81b5ac960c803b77e0134e078fadb94b7016a4c1e5d6d913cedec26280144"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"U03P001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"U03P002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":2,"disposedCount":2,"caseIds":["U03P001","U03P002"],"caseSetSha256":"a2f81b5ac960c803b77e0134e078fadb94b7016a4c1e5d6d913cedec26280144","dispositionsSha256":"9e9fe995877fb91a4ab647556a5b3308c066466981fcf7bb0b2c63a8bced26b1","counts":{"pass":2,"fail":0,"skip":0,"todo":0}}

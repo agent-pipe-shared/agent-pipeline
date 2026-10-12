@@ -1,0 +1,104 @@
+{
+  "schema": "alfred.crt035-combined.execution.v1",
+  "businessAttempts": 1,
+  "reservation": true,
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "setupError": null,
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "cabe4b13c1d4cc5ca92f783a90a8dec47569dc1811ff1814d21b027546596ab9",
+    "caseSetSha256": "97602d24323e998ce10c015bf0f5506832486de2132ebe1216c67a1697be0896",
+    "dispositionsSha256": "16c9ba1dbe9c252e5f8cbc3546bb112540bace1ec7db2f196aa45ad0cf1a63a7",
+    "declaredCount": 13,
+    "disposedCount": 13,
+    "counts": {
+      "pass": 13,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionError": null,
+  "conservationError": null,
+  "freezeSHA256": "224990b770c4409263a9ec7905ec906875f1b659292f0f652b9821cb2031c94c",
+  "graphManifestSHA256": "3bed10e509335b4f40006d8d84bf018f85eff9f7a4d38c4c2bf2b177fda6ecf7",
+  "sourceBindings": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "sha256": "b7d3db64804d3eca85c83c3416ea74112e9abb6a9727de466a3366407b73c8f2",
+      "source": "legacy-origin:alfred-critic-external-stop-observer-source-v2-20261010/postimages/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "provenance": "CRT035-observer"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "sha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+      "source": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "provenance": "CRT035-runtime"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+      "sha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+      "source": "legacy-origin:alfred-critic-s2-course-source-implementation-20261010/postimages/plugins/pipeline-core/lib/critic-review-lineage.mjs",
+      "provenance": "current-S2"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+      "sha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4",
+      "source": "legacy-origin:alfred-critic-s3-runtime-source-implementation-20261010/postimages/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+      "provenance": "current-S3"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+      "sha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216",
+      "source": "legacy-origin:alfred-critic-external-stop-observer-source-v2-20261010/postimages/plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+      "provenance": "CRT035-observer"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/review-economy.mjs",
+      "sha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12",
+      "source": "legacy-origin:alfred-critic-s2-course-source-implementation-20261010/postimages/plugins/pipeline-core/lib/review-economy.mjs",
+      "provenance": "current-S2"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "sha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313",
+      "source": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+      "provenance": "CRT035-runtime"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "sha256": "0171392c243b0acd2b4a13041ad59c4f167ca478feb6bfe2fb1acc55aa2375d8",
+      "source": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+      "provenance": "CRT035-runtime"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+      "source": "legacy-origin:alfred-critic-external-stop-runtime-source-20261010/postimages/plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "provenance": "CRT035-runtime"
+    }
+  ],
+  "captures": [
+    {
+      "path": "captures-v2/stdout.txt",
+      "sha256": "4c1d38d0dee4bc058c237c33b62480445a307c1e46b031437c619ea6ff6ab6a9",
+      "bytes": 1353
+    },
+    {
+      "path": "captures-v2/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "captures-v2/completion.jsonl",
+      "sha256": "0b279e56dc398c53ea7149e3e775cf11a7b802623e26954eae85820107c54b8c",
+      "bytes": 2238
+    }
+  ],
+  "inheritedPreloadPresent": false,
+  "inheritedThreadPresent": true,
+  "assurance": "controlled actual physical owner/guard/course/preflight/claim/finalizer method only; no native/model/human/Critic PASS"
+}

@@ -1,0 +1,290 @@
+{
+  "schema": "alfred.four-runtime-actual-atomic-integration.v1",
+  "status": "applied",
+  "atomicPlanSha256": "5211d8b2201c9f1945ff76308b9cfe1b25694faa0ffcb70d8a24f8834e87f7b4",
+  "intentSha256": "8a60e225110fd3b7b4a3fb50acb4f6bba1663445b3d3a0b1e5cd50340adca325",
+  "inspectionSha256": "f41ba79a6fc33380fcd1cf9e6df6730acd8830d916c8b34688e91ce3276f7c71",
+  "targets": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "parent": {
+        "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "present": true,
+        "sha256": "0bc159856bb1001e0a1dd011075c629705d3d54377418f90a7f7afcd36a28bb6",
+        "bytes": 15989,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "421fd115d4d2b6fc27cac2fa1c4ac6d9bc5ffe93438714fcc90a904018903135",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "post": {
+        "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "present": true,
+        "sha256": "2a00419918c8ec1886d650b171a651e99e73b6cfdcde68dbe30fa54c4650a613",
+        "bytes": 49461,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "c7c84c406f2d4cf4fbb36c91a941d279d368a11521490708fcc5d835adf34b80",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "backup": {
+        "path": "legacy-origin:alfred-selected164-four-runtime-content-preparation-20261011/atomic-state/backups/0",
+        "present": true,
+        "sha256": "0bc159856bb1001e0a1dd011075c629705d3d54377418f90a7f7afcd36a28bb6",
+        "bytes": 15989,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "421fd115d4d2b6fc27cac2fa1c4ac6d9bc5ffe93438714fcc90a904018903135",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "newInode": true,
+      "qualifiedBusiness": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "parent": {
+        "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "present": true,
+        "sha256": "34aa1bd5a1bd1ed6509cb383c423a05bdd382ce429bb16753a5a01bae9b0e362",
+        "bytes": 245178,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "0749a273ff23e9ce2ed30834f34dfd3aeb2ac09775d4cd049936216d7bddb5ed",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "post": {
+        "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "present": true,
+        "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+        "bytes": 301059,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "4200d893dd0ae3fac47674c30df04f8845ecd86c32e7002fd5cc1f504ddff7e0",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "backup": {
+        "path": "legacy-origin:alfred-selected164-four-runtime-content-preparation-20261011/atomic-state/backups/1",
+        "present": true,
+        "sha256": "34aa1bd5a1bd1ed6509cb383c423a05bdd382ce429bb16753a5a01bae9b0e362",
+        "bytes": 245178,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "0749a273ff23e9ce2ed30834f34dfd3aeb2ac09775d4cd049936216d7bddb5ed",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "newInode": true,
+      "qualifiedBusiness": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "parent": {
+        "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "present": true,
+        "sha256": "cd5ed934902daa3668ccab9791ee905afd826e80ebd876fa465c3e8f050965b7",
+        "bytes": 29937,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "e54bc377a86ec06753143c50dcc105056bcf592a2b9855604c7247f12044fe76",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "post": {
+        "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "present": true,
+        "sha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+        "bytes": 32208,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "5e553bebfe4a70e7cae18863c21c1468f9bbc04808b0059869edadd025dd4088",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "backup": {
+        "path": "legacy-origin:alfred-selected164-four-runtime-content-preparation-20261011/atomic-state/backups/2",
+        "present": true,
+        "sha256": "cd5ed934902daa3668ccab9791ee905afd826e80ebd876fa465c3e8f050965b7",
+        "bytes": 29937,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "e54bc377a86ec06753143c50dcc105056bcf592a2b9855604c7247f12044fe76",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "newInode": true,
+      "qualifiedBusiness": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "parent": {
+        "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "present": true,
+        "sha256": "e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51",
+        "bytes": 422907,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "06ea21e2da9ceff27dc9377dd4419845b29baec8dd0bb5a6c287204278646361",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "post": {
+        "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "present": true,
+        "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+        "bytes": 423484,
+        "mode": 420,
+        "nlink": 1,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "bbebeff70e8bded92fc0f049b0c1b3e1b633193265ff767e92184e66dde5a6df",
+          "bytes": 7,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "backup": {
+        "path": "legacy-origin:alfred-selected164-four-runtime-content-preparation-20261011/atomic-state/backups/3",
+        "present": true,
+        "sha256": "e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51",
+        "bytes": 422907,
+        "mode": 420,
+        "nlink": 2,
+        "dev": {
+          "excluded": true,
+          "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+          "bytes": 4,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        },
+        "ino": {
+          "excluded": true,
+          "rawSha256": "06ea21e2da9ceff27dc9377dd4419845b29baec8dd0bb5a6c287204278646361",
+          "bytes": 6,
+          "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+        }
+      },
+      "newInode": true,
+      "qualifiedBusiness": false
+    }
+  ],
+  "dependencyPinsConserved": 240,
+  "rootReceiptTransitions": [
+    {
+      "path": "legacy-origin:alfred-aggregate5-current-main-coherence-preparation-20261011/integration-successor/directory-membership-successor/actual-integration-receipt.json",
+      "sha256": "e25f00f02031c4e90faebdcba0c9e9ec4eaa6319da247e259ed53d8eeb4020dd",
+      "paths": []
+    },
+    {
+      "path": "legacy-origin:alfred-runtime-model-dispatch-control5-integration-preparation-20261011/atomic5/apply-once/actual-receipt.json",
+      "sha256": "60f233423f9746d87ef2cf4d35f2ee9f89487f4581a91a4106c585e833a9f5d5",
+      "paths": [
+        "plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs"
+      ]
+    }
+  ],
+  "businessRuns": 0,
+  "gitWrites": 0,
+  "qualifiedBusiness": false,
+  "fullVerify": false,
+  "runtimeDependency": "Coherent Main runtime qualification remains separate; this receipt proves physical four-source integration only",
+  "atomicity": "Per-path atomic renames with exact rollback; no simultaneous four-path visibility claim"
+}

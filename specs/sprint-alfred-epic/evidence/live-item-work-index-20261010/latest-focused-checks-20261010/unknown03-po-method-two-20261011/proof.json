@@ -1,0 +1,65 @@
+{
+  "schema": "alfred.unknown03.po-method-two-public-proof.v1",
+  "date": "2026-10-11",
+  "status": "Root-executed-controlled-unit-two-PASS",
+  "cases": [
+    {
+      "id": "U03P001",
+      "disposition": "pass",
+      "scope": "Actual public owner/private operation/unbound cancelled Source lifetime; controlled missing-OpenSSL readiness refusal before resolver/confirmation/signing."
+    },
+    {
+      "id": "U03P002",
+      "disposition": "pass",
+      "scope": "Actual public owner/private operation/unbound Source lifetimes, actual OpenSSL version/sign/verify readiness and disposable encrypted unit-key signature; exact disclosure before signing, wrong intent and hardlinked request refuse without proof/signing."
+    }
+  ],
+  "result": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "aa0c150dee181b030efa4ef2df031d0cdbee38abe6a01c2950cc6a57c6399c7c",
+    "caseSetSha256": "a2f81b5ac960c803b77e0134e078fadb94b7016a4c1e5d6d913cedec26280144",
+    "dispositionsSha256": "9e9fe995877fb91a4ab647556a5b3308c066466981fcf7bb0b2c63a8bced26b1",
+    "declaredCount": 2,
+    "disposedCount": 2,
+    "counts": {
+      "pass": 2,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "resourceCount": 368,
+  "sourceConserved": true,
+  "secureAncestryConserved": true,
+  "execution": {
+    "receiptSha256": "90e069aed31236eb6d2147fda6bb45a3d33f3da7e750fca6b130b4f77f1f2c2f",
+    "qualificationFreezeSha256": "172c896d9b5952297ed9c344b5c3b8ccd362c3130de3dee042fc101b9b37e168",
+    "completionSha256": "7d2d1a366d135e6748cb198dfb3919be7f4485b78e8b0bb8285b44b0c7838c8d",
+    "completionBytes": 771,
+    "stdoutSha256": "cd305b17e651764d49b4623c763146fcaa987da462dbabc13b8052cd8bfcf730",
+    "stdoutBytes": 770,
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrBytes": 0,
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  "selectedSource": {
+    "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+    "sha256": "7470262a0a7ab188465d77dfdaf6dc15c7ba2aee92c80d36cd522b88c2e76f85",
+    "qualityDescriptorSha256": "d6d7c7ece9a82d50772e9b210f35f7c45ff99298ad301e2a295407d671c363bc",
+    "resourceFreezeSha256": "2535b6ba99cce5562eae03e65f304dc9bdd0445896f3aa52d0bcf7723ca051c4"
+  },
+  "controlledBoundary": "Fresh real synthetic Git repositories without catalogue. Existing isTTY and spawn seams are explicitly controlled unit inputs; one known disposable passphrase is supplied only to that exact owned encrypted unit key. Actual OpenSSL successful results/signatures are not substituted. No actual attended terminal or Human authorization is observed. Genuine Source lifetimes are unbound, never a bound requester grant.",
+  "holds": [
+    "U03H001 authentic accepted denial/plan/index-emitter producer course",
+    "Actual attended Human design/push ceremony",
+    "Current bound all12/PO constructor proof"
+  ],
+  "history": "Original consumer4 dd371 PASS retained; this exact PO2 launcher consumed once, no repeat of prior passing four.",
+  "authorship": "Source proposal author also authored these component regressions; independent Critic remains separate.",
+  "nativeClaims": false,
+  "itemAcceptance": false,
+  "humanAuthorization": false
+}

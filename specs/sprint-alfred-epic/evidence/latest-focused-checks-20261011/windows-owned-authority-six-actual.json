@@ -1,0 +1,143 @@
+{
+  "rawReceiptSha256": "c60665c90517b202f9c9852829ceb914a21a7a6c5dfc549d32a06fd9525b28e6",
+  "rawReceiptBytes": 5714,
+  "privateForensicsRetained": true,
+  "schema": "alfred.public.windows-owned-authority-six.actual.v1",
+  "result": "PASS",
+  "caseIds": [
+    "WNB001",
+    "WNB002",
+    "WNB003",
+    "WNB004",
+    "WNB005",
+    "WPC001"
+  ],
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "3aa7f39b96ce8dc61ba143c8011d18ed946b27b3061622aaa7f3b28bc121c798",
+    "caseSetSha256": "dbd32de48fda2f5f6efe97a82e81ce1bd9ff8756f6dded9a7ce7976ccebb62a8",
+    "dispositionsSha256": "c9dcb3a63055305d94ef74c690211a1eca770e925b981c4d48068521aed438bc",
+    "declaredCount": 6,
+    "disposedCount": 6,
+    "counts": {
+      "pass": 6,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "7496dd7f6ef1e98f02b3e871739e791ee5ff3e57f2f7f2b99cadd9fc6182436e",
+  "invocation": {
+    "executor": "Root",
+    "nativeRuntime": "Windows PowerShell and Windows Node",
+    "launcherSha256": "f5b35afa00340e931a7934541a6a1a8c83c080bf39b47aa9f6446ff12884562c",
+    "bindingSha256": "bfe84ad38546e46660865a88d395c2d2929a59ccd335c33a59bf2946a2e2b1ef",
+    "readySha256": "a61e4366fb23477a75294b9a0ff297e988d61e6591ac7790273ec0debc14e286"
+  },
+  "sources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/governance-event.mjs",
+      "role": "production-source",
+      "sha256": "bacdef30154cb0c30561bd7e056503ec20f0af3a647f3036a91e58d684d5a06e",
+      "bytes": 15831
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/successful-spawn.mjs",
+      "role": "production-source",
+      "sha256": "55c4e49b46d1e9543bb068ca4d5a86070354f023a2522c5d1bc826fe7189387e",
+      "bytes": 906
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/test-case-completion.mjs",
+      "role": "production-source",
+      "sha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "bytes": 10816
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+      "role": "production-source",
+      "sha256": "412fddb4b951bb43db07e62c85abbae3480835a4724509207fa8ecb9a6b0395a",
+      "bytes": 6904
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-native-process-observer.ps1",
+      "role": "production-source",
+      "sha256": "6c55d97eba1c18ef37befab1c6e6052301f8ecc0b90d1521a49e158a49fc4d40",
+      "bytes": 13949
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+      "role": "production-source",
+      "sha256": "3e9922b327791479ab4c61fab22589b48708877d561e1909298f0379ff597be7",
+      "bytes": 7490
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-owned-authority-native.ps1",
+      "role": "production-source",
+      "sha256": "66865ee9c17f83cd1fe9bb68f9acd593e06b8064257f1b10b84c224e9cd4d720",
+      "bytes": 18539
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-private-state.mjs",
+      "role": "production-source",
+      "sha256": "00a4ccdaec9b30abe2213fd93169aabf4cf8761c8025b1a3809a5a63db236b32",
+      "bytes": 15000
+    },
+    {
+      "canonicalPath": null,
+      "role": "test-only-parent-control",
+      "sha256": "e483604e49cbddb9c257447ffed6faa7b673a00e7fbb1a47d58332c7e2c80e39",
+      "bytes": 18999
+    }
+  ],
+  "sourceManifestSha256": "0b93efbff4c811e789f17742f0a1a8dc2271ee2ade933ee317b8a1128ce8f1ed",
+  "sourceInventorySha256": "e8c75c8f84055a24ea951486dd5297423feed5bafe3957c69634dec90d389c30",
+  "observed": {
+    "sourceConserved": true,
+    "toolsConserved": true,
+    "inputsConserved": true,
+    "jobSettled": true,
+    "readerSettled": true,
+    "readbackVerified": true,
+    "control": [
+      {
+        "id": "WPC001",
+        "schema": "alfred.native-publication-parent-control.v1",
+        "tempClosed": true,
+        "childMoved": true,
+        "liveDeleteRefused": true,
+        "liveDeleteError": 32,
+        "liveRenameRefused": true,
+        "liveRenameError": 32,
+        "liveIdentityDaclAndChildConserved": true,
+        "releasedDeleteOpened": true,
+        "releasedDeleteError": 0,
+        "releasedRenameSucceeded": true,
+        "releasedRenameError": 0,
+        "restored": true
+      }
+    ]
+  },
+  "scope": [
+    "actual directory flush",
+    "readonly native Node image above 1MiB and current/parent process observations",
+    "private publish/read/removal",
+    "same bytes with different FileID stale-CAS refusal and conservation",
+    "real hardlink refusal/restoration",
+    "live publication parent DELETE/rename refusal and positive released baselines"
+  ],
+  "limits": {
+    "formalItemStage": "OPEN",
+    "wholeItemClosed": false,
+    "requesterAuthorityGranted": false,
+    "readyGranted": false,
+    "humanSigningQualified": false,
+    "nativeDabQualified": false,
+    "gitCommitOrPushPerformedByPublication": false,
+    "wholeWindowsPlatformQualified": false,
+    "nativeInstallerCourseQualified": false,
+    "managedRequesterCourseQualified": false,
+    "sourceContentPromotionByEvidence": false
+  }
+}

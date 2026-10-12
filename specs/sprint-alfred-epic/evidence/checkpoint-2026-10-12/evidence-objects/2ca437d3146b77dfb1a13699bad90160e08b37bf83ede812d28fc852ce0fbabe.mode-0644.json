@@ -1,0 +1,392 @@
+{
+  "schema": "alfred.unknown01.actual-source-findings.v1",
+  "status": "ASSESSMENT-ONLY; no item accepted or stage promoted",
+  "rows": [
+    {
+      "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+      "disposition": [
+        "code-present",
+        "consumer-verification"
+      ],
+      "finding": "Current Main already has a bounded read-only Git-to-head pipeline parser and its scope-guard consumer. The permitted source command, operand checks and head bound are narrow. No generalized shell relaxation is needed. The current protected grammar Source generation must be retained separately from Main.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "lines": "315-355, 684, 1005",
+          "owner": "isBoundedGitPipeline / isApprovedSingleCommandReadArg / isReadOnlyGitSubcommand"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/read-scope.mjs",
+          "lines": "11, 271",
+          "owner": "bounded pipeline scope consumer"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+          "lines": "237",
+          "owner": "parseGuardCommand"
+        },
+        {
+          "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "lines": "pending protected canonical Source",
+          "owner": "index3ea154 selected Source"
+        }
+      ],
+      "proofScope": "No actual installed Agy normalized rev:path admission receipt is established by this assessment. Source presence is not that receipt.",
+      "nextAction": "Bind the actual normalized Agy input and loaded grammar/scope source identities to existing positive/negative proof; run only an uncovered essential consumer case if those original receipts cannot be recovered. Preserve substitution/write/redirect refusal and the finite head bound.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+      "disposition": [
+        "real-code-gap",
+        "consumer-verification",
+        "native-hold"
+      ],
+      "finding": "The helper's same-build already-armed branch never renews an expired lock, while genuine preflight rejects locks older than 30 minutes. Current ordinary-ready regression deliberately forbids refreshing a fresh lock. A stale-only private repair is prepared. Native identity handling and report-only role fallback exist; umbrella dispatch and greenfield happy-path completion are not established.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-bootstrap-lock.mjs",
+          "lines": "9-26",
+          "owner": "armAntigravityBootstrapSession"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+          "lines": "95-141",
+          "owner": "validated native session and initialized Git caller"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "lines": "425, 438-535",
+          "owner": "observeAntigravityHardEnforcement freshness/build observer"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-start-hint.test.mjs",
+          "lines": "67-126",
+          "owner": "original repeated-ready/barrier behavior"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "lines": "502-518",
+          "owner": "native hook session/barrier consumer"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs",
+          "lines": "41, 286-295",
+          "owner": "registered readiness route resolver"
+        }
+      ],
+      "proofScope": "Private stale-lock proposal has syntax validation only. No AGY host/native worker or whole happy-path qualification is inferred from existing source or older report-era runs.",
+      "nextAction": "Root reviews the stale-only proposal and qualifies the resumed hook/observer with the original fresh-lock/barrier invariants. Separately reconcile actual native and CLI worker start/read-only/terminal records, loaded source/policy, role-route degradation and EL-01/coverage dependencies; no provider or Critic authority grant from a fallback report.",
+      "sourceProposal": "agy-stale-lock-proposal/manifest.json"
+    },
+    {
+      "id": "pipeline.approval-verification-demands-head-equals-candidate",
+      "disposition": [
+        "code-present",
+        "consumer-verification"
+      ],
+      "finding": "Current Main forwards requireCurrentCandidate through answered and unavailable V2 package, host evidence, advisor-context and Codex-finalization readers. Legacy approved-package reread explicitly reads only approved package/PRD/Spec bytes, not live HEAD/private course state. Current v8/v9 architecture approval uses DAB admission and signed decision bindings.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+          "lines": "39-42, 86-119, 127-165",
+          "owner": "strict preparation flag and explicit forwarding"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+          "lines": "116, 151, 173",
+          "owner": "host readiness verification"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+          "lines": "4-5",
+          "owner": "context flag forwarding"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-readiness-finalization.mjs",
+          "lines": "102",
+          "owner": "Codex candidate flag forwarding"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+          "lines": "781-840",
+          "owner": "rereadApprovedDesignWorkflowPackage"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "lines": "214-221, 296",
+          "owner": "current DAB versus legacy approved-package route"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
+          "lines": "existing original CANDBIND controls",
+          "owner": "unexecuted in this assessment"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+          "lines": "existing original Codex CANDBIND controls",
+          "owner": "unexecuted in this assessment"
+        }
+      ],
+      "proofScope": "Current aggregate+State+Model twelve-case proof is a distinct DAB generation and does not substitute for the original legacy answered/unavailable/Codex descendant controls. Existing tests are source, not actual run receipts.",
+      "nextAction": "Recover and bind the original strict-preparation/approved-descendant negative and positive receipts to these current reader bytes. Keep hash, signature, feature, PRD/Spec and advisor exception CAS strict; no DWP route revival.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+      "disposition": [
+        "code-present",
+        "consumer-verification"
+      ],
+      "finding": "Current architecture owner returns not-required for a non-fresh-greenfield project without a materialization receipt before parsing a greenfield architecture block, while existing receipts remain validated. Entry readiness permits deferred design only after physical map/model/AGENTS checks; guard entry consumer still denies unknown/incomplete/unavailable fitness. This is an exemption with retained integrity checks.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/architecture-design.mjs",
+          "lines": "188-260",
+          "owner": "inspectArchitectureDesignMaterialization"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "lines": "264, 432",
+          "owner": "entry readiness physical checks and deferred disposition"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/entry-gates.mjs",
+          "lines": "145-186",
+          "owner": "implementation consumer and unavailable refusal"
+        }
+      ],
+      "proofScope": "Original source hotfix is recorded in the item body; installed Windows/POSIX consumer checklist is not established by current source inspection.",
+      "nextAction": "Reconcile exact original brownfield/empty/new-greenfield consumer corpus with current effective-decision/baseline/ratchet dependencies; qualify only uncovered installed/native cases. Do not duplicate the existing source exemption.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.capability-inventory-checker-is-red-at-head",
+      "disposition": [
+        "binding-only"
+      ],
+      "finding": "The checker deliberately discovers committed regular source blobs and validates an actual commit/tree baseline and inventory-only descendant. The retained original CRI10 failures were absent committed Source references, not evidence of a checker algorithm defect. Main content transfer is not a committed C0 baseline.",
+      "source": [
+        {
+          "path": "harness/scripts/check-product-capability-inventory.mjs",
+          "lines": "145-170, 249, 648-728",
+          "owner": "committed source/discovery/baseline/inventory-only checks"
+        }
+      ],
+      "proofScope": "Cause reconciliation912df records original CRI10 seven PASS/three FAIL (CRI001/003/004), absent committed Source d214/T67b. No newer actual C0/C1/checker receipt is held here.",
+      "nextAction": "After Root's lawful C0 commit/tree readback, bind inventory-only C1 to actual C0/T0 and run the remaining meaningful checker closure. Preserve committed-source semantics; no workingtree waiver/fake commit.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "disposition": [
+        "code-present",
+        "consumer-verification"
+      ],
+      "finding": "Current fresh intent requires the selected runner, persists enabled=[runner], and projects only that runner's target family. Migration passes enabledRunners into baseline/target selection and excludes .codex targets when Codex is disabled. In-memory seed data is not a materialized Codex configuration.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "lines": "938-948, 1476-1483, 5532-5580, 7280",
+          "owner": "fresh intent, selected runtime projection and restart"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+          "lines": "366-390, 692, 708-711",
+          "owner": "enabled runner baseline and targets"
+        }
+      ],
+      "proofScope": "No real installed three-host activation/native program receipt is established by this read-only assessment.",
+      "nextAction": "Bind existing Claude/Codex/Agy fresh and migration target reports to exact producer bytes and public managed surfaces. Inspect native host activation only if that original evidence remains uncovered; do not reimplement selected-runner filtering.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "disposition": [
+        "code-present",
+        "consumer-verification",
+        "native-hold"
+      ],
+      "finding": "Current Advisor/readiness/journal owners permit owned non-group/world-writable shared agent-pipeline ancestry, including an existing 0755 shared root, while duty/fingerprint/process descendants retain private-mode and physical identity CAS. They do not chmod a foreign shared namespace. Host platform support remains separately bounded.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+          "lines": "rootPaths / currentRoots",
+          "owner": "shared versus private ancestry custody"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+          "lines": "45-105",
+          "owner": "rootIdentity / materializeRoot"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+          "lines": "66-125",
+          "owner": "shared ancestry and private child custody"
+        }
+      ],
+      "proofScope": "Item body reports old focused cases/readiness six; those reported generations do not establish current installed Advisor+readiness concurrent native behavior.",
+      "nextAction": "Recover actual old focused receipts and compare their full Source generation; bind current installed shared-root identity and private-child/concurrency negatives only where uncovered. No shared-root chmod or broad directory-mode waiver.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "disposition": [
+        "binding-only",
+        "deferred-scope"
+      ],
+      "finding": "The original item explicitly marks the action needs-verification and post-0.7 automation unless recurring measured toil pulls it in. Presence of a bootstrap script alone does not establish recurring manual-only gate behavior or authorize revived scope.",
+      "source": [],
+      "proofScope": "No reproducible repeated invocation timing or typed-next-action failure series is supplied in this assigned scope.",
+      "nextAction": "Retain the original defer. If Root has an actual reproducible typed-next-action/manual-toil record, bind that record and the sanctioned bootstrap command generation before deciding current 0.7 work. No new automation source or fabricated toil metric.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.declared-system-skill-read-requires-human-override",
+      "disposition": [
+        "consumer-verification",
+        "native-hold"
+      ],
+      "finding": "Current passive-read policy permits some physically safe explicit files outside the repository, so total absence of an outside-root route would be false. That generic path is not a runtime-catalog-bound skill authority: no genuine host-owned declared-skill catalog identity/digest revalidation producer was established from the actual scope consumer. Caller paths/booleans cannot substitute for that producer.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+          "lines": "explicit outside-root physical passive file policy",
+          "owner": "bounded passive reads, secret/system denials"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/read-scope.mjs",
+          "lines": "actual public scope consumer",
+          "owner": "not a runtime skill catalog producer"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "lines": "actual read argument consumer",
+          "owner": "passive policy delegation"
+        }
+      ],
+      "proofScope": "No exact native host catalog identity/drift contract is established here; existing guard refusals are preserved and not overridden. This assessment does not claim a fabricated catalog or a general host read grant.",
+      "nextAction": "Identify the genuine selected host runtime-catalog producer and exact entry identity/digest/custody contract. Qualify exact declared-skill positive and credential/unlisted/replaced entry negatives through that owner. Keep arbitrary external paths and private material refused.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+      "disposition": [
+        "code-present",
+        "pending-source-binding",
+        "policy-conflict"
+      ],
+      "finding": "Main consumer contract check explicitly accepts baseline-only when product Verify is not configured, while the evidence producer's full-command path returns unavailable without a real product command. Current onboarding guidance allows initial design Verify to be deferred. Pending Statec28 separately classifies baseline-only and permits a deliberately configured baseline implementation route. That newer contract is not the original item's implementation-reject requirement; do not silently equate them or patch an older Main gate as if pending Source were absent.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+          "lines": "34-65",
+          "owner": "baseline-only contract and product refusal"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+          "lines": "275-314",
+          "owner": "full-command configured evidence prerequisite"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/consumer-verify.mjs",
+          "lines": "readConsumerVerifyConfiguration",
+          "owner": "null/placeholder fullCommand"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "lines": "6660, 6841",
+          "owner": "late configuration and initial design guidance"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "lines": "current Main generation",
+          "owner": "preserved current writer"
+        },
+        {
+          "path": "legacy-origin:alfred-afk-registry-plan-functional-source-20261011/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "lines": "1-26, 3544, 3605, 10642",
+          "owner": "pending Statec28 deliberately configured baseline implementation"
+        }
+      ],
+      "proofScope": "Pending Statec28/Registryd30/I03dc31 are a coupled proposed generation, not final qualification or HGO authority. No producer-evidence baseline PASS is invented.",
+      "nextAction": "Root reconciles original design-baseline/implementation-refusal clause with the explicit newer approved baseline implementation policy and pending Source owners; then bind the actual Verify evidence producer/consumer/configuration generation. Preserve genuine command execution and do not report deferred product Verify as completed.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+      "disposition": [
+        "real-code-gap",
+        "native-hold"
+      ],
+      "finding": "Current readiness custody store explicitly requires Linux, and the original V2 fixture explicitly skips native Windows with WSL guidance. Skipping removes the original native-Windows RC-12 execution; it does not supply a cross-platform custody implementation. Retiring ordinary DWP presentation does not retroactively qualify retained legacy Windows behavior.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+          "lines": "66",
+          "owner": "Linux-only physical custody precondition"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
+          "lines": "39",
+          "owner": "explicit native Windows fixture skip"
+        }
+      ],
+      "proofScope": "No native-Windows actual readiness custody receipt or unskipped RC-12 PASS is established.",
+      "nextAction": "A separately owned real Windows custody/host transport and its identity/private-store contract are required before original RC-12 can execute there. Do not remove a platform check or equate WSL with native Windows. Root resolves retained legacy acceptance scope without reviving retired DWP happy-path ceremony.",
+      "sourceProposal": null
+    },
+    {
+      "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "disposition": [
+        "pending-source-binding",
+        "consumer-verification"
+      ],
+      "finding": "Main still performs whole-repository capability comparison at consumption. Declared cumulative pending Source13e already implements v4 native Edit/Write sorted exact physical target preimages and reclassification before excluding only statusSha256; HEAD/tree/state/policy/plugin/input/denials/expiry/replay remain bound. Legacy v3, Bash, plugin installs and apply_patch remain strict. This is pending source integration and original matrix coverage, not a missing implementation to duplicate.",
+      "source": [
+        {
+          "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+          "lines": "4328, 4388-4445",
+          "owner": "current Main whole-repository consume"
+        },
+        {
+          "path": "legacy-origin:alfred-hgo-denial-reason-validation-source-20261010/postimages/plugins/pipeline-core/lib/human-guard-override.mjs",
+          "lines": "2115-2222, 3494-3500, 4598-4626",
+          "owner": "pending v4 target-preimage producer and consumer"
+        },
+        {
+          "path": "legacy-origin:alfred-hgo-native-action-preparation-source-20261010/api-contract.json",
+          "lines": "nativeVersions and legacy/disclosure scope",
+          "owner": "exact original pending v4 contract"
+        }
+      ],
+      "proofScope": "Retained original HGO10 ran nine PASS/one HGS003 FAIL; corrected Source13e focused HDN001-004/HGS003 five PASS is denial/policy-drift scope, not the original disjoint-action matrix or native rehearsal/Human ceremony. No current joint disjoint-action acceptance is borrowed.",
+      "nextAction": "Preserve cumulative Source13e while UNKNOWN02/03 owners add their distinct rehearsal/disclosure/index work. Bind the actual v4 disjoint-target/target-drift/ancestor/HEAD/state/policy/plugin/input/replay matrix and legacy serial-dependency disclosure in its final generation. No apply_patch/native-engine grant.",
+      "sourceProposal": null
+    }
+  ],
+  "proofReferences": [
+    {
+      "path": "legacy-origin:alfred-capability-registration-independent-20261010/cause-reconciliation/manifest.json",
+      "sha256": "912dfc2ee4f814f85f760a4b88cc3783bc40c39db2cef8560cbe1435e5d60ed5",
+      "scope": "retained CRI10 absent committed Source cause, not current C0"
+    },
+    {
+      "path": "legacy-origin:alfred-hgo-denial-reason-validation-source-20261010/manifest.json",
+      "sha256": "c78e0ea0d03fc5e7f9f9e906d4d58f618fcc009419d38fd8fc6349b60a422448",
+      "scope": "cumulative pending13e source-only manifest; later focused Root qualification distinct"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/aggregate-joint-state-model-generation-20261011/public-actual-proof.json",
+      "sha256": "1becd6f257db5faf46d60ac0ee1f0aabfd6a4a763e38c2739ca313816d4628f1",
+      "scope": "twelve original DAB/State/Model/EFC controls, not legacy descendant/Windows/HGO/native cases"
+    }
+  ],
+  "limits": [
+    "All twelve original requirements/clauses/remainders remain the normative assigned scope; current body drift is a new observation.",
+    "Main150 and pending protected Source are compared separately; no absent Main leaf automatically means absent implementation.",
+    "No item acceptance/stage promotion, business run, test execution, product import, Main/Audit write, Git command, additional Critic, native/Human claim or new signing ceremony.",
+    "M1 host-first; M2/M3 report-only; one full Critic plus one correction diff; normal Chat with one Design and one Push signature preserved.",
+    "Nightwing/Batman and original deferred/post-0.7 work remain outside this assessment's implementation scope."
+  ]
+}

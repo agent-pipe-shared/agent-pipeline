@@ -1,0 +1,12 @@
+{
+  "schema": "alfred.passive-invalid-auxiliary.proof-lineage.v1",
+  "originalPreparationManifestSha256": "851eb0d07ffa1acd0d19a0c0bf78881ed0273e1f6c7da4b4b778f945a5c76b07",
+  "scopedPreparationManifestSha256": "924c0c53c2d30cd958bf296697d0be82b02d351ae50aecf73bac935ce4114d6c",
+  "capturePreparationManifestSha256": "21149df66e3f847835a043e85fc7bc228938076adfae5dcb103bac9f8b5a5650",
+  "retainedValidationSha256": "2c09207793b7b7440eb4ed01ad90e085122bc5a4eda037a721244d0cf963cc9a",
+  "actualPCF36ExecutionSha256": "04cbc1756195dd2c755f2685617c45b1670d68ab9e6944ecf13fb3a42b064069",
+  "originalPCFTestSha256": "696e847de64e5f99fc3c2289f068d9041902d40cd5c3ff7a9b253d7aec3ff049",
+  "originalPolicyTestSha256": "e79a476c89acebe3942bcf078df6787c7d9e80b7bc020899b17521e9ecb59891",
+  "independentTestSha256": "a4ee6d5c7a55c9ee8c85e8affd80c0830a7f0a5641c7c6079b3328f59b784945",
+  "sourceConserved": true
+}

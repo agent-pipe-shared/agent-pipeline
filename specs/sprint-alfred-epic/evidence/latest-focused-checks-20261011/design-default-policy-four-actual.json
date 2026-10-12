@@ -1,0 +1,69 @@
+{
+  "schema": "alfred.design-route-original-four-public-proof.v1",
+  "status": "qualified-controlled-source-original-four",
+  "executor": "Root",
+  "actualReceiptSha256": "b935b307fedcfec3874e47a51a9062b9e4e8f6816f884ffa7c43e328b0b52c6b",
+  "caseIds": [
+    "DABR001",
+    "DABR002",
+    "DABR003",
+    "DABR004"
+  ],
+  "completion": {
+    "sha256": "8086ff56e2ea75f7d1ef63870d8f7546f319a7650c83e0112784db0f72a5945f",
+    "bytes": 1037,
+    "attestation": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "48e95ba18ffad596c5234c22c6e550520b76e6aeb75d0e96839a833a6ee0257f",
+      "caseSetSha256": "2cb9a7989f518efcd578961bd985262c54c4dda412c5da23bdc05e651fc4052c",
+      "dispositionsSha256": "35052ba69da96175338c2227e6e60e78de40ace6ae51326972f26c9be153e5bf",
+      "declaredCount": 4,
+      "disposedCount": 4,
+      "counts": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  },
+  "child": {
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  "timedOut": false,
+  "errors": {
+    "lifetimeError": null,
+    "operationError": null,
+    "restorationError": null,
+    "conservationError": null,
+    "parseError": null
+  },
+  "sourceRestored": true,
+  "sourceCorrection": {
+    "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "parentSha256": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9",
+    "postSha256": "b522a46fed19ed6c471ef44b7ea45ecff9146e9a0f211bc1c35b99d07c53ab94",
+    "meaning": "Present default-key policy requires original committed/current bytes equality; actual file absence retains original candidate absence check."
+  },
+  "scope": {
+    "originalFourAssertionsPreserved": true,
+    "genuineSourceOwnedAll12AndRouteBinding": true,
+    "syntheticMethodFixture": true,
+    "fixtureLocalSyntheticHomeAndGitIsolationRetained": true,
+    "outerRuntimeEnvironmentInherited": true,
+    "signatureProof": "synthetic disposable Node crypto proof; attended sign-intent not exercised",
+    "native": false,
+    "wholeHumanChatFlow": false,
+    "mainIntegration": false,
+    "formalAcceptance": false,
+    "officialFourteenQualified": false,
+    "tenCompatibilityCasesQualifiedByThisProof": false
+  },
+  "separateRequirements": [
+    "Ten original compatibility/retirement callbacks require their own actual evidence or full candidate Verify.",
+    "Installation, architecture questions/chat tiles, attended design/push signing and native host course are not qualified by these four cases."
+  ]
+}

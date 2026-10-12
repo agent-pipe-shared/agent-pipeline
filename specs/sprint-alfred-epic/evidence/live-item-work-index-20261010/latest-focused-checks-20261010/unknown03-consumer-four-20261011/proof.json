@@ -1,0 +1,94 @@
+{
+  "schema": "alfred.unknown03.focused-four-public-proof.v1",
+  "date": "2026-10-11",
+  "status": "Root-executed-controlled-four-PASS",
+  "cases": [
+    {
+      "id": "U03I001",
+      "disposition": "pass"
+    },
+    {
+      "id": "U03I002",
+      "disposition": "pass"
+    },
+    {
+      "id": "U03Q001",
+      "disposition": "pass"
+    },
+    {
+      "id": "U03Q002",
+      "disposition": "pass"
+    }
+  ],
+  "result": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "0abd78db2e40a2bf3effe3e97a686c8413b40ec68d40bd0e3c6e7b178e88dede",
+    "caseSetSha256": "ed03ea8f86739dc6d64a90cdff8364608c50608eeeb16c5d0116cfd33a451f79",
+    "dispositionsSha256": "116003695bf931d9656ce998d55bfd99c754629067195a0b24dbb7e52d3761d2",
+    "declaredCount": 4,
+    "disposedCount": 4,
+    "counts": {
+      "pass": 4,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "sourceConserved": true,
+  "secureAncestryConserved": true,
+  "resourceCount": 368,
+  "execution": {
+    "receiptSha256": "dd37103939383c0a3f75a744561a8f29c32cdcd891d6dd87955f5860ee7fea1b",
+    "qualificationFreezeSha256": "c00505ea829fb8294fb9db570da06fc8ca5cfae4392091edab80d7855cafbd22",
+    "completionSha256": "3707f598f88ee7d37d54d8af4ca62bb87cdd1d6d44a66bb52bb7a126bf66330c",
+    "completionBytes": 1037,
+    "stdoutSha256": "f0de833399e16d2e1f85bf7f482494e6aaa000ad9dab8944800a1e45f8d0a1d8",
+    "stdoutBytes": 52,
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrBytes": 0,
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  "qualifiedSources": [
+    {
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "sha256": "d6d7c7ece9a82d50772e9b210f35f7c45ff99298ad301e2a295407d671c363bc",
+      "scope": "actual pure descriptor and intent/refusal inputs; includes Design prepare-commit source without qualifying that producer"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+      "sha256": "952d25835426316bd0791d885b728f1c9de0d9884a94d139e78170218db842ac",
+      "scope": "actual public installer, real synthetic Git prerequisite, actual artifact fsync/readback, foreign-hook refusal"
+    }
+  ],
+  "selectedDependencies": {
+    "sourceManifestSha256": "9cff6e06321f48a19643dc7c32b26875789ff5e6d50c6c02b9099bc3407d04ad",
+    "resourceFreezeSha256": "2535b6ba99cce5562eae03e65f304dc9bdd0445896f3aa52d0bcf7723ca051c4",
+    "HGO": "13e022b43fb4000fe3e1e353ecef3e9169dbf8d09727c1d744de7dce6189552c",
+    "WindowsProvider": "1641060677e797b87ef4b4adecb299c184e4f14c5e267f0692dc3bf0468a8b0b",
+    "State": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9",
+    "meaning": "Root-declared Notes365 private generation; no historical371 forest replacement and no whole Main generation proof."
+  },
+  "holds": [
+    {
+      "ids": [
+        "U03P001",
+        "U03P002"
+      ],
+      "reason": "Genuine current PO ceremony constructor not yet closed; no Human signature/approval inferred."
+    },
+    {
+      "ids": [
+        "U03H001"
+      ],
+      "reason": "Authentic current HGO emit/index producer course not yet qualified."
+    }
+  ],
+  "history": "Earlier metadata staging failures preserved privately. No preceding semantic consumer4 failure or retry; this exact four-case launcher was consumed once.",
+  "authorship": "Source proposal author also authored these controlled consumer regressions; independent Critic remains separate.",
+  "nativeClaims": false,
+  "itemAcceptance": false,
+  "humanAuthorization": false
+}

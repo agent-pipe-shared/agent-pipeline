@@ -1,0 +1,84 @@
+{
+  "schema": "alfred.original006.actual-controlled-pass-proof.v1",
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "caseId": "FULLSTATE006",
+  "status": "actual-pass",
+  "executionSha256": "269018af279ead2f41897fd60b638eeb8a0bbb0fdc86e3340455dde13f7faca2",
+  "complete": true,
+  "counts": {
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "captures": {
+    "stdout": {
+      "sha256": "3467a8d3cd8454cf792f63dcd2a0b08d00c9c8418de7ee61ee9a42203b724150",
+      "bytes": 250
+    },
+    "stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "fd3": {
+      "sha256": "192d334c72c326be7cb46f0667f62341f6f7fd243d5baf622afc838adf5029ee",
+      "bytes": 653
+    }
+  },
+  "sourcePins": {
+    "graph/plugins/pipeline-core/scripts/pipeline-state.mjs": "5d34764b753cdd50eefabe37f7bacb1ff92f1d3e4d09dbc641dd155b64d46c7c",
+    "graph/plugins/pipeline-core/lib/onboarding-continuity.mjs": "8667ebc4c0dab7679a5a2fe0ae5f09198f56a6c56135ad8a03c924b7cb43b9bf",
+    "graph/plugins/pipeline-core/lib/session-authority-registry.mjs": "7a8a368157153c8b723c55c19a3f840c19201483e56197e3bfe5d2e7aecf9a96",
+    "graph/plugins/pipeline-core/lib/session-authority-domain-owner.mjs": "138784269c2c38a6ded176c3363c30a26635cfef56136dbef1414c8549dcdd4d",
+    "graph/plugins/pipeline-core/lib/design-decision-bindings.mjs": "1821d8ef017a9e2d691aaa19aed944426ecd197ef6aa5b8a16a202c77343aa31",
+    "state-owner.fixture.mjs": "30a9145330b3a20ba598c768adab278dbf584edf6e03a448d8f82be58ed0e7c9"
+  },
+  "sourceGenerationSha256": "4f7cb9288716707c3cc432080e5e10a440611e0211a3b92d4f253edb2d0c8247",
+  "fixtureGenerationSha256": "1f9fdc8ff8fdaf21e58196af75245b928cbd8dceba8cf91289b6892bd963c9be",
+  "independentRepairNormSha256": "b9d88a430c85618a3635c4858b97ad0c7141b42cbaa4a0973aad097e189c7aff",
+  "fixturePrerequisiteNormSha256": "33d5ac02da347b6562be4edc9e92e848b9514a55794345aef3f4f0c23cd1c91d",
+  "unchangedCallbackSha256": "f0017f8b5b4590f39e6ef21cb8132193907a3d119493243a40b5320a67a396ce",
+  "scope": "One genuine controlled original approval course and canonical accepted-contract readback through the unchanged FULLSTATE006 assertions. Canonical lifecycle registration is fixture setup after real successful approval; production reader gates remain unchanged.",
+  "conservation": {
+    "selectedResourceCount": 443,
+    "source": true,
+    "runtime": true,
+    "originalI03SameInodeModeBytes": true,
+    "originalRegistrySameInodeModeBytes": true,
+    "originalFixtureSameInodeModeBytes": true
+  },
+  "history": [
+    {
+      "executionSha256": "88ea8017e724d5a74dd90a95b9a1b874f9a24263368147357d192cf1b1d798a2",
+      "meaning": "Earlier clean189d original006 failed."
+    },
+    {
+      "executionSha256": "738f489dd95dd2c0fbfe95b2cfb87f43ffcf6939e813757954f3a61330bf140d",
+      "meaning": "Diagnostic run failed with original-member-change origin; not a product qualification."
+    },
+    {
+      "executionSha256": "95e8e3d2ca8982ad1726b486d70d484cb40a80d9bd75adea3290d8f9f8435bb2",
+      "meaning": "Clean Source2 approval progressed; final accepted-contract reader failed because the fixture lacked canonical lifecycle registration."
+    }
+  ],
+  "priorPassesRetained": [
+    "FULLSTATE001",
+    "APLOCK001",
+    "APLOCK002"
+  ],
+  "priorPassesRerun": false,
+  "heldCases": [
+    "APLOCK003",
+    "APLOCK004",
+    "APLOCK005",
+    "APLOCK006",
+    "APLOCK007",
+    "APLOCK008"
+  ],
+  "authenticatedTicketControls": "Requirements remain; authentic callback capture constructor not yet supplied.",
+  "nativeAssurance": false,
+  "itemAcceptance": false,
+  "full26Qualified": false,
+  "rawPrivatePathsOrLogsExported": false,
+  "authorBusinessRuns": 0
+}

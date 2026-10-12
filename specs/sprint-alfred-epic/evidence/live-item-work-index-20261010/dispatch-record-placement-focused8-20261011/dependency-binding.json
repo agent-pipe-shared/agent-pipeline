@@ -1,0 +1,88 @@
+{
+  "schema": "alfred.dispatch-placement.public-dependency-binding.v1",
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs",
+    "parentSha256": "c90e1be45723b44bfe8fa7a0276004e93aea2b43172f806b39ee70d7bf1174b7",
+    "qualifiedPostSha256": "da07ae3df3663af4b8ec1a85189eb4f5ba3b7e5be4c8295862bfe0e42f40b9d3",
+    "exactSplices": 4
+  },
+  "donorGraphSha256": "be9016af244cb0aea22ca52658d53587cfcce621fc828c00eda10b8355ec04e3",
+  "resourceCount": 609,
+  "unchangedDirectPublicDependencies": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+      "bytes": 117511,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+      "bytes": 39560,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+      "sha256": "8ff391187571c8bbedb1c18117dea8c973878f49f047f02b07c081c50a458cf5",
+      "bytes": 31343,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/dispatch-record.mjs",
+      "sha256": "f1a4e43424983a86bb75015377f123658f9fe26d4f7d136e1d15f4b8f7f64f52",
+      "bytes": 20787,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+      "bytes": 118731,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/verdict.mjs",
+      "sha256": "927862f40f81593494a27578e89a5df64338d136b67fb850179b07effffda7da",
+      "bytes": 3338,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/bootstrap-receipt.mjs",
+      "sha256": "7a0f39e1627bd336e68123c50104b615f7538daadd0950e37b25bddd9289f0d3",
+      "bytes": 10229,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "sha256": "e87ee9b834c2f17cfbfbda90400e9962bbb197abf50fe1dcd93c61303b429e91",
+      "bytes": 32938,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/test-case-completion.mjs",
+      "sha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "bytes": 10816,
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+      "sha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+      "bytes": 5517,
+      "mode": 420
+    }
+  ],
+  "selectedLeafImportsUnchanged": true,
+  "newSourceModules": 0,
+  "forestCopy": false,
+  "actual609Conservation": true,
+  "retainedOriginalCallbacksSha256": "31ce9dec018435b9be4690bc2c7efe93de7bf9c7e759053d56999090a14b92d2",
+  "retainedOriginalFixturesSha256": "ecfe6bb66a26a87dc210818c641e97850bc2bd1bb7ab086df8640d88095b86e8",
+  "limits": {
+    "methodOnly": true,
+    "nativeHostClaim": false,
+    "topLevelGovernedDirectWriteProven": false,
+    "wholeItemAcceptance": false,
+    "templateMirrorOrHistoricalMigrationProven": false,
+    "protectedIntegrationAuthorization": false,
+    "priorWholeLDO12Replayed": false
+  }
+}

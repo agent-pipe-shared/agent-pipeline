@@ -1,0 +1,253 @@
+{
+  "schema": "alfred.passive-consumer-qualification.v1",
+  "phase": "original-red",
+  "preparationOnly": true,
+  "native": false,
+  "platform": "linux",
+  "sourceUnchanged": true,
+  "postimage": {
+    "path": "scratch/alfred-postinstall-whole-items-20261011/passive-read-consumer-delivery/postimages/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+    "sha256": "3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6",
+    "mode": 420,
+    "bytes": 21131
+  },
+  "results": [
+    {
+      "id": "no-heading",
+      "command": "rg --no-heading needle docs/state.md",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "short-max",
+      "command": "rg -m 2 needle docs/state.md",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "combined-flags",
+      "command": "rg --no-heading -n -m 2 needle docs/state.md",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "repeated-short-globs",
+      "command": "rg -n needle -g \"*.md\" -g \"*.js\" docs",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "repeated-long-globs",
+      "command": "rg --glob \"*.md\" --glob \"*.js\" needle docs",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "mixed-globs",
+      "command": "rg -g \"*.md\" --glob \"*.js\" --no-heading -m 2 needle docs",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "repeated-files-globs",
+      "command": "rg --files -g \"*.md\" -g \"*.js\" docs",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "bounded-max",
+      "command": "rg -m 500 needle docs/state.md",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "rg-pipeline",
+      "command": "rg --no-heading -m 2 needle docs/state.md | head -n 1",
+      "expected": true,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": false
+    },
+    {
+      "id": "duplicate-no-heading",
+      "command": "rg --no-heading --no-heading needle docs/state.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "unbounded-max",
+      "command": "rg -m 501 needle docs/state.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "negative-max",
+      "command": "rg -m -1 needle docs/state.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "noncanonical-max",
+      "command": "rg -m 02 needle docs/state.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "missing-max",
+      "command": "rg -m",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "pre",
+      "command": "rg --pre cat needle docs/state.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "follow",
+      "command": "rg --follow needle docs/state.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "hidden",
+      "command": "rg --hidden needle docs",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "no-ignore",
+      "command": "rg --no-ignore needle docs",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "hidden-glob",
+      "command": "rg -g \"*.md\" -g \".hidden*\" needle docs",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "path-glob",
+      "command": "rg -g \"*.md\" -g \"docs/*.js\" needle docs",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "exclude-glob",
+      "command": "rg -g \"*.md\" -g \"!excluded.md\" needle docs",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "any-glob",
+      "command": "rg -g \"*.md\" -g \"*\" needle docs",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "credential",
+      "command": "rg --no-heading -m 2 needle .env",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "credential-key",
+      "command": "rg --no-heading -m 2 needle docs/po-private.pem",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "traversal",
+      "command": "rg --no-heading -m 2 needle ../outside.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "output",
+      "command": "rg --no-heading -m 2 needle docs/state.md > out.txt",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "substitution",
+      "command": "rg --no-heading -m 2 \"$(id)\" docs/state.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "backtick",
+      "command": "rg --no-heading -m 2 \"`id`\" docs/state.md",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    },
+    {
+      "id": "execution",
+      "command": "rg --no-heading needle docs/state.md ; touch out.txt",
+      "expected": false,
+      "originalAdmitted": false,
+      "admitted": false,
+      "passed": true
+    }
+  ],
+  "retainedGitHeadIntegration": [],
+  "realRg": [],
+  "passed": 20,
+  "failed": 9,
+  "priorFourPAIReplayed": false
+}

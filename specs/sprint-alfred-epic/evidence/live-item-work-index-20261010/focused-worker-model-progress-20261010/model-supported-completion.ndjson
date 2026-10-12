@@ -1,0 +1,5 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["I08T001","I08T002","I08T010-LOST-PIN-CONTROL"],"caseCount":3,"caseSetSha256":"95a97140023d3b1951f1f2c3da1ffe75f211f784c2e52fdc1dc1311638c6a835"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"I08T001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"I08T002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"I08T010-LOST-PIN-CONTROL","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":3,"disposedCount":3,"caseIds":["I08T001","I08T002","I08T010-LOST-PIN-CONTROL"],"caseSetSha256":"95a97140023d3b1951f1f2c3da1ffe75f211f784c2e52fdc1dc1311638c6a835","dispositionsSha256":"eb83e8dc1b2b3452d5945e90cd8617bcccf08b507266395f0f49912f48816930","counts":{"pass":3,"fail":0,"skip":0,"todo":0}}

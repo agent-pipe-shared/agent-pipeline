@@ -1,0 +1,20 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "LSP001",
+    "LSP002",
+    "LSP003",
+    "LSP004",
+    "LSP005",
+    "LSP006",
+    "LSP007",
+    "LSP008",
+    "LSP009",
+    "LSP010",
+    "LSP011",
+    "LSP012",
+    "LSP013",
+    "LSP014"
+  ],
+  "maxBytes": 65536
+}

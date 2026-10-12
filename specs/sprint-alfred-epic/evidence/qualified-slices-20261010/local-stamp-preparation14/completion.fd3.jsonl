@@ -1,0 +1,16 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["LSP001","LSP002","LSP003","LSP004","LSP005","LSP006","LSP007","LSP008","LSP009","LSP010","LSP011","LSP012","LSP013","LSP014"],"caseCount":14,"caseSetSha256":"870990007d1ebe707a5cd214087c98256743422beabb40b33ea5f46854d2453a"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP003","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP004","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP005","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP006","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP007","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP008","ordinal":7,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP009","ordinal":8,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP010","ordinal":9,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP011","ordinal":10,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP012","ordinal":11,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP013","ordinal":12,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"LSP014","ordinal":13,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":14,"disposedCount":14,"caseIds":["LSP001","LSP002","LSP003","LSP004","LSP005","LSP006","LSP007","LSP008","LSP009","LSP010","LSP011","LSP012","LSP013","LSP014"],"caseSetSha256":"870990007d1ebe707a5cd214087c98256743422beabb40b33ea5f46854d2453a","dispositionsSha256":"11e11996664b10d7f0b553462620d41dcb8381bb32368a584180dbf6754475bb","counts":{"pass":14,"fail":0,"skip":0,"todo":0}}

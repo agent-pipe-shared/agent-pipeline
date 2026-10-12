@@ -1,0 +1,36 @@
+✖ single command applies stages authorizes without commit and retains exact scope (85.915437ms)
+✔ single command refuses forged-proof without effects (35.445981ms)
+✔ single command refuses dirty-tree without effects (35.770939ms)
+✔ quality disclosure resolves kind and exact digest scope and rejects mismatched intent (22.387994ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 229.56853
+
+✖ failing tests:
+
+test at scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package-whole-item-private.test.mjs:36:1
+✖ single command applies stages authorizes without commit and retains exact scope (85.915437ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'QUALITY-PACKAGE-BASE-DRIFT'
+  - 'QUALITY-PACKAGE-COMMIT-PREPARED'
+                     ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/wave-b-signed_quality/postimages/plugins/pipeline-core/lib/signed-quality-package-whole-item-private.test.mjs:36:269)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'QUALITY-PACKAGE-BASE-DRIFT',
+    expected: 'QUALITY-PACKAGE-COMMIT-PREPARED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

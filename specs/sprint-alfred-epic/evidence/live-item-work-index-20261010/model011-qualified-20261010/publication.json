@@ -1,0 +1,26 @@
+{
+  "schema": "alfred.model011.root-publication.v1",
+  "status": "copied-and-read-back",
+  "files": [
+    {
+      "path": "proof.json",
+      "sha256": "5fb8c80cac9d9c4483aa80a669ee5942f28efaf8b17bdd45e7c19e889c8cd79a",
+      "bytes": 3385
+    },
+    {
+      "path": "source-bindings.json",
+      "sha256": "c0cbbb0f4785c6fb9fe8b1d26c74d113fd8d1479d3ac5b97a782e7ae4a6457c0",
+      "bytes": 2820
+    },
+    {
+      "path": "completion.ndjson",
+      "sha256": "51cf88ca3afc591693f4d6c722d3ee3afd794d1867ff3e92200a30ddfc669fe6",
+      "bytes": 638
+    }
+  ],
+  "sourceApplied": false,
+  "itemStagePromotion": false,
+  "itemAccepted": false,
+  "businessReruns": 0,
+  "scope": "One original I08T011 and six observations; controlled method only. Source dependencies are not separately qualified Power behavior."
+}

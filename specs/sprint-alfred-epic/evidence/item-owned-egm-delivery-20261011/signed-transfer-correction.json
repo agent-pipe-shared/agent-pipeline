@@ -1,0 +1,23 @@
+{
+  "schema": "alfred.signed-transfer-correction.v1",
+  "firstIntentSha256": "1ed119963f4fffe8e6fb65ca38800a53a89fb5d920c2ba78410ccfcebb26e1d0",
+  "firstProofVerified": true,
+  "first144DigestsAndSignedGitModesVerified": true,
+  "firstCandidatePreserved": true,
+  "firstCommitPerformed": false,
+  "helperDefect": "install-agy.mjs helper expected644 instead of signed Git755; corrected helper now binds actual manifest gitMode",
+  "commitBlocker": "OG-DOC-UNCLASSIFIED for four prior accepted ADR0086/0087 files",
+  "correction": "four entries inserted in existing maintainer/normative-record document inventory; all other143 postimages unchanged",
+  "paths": 144,
+  "extraPathClaimCorrected": "Inventory file was already in the original144; only its content changes, no new path.",
+  "correctedIntentSha256": "7b47fe1e4cbc31e4d5823ddf9131df406796f022d5cbf46192e54c17c30b7201",
+  "correctedRequestSha256": "61570d23c7a3d34e32dbb2cb503a2141efc319a0014c732f916815b9cc195464",
+  "correctedCompositionManifestSha256": "cabde395beaa9e3bf8da6dae6e6bd4f0a7c3222d87a510530a8b6155fc203a47",
+  "hostReadonlyHelperCheckPassed": true,
+  "proposedDocumentClassifierFindings": 0,
+  "actualFutureStagedCommitStillRequired": true,
+  "hookBypassPerformed": false,
+  "newHumanSignatureRequired": true,
+  "correctedHelper": "scratch/alfred-egm-operating-optimization-20261011/attended-local-egm-doc-registered/run-attended.sh",
+  "fullVerifyDeferredForLocalCandidate": true
+}

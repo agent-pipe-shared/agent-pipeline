@@ -1,0 +1,85 @@
+{
+  "schema": "alfred.prepared-custody-assembly-supplement.v1",
+  "status": "prepared-not-applied-not-reviewed-not-accepted",
+  "parentReadback": {
+    "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.77136e4766b5d389de01c9d77ed66f70c32bffee3cf2567d92fe96c21969c7e3.json",
+    "sha256": "77136e4766b5d389de01c9d77ed66f70c32bffee3cf2567d92fe96c21969c7e3",
+    "mode": "0644",
+    "bytes": 72573
+  },
+  "scope": "Optional scope-v3 administrative assemblyv2 supplement; prior capsules immutable",
+  "artifacts": [
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-batch-assembly/manifest-v2.json",
+        "sha256": "a01548a65cf0e30b7f9e5897501b11e5120d614d36e7c9513d99e80dbf867c33",
+        "bytes": 219626,
+        "mode": "0644"
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-assembly-v2/objects/844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5.json",
+        "sha256": "844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5",
+        "bytes": 175149,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5.json",
+        "sha256": "844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5",
+        "bytes": 175149,
+        "mode": "0644"
+      }
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-batch-assembly/report-v2.md",
+        "sha256": "907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34",
+        "bytes": 4660,
+        "mode": "0644"
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-assembly-v2/objects/907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34.md",
+        "sha256": "907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34",
+        "bytes": 4660,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34.md",
+        "sha256": "907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34",
+        "bytes": 4660,
+        "mode": "0644"
+      }
+    },
+    {
+      "original": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-batch-assembly/collision.json",
+        "sha256": "2861c2243d8bfaee50f57afed94b7ab8153617cd0d2d1d31a1c245ae1c808854",
+        "bytes": 1819,
+        "mode": "0644"
+      },
+      "prepared": {
+        "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-assembly-v2/objects/10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1.json",
+        "sha256": "10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1",
+        "bytes": 1663,
+        "mode": "0644"
+      },
+      "copy": {
+        "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1.json",
+        "sha256": "10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1",
+        "bytes": 1663,
+        "mode": "0644"
+      }
+    }
+  ],
+  "conservation": "Exact sanitized prepared-to-canonical SHA/bytes/mode; raw input identities retained",
+  "collision": "Strict examiner onboarding pin6077ccde differs from selected compactioncd4f6f33; same-owner composed-graph qualification remains held; aca5 thirteen-control version stays separate.",
+  "qualification": "No tests executed. Assembly source hashes are administrative readbacks, not integration/whole-candidate qualification.",
+  "exclusions": [
+    "Host prefixes and private owner/fixture identity fields removed; no original requirement bodies, keys, signing material, transcripts or environment dumps copied."
+  ],
+  "sourceApplied": false,
+  "committed": false,
+  "productiveAdmission": false,
+  "nativeProof": false,
+  "reviewAccepted": false,
+  "acceptance": false
+}

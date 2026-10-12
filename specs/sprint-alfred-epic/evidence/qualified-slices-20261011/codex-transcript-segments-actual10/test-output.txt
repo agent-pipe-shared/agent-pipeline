@@ -1,0 +1,18 @@
+✔ CSR001 actual Codex payload.id authenticates one segment with unchanged bytes (4.657219ms)
+✔ CSR002 same-session/project segments merge in explicit storage order (2.999817ms)
+✔ CSR003 unterminated segment receives only the separator needed for JSONL concatenation (2.953567ms)
+✔ CSR004 wrong session never selects a matching project file (1.946591ms)
+✔ CSR005 current session is excluded even when explicitly requested (1.880161ms)
+✔ CSR006 foreign project metadata cannot authenticate a same-ID segment (1.924762ms)
+✔ CSR007 conflicting session metadata stays unavailable rather than guessing identity (1.915052ms)
+✔ CSR008 symlink member is excluded and never read as a session (2.24813ms)
+✔ CSR009 hardlinked segment refuses full-read physical membership (2.10948ms)
+✔ CSR010 list remains bounded metadata projection and foreign runner capability unavailable (5.623125ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32.312366

@@ -1,0 +1,90 @@
+{
+  "schema": "alfred.original20.reviewed-audit-manifest.v1",
+  "status": "reviewed-read-only-audit-complete-not-acceptance",
+  "parentManifest": {
+    "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/manifest.json",
+    "sha256": "a9560c70c14af117c62d8f2fb2e2476a173f07abb51b84b2d6cb616d235f438a"
+  },
+  "assignment": {
+    "path": "legacy-origin:alfred-176-remaining-fanout-20261010/alfred_optional_advisor_source_followthrough.json",
+    "sha256": "5de9465577a0d25b8a127d5a56113b95bf49a1ffa62da79344fe08ab4a45b41c"
+  },
+  "appliedSourceManifest": {
+    "path": "legacy-origin:alfred-agy-managed-topology-row-boundary-successor-20261010/actual-source-manifest.json",
+    "sha256": "2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381"
+  },
+  "appliedSourceCount": 146,
+  "proposed164Applied": false,
+  "artifacts": [
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/reviewed-successor/criterion-source-matrix.json",
+      "sha256": "bb0c1789707e3281020bc4f054869bbfcdeff1ad603711410bfc853498aace0b",
+      "bytes": 621958,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/reviewed-successor/static-conservation.json",
+      "sha256": "3f1bc916f50b90af82d1703ed621ad1a535ed3b241b76a84daad738ae0982f37",
+      "bytes": 11950,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/reviewed-successor/report.md",
+      "sha256": "46fe721f10cc863453afc868505d6692e42b8f6862123818c133f6332674e181",
+      "bytes": 9525,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-176-next-advisor-audit-20261010/finalize-reviewed-audit.mjs",
+      "sha256": "3a7072a39d4362905643aa346e98a03d775b950f2d9af972b906124d485886c7",
+      "bytes": 12513,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "itemCount": 20,
+  "clauseCount": 104,
+  "sourceCount": 32,
+  "proofReadbacks": [
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p16-actual16/actual-qualification-proof.json",
+      "sha256": "6de31c75a81ee135ca8bffa4190307566739e2cd46669fae574a8048ad65e0be",
+      "bytes": 7057,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p7-ordinary10/public-proof.json",
+      "sha256": "1f4ad15f63eb182e930e34151578c315281bac2a8e3abddda8e5484c2ab05927",
+      "bytes": 2044,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22/case-associations.json",
+      "sha256": "ea27c7d6dc8bc57dd91cb7c542dbdfd9a3af56ccfc481faa102560713c6114ed",
+      "bytes": 3290,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22/assertions.mjs",
+      "sha256": "c01e40cab9437f9ad889970ef7fe6d52428c05e80016775eb53590195b2f7aaf",
+      "bytes": 10842,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "originalBodyConservation": 20,
+  "p16TextualSeamsExact": true,
+  "p7TextualFunctionsExact": true,
+  "semanticExecutions": 0,
+  "gitCommands": 0,
+  "sourceEdits": 0,
+  "acceptance": false,
+  "nativeQualification": false,
+  "next": "Tracking worker consolidates reviewed matrix; Root owns remaining qualification/source/policy tasks. Parent initial manifest preserved."
+}

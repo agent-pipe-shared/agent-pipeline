@@ -1,0 +1,146 @@
+{
+  "schema": "alfred.rhh11-qualification-manifest.v1",
+  "status": "closed-actual11PASS-report-only-method",
+  "actualExecution": {
+    "path": "execution.json",
+    "sha256": "c075f79d13c4b4e43a5e272fe0b8ed095499b128eed7e0e35cac64f008914fb4",
+    "bytes": 1536,
+    "mode": 384,
+    "nlink": 1
+  },
+  "actualFD3": {
+    "path": "qualification/completion.fd3.jsonl",
+    "sha256": "9beee9089b879f0db65ca7c5d81937c7de78447d6a385108bb922afb70aee666",
+    "bytes": 1940,
+    "mode": 384,
+    "nlink": 1
+  },
+  "productionParsedCompletion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "4b8ccf946de4f46b8e99edbea31e47e60b501698186f491c97339d481c546cfa",
+    "caseSetSha256": "8620715cbe51c6bdf45142e8a659dbaa990f41be0309bc7f0d941a53e5ba405d",
+    "dispositionsSha256": "c79fa95f23decd90007890b0c95515256e4dc08b9567dc441e8c14f7390e5feb",
+    "declaredCount": 11,
+    "disposedCount": 11,
+    "counts": {
+      "pass": 11,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "sourceManifest": {
+    "path": "legacy-origin:alfred-claude-resource-headroom-source-20261010/manifest.json",
+    "sha256": "106d74bed88adebd9e2c603a8f3a0560c5232968c2da9132efedab3d5b83bff8",
+    "bytes": 6803,
+    "mode": 420,
+    "nlink": 1
+  },
+  "sourceFreeze": {
+    "path": "legacy-origin:alfred-claude-resource-headroom-source-20261010/source-freeze.json",
+    "sha256": "4746ee477b3958da9b9d998bc01f670ff2e8ddb4e8cced25c861d74aef30cef4",
+    "bytes": 1638,
+    "mode": 420,
+    "nlink": 1
+  },
+  "outputs": [
+    {
+      "path": "case-associations.json",
+      "sha256": "076ce5a9d305facc7995c93917a062f98ef83c0f5dc276dfaf96bac892a26d8c",
+      "bytes": 4652,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "focused-method-receipt.json",
+      "sha256": "56016d47fd6c3cac59401e5937028ccab3343196ebeb613fbe75599691d5f49b",
+      "bytes": 4915,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "qualification-report.md",
+      "sha256": "1e88443690d04017e716387fc41fd370906e4fcc4a5499b31b227af3556a75c3",
+      "bytes": 2529,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "public-proof-proposal/completion.fd3.jsonl",
+      "sha256": "9beee9089b879f0db65ca7c5d81937c7de78447d6a385108bb922afb70aee666",
+      "bytes": 1940,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "public-proof-proposal/policy.json",
+      "sha256": "cdb78b06a5f24bab75a69ba54ec100a2391c6841199291d648d2a74a6653db99",
+      "bytes": 206,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "public-proof-proposal/execution.json",
+      "sha256": "c075f79d13c4b4e43a5e272fe0b8ed095499b128eed7e0e35cac64f008914fb4",
+      "bytes": 1536,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "public-proof-proposal/focused-method-receipt.json",
+      "sha256": "56016d47fd6c3cac59401e5937028ccab3343196ebeb613fbe75599691d5f49b",
+      "bytes": 4915,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "public-proof-proposal/case-associations.json",
+      "sha256": "076ce5a9d305facc7995c93917a062f98ef83c0f5dc276dfaf96bac892a26d8c",
+      "bytes": 4652,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "public-proof-proposal/qualification-report.md",
+      "sha256": "1e88443690d04017e716387fc41fd370906e4fcc4a5499b31b227af3556a75c3",
+      "bytes": 2529,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "public-proof-transfer-proposal.json",
+      "sha256": "08235e14cf4568b652731d9969417ea3e5fbb7fcf8de7d52e3eaf5da8936a171",
+      "bytes": 1643,
+      "mode": 384,
+      "nlink": 1
+    }
+  ],
+  "publicProofProposal": {
+    "path": "public-proof-transfer-proposal.json",
+    "sha256": "08235e14cf4568b652731d9969417ea3e5fbb7fcf8de7d52e3eaf5da8936a171",
+    "bytes": 1643,
+    "mode": 384,
+    "nlink": 1
+  },
+  "sourceMethodQualified": true,
+  "templateWorkflowQualified": false,
+  "node24IsolationNoneCompatible": true,
+  "inheritedEnvironmentUnchanged": true,
+  "originalLauncherUnexecuted": true,
+  "businessCloseRuns": 0,
+  "reruns": 0,
+  "productEdits": 0,
+  "GitMutations": 0,
+  "actualMeasurementAuthentication": false,
+  "complianceCertified": false,
+  "nativePASS": false,
+  "candidateIntegration": false,
+  "wholeVerify": false,
+  "officialItemClosure": false,
+  "limits": [
+    "Declared observations do not authenticate product criterion/artifact bytes or actual measurement execution.",
+    "No actual native host, Git, candidate integration, whole Verify or official item closure.",
+    "Template guidance is bound statically by source manifest; RHH11 does not prove an actual dispatch workflow consumes it."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "alfred.afk-registry-plan-causal-repair-norm.v1",
+  "basis": "Actual original AFR001 diagnostic registry-plan/SDC-AUTHORITY-UNAVAILABLE plus exact Source companion allowlist omission",
+  "evidenceCeiling": "The first failing observed call region is Registry planning. No separately observed inner Registry predicate or owner witness is claimed.",
+  "requirements": [
+    {
+      "id": "AFKRP001",
+      "requirement": "Preserve the actual diagnostic1FAIL and all prior failed receipts. Exact executed c991 and protected5827 companionEntries omit afk-project; State authenticated plan.entry is the original private frame sub afk-project. Static short-circuit incompatibility matches the observed unavailable region without inventing an inner runtime log."
+    },
+    {
+      "id": "AFKRP002",
+      "requirement": "Registry admission may add only the existing fixed afk-project entry. Unknown entries and every original companion-plan shape/repository digest/effect bounds/duplicate/preimage/incidence/owner-witness gate remain refused unchanged."
+    },
+    {
+      "id": "AFKRP003",
+      "requirement": "AFK entry admission still requires the genuine original State-owned companion handle, actual frame/context/common boundary, actual retained onboarding operation/execution/requester/member identity, same physical State preimage and private host settlement. A CLI entry string, caller object, integer, controlled requester or public record alone cannot mint that authority."
+    },
+    {
+      "id": "AFKRP004",
+      "requirement": "Before and after actual State publication, retain every affected producer incidence/witness, unknown-overlap exclusion, actual namespace baseline/physical effects comparison, historical member/release conservation and authentic refresh ticket/current member ref join. Do not use the allowlist addition to bypass later failures."
+    },
+    {
+      "id": "AFKRP005",
+      "requirement": "Normalize only the actual AFK successful atomic writer result with ok:true, committed:true and PS-CONTINUITY-WRITTEN after the genuine companion sealed terminal and physical selected-State readback have succeeded. The normalized owning I03 exitCode is0 only after actual projection and current member ref match; this is AFK-specific, not a generic truthy-object/int-to-success rule."
+    },
+    {
+      "id": "AFKRP006",
+      "requirement": "Preserve the raw successful writer object as the actual sealed terminal result and Registry result-equality subject. Do not replace it prematurely with0 in a way that breaks genuine terminal/result equality. Normalize only at an existing genuine owning adapter boundary after that real readback."
+    },
+    {
+      "id": "AFKRP007",
+      "requirement": "Nonzero integers, unrecognized result objects/codes, thrown errors, committed:false/null, durability-unknown and unsealed/stale State/member readbacks never become completed. Keep honest host-retained/attempted/State disposition and original held lifetime; no rollback/release/success fabricated from an unchanged postimage."
+    },
+    {
+      "id": "AFKRP008",
+      "requirement": "The original six callback bodies/assertions and their AFK activation/entry/review/replay/context/interruption/physical history requirements remain unchanged. Original design/approval/Critic/Verify gates and M2/M3 report-only decisions stay intact; no tests create Human/native/METHOD grants."
+    },
+    {
+      "id": "AFKRP009",
+      "requirement": "Functional Source is composed onto qualified Lock6 Statebeea/I030609/Registry5827/custody205, preserving all approved lock/ticket/custody/CMO/AFK spans. The older26c/6a/c991 diagnostic tuple is evidence history only, not a final functional replacement."
+    },
+    {
+      "id": "AFKRP010",
+      "requirement": "Root first executes only original AFR001 on a fresh coherent causal successor with exact official one-case FD3 policy and Source/runtime/environment conservation. If that resolves the shared prerequisite, Root may run the original six. No author business, consumed runtime replay, private handle forgery, callback/DI or namespace prewarm."
+    },
+    {
+      "id": "AFKRP011",
+      "requirement": "Actual State exceptions may propagate through the AFK-only owning path only after the original genuine State-owned companion handle/context predicate has succeeded and the private frame remains original. No caller flag, unowned CLI or unknown entry selects propagation; ordinary/unowned State commands retain their original generic catch and integer2. Never turn that2 or a refusal into completed; owning I03 AFK nonzero integers remain unavailable/held."
+    }
+  ],
+  "functionalFixAlreadyQualified": false,
+  "businessRuns": 0,
+  "wholeAfkQualified": false
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "alfred.shared-credential-focused.case-map.v1",
+  "cases": [
+    {
+      "id": "SCR001",
+      "disposition": "pass",
+      "scope": "Same shared object and deep immutable metadata; actual runtime regex source/flags equal original702 literal, with six real refusal names."
+    },
+    {
+      "id": "SCR002",
+      "disposition": "pass",
+      "scope": "Genuine synthetic home credentials and directory descendants are refused; fixture bytes/identity conserved."
+    },
+    {
+      "id": "SCR003",
+      "disposition": "pass",
+      "scope": "Actual machine/repository key readers, configured credential roots and real symlink aliases retain refusal. System credential assertion is metadata-only."
+    },
+    {
+      "id": "SCR004",
+      "disposition": "pass",
+      "scope": "Invalid auxiliary configuration admits only safe canonical own files; aliases/hardlinks/missing/recursive targets remain refused."
+    },
+    {
+      "id": "SCR005",
+      "disposition": "pass",
+      "scope": "Actual closed rg grammar rejects -L and --follow; ordinary fixture bytes stay unchanged."
+    }
+  ],
+  "limits": {
+    "original43Replayed": false,
+    "nativeWindowsOrWSLClaim": false,
+    "globalHostEnforcementClaim": false,
+    "wholeItemAcceptance": false,
+    "MainIntegrationClaim": false,
+    "HumanApprovalOrSignature": false,
+    "otherLifecycleCoverage": false
+  }
+}

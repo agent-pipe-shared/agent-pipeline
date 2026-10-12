@@ -1,0 +1,126 @@
+{
+  "schema": "alfred.claude-inline-attestation-scoped-proof.v1",
+  "status": "actual-focused-controlled-method-qualified",
+  "sourceManifest": {
+    "path": "scratch/alfred-claude-inline-attestation-receipt-store-source-20261010/manifest.json",
+    "sha256": "2297ae15a2fcc4174f8ea328434a27e84f18e4b3130c589090a22ae327c91155",
+    "bytes": 6032,
+    "mode": 420,
+    "nlink": 1
+  },
+  "qualifiedSource": {
+    "path": "scratch/alfred-claude-inline-attestation-receipt-store-source-20261010/postimages/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+    "bytes": 115016,
+    "mode": 420,
+    "nlink": 1
+  },
+  "execution": {
+    "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/execution.json",
+    "sha256": "314895c2ad02b2b7ab1452950a6821ad174f85f1dff33d2dca4efd12cbc686f8",
+    "bytes": 2068,
+    "mode": 384,
+    "nlink": 1
+  },
+  "actualCompletion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "aabdf988b8945ca306d55f71e5e45bf23b108cb62271fc6b2fcd6ec3ca8fa508",
+    "caseSetSha256": "e5d690e99ab66c2f1f7b1efb0826a97d10dc77deb2b11b14f535b2dbd5c80168",
+    "dispositionsSha256": "4113f986dd8876e0807f6b915e97b12dc2a67598dad75115ca064068a9fc7cad",
+    "declaredCount": 10,
+    "disposedCount": 10,
+    "counts": {
+      "pass": 10,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "fd3": {
+    "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/qualification/completion.fd3.jsonl",
+    "sha256": "d516c536bf6ca95d9d8e818048e14aa0141a6ab4427811e553a02dbf537eb5b6",
+    "bytes": 1809,
+    "mode": 384,
+    "nlink": 1
+  },
+  "stdout": {
+    "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/qualification/stdout.log",
+    "sha256": "ab7f8bd310d0b248a834ea2751ef3c10dc78939edbc43775461ab3f3a8d5f9b3",
+    "bytes": 1091,
+    "mode": 384,
+    "nlink": 1
+  },
+  "stderr": {
+    "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/qualification/stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "mode": 384,
+    "nlink": 1
+  },
+  "durationMs": 6683.58552,
+  "graphFileCount": 2165,
+  "graphConserved": true,
+  "sourceConserved": true,
+  "childStatus": 0,
+  "error": null,
+  "parser": null,
+  "environment": "HOME/Git/hooks/signing/protected environment and execArgv inherited unchanged; explicit real receiptDirectory and owned fixture/temp/FD3 only.",
+  "history": {
+    "heldOriginal": {
+      "path": "scratch/alfred-claude-inline-attestation-independent-20261010/ready-manifest.json",
+      "sha256": "db260ebc19c3205be0527f38b79d0406371272c291f89843363791bc356ef0cd",
+      "bytes": 4303,
+      "mode": 420,
+      "nlink": 1
+    },
+    "originalAssertions": {
+      "path": "scratch/alfred-claude-inline-attestation-independent-20261010/assertion-freeze.json",
+      "sha256": "3d40b078a9a4138cbdb532e8e84792b52b3acba63efc10af81925dad1a8a2ea1",
+      "bytes": 1439,
+      "mode": 420,
+      "nlink": 1
+    },
+    "originalNorm": {
+      "path": "scratch/alfred-claude-inline-attestation-independent-20261010/normative.json",
+      "sha256": "f55f2a3c28e6ca1f17e21af084806591736b585b93336d3166b5290d805d1d57",
+      "bytes": 4651,
+      "mode": 420,
+      "nlink": 1
+    },
+    "corridor": {
+      "path": "scratch/alfred-claude-inline-attestation-independent-20261010/inherited-environment-corridor.json",
+      "sha256": "86744067cc9d23d2381e56e0132dd473377de9a0d36a078925a5d1185538fe79",
+      "bytes": 2455,
+      "mode": 420,
+      "nlink": 1
+    },
+    "donorDrift": {
+      "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/donor-drift.json",
+      "sha256": "25f7025821351e90439fa4a58481e08e7dbd191b3002fc33de09085f3f5881a2",
+      "bytes": 650,
+      "mode": 420,
+      "nlink": 1
+    },
+    "wiringInverse": {
+      "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/fixture-wiring-splices.json",
+      "sha256": "7d0eab02693b83e0364739efcca455d36d8a4ef8d83a2287ff62c300265acbcd",
+      "bytes": 2931,
+      "mode": 420,
+      "nlink": 1
+    },
+    "twoRowCustodyInverse": {
+      "path": "scratch/alfred-claude-inline-attestation-independent-20261010/explicit-receipt-store-successor/current-donor-successor/donor-custody-splices.json",
+      "sha256": "6c8e691bceb1f795a91a9498f9b7fa40a5fb957c2fc33b994e73f7013ff3fa10",
+      "bytes": 2234,
+      "mode": 420,
+      "nlink": 1
+    }
+  },
+  "limits": [
+    "No actual Claude native/provider installation, real user install consent or native session assurance.",
+    "No downstream project READY, full bootstrap, full candidate Verify, whole item or acceptance closure.",
+    "Main historical source family differs; exact composed integration remains Root-owned.",
+    "Raw runtime directory, private receipt/registry/fixture content, keys and host paths excluded from public projection."
+  ]
+}

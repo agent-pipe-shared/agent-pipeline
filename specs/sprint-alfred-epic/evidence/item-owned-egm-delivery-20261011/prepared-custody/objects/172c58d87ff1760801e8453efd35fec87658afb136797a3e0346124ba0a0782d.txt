@@ -1,0 +1,508 @@
+✖ darwin immutable native tuple uncontended acquire/release (injected) (1.471161ms)
+✖ darwin matching foreign-PID tuple remains live, unchanged (injected) (0.315488ms)
+✖ darwin reused live foreign PID different immutable start recovers (injected) (0.234159ms)
+✖ darwin absent owner recovers (injected) (0.257238ms)
+✖ darwin changed current boot recovers old same-host owner (injected) (0.359558ms)
+✔ darwin unavailable remains ambiguous and intact (injected) (0.555906ms)
+✔ darwin unknown remains ambiguous and intact (injected) (0.188109ms)
+✔ darwin wrong-pid remains ambiguous and intact (injected) (0.241118ms)
+✔ darwin malformed remains ambiguous and intact (injected) (0.310898ms)
+✖ darwin foreign host and platform preserve bytes (injected) (8.928549ms)
+✖ darwin live owner wait shares one deadline and never steals (injected) (0.424148ms)
+✖ darwin live released during wait acquires without recovery (injected) (0.266118ms)
+✖ darwin noncanonical persisted tuple remains malformed (injected) (0.288518ms)
+✖ win32 immutable native tuple uncontended acquire/release (injected) (0.421278ms)
+✖ win32 matching foreign-PID tuple remains live, unchanged (injected) (0.528588ms)
+✖ win32 reused live foreign PID different immutable start recovers (injected) (0.413598ms)
+✖ win32 absent owner recovers (injected) (0.364308ms)
+✖ win32 changed current boot recovers old same-host owner (injected) (0.311088ms)
+✔ win32 unavailable remains ambiguous and intact (injected) (0.322148ms)
+✔ win32 unknown remains ambiguous and intact (injected) (0.325908ms)
+✔ win32 wrong-pid remains ambiguous and intact (injected) (0.371928ms)
+✔ win32 malformed remains ambiguous and intact (injected) (0.321818ms)
+✔ win32 foreign host and platform preserve bytes (injected) (0.415658ms)
+✖ win32 live owner wait shares one deadline and never steals (injected) (0.373698ms)
+✖ win32 live released during wait acquires without recovery (injected) (0.436147ms)
+✖ win32 noncanonical persisted tuple remains malformed (injected) (0.344128ms)
+✖ legacy win32 approximate tuple remains ambiguous when its PID is present (0.366078ms)
+✖ legacy win32 tuple can recover proven absent PID (0.417657ms)
+✖ native adapters reject expired shared deadline without spawning or issuing native facts (0.164089ms)
+✔ native adapters never accept injected platform as native proof (0.203749ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 10
+ℹ fail 20
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29.424403
+
+✖ failing tests:
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:20:2
+✖ darwin immutable native tuple uncontended acquire/release (injected) (1.471161ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:20:180)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:21:2
+✖ darwin matching foreign-PID tuple remains live, unchanged (injected) (0.315488ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'counter-lock-owner-ambiguous'
+  - 'counter-lock-busy'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:21:133)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'counter-lock-owner-ambiguous',
+    expected: 'counter-lock-busy',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:22:2
+✖ darwin reused live foreign PID different immutable start recovers (injected) (0.234159ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:22:398)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:23:2
+✖ darwin absent owner recovers (injected) (0.257238ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:23:305)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:24:2
+✖ darwin changed current boot recovers old same-host owner (injected) (0.359558ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:24:383)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:26:2
+✖ darwin foreign host and platform preserve bytes (injected) (8.928549ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'counter-lock-malformed'
+  - 'counter-lock-owner-ambiguous'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:26:345)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'counter-lock-malformed',
+    expected: 'counter-lock-owner-ambiguous',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:27:2
+✖ darwin live owner wait shares one deadline and never steals (injected) (0.424148ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'counter-lock-owner-ambiguous'
+  - 'counter-lock-timeout'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:27:462)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'counter-lock-owner-ambiguous',
+    expected: 'counter-lock-timeout',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:28:2
+✖ darwin live released during wait acquires without recovery (injected) (0.266118ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:28:337)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:29:2
+✖ darwin noncanonical persisted tuple remains malformed (injected) (0.288518ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'counter-lock-owner-ambiguous'
+  - 'counter-lock-malformed'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:29:212)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'counter-lock-owner-ambiguous',
+    expected: 'counter-lock-malformed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:20:2
+✖ win32 immutable native tuple uncontended acquire/release (injected) (0.421278ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '1999999990'
+  - '638000000000000000'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:20:260)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '1999999990',
+    expected: '638000000000000000',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:21:2
+✖ win32 matching foreign-PID tuple remains live, unchanged (injected) (0.528588ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'counter-lock-owner-ambiguous'
+  - 'counter-lock-busy'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:21:133)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'counter-lock-owner-ambiguous',
+    expected: 'counter-lock-busy',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:22:2
+✖ win32 reused live foreign PID different immutable start recovers (injected) (0.413598ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:22:398)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:23:2
+✖ win32 absent owner recovers (injected) (0.364308ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:23:305)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:24:2
+✖ win32 changed current boot recovers old same-host owner (injected) (0.311088ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:24:383)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:27:2
+✖ win32 live owner wait shares one deadline and never steals (injected) (0.373698ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'counter-lock-owner-ambiguous'
+  - 'counter-lock-timeout'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:27:462)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'counter-lock-owner-ambiguous',
+    expected: 'counter-lock-timeout',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:28:2
+✖ win32 live released during wait acquires without recovery (injected) (0.436147ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:28:337)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:29:2
+✖ win32 noncanonical persisted tuple remains malformed (injected) (0.344128ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'counter-lock-owner-ambiguous'
+  - 'counter-lock-malformed'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:29:212)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'counter-lock-owner-ambiguous',
+    expected: 'counter-lock-malformed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:31:1
+✖ legacy win32 approximate tuple remains ambiguous when its PID is present (0.366078ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'counter-lock-busy'
+  - 'counter-lock-owner-ambiguous'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:31:186)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'counter-lock-busy',
+    expected: 'counter-lock-owner-ambiguous',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:32:1
+✖ legacy win32 tuple can recover proven absent PID (0.417657ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'rejected'
+  - 'acquired'
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:32:366)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'acquired',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:33:1
+✖ native adapters reject expired shared deadline without spawning or issuing native facts (0.164089ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'darwin-observer-platform-unavailable'
+  - 'darwin-observer-deadline'
+                     ^
+  
+      at TestContext.<anonymous> (file://<repository>/scratch/alfred-postinstall-whole-items-20261011/darwin-dispatch-owner-audit/platform-owner.test.mjs:33:155)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'darwin-observer-platform-unavailable',
+    expected: 'darwin-observer-deadline',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+

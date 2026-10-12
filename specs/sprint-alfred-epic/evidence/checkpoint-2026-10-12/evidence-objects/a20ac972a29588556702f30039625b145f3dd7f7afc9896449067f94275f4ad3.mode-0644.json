@@ -1,0 +1,615 @@
+{
+  "schema": "alfred.unknown-group03-actual-source-assessment.v1",
+  "status": "source-assessed-not-accepted",
+  "group": {
+    "path": "legacy-origin:alfred-item-closure-trace-preparation-20261011/partition-98/unknown-03.json",
+    "sha256": "bc7d856db7fc8b7f60df98b48224ff7793c88dbf9341f9e5fd54fc26bd55248a"
+  },
+  "methodologyRuleset": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "currentMainSnapshot": [
+    {
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "sha256": "65dec57031b859906087bcd0669390c2d1eb0a9409ae6a93890eab32950f983d",
+      "bytes": 16642,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "sha256": "18e60babbfd4902ad34cd6a2208e22be97fa495d3568ab20871d02092400415f",
+      "bytes": 32556,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/powershell-dialect.mjs",
+      "sha256": "c16f4ebd8a438fd1ecbb443e5e37738307fc37cd8b69116c6aaaef4a5e997f4b",
+      "bytes": 6669,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+      "sha256": "e9cc3e9f59985057b00d9abc6295f41361dcbc95b9d0feff53fbfe59837002e8",
+      "bytes": 22633,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552",
+      "bytes": 4832,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "sha256": "fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641",
+      "bytes": 702208,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+      "sha256": "4ed5c3250eef668a06a384461ded32ab5f43882603a18b4e0f141f037eb18046",
+      "bytes": 597,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+      "sha256": "3f6be98c495e7318523987632528584119d3b99b0ddf04a9f7942694a069fb3a",
+      "bytes": 4466,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/scratch-retention.mjs",
+      "sha256": "01baa676983f1a93e617cb2f3e334af0cddbc8b386ade534f9e5b7f7e43f9601",
+      "bytes": 7063,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "sha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+      "bytes": 11408,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+      "bytes": 150958,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+      "sha256": "e6101c86ceda0458930a7c27bf1a27212d12c67a138aa32854f4ff9012908333",
+      "bytes": 42932,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+      "sha256": "4f7718a9145bb599cc20b23a0b9e8d7000b84ca208e51a89ec9c345ecd3cb303",
+      "bytes": 61118,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+      "sha256": "f036f3864e8db57752c942297cb35b1e9a7887673649e42a200384b4e6fcb459",
+      "bytes": 90688,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "sha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd",
+      "bytes": 115016,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "bytes": 423484,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "docs/product-capability-inventory.json",
+      "sha256": "04c4c2539df5c0a271f68b44cf07d9a3ae78eb7e82c171d85d8bf3f237c38f58",
+      "bytes": 147344,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "e7b28b678c0c9b0aecde2a3ea592281f4550ac8e04e458e9d82b7d7b29c0f81e",
+      "bytes": 65092,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+      "bytes": 178532,
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+      "bytes": 301059,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "sha256": "c81bddab38440a69014a26dfd21c1788a8fbe9d7c1f63c63afbf0655d7ebcee3",
+      "bytes": 25033,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/write-scope.mjs",
+      "sha256": "b85c8cc7b5dd969e58cadefdaef1abb0aa262be003523f2879df760504cc2fc9",
+      "bytes": 27258,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+      "bytes": 117511,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "sha256": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+      "bytes": 46697,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/onboarding-init.mjs",
+      "sha256": "95334f693f879d43c18903aa57f79c89bc9b8ad6e21ab1fe2ca8755d52752c40",
+      "bytes": 77337,
+      "mode": 420,
+      "nlink": 2
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+      "sha256": "392ffb2abc3bf68318bf85c36d95978c51d983684cc6ea5c89bf5a56418c6a00",
+      "bytes": 42477,
+      "mode": 420,
+      "nlink": 2
+    }
+  ],
+  "counts": {
+    "implemented-evidence-hold": 8,
+    "retired-prerequisite-consumer-hold": 2,
+    "functional-code-gap": 2
+  },
+  "rows": [
+    {
+      "id": "pipeline.powershell-bypasses-onboarding-read-boundary",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+        "canonicalPath": "backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+        "sha256": "a2e2fbb3b955625a7758fc320b2bf5d3d4754751de194d82d47f7c8b70ea1775",
+        "bytes": 2128,
+        "parentSha256": "a2e2fbb3b955625a7758fc320b2bf5d3d4754751de194d82d47f7c8b70ea1775",
+        "assignmentChanged": false
+      },
+      "originalRemaining": [
+        {
+          "owner": {
+            "functionalRole": "Coordinator-or-assigned-agent",
+            "historicalActorExcluded": true
+          },
+          "activeRouting": [],
+          "nextAction": "Actual current lane registration/refusal and declared recovery coverage unresolved; audit does not prove continuing bypass. Safe synthetic lane controls before conditional source fix.",
+          "exactReceiptGap": "No exact actual current receipt/case binding retained; unknown is not an unimplemented fix",
+          "review": "official independent Critic not established for whole item",
+          "acceptance": "open; no closure inferred"
+        },
+        "Actual current lane registration/refusal and declared recovery coverage unresolved; audit does not prove continuing bypass. Safe synthetic lane controls before conditional source fix."
+      ],
+      "classification": "implemented-evidence-hold",
+      "finding": "PowerShell is routed to a closed parser and contained read/write grammar; native Read/Grep/Glob and shell tools share the actual lifecycle hook matcher. No unconditional PowerShell allow remains in the read source.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/hooks/hooks.json",
+          "lines": "44-63"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "lines": "70-76,220-230"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/powershell-dialect.mjs",
+          "lines": "entire file"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+          "lines": "8782-8842"
+        }
+      ],
+      "next": "Bind the exact current installed Windows guard/hook positives, returned recovery and escape negatives. Existing test source is not an actual run.",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.readiness-input-omits-current-advisor-observation",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-readiness-input-omits-current-advisor-observation.md",
+        "canonicalPath": "backlog/items/2026-09-28-readiness-input-omits-current-advisor-observation.md",
+        "sha256": "49d8425d687df36f27d5633f379c9ba3e17564af21bb782d534dfb3f142c0aee",
+        "bytes": 5024,
+        "parentSha256": "f82ac8fd4dcac39e1df1f4a57e2ca1ca2b10021262d165517606040e981c504b",
+        "assignmentChanged": true
+      },
+      "originalRemaining": "Retain actual optional consultation/source/range provenance where used; no blanket whole-item deferral or new ceremony.",
+      "classification": "retired-prerequisite-consumer-hold",
+      "finding": "The readiness reader delegates to the actual observation verifier; current design-course doctrine explicitly retires the mandatory initial Advisor prerequisite. The historical mandatory-course item cannot be promoted by inventing a new ordinary gate.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+          "lines": "entire file"
+        },
+        {
+          "path": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+          "lines": "entire file"
+        }
+      ],
+      "next": "Bind the current optional Advisor/legacy consumer route. Legacy coordinator source inspection was stopped; its source-specific implementation remains unverified here.",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-revised-native-design-cannot-reach-a-new-advisor-course.md",
+        "canonicalPath": "backlog/items/2026-10-04-revised-native-design-cannot-reach-a-new-advisor-course.md",
+        "sha256": "3223d2671bdd488c9c8cb5ffb854297a226b629030b32b7d013755de1fc54586",
+        "bytes": 2749,
+        "parentSha256": "3223d2671bdd488c9c8cb5ffb854297a226b629030b32b7d013755de1fc54586",
+        "assignmentChanged": false
+      },
+      "originalRemaining": "Qualify sanctioned current-source revision/rebind and optional native consultation if requested; preserve independent final authority.",
+      "classification": "retired-prerequisite-consumer-hold",
+      "finding": "Current design-course doctrine uses one independent review, at most one delta and one final human signature. It retires the ordinary initial Advisor course; revised-design optional consultation still needs exact consumer evidence.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/skills/pipeline-start/references/design-course.md",
+          "lines": "entire file"
+        }
+      ],
+      "next": "Assess the exact optional/legacy revised-course consumer without restoring a retired ceremony. No new Advisor invocation or source gap is inferred from the historical symptom.",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.scratch-has-no-retention-and-no-durability-check",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-scratch-has-no-retention-and-no-durability-check.md",
+        "canonicalPath": "backlog/items/2026-10-05-scratch-has-no-retention-and-no-durability-check.md",
+        "sha256": "70c82ba3de815edfca42bdc74dfe66859063e2aa83113a24d76109b7207d5180",
+        "bytes": 1373,
+        "parentSha256": "70c82ba3de815edfca42bdc74dfe66859063e2aa83113a24d76109b7207d5180",
+        "assignmentChanged": false
+      },
+      "originalRemaining": "Locate declared durability owner and actual staging/handover/push checks; do not infer absence from cleanup module.",
+      "classification": "implemented-evidence-hold",
+      "finding": "Actual scratch retention and a tracked multi-view custody report exist. The close ritual explicitly consumes the report as WARN only. The original source association omitted these producers.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/lib/scratch-retention.mjs",
+          "lines": "entire file"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+          "lines": "entire file"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+          "lines": "scratch-custody-report import"
+        },
+        {
+          "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+          "lines": "146"
+        }
+      ],
+      "next": "Bind current guard and close consumer generation to the already qualified historical Scratch18 scope; do not rerun those eighteen unchanged cases or claim native durability from them.",
+      "proof": "scratch18",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.semgrep-console-coverage-note-has-no-test",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-semgrep-console-coverage-note-has-no-test.md",
+        "canonicalPath": "backlog/items/2026-10-07-semgrep-console-coverage-note-has-no-test.md",
+        "sha256": "3488e8ae6dca2cd8a365177a446e36b2eccd41411a7aae7df7ddef9fcf87cf0d",
+        "bytes": 1715,
+        "parentSha256": "3488e8ae6dca2cd8a365177a446e36b2eccd41411a7aae7df7ddef9fcf87cf0d",
+        "assignmentChanged": false
+      },
+      "originalRemaining": [
+        {
+          "owner": {
+            "functionalRole": "Coordinator-or-assigned-agent",
+            "historicalActorExcluded": true
+          },
+          "activeRouting": [],
+          "nextAction": "Freeze actual security-scan console degraded/complete/failed output cases using controlled Semgrep protocol; test-only change unless actual source seam defect is proven.",
+          "exactReceiptGap": "No exact actual current receipt/case binding retained; unknown is not an unimplemented fix",
+          "review": "official independent Critic not established for whole item",
+          "acceptance": "open; no closure inferred"
+        },
+        "Freeze actual security-scan console degraded/complete/failed output cases using controlled Semgrep protocol; test-only change unless actual source seam defect is proven."
+      ],
+      "classification": "implemented-evidence-hold",
+      "finding": "The scanner formatter reports degraded coverage; a CLI fake-Semgrep regression explicitly asserts the partial-parsing count and exact console note, including duplicate-file count behavior.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+          "lines": "1113-1120"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+          "lines": "1762-1840"
+        }
+      ],
+      "next": "Bind the exact current formatter/CLI test execution receipt. No new mirroring test or assertion rewrite is needed.",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+        "canonicalPath": "backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+        "sha256": "42fc4b81bb2759d9a3399b3b1e097dbb6bb2809ffd83946554a987fc1dffd22f",
+        "bytes": 2875,
+        "parentSha256": "42fc4b81bb2759d9a3399b3b1e097dbb6bb2809ffd83946554a987fc1dffd22f",
+        "assignmentChanged": false
+      },
+      "originalRemaining": "Measure exact concurrent failure source and stable snapshots; diagnostics correction does not prove flapping fixed.",
+      "classification": "implemented-evidence-hold",
+      "finding": "Preflight and lifecycle guard request session readiness after bootstrap; strict cleanup failures retain their typed cause in partial readiness. This is a fail-closed branch, not evidence that the original concurrent flap is resolved.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "lines": "1482-1535,1706"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+          "lines": "47"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "lines": "1910-1946"
+        }
+      ],
+      "next": "Bind an existing actual concurrent schedule/cause to current source. Do not soften partial readiness or guess a race repair from static code.",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-shell-grammar-file-is-a-kernel-path-without-capability-placement.md",
+        "canonicalPath": "backlog/items/2026-10-05-shell-grammar-file-is-a-kernel-path-without-capability-placement.md",
+        "sha256": "4157fdc52a2371691d8451f2d130ea321922d63b0a4434a1942c44d1a9c845f6",
+        "bytes": 910,
+        "parentSha256": "4157fdc52a2371691d8451f2d130ea321922d63b0a4434a1942c44d1a9c845f6",
+        "assignmentChanged": false
+      },
+      "originalRemaining": [
+        "Retain original criterion and bind current full-item proof before promotion.",
+        "RGGRAM placement/fixture is explicitly split out; no exact capability inventory placement or fixture completion located. Assign finite registration/fixture identity reconciliation, no general parser rewrite."
+      ],
+      "classification": "implemented-evidence-hold",
+      "finding": "Capability inventory explicitly lists shell grammar and its independent placement test under hook safety. A retained actual four-case receipt is complete and green. The original unnamed fixture issue still has no exact identity.",
+      "evidence": [
+        {
+          "path": "docs/product-capability-inventory.json",
+          "lines": "90-116"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+          "lines": "source identity"
+        }
+      ],
+      "next": "Bind the old RGGRAM4 source generation and identify the separate original fixture before item completion. Current shell grammar differs from its retained source parent; four passes are not a new-current or native proof.",
+      "proof": "rggram4",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+        "canonicalPath": "backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+        "sha256": "2fc3f35c97a66d043394a8887bcc0f4940ad8da3b5d57dbc5fcf541883a89eb6",
+        "bytes": 2977,
+        "parentSha256": "2fc3f35c97a66d043394a8887bcc0f4940ad8da3b5d57dbc5fcf541883a89eb6",
+        "assignmentChanged": false
+      },
+      "originalRemaining": "Bind independently already-scoped exact executable/start writer proof or source actor packet; no equivalent lookup or inferred failure.",
+      "classification": "implemented-evidence-hold",
+      "finding": "The actual OpenSSL signing spawn uses shell:false, explicit cwd and the Win32 environment term. The original requirement explicitly accepts the remaining key-directory executable-search risk; that decision must be preserved.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+          "lines": "1058-1112"
+        }
+      ],
+      "next": "Bind native executable-resolution evidence to the current writer and preserve the accepted operator rule. No reverse policy decision or human-key probe is authorized here.",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md",
+        "canonicalPath": "backlog/items/2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md",
+        "sha256": "f5821326de25faf9ad97c78bfbd427fe497e6b20bee14152366f1bd0f89c0dc1",
+        "bytes": 2492,
+        "parentSha256": "f5821326de25faf9ad97c78bfbd427fe497e6b20bee14152366f1bd0f89c0dc1",
+        "assignmentChanged": false
+      },
+      "originalRemaining": "Require current bounded disclosure/executable/context timings and secret redaction proof from source owner; aggregate test counts are not latency.",
+      "classification": "functional-code-gap",
+      "finding": "sign-intent invokes disclosure describers/GMW/HGO before its real readiness probe; the HGO resolver enumerates requests and rederives each intent. No direct signed-quality-package disclosure branch is present in the actual sign-intent chain.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+          "lines": "2215-2385"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+          "lines": "4753-4805"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+          "lines": "115-159"
+        }
+      ],
+      "next": "Review the exact private readiness-order post; then close a genuine package-disclosure validator and producer-published digest locator with unchanged intent recomputation. No fake index authority, blanket scan fallback or cleanup grant. Current native latency remains unmeasured.",
+      "proposal": "signing-order-source-proposal/manifest.json",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.windows-greenfield-scratch-write-denied",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-windows-greenfield-scratch-write-denied.md",
+        "canonicalPath": "backlog/items/2026-09-29-windows-greenfield-scratch-write-denied.md",
+        "sha256": "4f0ba42f3a082ec76cfe036fdeb9f25963fa6450d5e8d99de5a571815c4e9935",
+        "bytes": 761,
+        "parentSha256": "4f0ba42f3a082ec76cfe036fdeb9f25963fa6450d5e8d99de5a571815c4e9935",
+        "assignmentChanged": false
+      },
+      "originalRemaining": "Bind exact native in-root scratch positive and alias/outside negative through actual guard/runtime without parser expansion.",
+      "classification": "implemented-evidence-hold",
+      "finding": "The actual PowerShell scratch route and native Write physical boundary exist; the source regression includes lifecycle-state and escape/path containment cases. A native Windows installed intake has not been observed by this assessment.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/lib/guard/powershell-dialect.mjs",
+          "lines": "entire file"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/write-scope.mjs",
+          "lines": "physical-scratch-boundary import"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+          "lines": "8782-8842"
+        }
+      ],
+      "next": "Bind the actual native Windows Write/PowerShell matrix and fresh intake plus Unix scopes, preserving symlink/hardlink/plugin exclusions.",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.md",
+        "canonicalPath": "backlog/items/2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.md",
+        "sha256": "97011a4fbc40b872388f5f57248cc6795c63183da5dbf163914ecbdb3b87dfa2",
+        "bytes": 2270,
+        "parentSha256": "5e48edc20f4d8a0e0562c3cc83d0eedd5292bd549b4c98972402a9c692d8fff6",
+        "assignmentChanged": true
+      },
+      "originalRemaining": "Bind Windows slash/drive identity and genuine non-Git progression/installed Claude proof; preflight separator12 is a separate identity.",
+      "classification": "implemented-evidence-hold",
+      "finding": "Worktree rows are resolved and realpathed before governance containment; failed portable application returns its actual non-success result. The driver stops on an unexpected outcome instead of repeating the mutation.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+          "lines": "256-278"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+          "lines": "110-114"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "lines": "7200-7220"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/onboarding-init.mjs",
+          "lines": "1180-1218"
+        }
+      ],
+      "next": "Bind exact Windows slash/drive behavior, rollback and fresh installed progression. No remaining adapter-discard gap was found in these current branches.",
+      "acceptanceEstablished": false
+    },
+    {
+      "id": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+      "originalRequirement": {
+        "path": "legacy-origin:alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-windows-pre-push-installer-fsync-and-relative-action.md",
+        "canonicalPath": "backlog/items/2026-09-29-windows-pre-push-installer-fsync-and-relative-action.md",
+        "sha256": "3e0fb5d931a0d04fb4750fd53cba39c35c49e66244b2e6c3788ad5dc9f38cb75",
+        "bytes": 796,
+        "parentSha256": "3e0fb5d931a0d04fb4750fd53cba39c35c49e66244b2e6c3788ad5dc9f38cb75",
+        "assignmentChanged": false
+      },
+      "originalRemaining": "Trace actual durable producer/default action consumer and prove native install/marker/block/removal plus Unix smoke; no durability failure inferred from no local fsync text.",
+      "classification": "functional-code-gap",
+      "finding": "applyInstall publishes its runtime snapshot, then writes the implementation, shim and marker directly with writeFileSync and returns installed. These final installer-owned artifact writes have no explicit durable descriptor sync/readback before that return. Snapshot helper behavior was not inspected and is not claimed absent.",
+      "evidence": [
+        {
+          "path": "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+          "lines": "704-737"
+        }
+      ],
+      "next": "A separate source owner must prepare a minimal final-artifact durable-write/readback change with writable-descriptor sync and typed refusal, preserving foreign-hook refusal, marker binding and removal ownership. Absolute action/installed Windows evidence remains a separate consumer hold.",
+      "acceptanceEstablished": false
+    }
+  ],
+  "retainedActualProofs": {
+    "scratch18": {
+      "path": "legacy-origin:alfred-scratch-durability-index-fix-replay-preparation-20261010/root-receipt.json",
+      "sha256": "47c3307d2804df5f24fb866c51898fba6fabe3e64ab9d8808d2e822ca89f896b",
+      "bytes": 4238,
+      "recordedCounts": {
+        "pass": 18,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "nativeProof": false,
+      "currentGenerationQualification": false,
+      "physicallyReadCompletion": {
+        "path": "legacy-origin:alfred-scratch-durability-index-fix-replay-preparation-20261010/completion.private.jsonl",
+        "sha256": "3a312bd4f5680e56bfd1b7ab15d3eefcff013fe014665491efbc5222f22a4fc1",
+        "bytes": 2965,
+        "independentParserRerun": false
+      }
+    },
+    "rggram4": {
+      "path": "legacy-origin:alfred-rggram-sorted-parent-fixture-replay-preparation-20261010/runtime/execution.json",
+      "sha256": "ccc6d6fb2148698be55357fd1dd09b7435ebf0bef90c2a7b64158a4a15522b67",
+      "bytes": 1598,
+      "recordedCounts": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "nativeProof": false,
+      "currentGenerationQualification": false
+    }
+  },
+  "stoppedReads": [
+    "Initial unsupported heredoc syntax; superseded only by Root-authorized fixed-path metadata helper.",
+    "Legacy design-advisory-coordinator/design-course-session reads stopped; no equivalent retry.",
+    "Git-hook-runtime-snapshot/hardened-private-directory regex read stopped; no claims about their internals.",
+    "Guessed close-codex locator read stopped; actual declared close-block skill consumed separately.",
+    "scripts/signed-quality-package.mjs regex read stopped; no direct descriptor export inferred. Actual declared library package validation was read.",
+    "A malformed project-onboarding.mjs locator returned ENOENT; exact declared project-onboarding-v3.mjs was used in the subsequent distinct resource read."
+  ],
+  "semanticRuns": 0,
+  "mainWrites": 0,
+  "privateKeyReads": 0,
+  "nativeClaims": false,
+  "itemAcceptance": false
+}

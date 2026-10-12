@@ -1,0 +1,77 @@
+{
+  "schema": "alfred.powershell-original-nine.history.v1",
+  "execution": {
+    "path": "scratch/alfred-powershell-coherent-nine-qualification-20261011/inherited-git-environment-successor/execution.json",
+    "sha256": "f597423fc6b82d84e27b1a5889129c5b904444aff1af8df7057d743bb1518278"
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "6449b80b9cd5b76393a6ad7fabcc94d3967e9af51a3e3038421373e90204d962",
+    "caseSetSha256": "38d608fdc3cb572b59c76e535affe5291f4eaf7a34c3c76305b074cdd2bae54d",
+    "dispositionsSha256": "97d05b49608d7370fdb480b298359b63ec3aa4854b0ebc24e3fe86bc9ce265a8",
+    "declaredCount": 9,
+    "disposedCount": 9,
+    "counts": {
+      "pass": 5,
+      "fail": 4,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "cases": [
+    {
+      "id": "PSB-Glob",
+      "disposition": "pass"
+    },
+    {
+      "id": "PSB-Grep",
+      "disposition": "fail"
+    },
+    {
+      "id": "PSB-Read",
+      "disposition": "fail"
+    },
+    {
+      "id": "PSB001",
+      "disposition": "pass"
+    },
+    {
+      "id": "PSB002",
+      "disposition": "fail"
+    },
+    {
+      "id": "PSB003",
+      "disposition": "fail"
+    },
+    {
+      "id": "PSB004",
+      "disposition": "pass"
+    },
+    {
+      "id": "PSB005",
+      "disposition": "pass"
+    },
+    {
+      "id": "PSB009",
+      "disposition": "pass"
+    }
+  ],
+  "fd3Sha256": "c4773f2d39d5b68a35c782d98a980ed419929478bbf6ac2169ef60ae03f9467c",
+  "preserved": true,
+  "retainedPassingIds": [
+    "PSB-Glob",
+    "PSB001",
+    "PSB004",
+    "PSB005",
+    "PSB009"
+  ],
+  "originalFailures": [
+    "PSB-Grep",
+    "PSB-Read",
+    "PSB002",
+    "PSB003"
+  ],
+  "premiseErratum": "The four original failures expected blanket refusal of benign visible host reads. Accepted policy admits these reads while refusing genuinely configured credential roots. Corrected cases pair benign positives with real metadata-only synthetic credential negatives; original outcomes remain unchanged.",
+  "jointNineRunClaim": false
+}

@@ -1,0 +1,80 @@
+{
+  "schema": "alfred.final-source2-lock6.public-proof.v1",
+  "scope": "Controlled APLOCK003–008 only",
+  "counts": {
+    "pass": 6,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "cases": [
+    {
+      "id": "APLOCK003",
+      "disposition": "pass"
+    },
+    {
+      "id": "APLOCK004",
+      "disposition": "pass"
+    },
+    {
+      "id": "APLOCK005",
+      "disposition": "pass"
+    },
+    {
+      "id": "APLOCK006",
+      "disposition": "pass"
+    },
+    {
+      "id": "APLOCK007",
+      "disposition": "pass"
+    },
+    {
+      "id": "APLOCK008",
+      "disposition": "pass"
+    }
+  ],
+  "executionSha256": "8c158b00b052f1b135b9369172498f6c5b2f4769d9df123ddb6ffe3740e5d99d",
+  "fd3Sha256": "4839c398be4b4ee0639eae6f6814a1690ef6c5c14b600e9f922d5d1e4f6bd410",
+  "stdoutSha256": "b58257ee3a9a64c816a8705addbb79f832ed9c3392450cae510fa79cb32ccc96",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "598b9f65e0f93896ff1b62ddff9d616f02c757c84d78283ca1ae6b4a96fac8f4",
+    "caseSetSha256": "19d466b281171e09e67fe07cb787ac863e58560f8ce69b5e86667a6ec8e36000",
+    "dispositionsSha256": "4ef50bd8d244354f0c46a6485ce719047de676ccef28e8afc922d17eb71a79df",
+    "declaredCount": 6,
+    "disposedCount": 6,
+    "counts": {
+      "pass": 6,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "sha256": "4839c398be4b4ee0639eae6f6814a1690ef6c5c14b600e9f922d5d1e4f6bd410",
+    "bytes": 1339
+  },
+  "sourcePins": {
+    "plugins/pipeline-core/lib/afk-ledger.mjs": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+    "plugins/pipeline-core/lib/afk-transaction-host.mjs": "a79718659a5bd44f087bdd2343f3407b7255d4358b2dccb22ff11b0ce3c48ae6",
+    "plugins/pipeline-core/lib/model-family-host-store.mjs": "29ac3208d228c75678fbe06accabfe30b5362ee98aa9f68cb6fccfac5b49965f",
+    "plugins/pipeline-core/lib/session-authority-domain-owner.mjs": "74e0feb567ef0321a98f432054945942f963f810215b84d65c2c116b4b3764ea",
+    "plugins/pipeline-core/lib/session-requester-bridge.mjs": "fda05d645a23c8187f19faad2419d9a916d1a4db13ac8c1c9938276384e9c711",
+    "plugins/pipeline-core/scripts/pipeline-state.mjs": "88f8dd56880eacbe302c6bd26320d7a4af316da0e470c0e0210da80bb11251b9",
+    "plugins/pipeline-core/lib/onboarding-continuity.mjs": "1d393c1eff205bb9e032c791161b2fccad6b70b2f0a6620b01033e109f30c871",
+    "plugins/pipeline-core/lib/session-authority-registry.mjs": "d30aaa52c97ac7f17c852a181572b773d952e2090fa5496afe4e609b86b5bea0",
+    "plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs": "205a592d28a178d6721e57983eefc01d6cf4e380901a66e135919a4776a77e9c"
+  },
+  "conservation": {
+    "originalResources": 1715,
+    "sourceConserved": true,
+    "allFourOverlaysRestoredSameInodeModeBytes": true,
+    "newCustodyLeafRemoved": true
+  },
+  "retainedOriginal006ProofSha256": "269018af279ead2f41897fd60b638eeb8a0bbb0fdc86e3340455dde13f7faca2",
+  "aplock002Rerun": false,
+  "whole26Qualified": false,
+  "nativeAssurance": false,
+  "wholeItemAccepted": false,
+  "privateRuntimePathsExcluded": true
+}

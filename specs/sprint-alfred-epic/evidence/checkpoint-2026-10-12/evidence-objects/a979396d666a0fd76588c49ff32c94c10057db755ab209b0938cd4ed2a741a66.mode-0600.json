@@ -1,0 +1,70 @@
+{
+  "schema": "alfred.afk-main-single-file-atomic-apply.v1",
+  "status": "applied-one-file",
+  "component": "ledger",
+  "canonicalPath": "plugins/pipeline-core/lib/afk-ledger.mjs",
+  "preimage": {
+    "path": "<repository>/plugins/pipeline-core/lib/afk-ledger.mjs",
+    "sha256": "258abe7f1d920426b358c1572609bfd61a58ddd45d67d4ac04380f6aeeef06ad",
+    "bytes": 27235,
+    "mode": 420,
+    "nlink": 2,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "084403a81349da1af706a204d303f64d345096149c0e200ed9fcb75c2c597d2c",
+      "bytes": 6,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "postimage": {
+    "path": "<repository>/plugins/pipeline-core/lib/afk-ledger.mjs",
+    "sha256": "a7a4bf0cfa6c6ecc9f4a075eeaedafe3db4906b79e6346872589607e9d7893f1",
+    "bytes": 33712,
+    "mode": 420,
+    "nlink": 1,
+    "dev": {
+      "excluded": true,
+      "rawSha256": "b72653265c6bad2943d9235c8725b57920e6e5e1ff76165410094e7ae3c9bb99",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "ino": {
+      "excluded": true,
+      "rawSha256": "36fca41906b98e556a890eeebd7f7a84d634e9e1c71540e82b05d5fc7acd9809",
+      "bytes": 7,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "uid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    },
+    "gid": {
+      "excluded": true,
+      "rawSha256": "40510175845988f13f6162ed8526f0b09f73384467fa855e1e79b44a56562a58",
+      "bytes": 4,
+      "reason": "Private original/key/proof/environment/transcript/host correlation excluded; metadata only"
+    }
+  },
+  "inverseRetained": "legacy-origin:alfred-afk-main-content-transfer-20261011/main-writer-v3/preflight/inverse/plugins/pipeline-core/lib/afk-ledger.mjs",
+  "captureManifestSha256": "87d1ae0b8bce7561d4baac3cac603e91be404b11fcae6c8c96dd3160dc218670"
+}

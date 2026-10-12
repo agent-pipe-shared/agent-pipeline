@@ -1,0 +1,58 @@
+{
+  "schema": "alfred.critic-cap.fixture-transport-derivative.v1",
+  "authority": "Root explicit inherited-policy mechanical derivative authorization, including removal of empty modelRoleEnvironment overrides",
+  "rows": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-inherited-policy-registration.fixture.mjs",
+      "source": "legacy-origin:alfred-critic-external-stop-independent-20261010/postimages/plugins/pipeline-core/scripts/critic-owned-root-registration.fixture.mjs",
+      "parentSha256": "45dc3c4b150568975049a45337d7c055bd71ce7faba8b8af527ca39c93aa9470",
+      "postSha256": "f6835e041ae38345688c7faa16b93ec101cb23fd052e1b6070dbc3d5bf7992c2",
+      "beforeBytes": 23284,
+      "postBytes": 22654,
+      "mode": 420,
+      "nlink": 1,
+      "edits": [
+        {
+          "from": "const home = join(units, 'home'), tmp = join(units, 'tmp'), hooks = join(units, 'empty-hooks');\nfor (const path of [home, tmp, hooks]) mkdirSync(path, { mode: 0o700 });\n// Child-local environment isolation; inherited preload and all other variables stay intact.\nObject.assign(process.env, { HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: home,\n  TMPDIR: tmp, TMP: tmp, TEMP: tmp, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(home, 'empty-gitconfig') });\nwriteFileSync(process.env.GIT_CONFIG_GLOBAL, '', { flag: 'wx', mode: 0o600 });\n",
+          "to": "// Root supplies owned temporary storage; inherited home/Git/preload/PO policy stays intact.\n",
+          "count": 1
+        },
+        {
+          "from": "['-c', `core.hooksPath=${hooks}`, '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', '-C', dir, ...argv]",
+          "to": "['-C', dir, ...argv]",
+          "count": 1
+        },
+        {
+          "from": "  git(dir, 'config', 'core.hooksPath', hooks); git(dir, 'config', 'commit.gpgsign', 'false');\n",
+          "to": "",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/critic-inherited-policy-course.fixture.mjs",
+      "source": "legacy-origin:alfred-critic39-review-target-fixture-closure-20261010/postimages/plugins/pipeline-core/scripts/critic-course-runtime.fixture.mjs",
+      "parentSha256": "279575b8b22644b51865439fc79dc620cca5ed62b4528c72bf1b943bdc04647a",
+      "postSha256": "0f3f01486109426fd101e5f510aeea4c03ffb9e1468899aca3b48094a74969db",
+      "beforeBytes": 26419,
+      "postBytes": 26326,
+      "mode": 420,
+      "nlink": 1,
+      "edits": [
+        {
+          "from": "'./critic-original-criterion.fixture.mjs'",
+          "to": "'./critic-inherited-policy-registration.fixture.mjs'",
+          "count": 1
+        },
+        {
+          "from": ",{modelRoleEnvironment:{}}",
+          "to": "",
+          "count": 4
+        }
+      ]
+    }
+  ],
+  "productChanges": 0,
+  "semanticRuns": 0,
+  "policy": "All inherited environment and Git hooks/signing/config retained; normal synthetic local author identity retained; actual setup may refuse"
+}

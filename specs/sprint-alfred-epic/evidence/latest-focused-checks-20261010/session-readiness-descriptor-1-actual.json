@@ -1,0 +1,73 @@
+{
+  "schema": "alfred.readiness-descriptor-concurrency-public-proof.v1",
+  "status": "controlled-descriptor-case-pass",
+  "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+  "originalBodySha256": "42fc4b81bb2759d9a3399b3b1e097dbb6bb2809ffd83946554a987fc1dffd22f",
+  "caseId": "SRF001",
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "094c13bb8c8fc8d91a16db09fb16e3063249c6756b446bb65f1f3390ac2b5a8d",
+    "caseSetSha256": "9a1e7d0ba9e39d9e0b60a5ec5637599537e8de4aea3f0e32eef5067b5d233b98",
+    "dispositionsSha256": "be24fdfbb7bcf05b8899c23cf3fe648ce90c84c12052271e82f482918fc9562b",
+    "declaredCount": 1,
+    "disposedCount": 1,
+    "counts": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "actualReceiptSha256": "774f148fa0ecf254eb2ff333ca3f2bdd67486119790b8f4006f18505ea226bc0",
+  "fd3": {
+    "sha256": "e316d670eb5396b3b5136fefdeffaa309c6169e22fa3815dbcda5c8e90fac981",
+    "bytes": 635
+  },
+  "observed": {
+    "schema": "alfred.readiness-descriptor-concurrency-result.v1",
+    "stableEpochs": 10,
+    "concurrentReadResults": 16,
+    "listLoadRetirementAbsent": true,
+    "requiredLoadMissingTyped": true,
+    "originalReadyAdmission": false,
+    "nativeWindows": false
+  },
+  "sources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/windows-private-state.mjs",
+      "sha256": "00a4ccdaec9b30abe2213fd93169aabf4cf8761c8025b1a3809a5a63db236b32"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/successful-spawn.mjs",
+      "sha256": "55c4e49b46d1e9543bb068ca4d5a86070354f023a2522c5d1bc826fe7189387e"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/git-null-device.mjs",
+      "sha256": "89be7dc2c32544c5a1a0159de3515c25fc773d9a7d112689558f9e52dd1a65eb"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/test-case-completion.mjs",
+      "sha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+      "sha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b"
+    }
+  ],
+  "strictInitialization": "Git init must return status0, absent/null spawn error and null signal; EPERM is never accepted. Original unrun predecessor retained.",
+  "sourceAndFixtureConserved": true,
+  "limits": [
+    "One controlled descriptor mechanical case: real create/retire writer child and four readers; ten held epochs and sixteen changing-epoch reader results.",
+    "List/load retirement is absent, but a required load retains WT-SESSION-MISSING.",
+    "No fabricated ready State, readiness capability or Human authority.",
+    "Full ready-session inspect/admission, production cleanup retry integration and native Windows remain unqualified.",
+    "No whole-item closure or engineering stage uplift."
+  ],
+  "nativeClaims": false,
+  "itemAccepted": false
+}

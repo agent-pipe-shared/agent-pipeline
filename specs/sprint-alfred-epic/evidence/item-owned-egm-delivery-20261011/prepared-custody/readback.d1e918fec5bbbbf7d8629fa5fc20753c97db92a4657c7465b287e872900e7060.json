@@ -1,0 +1,3085 @@
+{
+  "schema": "alfred.prepared-custody-supplement-readback.v7",
+  "manifest": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.573bfd7951d4334b268318343be1408f6a843db0e20564c390887abfa70ab4b3.json",
+  "manifestSha256": "573bfd7951d4334b268318343be1408f6a843db0e20564c390887abfa70ab4b3",
+  "status": "administrative-canonical-local-only",
+  "newArtifactRecords": 10,
+  "uniqueAdded": 11,
+  "reused": 0,
+  "files": [
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/e3b75ae5fc19279d7f2ec7aa1e1f837a68fb1f93822274d9cbc3f5b4b307181b.mode-0644.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e3b75ae5fc19279d7f2ec7aa1e1f837a68fb1f93822274d9cbc3f5b4b307181b.mode-0644.json",
+      "sha256": "e3b75ae5fc19279d7f2ec7aa1e1f837a68fb1f93822274d9cbc3f5b4b307181b",
+      "bytes": 251820,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/376fda837c89e32cf06209c43ef185c88de1417d075eb63abe5201bfce102b17.mode-0644.md",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/376fda837c89e32cf06209c43ef185c88de1417d075eb63abe5201bfce102b17.mode-0644.md",
+      "sha256": "376fda837c89e32cf06209c43ef185c88de1417d075eb63abe5201bfce102b17",
+      "bytes": 2652,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/b70b947e94e6a9e19a1afa4072f4107437048e1cb08e5d3f19a8e96716d4742b.mode-0644.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b70b947e94e6a9e19a1afa4072f4107437048e1cb08e5d3f19a8e96716d4742b.mode-0644.json",
+      "sha256": "b70b947e94e6a9e19a1afa4072f4107437048e1cb08e5d3f19a8e96716d4742b",
+      "bytes": 209566,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/536285a13055685ea9597c667bcc5b6f6f85df6fffa1809f60ed3f746e4455d0.mode-0644.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/536285a13055685ea9597c667bcc5b6f6f85df6fffa1809f60ed3f746e4455d0.mode-0644.json",
+      "sha256": "536285a13055685ea9597c667bcc5b6f6f85df6fffa1809f60ed3f746e4455d0",
+      "bytes": 66837,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/0cd0dc239ce54a043ccd98a4f29c280bf5dbd4c0b70c742d3b589d93d57bece1.mode-0644.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0cd0dc239ce54a043ccd98a4f29c280bf5dbd4c0b70c742d3b589d93d57bece1.mode-0644.json",
+      "sha256": "0cd0dc239ce54a043ccd98a4f29c280bf5dbd4c0b70c742d3b589d93d57bece1",
+      "bytes": 8740,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/064d175e9dec24a43b20c076bb9ca1958d9333eb4775fbda3f31bbd2379cf8e2.mode-0644.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/064d175e9dec24a43b20c076bb9ca1958d9333eb4775fbda3f31bbd2379cf8e2.mode-0644.json",
+      "sha256": "064d175e9dec24a43b20c076bb9ca1958d9333eb4775fbda3f31bbd2379cf8e2",
+      "bytes": 23410,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/85aaebbaedb2be1295de26af971e1bbf3fb6f4cde6f05b501823c586b64faff7.mode-0644.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/85aaebbaedb2be1295de26af971e1bbf3fb6f4cde6f05b501823c586b64faff7.mode-0644.json",
+      "sha256": "85aaebbaedb2be1295de26af971e1bbf3fb6f4cde6f05b501823c586b64faff7",
+      "bytes": 25238,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/c5748901fa87a0d849ef38179b8cd3c5da533608071859fa1d65e5cf449c93a4.mode-0644.md",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c5748901fa87a0d849ef38179b8cd3c5da533608071859fa1d65e5cf449c93a4.mode-0644.md",
+      "sha256": "c5748901fa87a0d849ef38179b8cd3c5da533608071859fa1d65e5cf449c93a4",
+      "bytes": 3254,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/35d195dd893e47deef3fac2e1e3e94fe78d4337addd964e2184f538b113195c8.mode-0644.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/35d195dd893e47deef3fac2e1e3e94fe78d4337addd964e2184f538b113195c8.mode-0644.json",
+      "sha256": "35d195dd893e47deef3fac2e1e3e94fe78d4337addd964e2184f538b113195c8",
+      "bytes": 387752,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/objects/e2de4ced5574661b874d0f18def201ebf65d2991761823bd8b4f737e094756e1.mode-0644.md",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e2de4ced5574661b874d0f18def201ebf65d2991761823bd8b4f737e094756e1.mode-0644.md",
+      "sha256": "e2de4ced5574661b874d0f18def201ebf65d2991761823bd8b4f737e094756e1",
+      "bytes": 20125,
+      "mode": "0644"
+    },
+    {
+      "from": "scratch/alfred-postinstall-whole-items-20261011/prepared-evidence-custody/ready-v7/manifest.573bfd7951d4334b268318343be1408f6a843db0e20564c390887abfa70ab4b3.json",
+      "to": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.573bfd7951d4334b268318343be1408f6a843db0e20564c390887abfa70ab4b3.json",
+      "sha256": "573bfd7951d4334b268318343be1408f6a843db0e20564c390887abfa70ab4b3",
+      "bytes": 156037,
+      "mode": "0644"
+    }
+  ],
+  "priorCanonicalFiles": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/README.md",
+      "sha256": "80f80f542aa4d5b48c57931d2d9914680814052123e6b1fb9176224c9c35258d",
+      "bytes": 728,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.3d6bb3117886d105ab9ce8ad200a41dd8af258dc2c1cc6db96e5fa988637a4fe.json",
+      "sha256": "3d6bb3117886d105ab9ce8ad200a41dd8af258dc2c1cc6db96e5fa988637a4fe",
+      "bytes": 361594,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd.json",
+      "sha256": "5866abf28dffc058dc9de694ee5077d9778d3e6b84935a345604a6c5bd6cd0fd",
+      "bytes": 34539,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.6322d16ff5d95b686b9b9641d89b6b678b9542373a93b1ea8dab7fd0c7830ba2.json",
+      "sha256": "6322d16ff5d95b686b9b9641d89b6b678b9542373a93b1ea8dab7fd0c7830ba2",
+      "bytes": 158291,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.a593bc57236837838eff3cee8cd97bdacc729ad69d8a31ed8b8833cca689fc2e.json",
+      "sha256": "a593bc57236837838eff3cee8cd97bdacc729ad69d8a31ed8b8833cca689fc2e",
+      "bytes": 169834,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.d84b37e7c8ec9e6c284360ce0f9deabc6837b27e75cdeeddd6f6ea1be19aff38.json",
+      "sha256": "d84b37e7c8ec9e6c284360ce0f9deabc6837b27e75cdeeddd6f6ea1be19aff38",
+      "bytes": 99229,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.f0e0c29a75af99a42b3d44cbb1cc91ea6191e31e44f8209ca30095326bcfe372.json",
+      "sha256": "f0e0c29a75af99a42b3d44cbb1cc91ea6191e31e44f8209ca30095326bcfe372",
+      "bytes": 4262,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/manifest.f8fe052324f7b2d94b423d129a866a398f779df5943f355e58b5d599ff035cc8.json",
+      "sha256": "f8fe052324f7b2d94b423d129a866a398f779df5943f355e58b5d599ff035cc8",
+      "bytes": 138488,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/020e957e16734add7f03aaa7105ceb607fa93c5c2601765a0a1a58d96b759be9.json",
+      "sha256": "020e957e16734add7f03aaa7105ceb607fa93c5c2601765a0a1a58d96b759be9",
+      "bytes": 247,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/03359828983168df6cef360b0b12906db1a107740cfd91aafd1f7a4ece1e0268.mjs",
+      "sha256": "03359828983168df6cef360b0b12906db1a107740cfd91aafd1f7a4ece1e0268",
+      "bytes": 70644,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/03359828983168df6cef360b0b12906db1a107740cfd91aafd1f7a4ece1e0268.mode-0644.mjs",
+      "sha256": "03359828983168df6cef360b0b12906db1a107740cfd91aafd1f7a4ece1e0268",
+      "bytes": 70644,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/064cf9431dc61786691620ae010b1f5b3413b406568e8a69ed4fd6a2602732d7.json",
+      "sha256": "064cf9431dc61786691620ae010b1f5b3413b406568e8a69ed4fd6a2602732d7",
+      "bytes": 15648,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/069a567819a20b3e90b5a60b51091a33a074a51be203e6ff961e2669bdd255c8.mjs",
+      "sha256": "069a567819a20b3e90b5a60b51091a33a074a51be203e6ff961e2669bdd255c8",
+      "bytes": 50814,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/06fd8980c9facf18c5d97a91cf8b31b127d1d1c67641b4b210e2c826119bfffc.mode-0644.md",
+      "sha256": "06fd8980c9facf18c5d97a91cf8b31b127d1d1c67641b4b210e2c826119bfffc",
+      "bytes": 3559,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0708eef59f709dd2c9405c6c9e0b69eaf10cab15ee2497203bdd44c78555948a.json",
+      "sha256": "0708eef59f709dd2c9405c6c9e0b69eaf10cab15ee2497203bdd44c78555948a",
+      "bytes": 8476,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/096f6594392e94b8d5871a409df4d292b8fb290be4c5cd89c34bd768a84a54b5.json",
+      "sha256": "096f6594392e94b8d5871a409df4d292b8fb290be4c5cd89c34bd768a84a54b5",
+      "bytes": 7315,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0a6665cf85030d6526ccc07299b7dc5e100db8d87d62b9c26a45b7884d783ead.json",
+      "sha256": "0a6665cf85030d6526ccc07299b7dc5e100db8d87d62b9c26a45b7884d783ead",
+      "bytes": 4491,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c.md",
+      "sha256": "0b377167dce5a3dfedae2bfa0d70734cf3448126814065af90d3ed31fe84c38c",
+      "bytes": 43025,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0c9626a79a19e689ac691514dc9c8af43d3ea4328f947cd628f5c6f070e86f58.json",
+      "sha256": "0c9626a79a19e689ac691514dc9c8af43d3ea4328f947cd628f5c6f070e86f58",
+      "bytes": 348143,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/0f8a3de75a2865e6fd36e11cd70d3761ae1a7126ec51f0ce2dd4875010c9cf02.json",
+      "sha256": "0f8a3de75a2865e6fd36e11cd70d3761ae1a7126ec51f0ce2dd4875010c9cf02",
+      "bytes": 2092,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/108c49b74f41131ce327cfbc818e2ac0279f4718fc20aa8e3679a04d12ed9487.json",
+      "sha256": "108c49b74f41131ce327cfbc818e2ac0279f4718fc20aa8e3679a04d12ed9487",
+      "bytes": 599426,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1.json",
+      "sha256": "10b26dd05e9c07f1c01112b2edd51eb8307607d17bee1020c1c1f1103dfc69f1",
+      "bytes": 1663,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/11abceb4a78f3dc7323a12774b3209103561dbfa851e8bf549999f28ac53e786.mode-0644.json",
+      "sha256": "11abceb4a78f3dc7323a12774b3209103561dbfa851e8bf549999f28ac53e786",
+      "bytes": 242,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1465d6cfb656d24e140cbf58c9365e4a5bf9c8374bff9d7b56815e258f359180.md",
+      "sha256": "1465d6cfb656d24e140cbf58c9365e4a5bf9c8374bff9d7b56815e258f359180",
+      "bytes": 4684,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/14ad1092b3d40723760b9490f0db180dca1a9b990658e21ec96d82cb12674671.jsonl",
+      "sha256": "14ad1092b3d40723760b9490f0db180dca1a9b990658e21ec96d82cb12674671",
+      "bytes": 4504,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1511a1a485c4fcf7277de993f53827f0f815a8492587ba6c3636bbab55e72e01.json",
+      "sha256": "1511a1a485c4fcf7277de993f53827f0f815a8492587ba6c3636bbab55e72e01",
+      "bytes": 10980,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1517ce5f4a63ef61acd045ae3e9a4fc62e29c3c0e918986182b2ffa70c6bd716.json",
+      "sha256": "1517ce5f4a63ef61acd045ae3e9a4fc62e29c3c0e918986182b2ffa70c6bd716",
+      "bytes": 1618,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46.mjs",
+      "sha256": "151c5f7c40cd8f62a930c73b4bbc5de93ae3cd0b2a40e0d6c56e85a39e366b46",
+      "bytes": 83773,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/166ab985f0cf03e9507fc2c12525c278d9b1e3fcb276570e7850545ff8d8c933.md",
+      "sha256": "166ab985f0cf03e9507fc2c12525c278d9b1e3fcb276570e7850545ff8d8c933",
+      "bytes": 3285,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/168a50e421fd15fb25bb1e1346c27788eca88c526c500416038b4c06fe5e315d.json",
+      "sha256": "168a50e421fd15fb25bb1e1346c27788eca88c526c500416038b4c06fe5e315d",
+      "bytes": 510659,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/172c58d87ff1760801e8453efd35fec87658afb136797a3e0346124ba0a0782d.txt",
+      "sha256": "172c58d87ff1760801e8453efd35fec87658afb136797a3e0346124ba0a0782d",
+      "bytes": 24081,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/176d60e3434101a34ec4988a056961f2741e4293c0290dea4b1c85f99f5a80f8.mjs",
+      "sha256": "176d60e3434101a34ec4988a056961f2741e4293c0290dea4b1c85f99f5a80f8",
+      "bytes": 50814,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/17a6d4086ff6a1e037147cbc38ffed501bc9fcda22136efda95d2aaf26deaa6f.json",
+      "sha256": "17a6d4086ff6a1e037147cbc38ffed501bc9fcda22136efda95d2aaf26deaa6f",
+      "bytes": 925,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1890d48b8d205bf6c96b28dd42958953d1f32eeac1db4b12b0be435c28ffd441.json",
+      "sha256": "1890d48b8d205bf6c96b28dd42958953d1f32eeac1db4b12b0be435c28ffd441",
+      "bytes": 1261,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/195dc8c3941fdb54d9c85bb4a331ae96c106656c61b853baecfdab3a4bf77ee9.json",
+      "sha256": "195dc8c3941fdb54d9c85bb4a331ae96c106656c61b853baecfdab3a4bf77ee9",
+      "bytes": 809,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1998721753f19221ecd5771fa88d9bddc74de24ed9a0d46b5679cd14937f14b6.mjs",
+      "sha256": "1998721753f19221ecd5771fa88d9bddc74de24ed9a0d46b5679cd14937f14b6",
+      "bytes": 6049,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/19bf2884f900ab66a1b51b2d153e6d0dba62bfcf8f879e98dbc737f1a34b0055.mjs",
+      "sha256": "19bf2884f900ab66a1b51b2d153e6d0dba62bfcf8f879e98dbc737f1a34b0055",
+      "bytes": 37692,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1b7d1cac232af8aa7a68bf722b3d9c6c00673c2a9977d5ad7458cf382215ffef.json",
+      "sha256": "1b7d1cac232af8aa7a68bf722b3d9c6c00673c2a9977d5ad7458cf382215ffef",
+      "bytes": 298755,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1b95224e62ed7fd5de7cab4d9f6a6723d97e1ca3efff572af0ac7cc1fd2a0ccf.json",
+      "sha256": "1b95224e62ed7fd5de7cab4d9f6a6723d97e1ca3efff572af0ac7cc1fd2a0ccf",
+      "bytes": 1432,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1bad2fa4d5e989a6701e41024d7ea8f9de7f1612c9060e1e0c54849c32e13d68.json",
+      "sha256": "1bad2fa4d5e989a6701e41024d7ea8f9de7f1612c9060e1e0c54849c32e13d68",
+      "bytes": 924,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1ce0ef61d61b4650d5b58363d3a3be728492bc5faf57e9d3159b650185a227bb.tap",
+      "sha256": "1ce0ef61d61b4650d5b58363d3a3be728492bc5faf57e9d3159b650185a227bb",
+      "bytes": 687,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1d2c136e078f46a33e2b8cbecd341cd4f44b7d96cbf4a48dac2ae9a3a7385368.json",
+      "sha256": "1d2c136e078f46a33e2b8cbecd341cd4f44b7d96cbf4a48dac2ae9a3a7385368",
+      "bytes": 196,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1edbe3d13a9d0acaf59c21981152696ae915ddd3fceb7e2c61303a5d86e45d09.json",
+      "sha256": "1edbe3d13a9d0acaf59c21981152696ae915ddd3fceb7e2c61303a5d86e45d09",
+      "bytes": 599699,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1f30bf592c9dfe7ac28ac78ba1c0fd07e4d32c6a48109889aa94421682f20b2c.json",
+      "sha256": "1f30bf592c9dfe7ac28ac78ba1c0fd07e4d32c6a48109889aa94421682f20b2c",
+      "bytes": 133999,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1faea786440a51f42e3ec8669270083a87bbe116883a8f27574a5a28ecd783b9.tap",
+      "sha256": "1faea786440a51f42e3ec8669270083a87bbe116883a8f27574a5a28ecd783b9",
+      "bytes": 6684,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/1fbf625e1c9f4ed00fd889a38061f76f67d1e5a1f17bce02006e794ffc63dfb8.json",
+      "sha256": "1fbf625e1c9f4ed00fd889a38061f76f67d1e5a1f17bce02006e794ffc63dfb8",
+      "bytes": 660501,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2003f2815634307a2574a361cfe563ac04e955deecc796127adeb0d590265c92.json",
+      "sha256": "2003f2815634307a2574a361cfe563ac04e955deecc796127adeb0d590265c92",
+      "bytes": 3489,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/203e3bc5b4d2f75d9a73e50ce7f8499d8194987ec252f621bafdc18cba90331e.patch",
+      "sha256": "203e3bc5b4d2f75d9a73e50ce7f8499d8194987ec252f621bafdc18cba90331e",
+      "bytes": 155,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/20e14aa1049ed3b0ce10cdc18fa1ee8c774af0a36d0587de99ff2797b931550b.patch",
+      "sha256": "20e14aa1049ed3b0ce10cdc18fa1ee8c774af0a36d0587de99ff2797b931550b",
+      "bytes": 171,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/20e776c0ebbfc3c683629935acb6f5629e5331ca112a1016ca3cfe17a2e7ef20.json",
+      "sha256": "20e776c0ebbfc3c683629935acb6f5629e5331ca112a1016ca3cfe17a2e7ef20",
+      "bytes": 198,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/21667210106c6091bdf2c3bb8f542073c11f6740745d120956d772959d713123.json",
+      "sha256": "21667210106c6091bdf2c3bb8f542073c11f6740745d120956d772959d713123",
+      "bytes": 19991,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/22e10e6140193543b1e055455deb44f722670589bdb673d42027e391385a7da6.mode-0644.json",
+      "sha256": "22e10e6140193543b1e055455deb44f722670589bdb673d42027e391385a7da6",
+      "bytes": 887,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/237c51fb18067a46b49b149993e115ece47aed3a8be450630ef13b3a047b402d.json",
+      "sha256": "237c51fb18067a46b49b149993e115ece47aed3a8be450630ef13b3a047b402d",
+      "bytes": 15715,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/24185836bda146bb6bbea0d46a3b069407d27fe559ed38b82fa2f09b897f8355.md",
+      "sha256": "24185836bda146bb6bbea0d46a3b069407d27fe559ed38b82fa2f09b897f8355",
+      "bytes": 3593,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/25058655212cf8097c0236462a503260d51f32c619ace5f08409f7d33c2fc30c.mode-0644.json",
+      "sha256": "25058655212cf8097c0236462a503260d51f32c619ace5f08409f7d33c2fc30c",
+      "bytes": 384103,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68.mjs",
+      "sha256": "263e24bb6222144e5b6df0159d3431cc602bb9972db1964929692ef3905c0c68",
+      "bytes": 81206,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/26b3696681855b54c1cb00105e0554c95a24c423ed3db25f2bf2c191985d091a.json",
+      "sha256": "26b3696681855b54c1cb00105e0554c95a24c423ed3db25f2bf2c191985d091a",
+      "bytes": 127806,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/270a8ebf49659b39038990b67db08c4539ec6cea0e8f175cd0367b8042c34683.json",
+      "sha256": "270a8ebf49659b39038990b67db08c4539ec6cea0e8f175cd0367b8042c34683",
+      "bytes": 2317,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/27406a4af798688502c7f67255b3295c595ed10d4a6a97aa6c33530712961858.md",
+      "sha256": "27406a4af798688502c7f67255b3295c595ed10d4a6a97aa6c33530712961858",
+      "bytes": 6744,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/279fd8fb17776ab7e81f0817884a24937d401f254721e328ac971a1387a93d83.mode-0644.md",
+      "sha256": "279fd8fb17776ab7e81f0817884a24937d401f254721e328ac971a1387a93d83",
+      "bytes": 4144,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/28a4f24d721b0cedd021973c87c287431070a0c49191ca007c112a44ce75d106.json",
+      "sha256": "28a4f24d721b0cedd021973c87c287431070a0c49191ca007c112a44ce75d106",
+      "bytes": 809,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/29140ac3fd04f505f88689f60642d32fb0de09c6b396be23016fef3df903876c.patch",
+      "sha256": "29140ac3fd04f505f88689f60642d32fb0de09c6b396be23016fef3df903876c",
+      "bytes": 384,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/29c39fb4e6964d397d22797e7789e2173da01ac5d47737c03b31c1aa7a7f7806.json",
+      "sha256": "29c39fb4e6964d397d22797e7789e2173da01ac5d47737c03b31c1aa7a7f7806",
+      "bytes": 3153,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/29d946f34668c1e377b4ca3691531d57ebfd187b91da74aed007bbe1af7a39eb.json",
+      "sha256": "29d946f34668c1e377b4ca3691531d57ebfd187b91da74aed007bbe1af7a39eb",
+      "bytes": 11820,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/29e75131ba15e31d29e5b95eec126bb2a251d6ef0861379d286b91bd155fae0b.json",
+      "sha256": "29e75131ba15e31d29e5b95eec126bb2a251d6ef0861379d286b91bd155fae0b",
+      "bytes": 737,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2a21dfbaf69dfbdd004cafcd972753552fb2dabe74a6a0b97ac8686c594a9217.json",
+      "sha256": "2a21dfbaf69dfbdd004cafcd972753552fb2dabe74a6a0b97ac8686c594a9217",
+      "bytes": 345,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2a3ebed2889f3f9e594ade441e95d3df776346a635c8e4dcc5d3944b65aa57c0.mode-0644.md",
+      "sha256": "2a3ebed2889f3f9e594ade441e95d3df776346a635c8e4dcc5d3944b65aa57c0",
+      "bytes": 5540,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2a52930e0ad2ffd71268aa74139a21ff7f740094e031fe161381b11b26a8540f.txt",
+      "sha256": "2a52930e0ad2ffd71268aa74139a21ff7f740094e031fe161381b11b26a8540f",
+      "bytes": 6121,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636.mjs",
+      "sha256": "2ae19bd15e6aabb00fda5b1df0248172fcc6b70669feb9ca3a9067576eb7c636",
+      "bytes": 26666,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2afc5a3f60590afd0530146e8994876f50fdc6d74f9eb1a2974e0fa36546bf6f.json",
+      "sha256": "2afc5a3f60590afd0530146e8994876f50fdc6d74f9eb1a2974e0fa36546bf6f",
+      "bytes": 292730,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2b6d85ab59df759326d24745cf582124c7188e32c131060ff580932b102bd8a2.mjs",
+      "sha256": "2b6d85ab59df759326d24745cf582124c7188e32c131060ff580932b102bd8a2",
+      "bytes": 8005,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2cf9f3c96887628a9b7070fb617beeff9837347e871308cda8ac520ccdd1f149.patch",
+      "sha256": "2cf9f3c96887628a9b7070fb617beeff9837347e871308cda8ac520ccdd1f149",
+      "bytes": 129,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d1181cf47a7ee9ed30efb78a4afb69488efc46d8373dee032fdf4e0c81c9cce.json",
+      "sha256": "2d1181cf47a7ee9ed30efb78a4afb69488efc46d8373dee032fdf4e0c81c9cce",
+      "bytes": 544790,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d3448426dd19bb3a93030633f0ff105ff829c2fd79f4616146f44c4630aca39.md",
+      "sha256": "2d3448426dd19bb3a93030633f0ff105ff829c2fd79f4616146f44c4630aca39",
+      "bytes": 4119,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d38fc768269879a7f5bc32bec6aa1df9355ce3bb9576a8780ce43e36dc8866c.json",
+      "sha256": "2d38fc768269879a7f5bc32bec6aa1df9355ce3bb9576a8780ce43e36dc8866c",
+      "bytes": 1236,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d41a73807052790f42072b636934642087bf49eb4a7909097d2e2441783368a.json",
+      "sha256": "2d41a73807052790f42072b636934642087bf49eb4a7909097d2e2441783368a",
+      "bytes": 101008,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d54a2a841e77a2fbaaae29b0d8a813c4479cf711accdaf04c48c3d228cffe49.txt",
+      "sha256": "2d54a2a841e77a2fbaaae29b0d8a813c4479cf711accdaf04c48c3d228cffe49",
+      "bytes": 6115,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2.mjs",
+      "sha256": "2d57851f44b41c1a6a9717a8fbb81ce606bea2634d061755bc5da20fdd6d66d2",
+      "bytes": 9275,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2e49fd853eb50789e80a06521914f6da56ae2fb9cf2d1eb49d5cfa22a46154d6.json",
+      "sha256": "2e49fd853eb50789e80a06521914f6da56ae2fb9cf2d1eb49d5cfa22a46154d6",
+      "bytes": 5611,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2e792f7937638f7265a69a0c68273c020396e77c70265d8b4bc7297ee44acb38.jsonl",
+      "sha256": "2e792f7937638f7265a69a0c68273c020396e77c70265d8b4bc7297ee44acb38",
+      "bytes": 913,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/2e876345c5794d070ba104477c85f09756c4fbbfa5fb979a17160a09cb838a72.mode-0644.json",
+      "sha256": "2e876345c5794d070ba104477c85f09756c4fbbfa5fb979a17160a09cb838a72",
+      "bytes": 8616,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/309e7c8dd2e0b37e56803b343f824004744d34ab2d1e7d366cdb9408142a8b6e.json",
+      "sha256": "309e7c8dd2e0b37e56803b343f824004744d34ab2d1e7d366cdb9408142a8b6e",
+      "bytes": 5903,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/33539ad1b7cdd6ccabfe587de8b48085d51118141b183ee230e898f8edce264f.md",
+      "sha256": "33539ad1b7cdd6ccabfe587de8b48085d51118141b183ee230e898f8edce264f",
+      "bytes": 3791,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/339806a318c66ef89fabba1667f4609676dde7cedca6230fecd58357d1fee641.json",
+      "sha256": "339806a318c66ef89fabba1667f4609676dde7cedca6230fecd58357d1fee641",
+      "bytes": 1056,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/34cb2b795a85d56a09f6a4e951786f1504c5dc7a27ebdeb480de266b4a088165.mode-0600.json",
+      "sha256": "34cb2b795a85d56a09f6a4e951786f1504c5dc7a27ebdeb480de266b4a088165",
+      "bytes": 35276,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/34d863452a4f72429aba5ba9f48d542401ed1fbc3699a93dc4559ded89bb4484.mode-0644.md",
+      "sha256": "34d863452a4f72429aba5ba9f48d542401ed1fbc3699a93dc4559ded89bb4484",
+      "bytes": 3515,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6.mjs",
+      "sha256": "3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6",
+      "bytes": 21131,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6.mode-0644.mjs",
+      "sha256": "3525f685ac661cfbfd97a226649aecf71ec074ea92990501cab1584b98fab5a6",
+      "bytes": 21131,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/354bb078d303c90be9cfba71a3db45d11f2161ed8ea9e21727d5eb91e85878e3.json",
+      "sha256": "354bb078d303c90be9cfba71a3db45d11f2161ed8ea9e21727d5eb91e85878e3",
+      "bytes": 5219,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/36c642fd798268f574e43f0e328ced3204b2214b0b47b712c6cb69cf0d2db5a1.mode-0644.md",
+      "sha256": "36c642fd798268f574e43f0e328ced3204b2214b0b47b712c6cb69cf0d2db5a1",
+      "bytes": 4528,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/36d6e585feb6d4043bed9c03e7405fe7da09a2d71d296ad97495e0f6e290f94e.json",
+      "sha256": "36d6e585feb6d4043bed9c03e7405fe7da09a2d71d296ad97495e0f6e290f94e",
+      "bytes": 2581,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/38c3f18ecc86b84204a267a4c4fdb05033ea2f1828ff64284419911b72472e55.json",
+      "sha256": "38c3f18ecc86b84204a267a4c4fdb05033ea2f1828ff64284419911b72472e55",
+      "bytes": 15259,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3948d6fbedddc42e1965f170e7c8d5ca71bb6693c6f81cf380bc108e099c3b19.json",
+      "sha256": "3948d6fbedddc42e1965f170e7c8d5ca71bb6693c6f81cf380bc108e099c3b19",
+      "bytes": 3533,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3a7b31c04877fed1c88236280604cf564eff20ae2d47af84d8cb86a94ececd9a.mjs",
+      "sha256": "3a7b31c04877fed1c88236280604cf564eff20ae2d47af84d8cb86a94ececd9a",
+      "bytes": 9868,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3ad299de655ed655162751fe182bc88e39d84321044402770d7aa74d6d13d073.mode-0644.md",
+      "sha256": "3ad299de655ed655162751fe182bc88e39d84321044402770d7aa74d6d13d073",
+      "bytes": 12910,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3adb2dcd54fb9ed086369d85c81c1b9f34a4b57084f386942a58200933ba1260.json",
+      "sha256": "3adb2dcd54fb9ed086369d85c81c1b9f34a4b57084f386942a58200933ba1260",
+      "bytes": 8795,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3aeb43ab719032beafc2e31cf23099f0d58161e352023cf6506cc84b152e0171.mjs",
+      "sha256": "3aeb43ab719032beafc2e31cf23099f0d58161e352023cf6506cc84b152e0171",
+      "bytes": 18581,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3d279814e31240dc67b105c2a023c7a5ecaab88fbc7d4aa2efc06ba474f603f3.json",
+      "sha256": "3d279814e31240dc67b105c2a023c7a5ecaab88fbc7d4aa2efc06ba474f603f3",
+      "bytes": 953753,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3e0ae5faadf7dc9a9615164ca127dd77cc1f09cd66bc8556e7b42e4401459d2e.json",
+      "sha256": "3e0ae5faadf7dc9a9615164ca127dd77cc1f09cd66bc8556e7b42e4401459d2e",
+      "bytes": 5019,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/3f2c43abab12a40e044b5b8a615c7365ecf5d55ad3d1cc9531e77c182ebe1185.mode-0644.json",
+      "sha256": "3f2c43abab12a40e044b5b8a615c7365ecf5d55ad3d1cc9531e77c182ebe1185",
+      "bytes": 278708,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4032ec8ab600cbd5bf8b3fe6b97dc6c740620e602f8487a8207db151df40d28f.json",
+      "sha256": "4032ec8ab600cbd5bf8b3fe6b97dc6c740620e602f8487a8207db151df40d28f",
+      "bytes": 6033,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/411d5230208b83e56ba28e3bd04269595d58abe4cf3cc2babe1e4744d6ea1d59.mode-0644.md",
+      "sha256": "411d5230208b83e56ba28e3bd04269595d58abe4cf3cc2babe1e4744d6ea1d59",
+      "bytes": 27121,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/42358100d5e1242a395fb3493028a2a7d49570d81756e2135fa60f65c46a2dd0.json",
+      "sha256": "42358100d5e1242a395fb3493028a2a7d49570d81756e2135fa60f65c46a2dd0",
+      "bytes": 298888,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549.mjs",
+      "sha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+      "bytes": 7532,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/436a2f4c4c8fe1630c0b2d9e1396e7bd876e9a0b2b00f7553ed942d37563fe2e.json",
+      "sha256": "436a2f4c4c8fe1630c0b2d9e1396e7bd876e9a0b2b00f7553ed942d37563fe2e",
+      "bytes": 3057,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/439d3706a6f32269628a803ffc63d31644d46e89bce90af98a22db95144bf4c9.json",
+      "sha256": "439d3706a6f32269628a803ffc63d31644d46e89bce90af98a22db95144bf4c9",
+      "bytes": 331568,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/43c9961556221637268de971e3714e8e078dcff8091e733188a90a5b38cec2ab.json",
+      "sha256": "43c9961556221637268de971e3714e8e078dcff8091e733188a90a5b38cec2ab",
+      "bytes": 427,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/444ea800b4d7125ce6b4c41cd65618ae38ec407a42d62b43391e7e7304410fee.mjs",
+      "sha256": "444ea800b4d7125ce6b4c41cd65618ae38ec407a42d62b43391e7e7304410fee",
+      "bytes": 3319,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/448154d255dc54e33c6e4676f5133fa6bd5092dcbbe0754faf61add98d0b1959.json",
+      "sha256": "448154d255dc54e33c6e4676f5133fa6bd5092dcbbe0754faf61add98d0b1959",
+      "bytes": 935,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/449b5fc4359f6fe344be82be8fd9ecb8d92e0b9574576241bdbf49a7233a8d0a.json",
+      "sha256": "449b5fc4359f6fe344be82be8fd9ecb8d92e0b9574576241bdbf49a7233a8d0a",
+      "bytes": 428,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/44bbd82751d9243df4305cd55fefcd0db7c3eb77aeb551aa4b6ddb92b93a16da.txt",
+      "sha256": "44bbd82751d9243df4305cd55fefcd0db7c3eb77aeb551aa4b6ddb92b93a16da",
+      "bytes": 1909,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/44c04ae8550d9cb13958d0fffbb7e2e1fd5a83ab1ad4d7a0909a2fbc2e427f0f.mode-0644.json",
+      "sha256": "44c04ae8550d9cb13958d0fffbb7e2e1fd5a83ab1ad4d7a0909a2fbc2e427f0f",
+      "bytes": 12148,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4650b1ce00fa57196fb7fe76d4b11846882cdccd1555b3ac095fdeb9fbd1d396.json",
+      "sha256": "4650b1ce00fa57196fb7fe76d4b11846882cdccd1555b3ac095fdeb9fbd1d396",
+      "bytes": 380258,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/48252ed0a582cbd04aaa90fb68335f73dd40d279dd731f390028bc30f8d2003d.json",
+      "sha256": "48252ed0a582cbd04aaa90fb68335f73dd40d279dd731f390028bc30f8d2003d",
+      "bytes": 2254,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/48885a5280450739117db2855a9228c3ef44f3289ef767bf973bb830e008c3e0.json",
+      "sha256": "48885a5280450739117db2855a9228c3ef44f3289ef767bf973bb830e008c3e0",
+      "bytes": 746,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4911a23a82497fef71dfb3700860aea1eeb97aaf99fc00ba6e7420994e83b726.json",
+      "sha256": "4911a23a82497fef71dfb3700860aea1eeb97aaf99fc00ba6e7420994e83b726",
+      "bytes": 3578,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4a2ad2ab98f923ae746bd42069e83881784ccfc39f7618f9664c7b1e1dd53dfe.json",
+      "sha256": "4a2ad2ab98f923ae746bd42069e83881784ccfc39f7618f9664c7b1e1dd53dfe",
+      "bytes": 1673,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b.mjs",
+      "sha256": "4a5515f28c96469343b756d44edbdd98ac8ab3ef6e1baa8a7d81059aebc8c47b",
+      "bytes": 16017,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4a59bd29cb2413e2c4b05807c74474bc8747e18d6dd0ce82c4b9f0494eb68d9f.json",
+      "sha256": "4a59bd29cb2413e2c4b05807c74474bc8747e18d6dd0ce82c4b9f0494eb68d9f",
+      "bytes": 1224,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4c0e4e59fcc83eb3a28e5cc515fcf22a5ef707c9af54cb4806faa53a708417e2.json",
+      "sha256": "4c0e4e59fcc83eb3a28e5cc515fcf22a5ef707c9af54cb4806faa53a708417e2",
+      "bytes": 23023,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4c5369f09e8f2ed102d03e45fe2d85e93f35dcff5a49377a85ea20426341c4d1.json",
+      "sha256": "4c5369f09e8f2ed102d03e45fe2d85e93f35dcff5a49377a85ea20426341c4d1",
+      "bytes": 1435,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4c57bd915fa98c5b45e71d4ddfb13310b90a9dbc54c6f77629158b6c9e0efe49.log",
+      "sha256": "4c57bd915fa98c5b45e71d4ddfb13310b90a9dbc54c6f77629158b6c9e0efe49",
+      "bytes": 546,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4dbfe26ea9c0e8e69eca55bca019fe4a651499ff9663633c33d0738958c22b6a.json",
+      "sha256": "4dbfe26ea9c0e8e69eca55bca019fe4a651499ff9663633c33d0738958c22b6a",
+      "bytes": 4627,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4de7aa91e5ee3efaec6911f2648efc8409b2c3b18a6cfc4e88636e9a94f6d384.json",
+      "sha256": "4de7aa91e5ee3efaec6911f2648efc8409b2c3b18a6cfc4e88636e9a94f6d384",
+      "bytes": 160,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4e10867c0aeb99b4a8546f0fe2be2cda03f39f73be7690611c6ae09fa1b81d46.json",
+      "sha256": "4e10867c0aeb99b4a8546f0fe2be2cda03f39f73be7690611c6ae09fa1b81d46",
+      "bytes": 126534,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4e1660d145fdfcb77f31557f2ed7b9f31872123202a4d3dd9629a40e192409ca.json",
+      "sha256": "4e1660d145fdfcb77f31557f2ed7b9f31872123202a4d3dd9629a40e192409ca",
+      "bytes": 2902,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4eba29917a1c7a157285209191611243ac28d839d7219f23bf3ff26fd17a68e8.mode-0644.json",
+      "sha256": "4eba29917a1c7a157285209191611243ac28d839d7219f23bf3ff26fd17a68e8",
+      "bytes": 1049,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4fae4b04487fc2151ba603f17f2bc3dd01aa3f37a7ccd610388b68522caf06df.mode-0644.json",
+      "sha256": "4fae4b04487fc2151ba603f17f2bc3dd01aa3f37a7ccd610388b68522caf06df",
+      "bytes": 631618,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/4fbe90710b7f5867c91fef2fdd4d68db42562aa20c1bddb23193e8b24fa62331.json",
+      "sha256": "4fbe90710b7f5867c91fef2fdd4d68db42562aa20c1bddb23193e8b24fa62331",
+      "bytes": 64474,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/50f814fbe86d854bab255bbe1e14d55b9320f3afe81d27be46ff788744fa0eb0.json",
+      "sha256": "50f814fbe86d854bab255bbe1e14d55b9320f3afe81d27be46ff788744fa0eb0",
+      "bytes": 5645,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2.mjs",
+      "sha256": "529bb481eddffdc1a18e2d893ff424c24d0f3c23fe54310eb239d5b3209991f2",
+      "bytes": 115330,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/54be9ac334415b06455f6d92ecef7bcadb98f0fe50f29b9ce3f780813f6b1508.json",
+      "sha256": "54be9ac334415b06455f6d92ecef7bcadb98f0fe50f29b9ce3f780813f6b1508",
+      "bytes": 62743,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/54c90ebb3e1a9b63a1f968e4983f737d5b77c4999dae04e0789cef49b4aae1cd.json",
+      "sha256": "54c90ebb3e1a9b63a1f968e4983f737d5b77c4999dae04e0789cef49b4aae1cd",
+      "bytes": 1396,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/55789b953dd32ad90d71d0450f13cc4905a2ea1c431d938adc9beec1de99f410.json",
+      "sha256": "55789b953dd32ad90d71d0450f13cc4905a2ea1c431d938adc9beec1de99f410",
+      "bytes": 749,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/55789b953dd32ad90d71d0450f13cc4905a2ea1c431d938adc9beec1de99f410.mode-0600.json",
+      "sha256": "55789b953dd32ad90d71d0450f13cc4905a2ea1c431d938adc9beec1de99f410",
+      "bytes": 749,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/56607332339069a275c205dcba76bcdb94f80f3e28422c48a03683c0da18a417.json",
+      "sha256": "56607332339069a275c205dcba76bcdb94f80f3e28422c48a03683c0da18a417",
+      "bytes": 16399,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/57885f961920955c8185117eebd517f3749c0c7a78a6c2c2b09bd2f127c303d2.log",
+      "sha256": "57885f961920955c8185117eebd517f3749c0c7a78a6c2c2b09bd2f127c303d2",
+      "bytes": 1249,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/588ebed768b336ef7d9a14b294dce5472b51c5869d2ae0a7fea0480d732f7278.mjs",
+      "sha256": "588ebed768b336ef7d9a14b294dce5472b51c5869d2ae0a7fea0480d732f7278",
+      "bytes": 7491,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/59cf982a4273958e51eb819b105e1b2e0a0fb8582c52ab872986c18c4dc6a022.json",
+      "sha256": "59cf982a4273958e51eb819b105e1b2e0a0fb8582c52ab872986c18c4dc6a022",
+      "bytes": 8726,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5a095941dea5860a15299f573dc7f74d2f8a33684a88131c15be7f9978a54362.json",
+      "sha256": "5a095941dea5860a15299f573dc7f74d2f8a33684a88131c15be7f9978a54362",
+      "bytes": 428,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5b5328e7ebe7c8d8328b70c1a91995e6fe7043f19eedc208edcaa60b3c5f4ab9.stderr",
+      "sha256": "5b5328e7ebe7c8d8328b70c1a91995e6fe7043f19eedc208edcaa60b3c5f4ab9",
+      "bytes": 33935,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5ba331b17eaea1848ed56f16a3d6856cc83197c3a2593a5493e7643fd4cb4d5c.mode-0644.json",
+      "sha256": "5ba331b17eaea1848ed56f16a3d6856cc83197c3a2593a5493e7643fd4cb4d5c",
+      "bytes": 4397,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5bff72cfb467d570a2c0c22e4a83ec0ad982d70fd497600d06287ec4d26928d0.log",
+      "sha256": "5bff72cfb467d570a2c0c22e4a83ec0ad982d70fd497600d06287ec4d26928d0",
+      "bytes": 26180,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5c3ee0fe35fde1cfd60ea78bd3c13a5f96710abd83bc928890aa73ad64392504.mode-0644.md",
+      "sha256": "5c3ee0fe35fde1cfd60ea78bd3c13a5f96710abd83bc928890aa73ad64392504",
+      "bytes": 3089,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5c9f67bb73e54f1ff09d59fd7819b877dee0cf753b61c95cf733e6bb4a5f403d.log",
+      "sha256": "5c9f67bb73e54f1ff09d59fd7819b877dee0cf753b61c95cf733e6bb4a5f403d",
+      "bytes": 456,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5cf31d60a264cd2e13f78f005d7b285d83e754fdaa3519f5e423a395e68d54dc.mjs",
+      "sha256": "5cf31d60a264cd2e13f78f005d7b285d83e754fdaa3519f5e423a395e68d54dc",
+      "bytes": 2337,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5d7ba717d05d093460c14e7aaca472f2bab544ddf4b020fb118a26f1265ee757.fd",
+      "sha256": "5d7ba717d05d093460c14e7aaca472f2bab544ddf4b020fb118a26f1265ee757",
+      "bytes": 2726,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/5faedf1b52affaeeb1db67938bcf73804416c38edbb54c8e7aa1c40155d9e40d.mode-0600.json",
+      "sha256": "5faedf1b52affaeeb1db67938bcf73804416c38edbb54c8e7aa1c40155d9e40d",
+      "bytes": 13857,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/614f6d06e0499797e6a4b76f8057f8745049f56b6144c8e7878c226aad1db4c8.patch",
+      "sha256": "614f6d06e0499797e6a4b76f8057f8745049f56b6144c8e7878c226aad1db4c8",
+      "bytes": 104,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/61e603cbf75701f4cfc3faf54c47a119e0129ae7b2c74ff94eec5ecb0c29a26b.json",
+      "sha256": "61e603cbf75701f4cfc3faf54c47a119e0129ae7b2c74ff94eec5ecb0c29a26b",
+      "bytes": 4218,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6226929ffc1b2fd9a47ca6306e24dc0e8f3b41a42b59199248512ba6b95e6942.json",
+      "sha256": "6226929ffc1b2fd9a47ca6306e24dc0e8f3b41a42b59199248512ba6b95e6942",
+      "bytes": 399,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/63e74459c606758f86c345281247b7cc5f49df676183f7f04c15c16bb0b2ab4e.md",
+      "sha256": "63e74459c606758f86c345281247b7cc5f49df676183f7f04c15c16bb0b2ab4e",
+      "bytes": 4090,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/644b4044ad12d5e0a93a1dc519308d9e3f2f0886681af7c20ecb557f3488fc8b.patch",
+      "sha256": "644b4044ad12d5e0a93a1dc519308d9e3f2f0886681af7c20ecb557f3488fc8b",
+      "bytes": 55,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/64c12d3daedcf4ef59e73d6663c8b6b4abfffe7bb73ce859eaa69b4b9b7cce23.txt",
+      "sha256": "64c12d3daedcf4ef59e73d6663c8b6b4abfffe7bb73ce859eaa69b4b9b7cce23",
+      "bytes": 1014,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/65293446a6fdaec2e0394fe551f71d705f393fc26be76fe26c95817726aaaa25.json",
+      "sha256": "65293446a6fdaec2e0394fe551f71d705f393fc26be76fe26c95817726aaaa25",
+      "bytes": 489,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/655c26e8ed6e40a5f2fb7baa3f628d0c89ba492f4cbf1282c80bc40f147e40fb.md",
+      "sha256": "655c26e8ed6e40a5f2fb7baa3f628d0c89ba492f4cbf1282c80bc40f147e40fb",
+      "bytes": 3050,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/67236ead37e220804845be3c92c46ecd9d91e171a9637a7440eea621314337ad.mode-0644.md",
+      "sha256": "67236ead37e220804845be3c92c46ecd9d91e171a9637a7440eea621314337ad",
+      "bytes": 19951,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/68b7b1b530063fbd2f75171a4544275597b925e3085670d5a6d4e191d5675ddb.json",
+      "sha256": "68b7b1b530063fbd2f75171a4544275597b925e3085670d5a6d4e191d5675ddb",
+      "bytes": 11196,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563.mjs",
+      "sha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+      "bytes": 1222,
+      "mode": "0755",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/68f961fbea14eef28aa3be89b4dab0fe71be545f5163aeb64d2762955044d64c.stdout",
+      "sha256": "68f961fbea14eef28aa3be89b4dab0fe71be545f5163aeb64d2762955044d64c",
+      "bytes": 1008,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6a3a55ae998f581a1900f55d4f9d5520689ed4ae75bee4a98092640318191cef.patch",
+      "sha256": "6a3a55ae998f581a1900f55d4f9d5520689ed4ae75bee4a98092640318191cef",
+      "bytes": 163,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6aab49a48c3799598fad31ff4afe101632b3cae3812f05649749403c9fb4caab.json",
+      "sha256": "6aab49a48c3799598fad31ff4afe101632b3cae3812f05649749403c9fb4caab",
+      "bytes": 325796,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6b15472e51e5fdba853d04a06b57a521c7ab27ac792f12d09ff483bcefa8bf9e.json",
+      "sha256": "6b15472e51e5fdba853d04a06b57a521c7ab27ac792f12d09ff483bcefa8bf9e",
+      "bytes": 425,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6b2b78d9b1f9e90beb05b2970d12c1d6c8145fd5efab16c31294c1707aeb1c78.mode-0644.json",
+      "sha256": "6b2b78d9b1f9e90beb05b2970d12c1d6c8145fd5efab16c31294c1707aeb1c78",
+      "bytes": 1633,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6c5502fdd700655ef6974aae6e96954ed114b7e1de8168071132874087f728ee.json",
+      "sha256": "6c5502fdd700655ef6974aae6e96954ed114b7e1de8168071132874087f728ee",
+      "bytes": 354500,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6c842314f845b9d88468bc25f7c73d8e8403b4fb5908a15289c96105c3459f83.stderr",
+      "sha256": "6c842314f845b9d88468bc25f7c73d8e8403b4fb5908a15289c96105c3459f83",
+      "bytes": 2612,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6daa7e76aa8f97e0803b381cfacc91faa67c56bda59a84ada18a4db497415dc1.json",
+      "sha256": "6daa7e76aa8f97e0803b381cfacc91faa67c56bda59a84ada18a4db497415dc1",
+      "bytes": 9211,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/6ee2d95e47191af824c1182dce52b4a9d4ded2018aab144e9383912b4d0a2273.json",
+      "sha256": "6ee2d95e47191af824c1182dce52b4a9d4ded2018aab144e9383912b4d0a2273",
+      "bytes": 1051,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/704dacf49ad118ecb32e315e3910513ce00e2a34691d816ac57b7414450befb1.json",
+      "sha256": "704dacf49ad118ecb32e315e3910513ce00e2a34691d816ac57b7414450befb1",
+      "bytes": 2715,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7066956eacb98e21e4766639cd2ec7641b91f11b933ddc25e501c4479e8dea8c.json",
+      "sha256": "7066956eacb98e21e4766639cd2ec7641b91f11b933ddc25e501c4479e8dea8c",
+      "bytes": 501,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/70f43e6dedf7e8d2e1a4e079a53bce1bb3957deb05cf083f7a00393242dd7dc1.json",
+      "sha256": "70f43e6dedf7e8d2e1a4e079a53bce1bb3957deb05cf083f7a00393242dd7dc1",
+      "bytes": 424,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/72e6c51937369914db6b88ada082dd2f24428231631628de676f5ed3ba394958.json",
+      "sha256": "72e6c51937369914db6b88ada082dd2f24428231631628de676f5ed3ba394958",
+      "bytes": 314,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/75b6af8ab0b98d3ef6b927c038225ff135dd97858886ac3d6da859b3f7db129a.md",
+      "sha256": "75b6af8ab0b98d3ef6b927c038225ff135dd97858886ac3d6da859b3f7db129a",
+      "bytes": 3125,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/75e1d3cfd4b36356e28cd7790e25c4530f9dbe266f5988aba49683f3666fe7b6.json",
+      "sha256": "75e1d3cfd4b36356e28cd7790e25c4530f9dbe266f5988aba49683f3666fe7b6",
+      "bytes": 33884,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7639dc3e7ab6c531bacd7744f8cd53c85c98e62dfb2bcd4bc108248832682c73.json",
+      "sha256": "7639dc3e7ab6c531bacd7744f8cd53c85c98e62dfb2bcd4bc108248832682c73",
+      "bytes": 189108,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/765ee9d12cf699a06f2e2e0c75316de59c1da66585e06291b344554f7612e6dc.patch",
+      "sha256": "765ee9d12cf699a06f2e2e0c75316de59c1da66585e06291b344554f7612e6dc",
+      "bytes": 325,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/76ec8f99886c9456c07e51d58cda4c4eccc60dc528b334f15077fb0fb1708f9f.mjs",
+      "sha256": "76ec8f99886c9456c07e51d58cda4c4eccc60dc528b334f15077fb0fb1708f9f",
+      "bytes": 4676,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7709b87dba4e67ec31b979d93c148799766e94cba6b7dfbadd75bb4a49e83978.json",
+      "sha256": "7709b87dba4e67ec31b979d93c148799766e94cba6b7dfbadd75bb4a49e83978",
+      "bytes": 558,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/775a127db0fc102bd0bfff3f711bb257959b2215090674c9b06eb4a80e60fcd7.mode-0600.json",
+      "sha256": "775a127db0fc102bd0bfff3f711bb257959b2215090674c9b06eb4a80e60fcd7",
+      "bytes": 569371,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/78b106d69d813c975c943911bc3e4385c1f354c5c6145a9ad60f3bc965b74a82.mjs",
+      "sha256": "78b106d69d813c975c943911bc3e4385c1f354c5c6145a9ad60f3bc965b74a82",
+      "bytes": 18581,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/79d98f736bf3fc2229b46f7171939f76f2b9149be5bd7b053b1c00002b1502be.mjs",
+      "sha256": "79d98f736bf3fc2229b46f7171939f76f2b9149be5bd7b053b1c00002b1502be",
+      "bytes": 8053,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7ad853ab1573f5cfd0cbc0c6dbef183e616a5487fba3247ee59be3495b55d554.json",
+      "sha256": "7ad853ab1573f5cfd0cbc0c6dbef183e616a5487fba3247ee59be3495b55d554",
+      "bytes": 1127,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7bb4e08bcee84c6baf0118d5929cde03b3860f680ea73aa225130a633c4295e4.json",
+      "sha256": "7bb4e08bcee84c6baf0118d5929cde03b3860f680ea73aa225130a633c4295e4",
+      "bytes": 827136,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7c1990b69e286886f1a709736b580da9214c01c57aad1a446fe4c1e47eedfeab.json",
+      "sha256": "7c1990b69e286886f1a709736b580da9214c01c57aad1a446fe4c1e47eedfeab",
+      "bytes": 1515,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7c8a566ab7ec4ba0123c583b50543a2a42ac9e8a0b5a7c878f7fbb8336315846.json",
+      "sha256": "7c8a566ab7ec4ba0123c583b50543a2a42ac9e8a0b5a7c878f7fbb8336315846",
+      "bytes": 3480,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7c9b2f7571f93d9a328a46d5fda88e23d416b1fb69dd3d6566f7fb8caefe7a6c.json",
+      "sha256": "7c9b2f7571f93d9a328a46d5fda88e23d416b1fb69dd3d6566f7fb8caefe7a6c",
+      "bytes": 504142,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7caa4923ea1f75ee7d4a18fad5efee6b2358c4943bfdf0c1aed1d0fe0bea9de0.json",
+      "sha256": "7caa4923ea1f75ee7d4a18fad5efee6b2358c4943bfdf0c1aed1d0fe0bea9de0",
+      "bytes": 2327,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7caa4923ea1f75ee7d4a18fad5efee6b2358c4943bfdf0c1aed1d0fe0bea9de0.mode-0600.json",
+      "sha256": "7caa4923ea1f75ee7d4a18fad5efee6b2358c4943bfdf0c1aed1d0fe0bea9de0",
+      "bytes": 2327,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7d2b8abc749094dc7164048bfdbc78378748355a5bf7d57ab6f9a24cb5da3b6a.mjs",
+      "sha256": "7d2b8abc749094dc7164048bfdbc78378748355a5bf7d57ab6f9a24cb5da3b6a",
+      "bytes": 1782,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7d5d41a7db95b20abd61d9d4d9f43f90544026354b4fac0845c1d0f95c79cef9.json",
+      "sha256": "7d5d41a7db95b20abd61d9d4d9f43f90544026354b4fac0845c1d0f95c79cef9",
+      "bytes": 21441,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7d933ef5570fd41963135beeda076cb7b94c24e869761e3bc7609794239505a2.json",
+      "sha256": "7d933ef5570fd41963135beeda076cb7b94c24e869761e3bc7609794239505a2",
+      "bytes": 997,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7dc998c3cb4cac7362b8a56a501483e5f73b866df3f1832c72a051dfeee4b5de.md",
+      "sha256": "7dc998c3cb4cac7362b8a56a501483e5f73b866df3f1832c72a051dfeee4b5de",
+      "bytes": 2751,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7dd818d78cc92937c743f1839060ed7fc47ce3b2f0bb2449786c6e94556a17c2.stdout",
+      "sha256": "7dd818d78cc92937c743f1839060ed7fc47ce3b2f0bb2449786c6e94556a17c2",
+      "bytes": 1918,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7ed3dce399f0389d50da1bb65d5b2892ef374a23840ea271c015a3ede4062ce6.json",
+      "sha256": "7ed3dce399f0389d50da1bb65d5b2892ef374a23840ea271c015a3ede4062ce6",
+      "bytes": 4443,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7f6e82ef58f534dbff730e9943e1e896b4f123598c41c6e6e49a27aaf6698155.json",
+      "sha256": "7f6e82ef58f534dbff730e9943e1e896b4f123598c41c6e6e49a27aaf6698155",
+      "bytes": 24626,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7fa33451a11694500161cdad1cfda7ee29cae6fc86c51c471da4026d96a781b0.txt",
+      "sha256": "7fa33451a11694500161cdad1cfda7ee29cae6fc86c51c471da4026d96a781b0",
+      "bytes": 486,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/7fd8ff9595025385214c73278b59af6a72cd42fe2f694bdfcfb22bed70fce9d3.json",
+      "sha256": "7fd8ff9595025385214c73278b59af6a72cd42fe2f694bdfcfb22bed70fce9d3",
+      "bytes": 14560,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/802f0dda175a2e719a198a9c98c4c0f07338f292cf26d2270800cf5ae3102f41.mjs",
+      "sha256": "802f0dda175a2e719a198a9c98c4c0f07338f292cf26d2270800cf5ae3102f41",
+      "bytes": 39506,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/812e2e71f7721d20deb012ff1a00247f9c03d6e3d7ed06c497fe27821f01952a.json",
+      "sha256": "812e2e71f7721d20deb012ff1a00247f9c03d6e3d7ed06c497fe27821f01952a",
+      "bytes": 687,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8286ec55f906d52ffcf22e85651dc9414fcbcd2cd2b5610dba4f452333eb9f59.mjs",
+      "sha256": "8286ec55f906d52ffcf22e85651dc9414fcbcd2cd2b5610dba4f452333eb9f59",
+      "bytes": 127099,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/82aff68aaccbdfc5f2f30580845fac2ff2f0f52e9222ae3b0dbb27f0d8b01ad0.mjs",
+      "sha256": "82aff68aaccbdfc5f2f30580845fac2ff2f0f52e9222ae3b0dbb27f0d8b01ad0",
+      "bytes": 6926,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/82ce4d05a6a88b12b7b1f883415d6a32d547c7b99ce52f8a92f218856bc504fc.mode-0644.json",
+      "sha256": "82ce4d05a6a88b12b7b1f883415d6a32d547c7b99ce52f8a92f218856bc504fc",
+      "bytes": 55716,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5.json",
+      "sha256": "844a73098f7b25e1e0a2a63e45bc2b83010c23b3bd20e2d54ae5cc027c6136f5",
+      "bytes": 175149,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493.mjs",
+      "sha256": "8461ad571340857d6ab89c8fe40de907a14c69952a715756330df241ac45a493",
+      "bytes": 126057,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/858e299d0efca393f27a74472430710e573adb3818b3833d2e8817c10b20c773.md",
+      "sha256": "858e299d0efca393f27a74472430710e573adb3818b3833d2e8817c10b20c773",
+      "bytes": 3657,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/861c0f9937cbd38beb0b7d670efe384d4588b96d8e04aa2cc67792a464b6c915.json",
+      "sha256": "861c0f9937cbd38beb0b7d670efe384d4588b96d8e04aa2cc67792a464b6c915",
+      "bytes": 2219,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/861c0f9937cbd38beb0b7d670efe384d4588b96d8e04aa2cc67792a464b6c915.mode-0600.json",
+      "sha256": "861c0f9937cbd38beb0b7d670efe384d4588b96d8e04aa2cc67792a464b6c915",
+      "bytes": 2219,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/893cef04835bc29fb41a291bcdf52851f3bc2288c0b831b2f930b3199f66e8ad.mjs",
+      "sha256": "893cef04835bc29fb41a291bcdf52851f3bc2288c0b831b2f930b3199f66e8ad",
+      "bytes": 8030,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8991bcbe2aba3f3f4a49112ef203599aecfa0bcff971d47f3dd131e00f61336d.md",
+      "sha256": "8991bcbe2aba3f3f4a49112ef203599aecfa0bcff971d47f3dd131e00f61336d",
+      "bytes": 9526,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/89b4d4034208f55b51cd4171db16d7d134502fa05d56e951121221e4fd1c0309.json",
+      "sha256": "89b4d4034208f55b51cd4171db16d7d134502fa05d56e951121221e4fd1c0309",
+      "bytes": 10643,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8acb89b087bbd1b8b1c8091a0dbb2e929027a3dc24e71bc05490c574b825dae2.json",
+      "sha256": "8acb89b087bbd1b8b1c8091a0dbb2e929027a3dc24e71bc05490c574b825dae2",
+      "bytes": 64295,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8aea0933666539647fb63d8ecc93e5d514a234a53f8aed18e4c11031d148f791.json",
+      "sha256": "8aea0933666539647fb63d8ecc93e5d514a234a53f8aed18e4c11031d148f791",
+      "bytes": 3179,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8bd10e0dfce87ad3469f345d574f332365cb7fa3f845c597b88334755b550090.mjs",
+      "sha256": "8bd10e0dfce87ad3469f345d574f332365cb7fa3f845c597b88334755b550090",
+      "bytes": 4120,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8c9b656dbf6a2d1fa735a201a38a5318972e760f767bc739eed61795e17a7b2d.json",
+      "sha256": "8c9b656dbf6a2d1fa735a201a38a5318972e760f767bc739eed61795e17a7b2d",
+      "bytes": 1047,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8cbc3beebc26ad8f74e0b6910240eb44719eaf9719a3cf709ebda84ebdbdd263.json",
+      "sha256": "8cbc3beebc26ad8f74e0b6910240eb44719eaf9719a3cf709ebda84ebdbdd263",
+      "bytes": 3593,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8d9d9d134ae6e41af1acc26b44943bc8762746b776c85b77a0ea6e8513440259.md",
+      "sha256": "8d9d9d134ae6e41af1acc26b44943bc8762746b776c85b77a0ea6e8513440259",
+      "bytes": 4315,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8ee2dffff21754d17425f41cef6a0bb5104f9b2f4a058b74c8a81a433bbf9c95.json",
+      "sha256": "8ee2dffff21754d17425f41cef6a0bb5104f9b2f4a058b74c8a81a433bbf9c95",
+      "bytes": 372794,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8ee91caa6707ef1c2895411bd8bbd7939c822d21fa192bab8ff4284ad11a2a1e.json",
+      "sha256": "8ee91caa6707ef1c2895411bd8bbd7939c822d21fa192bab8ff4284ad11a2a1e",
+      "bytes": 829,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/8fd0f0ce69fb2a96d2279c0487e17924b87e4ab42e30971dbfff191cf5b55112.md",
+      "sha256": "8fd0f0ce69fb2a96d2279c0487e17924b87e4ab42e30971dbfff191cf5b55112",
+      "bytes": 4120,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34.md",
+      "sha256": "907bcee6b29291c5daa2c21f0d7c6a4e51fe4d04537c767f4abe2af81b5cee34",
+      "bytes": 4660,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/91a5fea74e5d465be5d81cf71ab22e2c3997c6d96dd4e08f97793bf8416183e1.mjs",
+      "sha256": "91a5fea74e5d465be5d81cf71ab22e2c3997c6d96dd4e08f97793bf8416183e1",
+      "bytes": 1730,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9233cd15781382ec952d328cb5825de03f1f2cd6680e6357aacca41d04c2dbe0.json",
+      "sha256": "9233cd15781382ec952d328cb5825de03f1f2cd6680e6357aacca41d04c2dbe0",
+      "bytes": 1662,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/929827d5a55a529c0ff30a216dbca23d11582bc1077dce025c065333e4ad218b.md",
+      "sha256": "929827d5a55a529c0ff30a216dbca23d11582bc1077dce025c065333e4ad218b",
+      "bytes": 4147,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/938b22e1c732080fba283a5ad4b16699251e7cef51930e2a6975a06c8e216c6f.json",
+      "sha256": "938b22e1c732080fba283a5ad4b16699251e7cef51930e2a6975a06c8e216c6f",
+      "bytes": 7488,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/939f76a9641bbedf2eeb6c1c734e5ff60f19cd16884cdd434bfc38e229378a5c.json",
+      "sha256": "939f76a9641bbedf2eeb6c1c734e5ff60f19cd16884cdd434bfc38e229378a5c",
+      "bytes": 347,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268.mjs",
+      "sha256": "95edfe98f6bf305eb45f50a206291a2478b765a51516c1a82adf875cc1131268",
+      "bytes": 83723,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/965d24ed8c9cb5439615972ff830a0aecae77de79eadcbebdbab9f0aba898e43.json",
+      "sha256": "965d24ed8c9cb5439615972ff830a0aecae77de79eadcbebdbab9f0aba898e43",
+      "bytes": 3081,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/97b0251baf7e596e8eafe81780a58afcc088241bc38404e792aec81c5a0f1ba5.json",
+      "sha256": "97b0251baf7e596e8eafe81780a58afcc088241bc38404e792aec81c5a0f1ba5",
+      "bytes": 64322,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/97d70a95d5360df0de219778b4ca9f6bb08b72145cbc2175b46060eaef232bbe.mjs",
+      "sha256": "97d70a95d5360df0de219778b4ca9f6bb08b72145cbc2175b46060eaef232bbe",
+      "bytes": 8121,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/98a90e9522314477751b677801689574e5b777e9649060c0a5ec880f17c97b19.patch",
+      "sha256": "98a90e9522314477751b677801689574e5b777e9649060c0a5ec880f17c97b19",
+      "bytes": 119,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/98fc436855bfdf9210fe3e2a1597d1bcfa4a90849e356bcadc9026d353f54d5e.json",
+      "sha256": "98fc436855bfdf9210fe3e2a1597d1bcfa4a90849e356bcadc9026d353f54d5e",
+      "bytes": 128762,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/99a9da576f34e10065cf3a88e7df3c46ec6380d350c839a815de6faaa71d931b.mode-0644.json",
+      "sha256": "99a9da576f34e10065cf3a88e7df3c46ec6380d350c839a815de6faaa71d931b",
+      "bytes": 12328,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9a08daf2e6cdbd01f05adc2653c76f9430b212b5004829be93574b6548f2cdfe.json",
+      "sha256": "9a08daf2e6cdbd01f05adc2653c76f9430b212b5004829be93574b6548f2cdfe",
+      "bytes": 994,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9a10cc48aabb07ac778930dcb4bf9c282d1584dcdb308e97578fbd804a7a5a69.json",
+      "sha256": "9a10cc48aabb07ac778930dcb4bf9c282d1584dcdb308e97578fbd804a7a5a69",
+      "bytes": 655338,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9ace5aa1e7b0e2a9fd5da20d0bc7d9274c6e54194ebd87eeb438aa3903400aba.json",
+      "sha256": "9ace5aa1e7b0e2a9fd5da20d0bc7d9274c6e54194ebd87eeb438aa3903400aba",
+      "bytes": 912,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9bd48085509aafa5852d3d790ec44616c4d69d8c030cde4b43afdf80f1d16406.patch",
+      "sha256": "9bd48085509aafa5852d3d790ec44616c4d69d8c030cde4b43afdf80f1d16406",
+      "bytes": 155,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9cd0b14b1cc1b74c07d46fbe9ed13956f82c55254afbef6c757558102db38f4c.mode-0644.md",
+      "sha256": "9cd0b14b1cc1b74c07d46fbe9ed13956f82c55254afbef6c757558102db38f4c",
+      "bytes": 9311,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9d360f1741ca257cca1387780cf7fb8a99857b58578d596bea8ed82f677c8e39.json",
+      "sha256": "9d360f1741ca257cca1387780cf7fb8a99857b58578d596bea8ed82f677c8e39",
+      "bytes": 9598,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9d96e34a3e0431dede872e41bfeb95c97cd9a1c3c117ba90c5fe647ce5289d6c.json",
+      "sha256": "9d96e34a3e0431dede872e41bfeb95c97cd9a1c3c117ba90c5fe647ce5289d6c",
+      "bytes": 1121,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9ef7c0f386a5e3c08a9b55f9b6cd2aacee1a3f24c615b3778ea30ca49677541c.mode-0644.json",
+      "sha256": "9ef7c0f386a5e3c08a9b55f9b6cd2aacee1a3f24c615b3778ea30ca49677541c",
+      "bytes": 7927,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9f678a32fd717cfa5dbd1cbad1aa7b7e20538364dff268f6691a6a02e8009926.json",
+      "sha256": "9f678a32fd717cfa5dbd1cbad1aa7b7e20538364dff268f6691a6a02e8009926",
+      "bytes": 1621,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/9fff6ed971e82fa63fafb868ee2e3246dd4a0e3bf0ee4552c9c6da93fbde8b48.json",
+      "sha256": "9fff6ed971e82fa63fafb868ee2e3246dd4a0e3bf0ee4552c9c6da93fbde8b48",
+      "bytes": 102312,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a088ec6250bb6d5f10647439893f9ae35728315f71a418469d9edfc811233dec.json",
+      "sha256": "a088ec6250bb6d5f10647439893f9ae35728315f71a418469d9edfc811233dec",
+      "bytes": 13976,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a0fc9fe162a2a9e203714dcfcb4e558dfab6b18cc40f9d1240db467213f4858a.json",
+      "sha256": "a0fc9fe162a2a9e203714dcfcb4e558dfab6b18cc40f9d1240db467213f4858a",
+      "bytes": 10567,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a2a75ec07d4c686fd64b986756127fd8ebe4ec4b436f2277ab66f05d8efb7ae0.mjs",
+      "sha256": "a2a75ec07d4c686fd64b986756127fd8ebe4ec4b436f2277ab66f05d8efb7ae0",
+      "bytes": 3891,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a30d4d4c4a70e4d6fa265bcfe1850a3c2c591defbde0c7003a927cb06eb91b6c.mode-0644.json",
+      "sha256": "a30d4d4c4a70e4d6fa265bcfe1850a3c2c591defbde0c7003a927cb06eb91b6c",
+      "bytes": 3847,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa.ndjson",
+      "sha256": "a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa",
+      "bytes": 3250,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a407063e32b2e4d47096a78a5f6f873773e8b1668c3354aba991aedebb67b56d.json",
+      "sha256": "a407063e32b2e4d47096a78a5f6f873773e8b1668c3354aba991aedebb67b56d",
+      "bytes": 998,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a4468c8ea23c9b489f6b4d179aa43053a892a082166b9369438cdc6be7a7d69b.json",
+      "sha256": "a4468c8ea23c9b489f6b4d179aa43053a892a082166b9369438cdc6be7a7d69b",
+      "bytes": 23235,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a4bcf207a7b3bacaedf75bc0d5e92dbc4e137fb9eb3439d95d3fdfac06108997.log",
+      "sha256": "a4bcf207a7b3bacaedf75bc0d5e92dbc4e137fb9eb3439d95d3fdfac06108997",
+      "bytes": 3596,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a57dde9ce8361ff9ba20463b4afd7c4733568661e5d81007a67083219eca3c8b.json",
+      "sha256": "a57dde9ce8361ff9ba20463b4afd7c4733568661e5d81007a67083219eca3c8b",
+      "bytes": 598423,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a65399ce817588e6b9ce36444fb04d48e4f95c0ec608595056acad5e74eb4a4b.json",
+      "sha256": "a65399ce817588e6b9ce36444fb04d48e4f95c0ec608595056acad5e74eb4a4b",
+      "bytes": 1222,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a67f5141183144502289351f1ea7ae1820007dd623c1b957c7a5b5a6d18db0b6.json",
+      "sha256": "a67f5141183144502289351f1ea7ae1820007dd623c1b957c7a5b5a6d18db0b6",
+      "bytes": 1439,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a847054f0803e5c18a4f26ab7b072e3fa3825c9960510e273de944a0615d1a8c.md",
+      "sha256": "a847054f0803e5c18a4f26ab7b072e3fa3825c9960510e273de944a0615d1a8c",
+      "bytes": 6188,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a87f234208dffbbef770e9b0bedb6c3f8119b97ca55bc6469a48a64163d8f587.log",
+      "sha256": "a87f234208dffbbef770e9b0bedb6c3f8119b97ca55bc6469a48a64163d8f587",
+      "bytes": 1613,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a9c9331e2b9bad057a50dfcc0c5e53a91623a2439a0535fb3b3b9b8d7680b6aa.patch",
+      "sha256": "a9c9331e2b9bad057a50dfcc0c5e53a91623a2439a0535fb3b3b9b8d7680b6aa",
+      "bytes": 99,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a9d6785960a949d788017cec984d9203e27f60c4836823e4cd164395c9950c3e.json",
+      "sha256": "a9d6785960a949d788017cec984d9203e27f60c4836823e4cd164395c9950c3e",
+      "bytes": 177378,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f.mjs",
+      "sha256": "a9da96e4ee9d1c6cdf1a6e4fef5eaaaca61ab41a1a4c8f427bc953f41db49f9f",
+      "bytes": 123685,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/a9f575ef9061d804276dc991f34825fba46f3bc9437b86619d2d776e39422985.md",
+      "sha256": "a9f575ef9061d804276dc991f34825fba46f3bc9437b86619d2d776e39422985",
+      "bytes": 3379,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/aca5e1195ea7ca3ee445f644c7133450083438071ef4689f143da571e5601295.mjs",
+      "sha256": "aca5e1195ea7ca3ee445f644c7133450083438071ef4689f143da571e5601295",
+      "bytes": 50814,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ad02326b20070be5ff2e8f93b3bd5c84bc4b041891c74a51df335165f04b6740.mjs",
+      "sha256": "ad02326b20070be5ff2e8f93b3bd5c84bc4b041891c74a51df335165f04b6740",
+      "bytes": 50814,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce.mjs",
+      "sha256": "ad04ede7158411202da65f08806a364817318765ab4e49879d7b8fafa2012dce",
+      "bytes": 40810,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ad1457f83ce5ca70b93a131f19ff408648b07eb38b207e60a4d980e819229f2e.mode-0644.json",
+      "sha256": "ad1457f83ce5ca70b93a131f19ff408648b07eb38b207e60a4d980e819229f2e",
+      "bytes": 184611,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ae057335f8cc0ccefe578095bbcd30d4f011b539b1ac599b733075baa3870a2e.md",
+      "sha256": "ae057335f8cc0ccefe578095bbcd30d4f011b539b1ac599b733075baa3870a2e",
+      "bytes": 15860,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ae47b624f4ebe3f368a4b7dcef096ed283acad2474eabb5d4218ee5a28e1ad25.patch",
+      "sha256": "ae47b624f4ebe3f368a4b7dcef096ed283acad2474eabb5d4218ee5a28e1ad25",
+      "bytes": 101,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ae9e4e8dfcdd1cd9d19d4008758fe9ae10a49df4b4dc7f56cf92f11d2c9bf249.mode-0644.txt",
+      "sha256": "ae9e4e8dfcdd1cd9d19d4008758fe9ae10a49df4b4dc7f56cf92f11d2c9bf249",
+      "bytes": 1085,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/aedada770176d48a6914e18df5a75d260e151e2053e6df00c207e002ce543940.mode-0600.md",
+      "sha256": "aedada770176d48a6914e18df5a75d260e151e2053e6df00c207e002ce543940",
+      "bytes": 9306,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/af3c92c6757cbaa6850c62c3adaf5ebe0099eb5152444957b88c7fd5b017c1d9.md",
+      "sha256": "af3c92c6757cbaa6850c62c3adaf5ebe0099eb5152444957b88c7fd5b017c1d9",
+      "bytes": 2422,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b018bb3cefbe4de037c51fc8bb9e70c203315e426775c05ff5a82b775a910ab1.json",
+      "sha256": "b018bb3cefbe4de037c51fc8bb9e70c203315e426775c05ff5a82b775a910ab1",
+      "bytes": 2849,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b05095457b99b28198e6cec9b2cb2ff37fe61185abe1a1c31f7f8cc217f36815.md",
+      "sha256": "b05095457b99b28198e6cec9b2cb2ff37fe61185abe1a1c31f7f8cc217f36815",
+      "bytes": 3975,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b15d2437d4c919fbc9f0e4c8ace93a8707df707249ebb2cbe02b568b228d7f70.json",
+      "sha256": "b15d2437d4c919fbc9f0e4c8ace93a8707df707249ebb2cbe02b568b228d7f70",
+      "bytes": 20685,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b2f14defd0d5bfce96735a788df10261ab242c5f0f4a42949df4a0a30376ac61.mode-0644.mjs",
+      "sha256": "b2f14defd0d5bfce96735a788df10261ab242c5f0f4a42949df4a0a30376ac61",
+      "bytes": 35701,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b3db62ff859e8258640adf0959bc74cf79c60217bd980096d46b43ddecaa8366.mjs",
+      "sha256": "b3db62ff859e8258640adf0959bc74cf79c60217bd980096d46b43ddecaa8366",
+      "bytes": 48115,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b47b1fcc3d32237d9f2f433b657d807158b20158a22e5c54890a1a3290cd7053.json",
+      "sha256": "b47b1fcc3d32237d9f2f433b657d807158b20158a22e5c54890a1a3290cd7053",
+      "bytes": 3138,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b5622245ea8cfb0b0471a66b6e324c176c3bd852c5fb7e52cea88128142ab929.mode-0600.json",
+      "sha256": "b5622245ea8cfb0b0471a66b6e324c176c3bd852c5fb7e52cea88128142ab929",
+      "bytes": 148543,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b6150ad427d9ffcb8e2958ee1968f6105557555a467c854842f8f2c5a3e25302.json",
+      "sha256": "b6150ad427d9ffcb8e2958ee1968f6105557555a467c854842f8f2c5a3e25302",
+      "bytes": 15454,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b68a323c68b3769e9c799c5f4395ff7cb7b52140167339cfdfa25b8e1ffe5235.mode-0644.mjs",
+      "sha256": "b68a323c68b3769e9c799c5f4395ff7cb7b52140167339cfdfa25b8e1ffe5235",
+      "bytes": 10106,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b6bc89c8897e389f9c0a2fe5b7cc0bfb1b7b86175579620ca94d485c102e75a0.json",
+      "sha256": "b6bc89c8897e389f9c0a2fe5b7cc0bfb1b7b86175579620ca94d485c102e75a0",
+      "bytes": 123047,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b70a6c8693ba5aa6c9afd6d0ef03c52f1f06444847cbd6b92044ac37887e0f35.md",
+      "sha256": "b70a6c8693ba5aa6c9afd6d0ef03c52f1f06444847cbd6b92044ac37887e0f35",
+      "bytes": 3275,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/b973ec883d5b1a753010bf0d35027d7061ba9eabb9722bda9bc4ef5c4df72dae.md",
+      "sha256": "b973ec883d5b1a753010bf0d35027d7061ba9eabb9722bda9bc4ef5c4df72dae",
+      "bytes": 5477,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ba3038f66d26233bd531e2d1e00547951d791b574759fa8a86368fca074ed1e4.json",
+      "sha256": "ba3038f66d26233bd531e2d1e00547951d791b574759fa8a86368fca074ed1e4",
+      "bytes": 863,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ba443a04f879d36d5b84b30e1f482afe51344e56f26bd0e52ba6acfe03c51430.mode-0644.md",
+      "sha256": "ba443a04f879d36d5b84b30e1f482afe51344e56f26bd0e52ba6acfe03c51430",
+      "bytes": 5970,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ba85bf8ff2c176c5a8f1162cc6da94083edbc82d95a25e759f87484136eb9393.json",
+      "sha256": "ba85bf8ff2c176c5a8f1162cc6da94083edbc82d95a25e759f87484136eb9393",
+      "bytes": 94,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/bb770d3e4064306205896be0a55460f4f4467cdf2722a582cf1e53b6fb5df93e.json",
+      "sha256": "bb770d3e4064306205896be0a55460f4f4467cdf2722a582cf1e53b6fb5df93e",
+      "bytes": 13048,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/bd1d9dd6fd669a346cf3b132d756e7f2e25d2f25ba307dc6f64d5490ae6fef93.md",
+      "sha256": "bd1d9dd6fd669a346cf3b132d756e7f2e25d2f25ba307dc6f64d5490ae6fef93",
+      "bytes": 3544,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/bf26c721f4dfd0e92e6d999f35c013097994e89bf986a6840d98fdee666f5876.md",
+      "sha256": "bf26c721f4dfd0e92e6d999f35c013097994e89bf986a6840d98fdee666f5876",
+      "bytes": 2802,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/bf61b60b99bc5246b2ef4ccd472cfc7058d8c2ca1b51453b5446c63335a0cf7b.mjs",
+      "sha256": "bf61b60b99bc5246b2ef4ccd472cfc7058d8c2ca1b51453b5446c63335a0cf7b",
+      "bytes": 18581,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c0b2b6c8a11a4f5b9c04febf3326df7de41214363f5090a6b50f61e72b02f45a.json",
+      "sha256": "c0b2b6c8a11a4f5b9c04febf3326df7de41214363f5090a6b50f61e72b02f45a",
+      "bytes": 1502,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c173d54bee01061fd62281cc3616cf59520d0b37b4e4ff632496b5901cff5462.json",
+      "sha256": "c173d54bee01061fd62281cc3616cf59520d0b37b4e4ff632496b5901cff5462",
+      "bytes": 1223,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c33e8b45a389ef7fd9c1cd0c8b237a6ef64e2a5d7f806dbb7444c330b9c70a94.md",
+      "sha256": "c33e8b45a389ef7fd9c1cd0c8b237a6ef64e2a5d7f806dbb7444c330b9c70a94",
+      "bytes": 4223,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c375ff4f44fe15de7600755233e9feee9050af291ae45fcc6aad9f47bfae47e3.mode-0644.json",
+      "sha256": "c375ff4f44fe15de7600755233e9feee9050af291ae45fcc6aad9f47bfae47e3",
+      "bytes": 155335,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c4e3172f4c8d1d4ad6b9803890ee8e5139f52612f0d8bb6160cb44ca9df970e7.tap",
+      "sha256": "c4e3172f4c8d1d4ad6b9803890ee8e5139f52612f0d8bb6160cb44ca9df970e7",
+      "bytes": 2179,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c51f6dc131e38a5a51c8e92975f549855e51635d86b89159b4e9309da2080554.mode-0644.txt",
+      "sha256": "c51f6dc131e38a5a51c8e92975f549855e51635d86b89159b4e9309da2080554",
+      "bytes": 2896,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c5586eb8f919dedc1cfdc042aaacaf683999c7764adca4bd6664d34f16b491dd.md",
+      "sha256": "c5586eb8f919dedc1cfdc042aaacaf683999c7764adca4bd6664d34f16b491dd",
+      "bytes": 17632,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c63e3d012877637f7e066c120c53cda3e473f4ad6a2212735b8fcbf3dc6db20f.json",
+      "sha256": "c63e3d012877637f7e066c120c53cda3e473f4ad6a2212735b8fcbf3dc6db20f",
+      "bytes": 1389154,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/c6860e42fb93120df397738f850ae61a7c0e280246c92ea4ededf1da96e50004.md",
+      "sha256": "c6860e42fb93120df397738f850ae61a7c0e280246c92ea4ededf1da96e50004",
+      "bytes": 3993,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/cb3c924793557e7a6e9f0e64294a7ec66427be57cceeef117157386015ee5e71.md",
+      "sha256": "cb3c924793557e7a6e9f0e64294a7ec66427be57cceeef117157386015ee5e71",
+      "bytes": 4599,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/cb98900d47b25d47aba29f95f848aafde54768bcec05fed50e75d883ac37ff07.json",
+      "sha256": "cb98900d47b25d47aba29f95f848aafde54768bcec05fed50e75d883ac37ff07",
+      "bytes": 1663,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39.mjs",
+      "sha256": "cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39",
+      "bytes": 16196,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/cd4f6f335d18fc6b0b53d93687347eca91867aac77d9a423762d7f58cf610bfb.mjs",
+      "sha256": "cd4f6f335d18fc6b0b53d93687347eca91867aac77d9a423762d7f58cf610bfb",
+      "bytes": 663036,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ce23a5e3a71dd6c2d2a5639b6784f3d1e4f5913138cdeb7edffe1d42f2d718d9.json",
+      "sha256": "ce23a5e3a71dd6c2d2a5639b6784f3d1e4f5913138cdeb7edffe1d42f2d718d9",
+      "bytes": 2520,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/cfa89cd2af872fe4a84452a27acfa826cafb6b0f4b8121f59d18c5b929b01477.log",
+      "sha256": "cfa89cd2af872fe4a84452a27acfa826cafb6b0f4b8121f59d18c5b929b01477",
+      "bytes": 3196,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/cff1c7ddd01739cdf36046e1a3216673c23e91c33f947f72b49d95598d0a2a7a.md",
+      "sha256": "cff1c7ddd01739cdf36046e1a3216673c23e91c33f947f72b49d95598d0a2a7a",
+      "bytes": 3701,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d0eba07ca25362b9d1c6346bf49a986ccf8f9ef81e1b1b027d8c044561f828e1.json",
+      "sha256": "d0eba07ca25362b9d1c6346bf49a986ccf8f9ef81e1b1b027d8c044561f828e1",
+      "bytes": 255666,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d11c40ed79bc5c17ea0ba7aec1851a03f15c458e02f846c2ebe4d2b8c49df108.json",
+      "sha256": "d11c40ed79bc5c17ea0ba7aec1851a03f15c458e02f846c2ebe4d2b8c49df108",
+      "bytes": 5767,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d11d071d4bdc69fc4402cacf3a154236c19552b05e284306f12debe7178ccc41.json",
+      "sha256": "d11d071d4bdc69fc4402cacf3a154236c19552b05e284306f12debe7178ccc41",
+      "bytes": 1030,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d12086adb7f29a44996ec2456042eecb82dc32c0f28921133bb3c8992f7b291f.md",
+      "sha256": "d12086adb7f29a44996ec2456042eecb82dc32c0f28921133bb3c8992f7b291f",
+      "bytes": 2541,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d17ff74535ede3b3889a42cfefb4d8320e71d1772d3aebffe14ba16601e33d6a.json",
+      "sha256": "d17ff74535ede3b3889a42cfefb4d8320e71d1772d3aebffe14ba16601e33d6a",
+      "bytes": 706,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d1d7598ea24b312b9901b30b02fcc4a60002de370e35e63401a3d06d51e8673c.md",
+      "sha256": "d1d7598ea24b312b9901b30b02fcc4a60002de370e35e63401a3d06d51e8673c",
+      "bytes": 7306,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d1ed094e1b5f99e8de9bc2deca7150c33939a706cc28d48c2fb655691d026ecb.txt",
+      "sha256": "d1ed094e1b5f99e8de9bc2deca7150c33939a706cc28d48c2fb655691d026ecb",
+      "bytes": 2519,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d234edaf08c67ce2c86fa4eaa53b60813128f9416c07ae71c5d4cafa1166b700.mode-0644.json",
+      "sha256": "d234edaf08c67ce2c86fa4eaa53b60813128f9416c07ae71c5d4cafa1166b700",
+      "bytes": 3885,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d3af2e8df0b8dda1f0a848cea508e7531d26ebaf850292042352ab1efb028c77.mode-0644.json",
+      "sha256": "d3af2e8df0b8dda1f0a848cea508e7531d26ebaf850292042352ab1efb028c77",
+      "bytes": 9654,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d3ed1730bed506298f2c1f89a369a7710b20ad31dc1717bcc99b55e2c74b15c6.json",
+      "sha256": "d3ed1730bed506298f2c1f89a369a7710b20ad31dc1717bcc99b55e2c74b15c6",
+      "bytes": 6520,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d5012f22d6a2e6507d1e46aa7f3c14faeb18228e9355cb30975a9822ebf61c36.json",
+      "sha256": "d5012f22d6a2e6507d1e46aa7f3c14faeb18228e9355cb30975a9822ebf61c36",
+      "bytes": 7409,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d54a1f605d7da5f0776d464464dafceb627744903ec4341af4cf9875de9a053d.mode-0600.json",
+      "sha256": "d54a1f605d7da5f0776d464464dafceb627744903ec4341af4cf9875de9a053d",
+      "bytes": 7512,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d578366bbe941dd1c56a3bb4ac8d02a44a139a50a1034951b67bc0c21e601535.json",
+      "sha256": "d578366bbe941dd1c56a3bb4ac8d02a44a139a50a1034951b67bc0c21e601535",
+      "bytes": 12352,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d5cb48a3c758f99aec4f6fcf7e634485e615efcb7ff3fc5246cda63110167ad6.json",
+      "sha256": "d5cb48a3c758f99aec4f6fcf7e634485e615efcb7ff3fc5246cda63110167ad6",
+      "bytes": 8987,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d63f63a0cc058f200cc48cf306286f0c60aa5c7471f6e92e359fff6159e23925.log",
+      "sha256": "d63f63a0cc058f200cc48cf306286f0c60aa5c7471f6e92e359fff6159e23925",
+      "bytes": 631,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14.mjs",
+      "sha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14",
+      "bytes": 423673,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/da69b2facbfdda558465665304e0ad8d076588b13807ac252fae357c7a10a075.mjs",
+      "sha256": "da69b2facbfdda558465665304e0ad8d076588b13807ac252fae357c7a10a075",
+      "bytes": 37692,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/dae0c7359c2e0c67a287c7e5ba80bcceb9f325832d59242b0f8fa9b7a556cd05.patch",
+      "sha256": "dae0c7359c2e0c67a287c7e5ba80bcceb9f325832d59242b0f8fa9b7a556cd05",
+      "bytes": 1581,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/db4de2442bc3528ef770556e53955eef070092bbfb6d61021937cbef6f08fcd5.json",
+      "sha256": "db4de2442bc3528ef770556e53955eef070092bbfb6d61021937cbef6f08fcd5",
+      "bytes": 10253,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/db521480a1ca9b50191be3cfe6e68f1870e7f39b532851edefb32c9be45de02f.mjs",
+      "sha256": "db521480a1ca9b50191be3cfe6e68f1870e7f39b532851edefb32c9be45de02f",
+      "bytes": 15761,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/db7dc13cb7dd4f75c0e8ca02f2c3f30c0a7033f81ea455108d8c4316f15ad3a5.mode-0600.json",
+      "sha256": "db7dc13cb7dd4f75c0e8ca02f2c3f30c0a7033f81ea455108d8c4316f15ad3a5",
+      "bytes": 19635,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/dc10dfcdd17313471c9b49fedba6f6febc6417ddc7042dfd80a34c4ab2fb78a1.json",
+      "sha256": "dc10dfcdd17313471c9b49fedba6f6febc6417ddc7042dfd80a34c4ab2fb78a1",
+      "bytes": 1432,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/dc11aad7b877c8ee7858743899d61f397f6caf7b9eb55d578bb0dbc6999eebdc.json",
+      "sha256": "dc11aad7b877c8ee7858743899d61f397f6caf7b9eb55d578bb0dbc6999eebdc",
+      "bytes": 3042,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/dd378124f24a751584320b28f6a827af941dcdba362f372a19200830ae5b8df2.json",
+      "sha256": "dd378124f24a751584320b28f6a827af941dcdba362f372a19200830ae5b8df2",
+      "bytes": 338130,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/dd636982d337f00dd6a61977dfc52091ec1ae40b5dd7451fae1e2562f33af52b.md",
+      "sha256": "dd636982d337f00dd6a61977dfc52091ec1ae40b5dd7451fae1e2562f33af52b",
+      "bytes": 3077,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/dfbcb28c8cba0ff5f6ebb475d14c996fd62a62dfe0308a68cc6e538f4838ce0f.patch",
+      "sha256": "dfbcb28c8cba0ff5f6ebb475d14c996fd62a62dfe0308a68cc6e538f4838ce0f",
+      "bytes": 145,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e0619f49554f2e2a5a43ba389b07356f3b7673778527d6a597c89d5328789f3a.log",
+      "sha256": "e0619f49554f2e2a5a43ba389b07356f3b7673778527d6a597c89d5328789f3a",
+      "bytes": 633,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e16971e85e77cca93e28e1fbd7ba03b3b43a0da6f700ea122f342d42a909b16d.md",
+      "sha256": "e16971e85e77cca93e28e1fbd7ba03b3b43a0da6f700ea122f342d42a909b16d",
+      "bytes": 4788,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e19210fd9a075f810a72fd8eae5eab764ed96c6d14ede1f7ed2a3ef08940ebc4.json",
+      "sha256": "e19210fd9a075f810a72fd8eae5eab764ed96c6d14ede1f7ed2a3ef08940ebc4",
+      "bytes": 599809,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e291a0cb57fb7dfbd2811d6d2e51e6e7bce761acf7f0d01385a25191a4af9b44.json",
+      "sha256": "e291a0cb57fb7dfbd2811d6d2e51e6e7bce761acf7f0d01385a25191a4af9b44",
+      "bytes": 1307,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e29abd8b49209fcd9b6469c73f30f4cac05ba47780e8f0b5ee79d70fb80554a1.json",
+      "sha256": "e29abd8b49209fcd9b6469c73f30f4cac05ba47780e8f0b5ee79d70fb80554a1",
+      "bytes": 18170,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.mode-0644.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e498b3b9419f08b52d27326ee810264b665949ca27876b043c652b2aa561faa8.mjs",
+      "sha256": "e498b3b9419f08b52d27326ee810264b665949ca27876b043c652b2aa561faa8",
+      "bytes": 7308,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e4e7d12cdf2dc0a4d3b145a8b11268b4ea110ff9fa2da0fde7744f9b19b9947e.json",
+      "sha256": "e4e7d12cdf2dc0a4d3b145a8b11268b4ea110ff9fa2da0fde7744f9b19b9947e",
+      "bytes": 11436,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e5e6915f4ba5acaa8ee76d32d64c6ae1caccbdd45de5ea17acbfd92493689981.jsonl",
+      "sha256": "e5e6915f4ba5acaa8ee76d32d64c6ae1caccbdd45de5ea17acbfd92493689981",
+      "bytes": 913,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e676e125ac205c26613f4913feef2ca77be158e9d3af7b56775f183ac1f3d729.stdout",
+      "sha256": "e676e125ac205c26613f4913feef2ca77be158e9d3af7b56775f183ac1f3d729",
+      "bytes": 1919,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e6d95b2c3f84d277af51b693e1255e99e44b26bcbd19bd0e1e9ed6e8740735db.json",
+      "sha256": "e6d95b2c3f84d277af51b693e1255e99e44b26bcbd19bd0e1e9ed6e8740735db",
+      "bytes": 924,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e74b224d75dc391157b5e7167b006d66f1d8e5ee5a2e6bfe6db737820ea27b8f.mode-0644.json",
+      "sha256": "e74b224d75dc391157b5e7167b006d66f1d8e5ee5a2e6bfe6db737820ea27b8f",
+      "bytes": 5118,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e7f5ae2e110510b5e61341f53752ccc32e77504564afe6743b9c1468c2b8c3d4.json",
+      "sha256": "e7f5ae2e110510b5e61341f53752ccc32e77504564afe6743b9c1468c2b8c3d4",
+      "bytes": 1336,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e8082c94bf3ee5fc246d0d3f6ec495a60962e9db6833690aeda505195f18f99f.mode-0644.md",
+      "sha256": "e8082c94bf3ee5fc246d0d3f6ec495a60962e9db6833690aeda505195f18f99f",
+      "bytes": 6950,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e84c7079c3f5335825093adfc7a550af82e863ba9260866e2c0cd680d91a8761.mjs",
+      "sha256": "e84c7079c3f5335825093adfc7a550af82e863ba9260866e2c0cd680d91a8761",
+      "bytes": 11943,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e9475a72315f76aea1d53c1354a68c2f06edde857fe6bbf875503bc745d4fa96.json",
+      "sha256": "e9475a72315f76aea1d53c1354a68c2f06edde857fe6bbf875503bc745d4fa96",
+      "bytes": 358960,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e9b9317cc4644824670cdef5a829cac42a73ce11d281d028e6128a06fa900e21.md",
+      "sha256": "e9b9317cc4644824670cdef5a829cac42a73ce11d281d028e6128a06fa900e21",
+      "bytes": 3023,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/e9e1f28ea49a0d95d752a15c82be941fdc8529f237c0cf0a15ef051e65f0376e.json",
+      "sha256": "e9e1f28ea49a0d95d752a15c82be941fdc8529f237c0cf0a15ef051e65f0376e",
+      "bytes": 650084,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ea7abba4d11e50c8f8c7bde3d0f43519110e959424b71046a7978959c5cddf25.json",
+      "sha256": "ea7abba4d11e50c8f8c7bde3d0f43519110e959424b71046a7978959c5cddf25",
+      "bytes": 1422,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/eb67ed009f7820bbf0875e02ac794abcb49ffb7d4dc42debe5455913089d2ba3.mjs",
+      "sha256": "eb67ed009f7820bbf0875e02ac794abcb49ffb7d4dc42debe5455913089d2ba3",
+      "bytes": 41247,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ec09e83c98ec827b3da8931ccc60046ef68d2acbc2069273551ad55cc35059ec.log",
+      "sha256": "ec09e83c98ec827b3da8931ccc60046ef68d2acbc2069273551ad55cc35059ec",
+      "bytes": 5287,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ecc18fad8ef3ea0552d0867a86df6d4024a6c29de2c170bc6732c43603d8b26b.json",
+      "sha256": "ecc18fad8ef3ea0552d0867a86df6d4024a6c29de2c170bc6732c43603d8b26b",
+      "bytes": 7496,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ecd6943be64832c64036e56474fa021e9853d6aae1987f33ea0af68a2d559641.patch",
+      "sha256": "ecd6943be64832c64036e56474fa021e9853d6aae1987f33ea0af68a2d559641",
+      "bytes": 103,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ece08cbfe20eee2ee1cddac8e2a777eb757a89e70d7f52e2ba13ca90bb481a6d.mode-0600.json",
+      "sha256": "ece08cbfe20eee2ee1cddac8e2a777eb757a89e70d7f52e2ba13ca90bb481a6d",
+      "bytes": 3107,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ed0edd5d37677c0f59fe524e2e9a38ea8701cf825fca6b87b2859a0daa5bbb0f.json",
+      "sha256": "ed0edd5d37677c0f59fe524e2e9a38ea8701cf825fca6b87b2859a0daa5bbb0f",
+      "bytes": 388,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ede646a36aba1698df2a41105ff88047f1b67fe7e6d785cc632e5400c014746e.json",
+      "sha256": "ede646a36aba1698df2a41105ff88047f1b67fe7e6d785cc632e5400c014746e",
+      "bytes": 1610,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/eed356887cd0846d3726e7f47d9309009635ccb08f727dd1f287c742cfff5b88.json",
+      "sha256": "eed356887cd0846d3726e7f47d9309009635ccb08f727dd1f287c742cfff5b88",
+      "bytes": 17704,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ef0a4c2db5c4a345e503de9537e92eee4ed636362df8d0ffe00ceb0c0a417a4b.json",
+      "sha256": "ef0a4c2db5c4a345e503de9537e92eee4ed636362df8d0ffe00ceb0c0a417a4b",
+      "bytes": 514,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ef977925a156bed8251622ae2e320efbfbe9bad63217b8c2cdf4d84133efef58.json",
+      "sha256": "ef977925a156bed8251622ae2e320efbfbe9bad63217b8c2cdf4d84133efef58",
+      "bytes": 331547,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/efe3a9b34432b649fd886677ebba9dcb6231f2cf044064a2ceea7042369839ac.json",
+      "sha256": "efe3a9b34432b649fd886677ebba9dcb6231f2cf044064a2ceea7042369839ac",
+      "bytes": 22895,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f0283ac7ffba8c013b429b46ee66649888a6ad60ca3b9d47e7c8d960904b490f.json",
+      "sha256": "f0283ac7ffba8c013b429b46ee66649888a6ad60ca3b9d47e7c8d960904b490f",
+      "bytes": 273,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f08db3ab9ddb6bf3db3f1ea2bb5b6c779749e2e434f44b05942f58d60cbd1d37.json",
+      "sha256": "f08db3ab9ddb6bf3db3f1ea2bb5b6c779749e2e434f44b05942f58d60cbd1d37",
+      "bytes": 163323,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f0aab946bd9617d44426c1d6cd7100c0e10326d4a3a3efcd450049657ce0a3f3.json",
+      "sha256": "f0aab946bd9617d44426c1d6cd7100c0e10326d4a3a3efcd450049657ce0a3f3",
+      "bytes": 64290,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f158df7422614eb6c03987eb96b645f8c9c03d70519df334788afc61daf31f71.json",
+      "sha256": "f158df7422614eb6c03987eb96b645f8c9c03d70519df334788afc61daf31f71",
+      "bytes": 3898,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f2896969910e0911370565ed2d7835bf01b1b08177e77773805ed5354036beaf.json",
+      "sha256": "f2896969910e0911370565ed2d7835bf01b1b08177e77773805ed5354036beaf",
+      "bytes": 1408575,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f2c8d6762cabf86ee1ff489b5d7974722bb80959c28e4e7f06ef74803dbf35cd.log",
+      "sha256": "f2c8d6762cabf86ee1ff489b5d7974722bb80959c28e4e7f06ef74803dbf35cd",
+      "bytes": 757,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f40d564b3b503a0f9274709cab7ac8d848ea6b723c7ec2815eae7ba4b938854b.mode-0600.json",
+      "sha256": "f40d564b3b503a0f9274709cab7ac8d848ea6b723c7ec2815eae7ba4b938854b",
+      "bytes": 3654,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f5fec6d56804a30b217a2874196dc7809c21f80f396a274417b9eed980551ee1.fd",
+      "sha256": "f5fec6d56804a30b217a2874196dc7809c21f80f396a274417b9eed980551ee1",
+      "bytes": 2726,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe.mjs",
+      "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+      "bytes": 150958,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f75c1139c23c53cf06906979b29833a1faca5d872b01854e4126e221d43435bb.json",
+      "sha256": "f75c1139c23c53cf06906979b29833a1faca5d872b01854e4126e221d43435bb",
+      "bytes": 241991,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f8ba3134dac09499bc4ced271f2fcea4b26f474f28d655b3a37a94a3ef50e4e0.json",
+      "sha256": "f8ba3134dac09499bc4ced271f2fcea4b26f474f28d655b3a37a94a3ef50e4e0",
+      "bytes": 500810,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f9b538e57b28bc6a3ea76a0802f99a1629c70f1affa2ac070c6befc7723bb3e7.json",
+      "sha256": "f9b538e57b28bc6a3ea76a0802f99a1629c70f1affa2ac070c6befc7723bb3e7",
+      "bytes": 1434,
+      "mode": "0600",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/f9f600c218b9ccfa63380c3e3592d8d61c249b3e4550faa1eaccb0a18fb26a5c.json",
+      "sha256": "f9f600c218b9ccfa63380c3e3592d8d61c249b3e4550faa1eaccb0a18fb26a5c",
+      "bytes": 310,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/faf8c671e6cc52b4877b5b1ea22b6148ef2279ef24299bc5af40277d7b3731ed.json",
+      "sha256": "faf8c671e6cc52b4877b5b1ea22b6148ef2279ef24299bc5af40277d7b3731ed",
+      "bytes": 196590,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fb29c35f11a968921827235c76f71e4e2bfd22e64e2efca30712ea1b9508248c.patch",
+      "sha256": "fb29c35f11a968921827235c76f71e4e2bfd22e64e2efca30712ea1b9508248c",
+      "bytes": 1581,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fb4a6d0da90419a52dd6bdf7478282499dc94efa7651a5caadf3de323e8f579d.json",
+      "sha256": "fb4a6d0da90419a52dd6bdf7478282499dc94efa7651a5caadf3de323e8f579d",
+      "bytes": 4828,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fb4e564c1ed993172afed267971d96bd65bb444af099f9b36936a8e700fc9224.mode-0644.md",
+      "sha256": "fb4e564c1ed993172afed267971d96bd65bb444af099f9b36936a8e700fc9224",
+      "bytes": 3597,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fba3a222345793300ed7b9723cfe6043d76f05e7b82bbf8afcf1942cd68fa19b.json",
+      "sha256": "fba3a222345793300ed7b9723cfe6043d76f05e7b82bbf8afcf1942cd68fa19b",
+      "bytes": 347,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fca6d3514fdf79b67a5ce995a5c28fe7ff7a4e41332e4d56bd8bbc6b3e094b77.json",
+      "sha256": "fca6d3514fdf79b67a5ce995a5c28fe7ff7a4e41332e4d56bd8bbc6b3e094b77",
+      "bytes": 3057,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fcc18320f049f6739a83c7350ecbe953c5af7d76a0c224691545af5de3ea8755.md",
+      "sha256": "fcc18320f049f6739a83c7350ecbe953c5af7d76a0c224691545af5de3ea8755",
+      "bytes": 3929,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fd8e403f8c4f08a77cce15d3387a208219e9a2967ec665845dce509f51112059.json",
+      "sha256": "fd8e403f8c4f08a77cce15d3387a208219e9a2967ec665845dce509f51112059",
+      "bytes": 2396,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fd93bcb15c5019e8a2bd4d8d2e5bef4946065271aed3ef517d6094aacf38d07d.json",
+      "sha256": "fd93bcb15c5019e8a2bd4d8d2e5bef4946065271aed3ef517d6094aacf38d07d",
+      "bytes": 47671,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fdd72afab83e910d6cf05642203450d5928cbbeffc0d65a0f4ffb357258d2c1f.json",
+      "sha256": "fdd72afab83e910d6cf05642203450d5928cbbeffc0d65a0f4ffb357258d2c1f",
+      "bytes": 4578,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/feb2cb106c0736a308a0c30ac299e7c4774a193ba86242acd25ad401e27a7e7b.json",
+      "sha256": "feb2cb106c0736a308a0c30ac299e7c4774a193ba86242acd25ad401e27a7e7b",
+      "bytes": 12640,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/fee51980b022fa9e676752556967055b6b961e7ec62d32f14d153c8ed2e8e99c.json",
+      "sha256": "fee51980b022fa9e676752556967055b6b961e7ec62d32f14d153c8ed2e8e99c",
+      "bytes": 1222,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/objects/ff330a9eebc54e5a621ff25589711eefa2fca826fa1fa506e8758f598207bc92.mode-0644.json",
+      "sha256": "ff330a9eebc54e5a621ff25589711eefa2fca826fa1fa506e8758f598207bc92",
+      "bytes": 161978,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.19d45c2b826088bdf9cd235434e6b810dffd620a0108faf09133ee740fdd61c5.json",
+      "sha256": "19d45c2b826088bdf9cd235434e6b810dffd620a0108faf09133ee740fdd61c5",
+      "bytes": 135448,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.2af1e3d8f61cf803d82d43de24db573d867b94f83a3b928ab54eedfc366c6c03.json",
+      "sha256": "2af1e3d8f61cf803d82d43de24db573d867b94f83a3b928ab54eedfc366c6c03",
+      "bytes": 44026,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.2d16e9b11fcc25ca6594f1a6df17c59102e1d8ba42219bd9c8104394044a3a0a.json",
+      "sha256": "2d16e9b11fcc25ca6594f1a6df17c59102e1d8ba42219bd9c8104394044a3a0a",
+      "bytes": 152598,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.413b03ad8649577cba2adb65b86cbacfa1c313e235792c1edf50bbcf4bb6d2f2.json",
+      "sha256": "413b03ad8649577cba2adb65b86cbacfa1c313e235792c1edf50bbcf4bb6d2f2",
+      "bytes": 11761,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.44cb139dc41196d0a7803c2dbe26e97832f4cb66459390c26d35954524157614.json",
+      "sha256": "44cb139dc41196d0a7803c2dbe26e97832f4cb66459390c26d35954524157614",
+      "bytes": 172928,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.77136e4766b5d389de01c9d77ed66f70c32bffee3cf2567d92fe96c21969c7e3.json",
+      "sha256": "77136e4766b5d389de01c9d77ed66f70c32bffee3cf2567d92fe96c21969c7e3",
+      "bytes": 72573,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/readback.89c197a99159fbac14631ef2c77ab259a75f122b89579c7a02e6829bc69f4305.json",
+      "sha256": "89c197a99159fbac14631ef2c77ab259a75f122b89579c7a02e6829bc69f4305",
+      "bytes": 2712,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "allPriorFilesConserved": true,
+  "inputPins": [
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v4/items/read_diagnostics/composition-v1/manifest.json",
+      "sha256": "0a9088b0c1f16d5f816d5050b2cb25a0090d98fb5d439bf3838e2896a900e8af",
+      "bytes": 312890,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v4/items/read_diagnostics/composition-v1/report.md",
+      "sha256": "376fda837c89e32cf06209c43ef185c88de1417d075eb63abe5201bfce102b17",
+      "bytes": 2652,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v4/items/read_diagnostics/composition-v1/cases.json",
+      "sha256": "04a33c40dd3e7a79d32c7edb523c5ac34d304a689e26d2624583bdcab53afca4",
+      "bytes": 525865,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v4/items/read_diagnostics/composition-v1/initialization-coverage.json",
+      "sha256": "3ff3e08b3f76592853df04a03ba9b7438a5af48580b51f9aacd24814e99a0fe6",
+      "bytes": 132314,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v4/items/read_diagnostics/composition-v1/coverage-summary.json",
+      "sha256": "54cc8c1a88f860701101f87ebd64ae9d1202309b0314276b58f606b8eb0e572f",
+      "bytes": 12339,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-batch-assembly/resource-recovery/fixtures-20261012/manifest.json",
+      "sha256": "98d45a5476fa2ae2bcddea2de34a8e9cddc050639508467f19afd76d7a617616",
+      "bytes": 34424,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-batch-assembly/resource-recovery/fixtures-20261012/readback.json",
+      "sha256": "7a808b8da7f659e65260d96965ca3b3f5f5576d28d56130867dfa2728ab5a45e",
+      "bytes": 32325,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/prepared-batch-assembly/resource-recovery/fixtures-20261012/report.md",
+      "sha256": "c5748901fa87a0d849ef38179b8cd3c5da533608071859fa1d65e5cf449c93a4",
+      "bytes": 3254,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.json",
+      "sha256": "c2a7b8ccad72b5d707c677702080d2dba63c654c7c839a4c40466343aefab871",
+      "bytes": 514704,
+      "mode": "0644",
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.md",
+      "sha256": "e7d212559baf44bcc8249e11ab8eda1bdb09963f0b1a92dd0830744cde7c2bbe",
+      "bytes": 20098,
+      "mode": "0644",
+      "nlink": 1
+    }
+  ],
+  "sourceCAS": [
+    {
+      "path": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "sha256": "71b0d56fbafa91d239773e5872f3a28c51d3a4f78f8f77bf0b6b3d0c0eaae926",
+      "bytes": 77278,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "fixture producer line66 observation",
+      "matched": true,
+      "observationOnly": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/fixtures/local-worker-supervisor-worker.mjs",
+      "sha256": "c9535af514c87e136b7727f83ee30f9ecd016854fb57a5c92e2bbfaff4775e27",
+      "bytes": 3157,
+      "mode": "0644",
+      "nlink": 1,
+      "item": "required worker leaf observation; no contents copied",
+      "matched": true,
+      "observationOnly": true
+    }
+  ],
+  "matrixUnchanged": {
+    "path": "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.json",
+    "sha256": "c2a7b8ccad72b5d707c677702080d2dba63c654c7c839a4c40466343aefab871",
+    "bytes": 514704,
+    "mode": "0644",
+    "nlink": 1
+  },
+  "physicalContainment": true,
+  "singleLinkCopies": true,
+  "ShaBytesModeConserved": true,
+  "gitCheckIgnore": {
+    "exitCode": 1,
+    "stdout": "",
+    "ignored": false
+  },
+  "gitStatus": {
+    "exitCode": 0,
+    "stdout": "?? specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/prepared-custody/\n",
+    "untracked": true
+  },
+  "exclusions": [
+    {
+      "reason": "All32 fixture contents intentionally not copied; sanitized technical metadata sufficient. No secret contents opened or execution authority inferred."
+    },
+    {
+      "reason": "Private originals, keys including synthetic key/MAC/secret material, signingproofs, environment dumps/transcripts/hostidentity/PID/correlation excluded. Original raw artifacts preserved; transformed copies bind raw and derived SHA/bytes/modes."
+    },
+    {
+      "reason": "Four inspected finite technical stderr strings and empty stderr retained exactly; raw transport/session transcripts are not selected. Fixture report finite-marker screening is not exhaustive secret assurance."
+    },
+    {
+      "reason": "No future planner/kernel design, whole-assembly qualification, or Sourceapplication inferred."
+    }
+  ],
+  "compositionProof": {
+    "manifest": {
+      "path": "scratch/alfred-postinstall-whole-items-20261011/next-item-reservation-plan/wave-v4/items/read_diagnostics/composition-v1/manifest.json",
+      "sha256": "0a9088b0c1f16d5f816d5050b2cb25a0090d98fb5d439bf3838e2896a900e8af",
+      "bytes": 312890,
+      "mode": "0644",
+      "nlink": 1
+    },
+    "reportedCases": 4,
+    "caseIds": [
+      "config",
+      "ordinary",
+      "config-pipeline",
+      "dynamic"
+    ],
+    "reportedPassed": 4,
+    "qualificationMeaning": "All four outcomes conserve original verdict/code/retryActions/HGOreason/full stderr, including original refusals; no admission inferred",
+    "stderrBindings": [
+      {
+        "id": "config",
+        "actualExit": 2,
+        "originalExit": 2,
+        "actualStderrSha256": "e30910b7d805327acdfb5b5736caf8be5d5a19acc749a90fbb2db359a0707fc6",
+        "originalStderrSha256": "e30910b7d805327acdfb5b5736caf8be5d5a19acc749a90fbb2db359a0707fc6",
+        "stderrBytes": 2879,
+        "exactConservation": true
+      },
+      {
+        "id": "ordinary",
+        "actualExit": 0,
+        "originalExit": 0,
+        "actualStderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "originalStderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrBytes": 0,
+        "exactConservation": true
+      },
+      {
+        "id": "config-pipeline",
+        "actualExit": 2,
+        "originalExit": 2,
+        "actualStderrSha256": "3faa91773ab0daa18ce769a3214707c4008a114af4c5c08b19354496f55b8e37",
+        "originalStderrSha256": "3faa91773ab0daa18ce769a3214707c4008a114af4c5c08b19354496f55b8e37",
+        "stderrBytes": 2566,
+        "exactConservation": true
+      },
+      {
+        "id": "dynamic",
+        "actualExit": 2,
+        "originalExit": 2,
+        "actualStderrSha256": "1c45cfda17f9ec787c60fc1dda9ba0aa62e4b5767a8bc1bbd4649b0983a4dfd8",
+        "originalStderrSha256": "1c45cfda17f9ec787c60fc1dda9ba0aa62e4b5767a8bc1bbd4649b0983a4dfd8",
+        "stderrBytes": 2279,
+        "exactConservation": true
+      }
+    ],
+    "coverage": "actual V8 initialization/per-case ranges retained; historical16 reachability structural only",
+    "assurance": {
+      "native": false,
+      "installed": false,
+      "sourceAdmitted": false,
+      "fullAssemblyGraphGreen": false,
+      "fullVerify": false,
+      "critic": false,
+      "prior16BlanketReplay": false,
+      "completed62Replay": false,
+      "completed37Replay": false,
+      "m6Replay": false,
+      "newSelectorPolicy": false,
+      "modeFreshness": "original custody preserved; unavailable producer mode freshness remains held"
+    },
+    "reportedTuple": 36,
+    "original377Preserved": true,
+    "original16Replay": false,
+    "other12Replay": false,
+    "fullTupleGreen": false,
+    "producerModeFreshness": "held"
+  },
+  "fixtureProof": {
+    "fileCount": 32,
+    "totalBytes": 18866,
+    "directoryCount": 12,
+    "contentsCopied": false,
+    "metadataConservation": "Source/copy SHA/bytes/modes and directory sets retained; host dev/ino/uid/gid fields removed",
+    "testsLaunched": false,
+    "productCallbacks": 0,
+    "sourceCASUnchanged": true,
+    "earlierGraphChanged": false,
+    "stopTwoPreserved": true,
+    "retryWaiver": false,
+    "fullResourceSemanticsQualified": false
+  },
+  "holds": [
+    "SQ productive admission unavailable; prepared-only custody is not dispatch admission",
+    "Whole tuple GREEN, changed callable onboarding/signing/native/kernel/bootstrap/Git domains and producer physical mode freshness held",
+    "Original12 omitted cases remain originaltuple-bound; no16/62/37/M6 replay",
+    "Fixture capture grants no retry/StopTwo waiver or consumer semantic qualification",
+    "Sourceapplication/signature, coherent review FULL1+max3DIFF, fullVerify/native/manual/POacceptance all preserved"
+  ],
+  "testsRun": 0,
+  "sourceApplied": false,
+  "committed": false
+}
