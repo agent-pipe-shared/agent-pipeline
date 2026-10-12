@@ -1,0 +1,286 @@
+command: node --test plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+label: t6a-nghs-wsl
+exitCode: 1
+head: 8089fd33820aca4207b2db26494deb415bfdfedd
+tree: f8d5b21394858c9d96ae425e12032606cbabcf86
+dirty: true
+--- stdout ---
+✔ NGHS01 unmarked native dispatch stays untouched (1152.843017ms)
+✔ NGHS02 clean Claude preflight binds exact session and tool-use identity (4575.328059ms)
+✔ NGHS03 Codex start-stop association consumes resolved pending bindings and refuses true ambiguity (11025.768804ms)
+✔ NGHS04 candidate, runner role and dirty checkout are checked before model launch (3424.621038ms)
+✔ NGHS05 expired unstarted Codex pending state cannot poison a later exact start (5857.580556ms)
+✖ NGHS06 governed approved course refuses missing and legacy queue independently of fanout environment (11159.865876ms)
+✖ NGHS07 actual native authority admission reserves item and scopes across sessions (10961.782002ms)
+✖ NGHS08 AGY dispatch journal v2 retains stable physical identity across a real candidate advance; v1 never silently migrates (2580.473813ms)
+✖ NGHS09 targeted check evidence observes real process failures and binds tests, dependencies and candidate; forged PASS is rejected (6947.146623ms)
+✖ NGHS10 same authenticated item owner checkpoints survive reconstruction without granting phase PASS or cancellation release (11209.575733ms)
+✖ NGHS11 actual original approval continuation automatically creates and rebinds legacy queue without promoting old completion (11055.431467ms)
+✖ NGHS12 controlled Source native return runs candidate-bound checks and only verified Main integration releases dependency readiness (11159.65178ms)
+✖ NGHS13 same retained Source item requalifies only actually impacted dependencies and rejects unchanged replay or checker weakening (11129.041005ms)
+✖ NGHS14 same Source item extends its checked scope atomically without hiding collisions and real host adopts added paths (11163.321288ms)
+✔ NGHS15 caller write-scope prose cannot exempt a writable Goldfish dispatch from governed item admission (0.467748ms)
+✖ NGHS16 actual approved original criterion aliases cannot acquire another owner and independent queue preparation preserves first native return custody (11230.66529ms)
+✖ NGHS17 two genuine original items author simultaneously and return in either order without admitting unowned dirty paths or HEAD advances (11443.705839ms)
+✖ NGHS18 native concurrency rejects fabricated foreign authority, expired custody, aliased roots, other repositories and unauthenticated HEAD commits (11029.852296ms)
+✖ NGHS19 closed native v2 requires delivery even after additive v3 and canonical fixtures remain inside their actual outer Git checkout (11510.048015ms)
+✖ NGHS20 T6-A Claude hook-observed session owner lets governed admission create the queue only inside its own entered scope (11115.478682ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 6
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 178071.113115
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS06 governed approved course refuses missing and legacy queue independently of fanout environment (11159.865876ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:180:29
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:177:125)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS07 actual native authority admission reserves item and scopes across sessions (10961.782002ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:194:16
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:191:106)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS08 AGY dispatch journal v2 retains stable physical identity across a real candidate advance; v1 never silently migrates (2580.473813ms)
+  Error: AGY-AUTHORITY-PRIVATE-PATH
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/agy-host-observed-store.mjs:27:43)
+      at own (file://<repo-root>/plugins/pipeline-core/lib/agy-host-observed-store.mjs:60:81)
+      at authorityRoot (file://<repo-root>/plugins/pipeline-core/lib/agy-host-observed-store.mjs:80:35)
+      at readAgyAuthorityInventory (file://<repo-root>/plugins/pipeline-core/lib/agy-host-observed-store.mjs:111:18)
+      at inventory (file://<repo-root>/plugins/pipeline-core/lib/agy-host-observed-store.mjs:179:33)
+      at Object.readBaseline (file://<repo-root>/plugins/pipeline-core/lib/agy-host-observed-store.mjs:241:39)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:238:28
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:229:148)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21) {
+    code: 'AGY-AUTHORITY-PRIVATE-PATH'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS09 targeted check evidence observes real process failures and binds tests, dependencies and candidate; forged PASS is rejected (6947.146623ms)
+  AssertionError [ERR_ASSERTION]: {"status":"observed","code":"SQ-TARGETED-CHECKS-PASSED","handle":{},"evidence":{"schema":"pipeline.item-targeted-checks.v1","candidate":{"commit":"ca34735e440abc31e9796324304c465d7849cada","tree":"e93f1c09ee7d4c3188e130f67b249937ac329fa9"},"contractSha256":"91aa1654fe08119ddcf1b3ccde647edf6f9ea97c0d179b3c99a2d25018f771fc","files":[{"path":"dependency.txt","sha256":"7f8b1dfc466b6249f06cbe55c9174df2578e7754da793fded244ef5cba2a38f1","size":8},{"path":"unit.test.cjs","sha256":"d0ab9cc8ce03800f455b85a6e366270f1e7e1f0bf932a51097fd459ce3fcff51","size":297}],"results":[{"id":"unit","path":"unit.test.cjs","executable":"<home>/.local/lib/node-v24.15.0/bin/node","args":["--test","unit.test.cjs"],"status":0,"signal":null,"error":null,"stdoutSha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderrSha256":"ecc2bd355bce668303f97e8e93a349b2d4e641ce720c28c4cbf7a047c04eec78"}],"verdict":"passed"}}
+  + actual - expected
+  
+  + 'SQ-TARGETED-CHECKS-PASSED'
+  - 'SQ-TARGETED-CHECKS-FAILED'
+                        ^
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:262:12
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:247:155)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'SQ-TARGETED-CHECKS-PASSED',
+    expected: 'SQ-TARGETED-CHECKS-FAILED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS10 same authenticated item owner checkpoints survive reconstruction without granting phase PASS or cancellation release (11209.575733ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:272:16
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:269:148)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS11 actual original approval continuation automatically creates and rebinds legacy queue without promoting old completion (11055.431467ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:311:219
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:310:149)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS12 controlled Source native return runs candidate-bound checks and only verified Main integration releases dependency readiness (11159.65178ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:339:219
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:338:156)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS13 same retained Source item requalifies only actually impacted dependencies and rejects unchanged replay or checker weakening (11129.041005ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:367:219
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:366:155)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS14 same Source item extends its checked scope atomically without hiding collisions and real host adopts added paths (11163.321288ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:402:219
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:401:144)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS16 actual approved original criterion aliases cannot acquire another owner and independent queue preparation preserves first native return custody (11230.66529ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:440:219
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:439:175)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS17 two genuine original items author simultaneously and return in either order without admitting unowned dirty paths or HEAD advances (11443.705839ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:460:224
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:459:60)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS18 native concurrency rejects fabricated foreign authority, expired custody, aliased roots, other repositories and unauthenticated HEAD commits (11029.852296ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:486:222
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:485:172)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS19 closed native v2 requires delivery even after additive v3 and canonical fixtures remain inside their actual outer Git checkout (11510.048015ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:506:216
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:503:158)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS20 T6-A Claude hook-observed session owner lets governed admission create the queue only inside its own entered scope (11115.478682ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:51:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:424:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:357:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:219:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:343:75)
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:526:219
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:525:146)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+--- stderr ---

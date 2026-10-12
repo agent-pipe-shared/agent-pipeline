@@ -21,7 +21,8 @@ import { readyAndLive } from "./slice-queue.mjs";
 import { runCli, writeQueueAtomic } from "../scripts/slice-queue.mjs";
 import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
 import { createAgyAuthorityJournalOwner } from "./agy-host-observed-store.mjs";
-import { nativeManagedDigest } from "./native-managed-authority-support.mjs";
+import { nativeManagedDigest, nativeManagedCurrentOwner } from "./native-managed-authority-support.mjs";
+import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner, CLAUDE_HOOK_SESSION_OWNER_SOURCE } from "./claude-hook-session-owner.mjs";
 import { initializeSessionAuthorityRegistry, refreshSourceOwnedDispatchAuthorityMember } from "./session-authority-registry.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
@@ -519,6 +520,39 @@ const cases = [
         writeFileSync(pendingPath,originalBytes);assert.doesNotThrow(()=>port.readBaseline(),'restoring the original authenticated bytes restores original readiness');
       }
     } finally {writeFileSync(pendingPath,originalBytes);}
+  })},
+
+  {id:'NGHS20',name:'T6-A Claude hook-observed session owner lets governed admission create the queue only inside its own entered scope',run:()=>fixture(({root})=>{
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root);
+    initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+    const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+    const prepare=()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['src/change.mjs']});
+    const sessionId='0f6c2c1e-5b7a-4d1e-9a3b-7c2d1e0f9a8b',queuePath=join(root,'specs/unit/slice-queue.json');
+    try {
+      // Original behavior: a hook process has no in-process requester, so admission refuses.
+      const unbound=prepare();assert.equal(unbound.status,'refused',JSON.stringify(unbound));assert.equal(unbound.reason,'item-course-requester-unavailable');assert.equal(existsSync(queuePath),false);
+      assert.equal(nativeManagedCurrentOwner(repository).association.state,'unbound');
+      // Unusable hook identity binds nothing.
+      assert.equal(enterClaudeHookSessionOwner({root,input:{session_id:'../escape'}}),false);assert.equal(prepare().reason,'item-course-requester-unavailable');
+      // A different repository root never binds this repository.
+      const foreign=mkdtempSync(join(nativeContractFixtureParent(),'claude-hook-foreign-'));
+      try { assert.equal(enterClaudeHookSessionOwner({root:foreign,input:{session_id:sessionId}}),true);assert.equal(readClaudeHookSessionOwner({repository}),null);assert.equal(nativeManagedCurrentOwner(repository).association.state,'unbound'); }
+      finally { rmSync(foreign,{recursive:true,force:true}); }
+      // Own entered scope: a private descriptor is created once and admission proceeds.
+      assert.equal(enterClaudeHookSessionOwner({root,input:{session_id:sessionId}}),true);
+      const owner=nativeManagedCurrentOwner(repository);assert.equal(owner.association.state,'bound',JSON.stringify(owner));
+      assert.equal(owner.association.target.sessionId,`claude-${sessionId}`);assert.equal(owner.assurance,'physical-readback');assert.equal(owner.ownerSource,CLAUDE_HOOK_SESSION_OWNER_SOURCE);
+      const descriptor=JSON.parse(readFileSync(join(repository.commonDir,'agent-pipeline/session-descriptors/active',`claude-${sessionId}.json`),'utf8'));
+      assert.equal(descriptor.ownerRuntime,null,'transient hook process records no owner pid');
+      assert.deepEqual(nativeManagedCurrentOwner(repository).association,owner.association,'a later read reuses the same descriptor and nonce');
+      const created=prepare();assert.equal(created.status,'required',JSON.stringify(created));assert.equal(created.queue.slices[0].id,'ITEM-AC-1');assert.equal(created.queue.slices[0].delivery.criteria[0],'AC-1');
+      // Approval/criterion binding is unchanged by the owner source.
+      const wrong=prepareGovernedItemQueue({root,itemDelivery:{...itemDelivery,criterionLocator:{...original.criterionLocator,sourceSha256:'f'.repeat(64)}},candidate:original.candidate,writeScope:['src/change.mjs']});assert.equal(wrong.status,'refused');
+      // Leaving the scope restores the original refusal.
+      leaveClaudeHookSessionOwner();assert.equal(nativeManagedCurrentOwner(repository).association.state,'unbound');
+    } finally { leaveClaudeHookSessionOwner(); }
   })},
 
 ];

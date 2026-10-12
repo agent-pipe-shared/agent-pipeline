@@ -687,7 +687,7 @@ export function startSessionDescriptor(startPath, options = {}) {
     createdAt: nowIso(options.now),
     ownerNonce,
     ownerNonceSha256: ownerDigest(ownerNonce),
-    ownerRuntime: localProcessOwnerRuntime(options.ownerPid ?? process.pid, options),
+    ownerRuntime: options.ownerRuntime === null ? null : localProcessOwnerRuntime(options.ownerPid ?? process.pid, options),
   };
   assertOwnedDescriptorLifetimeCapacity();
   writeAtomic(path, canonicalJson(descriptor));

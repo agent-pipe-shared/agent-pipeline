@@ -67,6 +67,7 @@ import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
 import { prepareNativeGoldfishHostState, resolveGovernedItemQueue, prepareGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
@@ -384,6 +385,10 @@ if (isDirectInvocation(import.meta.url)) {
 
   const toolInput = input?.tool_input;
   if (!toolInput || typeof toolInput !== "object") process.exit(0);
+  // T6-A: a Claude Task/Agent call binds this hook process to its own hook-observed session owner.
+  if (["Task", "Agent"].includes(input?.tool_name)) {
+    enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
+  }
 
   // The subagent tool is `Task` in Claude Code and `Agent` in some runners; both are accepted
   // rather than guessing one, because a matcher that names the wrong tool is a silent no-op —

@@ -6,6 +6,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
 import { finalizeNativeGoldfishHostReturn } from "../lib/native-goldfish-host-finalizer.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 // Repository admission precedes hook input hardening and all governed effects.
 if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
@@ -33,6 +34,8 @@ if (isDirectInvocation(import.meta.url)) {
   let input;
   try { input = JSON.parse(readFileSync(0, "utf8")); }
   catch { process.exit(0); }
+  // T6-A: bind this Claude hook process to its own hook-observed session owner.
+  if (runner === "claude") enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
   let result;
   try {
     result = finalizeNativeGoldfishHostReturn({ runner,

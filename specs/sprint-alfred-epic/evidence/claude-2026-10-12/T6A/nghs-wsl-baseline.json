@@ -1,0 +1,196 @@
+command: node --test plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+label: t6a-baseline
+exitCode: 1
+head: 8089fd33820aca4207b2db26494deb415bfdfedd
+tree: f8d5b21394858c9d96ae425e12032606cbabcf86
+dirty: true
+--- stdout ---
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:09:01.409Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:09:01.746Z; bound to submission f3e9327fe8d1....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:09:01.986Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:09:11.326Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:09:11.641Z; bound to submission 53a9284eeedd....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:09:11.873Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:10:14.303Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:10:14.644Z; bound to submission 0d2ced8dd150....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:10:14.886Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:11:13.266Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:11:13.616Z; bound to submission c878e23a0e16....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:11:13.880Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:13:11.362Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(31eeb9bdce5c...)+specs/unit/spec.md(06b58970b4b8...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:13:11.727Z; bound to submission 8cd7fe9993da....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:13:11.984Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(31eeb9bdce5c...)+specs/unit/spec.md(06b58970b4b8...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:14:28.243Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(86231d5c30de...)+specs/unit/spec.md(45e0940b6834...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:14:28.594Z; bound to submission 5c7bf2e761a8....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:14:28.854Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(86231d5c30de...)+specs/unit/spec.md(45e0940b6834...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:16:13.421Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(86231d5c30de...)+specs/unit/spec.md(45e0940b6834...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:16:13.790Z; bound to submission c701af482911....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:16:14.047Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(86231d5c30de...)+specs/unit/spec.md(45e0940b6834...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:18:00.043Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:18:00.396Z; bound to submission e25e83b98095....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:18:00.650Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:18:35.304Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:18:35.690Z; bound to submission b76cc2eaba38....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:18:35.961Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Plan submitted by "Synthetic fixture" on 2026-10-12T09:18:54.445Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Synthetic fixture" on 2026-10-12T09:18:54.803Z; bound to submission 4f628c967726....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "Synthetic fixture PO" on 2026-10-12T09:18:55.073Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/unit/prd_unit.md(14c8b90e55df...)+specs/unit/spec.md(e2d5f02a8bb0...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+✔ NGHS01 unmarked native dispatch stays untouched (70.182092ms)
+✔ NGHS02 clean Claude preflight binds exact session and tool-use identity (258.960652ms)
+✔ NGHS03 Codex start-stop association consumes resolved pending bindings and refuses true ambiguity (523.330545ms)
+✔ NGHS04 candidate, runner role and dirty checkout are checked before model launch (165.188499ms)
+✔ NGHS05 expired unstarted Codex pending state cannot poison a later exact start (285.792964ms)
+✔ NGHS06 governed approved course refuses missing and legacy queue independently of fanout environment (975.627732ms)
+✔ NGHS07 actual native authority admission reserves item and scopes across sessions (29210.471315ms)
+✔ NGHS08 AGY dispatch journal v2 retains stable physical identity across a real candidate advance; v1 never silently migrates (480.736203ms)
+✖ NGHS09 targeted check evidence observes real process failures and binds tests, dependencies and candidate; forged PASS is rejected (637.355222ms)
+✔ NGHS10 same authenticated item owner checkpoints survive reconstruction without granting phase PASS or cancellation release (28320.924531ms)
+✔ NGHS11 actual original approval continuation automatically creates and rebinds legacy queue without promoting old completion (9923.903031ms)
+✔ NGHS12 controlled Source native return runs candidate-bound checks and only verified Main integration releases dependency readiness (62945.436085ms)
+✖ NGHS13 same retained Source item requalifies only actually impacted dependencies and rejects unchanged replay or checker weakening (58896.766052ms)
+✔ NGHS14 same Source item extends its checked scope atomically without hiding collisions and real host adopts added paths (118086.263322ms)
+✔ NGHS15 caller write-scope prose cannot exempt a writable Goldfish dispatch from governed item admission (0.712302ms)
+✔ NGHS16 actual approved original criterion aliases cannot acquire another owner and independent queue preparation preserves first native return custody (76890.714731ms)
+✔ NGHS17 two genuine original items author simultaneously and return in either order without admitting unowned dirty paths or HEAD advances (211798.866857ms)
+✔ NGHS18 native concurrency rejects fabricated foreign authority, expired custody, aliased roots, other repositories and unauthenticated HEAD commits (35153.226794ms)
+✔ NGHS19 closed native v2 requires delivery even after additive v3 and canonical fixtures remain inside their actual outer Git checkout (19262.438983ms)
+✖ NGHS20 T6-A Claude hook-observed session owner lets governed admission create the queue only inside its own entered scope (6221.655ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 17
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 660880.039275
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS09 targeted check evidence observes real process failures and binds tests, dependencies and candidate; forged PASS is rejected (637.355222ms)
+  AssertionError [ERR_ASSERTION]: {"status":"observed","code":"SQ-TARGETED-CHECKS-PASSED","handle":{},"evidence":{"schema":"pipeline.item-targeted-checks.v1","candidate":{"commit":"87b8db1aad6265823b6bbe9b28d95e7f9add99ad","tree":"e93f1c09ee7d4c3188e130f67b249937ac329fa9"},"contractSha256":"91aa1654fe08119ddcf1b3ccde647edf6f9ea97c0d179b3c99a2d25018f771fc","files":[{"path":"dependency.txt","sha256":"7f8b1dfc466b6249f06cbe55c9174df2578e7754da793fded244ef5cba2a38f1","size":8},{"path":"unit.test.cjs","sha256":"d0ab9cc8ce03800f455b85a6e366270f1e7e1f0bf932a51097fd459ce3fcff51","size":297}],"results":[{"id":"unit","path":"unit.test.cjs","executable":"<home>/.local/lib/node-v24.15.0/bin/node","args":["--test","unit.test.cjs"],"status":0,"signal":null,"error":null,"stdoutSha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stderrSha256":"4b3f139d89bfba6b69da93c65a651f8b635d30c0af6a824ae7df197c82c50a72"}],"verdict":"passed"}}
+  + actual - expected
+  
+  + 'SQ-TARGETED-CHECKS-PASSED'
+  - 'SQ-TARGETED-CHECKS-FAILED'
+                        ^
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:262:12
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:247:155)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'SQ-TARGETED-CHECKS-PASSED',
+    expected: 'SQ-TARGETED-CHECKS-FAILED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS13 same retained Source item requalifies only actually impacted dependencies and rejects unchanged replay or checker weakening (58896.766052ms)
+  AssertionError [ERR_ASSERTION]: {"status":"requalified","code":"NGHS-ITEM-REQUALIFIED","revision":1,"executedCheckIds":["criterion-one"],"reusedCheckIds":["unaffected"],"checkRef":{"ok":true,"code":"NGHS-STORED","sha256":"c3d965267a012f73968aaee01d3e9e8fd18922b60e5471fa5e780d86d3074975","path":"agent-pipeline/run/native-goldfish-host-commit/authority-recheck-b8c30fd5b422e1f6b15bfeeee4a52b02527db2ac535299ee208d1b384fca0220-1.json"},"memberRef":{"path":".git/agent-pipeline/session-authority/members/native-goldfish/member-e5a0d60fdbb607734e3c3f610ab7d6ea.1.json","sha256":"d4e9c0144bacab8493cc75d287844a3629d5879308d88881521a54b9395f1bdd","size":2556},"reservation":"retained"}
+  + actual - expected
+  
+  + 'requalified'
+  - 'targeted-failed'
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:390:116
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:366:155)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'requalified',
+    expected: 'targeted-failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ NGHS20 T6-A Claude hook-observed session owner lets governed admission create the queue only inside its own entered scope (6221.655ms)
+  AssertionError [ERR_ASSERTION]: {"association":{"state":"unbound","target":null},"descriptorHandle":null,"assurance":"physical-readback"}
+  
+  'unbound' !== 'bound'
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:545:64
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:51:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs:525:146)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unbound',
+    expected: 'bound',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

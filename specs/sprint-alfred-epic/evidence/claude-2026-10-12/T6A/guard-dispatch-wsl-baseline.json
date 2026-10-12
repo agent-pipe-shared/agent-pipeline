@@ -1,0 +1,109 @@
+command: node --test plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+label: t6a-gd-baseline
+exitCode: 1
+head: a2c799c28b1241b065de672069dd3c8e81a59a66
+tree: fed8fc5454baddaf002d624cf37bb05d7628bc6b
+dirty: false
+--- stdout ---
+✔ GD01 GD1 block  a Critic dispatch carrying a claims list (650.329182ms)
+✔ GD02 GD2 allow  a references-only Critic dispatch (608.402383ms)
+✔ GD03 GD2a allow and bind a policy-clean Critic dispatch carrying the exact Advisor prohibition (633.334289ms)
+✔ GD04 GD2b the pre-launch carrier contains only the exact role, disposition and prompt digest (1.900719ms)
+✔ GD05 GD2c block a prohibition-bearing child whose parent tool-use id is absent (593.32103ms)
+✔ GD06 GD2d block a same-role Workflow batch whose mixed Advisor dispositions cannot map to exact children (639.260664ms)
+✔ GD07 GD2e only the exact canonical MP-26 line creates a prohibition (1.202101ms)
+✔ GD08 GD2f the portable binding preserves a prohibited child and an unrestricted sibling (1.388766ms)
+✔ GD09 GD2g the private carrier resolves only the exact parent and role (3.386428ms)
+✔ GD10 GD2h a private denial audit is content-free and digest-bound (1.718402ms)
+✔ GD11 GD2i allow a Explore dispatch without a prohibition line (exact live tool_input shape) (616.570541ms)
+✔ GD12 GD2i allow a Plan dispatch without a prohibition line (exact live tool_input shape) (606.280826ms)
+✔ GD13 GD2i allow a general-purpose dispatch without a prohibition line (exact live tool_input shape) (585.847104ms)
+✔ GD14 GD2j allow a batch of two Explore dispatches without a prohibition line (596.277923ms)
+✔ GD15 GD2k built-in role spellings bind case-preservingly when the prohibition line is present (2.199875ms)
+✔ GD16 GD2l an unparseable role gets its own code naming the value (0.578288ms)
+✔ GD17 GD2i an unbound child and an orchestrator are not blanket-blocked (163.642808ms)
+✔ GD18 GD2j an exactly bound prohibited child is content-free audited and blocked (53.035868ms)
+✔ GD19 GD2k audit failure remains blocked before a model call (54.457216ms)
+✔ GD20 GD2l the real Claude hook path resolves the dispatch carrier, denies, and emits a content-free audit (634.134347ms)
+✔ GD21 GD3 block  the camelCase subagentType field is read too (649.242852ms)
+✖ GD22 GD4 block  an incomplete Goldfish briefing (653.236911ms)
+✔ GD23 GD5 allow  an unrelated subagent type (596.614467ms)
+✔ GD24 GD6 allow  a payload with no tool_input (594.15264ms)
+✔ GD25 GD7 allow  a dispatch with no subagent type (603.653252ms)
+✔ GD26 GD8 the real critic-review.md template, filled, is dispatchable (632.358314ms)
+✖ GD27 GD9 the real goldfish-task.md template, filled, is dispatchable (632.81012ms)
+✔ GD28 GD10 block  a Workflow-embedded agent() call carrying a claims list (604.618659ms)
+✔ GD29 GD11 allow  a Workflow-embedded agent() call with a clean references-only prompt (610.150241ms)
+✔ GD30 GD12 block  an Antigravity Subagents-array dispatch carrying a claims list (594.612167ms)
+✔ GD31 GD13 allow  an Antigravity Subagents-array dispatch with a clean references-only prompt (603.463783ms)
+✔ GD32 GD14 block  a freehand prose Antigravity Critic dispatch (the reproduced source-session bypass) (608.578844ms)
+✔ GD33 GD15 allow  an Antigravity dispatch of an unrelated subagent type (616.93673ms)
+✔ GD34 GD15a block a direct Agent packet with no role before launch (617.359927ms)
+✔ GD35 GD15b block a shipped direct role with no prompt before launch (582.062247ms)
+✔ GD36 GD15c block an unknown namespaced role before launch (585.249047ms)
+✔ GD37 GD15d block a statically visible Workflow role without the plugin prefix (594.092006ms)
+✔ GD38 GD15e block malformed Antigravity entries before launch (593.821348ms)
+✔ GD39 GD15f block an empty Antigravity batch before launch (594.252541ms)
+✔ GD40 GD15g block a Codex critic packet carrying a claims list (594.399009ms)
+✔ GD41 GD15h allow an ordinary Codex worker packet (615.000939ms)
+✔ GD42 GD15i allow Codex to use its valid default role when agent_type is omitted (597.205883ms)
+✔ GD43 GD15j block a Codex packet with no message before launch (597.753267ms)
+✔ GD44 GD16 extractWorkflowDispatches is importable and callable directly, via a subprocess, with no in-process import of the hook module (589.474547ms)
+✔ GD45 GD17 block  via the real path, a refusable dispatch still refuses after the entrypoint gate (626.574369ms)
+✔ GD46 GD18 allow  via the real path, an admissible dispatch still admits after the entrypoint gate (611.512128ms)
+✔ GD47 GD18a block a budget-bearing Claude dispatch without its parent tool-use id before launch (604.88686ms)
+✔ GD48 GD19 block  invoked through a symlink to the module, the hook still refuses (the 2026-08-06 failure shape) (675.469293ms)
+✔ GD49 GD20 extractAntigravityDispatches is importable and callable directly, via a subprocess, with no in-process import of the hook module (622.721661ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 47
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24969.303159
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ GD22 GD4 block  an incomplete Goldfish briefing (653.236911ms)
+  AssertionError [ERR_ASSERTION]: stderr missing "DISPATCH-INCOMPLETE-BRIEFING"
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/guard-dispatch.test.mjs:87:66)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ GD27 GD9 the real goldfish-task.md template, filled, is dispatchable (632.81012ms)
+  AssertionError [ERR_ASSERTION]: exit 2 (expected 0) -- BLOCKED (guard-dispatch): SQ-AUTHORITY-UNAVAILABLE: Restore the approved feature's valid v2 slice-queue.json through the governed course writer; legacy delivery evidence requires explicit migration.
+  
+  2 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/guard-dispatch.test.mjs:86:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

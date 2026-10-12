@@ -7,6 +7,7 @@ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.m
 import { readAuthorityNamespace, readAuthoritySourceFile } from './session-authority-domain-owner.mjs';
 import { readSourceOwnedAuthorityContext, inspectSourceOwnedCurrentAuthorityContext } from './session-requester-bridge.mjs';
 import { validateNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
+import { readClaudeHookSessionOwner } from './claude-hook-session-owner.mjs';
 
 export const nativeManagedDigest = value => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : canonical(value)).digest('hex');
 export function nativeManagedFault(reason) {
@@ -20,7 +21,13 @@ export function nativeManagedRepository(repository) {
 }
 export function nativeManagedCurrentOwner(repository) {
   const context = readSourceOwnedAuthorityContext({ repository });
-  if (context.status !== 'bound') return { association: { state: 'unbound', target: null }, descriptorHandle: null, assurance: 'physical-readback' };
+  if (context.status !== 'bound') {
+    // T6-A fallback: a Claude hook process that entered its own hook-observed session scope.
+    const hook = readClaudeHookSessionOwner({ repository });
+    if (hook) return { association: { state: 'bound', target: { sessionId: hook.sessionId, descriptorSha256: hook.descriptorSha256, ownerNonceSha256: hook.ownerNonceSha256 } },
+      descriptorHandle: null, assurance: 'physical-readback', ownerSource: hook.ownerSource };
+    return { association: { state: 'unbound', target: null }, descriptorHandle: null, assurance: 'physical-readback' };
+  }
   const observed = inspectSourceOwnedCurrentAuthorityContext({ repository });
   const requester = observed.currentRequester;
   return { association: { state: 'bound', target: { sessionId: requester.sessionId, descriptorSha256: requester.descriptorSha256, ownerNonceSha256: requester.ownerNonceSha256 } },
