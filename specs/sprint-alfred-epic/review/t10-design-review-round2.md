@@ -27,5 +27,8 @@ The ID-only registry did not let the Critic map T10-F1..F3 to their gaps; it rep
 ## Disposition of T10-D1
 The locator record is a preparation artifact, not an approval input. It is regenerated against the approved Spec bytes when the v3 item prompts are rebuilt after approval, and every prompt build re-parses its locator against the then-current `spec.md` (fail closed on mismatch). D1 stays listed as open in the round-2 receipt so the approval binding carries it.
 
+## Bound companion (disclosure)
+The round-2 receipt binds `specs/sprint-alfred-epic/traceability.md` (sha256 559be0739a6d7de052e4faa29f3ea521ab90e603a04e87697934eb4c9e2eb12d) as a companion, because the presentation consistency check requires the traceability file to be bound. That file is unchanged since commit 087652e73 (2026-10-07, the previously approved design round) and was not part of the T10 review object; neither T10 Critic opened it. Binding it pins its bytes for the approval; it is not a claim that T10 reviewed it.
+
 ## Not reached
 Commit-trailer authorship of the three commits (a trailer query was refused by guard-push); roles/elephant.md, ADR-0011, critic-accepted-contract.mjs, project/pipeline.json, ADR-0063, on-disk CLAUDE.md; row-by-row manifest-to-register identity; companions design.md, traceability.md, design-input.md; unsampled ranges of the portable record and manifest.
