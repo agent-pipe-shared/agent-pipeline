@@ -1,0 +1,2345 @@
+{
+ "schema": "alfred.claude-reuse-index.v1",
+ "derivedFrom": [
+  "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.json",
+  "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-evidence-map.json",
+  "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/manifest.json"
+ ],
+ "note": "Reuse pointers only. No stage, acceptance or qualification is changed by this index.",
+ "items": [
+  {
+   "id": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Remaining work is exact current template/lane-to-refusal case binding, wrapper/alias coverage, then real host callbacks; native Desktop is separate. No new source defect is established by this read.",
+   "nextActionOrBlocker": "Remaining work is exact current template/lane-to-refusal case binding, wrapper/alias coverage, then real host callbacks; native Desktop is separate. No new source defect is established by this read.",
+   "backlogItem": "backlog/items/2026-10-07-a-read-only-probe-can-dump-the-process-environment-into-a-transcript.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+   "stage": "UNKNOWN",
+   "deliveryState": "merged-repair-targeted-green-prepared",
+   "remaining": "Private original git/head repair preserved in merged grammar:62/62 controls including new rg gaps and two actual WSL invocations. Not integrated; native Agy/Windows readback and governed application open.",
+   "nextActionOrBlocker": "Bind the actual normalized Agy input and loaded grammar/scope source identities to existing positive/negative proof; run only an uncovered essential consumer case if those original receipts cannot be recovered. Preserve substitution/write/redirect refusal and the finite head bound.",
+   "backlogItem": "backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+   "stage": 50,
+   "deliveryState": "current-contract-qualified-course-decision-held",
+   "remaining": "Four current contract groups pass; actual old design coordinator retired for all three runners with no bridge effects. Durable generic-question course authority needs bounded PO decision; do not weaken exact material bindings. Historical eight helper fixtures retained.",
+   "nextActionOrBlocker": [
+    "Retained directed7/store10/coordinator3 receipt identities and current default on-demand caller/restart/new-dispatch binding remain unbound; no mandatory Advisor is reinstated."
+   ],
+   "backlogItem": "backlog/items/2026-09-28-advisor-demand-reuse-has-no-design-course-bound.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+   "stage": 50,
+   "deliveryState": "recovered-qualified-source-held",
+   "remaining": "Existing Main postimage and seven prior cases match; security/architecture, DWP cause and native consumer proof open.",
+   "nextActionOrBlocker": "First obtain the specified decision/review, then bind retained/on-demand callers and test the approved predicate. No additional Critic was run.",
+   "backlogItem": "backlog/items/2026-10-05-advisor-provenance-ancestor-check-fails-on-any-sibling-write.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Next bind same-question, revision, wrong-question, unrelated candidate, forged disposition, and both approval modes to the actual surviving producer/validator; historical divergence alone is not a current defect.",
+   "nextActionOrBlocker": "Next bind same-question, revision, wrong-question, unrelated candidate, forged disposition, and both approval modes to the actual surviving producer/validator; historical divergence alone is not a current defect.",
+   "backlogItem": "backlog/items/2026-09-28-advisor-question-contract-and-final-source-binding-conflict.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Preserve the protected transfer boundary and qualify generated spelling against the actual selected guard before treating the item as complete.",
+   "nextActionOrBlocker": "Preserve the protected transfer boundary and qualify generated spelling against the actual selected guard before treating the item as complete.",
+   "backlogItem": "backlog/items/2026-10-09-agent-obligations-recommends-a-commit-spelling-guard-push-refuses.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+   "stage": 50,
+   "deliveryState": "current-main-targeted-green-native-held",
+   "remaining": "113 local assertions PASS;377 current Source/dependency byte+mode pins conserved. Current generated canonical/vendored text parity qualified. No new Source delta; installed three-runner/native/candidate checklist/review/acceptance remain open.",
+   "nextActionOrBlocker": [
+    "Exact generator equality receipt and installed three-runner guard/text parity remain unbound."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Root reviews the stale-only proposal and qualifies the resumed hook/observer with the original fresh-lock/barrier invariants. Separately reconcile actual native and CLI worker start/read-only/terminal records, loaded source/policy, role-route degradation and EL-01/coverage dependencies; no provider or Critic authority grant from a fallback report.",
+   "nextActionOrBlocker": "Root reviews the stale-only proposal and qualifies the resumed hook/observer with the original fresh-lock/barrier invariants. Separately reconcile actual native and CLI worker start/read-only/terminal records, loaded source/policy, role-route degradation and EL-01/coverage dependencies; no provider or Critic authority grant from a fallback report.",
+   "backlogItem": "backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.agy-el01-write-authorization-gap",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind this original item to authenticated native Edit/Write carrier evidence and owned-worker scope; do not infer authorization from a prompt role or missing proof.",
+   "nextActionOrBlocker": "Bind this original item to authenticated native Edit/Write carrier evidence and owned-worker scope; do not infer authorization from a prompt role or missing proof.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Finish the authorized isolated CLI/config precedence spike and PO decisions before any topology change; separately prove actual loaded source/version and stale-copy refresh. Do not treat an installer or selected source hash as effective-load proof.",
+   "nextActionOrBlocker": "Finish the authorized isolated CLI/config precedence spike and PO decisions before any topology change; separately prove actual loaded source/version and stale-copy refresh. Do not treat an installer or selected source hash as effective-load proof.",
+   "backlogItem": "backlog/items/2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind original first-start/stale/readback clauses to a clean non-Git fixture, then report installed/native evidence separately; do not infer it from the attestation helper alone.",
+   "nextActionOrBlocker": "Bind original first-start/stale/readback clauses to a clean non-Git fixture, then report installed/native evidence separately; do not infer it from the attestation helper alone.",
+   "backlogItem": "backlog/items/2026-09-29-agy-managed-copy-first-start-lacks-attestation.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Actual Agy global refresh/install/readback, fresh stamp and greenfield preflight are original explicit native/installed holds."
+   ],
+   "nextActionOrBlocker": [
+    "Actual Agy global refresh/install/readback, fresh stamp and greenfield preflight are original explicit native/installed holds."
+   ],
+   "backlogItem": "backlog/items/2026-09-29-antigravity-1-2-13-blocks-managed-refresh.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Ordinary mandatory DWP retired. Surviving portability default-reader/ignored-path controls require retained reader receipts; ADR0063 refinement and complete handover bound-path inventory not verified. Denied ADR glob was not retried."
+   ],
+   "nextActionOrBlocker": [
+    "Ordinary mandatory DWP retired. Surviving portability default-reader/ignored-path controls require retained reader receipts; ADR0063 refinement and complete handover bound-path inventory not verified. Denied ADR glob was not retried."
+   ],
+   "backlogItem": "backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.approval-verification-demands-head-equals-candidate",
+   "stage": "UNKNOWN",
+   "deliveryState": "current-main-targeted-green-held",
+   "remaining": "57 Linux assertions pass on unchanged current reader; actual live/native consumer, review and acceptance open.",
+   "nextActionOrBlocker": "Recover and bind the original strict-preparation/approved-descendant negative and positive receipts to these current reader bytes. Keep hash, signature, feature, PRD/Spec and advisor exception CAS strict; no DWP route revival.",
+   "backlogItem": "backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Close genuine owning Windows producer/default journal/native-reference counterpart and authority-open failures; compose the requester Windows/Linux siblings with the I03/executor/guard tuple, then independently qualify OSV001–008 before activation.",
+   "nextActionOrBlocker": "Bind the full named approved/malformed recovery and record-write corridors to one current integrated generation; do not select the pending triple as qualified.",
+   "backlogItem": "backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Review whether current onboarding already satisfies the exact install/clone scope, then qualify only that path; do not duplicate hook installation.",
+   "nextActionOrBlocker": "Review whether current onboarding already satisfies the exact install/clone scope, then qualify only that path; do not duplicate hook installation.",
+   "backlogItem": "backlog/items/2026-10-08-auto-install-pre-push-hook-with-the-plugin.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind the typed result to exact current source and an actual bootstrap refresh/readback path. Avoid duplicating hook reinstatement or treating a backlog item as execution.",
+   "nextActionOrBlocker": "Bind the typed result to exact current source and an actual bootstrap refresh/readback path. Avoid duplicating hook reinstatement or treating a backlog item as execution.",
+   "backlogItem": "backlog/items/2026-10-05-bootstrap-should-refresh-hooks-when-the-plugin-updated.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.bounded-reader-terminal-binding",
+   "stage": 25,
+   "deliveryState": "current-protocol-recovered-terminal-evidence-held",
+   "remaining": "Current protocol and nine canonical cases inspected; exact original terminal/dependency CAS unavailable after StopTwo. No test/review rerun or acceptance claimed.",
+   "nextActionOrBlocker": "Bind current checker and immutable reports to the actual terminal Git state and dispositions; no further Reader review is called for by this assessment.",
+   "backlogItem": "backlog/items/2026-09-27-bounded-reader-terminal-binding.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+   "stage": "UNKNOWN",
+   "deliveryState": "net-new-ratchet-red-design-held",
+   "remaining": "Accepted exemption retained; two controls pass, established/deferred net-new target incorrectly admits. D3/D4 ratchet policy and library-only guard delegation need bounded decisions/scope.",
+   "nextActionOrBlocker": "Reconcile exact original brownfield/empty/new-greenfield consumer corpus with current effective-decision/baseline/ratchet dependencies; qualify only uncovered installed/native cases. Do not duplicate the existing source exemption.",
+   "backlogItem": "backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind current generated brief/template and the current guard/admission joint candidate; do not rerun completed cases as preparation. Critic’s approved policy is one full review plus at most one diff; that is separate from Reader’s 2+1 budget.",
+   "nextActionOrBlocker": "Bind current generated brief/template and the current guard/admission joint candidate; do not rerun completed cases as preparation. Critic’s approved policy is one full review plus at most one diff; that is separate from Reader’s 2+1 budget.",
+   "backlogItem": "backlog/items/2026-10-05-budget-checkpoint-fires-below-the-briefed-cap.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.capability-inventory-checker-is-red-at-head",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "After Root's lawful C0 commit/tree readback, bind inventory-only C1 to actual C0/T0 and run the remaining meaningful checker closure. Preserve committed-source semantics; no workingtree waiver/fake commit.",
+   "nextActionOrBlocker": "After Root's lawful C0 commit/tree readback, bind inventory-only C1 to actual C0/T0 and run the remaining meaningful checker closure. Preserve committed-source semantics; no workingtree waiver/fake commit.",
+   "backlogItem": "backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+   "stage": 75,
+   "deliveryState": "recovered-qualified-source-native-held",
+   "remaining": "12 prior WEL cases/source hashes match; native Windows qualification open.",
+   "nextActionOrBlocker": "Reuse WEL12 receipts and qualify the native Windows cmd/npm acceptance; do not rerun completed qualification as preparation.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6a54914411f6ec87b03d00224ba7765caa529c306493b830dc1ca627bd7b5b47.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Reconcile current command/state inventory and exact admitted emitted commands, including retained DLR/D2 proposals; preserve the existing answers-file parser and resolve DLR035 without broad grammar relaxation.",
+   "nextActionOrBlocker": "Reconcile current command/state inventory and exact admitted emitted commands, including retained DLR/D2 proposals; preserve the existing answers-file parser and resolve DLR035 without broad grammar relaxation.",
+   "backlogItem": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.claude-design-readiness-cannot-start-on-windows",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Any remaining legacy child-route reachability and native Windows behavior stay separate and unbound; do not revive the retired path.",
+   "nextActionOrBlocker": "Any remaining legacy child-route reachability and native Windows behavior stay separate and unbound; do not revive the retired path.",
+   "backlogItem": "backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Bind existing Claude/Codex/Agy fresh and migration target reports to exact producer bytes and public managed surfaces. Inspect native host activation only if that original evidence remains uncovered; do not reimplement selected-runner filtering.",
+   "nextActionOrBlocker": "Bind existing Claude/Codex/Agy fresh and migration target reports to exact producer bytes and public managed surfaces. Inspect native host activation only if that original evidence remains uncovered; do not reimplement selected-runner filtering.",
+   "backlogItem": "backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+   "stage": 25,
+   "deliveryState": "source-correct-empty-child-held",
+   "remaining": "Current hint suppresses Codex guidance for explicit Claude; qualification returned empty FD/output, no PASS. Native configured startup and accepted branch-ref continuity remain open.",
+   "nextActionOrBlocker": "Bind actual Claude SSRI/config route and resolve the retained product decision before changing protected wiring; host absolute-path and branch-ref behavior remain part of the assigned observation.",
+   "backlogItem": "backlog/items/2026-10-03-claude-session-start-emits-codex-transcript-recovery-hint.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c371183fb6cf7c54af84413de3cde4fab50eed18f8b2148ff69cefd3acfafa70.mode-0644.md",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind each V9/V10/V12/V13 original clause to its actual producer and focused receipt; retain native Windows hold and two-approval scope.",
+   "nextActionOrBlocker": "Bind each V9/V10/V12/V13 original clause to its actual producer and focused receipt; retain native Windows hold and two-approval scope.",
+   "backlogItem": "backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+   "stage": 50,
+   "deliveryState": "new-merged-grammar-repair-targeted-green-prepared",
+   "remaining": "Private merged grammar62/62: rg --no-heading, -m 2 and repeated extension glob gaps fixed with git/head repair retained. Original four PAI proofs not replayed. Source application and genuine native Windows proof remain open.",
+   "nextActionOrBlocker": [
+    "Original clause25.12 requires per-target unhealthy-plane behavior. Locate actual previously returned successor and rebind selection before a new fix; Windows spellings and current native readback remain independent proof holds."
+   ],
+   "backlogItem": "backlog/items/2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [
+    "passive-read-consumer-delivery",
+    "passive-read-batch-correction"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "6a711bdb8a5db034007920808d36ef260873603b4a54364552f4e9f6d408ddcd"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.codex-advisor-evidence-fails-after-host-update",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind existing diagnostic Source and exact focused proof, then reproduce only an unresolved actual updated-host consumer path if required; do not duplicate the producer.",
+   "nextActionOrBlocker": "Bind existing diagnostic Source and exact focused proof, then reproduce only an unresolved actual updated-host consumer path if required; do not duplicate the producer.",
+   "backlogItem": "backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+   "stage": "UNKNOWN",
+   "deliveryState": "evidence-read-refused-held",
+   "remaining": "Original clauses and existing Source mapped, but unsupported-read StopTwo preserved. No tests/new Source/CAS qualification claimed; fresh repository consumer proof and original review/acceptance open.",
+   "nextActionOrBlocker": "Recover actual old focused receipts and compare their full Source generation; bind current installed shared-root identity and private-child/concurrency negatives only where uncovered. No shared-root chmod or broad directory-mode waiver.",
+   "backlogItem": "backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Retain the original defer. If Root has an actual reproducible typed-next-action/manual-toil record, bind that record and the sanctioned bootstrap command generation before deciding current 0.7 work. No new automation source or fabricated toil metric.",
+   "nextActionOrBlocker": "Retain the original defer. If Root has an actual reproducible typed-next-action/manual-toil record, bind that record and the sanctioned bootstrap command generation before deciding current 0.7 work. No new automation source or fabricated toil metric.",
+   "backlogItem": "backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.codex-design-readiness-child-rejects-valid-review",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Record ordinary-route retirement separately from retained host security clauses; bind exact native/consumer proof without restoring a mandatory readiness gate.",
+   "nextActionOrBlocker": "Record ordinary-route retirement separately from retained host security clauses; bind exact native/consumer proof without restoring a mandatory readiness gate.",
+   "backlogItem": "backlog/items/2026-09-28-codex-design-readiness-child-rejects-valid-review.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.codex-own-session-audit-export-missing",
+   "stage": 75,
+   "deliveryState": null,
+   "remaining": "Tracking owner: correct stale assignment remainingWork (104→106) using applied146 selection without changing item acceptance. Host qualification owner: capture actual selected Codex own-session metadata/reconnect behavior only if needed for native acceptance; no repeat OSE22 merely because status is open.",
+   "nextActionOrBlocker": "Tracking owner: correct stale assignment remainingWork (104→106) using applied146 selection without changing item acceptance. Host qualification owner: capture actual selected Codex own-session metadata/reconnect behavior only if needed for native acceptance; no repeat OSE22 merely because status is open.",
+   "backlogItem": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6a54914411f6ec87b03d00224ba7765caa529c306493b830dc1ca627bd7b5b47.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+   "stage": 50,
+   "deliveryState": "reader-qualified-host-root-held",
+   "remaining": "Three receipt-reader checks pass; composition stops at host-process-root-unregistered. Complete default package/native host and legitimate controller/root admission remain open.",
+   "nextActionOrBlocker": [
+    "Complete productive default package path and no-report/changed-controls/native causality remain unbound. No successful Readiness review follows from the observed validation surface alone."
+   ],
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind the real on-demand store/host/admission consumer and its honest unavailable route. Preserve export-denial boundaries; no mandatory consultation or alternate authority source.",
+   "nextActionOrBlocker": "Bind the real on-demand store/host/admission consumer and its honest unavailable route. Preserve export-denial boundaries; no mandatory consultation or alternate authority source.",
+   "backlogItem": "backlog/items/2026-09-27-codex-wsl-required-advisor-has-no-completable-route.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+   "stage": 50,
+   "deliveryState": "new-repair-targeted-green-prepared",
+   "remaining": "Commit classifier repair: 39 targeted cases and genuine isolated POSIX commit pass; not integrated. Native Windows, policy binding and 13 unchanged suite failures open.",
+   "nextActionOrBlocker": [
+    "Protected Main remains old generation. Remediation explicitly retains message-file fallback for fail-closed markers/scoped parentheses; only marker-free subset is observed file-free. Exact accepted subject/body/trailer POSIX/Windows criterion is not claimed complete."
+   ],
+   "backlogItem": "backlog/items/2026-09-29-commit-grammar-hint-still-requires-scratch-message-file.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+   "stage": 50,
+   "deliveryState": "current-main-consumer-targeted-green-held",
+   "remaining": "Four groups pass including actual contained POSIX command consumption; native release host and batch admission open.",
+   "nextActionOrBlocker": [
+    "Bind original public CLI unsorted-path/budget/consumption cases; no repeated passing case or budget exemption required merely because OPEN."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+   "stage": 50,
+   "deliveryState": "current-vac010-green-complete-graph-prepared",
+   "remaining": "Current canonical17/17 passes; complete1892-file dependency fixture prepared without third run after stop-two. Sanctioned reground continuation and native checklist held; historical failure logs empty.",
+   "nextActionOrBlocker": [
+    "Current single-file marker-absent and strict announced-FD failure receipts/native checklist unbound. Author executions during this audit zero."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-completion-fd-suites-cannot-run-as-single-files.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Native Windows live/dead/old-boot warning scenario remains original host hold; no native operation was executed."
+   ],
+   "nextActionOrBlocker": [
+    "Native Windows live/dead/old-boot warning scenario remains original host hold; no native operation was executed."
+   ],
+   "backlogItem": "backlog/items/2026-10-09-concurrent-session-warning-never-fires-on-native-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+   "stage": 75,
+   "deliveryState": "current-main-consumer-targeted-green-held",
+   "remaining": "Three new controlled Verify-to-hook commit cases pass; 1,143 dependency hashes conserved, prior16 not rerun. Six-span historical locator, native/batch acceptance and sanctioned closure open.",
+   "nextActionOrBlocker": "Root integration owner: retain exact P16 sixteen-case evidence with this six-span byte conservation and exact354b helper. Consumer/native whole Verify/hook walk remains a separate finite checklist; no repeat of unchanged seam solely for OPEN status.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6a54914411f6ec87b03d00224ba7765caa529c306493b830dc1ca627bd7b5b47.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Retained DBLO13 is budget-stop method evidence, not security-diff completion/notes persistence. Original historical critic-launch-observation module reference is absent Main and not proof of a missing mandatory implementation. Budget template/installed identity and genuine security-class notes persistence remain consumer holds."
+   ],
+   "nextActionOrBlocker": [
+    "Retained DBLO13 is budget-stop method evidence, not security-diff completion/notes persistence. Original historical critic-launch-observation module reference is absent Main and not proof of a missing mandatory implementation. Budget template/installed identity and genuine security-class notes persistence remain consumer holds."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Coherent protected args1437/State88f installation and actual current consumed Critic course. No actual independent review/native/whole-item acceptance established by historical controlled cases.",
+   "nextActionOrBlocker": "Root/OBL016 must bind the current registered cap2 Source to retained CCD8 generation, and separately own a durable generic course/history producer before claiming every batch is covered; no caller round counter or third review.",
+   "backlogItem": "backlog/items/2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind a sanctioned source-owned exclusive directory/notes writer or explicit unavailable fallback and creation/collision evidence. Do not substitute mkdir -p or random shell commands.",
+   "nextActionOrBlocker": "Bind a sanctioned source-owned exclusive directory/notes writer or explicit unavailable fallback and creation/collision evidence. Do not substitute mkdir -p or random shell commands.",
+   "backlogItem": "backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.critic-scratch-notes-write-is-refused-again",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Root must join the actual source-owned dispatch notes directory in the writer admission and bind own-create/append versus another-directory refusal; preserve no Bash notes retry.",
+   "nextActionOrBlocker": "Root must join the actual source-owned dispatch notes directory in the writer admission and bind own-create/append versus another-directory refusal; preserve no Bash notes retry.",
+   "backlogItem": "backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Assign the real host capture issuer with session/turn/scope/expiry/consent and exact bytes, then integrate its consumer. No model re-emission or synthetic native capture.",
+   "nextActionOrBlocker": "Assign the real host capture issuer with session/turn/scope/expiry/consent and exact bytes, then integrate its consumer. No model re-emission or synthetic native capture.",
+   "backlogItem": "backlog/items/2026-09-29-cross-runner-chat-intake-reference-needs-host-capture.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+   "stage": 25,
+   "deliveryState": "frozen-proof-recovered-current-dependencies-held",
+   "remaining": "Original private criterion and11-case frozen proof retained without replay; current Git-policy dependencies differ. Report-only choice preserved; authentic product/custody/AC14 proof remains open.",
+   "nextActionOrBlocker": "Bind actual consuming-project evidence classes and candidate scope to the original criterion; retain report-only behavior and resolve original-body provenance without canonical history edits.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.declared-system-skill-read-requires-human-override",
+   "stage": "UNKNOWN",
+   "deliveryState": "host-catalog-authority-held",
+   "remaining": "Original four clauses held: authenticated host catalog producer/entry digest/custody unavailable. No permission waiver or native attestation fabricated.",
+   "nextActionOrBlocker": "Identify the genuine selected host runtime-catalog producer and exact entry identity/digest/custody contract. Qualify exact declared-skill positive and credential/unlisted/replaced entry negatives through that owner. Keep arbitrary external paths and private material refused.",
+   "backlogItem": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.denial-names-a-diagnosis-it-refuses",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind the exact emitted command, state, admission corridor and focused DLR035 receipt; propose a Source change only if the current concrete emitter/admission mismatch persists.",
+   "nextActionOrBlocker": "Bind the exact emitted command, state, admission corridor and focused DLR035 receipt; propose a Source change only if the current concrete emitter/admission mismatch persists.",
+   "backlogItem": "backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-approval-validator-rejects-json-key-reordering",
+   "stage": 50,
+   "deliveryState": "qualification-not-run-held",
+   "remaining": "Read/bootstrap refusal stopped qualification; default nested permutation/disposable-key proof readback open.",
+   "nextActionOrBlocker": [
+    "Default disposable-key nested-permutation/signing proof-readback original criterion unbound; CSR27 proves different request transport controls and is not a substitute."
+   ],
+   "backlogItem": "backlog/items/2026-09-28-design-approval-validator-rejects-json-key-reordering.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Root reconciles original design-baseline/implementation-refusal clause with the explicit newer approved baseline implementation policy and pending Source owners; then bind the actual Verify evidence producer/consumer/configuration generation. Preserve genuine command execution and do not report deferred product Verify as completed.",
+   "nextActionOrBlocker": "Root reconciles original design-baseline/implementation-refusal clause with the explicit newer approved baseline implementation policy and pending Source owners; then bind the actual Verify evidence producer/consumer/configuration generation. Preserve genuine command execution and do not report deferred product Verify as completed.",
+   "backlogItem": "backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Map original clauses to superseding ordinary route or retained legacy repair consumer, then bind focused evidence. Do not revive mandatory Advisor/exception/readiness steps.",
+   "nextActionOrBlocker": "Map original clauses to superseding ordinary route or retained legacy repair consumer, then bind focused evidence. Do not revive mandatory Advisor/exception/readiness steps.",
+   "backlogItem": "backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-generator-repeats-large-source-material",
+   "stage": 50,
+   "deliveryState": "new-complete-source-repair-targeted-green-prepared",
+   "remaining": "Private current-source composition passes21 unchanged callbacks; stored bytes56881->24173 and copies3->1. CLI/qualifier companions scope-bound; Main application/native presentation/reader/batch review open.",
+   "nextActionOrBlocker": "Bind selected compaction implementation into current Main and retain original GSC21 scope; native context/budget comparison remains a separate consumer proof obligation.",
+   "backlogItem": "backlog/items/2026-09-27-design-generator-repeats-large-source-material.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [
+    "wave-b-design_material"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "d90075fcfc855a9c8458b4052aa6df0cd0bcb7226c3dcec194032a0968f32e14"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "0050f25191b7576df2c52d7f6d82b24e32cbc60f1f75b7fb1547b7ba856776d3"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.design-intake-generator-omits-question-answers",
+   "stage": 75,
+   "deliveryState": null,
+   "remaining": "Root tracking/integration owner: retain P7 ordinary ten actual proof with this eight-function textual conservation. Wider all-runner/I03 authority producers/native qualification remains separate; no rerun of unchanged ten callbacks solely for OPEN status.",
+   "nextActionOrBlocker": "Root tracking/integration owner: retain P7 ordinary ten actual proof with this eight-function textual conservation. Wider all-runner/I03 authority producers/native qualification remains separate; no rerun of unchanged ten callbacks solely for OPEN status.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6a54914411f6ec87b03d00224ba7765caa529c306493b830dc1ca627bd7b5b47.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-package-parent-metadata-false-drift",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Preserve original21 assertions; pending protected suite registration, installed current reader proof and historical failure attribution remain holds."
+   ],
+   "nextActionOrBlocker": [
+    "Preserve original21 assertions; pending protected suite registration, installed current reader proof and historical failure attribution remain holds."
+   ],
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Preserve current protected State ownership and integrate its corrected tuple through Root admission; bind actual new review/signature consumer proof without extra ceremonies.",
+   "nextActionOrBlocker": "Preserve current protected State ownership and integrate its corrected tuple through Root admission; bind actual new review/signature consumer proof without extra ceremonies.",
+   "backlogItem": "backlog/items/2026-10-07-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-trailer-verifier-lost-after-closure",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind exact ADR/PO disposition and retained merge-survival regression evidence for the original clause. Do not silently restore an exemption or invent replacement policy.",
+   "nextActionOrBlocker": "Bind exact ADR/PO disposition and retained merge-survival regression evidence for the original clause. Do not silently restore an exemption or invent replacement policy.",
+   "backlogItem": "backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-workflow-package-omits-contract",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind the original five-source/self-contained security clauses and artifact ordering to the retained route or accepted successor; no duplicate mandatory Advisor/readiness ceremony.",
+   "nextActionOrBlocker": "Bind the original five-source/self-contained security clauses and artifact ordering to the retained route or accepted successor; no duplicate mandatory Advisor/readiness ceremony.",
+   "backlogItem": "backlog/items/2026-09-28-design-workflow-package-omits-contract.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/081c4617e6c6ee6693629fa24ab1697ec4c7ccd079c869e48a704b2b179aecba.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Resolve the genuine native authority-open failure using its exact owning producer/backend evidence, then execute canonical DAB and separate legacy API checks per ADR-0086. Preserve the two native passes and three failures; no blanket backend or DAB success.",
+   "nextActionOrBlocker": "A separately owned real Windows custody/host transport and its identity/private-store contract are required before original RC-12 can execute there. Do not remove a platform check or equate WSL with native Windows. Root resolves retained legacy acceptance scope without reviving retired DWP happy-path ceremony.",
+   "backlogItem": "backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.desktop-app-support-is-unverified",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Native installed consumer qualifier",
+   "nextActionOrBlocker": "Native installed consumer qualifier",
+   "backlogItem": "backlog/items/2026-10-07-desktop-app-support-is-unverified.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Preserve cumulative Source13e while UNKNOWN02/03 owners add their distinct rehearsal/disclosure/index work. Bind the actual v4 disjoint-target/target-drift/ancestor/HEAD/state/policy/plugin/input/replay matrix and legacy serial-dependency disclosure in its final generation. No apply_patch/native-engine grant.",
+   "nextActionOrBlocker": "Preserve cumulative Source13e while UNKNOWN02/03 owners add their distinct rehearsal/disclosure/index work. Bind the actual v4 disjoint-target/target-drift/ancestor/HEAD/state/policy/plugin/input/replay matrix and legacy serial-dependency disclosure in its final generation. No apply_patch/native-engine grant.",
+   "backlogItem": "backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a2a60ad13d2331cbab3b48dada7b22b626da79572848c324741a1f4ae579a9aa.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+   "stage": 50,
+   "deliveryState": "current-source-targeted-qualified-native-held",
+   "remaining": "Five private production postimages;30 owner+8 adapter+3 affected real consumer cases GREEN;1930 Source copies conserved. Native Windows/macOS/hard-native walltime, registry/Critic-template/review/application/acceptance held.",
+   "nextActionOrBlocker": [
+    "Native Windows real budget-counted Read/Write/Bash, exactly-once counting and bootstrap briefing/installed copy remain original proof holds."
+   ],
+   "backlogItem": "backlog/items/2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [
+    "darwin-dispatch-owner-audit"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "b18dd62149c2be993b1801d79aa4df1dac04419ebe9394d2c0f0f8f65a725a62"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "cd10c75b11d0f1b61c93bcda210c196614ed90b964033d237941bafbda6b8946"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "412fddb4b951bb43db07e62c85abbae3480835a4724509207fa8ecb9a6b0395a"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/native-platform-process-observer.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "ed8b29eb1d121e5bf9b374e286b8cdd9f70ee11dfc88e8b0538f71ac34ab39c3"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "3e9922b327791479ab4c61fab22589b48708877d561e1909298f0379ff597be7"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/hooks/guard-dispatch-budget-platform-owner.test.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/hooks/guard-dispatch-budget-platform-owner.test.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": null
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/native-platform-process-observer-deadlines.test.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/native-platform-process-observer-deadlines.test.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": null
+    }
+   ]
+  },
+  {
+   "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+   "stage": 50,
+   "deliveryState": "current-main-targeted-green-held",
+   "remaining": "15 source checks and five real guard-consumer cases pass on unchanged Main bytes; native runner and sanctioned delivery/closure open.",
+   "nextActionOrBlocker": [
+    "Current actual role/batch/host cases must bind retained receipt; no native dispatch or current unexecuted test is reported as passing."
+   ],
+   "backlogItem": "backlog/items/2026-10-03-dispatch-guard-rejects-built-in-capitalized-agent-types.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Native dispatch progress source owner",
+   "nextActionOrBlocker": "Native dispatch progress source owner",
+   "backlogItem": "backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Integration owner plus native dispatch owner",
+   "nextActionOrBlocker": "Integration owner plus native dispatch owner",
+   "backlogItem": "backlog/items/2026-10-05-dispatch-record-ownership-binds-an-attempted-creation.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.dispatch-records-land-under-specs-evidence",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Root integration",
+   "nextActionOrBlocker": "Root integration",
+   "backlogItem": "backlog/items/2026-10-05-dispatch-records-land-under-specs-evidence.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+   "stage": "UNKNOWN",
+   "deliveryState": "original-scanner-inputs-unavailable-held",
+   "remaining": "Original candidate/scanner version/config/rule/span unavailable; diagnostic cases prepared, no classifier correction or product PASS invented.",
+   "nextActionOrBlocker": [
+    "Pin authorized sanitized finding + public candidate/tree + actual scanner/config/rule; use real reproduction before any remedy. Do not change suppression on this assessment."
+   ],
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "stage": 50,
+   "deliveryState": "private-role-bootstrap-repair-targeted-green-partial-held",
+   "remaining": "Private exact role selector and Goldfish/Critic housekeeping repair: two targeted tests GREEN; original11GREEN/twoRED unreplayed. Literal variable/provisioning, modes, Main integration and lifecycle/model/native acceptance held.",
+   "nextActionOrBlocker": [
+    "Catalogue/devplan protected Main old. Exact draft/Windows slash and prescribed literal variable spelling plus ready/provisioning continuation are not established by source presence; no new generic readonly or preREADY grant."
+   ],
+   "backlogItem": "backlog/items/2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [
+    "literal-bootstrap-item-delivery"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "a2e453a0929022f8cf94b82f1b73a8c20243e16d594fed6419f544ca7027a300"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "cc30578efd8868fba1ffb1a684916cdbd0e1b088f333bad99e255793f8d7fe39"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "29d95d3776736bc08e3c6ec4cf2e965748620d873b50a44f4a3fdb6e5c8587dd"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Root/telemetry owner supply exact existing minimizing producer and original C1 grouping; collect candidate-bound per-cause before/after + <=10% admin result without raw/private transcripts."
+   ],
+   "nextActionOrBlocker": [
+    "Root/telemetry owner supply exact existing minimizing producer and original C1 grouping; collect candidate-bound per-cause before/after + <=10% admin result without raw/private transcripts."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Private additive template step0 successor, independent targeted/Quick/five closing guidance conserved; Root integrate through existing protected route. Genuine fresh dispatch first Write proof remains required; no retry-after-refusal counted as positive."
+   ],
+   "nextActionOrBlocker": [
+    "Private additive template step0 successor, independent targeted/Quick/five closing guidance conserved; Root integrate through existing protected route. Genuine fresh dispatch first Write proof remains required; no retry-after-refusal counted as positive."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-every-dispatch-pays-a-bootstrap-receipt-detour.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.evidence-artifacts-carry-no-commit-identity",
+   "stage": 50,
+   "deliveryState": "current-main-targeted-green-held",
+   "remaining": "Six identity/header cases pass on unchanged current source; admission, coherent review and acceptance open.",
+   "nextActionOrBlocker": [
+    "Bind exact commit/header case; WEL12 method launch proof is narrower than this original identity assertion."
+   ],
+   "backlogItem": "backlog/items/2026-10-08-evidence-artifacts-carry-no-commit-identity.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Original private fingerprint/key-byte preservation, attended external recovery, replay/aliases/Windows/wrong-key criteria remain separately unproven; canonical EPA15 final-Main execution awaits coherent official Verify.",
+   "nextActionOrBlocker": "Onboarding consumer qualifier",
+   "backlogItem": "backlog/items/2026-09-29-existing-signing-key-reuse-deadlocks-onboarding.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.feature-branch-push-admitted-without-signature-approval",
+   "stage": 50,
+   "deliveryState": "installed-consumer-targeted-green-held",
+   "remaining": "Installed pre-push and seven session proof modes pass; broader noncheckpoint/main-release, batch review and sanctioned closure open.",
+   "nextActionOrBlocker": [
+    "Installed pre-push/session route exact signed and absent/stale signatures remain original consumer tests; no push was run."
+   ],
+   "backlogItem": "backlog/items/2026-10-03-feature-branch-push-admitted-without-signature-approval.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.first-enrollment-enters-retirement-before-consent",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Original OBC298/FRB001–004 actual combined/current receipt and installed check remain unbound; source test definitions are not case outcomes."
+   ],
+   "nextActionOrBlocker": [
+    "Original OBC298/FRB001–004 actual combined/current receipt and installed check remain unbound; source test definitions are not case outcomes."
+   ],
+   "backlogItem": "backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.foreign-worktree-closes-the-implementation-gate",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Bind actual active consumer reader and fixed foreign-worktree underlying enum; preserve bounded original cause; independently establish environment-unavailable vs real content drift and named read-only diagnostic admission before any narrow functional successor."
+   ],
+   "nextActionOrBlocker": [
+    "Bind actual active consumer reader and fixed foreign-worktree underlying enum; preserve bounded original cause; independently establish environment-unavailable vs real content drift and named read-only diagnostic admission before any narrow functional successor."
+   ],
+   "backlogItem": "backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Transcript recovery Source owner",
+   "nextActionOrBlocker": "Transcript recovery Source owner",
+   "backlogItem": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.gh-delivery-classifier-is-not-wired",
+   "stage": 75,
+   "deliveryState": null,
+   "remaining": [
+    "Bind gh classifier-to-guard wiring and exact ready-session gh pr merge refusal plus safe read controls, protected signed-package lineage and native runner hook observation. No gh operation is executed here.",
+    "Historical unwired source gap superseded by sharedGh10 and actualTwoHook12; exact selected Codex/Agy hook source controls, final candidate and native remain."
+   ],
+   "nextActionOrBlocker": [
+    "Bind gh classifier-to-guard wiring and exact ready-session gh pr merge refusal plus safe read controls, protected signed-package lineage and native runner hook observation. No gh operation is executed here.",
+    "Historical unwired source gap superseded by sharedGh10 and actualTwoHook12; exact selected Codex/Agy hook source controls, final candidate and native remain."
+   ],
+   "backlogItem": "backlog/items/2026-10-08-gh-delivery-classifier-is-not-wired.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6a54914411f6ec87b03d00224ba7765caa529c306493b830dc1ca627bd7b5b47.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Rebind retained real ratchet/full candidate evidence and original Git-for-Windows host matrix; keep inherited qualification Git policies. Check original Node-v24 acceptance docs in its owning item, not duplicate this fix."
+   ],
+   "nextActionOrBlocker": [
+    "Rebind retained real ratchet/full candidate evidence and original Git-for-Windows host matrix; keep inherited qualification Git policies. Check original Node-v24 acceptance docs in its owning item, not duplicate this fix."
+   ],
+   "backlogItem": "backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Original handover commit and full missing/changed/alias/install-removal source-bound suite closure remain qualification; do not infer proof from copied catalogue membership."
+   ],
+   "nextActionOrBlocker": [
+    "Original handover commit and full missing/changed/alias/install-removal source-bound suite closure remain qualification; do not infer proof from copied catalogue membership."
+   ],
+   "backlogItem": "backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+   "stage": 25,
+   "deliveryState": "reproduced-current-snapshot-staleness-gap-held",
+   "remaining": "12 controlled PASS/one genuine stale-admission RED; installers detect drift but old active snapshot admits. Current selected-plugin carrier/authority missing; no postimage, native/fullcommit/update/operand clauses held.",
+   "nextActionOrBlocker": "Hook installer consumer owner",
+   "backlogItem": "backlog/items/2026-10-04-git-hook-runtime-snapshots-go-stale-after-plugin-changes.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Bind exact preexisting GITCLS cases/receipt to17352; test source existence is not actualPASS. No duplicate Source repair."
+   ],
+   "nextActionOrBlocker": [
+    "Bind exact preexisting GITCLS cases/receipt to17352; test source existence is not actualPASS. No duplicate Source repair."
+   ],
+   "backlogItem": "backlog/items/2026-10-08-git-push-classifier-misses-env-s-and-editor-bang.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.git-stash-list-classified-as-working-tree-write",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Integrate pending protected grammar/tests and bind original positives/mutating/output negatives; no broadened stash command set."
+   ],
+   "nextActionOrBlocker": [
+    "Integrate pending protected grammar/tests and bind original positives/mutating/output negatives; no broadened stash command set."
+   ],
+   "backlogItem": "backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Original native Windows four representations and actual matching matrix unbound; suspected issue not newly reproduced."
+   ],
+   "nextActionOrBlocker": [
+    "Original native Windows four representations and actual matching matrix unbound; suspected issue not newly reproduced."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-gitleaks-content-suppression-does-not-match-on-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+   "stage": 50,
+   "deliveryState": "current-main-targeted-green-held",
+   "remaining": "Five original groups pass on unchanged source; real scanner/native review and batch admission open.",
+   "nextActionOrBlocker": [
+    "Bind existing exact changed-value/untouched-file proof and registration; actual GLR recompute lineage is adjacent unless exact original case mapped."
+   ],
+   "backlogItem": "backlog/items/2026-10-06-gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+   "stage": 50,
+   "deliveryState": "current-main-targeted-green-native-held",
+   "remaining": "Eight controlled CLI cases pass with unchanged Main source; genuine Windows drive-letter execution open.",
+   "nextActionOrBlocker": [
+    "Actual native Windows drive-letter child acting behavior remains original host hold; portable GLR child does not certify nativeWindows."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-gitleaks-repair-ignore-cli-is-a-no-op-on-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Commit producer qualifier",
+   "nextActionOrBlocker": "Commit producer qualifier",
+   "backlogItem": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+   "stage": 50,
+   "deliveryState": "new-repair-targeted-green-prepared",
+   "remaining": "Both template postimages prepared and targeted RED->GREEN; not integrated. Sync receipt, reader/batch review, signed application open.",
+   "nextActionOrBlocker": [
+    "Root already performed exact official template sync after PCI integration; retain that actual receipt. Whole QG04 business discipline and reader/installed check are separate."
+   ],
+   "backlogItem": "backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [
+    "item-8"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/templates/prompts/goldfish-task.md",
+     "selection": "assembly-v7",
+     "preimageSha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58"
+    },
+    {
+     "sourcePath": "templates/prompts/goldfish-task.md",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/templates/prompts/goldfish-task.md",
+     "selection": "assembly-v7",
+     "preimageSha256": "6d7ef49496209bc2cd6480a6d69d1600af7cc86d1d5a5124db0668096a018f58"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Quick consumer qualification owner",
+   "nextActionOrBlocker": "Quick consumer qualification owner",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.governance-scope-rejects-readonly-host-git-control",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Bind original two host callbacks and mount/corrupt/nonempty cases/current HGL receipt. Source observer presence alone does not prove mount/readonly runtime."
+   ],
+   "nextActionOrBlocker": [
+    "Bind original two host callbacks and mount/corrupt/nonempty cases/current HGL receipt. Source observer presence alone does not prove mount/readonly runtime."
+   ],
+   "backlogItem": "backlog/items/2026-09-29-governance-scope-rejects-readonly-host-git-control.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Onboarding consumer qualifier",
+   "nextActionOrBlocker": "Onboarding consumer qualifier",
+   "backlogItem": "backlog/items/2026-09-27-greenfield-approval-policy-applies-after-intake-transition.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+   "stage": 25,
+   "deliveryState": "new-repair-targeted-green-partial-criterion-held",
+   "remaining": "Genuine direct public-parent CLI scope RED fixed privately;15 local cases GREEN,14 matching passes reused and one corrected fixture executed, plus direct CLI digest readback. SourceCAS conserved. Real derivative redaction/lineage, private custody, authenticated usage/publication/native/review/application remain held.",
+   "nextActionOrBlocker": "Public comparison consumer owner",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [
+    "next-item-reservation-plan/items/public_comparison"
+   ],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.greenfield-design-course-cost-and-proportionality",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Design-course qualifier",
+   "nextActionOrBlocker": "Design-course qualifier",
+   "backlogItem": "backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.greenfield-machine-output-and-skill-budget",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bootstrap and help consumer qualifier",
+   "nextActionOrBlocker": "Bootstrap and help consumer qualifier",
+   "backlogItem": "backlog/items/2026-09-29-greenfield-machine-output-and-skill-budget.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [
+    "bounded-denial-help-whole-item"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/lib/guard/denial-route.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/denial-route.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "87b1fd7eab69fac513eb399b1371b36bbe05d9dba6ab3f2f1e89c3e82b33ff13"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/scripts/guard-human-override.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/guard-human-override.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "91a40900dea8aa87956a7c1cbf657dc4589816b72e76ea2b5091f05510559009"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "1437a8fd954424076192550a0070db274962930be65479be2c6c7427a4fb4133"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/human-guard-override.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "92a0b33602345237a576cac9b5737bd647c150e41d263d0746f980e6bd9f7a94"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.guard-override-request-digest-drifts-after-arming",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Retained exact seed/sign/arm/identical-retry and differing-input tests/platform callbacks unbound. Proposed13e fivePASS covers denial/policy controls, not full Bash arm/retry criterion."
+   ],
+   "nextActionOrBlocker": [
+    "Retained exact seed/sign/arm/identical-retry and differing-input tests/platform callbacks unbound. Proposed13e fivePASS covers denial/policy controls, not full Bash arm/retry criterion."
+   ],
+   "backlogItem": "backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+   "stage": 50,
+   "deliveryState": "new-merged-repair-targeted-green-prepared",
+   "remaining": "68 cases pass with actual POSIX matches and guard RED->GREEN; prepared commit-inert-data repair retained. Universal flag exemptions not approved; native installed checks/integration/review open.",
+   "nextActionOrBlocker": [
+    "Reuse actual M6A35 same17352 partial classifier proof; bind exact guard boundary and original refused shape, without treating every unsafe flag as passive-read admission."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [
+    "wave-b-git_grep",
+    "next-item-reservation-plan/wave-v4/items/read_diagnostics"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/hooks/guard-push.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/hooks/guard-push.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/git-cmd.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/git-cmd.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.guard-push-refuses-read-only-git-without-push",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Nested shell git text still deliberately Q12 fail-closed; accepted policy supersession must be retained, not silently broadened to satisfy old unconditional wording. M6 partial proof reused; exact item consumer/native remainder unbound."
+   ],
+   "nextActionOrBlocker": [
+    "Nested shell git text still deliberately Q12 fail-closed; accepted policy supersession must be retained, not silently broadened to satisfy old unconditional wording. M6 partial proof reused; exact item consumer/native remainder unbound."
+   ],
+   "backlogItem": "backlog/items/2026-10-09-guard-push-refuses-read-only-git-without-push.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [
+    "next-item-reservation-plan/wave-v4/items/read_diagnostics"
+   ],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Exact actual guard/item case receipt and host readback remain unbound; source implementation already present."
+   ],
+   "nextActionOrBlocker": [
+    "Exact actual guard/item case receipt and host readback remain unbound; source implementation already present."
+   ],
+   "backlogItem": "backlog/items/2026-10-05-guard-push-treats-gitleaks-as-a-git-command.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Use exact current full native guard suite's existing/new Root host receipt with stale-fixture/platform/true-defect classification and baseline comparison. Do not rerun passed focused cases or invent native result."
+   ],
+   "nextActionOrBlocker": [
+    "Use exact current full native guard suite's existing/new Root host receipt with stale-fixture/platform/true-defect classification and baseline comparison. Do not rerun passed focused cases or invent native result."
+   ],
+   "backlogItem": "backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.handover-doc-committed-without-governance-classification",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Prepare narrow staged-index observation-inventory consumer seam: actual staged docs and staged policy, existing validator authority, source-checkout applicability and snapshot dependency closure; refuse unclassified before commit. Coordinate installer owner, preserve normal consumers and source trust. No worktree-only check/fabricated commit positive."
+   ],
+   "nextActionOrBlocker": [
+    "Prepare narrow staged-index observation-inventory consumer seam: actual staged docs and staged policy, existing validator authority, source-checkout applicability and snapshot dependency closure; refuse unclassified before commit. Coordinate installer owner, preserve normal consumers and source trust. No worktree-only check/fabricated commit positive."
+   ],
+   "backlogItem": "backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": [
+    "Reuse exact source-compatible AF/HDO receipt when recovered; no fresh proof claimed from tests. Busybox/unlisted receiver decision is outside original AF scope."
+   ],
+   "nextActionOrBlocker": [
+    "Reuse exact source-compatible AF/HDO receipt when recovered; no fresh proof claimed from tests. Busybox/unlisted receiver decision is outside original AF scope."
+   ],
+   "backlogItem": "backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+   "stage": 50,
+   "deliveryState": "current-source-targeted-qualified-native-held",
+   "remaining": "Sixteen current dependency-graph tests pass on unchanged implementation. Genuine Windows query/DACL/writer and current consumer planning route remain open.",
+   "nextActionOrBlocker": [
+    "Retained WHI initial15/1 then exactforeign-owner1PASS covers method-only original Windows observer; current13e source integration/dependency/window-native proof holds. Preserve Linux and no forged owner."
+   ],
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.hgo-patch-preflight-before-signature",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Close private native-engine adapter contract before any Source activation: exact sanctioned readonly rehearsal on private exact preimages, physical hunk order, output digests/complete validation, same request/preimage intent and redemption CAS. Product capability producer unavailable remains explicit original-scope prerequisite; no gate relaxation."
+   ],
+   "nextActionOrBlocker": [
+    "Close private native-engine adapter contract before any Source activation: exact sanctioned readonly rehearsal on private exact preimages, physical hunk order, output digests/complete validation, same request/preimage intent and redemption CAS. Product capability producer unavailable remains explicit original-scope prerequisite; no gate relaxation."
+   ],
+   "backlogItem": "backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.hgo-stale-capability-shadows-current-authorization",
+   "stage": 50,
+   "deliveryState": "controlled-ordinary-capability-qualified-native-contract-held",
+   "remaining": "Three new ordinaryv3 RC15C004-006 callbacks GREEN, actualschema asserted;1892 Source pins unchanged. OriginalWrite/nativev4 status expectations retained as semantic conflict, no scannerpatch/schema downgrade/nativeproof or wholePASS. Test-only successor prepared, integration/review/acceptance held.",
+   "nextActionOrBlocker": [
+    "Original RC15C two authentic capabilities/worktree drift/stale-only/corrupt audit receipt exact binding unbound. Do not duplicate existing scanner."
+   ],
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6ae6e9b30260bd23b9ead1522729950da36c230f5c67a467d71da9b41ccb1e45.mode-0600.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Recovery native consumer qualifier",
+   "nextActionOrBlocker": "Recovery native consumer qualifier",
+   "backlogItem": "backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Coverage report consumer qualifier",
+   "nextActionOrBlocker": "Coverage report consumer qualifier",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Resolve original acceptance against shared grammar and provenance-debt disposition; no automatic norm rewrite.",
+   "nextActionOrBlocker": "Resolve original acceptance against shared grammar and provenance-debt disposition; no automatic norm rewrite.",
+   "backlogItem": "backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+   "stage": 50,
+   "deliveryState": "private-closure-repair-partial-red-held",
+   "remaining": "V10 complete selectedDarwin5/bootstrap2/design/harness-reader Source graph442 physicalrefs+eight affectedcontrols GREEN; v8/14 and v9partial/7 preserved. Unknownruntime-stage independentlyRED, all-other-owner assembly/full/native/review/application unqualified.",
+   "nextActionOrBlocker": "Bind GMWKC01/08 dispositions and candidate stamp rejection route.",
+   "backlogItem": "backlog/items/2026-10-05-kernel-closure-check-masks-violations-after-the-first.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [
+    "wave-b-kernel_violations",
+    "kernel-producer-contract-audit"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "b0ec85c5ba52a0a42aa7be1f7bc04c2eb07b88f3876071ad0729f512da1c4fc1"
+    },
+    {
+     "sourcePath": "docs/guard-maintenance-window-threat-model.md",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/docs/guard-maintenance-window-threat-model.md",
+     "selection": "assembly-v7",
+     "preimageSha256": "fb68cb9a6071a0a5730fa509ef0eaea283b82589ebede4e4c905e7bbd765eab0"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "6077ccde87ec104c3e1689ea187ac917edf24c35f2592f6771a29ce21e42fa6e"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "f0a897d5fe38e7f54bfe7bd812f997a75c647f0d92a5e8eccd970bed471cc933"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/owned-continuity-verification.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/owned-continuity-verification.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "affbbaec382b8a84bc1506057321b92d9cacec113c7cd12021aeecbe2d539d17"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "8f57cf3c8117d9120423487ac6f500655a2cb5560f556863438c28edba9f7e67"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "ef1467d638ad52660a9b358ad70b2eab599529cb5465727cb496396380dcde0e"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+   "stage": 25,
+   "deliveryState": "current-source-lifecycle-argv-partial-green",
+   "remaining": "Five targeted actual Source cases GREEN with frozen graph CAS; no codegap/patch. Full phase/evaluator/scaffold/F6repair/nativeMSYS/scratchauthority clauses remain held.",
+   "nextActionOrBlocker": "Lifecycle command qualifier",
+   "backlogItem": "backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/26349b5d24479c03c43db4f4ee034c06c8da5abc88fa451570bd050623771f85.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+   "stage": 50,
+   "deliveryState": "current-main-consumer-targeted-qualified-review-held",
+   "remaining": "Nine genuine contained consumer cases pass with real EACCES, drift/recovery/read-only controls; all five current modules/1926 dependencies unchanged. Committed assembly/review and closure held.",
+   "nextActionOrBlocker": "Use cumulative pending State; bind inspect current PRD/Spec source observations before lifecycle derivation.",
+   "backlogItem": "backlog/items/2026-09-28-lifecycle-inspect-omits-current-plan-spec-digests.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Bind a genuine host declaration carrier and current lifecycle first; implement only missing closed exact instruction route after that, preserving implementation approvals/private roots/alias negatives and identical single/bounded diagnostic admission."
+   ],
+   "nextActionOrBlocker": [
+    "Bind a genuine host declaration carrier and current lifecycle first; implement only missing closed exact instruction route after that, preserving implementation approvals/private roots/alias negatives and identical single/bounded diagnostic admission."
+   ],
+   "backlogItem": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+   "stage": 50,
+   "deliveryState": "current-main-targeted-green-held",
+   "remaining": "CHRB001-009 pass unchanged current source; Verify enrollment/candidate binding, host checklist and batch review open.",
+   "nextActionOrBlocker": "Bind returned-refusal/rollback-failure controls to current clone-hook bytes.",
+   "backlogItem": "backlog/items/2026-10-06-mandatory-hook-readiness-returned-refusal-skips-rollback.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.merge-commit-message-skips-conventional-type-check",
+   "stage": 75,
+   "deliveryState": "briefing-recovery-required",
+   "remaining": "Missing initial ruleset binding stopped owner before qualification. Existing source needs consumer qualification.",
+   "nextActionOrBlocker": "Bind actual source integration and real consumer scope before whole-item disposition.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6a54914411f6ec87b03d00224ba7765caa529c306493b830dc1ca627bd7b5b47.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.model-family-approval-with-automatic-version-upgrades",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind genuine family migration/dispatch/host producer receipts, preserve unavailable discovery refusal. No selector rewrite demonstrated.",
+   "nextActionOrBlocker": "Bind genuine family migration/dispatch/host producer receipts, preserve unavailable discovery refusal. No selector rewrite demonstrated.",
+   "backlogItem": "backlog/items/2026-09-30-model-family-approval-with-automatic-version-upgrades.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+   "stage": 50,
+   "deliveryState": "new-repair-partial-green-prepared",
+   "remaining": "Import-cycle private repair RED->GREEN7; existing consumer4/5, MFH002 uncertain. Not integrated; native Windows and dependency resolution open.",
+   "nextActionOrBlocker": "Bind native Windows drive/UNC/casing and POSIX controls, without native assurance inference.",
+   "backlogItem": "backlog/items/2026-10-08-model-role-bootstrap-is-always-unavailable-on-native-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+   "stage": 50,
+   "deliveryState": "controlled-transport-qualified",
+   "remaining": "17 prior cases retained; two unfinished transport cases passed at supported host boundary without replay. Actual installed attended readback, complete dynamic binding and productive admission remain open.",
+   "nextActionOrBlocker": "Bind retained16 transport and genuine installed attended/wrong-digest/reuse cases.",
+   "backlogItem": "backlog/items/2026-09-28-model-role-confirmation-prompt-obscures-required-digest.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.native-patch-rename-drops-protected-content-markers",
+   "stage": 50,
+   "deliveryState": "current-source-patch-rename-consumer-qualified",
+   "remaining": "14 controlled real-child consumer cases GREEN; Source byte/mode unchanged, no patch. Native/installed/combinedcandidate/lifecycle/admission and refused historicalreceipt binding held.",
+   "nextActionOrBlocker": "Bind five directed controls and installed guard/combined candidate.",
+   "backlogItem": "backlog/items/2026-09-29-native-patch-rename-drops-protected-content-markers.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+   "stage": 50,
+   "deliveryState": "new-repair-targeted-green-prepared",
+   "remaining": "Declined-sibling PU-HOOK-SHARED reproduced; private two-file repair passes seven genuine Git controls. Original31 controls retained without replay; whole criterion/native/docs/archive and signed integration/review remain open.",
+   "nextActionOrBlocker": "Preserve latest onboarding and pending args; bind interruption/re-enrollment/worktree/native hook cases.",
+   "backlogItem": "backlog/items/2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [
+    "uninstall-shared-hook-delivery"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/lib/git-hook-footprint.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/git-hook-footprint.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "f82b5e4c12d9b13b065f62ce8f6c4bb67e56151f96de85318473b611cf29f65d"
+    },
+    {
+     "sourcePath": "plugins/pipeline-core/lib/project-uninstall.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/project-uninstall.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "0148a294b9fe2223fe72ae1f34ad7940dd1c44eb0c27014e7dd58db209186ca8"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind existing ratchet and native clean-run; optional refused filename discovery gives no absence evidence.",
+   "nextActionOrBlocker": "Bind existing ratchet and native clean-run; optional refused filename discovery gives no absence evidence.",
+   "backlogItem": "backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+   "stage": 50,
+   "deliveryState": "current-source-nongit-consumer-partial-green",
+   "remaining": "10 targeted genuine/refusal cases GREEN, five prior not replayed; actual public reader in isolated nonGit fixture. No patch; complete23/onboarding184/history/defaultrecord/native/acceptance remain held.",
+   "nextActionOrBlocker": "Bind original governance/onboarding cases against current131c.",
+   "backlogItem": "backlog/items/2026-09-29-nongit-retirement-reader-calls-inaccessible-controller-helper.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind six home-override regressions.",
+   "nextActionOrBlocker": "Bind six home-override regressions.",
+   "backlogItem": "backlog/items/2026-09-28-onboarding-home-override-does-not-bind-machine-plane.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Reconcile exact historical cells against19 current selectable cells and cleanup, bind retained duration/resource measurements/Verify scheduling. Keep pool2; original item does not authorize unconditional variable concurrency."
+   ],
+   "nextActionOrBlocker": [
+    "Reconcile exact historical cells against19 current selectable cells and cleanup, bind retained duration/resource measurements/Verify scheduling. Keep pool2; original item does not authorize unconditional variable concurrency."
+   ],
+   "backlogItem": "backlog/items/2026-09-29-onboarding-init-greenfield-matrix-is-serial-and-slow.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind complete assigned corpus and real scanner fixture; premature historical totals remain historical.",
+   "nextActionOrBlocker": "Bind complete assigned corpus and real scanner fixture; premature historical totals remain historical.",
+   "backlogItem": "backlog/items/2026-09-29-onboarding-test-runner-reports-async-pass-before-settlement.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+   "stage": 25,
+   "deliveryState": "controlled-batch-execution-timeout-held",
+   "remaining": "Existing CGB suite timed out180s, null status/SIGTERM/ETIMEDOUT and no case output;333 static pins unchanged. No GREEN/productRED. Policy/model/native/history/admission held; no obsolete proposal reapplied.",
+   "nextActionOrBlocker": "Exact private German-only parity proposal included; separately bind course budget/tier actual proof and generic logical-batch accounting. Do not add review rounds.",
+   "backlogItem": "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+   "stage": 75,
+   "deliveryState": "current-main-original-criterion-qualified-ready-for-batch-review",
+   "remaining": "Original two-option classification and tests checked on exact Main parser/collector generation; Root content disposition ready for batch review. Manual acceptance/closure and standing Source admission/review holds remain; no nativeWindows requirement added.",
+   "nextActionOrBlocker": "Integrate sanctioned protected ab6/current cumulative successor and bind option-file positive/negative controls; do not duplicate fix.",
+   "backlogItem": "backlog/items/2026-10-05-outside-root-read-label-skips-option-value-file-tokens.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Coordinate already-owned shared-lock Source/proof and group03 record successor; bind owning-dispatch commit→terminal + lost-ack/recovery + shared readiness/liveness original requirements. No duplicate Source writer or invented background PID grants."
+   ],
+   "nextActionOrBlocker": [
+    "Coordinate already-owned shared-lock Source/proof and group03 record successor; bind owning-dispatch commit→terminal + lost-ack/recovery + shared readiness/liveness original requirements. No duplicate Source writer or invented background PID grants."
+   ],
+   "backlogItem": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+   "stage": 75,
+   "deliveryState": null,
+   "remaining": [
+    {
+     "owner": "/root",
+     "activeRouting": [],
+     "nextAction": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed.",
+     "exactReceiptGap": "No exact actual current receipt/case binding retained; unknown is not an unimplemented fix",
+     "review": "official independent Critic not established for whole item",
+     "acceptance": "open; no closure inferred"
+    },
+    "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+   ],
+   "nextActionOrBlocker": [
+    {
+     "owner": "/root",
+     "activeRouting": [],
+     "nextAction": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed.",
+     "exactReceiptGap": "No exact actual current receipt/case binding retained; unknown is not an unimplemented fix",
+     "review": "official independent Critic not established for whole item",
+     "acceptance": "open; no closure inferred"
+    },
+    "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed."
+   ],
+   "backlogItem": "backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6a54914411f6ec87b03d00224ba7765caa529c306493b830dc1ca627bd7b5b47.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": [
+    "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure."
+   ],
+   "nextActionOrBlocker": [
+    "Bind existing full wiring-enumerated ungoverned/declined/governed receipts with actual scope Source and native payload limits; preserve global destructive union and suppressed declined hint. Treat old334/Hook9 and scope21+target2 separately, never whole native closure."
+   ],
+   "backlogItem": "backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c888f1014635a949aec11bf82ee9b763a8a89b8d5c7415cc5dfec3ae23ac932b.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.plan-submission-must-not-require-separate-po-approval",
+   "stage": 25,
+   "deliveryState": "current-source-plan-submission-partial-qualified",
+   "remaining": "11 actualwriter plus six implementation negatives GREEN, twelve captured action assertions consumed without replay;331 byte/mode bindings conserved, no patch. Genuineepic/feature reviews/finalapproval/replay/mini signature bootstrap provenance/native/admission held.",
+   "nextActionOrBlocker": "Owner must reconcile mini acknowledgement provenance with one final approval; bind actual epic/feature/mini submission/presentation modes. No authority waiver proposal.",
+   "backlogItem": "backlog/items/2026-09-28-plan-submission-must-not-require-separate-po-approval.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.powershell-bypasses-onboarding-read-boundary",
+   "stage": "UNKNOWN",
+   "deliveryState": "portable-controls-qualified-native-held",
+   "remaining": "22 source controls pass; exact native Windows boundary/recovery consumer and installed enforcement open.",
+   "nextActionOrBlocker": "Bind the exact current installed Windows guard/hook positives, returned recovery and escape negatives. Existing test source is not an actual run.",
+   "backlogItem": "backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind GSD cases/current safe retry/no-enrollment/unsafe/private controls.",
+   "nextActionOrBlocker": "Bind GSD cases/current safe retry/no-enrollment/unsafe/private controls.",
+   "backlogItem": "backlog/items/2026-10-06-preflight-hides-the-git-error-behind-gs-git-unavailable.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Retain separator-only accepted identity authority and explicit case-fold discrepancy; Native12 controlled proof is not native first Write.",
+   "nextActionOrBlocker": "Retain separator-only accepted identity authority and explicit case-fold discrepancy; Native12 controlled proof is not native first Write.",
+   "backlogItem": "backlog/items/2026-10-05-preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+   "stage": 50,
+   "deliveryState": "portable-controls-qualified-native-held",
+   "remaining": "Five control groups pass and refusal-removal mutation fails as expected; native Windows assurance/cleanup open.",
+   "nextActionOrBlocker": "Use existing seam; native Windows assurance/cleanup cases remain open.",
+   "backlogItem": "backlog/items/2026-10-07-private-temp-root-not-secure-branch-has-no-test-seam.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.project-calibration-retains-new-project-placeholder",
+   "stage": 75,
+   "deliveryState": "current-source-calibration-consumer-qualified",
+   "remaining": "Actual adapter METHOD reproduction found six zero/nonEPERM mismatches; private existing-predicate correction passed20controlled+2realnormal cases. Original currentCLI/calibration proof conserved. ProductionSource unchanged; no realnativeerror/securityclaim, application/assembly/review/native/acceptance held.",
+   "nextActionOrBlocker": "Bind initial/resume/alias/missing/substituted-root PCI cases and all receipt consumers to selected current bytes; existing Source delivery not whole-item acceptance.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/6a54914411f6ec87b03d00224ba7765caa529c306493b830dc1ca627bd7b5b47.mode-0644.json",
+   "preparedPackages": [
+    "next-item-reservation-plan/wave-v3/items/calibration_identity/execution-consistency-v2"
+   ],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.project-resource-budget-headroom-is-not-reported",
+   "stage": 50,
+   "deliveryState": "current-source-resource-process-qualified-route-held",
+   "remaining": "Three actualCLI process cases GREEN; matched RHH11 reused, HRC20 historical grammar mismatch notcurrentPASS. Five originalQuick scenarios and dependencies recovered, no executed five-case proof. Classifier import stopped beforecallbacks at actual supervisor worker fixture; failures conserved. Currentroute/candidateboundmeasurement/dispatch/native/review held.",
+   "nextActionOrBlocker": "Bind five Quick consumers and authentic measurements/native runtime obligations; no aggregate closure.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+   "stage": 50,
+   "deliveryState": "current-source-baseline-consumer-targeted-green",
+   "remaining": "Nine original cases GREEN: eight retained plus canonical discard after committed inert pre-onboarding fixture seed; original assertions and1892 Source pins conserved. No product patch; original CLI/fanout/candidate/installed-native acceptance held, fixture failures preserved.",
+   "nextActionOrBlocker": "Bind idle/discard and multi-guard consumer outcomes, preserving close evidence protection.",
+   "backlogItem": "backlog/items/2026-09-29-protected-baseline-rejects-canonical-discarded-idle-state.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.push-classifier-deny-list-does-not-converge",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind current consumers/host/item coverage under accepted OptionB; no repeat implementation.",
+   "nextActionOrBlocker": "Bind current consumers/host/item coverage under accepted OptionB; no repeat implementation.",
+   "backlogItem": "backlog/items/2026-10-06-push-classifier-deny-list-does-not-converge.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind escaped/here-string/subexpression controls or exact failclosed boundary; conditional fix only proven uncovered case.",
+   "nextActionOrBlocker": "Bind escaped/here-string/subexpression controls or exact failclosed boundary; conditional fix only proven uncovered case.",
+   "backlogItem": "backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind exact backslash quote and harmless echo/quoted executable controls.",
+   "nextActionOrBlocker": "Bind exact backslash quote and harmless echo/quoted executable controls.",
+   "backlogItem": "backlog/items/2026-10-05-push-classifier-misreads-backslash-escaped-quotes.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind nested quotes/redirection controls to current consumer; no source-gap inference from stale mapper.",
+   "nextActionOrBlocker": "Bind nested quotes/redirection controls to current consumer; no source-gap inference from stale mapper.",
+   "backlogItem": "backlog/items/2026-10-06-push-classifier-misses-nested-quotes-and-redirect-before-push.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+   "stage": 50,
+   "deliveryState": "private-truthful-read-diagnostics-targeted-green",
+   "remaining": "Two private diagnostic modules fix actual single/pipeline RIPGREP_CONFIG_PATH lies;16 targeted cases GREEN with377 CAS. Codes/verdict/retry/HGO unchanged, original62/37/M6 unreplayed. NativeGrep exact-file filters/subtrees/type contract and actualadapter/native/installed clauses remain held; SEC11 exactfile rule preserved.",
+   "nextActionOrBlocker": "Retain M6 proof generation; bind current passive-read auxiliary/source rules and actual runner matrix. No broad grammar loosening.",
+   "backlogItem": "backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [
+    "next-item-reservation-plan/wave-v4/items/read_diagnostics"
+   ],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.read-only-guard-admits-execution-and-output-options",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind actual grammar/hook composition and pending platform probes to original clauses; do not repeat M6 or treat parser association as complete item.",
+   "nextActionOrBlocker": "Bind actual grammar/hook composition and pending platform probes to original clauses; do not repeat M6 or treat parser association as complete item.",
+   "backlogItem": "backlog/items/2026-09-30-read-only-guard-admits-execution-and-output-options.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [
+    "next-item-reservation-plan/wave-v4/items/read_diagnostics"
+   ],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.readiness-input-omits-current-advisor-observation",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Bind the current optional Advisor/legacy consumer route. Legacy coordinator source inspection was stopped; its source-specific implementation remains unverified here.",
+   "nextActionOrBlocker": "Bind the current optional Advisor/legacy consumer route. Legacy coordinator source inspection was stopped; its source-specific implementation remains unverified here.",
+   "backlogItem": "backlog/items/2026-09-28-readiness-input-omits-current-advisor-observation.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind empty/valid/malformed controls and actual reconnect bootstrap readback.",
+   "nextActionOrBlocker": "Bind empty/valid/malformed controls and actual reconnect bootstrap readback.",
+   "backlogItem": "backlog/items/2026-09-29-reconnect-sandbox-empty-child-output-breaks-bootstrap.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind alias/null-root and genuine native onboarding regressions.",
+   "nextActionOrBlocker": "Bind alias/null-root and genuine native onboarding regressions.",
+   "backlogItem": "backlog/items/2026-09-29-retirement-reader-masks-typed-unsafe-layout-inspection.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Assess the exact optional/legacy revised-course consumer without restoring a retired ceremony. No new Advisor invocation or source gap is inferred from the historical symptom.",
+   "nextActionOrBlocker": "Assess the exact optional/legacy revised-course consumer without restoring a retired ceremony. No new Advisor invocation or source gap is inferred from the historical symptom.",
+   "backlogItem": "backlog/items/2026-10-04-revised-native-design-cannot-reach-a-new-advisor-course.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+   "stage": 25,
+   "deliveryState": "source-byte-recovery-qualified-consumer-held",
+   "remaining": "Current role preflight and selected dependency bytes match recovered postimages; unsupported-read StopTwo preserved. Actual consumer execution/native adapters/readiness carrier/intake proof remain held; no new GREEN.",
+   "nextActionOrBlocker": "Bind genuine owning course consumer for each role/runner or assign the missing accepted carrier; do not fabricate native role evidence or restore mandatory Advisor.",
+   "backlogItem": "backlog/items/2026-10-03-role-route-preflight-with-self-dispatch-fallback.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.scratch-has-no-retention-and-no-durability-check",
+   "stage": "UNKNOWN",
+   "deliveryState": "qualification-red-held",
+   "remaining": "Five checks pass, two fail; newer helper invalidates old18 reuse. Fixture repair/current dependency qualification open.",
+   "nextActionOrBlocker": "Bind current guard and close consumer generation to the already qualified historical Scratch18 scope; do not rerun those eighteen unchanged cases or claim native durability from them.",
+   "backlogItem": "backlog/items/2026-10-05-scratch-has-no-retention-and-no-durability-check.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Join durable scratch sweep receipts to exact current guard/helper generation. Actual host denial remains typed; no opaque interpreter workaround.",
+   "nextActionOrBlocker": "Join durable scratch sweep receipts to exact current guard/helper generation. Actual host denial remains typed; no opaque interpreter workaround.",
+   "backlogItem": "backlog/items/2026-09-27-scratch-must-remain-writable-across-lifecycle-states.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+   "stage": 50,
+   "deliveryState": "current-main-consumer-targeted-green-native-held",
+   "remaining": "Seven real-Git protected mutation/baseline/hook consumer cases GREEN after supported host EPERM recovery. Current rule identity and exact path qualified; Source byte+mode CAS unchanged. No product delta. Signed ceremony/installed hook/native/review/acceptance held.",
+   "nextActionOrBlocker": "Qualify mutation detection, authorized/unchanged/no-baseline cases and wiring; detector is not global syscall enforcement.",
+   "backlogItem": "backlog/items/2026-10-05-script-mediated-writes-bypass-protected-test-paths.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.security-scanner-failure-provenance",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind retained24 and real CL-P30/KeyR prerequisites; no duplicate retention implementation.",
+   "nextActionOrBlocker": "Bind retained24 and real CL-P30/KeyR prerequisites; no duplicate retention implementation.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.semgrep-console-coverage-note-has-no-test",
+   "stage": "UNKNOWN",
+   "deliveryState": "current-source-controlled-cli-qualified",
+   "remaining": "22 targeted checks GREEN:14 unchanged SEM-T3+8 realCLI fake-scanner assertions, exits0/0/2;26 static pins unchanged. No production gap/patch; whole dynamic/history/review/installed/native/manual acceptance held.",
+   "nextActionOrBlocker": "Bind the exact current formatter/CLI test execution receipt. No new mirroring test or assertion rewrite is needed.",
+   "backlogItem": "backlog/items/2026-10-07-semgrep-console-coverage-note-has-no-test.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.semgrep-offline-default-version-check",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind historical147+11/OFS001/current adapter and final candidate boundary.",
+   "nextActionOrBlocker": "Bind historical147+11/OFS001/current adapter and final candidate boundary.",
+   "backlogItem": null,
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+   "stage": 50,
+   "deliveryState": "current-main-consumer-targeted-green-native-held",
+   "remaining": "26 adapter and five consumer cases pass; two Windows-only skips explicitly held, actual scanner/default-ruleset checklist open.",
+   "nextActionOrBlocker": "Bind adapter cases and actual candidate/native checklist.",
+   "backlogItem": "backlog/items/2026-10-06-semgrep-partial-parsing-warnings-fail-the-whole-scan.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Bind an existing actual concurrent schedule/cause to current source. Do not soften partial readiness or guess a race repair from static code.",
+   "nextActionOrBlocker": "Bind an existing actual concurrent schedule/cause to current source. Do not soften partial readiness or guess a race repair from static code.",
+   "backlogItem": "backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+   "stage": 50,
+   "deliveryState": "current-main-targeted-qualified-review-held",
+   "remaining": "Both original clauses qualify:12/12 unchanged cases, Source/dependency CAS conserved, historical7/5 retained. No code delta; sanctioned assembly/batch review and closure remain open.",
+   "nextActionOrBlocker": "Bind newer12 exact receipt to7e6; retain old7/5 and legitimate unsupported refusal.",
+   "backlogItem": "backlog/items/2026-10-05-shell-classifier-faults-on-heredoc-body-text.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+   "stage": "UNKNOWN",
+   "deliveryState": "current-suite-registration-red-held",
+   "remaining": "Current metadata refers to placement test but registry has zero entries; original temporary-root fixture bytes missing. Exact fixture/canonical registration and grammar-generation binding open.",
+   "nextActionOrBlocker": "Bind the old RGGRAM4 source generation and identify the separate original fixture before item completion. Current shell grammar differs from its retained source parent; four passes are not a new-current or native proof.",
+   "backlogItem": "backlog/items/2026-10-05-shell-grammar-file-is-a-kernel-path-without-capability-placement.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+   "stage": "UNKNOWN",
+   "deliveryState": "portable-controls-qualified-native-held",
+   "remaining": "Six scoped controls pass; accepted residual risk versus stronger documentation needs reconciliation; native writer/readiness open.",
+   "nextActionOrBlocker": "Bind native executable-resolution evidence to the current writer and preserve the accepted operator rule. No reverse policy decision or human-key probe is authorized here.",
+   "backlogItem": "backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "OBL16 prepares bounded actual inner-child diagnostic preserving all five original assertions. Resolve the concrete activation failure, then qualify actual lazy CLI/two Critic branches on coherent Source; retain original latency/native/human-terminal obligations.",
+   "nextActionOrBlocker": "Review the exact private readiness-order post; then close a genuine package-disclosure validator and producer-published digest locator with unchanged intent recomputation. No fake index authority, blanket scan fallback or cleanup grant. Current native latency remains unmeasured.",
+   "backlogItem": "backlog/items/2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Reconcile approved body lineage without silently rebasing; owner I08 handles PO disclosure/index. Bind actual version/content request course; no extra ADR terminal step.",
+   "nextActionOrBlocker": "Reconcile approved body lineage without silently rebasing; owner I08 handles PO disclosure/index. Bind actual version/content request course; no extra ADR terminal step.",
+   "backlogItem": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+   "stage": 50,
+   "deliveryState": "new-repair-targeted-green-prepared",
+   "remaining": "Temporary readback falsely caused BASE-DRIFT: private owner-bound cleanup fix gives43 original+4 orchestration+6 single-link GREEN. Windows real agent route/latency/replaced-path injection/signature/review remain open.",
+   "nextActionOrBlocker": "Coordinate actual materializer/guard owner for agent-only apply/stage/authorize command and precise package disclosure; retain no-verify prohibition and native proof hold.",
+   "backlogItem": "backlog/items/2026-10-04-signed-quality-package-route-is-not-agent-operable-on-windows.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [
+    "wave-b-signed_quality"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/lib/signed-quality-package.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "3f0ea6b0a1e560ae30f3c6f10b8df08abf56b7938d9583291d8f7fd5bd5b60fd"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+   "stage": 50,
+   "deliveryState": "private-signing-fixture-repair-partial-held",
+   "remaining": "Two path controls plus RC21C003/005 GREEN after privatefixture repairs. RC21C001/002/004 unencrypted-key RED retained; encrypted successor controlling-terminal held. Test-only proposal, no production weakening/human keys/native proof.",
+   "nextActionOrBlocker": "Bind RC21C001–005/strict reverse and sanctioned suite transfer; no test-presence execution inference.",
+   "backlogItem": "backlog/items/2026-10-07-signing-default-test-fixture-root-escapes-the-repository.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.signing-prompt-prints-the-whole-review-package",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Current assembled-Main official Signing19 course plus original native latency/PO-facing coverage still required. Historical six pure cases and newer SDA2 do not fabricate one current19 green generation.",
+   "nextActionOrBlocker": "I08 disclosure owner must classify current supported request kinds, retain exact signed bytes, and provide compact indexed summary/artifact. No duplicate POHuman patch by this owner; measure native latency separately.",
+   "backlogItem": "backlog/items/2026-10-04-signing-prompt-prints-the-whole-review-package.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.signing-toolchain-readiness",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Native human-terminal clean/contaminated host and executable-resolution assurance remain unproven; final Main canonical course not executed.",
+   "nextActionOrBlocker": "Coordinate I08 for bounded pre-lookup readiness and validated outside-Git temp fallback. Unknown actual human-terminal availability stays held; no key reads.",
+   "backlogItem": "backlog/items/2026-10-08-signing-toolchain-readiness.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind existing focused source-vs-installed tests and exact guard-dispatch/budget provider tuple; do not reimplement root resolver based on stale stage25.",
+   "nextActionOrBlocker": "Bind existing focused source-vs-installed tests and exact guard-dispatch/budget provider tuple; do not reimplement root resolver based on stale stage25.",
+   "backlogItem": "backlog/items/2026-10-05-source-agent-definition-change-locks-that-agent-until-install.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.three-runner-happy-path-with-two-po-approvals",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Use genuine installed scenarios only when Root authorizes; one installation approval, ordinary Chat architecture questions, one final bundled design approval, one push approval. Keep worker/review/product acceptance/close distinct.",
+   "nextActionOrBlocker": "Use genuine installed scenarios only when Root authorizes; one installation approval, ordinary Chat architecture questions, one final bundled design approval, one push approval. Keep worker/review/product acceptance/close distinct.",
+   "backlogItem": "backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.transfer-redaction-alters-digest-bound-files",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Bind Transfer16/current delivery and original recovery lineage; cannot reconstruct lost historical preimages.",
+   "nextActionOrBlocker": "Bind Transfer16/current delivery and original recovery lineage; cannot reconstruct lost historical preimages.",
+   "backlogItem": "backlog/items/2026-10-08-transfer-redaction-alters-digest-bound-files.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+   "stage": 25,
+   "deliveryState": "selected-private-source-consent-constructor-qualified",
+   "remaining": "16 controlled transaction/consent cases GREEN;333 pins conserved, selectedd900/cd4/263e/2ae and21 priorGREEN unchanged. No patch; actualexportbeforeanswer consumer, fullguard/native/firstcommit/review/acceptance held.",
+   "nextActionOrBlocker": "Locate existing real first-answer transaction/export controls and join consumer proof; do not equate preparation text to atomic outcome or auto-export private evidence.",
+   "backlogItem": "backlog/items/2026-09-29-unasked-advisor-export-consent-in-fresh-seed.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+   "stage": 50,
+   "deliveryState": "new-repair-targeted-green-prepared",
+   "remaining": "Truncated Linux-home remedy reproduced RED then private short-hint repair GREEN6. Actual DrvFs/full CLI/native DACL and signed integration/review remain open.",
+   "nextActionOrBlocker": "Bind cause/hint and WSL/native DACL controls.",
+   "backlogItem": "backlog/items/2026-10-05-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [
+    "wave-b-verify_journal"
+   ],
+   "preparedLeaves": [
+    {
+     "sourcePath": "plugins/pipeline-core/scripts/verify-journal.mjs",
+     "portablePostimage": "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/plugins/pipeline-core/scripts/verify-journal.mjs",
+     "selection": "assembly-v7",
+     "preimageSha256": "6e4cde624280bfe16fcb5be76ab1656fef57f069cc182fed3b3b3523d38ca4a0"
+    }
+   ]
+  },
+  {
+   "id": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+   "stage": 50,
+   "deliveryState": null,
+   "remaining": "Qualify retained vi/vim/ex and busybox exact cases; repair only actual uncovered behavior.",
+   "nextActionOrBlocker": "Qualify retained vi/vim/ex and busybox exact cases; repair only actual uncovered behavior.",
+   "backlogItem": "backlog/items/2026-10-07-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.windows-greenfield-scratch-write-denied",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Bind the actual native Windows Write/PowerShell matrix and fresh intake plus Unix scopes, preserving symlink/hardlink/plugin exclusions.",
+   "nextActionOrBlocker": "Bind the actual native Windows Write/PowerShell matrix and fresh intake plus Unix scopes, preserving symlink/hardlink/plugin exclusions.",
+   "backlogItem": "backlog/items/2026-09-29-windows-greenfield-scratch-write-denied.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Map affected fixture consumers to existing Windows qualification receipts; preserve DACL assurance. No host PASS or weakened ACL proposal.",
+   "nextActionOrBlocker": "Map affected fixture consumers to existing Windows qualification receipts; preserve DACL assurance. No host PASS or weakened ACL proposal.",
+   "backlogItem": "backlog/items/2026-10-05-windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "Bind exact Windows slash/drive behavior, rollback and fresh installed progression. No remaining adapter-discard gap was found in these current branches.",
+   "nextActionOrBlocker": "Bind exact Windows slash/drive behavior, rollback and fresh installed progression. No remaining adapter-discard gap was found in these current branches.",
+   "backlogItem": "backlog/items/2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+   "stage": "UNKNOWN",
+   "deliveryState": null,
+   "remaining": "A separate source owner must prepare a minimal final-artifact durable-write/readback change with writable-descriptor sync and typed refusal, preserving foreign-hook refusal, marker binding and removal ownership. Absolute action/installed Windows evidence remains a separate consumer hold.",
+   "nextActionOrBlocker": "A separate source owner must prepare a minimal final-artifact durable-write/readback change with writable-descriptor sync and typed refusal, preserving foreign-hook refusal, marker binding and removal ownership. Absolute action/installed Windows evidence remains a separate consumer hold.",
+   "backlogItem": "backlog/items/2026-09-29-windows-pre-push-installer-fsync-and-relative-action.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/a20ac972a29588556702f30039625b145f3dd7f7afc9896449067f94275f4ad3.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+   "stage": 50,
+   "deliveryState": "current-main-consumer-targeted-green-held",
+   "remaining": "Eight parser groups plus genuine Linux spaced-name process/identity cases pass; final candidate/native release binding open.",
+   "nextActionOrBlocker": "Bind real spaced comm/PID reuse and ownership/temp/manifest controls.",
+   "backlogItem": "backlog/items/2026-09-28-worktree-process-start-parser-misreads-spaced-comm.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/c391b485ebdbacb7e018c4954da74b8d9b95388181517f11759f5e0292a47a4c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  },
+  {
+   "id": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+   "stage": 25,
+   "deliveryState": null,
+   "remaining": "Bind exact two-worktree legacy/foreign/barrier/history/crash/uninstall receipts; preserve active legacy authority. No reset of shared common slots or fake non-Git capability.",
+   "nextActionOrBlocker": "Bind exact two-worktree legacy/foreign/barrier/history/crash/uninstall receipts; preserve active legacy authority. No reset of shared common slots or fake non-Git capability.",
+   "backlogItem": "backlog/items/2026-09-29-worktrees-share-onboarding-private-state-with-root-bound-intake.md",
+   "assessmentBasis": "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/evidence-objects/dccfbcdf45dd1bb1e7660c88abf6ec221816c9fc2fa51bb423e1bb1f9cd2d78c.mode-0644.json",
+   "preparedPackages": [],
+   "preparedLeaves": []
+  }
+ ]
+}

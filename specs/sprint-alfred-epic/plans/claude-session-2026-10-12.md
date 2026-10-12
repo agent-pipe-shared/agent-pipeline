@@ -46,9 +46,20 @@ and PO topics. Status words follow the operating-model glossary: nothing here is
 
 ## Waves
 
+Batch **C1** (predeclared): pilot P0 plus wave 1. Review unit: one FULL Critic
+over the frozen integrated C1 scope plus at most one correction-diff review
+(stricter reading of T1), one Correction Goldfish for the whole batch.
+Order: native-Windows rows first (this host's unique value), then stage-50/75
+rows with prepared leaves, then 25/UNKNOWN. Items gated on an open PO decision
+(T4) are not dispatched. Briefings are generated from
+`templates/prompts/goldfish-task.md` into
+`specs/sprint-alfred-epic/implementation/claude-2026-10-12/briefings/<wave>/`
+and reuse the Codex results through
+[reuse-index.json](../implementation/claude-2026-10-12/reuse-index.json).
+
 | Wave | Items | Status |
 | --- | --- | --- |
-| (filled as waves launch) | | |
+| P0 pilot | gitleaks-repair-ignore-cli-is-a-no-op-on-windows (`ALF-C-P0-GLRWIN`) | dispatched; verifies worktree isolation, hooks, integration route |
 
 ## Collected signature-bound patches
 
@@ -68,3 +79,9 @@ and PO topics. Status words follow the operating-model glossary: nothing here is
   [po-decisions-2026-10-12](po-decisions-2026-10-12.md) (public derivative
   producer, snapshot-freshness carrier, direct-mini signature contract, native
   read selector policy, review-course design package) remain open.
+- **T5 Cadence:** 174 items at roughly 8 concurrent whole-item owners, each
+  briefing finalized and each result integrated by the Elephant, means many
+  sessions; no ETA is established or implied.
+- **Answered in chat:** Elephant model stays Opus (judgment/integration);
+  Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
+  500k tokens.
