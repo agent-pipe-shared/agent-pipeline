@@ -317,6 +317,7 @@
           "docs/adr/draft-alfred-a1-e3-evidence-promotion.json",
           "docs/adr/draft-alfred-a1-e3-evidence-promotion.md",
           "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md",
+          "docs/adr/draft-claude-hook-session-owner.md",
           "docs/adr/draft-content-bound-review-before-full-verify.json",
           "docs/adr/draft-content-bound-review-before-full-verify.md",
           "docs/adr/draft-critic-report-durable-write-location.md",

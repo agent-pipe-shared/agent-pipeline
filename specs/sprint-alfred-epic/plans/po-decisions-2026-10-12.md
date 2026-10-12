@@ -71,6 +71,18 @@ The push has since been performed: on 2026-10-12 the Claude continuation
 observed `origin/feat/sprint-alfred` at `6447fcc1a` (equal to local HEAD) after
 `git fetch`.
 
+## Claude session decisions (PO, chat, 2026-10-12)
+
+- **T6 → option A granted:** a bounded EL-01 exception for exactly ONE outcome —
+  the Elephant itself implements that governed item admission obtains a bound
+  current owner under the Claude runner, so the productive Goldfish dispatch
+  route becomes reachable. Followed by one full independent Critic review; any
+  protected-path part goes to the en-bloc signing package. The exception does
+  not extend to any other item; all other items run via Goldfish fanout.
+- **T2:** the Codex session is closed; this Claude session is the only Elephant.
+- **T1:** review budget per frozen batch is 1 FULL Critic + at most 3
+  correction-diff reviews (resolves the 1-vs-3 conflict in favour of 3).
+
 ## Signature-bound work: prepare now, sign en bloc later (PO, 2026-10-12, Claude session)
 
 PO chat instruction (German original, paraphrased in English): topics that need a

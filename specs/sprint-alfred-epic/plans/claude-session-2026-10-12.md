@@ -61,6 +61,24 @@ and reuse the Codex results through
 | --- | --- | --- |
 | P0 pilot | gitleaks-repair-ignore-cli-is-a-no-op-on-windows (`ALF-C-P0-GLRWIN`) | **blocked before launch** by guard-dispatch `SQ-DELIVERY-STATE-UNAVAILABLE` (see T6); nothing ran, nothing written |
 
+### T6-A exception scope (PO-granted, Elephant-implemented)
+
+Outcome: a role-`goldfish` Agent dispatch from a Claude session can obtain a
+bound current owner so `prepareGovernedItemQueue` can create the governed
+`slice-queue.json` and the v3 native item route becomes reachable.
+Design: a new fallback owner source, `lib/claude-hook-session-owner.mjs`,
+consulted by `nativeManagedCurrentOwner` ONLY when the in-process requester
+context is unavailable. It binds the Claude hook input `session_id` to a
+private session descriptor created/loaded through the existing
+`worktree-lifecycle.mjs` `startSessionDescriptor`/`loadSessionDescriptor`, and
+reports a distinct assurance `claude-hook-session-descriptor` (hook-observed,
+not an authenticated requester). Entry points that run under a Claude hook
+(`hooks/guard-dispatch.mjs`, `hooks/native-goldfish-host.mjs`) enter that scope
+from their own stdin. Not done: no queue hand-writing, no change to approval,
+criterion, scope, collision or Critic rules, no hooks.json/verify-suites edit,
+no installed-copy edit. Takes effect only after the operator refreshes the
+local marketplace copy. Review: one full design-tier Critic (MP-07).
+
 ### Verified cause of the dispatch block (2026-10-12)
 
 - `plugins/pipeline-core/hooks/guard-dispatch.mjs:131` — every role-`goldfish`
@@ -123,6 +141,18 @@ and reuse the Codex results through
   paths are already pushed. Classification is a dispatchable item once T6 is
   resolved; scanner availability (semgrep timeout, osv path trust) on this
   Windows host is a separate environment observation.
+- **T8 (post-Alfred, PO finding 2026-10-12):** TP-1..13 protect only the named
+  test files. Weakening a helper, fixture or sub-test that a protected test
+  depends on is not protected. Proposal to study after Alfred: two test
+  categories (critical vs ordinary) and extend protection to the dependency
+  closure of critical tests, not only the file itself. Register as a backlog
+  item when the backlog writer is next used.
+- **T9 Windows fixture baseline:** `prepareApprovedItemCourseFixture` fails on
+  native Windows at `submit-plan` for every fixture-based case in
+  `native-goldfish-host-state.test.mjs` (NGHS06-20); on `/mnt/d` under WSL the
+  same cases fail `GS-PRIVATE-MODE` (DrvFs has no POSIX modes). Qualification of
+  T6-A therefore runs in an owned native-WSL clone. Root-cause belongs to the
+  Windows temp/DACL fixture items.
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
