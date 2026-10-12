@@ -213,6 +213,12 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
   - T11: the preferred option is a per-file `.gitattributes` `eol=lf` override for the helper, plus a one-time re-checkout. It writes no production code. It also avoids colliding with the prepared backend postimage of the dispatch-budget item.
   - T10: the §23 register; recompute the locators against the actual post-edit spec sha; then one current-schema re-approval signature.
   - Capacity: two productive Goldfish slots under the current limit. The PO was asked whether to raise it.
+- **PO decision 2026-10-12:** follow both recommendations, T11 (a) and T10 (§23 register plus one re-approval signature).
+  - T11 (a) applied in `b1933efa0`; the helper working copy is now LF and matches the pin. Stamp `b29cf4f4c` (`0.7.0+claude.20261012111014.b1933ef`) is waiting for the PO's install.
+  - Capacity was not answered; it stays at the default.
+- **T13 Scope intake into a running sprint (PO concern, 2026-10-12; post-Alfred design topic):** with the §23 register, a new backlog item can only enter an implementing sprint through a spec change and a re-approval. That makes small bugfixes pay a design↔implementation switch.
+  - Checked: item admission binds the §23 row text in `spec.md`, not the backlog file bytes. Grep of `native-goldfish-host-state.mjs` and `critic-accepted-contract.mjs` shows no backlog binding. So an admitted item's backlog file can still be refined and extended with findings without re-approval.
+  - Open: a light intake lane for new in-sprint findings, for example reserved finding slots or a bugfix fast lane, as a Pipeline design item after Alfred.
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
