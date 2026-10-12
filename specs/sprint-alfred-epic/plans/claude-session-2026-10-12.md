@@ -413,3 +413,16 @@ osv-scanner was SKIPPED (`untrusted_path`), which is an existing Windows path-tr
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
+- **PO direction 2026-10-12 (late evening), batch Critic as the shipped standard for every repository:**
+  - No Critic run per item. A Critic reviews only an integrated state that belongs together functionally and has enough size. Each batch gets one FULL plus at most three DIFF reviews, on Sonnet.
+  - Goldfish never do Critic work. They own analysis, test, fix and targeted GREEN for their item.
+  - Defect it removes: slice-queue rule SQ-TIER requires a critic follow-up slice per guard/hook/security/architecture slice, and `prepareGovernedItemQueue` never creates one. That blocks W1-01 (AC-102) and W1-04 (AC-152) at admission.
+  - Fix direction: admission attaches each such slice to ONE shared batch-critic slice per batch (for example `ALF-C-C1-critic`). The rule's intent (an independent review exists) is kept; the per-item Critic run goes away.
+  - This must be shipped enforcement in `plugins/pipeline-core`, not a local hotfix. It attaches to existing §23 items, same treatment as T14/T15 (no new item, no design reopen). The Elephant picks the fitting item before dispatch.
+- **Parallelism observation, wave 1 (2026-10-12):**
+  - Admission is serial. Each guard-dispatch run takes 20–30 s and holds `session-authority/registry.lock`.
+  - A dispatch issued while another hook holds the lock is refused with `SDC-LOCK-HELD`. This happened live for W1-06, and the retry was admitted. Fix direction: bounded wait/retry on the registry lock inside admission. It joins the blocker list (preflight, lock recovery).
+  - The T14 ceiling (default 12) is still unenforced. PO decision 2026-10-12: work at 12 concurrent agents including the main session, so up to 11 dispatches. Watch for instability and reduce if it appears.
+- **W1-02 finding (Goldfish report, 2026-10-12):** the live guard-push at the candidate does NOT refuse `git commit -m … --trailer …`. `agent-obligations.md` and the generator (lines 145–147) claim it does.
+  - Either the sentence is stale, or the refusal sits in another layer (guard-git or guard-lifecycle-ready).
+  - Re-measure which layer refuses, then correct the generator text. This attaches to the same item (`agent-obligations-recommends-a-commit-spelling-guard-push-refuses`) as a follow-up slice with generator plus template scope.
