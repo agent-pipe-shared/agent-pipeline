@@ -27,12 +27,22 @@ function samePath(left, right) {
   return relative(left, right) === '';
 }
 
-function inPhysicalRoot(root, physicalRoot, input) {
+function inPhysicalRoot(root, physicalRoot, input, realpath = realpathSync.native ?? realpathSync) {
   const path = resolve(root, input);
   // A native absolute path may use the caller's spelling of the repository
   // root (including a different drive-letter case). Keep its components for
   // the symlink walk, but anchor them at the physical repository root.
   if (contained(root, path, true)) return resolve(physicalRoot, relative(root, path));
+  // A directory alias (junction/symlink) of the root is normalized before
+  // containment: only an ancestor whose physical identity IS the physical root
+  // re-anchors; the remaining components are kept verbatim for the link walk,
+  // so links below the root are never resolved away here.
+  for (let ancestor = path, parent = dirname(ancestor); ; ancestor = parent, parent = dirname(ancestor)) {
+    try {
+      if (samePath(realpath(ancestor), physicalRoot)) return resolve(physicalRoot, relative(ancestor, path));
+    } catch { /* missing or unreadable ancestor: keep walking up */ }
+    if (parent === ancestor) break;
+  }
   return path;
 }
 
@@ -57,11 +67,11 @@ export function isPhysicalScratchTarget(filePath, {
     if (!lstat(entryRoot).isDirectory()) return false;
     const root = realpath(entryRoot);
     const scratch = resolve(root, 'scratch');
-    const target = inPhysicalRoot(entryRoot, root, filePath);
+    const target = inPhysicalRoot(entryRoot, root, filePath, realpath);
     if (!contained(scratch, target, allowScratchRoot)) return false;
     for (const liveRoot of liveRoots) {
       if (typeof liveRoot !== 'string' || !liveRoot) return false;
-      const declared = inPhysicalRoot(entryRoot, root, liveRoot);
+      const declared = inPhysicalRoot(entryRoot, root, liveRoot, realpath);
       let physical;
       try { physical = realpath(declared); }
       catch (error) { if (error?.code !== 'ENOENT') return false; physical = declared; }
