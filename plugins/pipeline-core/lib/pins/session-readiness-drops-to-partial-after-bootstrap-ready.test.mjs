@@ -14,10 +14,14 @@
 // `requireProjectOnboardingReadyFn`) is driven so the bootstrap-ready/session-partial state is
 // deterministic. The guard's admission of the emitted command is decided by the guard's own real
 // function. Not covered (named, not claimed): the concurrent-schedule cause of intermittent
-// `cleanup_recovery_observation_unavailable` (measured 2026-10-05, separate FLAP fix), and
-// SKILL.md prose.
+// `cleanup_recovery_observation_unavailable` (measured 2026-10-05, separate FLAP fix; typed
+// uncovered point UNCOVERED-CONCURRENT-CAUSE: AC6 starts real parallel processes over one
+// deterministic probe state, but the real intermittent cause needs live shared on-disk state this pin
+// does not fabricate), and SKILL.md prose.
 
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { writeSync } from "node:fs";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -98,6 +102,16 @@ const commandOf = (action) => {
   return [action.executable, ...action.argv].map(word).join(" ");
 };
 
+// Child mode (AC6): the same file, run as a separate process, emits the preflight action as JSON.
+if (process.env.ALF_PIN_PREFLIGHT_CHILD === "1") {
+  const result = preflight(({ intent }) => {
+    if (intent === "session") throw partial("session");
+    return readyGate(intent);
+  });
+  writeSync(1, JSON.stringify({ status: result.status, nextAction: result.nextAction }));
+  process.exit(0);
+}
+
 test("AC1: bootstrap-ready but session-partial -> preflight emits the read-only `inspect --intent session` action", () => {
   const asked = [];
   const result = preflight(({ intent }) => {
@@ -151,13 +165,25 @@ test("AC5: bootstrap itself not ready -> session is not probed and the action is
   assert.equal(result.nextAction.mutation, false);
 });
 
-test("AC6: the readiness snapshot is consistent -- concurrent preflights over the same probe state emit identical actions", async () => {
-  const gate = ({ intent }) => {
-    if (intent === "session") throw partial("session");
-    return readyGate(intent);
-  };
-  const results = await Promise.all(Array.from({ length: 8 }, () => Promise.resolve().then(() => preflight(gate))));
+test("AC6: real parallel read-only preflight processes over the same probe state all see one consistent readiness snapshot", async () => {
+  const run = () => new Promise((res, rej) => {
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
+      env: { ...process.env, ALF_PIN_PREFLIGHT_CHILD: "1" }, stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (d) => { out += d; });
+    child.stderr.on("data", (d) => { err += d; });
+    child.on("error", rej);
+    child.on("close", (code) => (code === 0 ? res(JSON.parse(out)) : rej(new Error(`child exit ${code}: ${err}`))));
+  });
+  // All children are spawned in the same tick, before any is awaited, so they genuinely overlap.
+  const results = await Promise.all(Array.from({ length: 6 }, run));
   const first = JSON.stringify(results[0].nextAction);
-  for (const r of results) assert.equal(JSON.stringify(r.nextAction), first);
+  for (const r of results) {
+    assert.equal(r.status, "ready");
+    assert.equal(JSON.stringify(r.nextAction), first);
+  }
   assert.equal(intentOf(results[0].nextAction), "session");
+  assert.equal(results[0].nextAction.mutation, false);
 });
