@@ -20,10 +20,10 @@
 // alias is skipped as a typed host-limitation subtest, never silently passed.
 
 import assert from "node:assert/strict";
-import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
 import { isPhysicalScratchTarget } from "../physical-scratch-boundary.mjs";
@@ -169,7 +169,7 @@ test("W2: a hardlinked scratch file (nlink > 1) is refused, a plain file is admi
   } finally { f.cleanup(); }
 });
 
-test("W2: an active plugin root beneath scratch stays excluded (declared live-root seam)", () => {
+test("W2: an active plugin root beneath scratch stays excluded (declared live-root seam)", async () => {
   const f = fixture();
   try {
     const plugin = join(f.project, "scratch", "active-plugin");
@@ -178,9 +178,24 @@ test("W2: an active plugin root beneath scratch stays excluded (declared live-ro
     assert.equal(isPhysicalScratchTarget("scratch/active-plugin/hooks/h.mjs", opts), false, "inside live plugin root");
     assert.equal(isPhysicalScratchTarget("scratch/active-plugin", { ...opts, allowScratchRoot: true }), false, "the live plugin root itself");
     assert.equal(isPhysicalScratchTarget("scratch/nested/ok.md", opts), true, "sibling scratch path stays admitted");
-    // The executing module's own plugin install is always a live root (no seam needed).
-    const own = fileURLToPath(new URL("../../", import.meta.url));
-    assert.equal(isPhysicalScratchTarget(join(own, "hooks", "x.mjs"), { rootDir: f.project }), false, "own plugin install");
+    // The executing module's own plugin install is always a live root (no seam needed). To place
+    // that install beneath the project's scratch, run a byte-identical copy of the real module from
+    // <project>/scratch/own-plugin/lib/: its default own root is then <project>/scratch/own-plugin.
+    // The module imports only node builtins, so the copy behaves exactly like the original.
+    const own = join(f.project, "scratch", "own-plugin");
+    mkdirSync(join(own, "lib"), { recursive: true });
+    mkdirSync(join(own, "hooks"), { recursive: true });
+    const copy = join(own, "lib", "physical-scratch-boundary.mjs");
+    copyFileSync(fileURLToPath(new URL("../physical-scratch-boundary.mjs", import.meta.url)), copy);
+    const mod = await import(pathToFileURL(copy).href);
+    const target = "scratch/own-plugin/hooks/x.mjs";
+    // Default exclusion only (no liveRoots passed): refused.
+    assert.equal(mod.isPhysicalScratchTarget(target, { rootDir: f.project }), false, "own plugin install beneath scratch");
+    assert.equal(mod.isPhysicalScratchTarget("scratch/own-plugin", { rootDir: f.project, allowScratchRoot: true }), false, "own plugin root itself");
+    // Flip: with the own-plugin exclusion removed (empty liveRoots), the same path is plain
+    // scratch and is admitted -- so the refusal above is caused by that exclusion alone.
+    assert.equal(mod.isPhysicalScratchTarget(target, { rootDir: f.project, liveRoots: [] }), true, "same path without the exclusion");
+    assert.equal(mod.isPhysicalScratchTarget("scratch/nested/ok.md", { rootDir: f.project }), true, "sibling stays admitted under the default");
   } finally { f.cleanup(); }
 });
 
