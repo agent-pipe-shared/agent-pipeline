@@ -500,7 +500,12 @@ Status is "implementation complete, targeted GREEN by the dispatch". The batch C
     | C3-F4a-c | minor | corrected |
     | C3-F4d | minor | held: possible conflict with PO decision T12 |
     | C3-F5 | minor | briefing error: AC-128 listed but not in the batch |
-  - Corrections: `c4a247144` (P1-16), `2037af586` (P1-07), `e8adfcafb` (P1-09), `1729332fe` (P1-01), `3bcc40517` (P1-19). Review 2 (DIFF) is running.
+  - Corrections: `c4a247144` (P1-16), `2037af586` (P1-07), `e8adfcafb` (P1-09), `1729332fe` (P1-01), `3bcc40517` (P1-19).
+  - Review 2, DIFF over the five corrections: PASS, scoped. No blocker or major finding, so the review budget stops here. Two minors stay open:
+    - C3D-F1: the AC6 parallel processes share no on-disk state, so the real readiness flap (`cleanup_recovery_observation_unavailable`) stays uncovered. Its owner is the separate FLAP fix of the item.
+    - C3D-F2: the AC-130 mode-bit cases have never run, because they skip on win32. A POSIX run is pending.
+  - The DIFF review was not run against `guardrails/security.md`, `roles/goldfish.md` or `project/pipeline.json`. It also did not cover pin registration in Verify, which is unregistered anyway (see below).
+- **W1-07** `worktrees-share-onboarding-private-state-with-root-bound-intake`, `f08ca4e37`. Its new case OBC299 is GREEN on this host. The whole onboarding-continuity corpus is 301 tests: 251 pass, 50 fail on native Windows (symlink, mode, DACL and cleanup cases). W1-07 adds one case, so it is not the plausible cause. The corpus needs a POSIX run and a Windows baseline.
   - **Deviation from the one-Correction-Goldfish rule:** one shared correction slice was refused with SQ-OVERLAP, because the slice queue has no completion state. Each correction therefore reused its original slice id. This joins the queue-completion hotfix topic.
 - **Defects and findings:**
   - **Verify never runs the pins.** `harness/scripts/check-verify-suite-registration.mjs` exits 2 and reports 59 unregistered suites. They include every `lib/pins/*` file and several earlier Alfred suites. `harness/verify-suites.json` is TP-13 protected, so registration needs a PO-signed edit. This joins the hotfix package.
