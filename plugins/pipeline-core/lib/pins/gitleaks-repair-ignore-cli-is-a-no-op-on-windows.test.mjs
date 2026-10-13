@@ -100,14 +100,19 @@ test("CLI run as a child process ACTS: exit 0, reports the replacement, rewrites
   });
 });
 
-test("CLI still acts when argv[1] is a lower-case drive-letter / backslash / relative spelling", async () => {
+test("CLI still acts when argv[1] is a lower-case drive-letter / backslash / relative spelling", async (t) => {
+  const isWin = process.platform === "win32";
   const spellings = [
-    ["relative", (cwdRel) => cwdRel],
-    ["backslash", () => CLI.replace(/\//gu, "\\")],
-    ["lower-case drive", () => (/^[A-Za-z]:/u.test(CLI) ? CLI[0].toLowerCase() + CLI.slice(1) : CLI)],
-    ["upper-case drive", () => (/^[A-Za-z]:/u.test(CLI) ? CLI[0].toUpperCase() + CLI.slice(1) : CLI)],
+    ["relative", (cwdRel) => cwdRel, false],
+    ["backslash", () => CLI.replace(/\//gu, "\\"), true],
+    ["lower-case drive", () => (/^[A-Za-z]:/u.test(CLI) ? CLI[0].toLowerCase() + CLI.slice(1) : CLI), false],
+    ["upper-case drive", () => (/^[A-Za-z]:/u.test(CLI) ? CLI[0].toUpperCase() + CLI.slice(1) : CLI), false],
   ];
-  for (const [label, make] of spellings) {
+  for (const [label, make, winOnly] of spellings) {
+    if (winOnly && !isWin) {
+      t.diagnostic(`host-limitation: ${label} spelling is a win32-only path form; skipped on ${process.platform}`);
+      continue;
+    }
     await withFixture(({ root, expectedNew }) => {
       const arg = make(relative(REPO_ROOT, CLI));
       const r = runCli(root, arg, [], { cwd: REPO_ROOT });
