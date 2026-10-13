@@ -2212,9 +2212,10 @@ function captureNativeTargetPreimages(root, paths) {
   if (!nativeTargetsValid(result,paths)) fail("HGO-NATIVE-TARGET-SHAPE", "native target observation is not closed");
   return result;
 }
+const NATIVE_FILE_TOOLS = new Set(["Edit", "Write", "apply_patch"]);
 function assertNativeTargets(root, record) {
   if (!nativeTargetsValid(record.nativeTargets,record.eligiblePaths)
-    || !new Set(["Edit","Write"]).has(record.toolName)
+    || !NATIVE_FILE_TOOLS.has(record.toolName)
     || canonical(captureNativeTargetPreimages(root,record.eligiblePaths)) !== canonical(record.nativeTargets)) {
     fail("HGO-NATIVE-TARGET-DRIFT", "signed native target preimages changed");
   }
@@ -3199,7 +3200,7 @@ function validatedCapability(paths, path) {
   const native = value.schema === NATIVE_CAPABILITY_SCHEMA;
   if (!exactKeys(value, native ? [...CAPABILITY_KEYS, "nativeTargets"] : CAPABILITY_KEYS)
     || !(value.schema === CAPABILITY_SCHEMA || native)
-    || (native && (!new Set(["Edit", "Write"]).has(value.toolName) || !nativeTargetsValid(value.nativeTargets, value.eligiblePaths)))
+    || (native && (!NATIVE_FILE_TOOLS.has(value.toolName) || !nativeTargetsValid(value.nativeTargets, value.eligiblePaths)))
     || !new Set(["armed", "consumed"]).has(value.status)
     || !SHA256.test(value.requestSha256 ?? "")
     || !SHA256.test(value.planSha256 ?? "")
@@ -3251,7 +3252,7 @@ function validatedRequest(paths, requestSha256, request = readJson(requestPath(p
     ...(native ? ["nativeTargets"] : []),
   ])
     || !(request.schema === REQUEST_SCHEMA || native) || request.root === undefined
-    || (native && (!new Set(["Edit", "Write"]).has(request.toolName) || !nativeTargetsValid(request.nativeTargets, request.eligiblePaths)))
+    || (native && (!NATIVE_FILE_TOOLS.has(request.toolName) || !nativeTargetsValid(request.nativeTargets, request.eligiblePaths)))
     || !new Set(["standard", "pipeline-author-repair-candidate", "global-plugin-install"]).has(request.mode)
     || request.authorSourceRoot !== null
     || typeof request.externalReadOnly !== "boolean"
@@ -3493,7 +3494,7 @@ export function recordHumanGuardDenial({
     commandClass,
     denials,
   });
-  const nativeTargets = new Set(["Edit", "Write"]).has(toolName)
+  const nativeTargets = NATIVE_FILE_TOOLS.has(toolName)
     && (eligible.mode === "standard" || eligible.authorCandidate === true)
     && eligible.paths.length > 0
     ? captureNativeTargetPreimages(repo.root, eligible.paths) : null;
