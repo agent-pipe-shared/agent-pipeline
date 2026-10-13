@@ -5040,6 +5040,29 @@ export function runFreshEnrollmentHistoryRegression() {
 }
 check("first enrollment history reads stay empty and ignore foreign shared worktree intake",runFreshEnrollmentHistoryRegression);
 
+export function runTwoWorktreeRootBoundIntakeRegression() {
+  const root=mkdtempTestScratch("two-worktree-intake-");
+  const git=(args,cwd=root)=>{const run=spawnSync("git",args,{cwd,encoding:"utf8"});assert.equal(run.status,0,run.stderr);};
+  try {
+    git(["init","--initial-branch=main"]);
+    git(["-c","user.name=Disposable Fixture","-c","user.email=fixture@example.invalid","commit","--allow-empty","-m","fixture"]);
+    applyOnboardingIntakeConsent({rootDir:root,granted:true,language:"en",profile:"feature",activate:true});
+    const rootIntake=readOnboardingIntakeCheckpoint({rootDir:root}),rootBytes=readFileSync(rootIntake.paths.checkpoint);
+    const other=join(root,"other-worktree");git(["worktree","add","-b","other-fixture",other]);
+    const otherBefore=readOnboardingIntakeCheckpoint({rootDir:other});
+    assert.equal(otherBefore.status,"absent","a sibling worktree must not read the root's intake as its own");
+    assert.notEqual(otherBefore.paths.checkpoint,rootIntake.paths.checkpoint,"each physical root addresses its own intake slot");
+    applyOnboardingIntakeConsent({rootDir:other,granted:true,language:"en",profile:"feature",activate:true});
+    const otherAfter=readOnboardingIntakeCheckpoint({rootDir:other});
+    assert.equal(otherAfter.status,"present");
+    assert.notEqual(otherAfter.paths.checkpoint,rootIntake.paths.checkpoint);
+    assert.deepEqual(readFileSync(rootIntake.paths.checkpoint),rootBytes,"enrolling a sibling worktree preserves the root's active legacy authority bytes");
+    assert.equal(readOnboardingIntakeCheckpoint({rootDir:root}).sha256,rootIntake.sha256);
+    assert.equal(readOnboardingIntakeCheckpoint({rootDir:other}).sha256,otherAfter.sha256,"sibling intake stays stable on re-read");
+  } finally {rmSync(root,{recursive:true,force:true});}
+}
+check("two worktrees keep root-bound intake slots and preserve the other root's legacy authority",runTwoWorktreeRootBoundIntakeRegression);
+
 // Greenfield-walk RED pins F7 and F9 (E2E-ONB-B, 24a27a1c9; ONB-T3-20261009, Ruling 163). Intended reds until the F slices land.
 // F7. Owner: the buildKickoffPromotionPlan throw site in lib/onboarding-continuity.mjs
 // (`fail("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING", ...)`). The seam is a proposal: the F slice may move it,
@@ -5077,7 +5100,7 @@ check("planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding g
   assert.deepEqual(requests, [], "no signature request file may be written over an unfinished package");
 });
 
-assert.equal(cases.length, 300, "the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 301, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
