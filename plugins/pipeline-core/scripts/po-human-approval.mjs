@@ -1694,6 +1694,25 @@ function assertPoPrivateKeyProtected(pemPath, dependencies) {
   refuseUnencryptedPoPrivateKey(readPoPrivateKeyOrRefuse(dependencies.readFile ?? readFileSync, pemPath, "utf8"));
 }
 
+/** Pairing gate (ALF-C-F2-01): the public key the OpenSSL derivation yields from `po-private.pem` must equal the
+ * stored `po-public.pem` before setup reuses, recovers or anchors that pair. Nothing is written by this check.
+ * The derivation runs through the module's own spawn route; a passphrase prompt is the same terminal prompt
+ * the `--existing-key` route already uses (stdin/stderr are inherited, only stdout is captured). */
+function assertPoKeyPairing(paths, directory, dependencies) {  const read = dependencies.readFile ?? readFileSync;
+  const result = spawnOpenssl(["pkey", "-in", paths.privateKey, "-pubout"], { cwd: directory, encoding: "utf8", stdio: ["inherit", "pipe", "inherit"] }, dependencies);
+  if (result?.status !== 0 || typeof result.stdout !== "string" && !Buffer.isBuffer(result.stdout)) {
+    const error = new Error(`PO-KEY-PAIR-UNVERIFIABLE: the public key could not be derived from the PO private key (openssl exit ${result?.status ?? "none"}); the key pair was not reused, recovered or anchored`);
+    error.code = "PO-KEY-PAIR-UNVERIFIABLE";
+    throw error;
+  }
+  const squash = (value) => String(value).replace(/\s+/gu, "");
+  if (squash(result.stdout) !== squash(read(paths.publicKey, "utf8"))) {
+    const error = new Error("PO-KEY-PAIR-MISMATCH: the PO private key does not belong to the stored public key; the key pair was not reused, recovered or anchored");
+    error.code = "PO-KEY-PAIR-MISMATCH";
+    throw error;
+  }
+}
+
 /**
  * Names the flag that made a critical request unacceptable instead of only
  * stating that it is, and normalizes `--expires-at` rather than rejecting a
@@ -2335,6 +2354,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
       // TR-S1 (Ruling 78): recovering the key already sitting here registers it as the authority, so an
       // unreadable or unencrypted key is refused before the authority record is built or written.
       assertPoPrivateKeyProtected(paths.privateKey, dependencies);
+      assertPoKeyPairing(paths, directory, dependencies);
       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
       persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
@@ -2356,6 +2376,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
       if ((!legacyShape && !namedShape) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) {
         fail("existing trust policy does not match the local public key");
       }
+      assertPoKeyPairing(paths, directory, dependencies);
       if (!namedShape || !text(authority.humanName)) {
         if (!text(args.humanName)) {
           fail('existing PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
