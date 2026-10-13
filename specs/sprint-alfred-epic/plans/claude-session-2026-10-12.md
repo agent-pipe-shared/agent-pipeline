@@ -426,3 +426,57 @@ osv-scanner was SKIPPED (`untrusted_path`), which is an existing Windows path-tr
 - **W1-02 finding (Goldfish report, 2026-10-12):** the live guard-push at the candidate does NOT refuse `git commit -m … --trailer …`. `agent-obligations.md` and the generator (lines 145–147) claim it does.
   - Either the sentence is stale, or the refusal sits in another layer (guard-git or guard-lifecycle-ready).
   - Re-measure which layer refuses, then correct the generator text. This attaches to the same item (`agent-obligations-recommends-a-commit-spelling-guard-push-refuses`) as a follow-up slice with generator plus template scope.
+
+## Night fanout, 2026-10-12/13 (pin wave P1 and fix F1)
+
+Status is "implementation complete, targeted GREEN by the dispatch". The independent batch Critic (C3), Full Verify and PO acceptance are all still pending; nothing here is accepted.
+
+- **Committed (targeted GREEN, one commit per item, Commit-Act orchestrator):**
+
+  | Slice | Item | Commit |
+  |---|---|---|
+  | P1-11 | handover-doc-committed-without-governance-classification | `d68cbae1f` |
+  | P1-12 | lifecycle-inspect-omits-current-plan-spec-digests | `3463e72d7` |
+  | P1-13 | installed-design-trailer-example-is-rejected-by-git-guard | `8d0277665` |
+  | P1-14 | design-trailer-verifier-lost-after-closure | `731e457a0` |
+  | P1-15 | concurrent-session-warning-never-fires-on-native-windows | `853af051d` |
+  | P1-16 | gitleaks-repair-ignore-cli-is-a-no-op-on-windows | `925ecd409` |
+  | P1-17 | windows-portable-seed-rolls-back-with-hidden-worktree-error | `de316a75d` |
+  | P1-18 | retirement-reader-masks-typed-unsafe-layout-inspection | `43419638c` |
+  | P1-19 | codex-advisor-shared-namespace-rejects-fresh-repository-identity | `5cc985b24` |
+  | P1-22 | reconnect-sandbox-empty-child-output-breaks-bootstrap | `e367c0e86` |
+  | P1-23 | design-bootstrap-verify-state-contradicts-deferred-contract | `70eef1002` |
+  | P1-06 | design-approval-validator-rejects-json-key-reordering | `b5e197488` |
+  | F1-01 + P1-09 | windows-greenfield-scratch-write-denied (source fix in `physical-scratch-boundary.mjs` `inPhysicalRoot`, then pin) | `0eaa8d0b3`, `743f2ea6a` |
+
+  Notes on the committed pins:
+  - Typed win32 skips (directory symlinks, POSIX mode bits, file symlinks) are named in each pin. P1-19 has three POSIX-only cases that still need a POSIX run.
+  - P1-17 A5 (fresh Windows session with the installed candidate) and P1-09 W5 (fresh Windows intake) are manual checks, not claimed.
+
+- **Real defects found, not fixable inside a pin slice:**
+  - **P1-10**, item `claude-windows-guard-refuses-every-in-repo-read`:
+    - `rg --no-heading`, `-m N` and repeated `-g` are refused with GUARD-READ-COMMAND-UNSUPPORTED.
+    - The prepared Codex postimages for `hooks/guard-command-grammar.mjs` and `lib/guard/shell-grammar.mjs` apply without drift (preimage sha match). A simulated run of the pin is GREEN 9/9.
+    - Both paths are guard tier, so SQ-TIER needs the batch-critic slice. This goes into the PO hotfix package.
+  - **P1-24**, item `dispatch-record-ownership-binds-an-attempted-creation`:
+    - On native Windows `readDispatchRecordOwnerClaim` falls back to `physicalCreationFile()`. That requires `(mode & 0o022) === 0`, which Windows never satisfies.
+    - Result: every claim, including the owner's own, reads as `invalid-landed-claim`, so the owner is refused.
+    - The pin is 4 GREEN / 6 skipped (OWN-5/6 need POSIX). It is held uncommitted.
+    - The fix belongs in `lib/guard/dispatch-record-lane.mjs`, which is guard tier, so it also goes into the PO hotfix package.
+  - **P1-20**, item `existing-signing-key-reuse-deadlocks-onboarding`, suspected gap:
+    - `po-human-approval.mjs` setup's private+public+authority branch never derives the public key from `po-private.pem`.
+    - So a swapped canonical private key may be re-anchored silently. A second dispatch is measuring this (case A5b).
+- **Host/environment findings:**
+  - A fixture with `git init` but no commit (unborn HEAD) makes `set-feature` fail with WT-GIT-FAILED ("State authority route unavailable").
+    - This is the root cause of the P1-21 failures. The adjacent `pipeline-state-inspect.test.mjs` drift case fails the same way on this host.
+    - One empty initial commit fixes it. Open question for greenfield: should a fresh repository before its first commit be a typed state instead of WT-GIT-FAILED?
+  - Onboarding fixtures (driveOnboardingInit plus openssl setup) cost about 200 s each on this host. Each pin should build one shared fixture.
+  - `codex-design-readiness-host-store.shared-parent.test.mjs` asserts a 0755 shared parent after mint. That looks stale against the Ruling-141 private root creation (POSIX only, not run here).
+- **PO topics added tonight:**
+  1. P1-23: should `set-phase --phase implementation` keep admitting a baseline-only Verify (current, newer approved policy, release stays blocked) or require `--verify-command`? The pin records the measured policy as a visible case.
+  2. Hotfix package additions: the P1-10 grammar postimages and the P1-24 Windows mode check (both guard tier).
+  3. Unborn-HEAD typed state for greenfield (see above).
+- **Still running or held at 2026-10-13 early:**
+  - Continuations P1-03, P1-08, P1-20 and P1-21 are running.
+  - P1-24 is held (needs the guard fix).
+  - W1-05, W1-07 and N1-04 stay as recorded above.
