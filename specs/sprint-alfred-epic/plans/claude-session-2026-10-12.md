@@ -480,3 +480,42 @@ Status is "implementation complete, targeted GREEN by the dispatch". The indepen
   - Continuations P1-03, P1-08, P1-20 and P1-21 are running.
   - P1-24 is held (needs the guard fix).
   - W1-05, W1-07 and N1-04 stay as recorded above.
+
+## Night fanout, 2026-10-13 (batch C3 review and corrections)
+
+Status is "implementation complete, targeted GREEN by the dispatch". The batch C3 review is still running, and Full Verify and PO acceptance are pending. Nothing here is accepted.
+
+- **More commits (targeted GREEN, Commit-Act orchestrator):**
+  - P1-05 `governance-scope-rejects-readonly-host-git-control`, `065eca57e`. Points 1-5 and 8 are POSIX-only skips.
+  - W1-05 `disjoint-signed-hgo-actions-invalidate-one-another` (AC-160), `348b421f3`. `apply_patch` joins the native disjoint override contract. This is a security library, so it needs its own batch Critic.
+- **Batch C3 (22 commits: the P1 pins plus the F1-01 source fix):**
+  - Review 1, FULL: consumed, partial at the 80 % checkpoint, non-PASS. An earlier attempt stopped on a briefing violation that was the Elephant's error: the session ledger had been referenced as dispatch-record and claims evidence. No review happened in that attempt.
+  - Findings and their state:
+
+    | Finding | Severity | State |
+    |---|---|---|
+    | C3-F1 | major | corrected |
+    | C3-F2 | major | corrected |
+    | C3-F3 | major | PO topic: P1-23 A2 pins the measured policy against the item's bullet 2 |
+    | C3-F4a-c | minor | corrected |
+    | C3-F4d | minor | held: possible conflict with PO decision T12 |
+    | C3-F5 | minor | briefing error: AC-128 listed but not in the batch |
+  - Corrections: `c4a247144` (P1-16), `2037af586` (P1-07), `e8adfcafb` (P1-09), `1729332fe` (P1-01), `3bcc40517` (P1-19). Review 2 (DIFF) is running.
+  - **Deviation from the one-Correction-Goldfish rule:** one shared correction slice was refused with SQ-OVERLAP, because the slice queue has no completion state. Each correction therefore reused its original slice id. This joins the queue-completion hotfix topic.
+- **Defects and findings:**
+  - **Verify never runs the pins.** `harness/scripts/check-verify-suite-registration.mjs` exits 2 and reports 59 unregistered suites. They include every `lib/pins/*` file and several earlier Alfred suites. `harness/verify-suites.json` is TP-13 protected, so registration needs a PO-signed edit. This joins the hotfix package.
+  - **P1-20 A5b (security):**
+    - `po-human-approval.mjs` setup never derives the public key from `po-private.pem`. A swapped canonical private key is anchored with TRUST-ANCHOR-BOOTSTRAP-COMPLETE.
+    - A6 was a test-authoring issue: a replay correctly refuses with BTR-PLAN-DRIFT. It is now GREEN.
+    - The pin is held uncommitted until the source fix lands.
+  - **Critic persistence is unavailable on this host.** The notes write is refused with `DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: critic-notes-partial-held`, so the report lives only in the hand-back.
+  - **Goldfish and Critic preflights:**
+    - Every preflight reports `hook-refresh-required`, and the environment readiness check reports git `binary_missing`.
+    - Preflights see installed stamp `0.7.0+claude.20261012184536.e145eec`, while the briefings name `b1933ef`.
+- **PO topics added:**
+  1. TP-13 verify-suite registration for the 59 suites.
+  2. The P1-20 A5b source fix (security).
+  3. C3-F3 / P1-23 A2 disposition, which is the same question as topic 1 of the night list.
+  4. C3-F4d versus T12.
+  5. Stamp and hook refresh.
+  6. Critic notes persistence.
