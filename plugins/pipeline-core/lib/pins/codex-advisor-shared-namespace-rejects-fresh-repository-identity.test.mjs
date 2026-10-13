@@ -10,7 +10,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, ch
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readLocalRepositoryFingerprint } from "../governance-event-store.mjs";
-import { registerCodexHostProcessRoot } from "../codex-host-process-journal.mjs";
+import { createHostJournal, registerCodexHostProcessRoot } from "../codex-host-process-journal.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRATCH = resolve(HERE, "..", "..", "..", "..", "scratch");
@@ -72,7 +72,51 @@ test("the minted shared namespace is owner-only and not group/world writable", {
   assert.equal(lstatSync(join(common, "agent-pipeline", "governance-events")).mode & 0o077, 0);
 });
 
-test("registration still refuses an aliased common directory", { skip: HOST_LIMIT_LINK }, async (t) => {
+// Advisor store creation through the real module: registration is only a plan; the first journal
+// creation materializes `<common>/agent-pipeline/advisor-codex/<fingerprint>/processes`.
+async function advisorStoreAttempt(t, prepare = () => {}) {
+  const { root, common } = freshRepository(t);
+  execFileSync("git", [...GIT_ID, "commit", "-q", "--allow-empty", "-m", "fixture"], { cwd: root });
+  const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
+  prepare({ common, fingerprint });
+  const parent = registerCodexHostProcessRoot({ gitCommonDir: common, repoFingerprint: fingerprint, purpose: "advisor" });
+  const fields = { binding: { repoFingerprint: fingerprint }, cwd: root };
+  let error = null;
+  try { createHostJournal(parent, fields); } catch (caught) { error = caught; }
+  return { common, fingerprint, parent, error };
+}
+
+test("Advisor store creation materializes the owner-private duty chain below the minted shared namespace", async (t) => {
+  const { parent, common, fingerprint, error } = await advisorStoreAttempt(t);
+  // Materialization succeeded; the deliberately incomplete journal fields are what is refused afterwards.
+  assert.equal(error?.code, "host-process-intent-invalid");
+  assert.equal(parent, join(common, "agent-pipeline", "advisor-codex", fingerprint, "processes"));
+  assert.equal(lstatSync(parent).isDirectory(), true);
+});
+
+test("Advisor store creation accepts a 0755 shared agent-pipeline parent (sanctioned governance writers)", { skip: HOST_LIMIT_MODE }, async (t) => {
+  const { error } = await advisorStoreAttempt(t, ({ common }) => chmodSync(join(common, "agent-pipeline"), 0o755));
+  assert.equal(error?.code, "host-process-intent-invalid");
+});
+
+test("Advisor store creation refuses a group/world writable agent-pipeline shared parent without repairing it", { skip: HOST_LIMIT_MODE }, async (t) => {
+  const { common, error } = await advisorStoreAttempt(t, ({ common: c }) => chmodSync(join(c, "agent-pipeline"), 0o777));
+  assert.equal(error?.code, "host-process-root-unsafe");
+  assert.equal(lstatSync(join(common, "agent-pipeline")).mode & 0o777, 0o777);
+  assert.equal(existsSync(join(common, "agent-pipeline", "advisor-codex")), false);
+});
+
+test("Advisor store creation refuses a 0755 private duty directory without repairing it", { skip: HOST_LIMIT_MODE }, async (t) => {
+  const { common, error } = await advisorStoreAttempt(t, ({ common: c }) => {
+    const duty = join(c, "agent-pipeline", "advisor-codex");
+    mkdirSync(duty);
+    chmodSync(duty, 0o755);
+  });
+  assert.equal(error?.code, "host-process-root-unsafe");
+  assert.equal(lstatSync(join(common, "agent-pipeline", "advisor-codex")).mode & 0o777, 0o755);
+});
+
+test("registration still refuses an aliased common directory",{ skip: HOST_LIMIT_LINK }, async (t) => {
   const { root, common } = freshRepository(t);
   const fingerprint = await readLocalRepositoryFingerprint({ repositoryRoot: root });
   const alias = join(root, "common-alias");
