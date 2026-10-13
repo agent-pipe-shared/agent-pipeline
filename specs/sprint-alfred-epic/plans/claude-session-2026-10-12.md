@@ -505,6 +505,31 @@ Status is "implementation complete, targeted GREEN by the dispatch". The batch C
     - C3D-F1: the AC6 parallel processes share no on-disk state, so the real readiness flap (`cleanup_recovery_observation_unavailable`) stays uncovered. Its owner is the separate FLAP fix of the item.
     - C3D-F2: the AC-130 mode-bit cases have never run, because they skip on win32. A POSIX run is pending.
   - The DIFF review was not run against `guardrails/security.md`, `roles/goldfish.md` or `project/pipeline.json`. It also did not cover pin registration in Verify, which is unregistered anyway (see below).
+- **PO decisions, 2026-10-13 (chat, decision tiles):**
+  1. **Verify registration:** one combined patch registers all 59 unregistered suites in `harness/verify-suites.json` (TP-13). A Goldfish prepares and checks the exact patch, and the PO signs it once.
+  2. **P1-20 A5b:**
+     - A Goldfish fixes `po-human-approval.mjs` so the setup and recovery branches derive the public key from `po-private.pem` and compare it with `po-public.pem` and the fingerprint.
+     - The pin turns GREEN.
+     - A security batch Critic follows, on Sonnet.
+  3. **Guard hotfix package, all four items as one package:**
+     - P1-10, the `rg` grammar.
+     - P1-24, the Windows mode check in the dispatch-record owner claim.
+     - A completion state in the slice queue (ends SQ-OVERLAP).
+     - A bounded registry-lock retry in admission (ends SDC-LOCK-HELD).
+     - One batch Critic reviews the package, and the PO installs one stamp. The package is shipped enforcement for all repositories.
+  4. **P1-23 A2:**
+     - Keep baseline-only Verify at the `set-phase --phase implementation` entry. The newer policy governs, and release stays blocked.
+     - This is the PO disposition of C3-F3: the pin's A2-literal case stays as recorded.
+     - The item's Acceptance bullet 2 is superseded for implementation entry. Owner: PO. Recorded 2026-10-13.
+  5. **C3-F4d:** T12 governs. With no design-trailer verifier left, the Acceptance bullet 3 check over closed items lapses. C3-F4d is closed as a PO disposition, and the pin stays.
+  6. **Stamp:** no interim refresh. The PO installs one stamp after the guard hotfix package. The Elephant then rebases the briefings onto the new ruleset SHA.
+  7. **POSIX coverage:**
+     - The Elephant runs the onboarding corpus and the POSIX-only pin cases in WSL on this host, read-only, and records the results in this ledger.
+     - If the guard refuses the WSL route, the Elephant hands the exact commands to the PO.
+  8. **Order of work:**
+     - First: the hotfix package, the A5b fix and the Verify registration patch.
+     - In parallel: the P2 pins continue.
+     - After the stamp: large waves over the source-fix and guard items.
 - **W1-07** `worktrees-share-onboarding-private-state-with-root-bound-intake`, `f08ca4e37`. Its new case OBC299 is GREEN on this host. The whole onboarding-continuity corpus is 301 tests: 251 pass, 50 fail on native Windows (symlink, mode, DACL and cleanup cases). W1-07 adds one case, so it is not the plausible cause. The corpus needs a POSIX run and a Windows baseline.
   - **Deviation from the one-Correction-Goldfish rule:** one shared correction slice was refused with SQ-OVERLAP, because the slice queue has no completion state. Each correction therefore reused its original slice id. This joins the queue-completion hotfix topic.
 - **Defects and findings:**
