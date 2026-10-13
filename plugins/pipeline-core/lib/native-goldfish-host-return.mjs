@@ -24,6 +24,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const ROLE_TO_AGENT = Object.freeze({
   "pipeline-core:goldfish-implementor": "goldfish-implementor",
   "pipeline-core:goldfish-mechanic": "goldfish-mechanic",
+  "pipeline-core:goldfish-deep": "goldfish-deep",
 });
 const BRIEFING_FIELDS = ["schema", "dispatchId", "candidateCommit", "candidateTree", "runner", "role",
   "agentType", "model", "effort", "rulesetSha", "allowedPaths", "criticDecision"];

@@ -24,7 +24,7 @@ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
 import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
 import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
-import { ITEM_QUEUE_SCHEMA, validateSliceQueue, normalizeScope, scopesOverlap } from "./slice-queue.mjs";
+import { ITEM_QUEUE_SCHEMA, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
 
 export const NATIVE_GOLDFISH_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v1";
 export const NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v2";
@@ -808,6 +808,55 @@ export function resolveGovernedItemQueue({ root } = {}) {
 }
 
 
+/** Bounded retry for a transiently held Session Authority lock (SDC-LOCK-HELD is thrown, not returned).
+ * Only a refusal raised before the callback ran is retried; the same code is rethrown when the budget ends. */
+export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),now=()=>Date.now()}={}) {
+  const deadline=now()+budgetMs;let delay=25;
+  for(;;){
+    const entered={value:false};
+    try{return attempt(entered);}
+    catch(error){
+      if(error?.code!=='SDC-LOCK-HELD'||entered.value||now()+delay>deadline)throw error;
+      sleep(delay);delay=Math.min(delay*2,1000);
+    }
+  }
+}
+
+/** A briefing candidate older than the current checkout still admits when the checkout only advanced
+ * through commits that touch none of the item's scope, check or dependency paths. */
+function candidateAdvancedDisjointly(physical,candidate,repository,paths) {
+  try{
+    const from=candidate?.commit,head=repository.candidate?.commit;
+    if(typeof from!=='string'||!/^[0-9a-f]{40,64}$/u.test(from)||typeof head!=='string')return false;
+    const git=args=>spawnSync('git',['-C',physical,...args],{env:agyHostGitEnvironment(),shell:false,timeout:10000,maxBuffer:4*1024*1024});
+    const ancestor=git(['merge-base','--is-ancestor',from,head]);
+    if(ancestor.error||ancestor.status!==0)return false;
+    const diff=git(['diff','--name-only','-z',from,head]);
+    if(diff.error||diff.status!==0)return false;
+    const changed=Buffer.from(diff.stdout).toString('utf8').split('\0').filter(Boolean);
+    return changed.every(file=>paths.every(path=>!scopesOverlap(path,file)));
+  }catch{return false;}
+}
+
+/** Orders a slice after every other live slice it overlaps (only the slice being admitted is edited)
+ * and keeps one shared critic slice covering every critical-path slice. */
+function orderAndCoverAdmittedSlice(raw,sliceId) {
+  const slices=raw.slices,mine=slices.find(row=>row.id===sliceId);
+  const reaches=(from,to,seen=new Set())=>{if(from===to)return true;if(seen.has(from))return false;seen.add(from);return (slices.find(row=>row.id===from)?.dependsOn??[]).some(dep=>reaches(dep,to,seen));};
+  for(const other of slices){
+    if(other===mine||other.state==='cancelled'||other.tier==='critic'||(mine.dependsOn??[]).includes(other.id))continue;
+    if(!scopesOverlap(mine.writeScope,other.writeScope)||reaches(other.id,mine.id))continue;
+    mine.dependsOn=[...(mine.dependsOn??[]),other.id];
+  }
+  const critical=slices.filter(row=>row.state!=='cancelled'&&row.tier!=='critic'&&(row.writeScope??[]).some(path=>typeof path==='string'
+    &&DEFAULT_CRITICAL_PATH_PATTERNS.some(source=>new RegExp(source,'iu').test(path.trim().replaceAll('\\','/')))));
+  if(!critical.length)return;
+  const critic=slices.find(row=>row.tier==='critic'&&row.state!=='cancelled'&&row.id==='BATCH-CRITIC')??slices.find(row=>row.tier==='critic'&&row.state!=='cancelled');
+  if(critic){critic.dependsOn=[...new Set([...(critic.dependsOn??[]),...critical.filter(row=>!reaches(row.id,critic.id)).map(row=>row.id)])];return;}
+  slices.push({id:'BATCH-CRITIC',title:'Shared batch Critic review',state:'ready',dependsOn:critical.map(row=>row.id),writeScope:[],tier:'critic',
+    tierReason:'Critical-path write scope in this batch needs one shared independent Critic review.',commitMode:'diff-only',loadClass:'light'});
+}
+
 /** Automatic approved-course continuation. Selection metadata cannot approve a
  * plan or mint a requester; the Source observers and original bytes do both
  * checks before any lifecycle write under the existing authority lock. */
@@ -817,9 +866,11 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
     const physical=realpathSync(resolve(root));
     if(!observeGovernanceScope({rootDir:physical}).requiresEnforcement)return {status:'not-applicable',code:'SQ-NO-GOVERNANCE'};
     const repository=inspectSignedDescriptorCustodyRepository(physical);
-    if(nativeManagedDigest(candidate)!==nativeManagedDigest(repository.candidate))return {status:'refused',code:'SQ-ITEM-CANDIDATE-DRIFT'};
+    if(nativeManagedDigest(candidate)!==nativeManagedDigest(repository.candidate)
+      &&!candidateAdvancedDisjointly(physical,candidate,repository,[...(Array.isArray(writeScope)?writeScope:[]),...itemDelivery.checks.flatMap(check=>[check.path,...check.dependencies])]))return {status:'refused',code:'SQ-ITEM-CANDIDATE-DRIFT'};
     if(!Array.isArray(writeScope)||!writeScope.length||writeScope.some(path=>!normalizeScope(path).ok||!itemDelivery.checks.some(check=>check.dependencies.includes(path))))return {status:'refused',code:'SQ-ITEM-SCOPE-INVALID'};
-    return withSessionAuthorityBoundary({repository},()=>{
+    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
+      entered.value=true;
       const current=nativeManagedCurrentOwner(repository);
       if(current.association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
       const approval=observeCurrentPlanApprovalForCalibration({rootDir:physical});
@@ -857,12 +908,16 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const canRebindLegacy=existing&&existing.delivery?.status!=='unbound-legacy'&&!existing.delivery?.criterionLocator
         &&existing.delivery.itemId===itemDelivery.itemId&&nativeManagedDigest(existing.delivery.criteria)===nativeManagedDigest([locator.criterionId])
         &&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
-      if(existing?.delivery?.status!=='unbound-legacy'&&existing&&!canRebindLegacy){
+      // A never-dispatched `ready` slice with the identical item, criterion and write scope rebinds to the current candidate.
+      const canRebindReady=existing&&existing.state==='ready'&&existing.delivery?.status!=='unbound-legacy'&&existing.delivery?.itemId===itemDelivery.itemId
+        &&nativeManagedDigest(existing.delivery?.criteria)===nativeManagedDigest([locator.criterionId])&&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
+      if(existing?.delivery?.status!=='unbound-legacy'&&existing&&!canRebindLegacy&&!canRebindReady){
         if(nativeManagedDigest(existing.delivery)!==nativeManagedDigest(delivery)||nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope))throw nativeManagedFault('item-course-existing-binding-drift');
         return resolveGovernedItemQueue({root:physical});
       }
       if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];}
       else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
+      orderAndCoverAdmittedSlice(raw,itemDelivery.sliceId);
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-prepared-queue-invalid');
       // Approval, requester, candidate and preimage are checked again immediately
       // before publishing a fresh inode. Existing linked bytes remain unchanged.
@@ -875,7 +930,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const written=writeSync(fd,bytes,offset,bytes.length-offset);if(written<=0)throw nativeManagedFault('item-course-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,path);}
       finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
       return resolveGovernedItemQueue({root:physical});
-    });
+    }));
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
 }
 
