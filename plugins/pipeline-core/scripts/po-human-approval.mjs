@@ -1148,12 +1148,50 @@ const PATH_PLACEHOLDER = "<path>";
 const KNOWN_PATH_MIN_LENGTH = 4;
 const REDACTION_WINDOW_CHARS = 4096;
 
+// Known install locations searched after the PATH entries (data, not code). Windows: relative to the
+// program-files style environment roots; POSIX: absolute system directories.
+const WINDOWS_ENVIRONMENT_ROOTS = Object.freeze(["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"]);
+const WINDOWS_OPENSSL_LOCATIONS = Object.freeze(["Git/mingw64/bin", "Git/usr/bin", "Git/bin", "Programs/Git/mingw64/bin", "Programs/Git/usr/bin", "OpenSSL-Win64/bin", "OpenSSL/bin"]);
+const POSIX_OPENSSL_DIRECTORIES = Object.freeze(["/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]);
+
+/** Resolve the OpenSSL executable to an ABSOLUTE path outside every repository (ALF-C-N1-04). Never searches
+ * the working directory: relative or empty PATH entries are skipped. Candidates, in order: the PATH entries
+ * of the signing terminal, then the known install locations. A candidate must be an existing file whose
+ * directory lies outside every Git repository. Returns null when none qualifies. Reads `dependencies.env`
+ * and `dependencies.platform` only so a test can drive it; the production caller injects neither. */
+export function resolveOpensslExecutable(dependencies = {}) {
+  const platform = dependencies.platform ?? process.platform;
+  const env = dependencies.env ?? process.env;
+  const read = (name) => { const key = Object.keys(env).find((entry) => entry.toUpperCase() === name.toUpperCase()); return key === undefined ? "" : String(env[key] ?? ""); };
+  const suffix = platform === "win32" ? WINDOWS_EXECUTABLE_SUFFIX : "";
+  const directories = read("PATH").split(platform === "win32" ? ";" : ":").map((entry) => entry.trim().replace(/^"(.*)"$/u, "$1"));
+  if (platform === "win32") {
+    for (const name of WINDOWS_ENVIRONMENT_ROOTS) {
+      const base = read(name);
+      if (base !== "") for (const relative of WINDOWS_OPENSSL_LOCATIONS) directories.push(join(base, ...relative.split("/")));
+    }
+  } else directories.push(...POSIX_OPENSSL_DIRECTORIES);
+  const isFile = (path) => { try { return statSync(path).isFile(); } catch { return false; } };
+  for (const directory of directories) {
+    if (directory === "" || !isAbsolute(directory)) continue;
+    const candidate = join(directory, `${OPENSSL}${suffix}`);
+    if (isFile(candidate) && outsideEveryRepository(dirname(candidate))) return candidate;
+  }
+  return null;
+}
+
 function spawnOpenssl(args, options, dependencies) {
   const platform = dependencies.platform ?? process.platform;
   const env = { ...process.env };
   if (platform === "win32") env.NoDefaultCurrentDirectoryInExePath = "1";
-  return (dependencies.spawn ?? spawnSync)(OPENSSL, args, { ...options, env, shell: false });
+  // An injected spawn is a test seam and keeps the constant name; the real spawn only ever starts a
+  // resolved absolute path, so the child's working directory can never supply the program.
+  if (dependencies.spawn) return dependencies.spawn(OPENSSL, args, { ...options, env, shell: false });
+  const resolved = resolveOpensslExecutable({ platform });
+  if (resolved === null) return { status: null, error: Object.assign(new Error("openssl was not found outside every repository"), { code: "ENOENT" }) };
+  return spawnSync(resolved, args, { ...options, env, shell: false });
 }
+export { spawnOpenssl };
 
 /** The signing/setup spawn: inherits the terminal (the passphrase prompt) and runs from `cwd`,
  * the PO key directory. It reports its exit code only -- it has no stderr to read. */
