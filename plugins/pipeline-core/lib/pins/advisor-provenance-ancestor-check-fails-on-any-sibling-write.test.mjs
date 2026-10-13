@@ -3,12 +3,13 @@
 // The ancestor re-check in readAdvisorPhysicalBytes binds the ancestor's identity (dev/ino/mode plus the
 // realpath, isDirectory and not-symlink checks), not its membership: a sibling file or subdirectory created
 // or deleted next to an ancestor must not throw DAP-PHYSICAL-PARENT-DRIFT, while a swapped, replaced or
-// symlinked ancestor is still refused. Real filesystem, real module, no mocks.
+// symlinked ancestor is still refused. Real filesystem, real module, no mocks of the behavior under test.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, renameSync, symlinkSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import fs, { mkdtempSync, mkdirSync, writeFileSync, rmSync, renameSync, symlinkSync, realpathSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { readAdvisorPhysicalBytes } from '../design-advisor-provenance.mjs';
 
@@ -16,7 +17,9 @@ const REL = 'evidence/inner/source.json';
 const PAYLOAD = Buffer.from('{"advisor":"source"}\n', 'utf8');
 
 function fixture() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'alf-c-p1-07-')));
+  const scratch = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'scratch');
+  mkdirSync(scratch, { recursive: true });
+  const root = realpathSync(mkdtempSync(join(scratch, 'alf-c-p1-07-')));
   mkdirSync(join(root, 'evidence', 'inner'), { recursive: true });
   writeFileSync(join(root, REL), PAYLOAD);
   return root;
@@ -51,6 +54,27 @@ async function withChurn(root, body) {
     child.kill();
     await new Promise((resolve) => (child.exitCode !== null || child.signalCode ? resolve() : child.once('exit', resolve)));
   }
+}
+
+// Deterministic seam: wrap the real fs.lstatSync so that the FIRST lstat of the target in each read attempt (after
+// the ancestor identities were captured, before the file is opened) runs a real filesystem action on an ancestor.
+// The module's own logic is untouched; only the observation point is made deterministic.
+function hookTargetLstat(root, action) {
+  const target = join(root, ...REL.split('/'));
+  const real = fs.lstatSync;
+  const state = { targetLstats: 0, actions: 0 };
+  fs.lstatSync = function patched(path, ...rest) {
+    if (path === target) {
+      state.targetLstats++;
+      if (state.targetLstats % 2 === 1) { // odd = the "before" stat of an attempt; even = the "after" stat
+        const n = state.actions;
+        if (action(n) !== false) state.actions++;
+      }
+    }
+    return real.call(this, path, ...rest);
+  };
+  syncBuiltinESMExports();
+  return { state, restore() { fs.lstatSync = real; syncBuiltinESMExports(); } };
 }
 
 test('baseline: the target reads byte-exact from a quiet tree', () => {
@@ -90,6 +114,21 @@ test('a pre-existing sibling file and subdirectory beside each ancestor do not a
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('sibling file and subdirectory created in every ancestor exactly between ancestor capture and re-check do not fail the read', () => {
+  const root = fixture();
+  const hook = hookTargetLstat(root, (n) => {
+    for (const d of [root, join(root, 'evidence'), join(root, 'evidence', 'inner')]) {
+      writeFileSync(join(d, `sib-${n}.json`), 'x');
+      mkdirSync(join(d, `sibdir-${n}`));
+    }
+  });
+  try {
+    assert.ok(readAdvisorPhysicalBytes(root, REL).equals(PAYLOAD));
+    assert.equal(hook.state.actions, 1, 'siblings were written once, on the first and only attempt');
+    assert.equal(hook.state.targetLstats, 2, 'no re-observation: ancestor identity held (before + after target stat only)');
+  } finally { hook.restore(); rmSync(root, { recursive: true, force: true }); }
+});
+
 test('a symlinked or junctioned ancestor is still refused (DAP-PHYSICAL-PARENT)', (t) => {
   const root = fixture();
   try {
@@ -98,42 +137,55 @@ test('a symlinked or junctioned ancestor is still refused (DAP-PHYSICAL-PARENT)'
     writeFileSync(join(real, 'inner', 'source.json'), PAYLOAD);
     rmSync(join(root, 'evidence'), { recursive: true, force: true });
     try { symlinkSync(real, join(root, 'evidence'), 'junction'); }
-    catch { t.skip('cannot create a directory link on this host'); return; }
+    catch { t.skip('host limitation: cannot create a directory link on this host'); return; }
     assert.throws(() => readAdvisorPhysicalBytes(root, REL), /DAP-PHYSICAL-PARENT/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('an ancestor swapped for a different directory mid-read is never served as success with foreign bytes', async () => {
+test('an ancestor replaced by a different directory (foreign bytes at the same path) is never served as success', () => {
   const root = fixture();
   const FOREIGN = Buffer.from('{"advisor":"FOREIGN"}\n', 'utf8');
-  mkdirSync(join(root, 'alt', 'inner'), { recursive: true });
-  writeFileSync(join(root, 'alt', 'inner', 'source.json'), FOREIGN);
-  const swapper = `
-const fs=require('fs'),path=require('path');const r=process.argv[1];
-console.log('ready');
-for(;;){try{fs.renameSync(path.join(r,'evidence'),path.join(r,'tmp-e'));fs.renameSync(path.join(r,'alt'),path.join(r,'evidence'));
-fs.renameSync(path.join(r,'evidence'),path.join(r,'alt'));fs.renameSync(path.join(r,'tmp-e'),path.join(r,'evidence'));}catch{}}`;
-  const child = spawn(process.execPath, ['-e', swapper, root], { stdio: ['ignore', 'pipe', 'ignore'] });
+  const hook = hookTargetLstat(root, (n) => {
+    renameSync(join(root, 'evidence'), join(root, `old-evidence-${n}`));
+    mkdirSync(join(root, 'evidence', 'inner'), { recursive: true });
+    writeFileSync(join(root, REL), FOREIGN);
+  });
   try {
-    await new Promise((resolve, reject) => { child.once('error', reject); child.stdout.once('data', resolve); });
-    const until = Date.now() + 1000;
-    let served = 0;
-    while (Date.now() < until) {
-      try {
-        const bytes = readAdvisorPhysicalBytes(root, REL);
-        served++;
-        assert.ok(bytes.equals(PAYLOAD) || bytes.equals(FOREIGN), 'only whole, legitimate file contents are returned');
-      } catch (e) {
-        if (e?.name === 'AssertionError') throw e;
-        assert.match(String(e?.message), /^(DAP-|ENOENT|EPERM|EBUSY|EACCES)/u, 'a swap fails closed with a typed error');
-      }
-    }
-    assert.ok(served >= 0);
-  } finally {
-    child.kill();
-    await new Promise((resolve) => (child.exitCode !== null || child.signalCode ? resolve() : child.once('exit', resolve)));
-    rmSync(root, { recursive: true, force: true });
-  }
+    let served = null;
+    let error = null;
+    try { served = readAdvisorPhysicalBytes(root, REL); } catch (e) { error = e; }
+    assert.equal(served, null, 'foreign bytes from a replaced ancestor must not be returned as a successful read');
+    assert.equal(String(error?.message), 'DAP-PHYSICAL-PARENT-DRIFT', 'fails closed on the ancestor identity check');
+    assert.equal(hook.state.actions, 3, 'the bounded re-observation made exactly 3 attempts, each hit by a fresh replacement');
+  } finally { hook.restore(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('an ancestor replaced by a new directory that adopts the same target file is refused on ancestor identity alone', () => {
+  const root = fixture();
+  const hook = hookTargetLstat(root, (n) => {
+    renameSync(join(root, 'evidence'), join(root, `old-evidence-${n}`));
+    mkdirSync(join(root, 'evidence'));
+    renameSync(join(root, `old-evidence-${n}`, 'inner'), join(root, 'evidence', 'inner'));
+  });
+  try {
+    assert.throws(() => readAdvisorPhysicalBytes(root, REL), (e) => e.message === 'DAP-PHYSICAL-PARENT-DRIFT');
+    assert.equal(hook.state.actions, 3);
+  } finally { hook.restore(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a single ancestor replacement is re-observed on a fresh walk and then reads the unchanged target', () => {
+  const root = fixture();
+  const hook = hookTargetLstat(root, (n) => {
+    if (n > 0) return false;
+    renameSync(join(root, 'evidence'), join(root, 'old-evidence'));
+    mkdirSync(join(root, 'evidence'));
+    renameSync(join(root, 'old-evidence', 'inner'), join(root, 'evidence', 'inner'));
+    return true;
+  });
+  try {
+    assert.ok(readAdvisorPhysicalBytes(root, REL).equals(PAYLOAD));
+    assert.ok(hook.state.targetLstats >= 4, 'a second full attempt happened after the drift');
+  } finally { hook.restore(); rmSync(root, { recursive: true, force: true }); }
 });
 
 test('a target with an invalid path or a missing file still fails closed with a typed error', () => {
