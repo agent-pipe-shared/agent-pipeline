@@ -549,3 +549,25 @@ Status is "implementation complete, targeted GREEN by the dispatch". The batch C
   4. C3-F4d versus T12.
   5. Stamp and hook refresh.
   6. Critic notes persistence.
+
+## Night and morning, 2026-10-13/14 (fanout hotfix, P2 pins, hook latency)
+
+Status is "implementation complete, targeted GREEN by the dispatch" for each commit below. No batch Critic has reviewed them, and Full Verify and PO acceptance are pending. Nothing here is accepted.
+
+- **Fanout hotfix and interim stamp:** `02bc07085` (admission overlap ordering, shared BATCH-CRITIC slice, registry-lock retry, disjoint candidate drift, deep role), stamp `63c62e8d6` (`0.7.0+claude.20261013211724.02bc070`), installed by the PO. **Critic deferral (PO, 2026-10-13):** the hotfix Critic moves into batch C5, together with A5b.
+- **Commits, Commit-Act orchestrator:**
+
+  | Slice | Commit | Note |
+  |---|---|---|
+  | P2-03 | `ae5416903` | 4 cases skipped on Windows (no O_NOFOLLOW); POSIX run pending |
+  | P2-07 | `65d8334f2` | |
+  | P2-06 | `eb886f010` | some cases POSIX-only |
+  | P2-09 | `f63ddfce2` | |
+  | P2-08 | `93cdc50a0` | |
+  | F2-01 (A5b, AC-171) | `5908b6134` | security; encrypted keys now prompt for their passphrase in reuse/recovery (PO topic) |
+  | P2-10 | `c17ea62e0` | |
+  | P2-05 | `001c3001a` | |
+- **Blocked:** P2-02 (AC-113): a real gap (ADR-0063 text; `listBoundPathStatuses`/`renderHandoverBoundPaths` have no close/handover caller), so a PO scope question; pin uncommitted. P2-04 (AC-140): budget checkpoint, original acceptance missing.
+- **Hook latency, measured 2026-10-14 (PO report: "PreToolUse 4/5" for up to 16 min):** `guard-lifecycle-ready.mjs` takes more than 300 s for `git commit`/`node --test` (1.9 s for `git status`). Inspector stack: `devPlanShellRefusalHit` → `observedOnboardingCommandMatch` → full `inspectProjectOnboardingV3` → Windows private-path DACL probe via PowerShell per path. Bound to the existing item AC-128 instead of a new item (PO, 2026-10-14). See row P1 of the [audit item mapping](audit-2026-10-14-item-mapping.md). Hotfix briefing ALF-C-HK-01 (bound to AC-128, `bindingOnly`) is built.
+- **Fanout hotfix defect found live:** admitting a critical-path slice (`lib/guard/*`) is refused with `SDC-AUTHORITY-UNAVAILABLE` / `item-course-prepared-queue-invalid`. The offline replay (`scratch/alfred-claude-20261012/probe-queue-admit.mjs`) shows SQ-DELIVERY: the BATCH-CRITIC slice has no v2 delivery binding. So every guard/hook/security dispatch is blocked until the fix is installed. Fix dispatched: **ALF-C-H2-01** (AC-224, goldfish-deep). Order: H2 → stamp → PO install → HK-01 → stamp → PO install.
+- **Dispatched (running):** H2-01, P2-11, P2-12. P2-16 (`security*` pin path) is held until H2 is installed.
