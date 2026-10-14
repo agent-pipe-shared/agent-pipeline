@@ -650,3 +650,12 @@ Status is "implementation complete, targeted GREEN by the dispatch" for each com
   - ALF-C-AGY-01: admit every agy release from 1.2.12 on (PO decision K2, AC-112).
   - ALF-C-HK-01E: load each session descriptor once per cleanup-recovery plan (latency, AC-128 binding).
   - ALF-C-P1-10B: declare and pin both extra P1-10 admission lanes as one superseding patch (Critic C5 F1, PO decision K3).
+- **Results:**
+
+  | Slice | Commit | State |
+  |---|---|---|
+  | ALF-C-AGY-01 (AC-112) | `258d9b728` | agy >= 1.2.12 admitted; new case RC05C010 green. 4 pre-existing Windows failures in the suite (symlink EPERM, `ATR-WIRING-OWNERSHIP-UNVERIFIABLE`), rerun by the Elephant; 14/14 needs the WSL run. |
+  | ALF-C-HK-01E → HK-01F (AC-128) | `7fe199b90` | HK-01E stopped before any edit: the seam sits in `lib/worktree-lifecycle.mjs`. HK-01F added the loader seam and a call-scoped memo: about 7 descriptor loads per plan become 2. New test 5/5; failure names identical (9/0), `scratch/alfred-claude-20261012/hk01f-failset.json`. |
+  | ALF-C-P1-10B → P1-10C (AC-128) | `7fb29f0ab` | P1-10B stopped at its 80 % checkpoint after the mirror RED. P1-10C finished: mirror pin 14/14 GREEN after the source part, patch-check 6/6, `git apply --check` exit 0. Keeps the attached-value `stat` narrowing (AP14). Guard-suite comparison running. |
+  | ALF-C-P2-12B (AC-219) | running | Decides whether the held pin's RED is a pin or source defect. |
+- **Critic C5 DIFF round** (the one diff round after FULL, K12) dispatched over `012333a88` (P1-24C) and `7fb29f0ab` (P1-10B); [briefing](../implementation/claude-2026-10-12/critic/C5-diff1.md).
