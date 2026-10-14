@@ -110,3 +110,32 @@ versions". Trigger: the live WSL host reports agy 1.3.5 and the exact
 refused it (`ATR-CLI-CAPABILITY`). The earlier open check was commit
 `79687444f`. The plan and apply boundaries keep their other readbacks; only
 the version predicate changes.
+
+## Decision tiles answered (PO, 2026-10-14 evening, Claude session)
+
+Answers to structured questions; tile text in
+`scratch/alfred-claude-20261012/po-decision-tiles-2026-10-14.md`.
+
+- **K1 (orphan session descriptor):** the PO ran the planned
+  `session-cleanup.mjs archive-orphan` for descriptor
+  `claude-6776538f-…` (sha256 `eb40a4da…`); result `archived`. The four
+  capability descriptors remain pending signed custody.
+- **K3 (P1-10 read grammar, Critic F1):** declare AND pin both additional
+  lanes (`git show <rev>:<path> | head -N`, `stat -c|--format` with the two
+  fixed formats) in addition to the three rg flags. The correction carries
+  the declarations and regression pins; it is reviewed in the C5 DIFF round.
+- **K4 (protected-commit signatures):** sign en bloc once the C5 Critic is
+  complete; one prepared ceremony per commit, signed back to back.
+- **K5 (P2-02, AC-113):** wiring `listBoundPathStatuses` /
+  `renderHandoverBoundPaths` into close/handover is part of AC-113.
+- **K6 (P2-14 AC-232, P2-04 AC-140):** the Coordinator drafts an acceptance
+  proposal from each original item; the PO releases it.
+- **K7 (WSL node):** install Node LTS via nvm in the WSL Ubuntu distribution
+  so the POSIX pins run.
+- **K8 (root canon sync):** bound to epic AC-12 (release preflight); no new
+  item.
+- **K10 (P1-23):** `set-phase --phase implementation` keeps admitting a
+  baseline-only Verify; the release gate still blocks.
+- **K12 (C5 budget):** the two budget-truncated partial reviews together are
+  the one FULL round; the next round is one DIFF over the P1-10 correction and
+  P1-24C, then self-verification.
