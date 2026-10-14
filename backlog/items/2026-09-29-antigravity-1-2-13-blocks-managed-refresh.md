@@ -20,7 +20,8 @@ to the current source through the documented global installer route.
 ## Acceptance
 
 - Admit the observed 1.2.13 plugin lifecycle at both plan and apply boundaries
-  while retaining a refusal for unobserved future versions.
+  while every release from 1.2.12 on is admitted per the PO decision of
+  2026-10-14 (specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md).
 - Preserve the physical source, import, registry, hook and installed-attestation
   readbacks before reporting success.
 - Test 1.2.13 with a stale managed copy and an unknown version that remains
