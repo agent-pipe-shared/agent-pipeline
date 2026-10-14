@@ -95,3 +95,18 @@ never applied to protected paths and never self-authorized. One combined
 signing package is prepared for the PO's next attended session. This is not
 a signature, approval or acceptance; seed any ceremony only when the PO can
 sign immediately.
+
+## Antigravity CLI version gate: admit every release from 1.2.12 on (PO, 2026-10-14, Claude session)
+
+The PO decided in chat (German, answering a structured question) that the
+Antigravity plugin-lifecycle CLI check admits every `agy --version` from
+1.2.12 on. Paraphrased: an exact allowlist is not how the Pipeline treats
+Claude Code or Codex either; only running a new release reveals a break,
+which is then fixed. This amends the AC-112 item acceptance
+(`backlog/items/2026-09-29-antigravity-1-2-13-blocks-managed-refresh.md`),
+which until now required "retaining a refusal for unobserved future
+versions". Trigger: the live WSL host reports agy 1.3.5 and the exact
+1.2.12/1.2.13 allowlist that the signed checkpoint `d02409a8a` reintroduced
+refused it (`ATR-CLI-CAPABILITY`). The earlier open check was commit
+`79687444f`. The plan and apply boundaries keep their other readbacks; only
+the version predicate changes.
