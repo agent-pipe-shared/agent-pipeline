@@ -71,7 +71,7 @@ environment dump or a credential read; it reads such strings as text only.
   rule above — never the raw `evidence/dispatch-record-<TASK_ID>.json` path:
   not applicable — no raw dispatch records are retained for these native dispatches; authorship evidence is limited to each commit's own Dispatch/Commit-Act trailers
 - Guardrails/constraints (the law): CLAUDE.md, roles/goldfish.md, guardrails/quality-gates.md, guardrails/security.md, templates/prompts/agent-obligations.md, project/pipeline.json
-- Evidence artifact(s) of the submission: specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/C5-full-result.md (the FULL round result this diff round answers), the held, untracked pin plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs in the working tree (the P1-10B patch carries its post-change hunks)
+- Evidence artifact(s) of the submission: the held, untracked pin plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs in the working tree (the P1-10B patch carries its post-change hunks)
 - Claims/evidence record — a referenced, mechanical DoD result and command/exit
   code artifact only; the implementor's narrative rationale is NOT your input:
   not applicable — no mechanical DoD artifact is tracked; GREEN claims are self-reported, so read the patch and test code itself
