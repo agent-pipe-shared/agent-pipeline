@@ -1,0 +1,196 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 4c1481e..387d92e 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -4,7 +4,7 @@
+ import { createHash } from "node:crypto";
+ import { fileURLToPath } from "node:url";
+ import { lstatSync, readFileSync, realpathSync } from "node:fs";
+-import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
++import { basename, dirname, isAbsolute, join, posix, resolve, sep, win32 } from "node:path";
+ import { inspectSourceOwnedContinuityVerificationGuardContext, inspectSourceOwnedApprovedControllerCourse } from "../session-requester-bridge.mjs";
+ import { readOwnedVerificationPhysicalFile, recheckOwnedVerificationPhysicalRefs, readOwnedVerificationRegistration } from "../owned-continuity-verification.mjs";
+ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/owning-verification-controller.mjs";
+@@ -368,10 +368,20 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
+  * validator. A neighbouring executable, an altered argument, a ready or
+  * foreign-root observation, and any producer action outside that validator all
+  * remain refused.
++ *
++ * ALF-C-HK-01C: the inspection below is expensive (on native Windows one
++ * PowerShell DACL probe per private path) and every shell command reaches it,
++ * so a pure precondition on the parsed words runs first. Every producer of a
++ * `kind: "command"` next action publishes the executable as the literal `node`
++ * or an absolute Node path, with an absolute script path as argv[0]; a command
++ * whose words do not have that shape cannot equal any observed action, so it
++ * returns null without an inspection. The set of matching commands is unchanged.
+  */
+ export function observedOnboardingCommandMatch(command, root, dependencies = {}) {
+   const words = simpleWords(command, root);
+   if (!words) return null;
++  const abs = (word) => win32.isAbsolute(word) || posix.isAbsolute(word);
++  if (words.length < 2 || !(words[0] === "node" || abs(words[0])) || !abs(words[1])) return null;
+   let observed;
+   try {
+     observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
+diff --git a/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs b/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
+new file mode 100644
+index 0000000..1333386
+--- /dev/null
++++ b/plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs
+@@ -0,0 +1,156 @@
++// SPDX-License-Identifier: SUL-1.0
++// ALF-C-HK-01B regression: the shell lane must not run a complete onboarding
++// inspection (on native Windows: one PowerShell DACL probe per private path)
++// for a command that cannot possibly equal the observed next action. The
++// precondition is a pure function of the parsed words; what is matched,
++// admitted and refused must stay exactly what it was.
++import assert from "node:assert/strict";
++import { join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++import { isExactObservedOnboardingNextAction, observedOnboardingCommandMatch } from "./command-catalogue.mjs";
++import { devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
++import { simpleWords } from "./shell-grammar.mjs";
++
++const repository = fileURLToPath(new URL("../../../../", import.meta.url));
++// No fixture is materialized; this path only anchors injected observations.
++const root = join(repository, "scratch/.onboarding-inspect-prefilter-fixture");
++// Words stay in their native form (so the published argv[0] equals the repository
++// script constant on every platform) and are single-quoted: the closed grammar
++// refuses a backslash inside double quotes but takes it literally inside single
++// quotes (same spelling as recoveryCommandFor in devplan-shell-sanctioned-recovery.test.mjs).
++const rootWord = root;
++const onboardingScript = fileURLToPath(new URL("../../scripts/project-onboarding-v3.mjs", import.meta.url));
++const stateScript = fileURLToPath(new URL("../../scripts/pipeline-state.mjs", import.meta.url));
++const GUARD_NODE = process.execPath;
++const FOREIGN_NODE = "/opt/producer-node/bin/node";
++const commandFor = (words) => words.map((word) => "'" + word.replaceAll("'", "'\\''") + "'").join(" ");
++const observation = (action) => ({
++  schema: "pipeline.project-onboarding.v4", status: "partial", root, intent: "session",
++  diagnostics: [{ code: "po_authority_rebind_unavailable" }], nextAction: action,
++});
++function counting(action) {
++  let reads = 0;
++  return {
++    inspectProjectOnboardingV3Fn(input) {
++      assert.equal(input.rootDir, root);
++      assert.equal(input.intent, "session");
++      reads += 1;
++      return observation(action);
++    },
++    devPlanGateVerdictFn: () => ({ verdict: "block", reason: "fixture draft lifecycle", lifecycleStatus: "draft" }),
++    reads: () => reads,
++  };
++}
++const planner = (executable) => Object.freeze({
++  kind: "command", executable, argv: Object.freeze([stateScript, "po-authority-rebind-plan"]),
++  mutation: false, requiresConfirmation: false,
++});
++
++// The body of observedOnboardingCommandMatch before the precondition existed,
++// kept as an independent reference so equivalence is measured, not asserted.
++function legacyMatch(command, dependencies) {
++  const words = simpleWords(command, root);
++  if (!words) return null;
++  let observed;
++  try {
++    observed = dependencies.inspectProjectOnboardingV3Fn({ rootDir: root, intent: "session", runner: dependencies.runner });
++  } catch {
++    return null;
++  }
++  const action = observed?.nextAction;
++  if (observed?.schema !== "pipeline.project-onboarding.v4"
++    || observed?.status === "ready"
++    || typeof observed?.status !== "string"
++    || observed?.root !== root
++    || observed?.intent !== "session"
++    || action?.kind !== "command"
++    || typeof action.executable !== "string"
++    || !Array.isArray(action.argv)
++    || !action.argv.every((value) => typeof value === "string")
++    || typeof action.mutation !== "boolean"
++    || typeof action.requiresConfirmation !== "boolean"
++    || words.length !== action.argv.length + 1
++    || words[0] !== action.executable
++    || action.argv.some((value, index) => words[index + 1] !== value)) return null;
++  return { observed, action };
++}
++
++for (const [label, executable] of [["literal node", "node"], ["guard Node", GUARD_NODE], ["producer Node", FOREIGN_NODE]]) {
++  test(`an exact observed onboarding next action is still matched and admitted (${label})`, () => {
++    const action = planner(executable);
++    const deps = counting(action);
++    const command = commandFor([action.executable, ...action.argv]);
++    const match = observedOnboardingCommandMatch(command, root, deps);
++    assert.ok(match, "the exact observed action must still match");
++    assert.deepEqual(match.action, action);
++    assert.equal(deps.reads(), 1);
++    assert.equal(isExactObservedOnboardingNextAction(command, root, deps), true);
++    assert.equal(devPlanShellRefusalHit(command, root, deps), null,
++      "the exact read-only recovery action must still cross the draft shell lane");
++  });
++}
++
++test("a mutating or onboarding-script action with an absolute script is still matched", () => {
++  for (const action of [
++    { kind: "command", executable: "node", argv: [onboardingScript, "inspect", "--root", rootWord, "--runner", "claude"], mutation: false, requiresConfirmation: false },
++    { kind: "command", executable: FOREIGN_NODE, argv: [onboardingScript, "apply-repair", "--root", rootWord, "--plan-sha256", "a".repeat(64), "--activate"], mutation: true, requiresConfirmation: true },
++  ]) {
++    const deps = counting(action);
++    const match = observedOnboardingCommandMatch(commandFor([action.executable, ...action.argv]), root, deps);
++    assert.deepEqual(match?.action, action);
++    assert.equal(deps.reads(), 1);
++  }
++});
++
++for (const command of [
++  "git commit -F scratch/commit-msg/X.txt -- a.txt",
++  "node --test x.test.mjs",
++  "node scratch/x.mjs",
++  "node",
++  "git status --short",
++]) {
++  test(`no onboarding inspection runs for ${command}`, () => {
++    const deps = counting(planner("node"));
++    assert.equal(observedOnboardingCommandMatch(command, root, deps), null);
++    assert.equal(isExactObservedOnboardingNextAction(command, root, deps), false);
++    assert.equal(deps.reads(), 0, "a command that cannot equal the observed action must not trigger an inspection");
++    devPlanShellRefusalHit(command, root, deps);
++    assert.equal(deps.reads(), 0, "the shell lane must not inspect for it either");
++  });
++}
++
++test("matching is identical to the pre-precondition behaviour for every producer-shaped action", () => {
++  const actions = [
++    planner("node"), planner(GUARD_NODE), planner(FOREIGN_NODE),
++    { kind: "command", executable: "node", argv: [onboardingScript, "inspect", "--root", rootWord], mutation: false, requiresConfirmation: false },
++    { kind: "command", executable: GUARD_NODE, argv: [onboardingScript, "plan-repair", "--root", rootWord, "--runner", "codex"], mutation: false, requiresConfirmation: false },
++    { kind: "command", executable: "node", argv: [onboardingScript, "apply-repair", "--root", rootWord, "--plan-sha256", "b".repeat(64), "--activate"], mutation: true, requiresConfirmation: true },
++  ];
++  const commands = (action) => {
++    const words = [action.executable, ...action.argv];
++    return [
++      commandFor(words),
++      commandFor([...words, "--unexpected"]),
++      commandFor(words.slice(0, -1)),
++      commandFor(["node", ...words.slice(1)]),
++      commandFor(["/opt/other-node/bin/node", ...words.slice(1)]),
++      commandFor([words[0], "scratch/x.mjs", ...words.slice(2)]),
++      "git commit -F scratch/commit-msg/X.txt -- a.txt",
++      "node --test x.test.mjs",
++      "node scratch/x.mjs",
++      `${commandFor(words)} | head -n 1`,
++      `${commandFor(words)} && ${commandFor(words)}`,
++    ];
++  };
++  let matched = 0;
++  for (const action of actions) {
++    for (const command of commands(action)) {
++      const deps = counting(action);
++      const expected = legacyMatch(command, deps);
++      assert.deepEqual(observedOnboardingCommandMatch(command, root, counting(action)), expected, command);
++      if (expected !== null) matched += 1;
++    }
++  }
++  assert.ok(matched >= actions.length, "the table must contain real matches, not only refusals");
++});
