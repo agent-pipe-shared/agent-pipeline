@@ -753,7 +753,7 @@ export function loadSessionDescriptor(startPath, sessionId, options = {}) {
  * descriptors deliberately remain unobserved rather than being guessed stale.
  */
 export function inspectSessionOwnerRuntime(startPath, sessionId, options = {}) {
-  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const loaded = (options.loadSessionDescriptorFn ?? loadSessionDescriptor)(startPath, sessionId, options);
   const base = {
     schema: SESSION_OWNER_STATUS_SCHEMA,
     sessionId: loaded.sessionId,
@@ -786,7 +786,7 @@ export function inspectSessionOwnerRuntime(startPath, sessionId, options = {}) {
  * `unobserved` rather than guessed dead.
  */
 export function inspectSessionRetirement(startPath, sessionId, options = {}) {
-  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const loaded = (options.loadSessionDescriptorFn ?? loadSessionDescriptor)(startPath, sessionId, options);
   const owner = inspectSessionOwnerRuntime(startPath, sessionId, {
     ...options,
     expectedDescriptorSha256: loaded.descriptorSha256,
@@ -835,7 +835,7 @@ function externalRetirementEligibility(repo, manifest) {
  * recovery action.
  */
 export function inspectExternallyArchivedSession(startPath, sessionId, options = {}) {
-  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const loaded = (options.loadSessionDescriptorFn ?? loadSessionDescriptor)(startPath, sessionId, options);
   const owner = inspectSessionOwnerRuntime(startPath, loaded.sessionId, {
     ...options,
     expectedDescriptorSha256: loaded.descriptorSha256,
@@ -940,7 +940,7 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
  */
 function loadListedSessionDescriptor(startPath, sessionId, options) {
   try {
-    return loadSessionDescriptor(startPath, sessionId, options);
+    return (options.loadSessionDescriptorFn ?? loadSessionDescriptor)(startPath, sessionId, options);
   } catch (error) {
     if (error instanceof WorktreeLifecycleError && error.code === "WT-SESSION-MISSING") return null;
     throw error;
@@ -1102,7 +1102,7 @@ function appendOrphanArchiveAudit(path, entry) {
  */
 export function inspectOrphanArchiveEligibility(startPath, sessionId, options = {}) {
   const { requesterOwnerNonce, requesterSessionId, ...loadOptions } = options;
-  const loaded = loadSessionDescriptor(startPath, sessionId, loadOptions);
+  const loaded = (loadOptions.loadSessionDescriptorFn ?? loadSessionDescriptor)(startPath, sessionId, loadOptions);
   const owner = inspectSessionOwnerRuntime(startPath, sessionId, {
     ...loadOptions,
     expectedDescriptorSha256: loaded.descriptorSha256,

@@ -955,11 +955,32 @@ export function planSessionCleanupRecovery({
   // descriptor, and the base plan plus the archive offer both list. Memoize the
   // listing for the duration of THIS call only (per exact argument tuple; a
   // throw is memoized and re-thrown to each consumer).
+  //
+  // The default inspectors (retirement, external-archive, orphan-archive
+  // eligibility, and the listing) each re-load every descriptor, and every load
+  // runs a private-path probe. Hand them one call-scoped loader (same memo
+  // discipline: exact argument tuple, a throw re-thrown identically). An
+  // inspector the caller supplied is left untouched.
+  const loadOnce = loadOnceMemo(deps.loadSessionDescriptorFn ?? loadSessionDescriptor);
+  const withLoader = (fn) => (root, id, options = {}) => fn(root, id, {
+    ...options,
+    loadSessionDescriptorFn: loadOnce,
+  });
   const effectiveDeps = {
     ...deps,
     listActiveSessionDescriptorsFn: memoizeListing(
-      deps.listActiveSessionDescriptorsFn ?? listActiveSessionDescriptors,
+      deps.listActiveSessionDescriptorsFn
+        ?? ((root, options = {}) => listActiveSessionDescriptors(root, {
+          ...options,
+          loadSessionDescriptorFn: loadOnce,
+        })),
     ),
+    inspectSessionRetirementFn: deps.inspectSessionRetirementFn
+      ?? withLoader(inspectSessionRetirement),
+    inspectExternallyArchivedSessionFn: deps.inspectExternallyArchivedSessionFn
+      ?? withLoader(inspectExternallyArchivedSession),
+    inspectOrphanArchiveEligibilityFn: deps.inspectOrphanArchiveEligibilityFn
+      ?? withLoader(inspectOrphanArchiveEligibility),
   };
   const plan = planSessionCleanupRecoveryBase({ rootDir, scriptPath, deps: effectiveDeps });
   if (!ARCHIVE_OFFER_STATUSES.has(plan.status)) return plan;
@@ -976,6 +997,25 @@ export function planSessionCleanupRecovery({
   }
   if (offer === null || offer.candidates.length === 0) return plan;
   return { ...plan, archiveOrphan: { schema: offer.schema, candidates: offer.candidates } };
+}
+
+function loadOnceMemo(loadFn) {
+  const results = new Map();
+  return (startPath, sessionId, options = {}) => {
+    // The loader seam itself is not part of the key (functions do not serialize).
+    const key = JSON.stringify([startPath, sessionId, options]);
+    let entry = results.get(key);
+    if (entry === undefined) {
+      try {
+        entry = { ok: true, value: loadFn(startPath, sessionId, options) };
+      } catch (error) {
+        entry = { ok: false, error };
+      }
+      results.set(key, entry);
+    }
+    if (!entry.ok) throw entry.error;
+    return entry.value;
+  };
 }
 
 function memoizeListing(listFn) {
