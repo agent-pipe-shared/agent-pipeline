@@ -25,6 +25,7 @@ import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
 import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
 import { ITEM_QUEUE_SCHEMA, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
+import { isSafeTaskId } from "./dispatch-record.mjs";
 
 export const NATIVE_GOLDFISH_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v1";
 export const NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v2";
@@ -824,7 +825,7 @@ export function retryWhileSessionAuthorityLockHeld(attempt,{budgetMs=10000,sleep
 
 /** A briefing candidate older than the current checkout still admits when the checkout only advanced
  * through commits that touch none of the item's scope, check or dependency paths. */
-function candidateAdvancedDisjointly(physical,candidate,repository,paths) {
+export function candidateAdvancedDisjointly(physical,candidate,repository,paths) {
   try{
     const from=candidate?.commit,head=repository.candidate?.commit;
     if(typeof from!=='string'||!/^[0-9a-f]{40,64}$/u.test(from)||typeof head!=='string')return false;
@@ -838,9 +839,23 @@ function candidateAdvancedDisjointly(physical,candidate,repository,paths) {
   }catch{return false;}
 }
 
+const SHARED_CRITIC_ID='BATCH-CRITIC';
+const CRITIC_DELIVERY_KEYS='baseCommit,criteria,itemId';
+/** An item-owned queue (lib/slice-queue.mjs) gives every slice a v2 delivery binding, the shared critic included.
+ * The critic is not an item, so it carries the basic shape {itemId,baseCommit,criteria}: the de-duplicated
+ * criteria of the slices it covers (the validator allows 1..64 unique safe ids). */
+function criticDeliveryCriteria(covered,known,fallback) {
+  const ids=[];
+  for(const list of [...known,...covered.map(row=>row.delivery?.criteria)])
+    for(const id of Array.isArray(list)?list:[])if(typeof id==='string'&&isSafeTaskId(id)&&!ids.includes(id))ids.push(id);
+  return (ids.length?ids:fallback).slice(0,64);
+}
+
 /** Orders a slice after every other live slice it overlaps (only the slice being admitted is edited)
- * and keeps one shared critic slice covering every critical-path slice. */
-function orderAndCoverAdmittedSlice(raw,sliceId) {
+ * and keeps one shared critic slice covering every critical-path slice. The shared critic gets a valid
+ * basic delivery bound to the admitting candidate; an existing critic keeps its own shape and base
+ * commit, gains the basic binding only when it has none, and has its criteria extended. */
+export function orderAndCoverAdmittedSlice(raw,sliceId,baseCommit) {
   const slices=raw.slices,mine=slices.find(row=>row.id===sliceId);
   const reaches=(from,to,seen=new Set())=>{if(from===to)return true;if(seen.has(from))return false;seen.add(from);return (slices.find(row=>row.id===from)?.dependsOn??[]).some(dep=>reaches(dep,to,seen));};
   for(const other of slices){
@@ -851,10 +866,19 @@ function orderAndCoverAdmittedSlice(raw,sliceId) {
   const critical=slices.filter(row=>row.state!=='cancelled'&&row.tier!=='critic'&&(row.writeScope??[]).some(path=>typeof path==='string'
     &&DEFAULT_CRITICAL_PATH_PATTERNS.some(source=>new RegExp(source,'iu').test(path.trim().replaceAll('\\','/')))));
   if(!critical.length)return;
-  const critic=slices.find(row=>row.tier==='critic'&&row.state!=='cancelled'&&row.id==='BATCH-CRITIC')??slices.find(row=>row.tier==='critic'&&row.state!=='cancelled');
-  if(critic){critic.dependsOn=[...new Set([...(critic.dependsOn??[]),...critical.filter(row=>!reaches(row.id,critic.id)).map(row=>row.id)])];return;}
-  slices.push({id:'BATCH-CRITIC',title:'Shared batch Critic review',state:'ready',dependsOn:critical.map(row=>row.id),writeScope:[],tier:'critic',
-    tierReason:'Critical-path write scope in this batch needs one shared independent Critic review.',commitMode:'diff-only',loadClass:'light'});
+  const critic=slices.find(row=>row.tier==='critic'&&row.state!=='cancelled'&&row.id===SHARED_CRITIC_ID)??slices.find(row=>row.tier==='critic'&&row.state!=='cancelled');
+  const fallback=Array.isArray(mine.delivery?.criteria)&&mine.delivery.criteria.length?mine.delivery.criteria:[sliceId];
+  if(critic){
+    critic.dependsOn=[...new Set([...(critic.dependsOn??[]),...critical.filter(row=>!reaches(row.id,critic.id)).map(row=>row.id)])];
+    const held=critic.delivery;
+    if(held===undefined)critic.delivery={itemId:SHARED_CRITIC_ID,baseCommit,criteria:criticDeliveryCriteria(critical,[],fallback)};
+    else if(held!==null&&typeof held==='object'&&!Array.isArray(held)&&Object.keys(held).sort().join(',')===CRITIC_DELIVERY_KEYS)
+      critic.delivery={...held,criteria:criticDeliveryCriteria(critical,[held.criteria],fallback)};
+    return;
+  }
+  slices.push({id:SHARED_CRITIC_ID,title:'Shared batch Critic review',state:'ready',dependsOn:critical.map(row=>row.id),writeScope:[],tier:'critic',
+    tierReason:'Critical-path write scope in this batch needs one shared independent Critic review.',commitMode:'diff-only',loadClass:'light',
+    delivery:{itemId:SHARED_CRITIC_ID,baseCommit,criteria:criticDeliveryCriteria(critical,[],fallback)}});
 }
 
 /** Automatic approved-course continuation. Selection metadata cannot approve a
@@ -917,7 +941,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       }
       if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];}
       else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
-      orderAndCoverAdmittedSlice(raw,itemDelivery.sliceId);
+      orderAndCoverAdmittedSlice(raw,itemDelivery.sliceId,candidate.commit);
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-prepared-queue-invalid');
       // Approval, requester, candidate and preimage are checked again immediately
       // before publishing a fresh inode. Existing linked bytes remain unchanged.
