@@ -1,0 +1,154 @@
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index 65bc572cf..5650ab863 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -17,14 +17,14 @@ const SEARCH_BOOLEAN = new Set([
+   "-n", "--line-number", "-S", "--smart-case", "-i", "--ignore-case",
+   "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
+   "-x", "--line-regexp", "-l", "--files-with-matches",
+-  "--files-without-match", "--no-messages",
++  "--files-without-match", "--no-messages", "--no-heading",
+   // TR-B-F (T74): match-output spellings. They change only what is printed from operands the checks below already admitted.
+   "-o", "--only-matching",
+ ]);
+ const SEARCH_VALUE = new Set([
+   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+   "-t", "--type", "-T", "--type-not", "-e", "--regexp",
+-  "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
++  "-m", "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
+   "--max-columns",
+ ]);
+ // Recursive rg must use its default hidden/ignore policy. Only a basename
+@@ -34,9 +34,10 @@ const FILE_BOOLEAN = new Set(["--no-messages"]);
+ const FILE_VALUE = new Set(["-t", "--type", "-T", "--type-not", "--max-depth", "-g", "--glob"]);
+ const NUMERIC_VALUE = new Set([
+   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+-  "--max-count", "--max-depth", "--max-columns",
++  "-m", "--max-count", "--max-depth", "--max-columns",
+ ]);
+-const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
++// Repeated basename extension filters preserve the same bounded traversal policy.
++const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not", "-g", "--glob"]);
+ 
+ function isBoundedFilenameFilter(value) {
+   return typeof value === "string" && /^\*\.[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
+@@ -366,7 +367,7 @@ function validateRg(argv, root, windows, additionalRoots = []) {
+         if (arg === "--max-columns" && value === "0") return false;
+         if (["-e", "--regexp"].includes(arg)) regexpProvided = true;
+         if (["-g", "--glob"].includes(arg)) {
+-          if (globProvided || !isBoundedFilenameFilter(value)) return false;
++          if (!isBoundedFilenameFilter(value)) return false;
+           globProvided = true;
+         }
+         if (["-f", "--file"].includes(arg)) {
+@@ -410,6 +411,21 @@ export function isBoundedSingleRg(argv, root, additionalRoots = []) {
+  * also fall under, threaded straight through to `approvedReadPath()`. Optional and
+  * additive -- every existing call site naming only `(parsed, root)` is unaffected.
+  */
++function isContainedGitShowObject(argv, root) {
++  const args = argv[0] === "--no-pager" ? argv.slice(1) : argv;
++  if (args.length !== 2 || args[0] !== "show") return false;
++  const match = /^(?:HEAD|[0-9a-fA-F]{7,40}):(.+)$/u.exec(args[1]);
++  if (!match) return false;
++  const path = match[1];
++  // Git object paths are repository-relative slash paths, never host paths.
++  // Hidden/private roots and traversal stay closed even when a host passive
++  // reader would permit an unrelated external file.
++  if (path.split("/").some((part) => !part || part.startsWith(".") || part.startsWith("-"))
++    || /[\\:$`*?\[\]{}]/u.test(path)) return false;
++  return isRealpathedWithinBoundary(resolve(root, path), root)
++    && isAllowedPassiveReadTarget(path, { rootDir: root, recursive: true });
++}
++
+ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   if (!parsed || parsed.parseStatus !== "accepted"
+     || parsed.segments.length !== 2
+@@ -420,8 +436,10 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   const rgName = basename(parsed.segments[0].executable).toLowerCase();
+   const expectedRg = windows ? "rg.exe" : "rg";
+   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
+-  if (rgName !== expectedRg) return false;
+-  if (sinkName === expectedRg) {
++  const gitShowObject = rgName === (windows ? "git.exe" : "git")
++    && isContainedGitShowObject(parsed.segments[0].argv, root);
++  if (rgName !== expectedRg && !gitShowObject) return false;
++  if (!gitShowObject && sinkName === expectedRg) {
+     return parsed.redirects.length === 0
+       && validateRg(parsed.segments[0].argv, root, windows, additionalRoots)
+       && validateRg(parsed.segments[1].argv, root, windows, additionalRoots);
+@@ -431,7 +449,7 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   // sort permission: no sort flags, operands, redirects, or extra pipeline
+   // stages are accepted, so `sort -o <file>` cannot gain a write route.
+   const expectedSort = windows ? "sort.exe" : "sort";
+-  if (sinkName === expectedSort) {
++  if (!gitShowObject && sinkName === expectedSort) {
+     return parsed.redirects.length === 0
+       && parsed.segments[1].argv.length === 0
+       && validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
+@@ -442,6 +460,7 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   const expectedHead = windows ? "head.exe" : "head";
+   const expectedTail = windows ? "tail.exe" : "tail";
+   if (sinkName !== expectedHead && sinkName !== expectedTail) return false;
++  if (gitShowObject && sinkName !== expectedHead) return false;
+   if (parsed.redirects.length === 1) {
+     const redirect = parsed.redirects[0];
+     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
+@@ -456,5 +475,5 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   const sinkOk = (sinkArgs.length === 2 && sinkArgs[0] === "-n" && lineCount.test(sinkArgs[1]))
+     || (sinkArgs.length === 1 && sinkArgs[0].startsWith("-") && lineCount.test(sinkArgs[0].slice(1)));
+   if (!sinkOk) return false;
+-  return validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
++  return gitShowObject || validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
+ }
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index f86ae2220..9f7c549ee 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -921,6 +921,35 @@ function isResourceHeadroomReadOnlyInvocation(args, root) {
+   } catch { return false; }
+ }
+ 
++// This metadata lane recognizes only the two measured display formats. GNU
++// stat treats them as inert formatting data. Each operand must independently
++// be an existing, unaliased, contained passive read; no option changes lookup.
++const STAT_METADATA_FORMATS = new Set(["%a %s %n", "%a %s %h %n"]);
++
++export function isFormattedStatReadArgs(args, root, extraRoots = [], dependencies = {}) {
++  if (!Array.isArray(args) || args.length < 3
++    || !["-c", "--format"].includes(args[0])
++    || !STAT_METADATA_FORMATS.has(args[1])) return false;
++  const realpath = dependencies.realpath ?? realpathSync;
++  const lstat = dependencies.lstat ?? lstatSync;
++  const passive = dependencies.passive ?? isAllowedPassiveReadTarget;
++  return args.slice(2).every((arg) => {
++    const candidate = rawReadCandidatePath(arg, root);
++    if (candidate === null || !pathInside(root, resolve(candidate))) return false;
++    try {
++      const physicalRoot = realpath(root);
++      const physical = realpath(candidate);
++      const observed = lstat(candidate);
++      if (physicalRoot !== resolve(root) || physical !== resolve(candidate)
++        || !pathInside(physicalRoot, physical)
++        || (!observed.isFile() && !observed.isDirectory())) return false;
++    } catch { return false; }
++    return passive(arg, {
++      rootDir: root, recursive: true, additionalRecursiveRoots: extraRoots,
++    });
++  });
++}
++
+ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+   if (!words || words.length === 0) return false;
+   const executable = basename(words[0]).toLowerCase();
+@@ -976,6 +1005,11 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
+       && isApprovedSingleCommandReadArg(args[1], root, extraRoots);
+   }
+   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
++    // Route every formatting spelling to the closed lane, including unsupported
++    // attached values, so generic flag treatment cannot admit them indirectly.
++    if (executable === "stat" && args.some((arg) => /^--format(?:=|$)|^-c/u.test(arg))) {
++      return isFormattedStatReadArgs(args, root, extraRoots);
++    }
+     if (executable === "rg") return isBoundedSingleRg(args, root, extraRoots);
+     if (executable === "grep") return isSafeExactGrepArgs(args, root, extraRoots);
+     if (executable === "ls" && isNamesOnlyLsArgs(args, root, extraRoots)) return true;
