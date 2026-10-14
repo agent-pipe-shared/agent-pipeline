@@ -54,6 +54,23 @@ stage-0 packaging commit of prepared postimages whose producing dispatch records
 - The criticality row characterised the risk (a hunt hint); not used as evidence.
 - Commit messages carry implementor claims; treated as unverified.
 
+## Part 2 (briefing [C5-full-part2.md](C5-full-part2.md); commits `2436a1c01`, `1db8f1f69`)
+
+**PARTIAL review — pass/fail withheld; no finding passed the evidence gate.** Checkpoint at counted
+call 19 of 20; notes persistence refused again (`critic-notes-partial-held`). Examined: both patch
+preimages equal HEAD; P2-15B is a one-line Windows separator normalisation (identity on POSIX) whose
+AC-234 acceptance bullets 1-3 map to pin cases; HK-01C adds only early `null` returns before the
+inspection, so in the read caller (`devplan-shell-lane.mjs`) it can only tighten; the new test keeps a
+verbatim legacy oracle and weakens nothing; producer sites read in `project-onboarding-v3.mjs` use
+absolute script constants or `process.execPath`. Below the gate: producer-shape assumption only
+partly confirmed; two open items in the HK-01C commit message without owner/expiry. Not reached:
+the guardrail texts (categories 7/9), the AC-128 backlog item, callers other than
+`devplan-shell-lane.mjs`, and the remaining `commandAction` producer call sites.
+
+**Disposition (Coordinator, 2026-10-14):** P2-15B and HK-01C go into the interim LOCAL candidate as
+working-tree patches with `independent review: partial, no finding; completion pending` stated
+explicitly. This is a local test candidate, not acceptance. P1-10 stays out (F1).
+
 ## Remaining review scope (copied from the Critic's closing statement, mechanics only)
 
 Commits `2436a1c01`, `1db8f1f69`; `f822dcc85` residual. Paths: `lib/protected-baseline.mjs`,
