@@ -571,3 +571,46 @@ Status is "implementation complete, targeted GREEN by the dispatch" for each com
 - **Hook latency, measured 2026-10-14 (PO report: "PreToolUse 4/5" for up to 16 min):** `guard-lifecycle-ready.mjs` takes more than 300 s for `git commit`/`node --test` (1.9 s for `git status`). Inspector stack: `devPlanShellRefusalHit` → `observedOnboardingCommandMatch` → full `inspectProjectOnboardingV3` → Windows private-path DACL probe via PowerShell per path. Bound to the existing item AC-128 instead of a new item (PO, 2026-10-14). See row P1 of the [audit item mapping](audit-2026-10-14-item-mapping.md). Hotfix briefing ALF-C-HK-01 (bound to AC-128, `bindingOnly`) is built.
 - **Fanout hotfix defect found live:** admitting a critical-path slice (`lib/guard/*`) is refused with `SDC-AUTHORITY-UNAVAILABLE` / `item-course-prepared-queue-invalid`. The offline replay (`scratch/alfred-claude-20261012/probe-queue-admit.mjs`) shows SQ-DELIVERY: the BATCH-CRITIC slice has no v2 delivery binding. So every guard/hook/security dispatch is blocked until the fix is installed. Fix dispatched: **ALF-C-H2-01** (AC-224, goldfish-deep). Order: H2 → stamp → PO install → HK-01 → stamp → PO install.
 - **Dispatched (running):** H2-01, P2-11, P2-12. P2-16 (`security*` pin path) is held until H2 is installed.
+
+### Midday, 2026-10-14 (PO away for about 10 h; no new stamp)
+
+- **Read-only audit:**
+  - The release and architecture audit covered four packages.
+  - Its findings are bound to in-scope items in the [audit item mapping](audit-2026-10-14-item-mapping.md), committed in `15afd4f3c`.
+  - PO direction: critical findings, blockers and performance findings stay within the 174 items; no new out-of-scope items.
+- **Committed:**
+
+  | Work | Commit |
+  |---|---|
+  | P2-11 pin (AC-218) | `0c8416ca5` |
+  | P2-13 pin (AC-229) | `9b0890d5c` |
+  | Regenerated vendored `roles/critic.md` | `744e09fbd` |
+- **Canon drift runs both ways:**
+  - The vendored `guardrails/git.md` holds an administrative-commit section that the root lacks; the signed Main commit `d02409a8a` added it to the plugin copy only.
+  - The generator run was reverted for that file, because it would have deleted a live rule.
+  - The root fix is a critical-path dispatch (`guard*`), so it waits for the fanout fix (row B3a).
+- **Next interim candidates, as the PO agreed:**
+  - **A:** H2 (fanout critic delivery).
+  - **B:** HK-01 (guard latency) plus the root canon fix.
+  - HK cannot be dispatched before A is installed.
+- **Briefings rebuilt on the new HEAD:** wave p2d (P2-14, 15, 17-20) and H2-02.
+  - H2-02 finishes the H2-01 tests with no approval fixture, because of the 60 s check limit.
+- **P2-14 (AC-232) is blocked:** its original acceptance is unresolved (spec l.3013-3020); see PO topic 12.
+- **Afternoon results:**
+  - **H2:**
+    - Committed: the source fix in `2010e87c9` and its tests in `a0e3b1952` (8/8, about 3 s, RED on the pre-fix code).
+    - The companion `native-goldfish-host-state.test.mjs` shows the identical 13 failures (NGHS07-14, 16-20) both on a pre-H2 baseline worktree at `744e09fbd` and with the fix. They are pre-existing fixture/host failures (audit P5), not a regression.
+  - **P2-17 (AC-250):** pin committed in `d12af9232`.
+  - **P2-15 (AC-234):**
+    - Its pin found a real Windows defect: `canonicalProjectPath` returned backslash paths, so close bindings were never protected on Windows.
+    - P2-15B fixed it; the pin is 7/7 and the adjacent suite lost the close-binding failure with no new one.
+    - The fix touches the commit-protected `PB-BASELINE-LOADER` path. The pre-commit hook refused the orchestrator commit, so the fix is kept as the patch committed in `2436a1c01`. The pin stays uncommitted until the fix lands.
+  - **HK-01 (guard latency):** it is delivered as a patch because `lib/guard/*` is critical and commit-protected (`PB-GUARD-HOOKS`).
+    - HK-01 stopped at its budget after the analysis.
+    - HK-01B stopped after the mirror, the RED test and a corrected precondition.
+    - HK-01C finishes it (running).
+    - Briefing defect found: an item check path must end in `.test.mjs` (`NGHR-ITEM-DELIVERY-SHAPE`), otherwise the dispatch is refused as `SQ-NATIVE-ITEM-ADMISSION-REQUIRED`.
+  - **PO script for tonight:** `scratch/alfred-claude-20261012/po-candidate-2026-10-14.mjs` (check mode by default, `--apply` to act).
+    - It applies the patches to the working tree, copies the root canon, runs the tests and reverts on any failure.
+    - It then commits only the unprotected stamp.
+- **Running earlier:** H2-02, P2-15, P2-17. The WSL POSIX run cannot run yet: the clone succeeds, but `node` is not installed in the WSL Ubuntu distribution (exit 127, `node: command not found`). Installing it is a host-tool install, so it is a PO topic.
