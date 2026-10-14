@@ -951,16 +951,49 @@ export function planSessionCleanupRecovery({
   requesterOwnerNonce = null,
   deps = {},
 } = {}) {
-  const plan = planSessionCleanupRecoveryBase({ rootDir, scriptPath, deps });
+  // Latency: each active-descriptor listing spawns one private-path probe per
+  // descriptor, and the base plan plus the archive offer both list. Memoize the
+  // listing for the duration of THIS call only (per exact argument tuple; a
+  // throw is memoized and re-thrown to each consumer).
+  const effectiveDeps = {
+    ...deps,
+    listActiveSessionDescriptorsFn: memoizeListing(
+      deps.listActiveSessionDescriptorsFn ?? listActiveSessionDescriptors,
+    ),
+  };
+  const plan = planSessionCleanupRecoveryBase({ rootDir, scriptPath, deps: effectiveDeps });
   if (!ARCHIVE_OFFER_STATUSES.has(plan.status)) return plan;
   let offer = null;
   try {
-    offer = planOrphanDescriptorArchive({ rootDir, scriptPath, requesterOwnerNonce, deps });
+    offer = planOrphanDescriptorArchive({
+      rootDir,
+      scriptPath,
+      requesterOwnerNonce,
+      deps: effectiveDeps,
+    });
   } catch {
     offer = null;
   }
   if (offer === null || offer.candidates.length === 0) return plan;
   return { ...plan, archiveOrphan: { schema: offer.schema, candidates: offer.candidates } };
+}
+
+function memoizeListing(listFn) {
+  const results = new Map();
+  return (...args) => {
+    const key = JSON.stringify(args);
+    let entry = results.get(key);
+    if (entry === undefined) {
+      try {
+        entry = { ok: true, value: listFn(...args) };
+      } catch (error) {
+        entry = { ok: false, error };
+      }
+      results.set(key, entry);
+    }
+    if (!entry.ok) throw entry.error;
+    return entry.value;
+  };
 }
 
 // RF2A (ALFRED-RF2A-20261004): the two states that used to be a dead end for an
