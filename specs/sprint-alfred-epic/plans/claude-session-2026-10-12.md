@@ -642,3 +642,11 @@ Status is "implementation complete, targeted GREEN by the dispatch" for each com
   - Batch Critic C4 over today's pins.
   - P2-12 correction.
   - PO topics 8, 11-13 and 22.
+
+### Night, 2026-10-14: autonomous continuation (PO away)
+
+- **Stale lock removed by the Elephant:** `.git/agent-pipeline/session-authority/registry.lock` was 22 minutes old, carried no live owner and blocked every dispatch with `SDC-LOCK-HELD`. Removed with `scratch/alfred-claude-20261012/stale-lock.mjs --remove --min-age 600`, per the standing PO rule that the Elephant clears stale locks itself.
+- **Dispatched in parallel (Sonnet), all at candidate `488c97514`:**
+  - ALF-C-AGY-01: admit every agy release from 1.2.12 on (PO decision K2, AC-112).
+  - ALF-C-HK-01E: load each session descriptor once per cleanup-recovery plan (latency, AC-128 binding).
+  - ALF-C-P1-10B: declare and pin both extra P1-10 admission lanes as one superseding patch (Critic C5 F1, PO decision K3).
