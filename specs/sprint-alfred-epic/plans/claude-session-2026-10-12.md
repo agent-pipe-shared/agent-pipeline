@@ -614,3 +614,31 @@ Status is "implementation complete, targeted GREEN by the dispatch" for each com
     - It applies the patches to the working tree, copies the root canon, runs the tests and reverts on any failure.
     - It then commits only the unprotected stamp.
 - **Running earlier:** H2-02, P2-15, P2-17. The WSL POSIX run cannot run yet: the clone succeeds, but `node` is not installed in the WSL Ubuntu distribution (exit 127, `node: command not found`). Installing it is a host-tool install, so it is a PO topic.
+
+### Evening, 2026-10-14: interim candidate stamped by the PO
+
+- **Stamp:** `0.7.0+claude.20261014195634.012333a`, commit `b6fd05e74`, created by the PO's `--apply` run of `scratch/alfred-claude-20261012/po-candidate-2026-10-14.mjs`. All 4 test suites passed: fanout 8/8, HK-01D 5/5, P2-15B pin 7/7, HK-01C prefilter 10/10. The PO installs next.
+- **Contents:**
+  - **Committed:** H2 (`2010e87c9`, `a0e3b1952`), HK-01D (`848261ee1`), the pins P2-11/13/17/18/19/20, and the root `guardrails/git.md` canon sync (in the stamp commit).
+  - **Working tree only, signature-bound:** T17/T18, the ALF-C-P2-15B patch and the ALF-C-HK-01C patch.
+- **Guard latency:**
+  - HK-01C skips the onboarding inspection for non-candidate commands. Measured with noise: 261 s became 139 s.
+  - HK-01D lists the session descriptors once instead of twice. Root cause, from stacks at 20 s and 60 s: `requireProjectOnboardingReady` leads to `planSessionCleanupRecovery`; with orphan descriptors present the plan also adds an archive offer, and every listing runs one PowerShell DACL probe per descriptor.
+  - Remaining lever: archive the orphan descriptors (PO topic 8). Re-measure on the installed stamp.
+- **Regression comparisons by failure name, patched vs original:**
+  - HK-01C: 7 importer suites, identical failure sets, no new failure.
+  - HK-01D: `session-cleanup-recovery.test.mjs`, the identical 9 failures with and without the change.
+  - Script: `scratch/alfred-claude-20261012/diff-failsets.mjs`.
+- **Critic C5** ([result](../implementation/claude-2026-10-12/critic/C5-full-result.md)):
+  - Two partial parts. F1 (major) on P1-10: two undeclared, unpinned admission lanes.
+  - No finding on P2-15B or HK-01C. The guardrail texts and the remaining callers were not reached, so completion is pending.
+- **Held out of the candidate, patch retained:**
+  - ALF-C-P1-10 (`f822dcc85`): needs an F1 correction, either narrowed to the rg flags or with both lanes declared and pinned.
+  - ALF-C-P1-24C (`012333a88`): RED to GREEN in the mirror and patch-check 6/6. Its guard-suite comparison and Critic review are pending.
+- **Next:**
+  - Measure latency on the installed stamp.
+  - P1-10 correction.
+  - Rerun the P1-24C comparison, then run C5 as a DIFF round over P1-10 and P1-24C.
+  - Batch Critic C4 over today's pins.
+  - P2-12 correction.
+  - PO topics 8, 11-13 and 22.
