@@ -1,0 +1,86 @@
+diff --git a/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs b/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs
+index 52e40e047..27e16646b 100644
+--- a/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs
+@@ -13,6 +13,7 @@ import { isTerminalOutcome } from "../dispatch-record.mjs";
+ import { resolveGitCommonDir } from "../../hooks/guard-dispatch-budget.mjs";
+ import { verdict } from "./verdict.mjs";
+ import { lifecycleSubagentIdentity } from "./bootstrap-receipt.mjs";
++import { assessWindowsPrivatePath } from "../windows-private-state.mjs";
+ 
+ export const EVIDENCE_HOST_PATH_DENIAL_CODE = "GUARD-EVIDENCE-HOST-PATH";
+ 
+@@ -284,7 +285,7 @@ function creationDirectories(repository, root, create = false) {
+ function physicalCreationFile(path, expected = null) {
+   const before = lstatSync(path);
+   if (!before.isFile() || before.isSymbolicLink() || realpathSync(path) !== path || before.nlink !== 1 || before.size > CREATION_LIMIT
+-    || (before.mode & 0o022) !== 0 || (typeof process.getuid === "function" && before.uid !== process.getuid())) creationFailure("DRO-RECORD");
++    || (process.platform === "win32" ? assessWindowsPrivatePath(path).status !== "secure" : ((before.mode & 0o022) !== 0 || (typeof process.getuid === "function" && before.uid !== process.getuid())))) creationFailure("DRO-RECORD");
+   const fd = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+   try {
+     const opened = fstatSync(fd), buffer = Buffer.alloc(CREATION_LIMIT + 1);
+diff --git a/plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs b/plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs
+index 3d6cf7954..2d9353b3d 100644
+--- a/plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs
++++ b/plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs
+@@ -5,7 +5,7 @@
+ // Real module, no mocks of the behaviour under test. Fixtures live under the repository's scratch/ (the OS temp root is a protected read scope).
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { devNull } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+@@ -14,6 +14,7 @@ import {
+   checkDispatchRecordCollision, claimDispatchRecordOwnership, createControlledDispatchRecordCreationFixture,
+   createSourceOwnedDispatchRecord, LANDED_DISPATCH_RECORD_OWNER_SCHEMA,
+ } from "../guard/dispatch-record-lane.mjs";
++import { hardenWindowsPrivateDirectory } from "../windows-private-state.mjs";
+ 
+ const here = dirname(fileURLToPath(import.meta.url));
+ const git = (cwd, ...args) => {
+@@ -117,6 +118,43 @@ test("OWN-4 the attempt is bound, not a landed record: a record that already lan
+   } finally { fx.cleanup(); }
+ });
+ 
++// The guard calls the claim reader with NO readFileSyncFn seam, so the claim is read through physicalCreationFile(). That reader demanded POSIX mode bits
++// (no group/other write); native Windows reports every file as 0o666, so it refused every claim, the owner's own included. On win32 that one term is
++// replaced by the repository's existing native private-state assessment (owner + DACL, assessWindowsPrivatePath); an attacker-writable claim is still
++// refused on every platform. The Windows fixture hardens the repository-private root first, as ensureAgentPipelineRoot does in a provisioned checkout.
++const production = { gitCommitForTaskIdFn: () => null };
++const collideProduction = (fx, root, id, agentId) => checkDispatchRecordCollision({
++  relPath: rel(id), requested: fx.file(root, id), payload: open(id), root, input: input(agentId), dependencies: production });
++function hardenRegistryRoot(fx) {
++  if (process.platform !== "win32") return;
++  const root = join(fx.commonDir, "agent-pipeline");
++  mkdirSync(root);
++  assert.equal(hardenWindowsPrivateDirectory(root).status, "secure", "fixture: the repository-private root must end private");
++}
++function makeClaimAttackerWritable(path) {
++  if (process.platform !== "win32") { chmodSync(path, 0o666); return; }
++  const grant = spawnSync("icacls", [path, "/grant", "*S-1-1-0:(M)"], { encoding: "utf8", windowsHide: true });
++  assert.equal(grant.status, 0, String(grant.stderr || grant.stdout));
++}
++
++test("OWN-7 the production claim reader (no readFileSyncFn seam) admits the owner, refuses everyone else, and fails closed on an attacker-writable claim", () => {
++  const fx = twoLinkedWorktrees();
++  try {
++    const id = "OWN-PROD-7";
++    hardenRegistryRoot(fx);
++    assert.equal(claimDispatchRecordOwnership({ relPath: rel(id), requested: fx.file(fx.a, id), root: fx.a, input: input(OWNER) }).status, "claimed");
++    assert.equal(collideProduction(fx, fx.a, id, OWNER), null, "the owner is admitted through the production claim reader");
++    assert.equal(collideProduction(fx, fx.b, id, OWNER), null, "the owner is admitted from the linked worktree too");
++    for (const who of [OTHER, null]) {
++      const hit = collideProduction(fx, fx.b, id, who);
++      assert.notEqual(hit, null, String(who));
++      assert.match(hit.reason, /owned by dispatch agent ownership-agent-owner/u, String(who));
++    }
++    makeClaimAttackerWritable(fx.claim(id));
++    for (const who of [OWNER, OTHER, null]) assert.notEqual(collideProduction(fx, fx.a, id, who), null, "an attacker-writable claim is never honoured, not even for the owner: " + String(who));
++  } finally { fx.cleanup(); }
++});
++
+ // The landed (v2) creation needs POSIX directory mode bits, O_DIRECTORY and directory fsync (secureDirectory / syncCreationDirectory), which native
+ // Windows does not provide; there it is a typed host limitation, not a pass. On POSIX the cases run for real.
+ const HOST_LIMIT = process.platform === "win32" ? "host-limitation: landed creation requires POSIX directory mode bits and O_DIRECTORY; unavailable on native Windows" : false;
