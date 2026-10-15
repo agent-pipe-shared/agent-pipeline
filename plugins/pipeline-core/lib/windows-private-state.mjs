@@ -170,10 +170,36 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
  */
 export function observeWindowsPrivatePath(path, options = {}) {
   if (typeof path !== "string" || path.length === 0) return { ...unavailable("private path is unavailable"), observation: null };
+  // Process-local memo of SUCCESSFUL native observations only. Test seams (injected run/environment) bypass it.
+  const memoable = options.run === undefined && options.environment === undefined;
+  const identity = memoable ? lstatIdentity(path) : null;
+  if (identity !== null) {
+    const hit = OBSERVATION_MEMO.get(path);
+    if (hit && hit.identity === identity) return { status: null, reason: null, observation: structuredClone(hit.observation) };
+    if (hit) OBSERVATION_MEMO.delete(path);
+  }
   const result = invoke(path, OBSERVE_SCRIPT, options);
   if (result?.status) return { ...result, observation: null };
   const observation = parseObservation(result.stdout);
-  return observation === null ? { ...unavailable("native Windows DACL output is malformed"), observation: null } : { status: null, reason: null, observation };
+  if (observation === null) return { ...unavailable("native Windows DACL output is malformed"), observation: null };
+  // Store only when the path identity did not move while the native read ran.
+  if (identity !== null && lstatIdentity(path) === identity) {
+    if (OBSERVATION_MEMO.size >= OBSERVATION_MEMO_LIMIT) OBSERVATION_MEMO.delete(OBSERVATION_MEMO.keys().next().value);
+    OBSERVATION_MEMO.set(path, { identity, observation: structuredClone(observation) });
+  }
+  return { status: null, reason: null, observation };
+}
+
+const OBSERVATION_MEMO = new Map();
+const OBSERVATION_MEMO_LIMIT = 256;
+
+function lstatIdentity(path) {
+  try {
+    const s = lstatSync(path);
+    return JSON.stringify([s.dev, s.ino, s.size, s.mtimeMs, s.ctimeMs, s.birthtimeMs, s.mode, s.isSymbolicLink()]);
+  } catch {
+    return null;
+  }
 }
 
 /** Observe one physical Windows path against the concrete current principal. */
@@ -260,6 +286,7 @@ export function assessWindowsPrivatePaths(paths, options = {}) {
  * already hardened persists the same Access and Owner sections again and returns the same result.
  */
 export function hardenWindowsPrivateDirectory(path, options = {}) {
+  OBSERVATION_MEMO.delete(path);
   const result = invoke(path, HARDEN_DIRECTORY_SCRIPT, options, "hardening");
   if (result?.status) return result;
   return assessWindowsPrivatePath(path, options);
