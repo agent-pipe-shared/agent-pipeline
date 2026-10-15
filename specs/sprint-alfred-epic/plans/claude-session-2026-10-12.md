@@ -659,3 +659,11 @@ Status is "implementation complete, targeted GREEN by the dispatch" for each com
   | ALF-C-P1-10B → P1-10C (AC-128) | `7fb29f0ab` | P1-10B stopped at its 80 % checkpoint after the mirror RED. P1-10C finished: mirror pin 14/14 GREEN after the source part, patch-check 6/6, `git apply --check` exit 0. Keeps the attached-value `stat` narrowing (AP14). Guard-suite comparison running. |
   | ALF-C-P2-12B (AC-219) | running | Decides whether the held pin's RED is a pin or source defect. |
 - **Critic C5 DIFF round** (the one diff round after FULL, K12) dispatched over `012333a88` (P1-24C) and `7fb29f0ab` (P1-10B); [briefing](../implementation/claude-2026-10-12/critic/C5-diff1.md).
+- **Later night results:**
+
+  | Slice | Commit | State |
+  |---|---|---|
+  | ALF-C-P2-12B/C (AC-219) | `2a5bd9fea` | Pin 4/4; no source defect, the earlier pin draft was wrong. A mirror revert of line 351 turns A1/A2 RED. |
+  | Critic C5 DIFF, parts 1 and 2 | `cb97b4a1f`, `dd08f47d1` | Round closed (K12). Part 1: F1 minor (stat declaration overclaims; `--printf=` and clustered `-Lc%a` unpinned). Part 2: candidate confirmed by the Elephant: P1-10/P1-10B admit repeated `rg -g`, contradicting the SEC-11 examiner in `guard-lifecycle-ready.test.mjs` ~:1722. |
+  | ALF-C-P2-02B (AC-113, K5) | `377417425` | ADR-0063 amendment, warn-only `bound-path-status-report.mjs` + test, close-block step 5 wiring. Pin 6/6 and new test 4/4 (Elephant rerun 10/10); directory-contract tests 25/25. `r7-3-bound-paths.test.mjs` R7-3d fails on live State fields the slice did not touch (`rigorHistory.body.planPath`, `planPresentation.designApprovalRequestPath`); treated as pre-existing, not baselined. |
+  | ALF-C-P1-10D (AC-128) | running | Supersedes P1-10B: repeated `-g` stays refused (SEC-11), every `stat` format spelling routed into the closed lane and pinned. Elephant self-verifies (no further Critic round). Admitting `-g` is a PO decision tile (topic 23). |
