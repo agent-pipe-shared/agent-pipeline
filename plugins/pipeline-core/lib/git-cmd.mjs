@@ -157,7 +157,7 @@ function readDoubleQuoted(cmd, open) {
  *     backslash as `/` (a path separator, accepted at every boundary the classifier tests) so the option-value
  *     token of `normalizeGlobalGitOptions`, which reads `\<space>` as ONE escaped space, cannot swallow the push
  *     word that follows a drive path ending in a backslash. Not modelled (see `commandIsGitPush`): the backtick
- *     escape inside double quotes, here-strings.
+ *     escape inside double quotes; a here-string is a marker only when executed through iex / Invoke-Expression.
  */
 const READING_POSIX = "posix";
 const READING_WINDOWS_PATH = "windows-path";
@@ -800,6 +800,8 @@ function splitRawWords(cmd) {
  */
 function hasGitWord(cmd) {
   if (spellsGitWord(cmd)) return true;
+  // PowerShell reads a backtick before a word character as that character (g`it is git): drop it, then test again.
+  if (cmd.includes("`") && spellsGitWord(cmd.replace(/`(?=\w)/gu, ""))) return true;
   if (!cmd.includes("{")) return false;
   for (const word of splitRawWords(cmd)) {
     if (!word.includes("{")) continue;
@@ -1028,8 +1030,17 @@ export function hasFailClosedMarker(cmd) {
     NESTED_POSIX_SHELL_RE.test(cmd) ||
     NESTED_WINDOWS_SHELL_RE.test(cmd) ||
     hasBackslashOutsidePathTokens(cmd) ||
-    hasShellHeredocReceiver(cmd)
+    hasShellHeredocReceiver(cmd) ||
+    hasExecutedPowerShellHereString(cmd)
   );
+}
+
+// A PowerShell here-string opener (`@"` or `@'` ending its line) in a text that also names Invoke-Expression / iex: the body
+// is a program that is executed. A here-string used as data (`| Set-Content a.txt`) names no executor and stays plain.
+const POWERSHELL_HERE_STRING_OPENER_RE = /@["'][ \t]*\r?\n/u;
+const POWERSHELL_EXPRESSION_EXECUTOR_RE = /(?:^|[\s;&|(`'"])(?:iex|Invoke-Expression)(?![\w-])/iu;
+function hasExecutedPowerShellHereString(cmd) {
+  return POWERSHELL_HERE_STRING_OPENER_RE.test(cmd) && POWERSHELL_EXPRESSION_EXECUTOR_RE.test(cmd);
 }
 
 // ---- M6A: narrow literal/data routing proof; reader admission remains separate --------
@@ -1280,9 +1291,11 @@ function innerCommandIsPush(cmd, depth) {
  * `NAME=value` assignments and an optional `env`; branch 3 (`shellWrapperPush`) matches a
  * `sh|bash|zsh|dash|pwsh|powershell|cmd|ssh` wrapper whose argument contains `git ... push`.
  *
- * NOT modelled, still open (QG-06 needs an owner and an expiry set by the dispatcher; tracked in
- * backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md): PowerShell here-strings
- * (`@"..."@`) hold no marker of the list above. Likewise, the receiver lists of decisions X and AF do not model every
+ * PowerShell (backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md): a here-string opener
+ * (`@"` / `@'` ending its line) in a text that also names `iex` / `Invoke-Expression` is a marker (`hasExecutedPowerShellHereString`),
+ * because the body is then executed; a here-string used as data stays plain. A backtick before a word character is dropped when
+ * testing for the git word (`hasGitWord`), so `g`it` counts as `git`. NOT modelled, still open: a here-string body executed through
+ * some other route than iex / Invoke-Expression. Likewise, the receiver lists of decisions X and AF do not model every
  * command that runs text from standard input (`busybox` applets, ...): a here-document fed to one of those is
  * data to this rule (an extension of the receiver list is a new PO decision, not a test edit).
  *
