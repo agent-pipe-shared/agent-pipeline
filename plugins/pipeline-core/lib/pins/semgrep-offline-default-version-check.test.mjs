@@ -5,7 +5,8 @@
 // adapter through its documented `spawnFn` seam (captures the actual child environment).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import * as adapter from "../../scripts/security-adapters/semgrep.mjs";
 
 const BINARY = "synthetic-semgrep-binary";
@@ -106,3 +107,54 @@ test("scratch dir named in the child env is cleaned up after the scan", async ()
   assert.equal(existsSync(log), false);
   assert.equal(existsSync(c.seen[0].options.env.SEMGREP_VERSION_CACHE_PATH), false);
 });
+
+// The test above can pass vacuously: its fake spawnFn creates nothing, so the named paths never
+// exist whether or not the adapter cleans up. This probe is the version that can fail. Its fake
+// spawnFn behaves like the real semgrep child -- it writes the log file, the settings file and a
+// populated version-cache directory into the scratch directory the adapter named in the child env,
+// and records that they were really there DURING the spawn. After the scan the whole scratch
+// directory must be gone, on every exit path of the adapter that has taken ownership of it.
+function scratchProbe(outcome) {
+  const probe = { calls: 0, dir: null, during: null };
+  probe.spawnFn = (_command, _args, options) => {
+    probe.calls += 1;
+    const { SEMGREP_LOG_FILE: log, SEMGREP_SETTINGS_FILE: settings, SEMGREP_VERSION_CACHE_PATH: cache } = options.env;
+    probe.dir = dirname(log);
+    probe.sameDir = dirname(settings) === probe.dir && dirname(cache) === probe.dir;
+    writeFileSync(log, "synthetic semgrep log\n");
+    writeFileSync(settings, "synthetic: settings\n");
+    mkdirSync(cache, { recursive: true });
+    writeFileSync(join(cache, "version"), "synthetic cached version\n");
+    probe.during = { dir: existsSync(probe.dir), log: existsSync(log), settings: existsSync(settings), cacheFile: existsSync(join(cache, "version")) };
+    if (outcome instanceof Error) throw outcome;
+    return outcome;
+  };
+  return probe;
+}
+
+const SCRATCH_CASES = [
+  ["a completed scan", okResult, (r) => assert.equal(r.status, "PASS")],
+  ["a non-zero exit", { status: 2, stdout: "", stderr: "boom" }, (r) => { assert.equal(r.status, "ERROR"); assert.match(r.reason, /exited 2/); }],
+  ["a timeout", { error: Object.assign(new Error("t"), { code: "ETIMEDOUT" }), status: null, stdout: "", stderr: "" }, (r) => { assert.equal(r.status, "ERROR"); assert.match(r.reason, /timed out after 4321ms/); }],
+  ["a spawn that throws", new Error("spawn exploded"), (r) => { assert.equal(r.status, "ERROR"); assert.match(r.reason, /spawn error: spawn exploded/); }],
+];
+
+for (const [label, outcome, assertResult] of SCRATCH_CASES) {
+  test(`scratch dir holding the child's log, settings and version cache is removed after ${label}`, async () => {
+    const probe = scratchProbe(outcome);
+    try {
+      const r = await adapter.run({ rootDir: ROOT, config: { binaryPath: BINARY }, timeoutMs: 4321, spawnFn: probe.spawnFn, env: {} });
+      assertResult(r);
+      // The fake really ran and really populated the scratch dir (otherwise the final check is vacuous).
+      assert.equal(probe.calls, 1);
+      assert.match(basename(probe.dir), /^pipeline-semgrep-scan-/);
+      assert.equal(probe.sameDir, true, "log, settings and version-cache all live under one scratch dir");
+      assert.deepEqual(probe.during, { dir: true, log: true, settings: true, cacheFile: true });
+      // Nothing of it may survive the scan.
+      assert.equal(existsSync(probe.dir), false);
+    } finally {
+      // Never leak the temp dir when the assertion above is the thing that fails.
+      if (probe.dir && /^pipeline-semgrep-scan-/.test(basename(probe.dir))) rmSync(probe.dir, { recursive: true, force: true });
+    }
+  });
+}
