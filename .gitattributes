@@ -19,6 +19,9 @@ evidence/design-course/sprint-alfred-epic/claude-r5d.initial.json -text
 # Digest-pinned helper: windows-owned-authority-backend.mjs pins the LF blob
 # (HELPER_SHA256), so the working copy must stay LF on every host (T11).
 plugins/pipeline-core/lib/windows-owned-authority-native.ps1 text eol=lf
+# Digest-pinned helper: windows-native-process-observer.mjs pins the LF blob
+# (HELPER_SHA256), so the working copy must stay LF on every host.
+plugins/pipeline-core/lib/windows-native-process-observer.ps1 text eol=lf
 
 # Binary files: no text conversion.
 *.png binary
