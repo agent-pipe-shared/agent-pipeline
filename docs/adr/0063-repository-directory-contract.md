@@ -138,6 +138,21 @@ requirement — consistent with ADR-0046's project-authority layering.
   required follow-ups instead (points 2 and 4) so they are not silently
   dropped.
 
+## Amendment 2026-10-15 — "machine-regenerated" means regenerable from tracked inputs
+
+The accepted decision above is unchanged. This amendment sharpens one phrase of
+the kinds table. The ignored root `evidence/` holds only artifacts that can be
+regenerated bit-for-bit from tracked inputs. An artifact that is bound by digest
+to an approval, a gate or a signature is not "machine-regenerated" in that sense
+(a regeneration yields a different digest and invalidates the binding), so it is
+ineligible for `evidence/` and MUST live at a tracked path (`specs/*/evidence/`
+or `backlog/evidence/`). The close check `plugins/pipeline-core/scripts/bound-path-status-report.mjs`
+(close-block step 5, warn-only) lists the State-bound paths and flags an ignored
+or untracked one. Basis: backlog item
+`backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md`
+and PO decision K5 (2026-10-14,
+`specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md`, "Decision tiles answered").
+
 ## Resubmission
 
 - Nightwing-era sprint: full taxonomy revision, superseding this ADR's lean
