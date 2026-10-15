@@ -1397,7 +1397,23 @@ function classifyPush(cmd, reading) {
   // normalizeGlobalGitOptions above, so a `git`/`git.exe` still immediately followed by a `-`-prefixed token here names
   // an option this file does not know how to consume. Do not guess "not a push".
   if (GIT_EXECUTABLE_THEN_OPTION_RE.test(commandRegion)) return true;
-  const rawDetectionTokens = scan.words;
+  // A redirection (`2>&1`, `2> file`, `>out`, `>>out`, `<in`, `&>out`) sits between the git word, its options and the
+  // subcommand without changing which command runs; skip the operator and its target so the subcommand word is found.
+  const rawDetectionTokens = (() => {
+    const kept = [];
+    const redirectionRe = /^(?:\d*|&)(?:>>?|<)(?:&(?:\d+-?|-)?)?/u;
+    for (let index = 0; index < scan.words.length; index += 1) {
+      const word = scan.words[index];
+      const match = redirectionRe.exec(word);
+      if (match === null) {
+        kept.push(word);
+        continue;
+      }
+      // The target is attached (`>out`, `2>&1`) or is the next word (`2> file`, `>&` then a fd/file).
+      if (match[0].length === word.length && !/&(?:\d+-?|-)$/u.test(match[0])) index += 1;
+    }
+    return kept;
+  })();
   // Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
   // `env git push` are still detected POSITIONALLY.
   const detectionTokens = (() => {
