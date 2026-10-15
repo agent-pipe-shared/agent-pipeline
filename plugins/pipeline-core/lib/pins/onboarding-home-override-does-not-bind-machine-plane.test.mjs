@@ -5,7 +5,11 @@
  * Acceptance points, exercised through the real module / real CLI (no mock of the behaviour under test):
  *  A1  library call with injected home B reads B's machine plane + public anchor although the OS home is A.
  *  A2  B without a plane / without an anchor never falls back to A's ambient data.
- *  A3  an explicit readMachinePlane override is retained unchanged; no override keeps the documented default.
+ *  A2b B whose machine.json is not JSON (MP-MALFORMED) yields the no-anchor seed, never A's (or B's) anchor.
+ *  A2c B whose plane is schema-invalid (pushApprovalDefault "bogus", MP-PUSH-APPROVAL-DEFAULT) yields the no-anchor
+ *      seed even though its poKeyDirectory points at a real trust-policy directory; neither A's nor B's anchor.
+ *  A3  an explicit readMachinePlane override is retained unchanged (covers ONLY the explicit override).
+ *  A3b with deps.homedir omitted the documented default holds: the ambient OS home's plane and anchor are read.
  *  A4  source immutability: neither home's files change.
  *  A5  the supported CLI override (PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE) agrees with the selected home (B) while
  *      the child process OS home is A.
@@ -19,6 +23,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { readMachinePlane } from "../machine-plane.mjs";
 import { freshCriticalHumanProofPolicyBytes, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
@@ -27,8 +32,8 @@ const SCRATCH = join(REPO_ROOT, "scratch");
 const DIGEST_A = "a".repeat(64);
 const DIGEST_B = "b".repeat(64);
 
-function plane(keyDir) {
-  return JSON.stringify({ schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDir, pushApprovalDefault: "signature",
+function plane(keyDir, pushApprovalDefault = "signature") {
+  return JSON.stringify({ schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDir, pushApprovalDefault,
     routing: null, language: null, session: null, usage: null, updatedAt: "2026-10-14T00:00:00.000Z" });
 }
 function makeHome(base, name, digest) {
@@ -99,6 +104,42 @@ test("A2 selected home without a plane never borrows the ambient OS home's ancho
   assert.notEqual(got, policySha(keyDirOf(a)), "must not borrow A's anchor");
 }));
 
+test("A2b selected home whose machine.json is not JSON yields the no-anchor seed, never the ambient home's anchor", () => arrange((base) => {
+  const a = makeHome(base, "homeA", DIGEST_A);
+  const b = makeHome(base, "homeB", DIGEST_B);
+  writeFileSync(join(b, ".agent-pipeline", "machine.json"), "{not json");
+  const root = makeRoot(base, "repo");
+  // Fixture guard: B's plane is PRESENT but malformed (invalid / MP-MALFORMED), not absent.
+  const read = readMachinePlane({ homedirFn: () => b });
+  assert.equal(read.status, "invalid");
+  assert.equal(read.code, "MP-MALFORMED");
+  const got = policyShaOf(withOsHome(a, () => planProjectOnboardingV3({ rootDir: root, runner: "claude", deps: { homedir: () => b } })));
+  assert.equal(got, noAnchorSha(), "B's plane is malformed: no-anchor seed");
+  assert.notEqual(got, policySha(keyDirOf(a)), "must not borrow A's anchor");
+  assert.notEqual(got, policySha(keyDirOf(b)), "a malformed plane is not a usable pointer to B's key directory either");
+}));
+
+test("A2c selected home with a schema-invalid plane yields the no-anchor seed although its key directory is real", () => arrange((base) => {
+  const a = makeHome(base, "homeA", DIGEST_A);
+  const b = makeHome(base, "homeB", DIGEST_B); // supplies a real trust-policy directory carrying the B digest
+  const c = makeHome(base, "homeC", null); // the selected home: its plane is written below
+  const machineJson = join(c, ".agent-pipeline", "machine.json");
+  const planFor = (root) => policyShaOf(withOsHome(a, () => planProjectOnboardingV3({ rootDir: root, runner: "claude", deps: { homedir: () => c } })));
+  // Control: the identical plane with a VALID pushApprovalDefault is read as valid and binds B's real directory, so
+  // the single schema fault below is the only thing that can explain the no-anchor outcome.
+  writeFileSync(machineJson, plane(keyDirOf(b)));
+  assert.equal(readMachinePlane({ homedirFn: () => c }).status, "valid");
+  assert.equal(planFor(makeRoot(base, "repoControl")), policySha(keyDirOf(b)), "control: the valid plane binds B's key directory");
+  writeFileSync(machineJson, plane(keyDirOf(b), "bogus"));
+  const read = readMachinePlane({ homedirFn: () => c });
+  assert.equal(read.status, "invalid");
+  assert.equal(read.code, "MP-PUSH-APPROVAL-DEFAULT");
+  const got = planFor(makeRoot(base, "repo"));
+  assert.equal(got, noAnchorSha(), "schema-invalid plane: no-anchor seed");
+  assert.notEqual(got, policySha(keyDirOf(a)), "must not borrow A's anchor");
+  assert.notEqual(got, policySha(keyDirOf(b)), "must not trust the invalid plane's pointer to B's key directory");
+}));
+
 test("A3 an explicit readMachinePlane override is retained unchanged", () => arrange((base) => {
   const a = makeHome(base, "homeA", DIGEST_A);
   const b = makeHome(base, "homeB", DIGEST_B);
@@ -106,6 +147,15 @@ test("A3 an explicit readMachinePlane override is retained unchanged", () => arr
   const got = policyShaOf(withOsHome(a, () => planProjectOnboardingV3({ rootDir: root, runner: "claude", deps: { homedir: () => b, readMachinePlane: () => ({ status: "absent", plane: null }) } })));
   assert.equal(got, noAnchorSha(), "absent override wins over both homes");
   assert.notEqual(got, policySha(keyDirOf(b)));
+}));
+
+test("A3b no deps.homedir keeps the documented default: the ambient OS home's plane and anchor", () => arrange((base) => {
+  const a = makeHome(base, "homeA", DIGEST_A);
+  const b = makeHome(base, "homeB", DIGEST_B);
+  const root = makeRoot(base, "repo");
+  const got = policyShaOf(withOsHome(a, () => planProjectOnboardingV3({ rootDir: root, runner: "claude" })));
+  assert.equal(got, policySha(keyDirOf(a)), "no homedir override: the OS home (A) supplies the anchor");
+  assert.notEqual(got, policySha(keyDirOf(b)), "an unselected home never supplies the anchor");
 }));
 
 test("A5 the supported CLI override selects B while the child OS home is A", () => arrange((base) => {
