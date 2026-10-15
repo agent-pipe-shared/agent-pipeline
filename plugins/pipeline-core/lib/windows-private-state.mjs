@@ -8,7 +8,8 @@
  * it never resolves a shell through PATH, user configuration, or a wrapper.
  */
 import { spawnSync } from "node:child_process";
-import { lstatSync } from "node:fs";
+import { lstatSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 export const WINDOWS_POWERSHELL_PATHS = Object.freeze([
@@ -177,29 +178,129 @@ export function observeWindowsPrivatePath(path, options = {}) {
     const hit = OBSERVATION_MEMO.get(path);
     if (hit && hit.identity === identity) return { status: null, reason: null, observation: structuredClone(hit.observation) };
     if (hit) OBSERVATION_MEMO.delete(path);
+    const root = privateTreeRoot(path);
+    if (root !== null) {
+      const prefetched = prefetchPrivateTree(path, identity, root);
+      if (prefetched !== null) return { status: null, reason: null, observation: prefetched };
+    }
   }
   const result = invoke(path, OBSERVE_SCRIPT, options);
   if (result?.status) return { ...result, observation: null };
   const observation = parseObservation(result.stdout);
   if (observation === null) return { ...unavailable("native Windows DACL output is malformed"), observation: null };
-  // Store only when the path identity did not move while the native read ran.
-  if (identity !== null && lstatIdentity(path) === identity) {
-    if (OBSERVATION_MEMO.size >= OBSERVATION_MEMO_LIMIT) OBSERVATION_MEMO.delete(OBSERVATION_MEMO.keys().next().value);
-    OBSERVATION_MEMO.set(path, { identity, observation: structuredClone(observation) });
-  }
+  // Store only when the object identity did not move while the native read ran.
+  if (identity !== null && lstatIdentity(path) === identity) memoStore(path, identity, observation);
   return { status: null, reason: null, observation };
 }
 
 const OBSERVATION_MEMO = new Map();
 const OBSERVATION_MEMO_LIMIT = 256;
+const PREFETCH_MAX_DEPTH = 3;
+const PREFETCH_MAX_PATHS = 128;
 
+function memoStore(path, identity, observation) {
+  if (OBSERVATION_MEMO.size >= OBSERVATION_MEMO_LIMIT && !OBSERVATION_MEMO.has(path)) OBSERVATION_MEMO.delete(OBSERVATION_MEMO.keys().next().value);
+  OBSERVATION_MEMO.set(path, { identity, observation: structuredClone(observation) });
+}
+
+// The memo key is the stable object identity (exact path, dev, ino, object type), re-validated by a fresh lstat on
+// every lookup. An object whose observed DACL and owner pass the private-state policy cannot have its DACL or owner
+// changed by a foreign principal, and a replaced object (new ino) or a type change yields another key and therefore a
+// fresh native observation. Size and timestamps are deliberately not part of it: writing an entry into a directory
+// moves its mtime/ctime without touching its DACL.
 function lstatIdentity(path) {
   try {
-    const s = lstatSync(path);
-    return JSON.stringify([s.dev, s.ino, s.size, s.mtimeMs, s.ctimeMs, s.birthtimeMs, s.mode, s.isSymbolicLink()]);
+    const s = lstatSync(path, { bigint: true });
+    if (s.ino === 0n) return null;
+    const type = s.isSymbolicLink() ? "link" : s.isDirectory() ? "dir" : s.isFile() ? "file" : "other";
+    return `${s.dev}:${s.ino}:${type}`;
   } catch {
     return null;
   }
+}
+
+/** The `<...>/.git/agent-pipeline` directory that contains `path` (or is `path`), else null. */
+function privateTreeRoot(path) {
+  const match = /^(.*?[\\/]\.git[\\/]agent-pipeline)(?:[\\/]|$)/iu.exec(path);
+  return match === null ? null : match[1];
+}
+
+/** Existing entries of the tree, breadth-first, never following symbolic links or reparse points. */
+function privateTreeEntries(root, limit) {
+  const found = [];
+  let level = [root];
+  for (let depth = 0; depth < PREFETCH_MAX_DEPTH && level.length > 0 && found.length < limit; depth += 1) {
+    const next = [];
+    for (const directory of level) {
+      let entries;
+      try { entries = readdirSync(directory, { withFileTypes: true }); } catch { continue; }
+      for (const entry of entries) {
+        if (found.length >= limit) break;
+        if (entry.isSymbolicLink()) continue;
+        const child = join(directory, entry.name);
+        found.push(child);
+        if (entry.isDirectory()) next.push(child);
+      }
+    }
+    level = next;
+  }
+  return found;
+}
+
+function batchRowObservation(row, path) {
+  const keys = ["currentOwner", "owner", "path", "principals", "reparsePoint"];
+  if (!row || typeof row !== "object" || Array.isArray(row) || row.path !== path || row.error === true
+    || Object.keys(row).length !== keys.length || keys.some((key) => !Object.hasOwn(row, key))) return null;
+  const { path: _path, ...facts } = row;
+  return parseObservation(JSON.stringify(facts));
+}
+
+/**
+ * On a memo miss inside `<.git>/agent-pipeline`, observe the missed path plus the existing, not yet memoized entries
+ * of that tree in ONE native batch call and memoize every well-formed row under its own identity. Returns the missed
+ * path's observation, or null when the batch failed or that row was unusable (the caller then runs the single-path route).
+ */
+function prefetchPrivateTree(path, identity, root) {
+  const identities = new Map([[path, identity]]);
+  for (const candidate of [root, ...privateTreeEntries(root, PREFETCH_MAX_PATHS)]) {
+    if (identities.size >= PREFETCH_MAX_PATHS) break;
+    if (identities.has(candidate)) continue;
+    const candidateIdentity = lstatIdentity(candidate);
+    if (candidateIdentity === null) continue;
+    const hit = OBSERVATION_MEMO.get(candidate);
+    if (hit && hit.identity === candidateIdentity) continue;
+    identities.set(candidate, candidateIdentity);
+  }
+  const batch = [...identities.keys()];
+  const executable = fixedPowerShell();
+  if (executable === null) return null;
+  const native = spawnSync(executable, [
+    "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", OBSERVE_BATCH_SCRIPT,
+  ], {
+    input: Buffer.from(JSON.stringify(batch), "utf8").toString("base64") + "\n",
+    encoding: "utf8",
+    timeout: 10_000,
+    maxBuffer: 4 * 1024 * 1024,
+    shell: false,
+    windowsHide: true,
+    env: sanitizeChildEnvironment(process.env),
+  });
+  if (!isSuccessfulSpawn(native)) return null;
+  let rows;
+  try {
+    rows = JSON.parse(String(native.stdout).trim());
+    if (!Array.isArray(rows)) rows = [rows];
+  } catch { return null; }
+  let missed = null;
+  for (const row of rows) {
+    const rowPath = row && typeof row === "object" ? row.path : undefined;
+    if (typeof rowPath !== "string" || !identities.has(rowPath)) continue;
+    const observation = batchRowObservation(row, rowPath);
+    if (observation === null) continue;
+    if (rowPath === path) missed = observation;
+    if (lstatIdentity(rowPath) === identities.get(rowPath)) memoStore(rowPath, identities.get(rowPath), observation);
+  }
+  return missed === null ? null : structuredClone(missed);
 }
 
 /** Observe one physical Windows path against the concrete current principal. */
