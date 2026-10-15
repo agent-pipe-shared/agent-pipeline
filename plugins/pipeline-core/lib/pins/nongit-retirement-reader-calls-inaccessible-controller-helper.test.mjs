@@ -5,6 +5,12 @@
 // public sealed controller observation (never a module-scope `inspect`), return no
 // journal for inactive roots without history and for valid active enrollment, and
 // still fail closed with typed diagnostics for retained/corrupt/unverifiable history.
+//
+// Seam limitation (C4-F4): no controller seam exists. readGovernanceEnrollmentRetirement calls the module-private
+// defaultController.observe({rootDir:ctx.root}); CONTROLLERS is an unexported WeakSet and observe() re-resolves the root, so
+// no behavioural case can observe which root the reader handed to the controller. The behavioural cases therefore pin the
+// reader's RESULTS for each observed state, the observation-root case pins the root the public controller reports, and the
+// reader's own call (exact text, non-Git branch only) is pinned by the structural case at the end of this file.
 import assert from "node:assert/strict";
 import { tmpdir } from "node:os";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -105,7 +111,7 @@ test("unverifiable active enrollment fails closed with a typed diagnostic", () =
   } finally { cleanup(); }
 });
 
-test("the reader's physical root matches the sealed controller observation root", () => {
+test("the public controller observation root equals the fixture physical root", () => {
   const root = fixture();
   try {
     put(root, ".agent-pipeline/onboarding-consent.json", CONSENT);
@@ -126,11 +132,20 @@ test("public onboarding inspection of non-Git roots does not throw ReferenceErro
   } finally { cleanup(); }
 });
 
-test("structural: the reader's non-Git branch calls no module-scope inspect", () => {
+test("structural: the reader's non-Git branch calls no module-scope inspect and observes the physical root through the public controller", () => {
   const source = readFileSync(join(HERE, "..", "governance-scope.mjs"), "utf8");
   const start = source.indexOf("export function readGovernanceEnrollmentRetirement");
   const body = source.slice(start, source.indexOf("export const withGovernanceRetirementScopeLock", start));
   assert.ok(start > 0 && body.length > 0);
   assert.doesNotMatch(body, /(^|[^.\w])inspect\(/);
   assert.match(body, /defaultController\.observe\(/);
+  // The host-managed branch makes the same call, so the whole-body match above cannot show the NON-GIT branch is bound.
+  // Isolate that branch (from its guard to the child-process fallback) and bind the exact call text inside it.
+  const branchStart = body.indexOf("if(ctx.common===null){");
+  const branchEnd = body.indexOf("const output=", branchStart);
+  assert.ok(branchStart > 0 && branchEnd > branchStart, "non-Git branch (if(ctx.common===null){ ... const output=) not found in the reader");
+  const branch = body.slice(branchStart, branchEnd);
+  const OBSERVE_CALL = "defaultController.observe({rootDir:ctx.root})";
+  assert.equal(branch.split(OBSERVE_CALL).length - 1, 1, `the non-Git branch must contain ${OBSERVE_CALL} exactly once`);
+  assert.equal((branch.match(/\bobserve\(/g) ?? []).length, 1, "the non-Git branch must make no other observe( call (every observation uses the physical root)");
 });

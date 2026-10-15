@@ -15,6 +15,15 @@
 //   A5 integration/final-candidate binding                                                  -> not a unit-test concern (host)
 // The parser is not exported, so S-* evaluate its exact source text out of the real module (no re-implementation);
 // L-* observe it through the module's exported routes against real /proc and are skipped off Linux with a typed reason.
+//
+// QG-06 skip record (a documented, owned, dated exception, not a silent decay): L-1 and L-2 are SKIPPED, not run, on every
+// non-Linux host, and no Linux/WSL run of this pin has been recorded yet.
+//   pending : one Linux or WSL run of this file in which L-1 and L-2 execute and pass (not skipped)
+//   owner   : Coordinator
+//   due     : 2026-10-19
+//   decision: PO decision K7
+// At the due date the recorded Linux/WSL run replaces the skip, or the skip is promoted to a blocking failure or deleted; the
+// date is never extended silently. Until then S-1..S-4 run on every host and carry A1, A2 and A4 at source level.
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -38,9 +47,11 @@ const repoRoot = join(here, "..", "..", "..", "..");
 const SOURCE_PATH = join(here, "..", "worktree-lifecycle.mjs");
 const SOURCE = readFileSync(SOURCE_PATH, "utf8");
 
+// QG-06 skip record (see the header): pending Linux/WSL run, owner Coordinator, due 2026-10-19, PO decision K7.
 const HOST_LIMITATION_SKIP = process.platform === "linux"
   ? false
-  : "host-limitation: real /proc/<pid>/stat process identity exists only on Linux; this host is " + process.platform;
+  : "host-limitation: real /proc/<pid>/stat process identity exists only on Linux; this host is " + process.platform
+    + "; pending Linux/WSL run, owner Coordinator, due 2026-10-19, PO decision K7, QG-06";
 
 const SPACED_COMM = "a (b) c";
 const roots = [];
