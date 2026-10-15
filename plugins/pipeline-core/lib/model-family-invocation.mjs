@@ -231,9 +231,12 @@ export function createModelFamilyInvocationEntry({ runtimeHost = createModelFami
     launchModelFamilyInvocation, disposeModelFamilyInvocation, readHeld });
 }
 
-const defaultEntry = createModelFamilyInvocationEntry();
-export const prepareModelFamilyInvocation = (input) => defaultEntry.prepareModelFamilyInvocation(input);
-export const prepareCurrentModelFamilyInvocation = (input) => defaultEntry.prepareCurrentModelFamilyInvocation(input);
-export const bindModelFamilyInvocation = (input) => defaultEntry.bindModelFamilyInvocation(input);
-export const launchModelFamilyInvocation = (input) => defaultEntry.launchModelFamilyInvocation(input);
-export const readHeldModelFamilyInvocation = (input) => defaultEntry.readHeld(input);
+// Lazy: creating the entry at module load calls createModelFamilyRuntimeHost while
+// model-family-runtime-host.mjs may still be evaluating (import cycle, TDZ).
+let defaultEntryInstance;
+const defaultEntry = () => (defaultEntryInstance ??= createModelFamilyInvocationEntry());
+export const prepareModelFamilyInvocation = (input) => defaultEntry().prepareModelFamilyInvocation(input);
+export const prepareCurrentModelFamilyInvocation = (input) => defaultEntry().prepareCurrentModelFamilyInvocation(input);
+export const bindModelFamilyInvocation = (input) => defaultEntry().bindModelFamilyInvocation(input);
+export const launchModelFamilyInvocation = (input) => defaultEntry().launchModelFamilyInvocation(input);
+export const readHeldModelFamilyInvocation = (input) => defaultEntry().readHeld(input);

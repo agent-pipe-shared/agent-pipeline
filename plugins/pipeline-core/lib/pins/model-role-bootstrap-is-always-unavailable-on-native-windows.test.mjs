@@ -190,10 +190,7 @@ test("P4 realpath casing: a differently-cased spelling of an existing win32 repo
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("adjacent defect: model-family-runtime-host.mjs cannot be entered first (import-cycle TDZ)",
-  { todo: "RED evidence, outside AC-213 scope and write scope: model-family-invocation.mjs line ~234 "
-    + "(module-level createModelFamilyInvocationEntry -> createModelFamilyRuntimeHost) runs while "
-    + "model-family-runtime-host.mjs is still evaluating; makes model-family-runtime-host.test.mjs unloadable" },
+test("model-family-runtime-host.mjs can be entered first (no import-cycle TDZ)",
   () => {
     const url = new URL("../model-family-runtime-host.mjs", import.meta.url).href;
     const run = spawnSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(url)})`],
