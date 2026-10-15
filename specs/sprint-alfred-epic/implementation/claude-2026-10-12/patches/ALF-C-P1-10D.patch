@@ -1,0 +1,479 @@
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index 65bc572..1ae4a68 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -17,14 +17,14 @@ const SEARCH_BOOLEAN = new Set([
+   "-n", "--line-number", "-S", "--smart-case", "-i", "--ignore-case",
+   "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
+   "-x", "--line-regexp", "-l", "--files-with-matches",
+-  "--files-without-match", "--no-messages",
++  "--files-without-match", "--no-messages", "--no-heading",
+   // TR-B-F (T74): match-output spellings. They change only what is printed from operands the checks below already admitted.
+   "-o", "--only-matching",
+ ]);
+ const SEARCH_VALUE = new Set([
+   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+   "-t", "--type", "-T", "--type-not", "-e", "--regexp",
+-  "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
++  "-m", "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
+   "--max-columns",
+ ]);
+ // Recursive rg must use its default hidden/ignore policy. Only a basename
+@@ -34,8 +34,11 @@ const FILE_BOOLEAN = new Set(["--no-messages"]);
+ const FILE_VALUE = new Set(["-t", "--type", "-T", "--type-not", "--max-depth", "-g", "--glob"]);
+ const NUMERIC_VALUE = new Set([
+   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+-  "--max-count", "--max-depth", "--max-columns",
++  "-m", "--max-count", "--max-depth", "--max-columns",
+ ]);
++// Only the type filters (-t/-T) may repeat. -g/--glob is deliberately NOT repeatable: a recursive rg carries at most one bounded basename
++// glob, and a second one (in either spelling) is refused so the traversal stays selective in one place only (SEC-11; examiner: the
++// "recursive rg keeps default hidden/ignore semantics; globs may expose private paths" case of hooks/guard-lifecycle-ready.test.mjs).
+ const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
+ 
+ function isBoundedFilenameFilter(value) {
+@@ -400,6 +403,31 @@ export function isBoundedSingleRg(argv, root, additionalRoots = []) {
+   return validateRg(argv, root, false, additionalRoots);
+ }
+ 
++// LANE (declared under backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read; ALF-C-P1-10, AC-128; PO decision K3, 2026-10-14):
++// contained git-show object read -- `git [--no-pager] show <HEAD|7..40-hex>:<path> | head -N`.
++// Why: a `<rev>:<path>` operand names a git object, not a host path, and the generic git-pipeline lane (which judges each operand as a
++// host path) refused it on Windows although the path itself is an ordinary in-repo file.
++// Bounds (all must hold, anything else is not this lane): the git side is exactly `show <object>` with at most a leading `--no-pager`;
++// <object> is `HEAD` or a 7..40 digit hex id (no ref name, no `~`/`^` suffix); <path> is a repository-relative slash path whose every part
++// is non-empty and starts with neither `.` nor `-`, with no backslash, colon, `$`, backtick, glob or brace character; it must stay inside
++// the project root after realpath and be approved by the passive-read policy (credential names stay refused). The only sink is `head`
++// with the 1..500 line count of this pipeline family -- never tail, sort or rg -- and a bare `git show` is not this lane.
++// Pinned by lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs (AP10 admitted shapes, AP11 fail-closed shapes).
++function isContainedGitShowObject(argv, root) {
++  const args = argv[0] === "--no-pager" ? argv.slice(1) : argv;
++  if (args.length !== 2 || args[0] !== "show") return false;
++  const match = /^(?:HEAD|[0-9a-fA-F]{7,40}):(.+)$/u.exec(args[1]);
++  if (!match) return false;
++  const path = match[1];
++  // Git object paths are repository-relative slash paths, never host paths.
++  // Hidden/private roots and traversal stay closed even when a host passive
++  // reader would permit an unrelated external file.
++  if (path.split("/").some((part) => !part || part.startsWith(".") || part.startsWith("-"))
++    || /[\\:$`*?\[\]{}]/u.test(path)) return false;
++  return isRealpathedWithinBoundary(resolve(root, path), root)
++    && isAllowedPassiveReadTarget(path, { rootDir: root, recursive: true });
++}
++
+ /**
+  * Validate the small, bounded search-pipeline family.  A second rg consumes
+  * only the first rg's stdout and is still a closed, read-only diagnostic.  It
+@@ -420,8 +448,12 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   const rgName = basename(parsed.segments[0].executable).toLowerCase();
+   const expectedRg = windows ? "rg.exe" : "rg";
+   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
+-  if (rgName !== expectedRg) return false;
+-  if (sinkName === expectedRg) {
++  // Git-show lane (isContainedGitShowObject above; backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read, K3): such a source takes the `head` sink only;
++  // the rg-to-rg, sort and tail branches below never apply to it.
++  const gitShowObject = rgName === (windows ? "git.exe" : "git")
++    && isContainedGitShowObject(parsed.segments[0].argv, root);
++  if (rgName !== expectedRg && !gitShowObject) return false;
++  if (!gitShowObject && sinkName === expectedRg) {
+     return parsed.redirects.length === 0
+       && validateRg(parsed.segments[0].argv, root, windows, additionalRoots)
+       && validateRg(parsed.segments[1].argv, root, windows, additionalRoots);
+@@ -431,7 +463,7 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   // sort permission: no sort flags, operands, redirects, or extra pipeline
+   // stages are accepted, so `sort -o <file>` cannot gain a write route.
+   const expectedSort = windows ? "sort.exe" : "sort";
+-  if (sinkName === expectedSort) {
++  if (!gitShowObject && sinkName === expectedSort) {
+     return parsed.redirects.length === 0
+       && parsed.segments[1].argv.length === 0
+       && validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
+@@ -442,6 +474,7 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   const expectedHead = windows ? "head.exe" : "head";
+   const expectedTail = windows ? "tail.exe" : "tail";
+   if (sinkName !== expectedHead && sinkName !== expectedTail) return false;
++  if (gitShowObject && sinkName !== expectedHead) return false;
+   if (parsed.redirects.length === 1) {
+     const redirect = parsed.redirects[0];
+     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
+@@ -456,5 +489,5 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   const sinkOk = (sinkArgs.length === 2 && sinkArgs[0] === "-n" && lineCount.test(sinkArgs[1]))
+     || (sinkArgs.length === 1 && sinkArgs[0].startsWith("-") && lineCount.test(sinkArgs[0].slice(1)));
+   if (!sinkOk) return false;
+-  return validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
++  return gitShowObject || validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
+ }
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index f86ae22..5710daa 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -921,6 +921,62 @@ function isResourceHeadroomReadOnlyInvocation(args, root) {
+   } catch { return false; }
+ }
+ 
++// LANE (declared under backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read; ALF-C-P1-10, AC-128; PO decision K3, 2026-10-14):
++// formatted stat metadata read -- `stat -c|--format <FORMAT> <path...>` (predicate isFormattedStatReadArgs below).
++// Bounds (all must hold, anything else is not this lane): the option is the FIRST argument and a separate token, `-c` or `--format` (an
++// attached value such as `--format=...` or `-c%a` is refused); <FORMAT> is exactly one of the two fixed strings below, which GNU stat
++// treats as inert display data; at least one operand follows; every operand is an existing file or directory that lies inside the project
++// root, is not reached through a link or alias (its realpath equals the path itself) and is approved by the passive-read policy
++// (a dot-directory file such as .claude/settings.json is judged exactly as plain `stat` and `cat` judge it; credential names stay refused).
++// isReadOnlySimpleWords routes every stat call that carries a format-bearing argument (predicate isStatFormatBearingArg below) into this
++// lane: `--format` and `--printf` (attached `=value` or a separate value), `-c` and `-f` (also `--file-system`), a clustered short option
++// that contains `c` or `f` (`-Lc`, `-cL`, `-Lc%a`) and any unambiguous long-option abbreviation of those (`--form`, `--print`). Only the two
++// fixed shapes above are admitted; every other such argument is refused, so no spelling of a format option is admitted through the generic
++// flag treatment.
++// Pinned by lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs (AP12 admitted shapes, AP13 fail-closed shapes, AP14 attached spellings,
++// AP15 --printf, -f, clusters and abbreviations).
++const STAT_METADATA_FORMATS = new Set(["%a %s %n", "%a %s %h %n"]);
++
++// Lane predicate: the declaration above STAT_METADATA_FORMATS is its contract (backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read, K3).
++export function isFormattedStatReadArgs(args, root, extraRoots = [], dependencies = {}) {
++  if (!Array.isArray(args) || args.length < 3
++    || !["-c", "--format"].includes(args[0])
++    || !STAT_METADATA_FORMATS.has(args[1])) return false;
++  const realpath = dependencies.realpath ?? realpathSync;
++  const lstat = dependencies.lstat ?? lstatSync;
++  const passive = dependencies.passive ?? isAllowedPassiveReadTarget;
++  return args.slice(2).every((arg) => {
++    const candidate = rawReadCandidatePath(arg, root);
++    if (candidate === null || !pathInside(root, resolve(candidate))) return false;
++    try {
++      const physicalRoot = realpath(root);
++      const physical = realpath(candidate);
++      const observed = lstat(candidate);
++      if (physicalRoot !== resolve(root) || physical !== resolve(candidate)
++        || !pathInside(physicalRoot, physical)
++        || (!observed.isFile() && !observed.isDirectory())) return false;
++    } catch { return false; }
++    return passive(arg, {
++      rootDir: root, recursive: true, additionalRecursiveRoots: extraRoots,
++    });
++  });
++}
++
++// Routing predicate of the stat lane above (backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read, K3): true for every argument
++// that bears a stat format or format-like mode, so isReadOnlySimpleWords hands the whole call to isFormattedStatReadArgs. GNU getopt_long also
++// accepts any unambiguous prefix of a long option (`--form`, `--print`), so a long argument counts when its name part (before any `=`) is a
++// prefix of `--format`, `--printf` or `--file-system`. A short argument counts when it contains `c` or `f` anywhere, so clusters such as
++// `-Lc`, `-cL`, `-Lf` and attached values such as `-Lc%a` are covered. Over-matching only narrows: the lane refuses everything but the two fixed shapes.
++const STAT_FORMAT_LONG_OPTIONS = ["--format", "--printf", "--file-system"];
++function isStatFormatBearingArg(arg) {
++  if (typeof arg !== "string" || arg.length < 2 || arg[0] !== "-") return false;
++  if (arg[1] === "-") {
++    const name = arg.split("=", 1)[0];
++    return name.length > 2 && STAT_FORMAT_LONG_OPTIONS.some((option) => option.startsWith(name));
++  }
++  return /[cf]/u.test(arg);
++}
++
+ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
+   if (!words || words.length === 0) return false;
+   const executable = basename(words[0]).toLowerCase();
+@@ -976,6 +1032,12 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
+       && isApprovedSingleCommandReadArg(args[1], root, extraRoots);
+   }
+   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
++    // Stat lane routing (backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read, K3; see isStatFormatBearingArg and isFormattedStatReadArgs; pinned by AP12-AP15):
++    // route every format-bearing spelling to the closed lane, including unsupported
++    // attached values, --printf, -f and clustered short options, so generic flag treatment cannot admit them indirectly.
++    if (executable === "stat" && args.some((arg) => isStatFormatBearingArg(arg))) {
++      return isFormattedStatReadArgs(args, root, extraRoots);
++    }
+     if (executable === "rg") return isBoundedSingleRg(args, root, extraRoots);
+     if (executable === "grep") return isSafeExactGrepArgs(args, root, extraRoots);
+     if (executable === "ls" && isNamesOnlyLsArgs(args, root, extraRoots)) return true;
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+index 162dba4..81f53c0 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+@@ -5,14 +5,21 @@
+ // Glob listing and the missing-file diagnostic -- while out-of-root and credential reads stay refused, and a single
+ // unhealthy or case-differing auxiliary (session) root must never deny an in-root target.
+ // Every case runs through the real guard (evaluateLifecycleReadyGuard) or the real read policy; nothing is mocked.
++// K3 (PO decision 2026-10-14, Critic finding F1 of batch C5): AP10-AP14 declare and pin the two further admission lanes this item's patch
++// carries -- `git show <rev>:<path> | head -N` and `stat -c|--format` with the two fixed formats -- admitted shapes and fail-closed shapes.
++// ALF-C-P1-10D (C5 correction round, findings C5D-F1 and C5D-C1): AP3 keeps a repeated rg -g/--glob REFUSED (SEC-11 examiner in
++// hooks/guard-lifecycle-ready.test.mjs), and AP15 pins that every stat format-bearing spelling is routed into the closed stat lane.
+ import assert from "node:assert/strict";
+-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+ import { basename, dirname, join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
+ import { isAllowedPassiveReadTarget } from "../passive-read-policy.mjs";
+ import { sessionReadScopeRoots } from "../guard/read-scope.mjs";
++import { isBoundedReadOnlyPipeline, isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
++import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "../guard/constants.mjs";
++import * as shellGrammar from "../guard/shell-grammar.mjs";
+ 
+ // Host fact: fixtures live under the repository scratch/, never the OS temp dir (protected by the read scope).
+ const SCRATCH_ROOT = fileURLToPath(new URL("../../../../scratch/", import.meta.url));
+@@ -81,18 +88,52 @@ test("AP2 Bash head/cat/tail/wc/rg with a relative or absolute in-repo path are
+   }
+ }));
+ 
+-test("AP3 the rg flags the item names (--no-heading, -m N, repeated -g) on an in-repo target are admitted", () => withFixture((path) => {
++test("AP3 the rg flags the item names (--no-heading, -m N) on an in-repo target are admitted; a repeated -g/--glob stays refused (SEC-11, C5D-C1)", () => withFixture((path) => {
+   const file = "plugins/pipeline-core/lib/a.mjs";
+   for (const command of [
+     `rg -n --no-heading apply docs/state.md`,
+     `rg -n -m 2 apply docs/state.md`,
+     `rg -n --no-heading -m 20 "export" ${file}`,
+-    `rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
+     `rg -n --no-heading "authorize-commit" ${fwd(path)}/scratch`,
++    // Unchanged by this item: one bounded basename filter and repeated type filters keep their pre-existing verdict.
++    `rg -n --no-heading "authorize-commit" scratch -g "*.md"`,
++    `rg -n apply docs/state.md --glob "*.md"`,
++    `rg -n apply docs/state.md -t md -t txt`,
+   ]) {
+     const r = verdict(bash(command), path);
+     assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
+   }
++  // SEC-11 (examiner: hooks/guard-lifecycle-ready.test.mjs "recursive rg keeps default hidden/ignore semantics; globs may expose private
++  // paths"): a recursive rg carries at most ONE bounded basename glob. A second glob is refused whichever spelling carries it, and the
++  // refusal holds at the guard entry, at the single-command predicate and in the bounded `| head` pipeline.
++  for (const command of [
++    `rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
++    `rg -l -S lifecycle plugins -g "*.mjs" -g "*.md"`,
++    `rg -n apply docs/state.md --glob "*.md" --glob "*.txt"`,
++    `rg -n apply docs/state.md -g "*.md" --glob "*.txt"`,
++    `rg -l -S lifecycle plugins -g "*.mjs" -g "*.md" | head -n 180`,
++    `rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180`,
++  ]) {
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
++    if (command.includes(" | ")) {
++      const parsed = parseGuardCommand(command, path, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
++      assert.equal(isBoundedReadOnlyPipeline(parsed, path), false, `pipeline lane: ${command}`);
++    }
++  }
++  for (const argv of [
++    ["-n", "--no-heading", "authorize-commit", "scratch", "-g", "*.md", "-g", "*.txt", "-g", "*.ps1"],
++    ["-l", "-S", "lifecycle", "plugins", "-g", "*.mjs", "-g", "*.md"],
++    ["-n", "apply", "docs/state.md", "--glob", "*.md", "--glob", "*.txt"],
++    ["-n", "apply", "docs/state.md", "-g", "*.md", "--glob", "*.txt"],
++  ]) {
++    assert.equal(isBoundedSingleRg(argv, path), false, `single-command predicate: rg ${argv.join(" ")}`);
++  }
++  // Control: the same search with ONE glob is admitted, so the refusal above is the repetition and nothing broader.
++  assert.equal(isBoundedSingleRg(["-l", "-S", "lifecycle", "plugins", "-g", "*.mjs"], path), true);
++  const oneGlob = `rg -l -S lifecycle plugins -g "*.mjs" | head -n 180`;
++  assert.equal(isBoundedReadOnlyPipeline(parseGuardCommand(oneGlob, path, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM }), path), true);
++  assert.equal(verdict(bash(oneGlob), path).exitCode, 0);
+ }));
+ 
+ test("AP4 an unsupported in-root read command is refused with GUARD-READ-COMMAND-UNSUPPORTED, never the outside-root code", () => withFixture((path) => {
+@@ -180,3 +221,211 @@ test("AP9 Glob wildcard listing of an in-repo directory is admitted; hidden/esca
+   assert.equal(dirGrep.exitCode, 2);
+   assert.match(dirGrep.text, /GUARD-READ-TARGET/u);
+ }));
++
++// ---------------------------------------------------------------------------------------------------------------------
++// K3 (PO decision 2026-10-14, Critic finding F1 of batch C5): the patch for this item carries two admission lanes beyond the
++// three rg flags. Both are declared in the grammar sources and pinned here.
++//   Lane (a) guard-command-grammar.mjs isContainedGitShowObject:  git [--no-pager] show <HEAD|7..40-hex>:<path> | head -N
++//   Lane (b) lib/guard/shell-grammar.mjs isFormattedStatReadArgs:  stat -c|--format "%a %s %n"|"%a %s %h %n" <path...>
++// Each case runs through the real guard entry, and the lane predicate is asserted beside it: a refusal by an unrelated lane
++// must not hide a lane that was widened, and an admission by an unrelated (pre-existing) lane must not hide one that was closed.
++// ---------------------------------------------------------------------------------------------------------------------
++const laneParse = (command, path) => parseGuardCommand(command, path, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
++const gitShowLane = (command, path) => isBoundedReadOnlyPipeline(laneParse(command, path), path);
++const quoteWord = (word) => (/[ %]/u.test(word) ? `"${word}"` : word);
++const statCommand = (...words) => ["stat", ...words].map(quoteWord).join(" ");
++const statLane = (path, ...words) => shellGrammar.isReadOnlySimpleWords(["stat", ...words], path);
++const STAT_FORMAT = "%a %s %n";
++const STAT_FORMAT_LINKS = "%a %s %h %n";
++
++function withLaneFixture(fn) {
++  return withFixture((path) => {
++    writeFileSync(join(path, ".claude", "settings.json"), "{}\n");
++    writeFileSync(join(path, "docs", ".hidden.md"), "hidden\n");
++    const outside = fixture();
++    let aliased = false;
++    try {
++      // Directory links: one aliases docs/ inside the root, one leaves the root. Without link privilege this is a typed
++      // host limitation and the alias cases are not run.
++      symlinkSync(join(path, "docs"), join(path, "scratch", "docs-alias"), "junction");
++      symlinkSync(outside, join(path, "scratch", "out-alias"), "junction");
++      aliased = true;
++    } catch { aliased = false; }
++    try { return fn(path, { aliased }); } finally {
++      for (const name of ["docs-alias", "out-alias"]) {
++        try { unlinkSync(join(path, "scratch", name)); } catch { /* absent */ }
++      }
++      rmSync(outside, { recursive: true, force: true });
++    }
++  });
++}
++
++test("AP10 git show <HEAD|hex>:<path> | head -N of a contained in-repo path is admitted (lane isContainedGitShowObject, K3)", () => withLaneFixture((path) => {
++  for (const command of [
++    "git show HEAD:docs/state.md | head -5",
++    "git show abc1234:docs/state.md | head -n 20",
++    "git --no-pager show HEAD:docs/state.md | head -5",
++    "git show 0123456789abcdef0123456789abcdef01234567:docs/state.md | head -500",
++    "git show HEAD:plugins/pipeline-core/lib/a.mjs | head -5",
++  ]) {
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
++    assert.equal(gitShowLane(command, path), true, `lane: ${command}`);
++  }
++}));
++
++test("AP11 the git-show lane fails closed: other sinks, no sink, hidden/dash/traversal/backslash/aliased/credential paths, extra operands, other revisions", () => withLaneFixture((path, { aliased }) => {
++  // The sink and the line bound do not depend on how a host reads `<rev>:<path>`: refused at the guard entry on every host.
++  const sinkOrBound = [
++    "git show HEAD:docs/state.md | tail -5",
++    "git show HEAD:docs/state.md | sort",
++    "git show HEAD:docs/state.md | rg apply",
++    "git show HEAD:docs/state.md | head -501",
++    "git show HEAD:docs/state.md | head -0",
++  ];
++  // Path and operand shape: the lane predicate refuses all of them everywhere. The guard-entry refusal is asserted on win32,
++  // where it was measured; how another host's pre-existing git-pipeline lane reads a `<rev>:<path>` operand is not asserted here.
++  const pathOrOperand = [
++    "git show HEAD:.claude/settings.json | head -5",
++    "git show HEAD:docs/.hidden.md | head -5",
++    "git show HEAD:-x/state.md | head -5",
++    "git show HEAD:../state.md | head -5",
++    "git show 'HEAD:docs\\state.md' | head -5",
++    "git show HEAD:vault/id_rsa | head -5",
++    "git show HEAD:docs/state.md extra | head -5",
++    "git show --stat HEAD:docs/state.md | head -5",
++    "git show HEAD~1:docs/state.md | head -5",
++    "git show main:docs/state.md | head -5",
++    "git show abc123:docs/state.md | head -5",
++    "git log HEAD:docs/state.md | head -5",
++    "git show HEAD: | head -5",
++    "git show HEAD:docs/ | head -5",
++    ...(aliased ? ["git show HEAD:scratch/out-alias/docs/state.md | head -5"] : []),
++  ];
++  // Lane-only: the pre-existing generic git-pipeline lane judges the `..` spelling itself, so only the lane predicate is pinned.
++  const laneOnly = ["git show HEAD:docs/../docs/state.md | head -5", "git show HEAD:docs/state.md"];
++  for (const command of [...sinkOrBound, ...pathOrOperand, ...laneOnly]) {
++    assert.equal(gitShowLane(command, path), false, `lane: ${command}`);
++  }
++  for (const command of sinkOrBound) {
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
++  }
++  if (WIN) {
++    for (const command of pathOrOperand) {
++      const r = verdict(bash(command), path);
++      assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
++    }
++  }
++  // Without a sink the lane does not apply; the bare form stays with the pre-existing read-only git rule, unchanged by this lane.
++  assert.equal(verdict(bash("git show HEAD:docs/state.md"), path).exitCode, 0);
++}));
++
++test("AP12 stat -c|--format with one of the two fixed formats on contained, unaliased files and directories is admitted (lane isFormattedStatReadArgs, K3)", () => withLaneFixture((path) => {
++  for (const words of [
++    ["-c", STAT_FORMAT, "docs/state.md"],
++    ["--format", STAT_FORMAT_LINKS, "docs/state.md", "docs"],
++    ["-c", STAT_FORMAT_LINKS, "docs/state.md"],
++    ["--format", STAT_FORMAT, "docs/state.md"],
++    ["-c", STAT_FORMAT, "docs"],
++  ]) {
++    const command = statCommand(...words);
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
++    assert.equal(statLane(path, ...words), true, `routing: ${command}`);
++    assert.equal(shellGrammar.isFormattedStatReadArgs(words, path), true, `lane: ${command}`);
++  }
++  // The lane defers to the passive-read policy for every operand: a dot-directory file that plain `stat` and `cat` already read
++  // is judged identically, so the lane neither widens nor narrows which contained operands may be named (measured parity).
++  for (const operand of [".claude/settings.json", "docs/.hidden.md"]) {
++    const plain = verdict(bash(`stat ${operand}`), path).exitCode;
++    const formatted = verdict(bash(statCommand("-c", STAT_FORMAT, operand)), path).exitCode;
++    assert.equal(formatted, plain, `policy parity for ${operand}`);
++  }
++}));
++
++test("AP13 the stat lane fails closed: other formats, -c/--format not first, missing/outside/aliased/credential operands, mixed operand lists", () => withLaneFixture((path, { aliased }) => {
++  for (const words of [
++    ["-c", "%U %n", "docs/state.md"],
++    ["-c", `${STAT_FORMAT} %x`, "docs/state.md"],
++    ["docs/state.md", "-c", STAT_FORMAT],
++    ["-L", "-c", STAT_FORMAT, "docs/state.md"],
++    ["-c", STAT_FORMAT],
++    ["-c", STAT_FORMAT, "../x"],
++    ["-c", STAT_FORMAT, "/etc/hostname"],
++    ["-c", STAT_FORMAT, "docs/missing.md"],
++    ["-c", STAT_FORMAT, "vault/id_rsa"],
++    ["-c", STAT_FORMAT, "docs/state.md", "vault/id_rsa"],
++    ["-c", STAT_FORMAT, "-"],
++    // Other format options are not this lane; the routing sends them into the closed lane, which refuses them (AP15 pins the further spellings).
++    ["-f", STAT_FORMAT, "docs/state.md"],
++    ["--printf", STAT_FORMAT, "docs/state.md"],
++    ...(aliased ? [
++      ["-c", STAT_FORMAT, "scratch/docs-alias"],
++      ["-c", STAT_FORMAT, "scratch/out-alias"],
++      ["-c", STAT_FORMAT, "docs/state.md", "scratch/docs-alias"],
++    ] : []),
++  ]) {
++    const command = statCommand(...words);
++    assert.equal(statLane(path, ...words), false, `lane: ${command}`);
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
++  }
++  // The predicate itself, called directly, never answers true for a mixed list (tolerant of a tree that does not export it yet).
++  assert.notEqual(shellGrammar.isFormattedStatReadArgs?.(["-c", STAT_FORMAT, "docs/state.md", "vault/id_rsa"], path), true);
++}));
++
++test("AP14 attached-value stat format spellings, which the generic flag treatment used to admit, are routed into the closed lane and refused", () => withLaneFixture((path) => {
++  for (const words of [
++    [`--format=${STAT_FORMAT}`, "docs/state.md"],
++    ["--format=%U %n", "docs/state.md"],
++    ["-c%a", "docs/state.md"],
++    ["-c%U", "docs/state.md"],
++  ]) {
++    const command = statCommand(...words);
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
++    assert.equal(statLane(path, ...words), false, `lane: ${command}`);
++  }
++}));
++
++test("AP15 every other stat format-bearing spelling (--printf, -f, clustered short options, long-option abbreviations) is routed into the closed lane and refused (C5D-F1)", () => withLaneFixture((path) => {
++  for (const words of [
++    // The five spellings the correction round named: separate and attached --printf, clustered -Lc with an attached and a separate format, -f.
++    ["--printf=%a", "docs/state.md"],
++    ["--printf", "%a", "docs/state.md"],
++    ["-Lc%a", "docs/state.md"],
++    ["-Lc", STAT_FORMAT, "docs/state.md"],
++    ["-f", "docs/state.md"],
++    // The same family: --printf with a full format, clusters in either order and with -f, the long spelling of -f, getopt long-option
++    // abbreviations of --format/--printf/--file-system, and a format-bearing argument that is not first or follows another option.
++    ["--printf=%a %s %n", "docs/state.md"],
++    ["-cL", STAT_FORMAT, "docs/state.md"],
++    ["-Lf", "docs/state.md"],
++    ["-fL", "docs/state.md"],
++    ["-L", "-f", "docs/state.md"],
++    ["--file-system", "docs/state.md"],
++    ["--form=%a", "docs/state.md"],
++    ["--print=%a", "docs/state.md"],
++    ["--for", STAT_FORMAT, "docs/state.md"],
++    ["--f", "docs/state.md"],
++    ["docs/state.md", "--printf=%a"],
++    ["docs/state.md", "-Lc%a"],
++    // A fixed admitted format does not carry a cluster, or a further format option among the operands, into the lane.
++    ["-Lc", STAT_FORMAT_LINKS, "docs/state.md"],
++    ["-c", STAT_FORMAT, "--printf=%a", "docs/state.md"],
++    ["--format", STAT_FORMAT, "-f", "docs/state.md"],
++  ]) {
++    const command = statCommand(...words);
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 2, `${command}\n${r.text}`);
++    assert.equal(statLane(path, ...words), false, `lane: ${command}`);
++  }
++  // Controls: the routing narrows format-bearing arguments only. A plain stat of a contained file and the two fixed shapes keep their verdict.
++  for (const words of [["docs/state.md"], ["-c", STAT_FORMAT, "docs/state.md"], ["--format", STAT_FORMAT_LINKS, "docs/state.md"]]) {
++    const command = statCommand(...words);
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
++    assert.equal(statLane(path, ...words), true, `routing: ${command}`);
++  }
++}));
