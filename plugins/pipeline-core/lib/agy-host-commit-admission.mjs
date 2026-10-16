@@ -35,6 +35,15 @@ function physicalRoot(root) {
     return stat.isDirectory() && !stat.isSymbolicLink() && realpathSync(absolute) === absolute ? absolute : null;
   } catch { return null; }
 }
+/** Git prints forward slashes on Windows; compare after path normalization, case-insensitively on win32. */
+function sameTopLevel(output, expected) {
+  if (typeof output !== "string" || typeof expected !== "string") return false;
+  const given = output.trim();
+  if (given.length === 0) return false;
+  const left = resolve(given);
+  const right = resolve(expected);
+  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
 function resultExists(root, resultPath) {
   try { lstatSync(resolve(root, resultPath)); return true; }
   catch (error) { return error?.code !== "ENOENT"; }
@@ -72,7 +81,7 @@ function captureHostCommitBaseline({ root, candidateCommit, resultPath } = {}, c
   const tracked = paths(git(physical, ["diff", "--no-renames", "--name-only", "-z", "HEAD"]));
   const untracked = paths(git(physical, ["ls-files", "--others", "--exclude-standard", "-z"]));
   if (head === null || topLevel === null || conflicts === null || staged === null || tracked === null || untracked === null) return fail("AGY-HOST-BASELINE-GIT");
-  if (topLevel.trim() !== physical || head.trim() !== candidateCommit || conflicts.length !== 0 || staged.length !== 0 || tracked.some(path=>!concurrent?.foreignPaths.includes(path))) return fail("AGY-HOST-BASELINE-DIRTY");
+  if (!sameTopLevel(topLevel, physical) || head.trim() !== candidateCommit || conflicts.length !== 0 || staged.length !== 0 || tracked.some(path=>!concurrent?.foreignPaths.includes(path))) return fail("AGY-HOST-BASELINE-DIRTY");
   if (resultExists(physical, resultPath)) return fail("AGY-HOST-BASELINE-RESULT-COLLISION");
   const files = untrackedDigests(physical, untracked.filter(path=>!concurrent?.foreignPaths.includes(path)));
   if (files === null) return fail("AGY-HOST-BASELINE-UNSAFE");
@@ -103,7 +112,7 @@ export function observeAgyHostHead({ baseline } = {}) {
   const head = git(baseline.root, ["rev-parse", "--verify", "HEAD^{commit}"]);
   const topLevel = git(baseline.root, ["rev-parse", "--show-toplevel"]);
   if (head === null || topLevel === null) return fail("AGY-HOST-HEAD-UNAVAILABLE");
-  if (topLevel.trim() !== baseline.root || head.trim() !== baseline.candidateCommit) {
+  if (!sameTopLevel(topLevel, baseline.root) || head.trim() !== baseline.candidateCommit) {
     return fail("AGY-HOST-HEAD-DRIFT");
   }
   return { ok: true, code: "AGY-HOST-HEAD-UNCHANGED" };
@@ -125,7 +134,7 @@ function assessHostCommit({ baseline, final, allowedPaths } = {}, concurrent=nul
   const tracked = paths(git(baseline.root, ["diff", "--no-renames", "--name-only", "-z", "HEAD"]));
   const untracked = paths(git(baseline.root, ["ls-files", "--others", "--exclude-standard", "-z"]));
   if (head === null || topLevel === null || conflicts === null || staged === null || tracked === null || untracked === null) return fail("AGY-HOST-COMMIT-GIT");
-  if (topLevel.trim() !== baseline.root || head.trim() !== baseline.candidateCommit || conflicts.length !== 0 || staged.length !== 0) return fail("AGY-HOST-COMMIT-DRIFT");
+  if (!sameTopLevel(topLevel, baseline.root) || head.trim() !== baseline.candidateCommit || conflicts.length !== 0 || staged.length !== 0) return fail("AGY-HOST-COMMIT-DRIFT");
   const preserved = untrackedDigests(baseline.root, baseline.untracked.map((entry) => entry.path));
   if (preserved === null || !same(preserved.map((entry) => `${entry.path}:${entry.sha256}`), baseline.untracked.map((entry) => `${entry.path}:${entry.sha256}`))) return fail("AGY-HOST-COMMIT-BASELINE-CHANGED");
   const newUntracked = untracked.filter((path) => !baseline.untracked.some((entry) => entry.path === path) && path !== baseline.resultPath);

@@ -348,6 +348,7 @@ function admittedName(taskId) {
 
 /** The commonDir must come from the host's physical repository descriptor. */
 export function persistAgyHostObservedReceipt({ root, commonDir, receipt, record, recordBytes } = {}) {
+  if (typeof root !== "string" || root.length === 0) return { ok: false, code: "AGY-HOST-STORE-ROOT" };
   if (!validateAgyHostObservedReceiptShape(receipt, { record, recordBytes })) return { ok: false, code: "AGY-HOST-STORE-BINDING" };
   try {
     return withSourceOwnedAgyHostObservedPublication({ root, commonDir, receipt }, () =>

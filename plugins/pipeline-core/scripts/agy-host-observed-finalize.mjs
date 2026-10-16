@@ -78,7 +78,7 @@ export async function finalizeAgyFamilyHostObservedReturn({ sealed, launched } =
     const privateDraft = draftAgyHostObservedReceipt({ modelWitness: witness, commitReadback: committed, record: draft.record });
     if (!privateDraft.ok) return recovery("AGY-FAMILY-FINALIZE-PRIVATE-DRAFT", committed.commit);
     const stored = loadStoredConsent(sealed.root, sealed.sessionId, sealed.descriptorSha256);
-    const privateStored = persistAgyHostObservedReceipt({ commonDir: stored.descriptor.repo.commonDir,
+    const privateStored = persistAgyHostObservedReceipt({ root: sealed.root, commonDir: stored.descriptor.repo.commonDir,
       receipt: privateDraft.receipt, record: draft.record, recordBytes: agyAuthoredRecordBytes(draft.record) });
     if (!privateStored.ok) return recovery("AGY-FAMILY-FINALIZE-PRIVATE-STORE", committed.commit);
     const published = await withAgyFamilyLocalReadback({ root: sealed.root, handle: launched.familyReturnHandle,
@@ -183,7 +183,7 @@ export function finalizeAgyHostObservedReturn({ sealed, launched } = {}, depende
     const privateDraft = draftAgyHostObservedReceipt({ modelWitness: witness,
       commitReadback: committed, record: draft.record });
     if (!privateDraft.ok) return recovery("AGY-FINALIZE-PRIVATE-DRAFT", committed.commit);
-    const privateStored = persistAgyHostObservedReceipt({ commonDir: stored.descriptor.repo.commonDir,
+    const privateStored = persistAgyHostObservedReceipt({ root: sealed.root, commonDir: stored.descriptor.repo.commonDir,
       receipt: privateDraft.receipt, record: draft.record,
       recordBytes: agyAuthoredRecordBytes(draft.record) });
     if (!privateStored.ok) return recovery("AGY-FINALIZE-PRIVATE-STORE", committed.commit);
