@@ -77,7 +77,9 @@ below assumes it holds and is written to catch a change that would break it.
   trust anchor), and
   `lib/critical-human-proof-policy.mjs`/`lib/po-approval-proof.mjs` (the two
   modules that verify a window and every push/deploy/publication/
-  release-preflight proof). The kernel must be closed under import, not just
+  release-preflight proof), and the interruption registry data file
+  `config/interruption-registry.v1.json` (imported by
+  `lib/interruption-receipt-store.mjs`). The kernel must be closed under import, not just
   these entries' own bytes — a valid window could otherwise reach the same
   code through one first-party import hop, exactly the recursive hole this
   list exists to close. NVA-A7FIX-2 replaced the hand-walked, twice-incomplete
@@ -523,6 +525,77 @@ artifacts, candidate ancestry and the existing final approval; the shared
 retirement module supplies typed refusals with no implementation authority.
 These delegates execute with kernel authority, so a maintenance window cannot
 rewrite their decisions while leaving the importing authority reader intact.
+
+Closure repair ALF-C-P3-01D adds the modules reached from the kernel roots
+through first-party imports and declared dynamic-import edges. They execute with
+kernel authority, so a maintenance window cannot lift them:
+`plugins/pipeline-core/lib/administrative-commit-policy.mjs`,
+`plugins/pipeline-core/lib/afk-assumption-mode.mjs`,
+`plugins/pipeline-core/lib/afk-capability-worker.mjs`,
+`plugins/pipeline-core/lib/afk-git-adapter.mjs`,
+`plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs`,
+`plugins/pipeline-core/lib/afk-ledger.mjs`,
+`plugins/pipeline-core/lib/afk-review.mjs`,
+`plugins/pipeline-core/lib/afk-transaction-host.mjs`,
+`plugins/pipeline-core/lib/agy-host-commit-execution.mjs`,
+`plugins/pipeline-core/lib/agy-item-delivery.mjs`,
+`plugins/pipeline-core/lib/architecture-prospective-materialization.mjs`,
+`plugins/pipeline-core/lib/backlog-state.mjs`,
+`plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs`,
+`plugins/pipeline-core/lib/claude-hook-session-owner.mjs`,
+`plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs`,
+`plugins/pipeline-core/lib/controlled-continuity-method-dispatch.mjs`,
+`plugins/pipeline-core/lib/controlled-method-dispatch-observation.mjs`,
+`plugins/pipeline-core/lib/critic-accepted-contract.mjs`,
+`plugins/pipeline-core/lib/critic-diagnostic-producer.mjs`,
+`plugins/pipeline-core/lib/critic-generic-batch.mjs`,
+`plugins/pipeline-core/lib/darwin-native-process-observer.mjs`,
+`plugins/pipeline-core/lib/design-decision-bindings.mjs`,
+`plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs`,
+`plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs`,
+`plugins/pipeline-core/lib/doc-reader-plan-scope.mjs`,
+`plugins/pipeline-core/lib/historical-fresh-review-admission.mjs`,
+`plugins/pipeline-core/lib/interruption-promotion.mjs`,
+`plugins/pipeline-core/lib/interruption-receipt-store.mjs`,
+`plugins/pipeline-core/lib/interruption-receipts.mjs`,
+`plugins/pipeline-core/lib/invocation-reliability.mjs`,
+`plugins/pipeline-core/lib/local-supervisor-state.mjs`,
+`plugins/pipeline-core/lib/local-worker-pool.mjs`,
+`plugins/pipeline-core/lib/local-worker-supervisor.mjs`,
+`plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs`,
+`plugins/pipeline-core/lib/native-managed-authority-support.mjs`,
+`plugins/pipeline-core/lib/native-platform-process-observer.mjs`,
+`plugins/pipeline-core/lib/observation-doc-classification.mjs`,
+`plugins/pipeline-core/lib/owned-continuity-verification.mjs`,
+`plugins/pipeline-core/lib/project-calibration-identity.mjs`,
+`plugins/pipeline-core/lib/rigor-lifecycle.mjs`,
+`plugins/pipeline-core/lib/session-authority-domain-owner.mjs`,
+`plugins/pipeline-core/lib/session-authority-registry.mjs`,
+`plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs`,
+`plugins/pipeline-core/lib/session-power.mjs`,
+`plugins/pipeline-core/lib/session-requester-bridge.mjs`,
+`plugins/pipeline-core/lib/slice-queue.mjs`,
+`plugins/pipeline-core/lib/staged-observation-doc-classification.mjs`,
+`plugins/pipeline-core/lib/verify-owning-controller-route.mjs`,
+`plugins/pipeline-core/lib/verify-resume.mjs`,
+`plugins/pipeline-core/lib/verify-suite-registration.mjs`,
+`plugins/pipeline-core/lib/windows-native-process-observer.mjs`,
+`plugins/pipeline-core/lib/windows-owned-authority-backend.mjs`,
+`plugins/pipeline-core/lib/windows-process-identity.mjs`,
+`plugins/pipeline-core/lib/windows-requester-runtime.mjs`,
+`plugins/pipeline-core/scripts/architecture-baseline.mjs`,
+`plugins/pipeline-core/scripts/dispatch-record-write.mjs`,
+`plugins/pipeline-core/scripts/onboarding-init.mjs`,
+`plugins/pipeline-core/scripts/osv-deadline-disconnect-controls.mjs`,
+`plugins/pipeline-core/scripts/osv-guard-refusal-controls.mjs`,
+`plugins/pipeline-core/scripts/osv-owned-file-controls.mjs`,
+`plugins/pipeline-core/scripts/osv-suite-source-controls.mjs`,
+`plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs`,
+`plugins/pipeline-core/scripts/owning-verification-controller.mjs`,
+`plugins/pipeline-core/scripts/report-interruptions.mjs`,
+`plugins/pipeline-core/scripts/session-power-controller.mjs`.
+The interruption registry data file (`plugins/pipeline-core/config/interruption-registry.v1.json`)
+is also in the array; the doc token form does not cover a `config/` directory.
 
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.

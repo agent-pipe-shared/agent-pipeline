@@ -275,14 +275,48 @@ const DYNAMIC_IMPORT_EDGES = {
     "../lib/guard-maintenance-window.mjs",
     "../lib/plan-spec-state-v2.mjs",
     "./pipeline-state.mjs",
+    "../lib/staged-observation-doc-classification.mjs",
+    "../lib/calibration-verify-commit-transition.mjs",
   ],
   "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs": [
     "../lib/commit-message-policy.mjs",
     "../lib/signed-quality-package.mjs",
     "../lib/project-authority.mjs",
     "../lib/guard-devplan-policy.mjs",
+    "../lib/administrative-commit-policy.mjs",
+  ],
+  // closure repair ALF-C-P3-01D: lazily loaded modules of newly reached kernel files.
+  "plugins/pipeline-core/scripts/po-human-approval.mjs": [
+    "../lib/portable-critic-export.mjs",
+    "../lib/historical-fresh-review-admission.mjs",
+  ],
+  "plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs": [
+    "./evaluate.mjs",
+  ],
+  "plugins/pipeline-core/scripts/owning-verification-controller.mjs": [
+    "./owning-verification-controller-controls.mjs",
+  ],
+  // The generated hook-currentness probe template: three builtins plus a self-import.
+  "plugins/pipeline-core/lib/hook-currentness.mjs": [
+    "node:fs",
+    "node:path",
+    "node:url",
+    "./hook-currentness.mjs",
+  ],
+  // Two string-embedded sites: the modules are resolved from a runtime map.
+  "plugins/pipeline-core/lib/onboarding-continuity.mjs": [
+    { computed: "s.modules.recorder.url", alternatives: ["./test-case-completion.mjs"] },
+    { computed: "s.modules.lifecycle.url", alternatives: ["./critic-verify-lifecycle.mjs"] },
   ],
 };
+
+// The ONE narrow exemption to the import scan: a kernel file whose runtime fixture embeds an
+// import statement inside a string. The scanner skips exactly this file+specifier pair; the
+// exempted target must NOT exist on disk (asserted in GMWKC10), so a real module of that
+// name can never hide behind the exemption.
+const FIXTURE_STRING_IMPORTS = [
+  { from: "plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs", specifier: "./actual-support.mjs" },
+];
 
 // Spawn-edge scanner (pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges): see
 // the "SPAWN EDGES" section of the file header for the shapes this classifies.
@@ -463,6 +497,7 @@ function relativeImportSpecifiersFromSource(rawSource, repoRelativePath, violati
   }
   const relativeSpecs = [];
   for (const spec of specs) {
+    if (FIXTURE_STRING_IMPORTS.some((e) => e.from === repoRelativePath && e.specifier === spec)) continue;
     if (spec.startsWith("./") || spec.startsWith("../")) relativeSpecs.push(spec);
   }
   return relativeSpecs;
@@ -744,7 +779,7 @@ check("GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from
 
 // A backtick-quoted path token in the threat-model prose. The directory part admits zero or more
 // nested segments (`lib/guard/verdict.mjs`, S2-70); a segment is a plain name, so `..`/`.` never match.
-const DOC_PATH_TOKEN_RE = /`((?:plugins\/pipeline-core\/)?(?:lib|scripts|hooks|schemas)\/(?:[A-Za-z0-9_\-]+\/)*[A-Za-z0-9_.\-]+\.(?:mjs|js|json)|\.\/schemas\/[A-Za-z0-9_.\-]+\.json|harness\/(?:scripts|config)\/[A-Za-z0-9_.\-]+\.(?:mjs|json)|project\/critical-human-proof\.json)`/g;
+const DOC_PATH_TOKEN_RE = /`((?:plugins\/pipeline-core\/)?(?:lib|scripts|hooks|schemas|config)\/(?:[A-Za-z0-9_\-]+\/)*[A-Za-z0-9_.\-]+\.(?:mjs|js|json)|\.\/schemas\/[A-Za-z0-9_.\-]+\.json|harness\/(?:scripts|config)\/[A-Za-z0-9_.\-]+\.(?:mjs|json)|project\/critical-human-proof\.json)`/g;
 
 check("GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry", () => {
   const docPath = join(REPO_ROOT, "docs", "guard-maintenance-window-threat-model.md");
@@ -777,6 +812,8 @@ check("GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict o
   assert.deepEqual(tokens("`lib/guard/verdict.mjs`"), ["lib/guard/verdict.mjs"]);
   assert.deepEqual(tokens("`plugins/pipeline-core/lib/guard/verdict.mjs`"), ["plugins/pipeline-core/lib/guard/verdict.mjs"]);
   assert.deepEqual(tokens("`lib/entrypoint.mjs`"), ["lib/entrypoint.mjs"]);
+  // A config/ data file (the interruption registry) is recognized too.
+  assert.deepEqual(tokens("`config/interruption-registry.v1.json`"), ["config/interruption-registry.v1.json"]);
   // Negative: an unlisted top directory, a traversal segment, a wrong extension, and a token
   // without its backticks never count as a protected-asset mention.
   assert.deepEqual(tokens("`docs/guard/verdict.mjs`"), []);
@@ -857,6 +894,15 @@ check("GMWKC07 supplementary completion policy and consumer are never liftable p
   ]) {
     assert.ok(NEVER_LIFTABLE_KERNEL_PATHS.includes(path), path);
     assert.equal(isNeverLiftableKernelPath(join(REPO_ROOT, path), { rootDir: REPO_ROOT }), true);
+  }
+});
+
+check("GMWKC10 every FIXTURE_STRING_IMPORTS exemption names a target that does NOT exist on disk", () => {
+  assert.ok(FIXTURE_STRING_IMPORTS.length > 0);
+  for (const { from, specifier } of FIXTURE_STRING_IMPORTS) {
+    const target = resolveRepoRelative(from, specifier);
+    assert.equal(existsSync(join(REPO_ROOT, target)), false, `${target} exists, so ${from} -> ${specifier} is a real import, not a fixture string`);
+    assert.ok(readFileSync(join(REPO_ROOT, from), "utf8").includes(specifier), `${from} still embeds ${specifier}; drop the stale exemption`);
   }
 });
 
