@@ -5,8 +5,93 @@ $NativeUtf8=[Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding=$NativeUtf8
 $OutputEncoding=$NativeUtf8
 # Fixed source-only read operations. Input can select only one bounded PID.
+# BEGIN pipeline-native-type-cache v1 (byte-identical in both native helpers; a pin compares the copies)
+# The C# type is compiled once per user and exact source, then loaded only from bytes verified in the same call.
+function Test-PipelinePrivateAcl($acl,[string]$sid) {
+ if($acl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value -ne $sid){return $false}
+ $rules=@($acl.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier]))
+ if($rules.Count -eq 0){return $false}
+ foreach($rule in $rules){if($rule.IdentityReference.Value -ne $sid -or $rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow){return $false}}
+ return $true
+}
+function Get-PipelineSha256([byte[]]$bytes) {
+ $hash=[System.Security.Cryptography.SHA256]::Create()
+ try{return [System.BitConverter]::ToString($hash.ComputeHash($bytes)).Replace('-','').ToLowerInvariant()}finally{$hash.Dispose()}
+}
+function Import-PipelineVerifiedAssembly([string]$dir,[string]$prefix,[string]$sid,[string]$typeName) {
+ $names=@();try{$names=@([System.IO.Directory]::GetFiles($dir,$prefix+'.*.dll'))}catch{return}
+ [System.Array]::Sort($names)
+ $tried=0
+ foreach($file in $names){
+  if($tried -ge 8){break}
+  $tried++
+  $bytes=$null
+  $expected=[regex]::Match([System.IO.Path]::GetFileName($file),'^'+[regex]::Escape($prefix)+'\.([0-9a-f]{64})\.dll$')
+  if(-not $expected.Success){continue}
+  $stream=$null
+  try{
+   if(([System.IO.File]::GetAttributes($file) -band [System.IO.FileAttributes]::ReparsePoint) -ne 0){continue}
+   $stream=[System.IO.FileStream]::new($file,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::Read)
+   if(-not (Test-PipelinePrivateAcl ($stream.GetAccessControl()) $sid)){continue}
+   if($stream.Length -lt 1024 -or $stream.Length -gt 4194304){continue}
+   $buffer=[byte[]]::new([int]$stream.Length);$at=0
+   while($at -lt $buffer.Length){$count=$stream.Read($buffer,$at,$buffer.Length-$at);if($count -le 0){break};$at+=$count}
+   if($at -eq $buffer.Length -and (Get-PipelineSha256 $buffer) -eq $expected.Groups[1].Value){$bytes=$buffer}
+  }catch{$bytes=$null}finally{if($null -ne $stream){$stream.Dispose()}}
+  if($null -eq $bytes){continue}
+  $assembly=$null
+  try{$assembly=[System.Reflection.Assembly]::Load($bytes)}catch{continue}
+  if($null -eq $assembly.GetType($typeName,$false)){throw 'PIPELINE-NATIVE-TYPE-MISSING'}
+  $script:PipelineNativeTypeLoaded=$true
+  return
+ }
+}
+function Test-PipelinePrivateDirectory([string]$dir,[string]$sid) {
+ try{
+  $attributes=[System.IO.File]::GetAttributes($dir)
+  $acl=[System.IO.Directory]::GetAccessControl($dir,[System.Security.AccessControl.AccessControlSections]'Access,Owner')
+  if(($attributes -band [System.IO.FileAttributes]::Directory) -eq 0 -or ($attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 -or -not $acl.AreAccessRulesProtected){return $false}
+  return (Test-PipelinePrivateAcl $acl $sid)
+ }catch{return $false}
+}
+function Import-PipelineNativeType([string]$source,[string]$tag,[string]$typeName,[string]$cacheRoot='') {
+ $script:PipelineNativeTypeLoaded=$false
+ $dir=$null;$prefix=$null;$sid=$null
+ try{
+  $sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $runtime=[string]::Join('|',@('v1',$tag,$PSVersionTable.PSVersion.ToString(),$PSVersionTable.CLRVersion.ToString(),[System.Diagnostics.FileVersionInfo]::GetVersionInfo([object].Assembly.Location).FileVersion,[Environment]::Is64BitProcess.ToString(),[Environment]::Is64BitOperatingSystem.ToString(),[string]$env:PROCESSOR_ARCHITECTURE))
+  $prefix=$tag+'-'+(Get-PipelineSha256 ([System.Text.Encoding]::UTF8.GetBytes($runtime+[string][char]10+$source))).Substring(0,32)
+  $root=$cacheRoot
+  if([string]::IsNullOrEmpty($root)){$root=[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)}
+  if([string]::IsNullOrEmpty($root)){throw 'PIPELINE-NATIVE-CACHE-ROOT'}
+  $dir=[System.IO.Path]::Combine($root,'agent-pipeline-native-cache')
+  if(-not [System.IO.Directory]::Exists($dir)){
+   $account=[System.Security.Principal.SecurityIdentifier]::new($sid)
+   $security=[System.Security.AccessControl.DirectorySecurity]::new()
+   $security.SetOwner($account)
+   $security.SetAccessRuleProtection($true,$false)
+   $security.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($account,[System.Security.AccessControl.FileSystemRights]::FullControl,[System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',[System.Security.AccessControl.PropagationFlags]::None,[System.Security.AccessControl.AccessControlType]::Allow))
+   [void][System.IO.Directory]::CreateDirectory($dir,$security)
+  }
+  if(-not (Test-PipelinePrivateDirectory $dir $sid)){$dir=$null}
+ }catch{$dir=$null}
+ if($null -ne $dir){
+  Import-PipelineVerifiedAssembly $dir $prefix $sid $typeName
+  if(-not $script:PipelineNativeTypeLoaded){
+   $build=[System.IO.Path]::Combine($dir,'b'+[Guid]::NewGuid().ToString('N')+'.dll')
+   try{
+    Add-Type -TypeDefinition $source -OutputAssembly $build
+    $built=[System.IO.File]::ReadAllBytes($build)
+    [System.IO.File]::Move($build,[System.IO.Path]::Combine($dir,$prefix+'.'+(Get-PipelineSha256 $built)+'.dll'))
+   }catch{}finally{try{[System.IO.File]::Delete($build)}catch{}}
+   Import-PipelineVerifiedAssembly $dir $prefix $sid $typeName
+  }
+ }
+ if(-not $script:PipelineNativeTypeLoaded){Add-Type -TypeDefinition $source}
+}
+# END pipeline-native-type-cache v1
 try {
-Add-Type -TypeDefinition @'
+$PipelineNativeSource=@'
 using System;
 using System.IO;
 using System.Text;
@@ -71,6 +156,7 @@ public static class PipelineProcessObserver {
  }
 }
 '@
+ Import-PipelineNativeType $PipelineNativeSource 'process-observer' 'PipelineProcessObserver'
  $raw=[Console]::In.ReadToEnd();if($raw.Length -gt 64){throw 'WPO-INPUT'}
  $request=ConvertFrom-Json -InputObject $raw
  if(@($request.PSObject.Properties.Name).Count -ne 1 -or $null -eq $request.pid -or ($request.pid -isnot [long] -and $request.pid -isnot [int]) -or $request.pid -lt 1 -or $request.pid -gt 2147483647){throw 'WPO-INPUT'}

@@ -8,7 +8,7 @@ import {isAbsolute,resolve} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 
-const HELPER_SHA256='66865ee9c17f83cd1fe9bb68f9acd593e06b8064257f1b10b84c224e9cd4d720';
+const HELPER_SHA256='12de3f490d6e2590b148ff2adb00a52e2778776c54e41e0effd8d12d69ed16ae';
 const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -16,7 +16,7 @@ const exact=(value,keys)=>object(value)&&Object.keys(value).sort().join(',')===[
 const factsPattern=/^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[a-f0-9]{64}$/u;
 function fail(reason,committed=false){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;error.committed=committed;throw error;}
 function path(value){if(typeof value!=='string'||!isAbsolute(value)||resolve(value)!==value||value.length>32768||/[\u0000-\u001f]/u.test(value)||value.startsWith('\\\\')||value.slice(2).includes(':'))fail('WIN-AUTH-PATH');return value;}
-function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>20000||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');if(digest(bytes)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return bytes.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
+function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>32768||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');if(digest(bytes)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return bytes.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
 function invoke(request){
  if(process.platform!=='win32')fail('WIN-AUTH-PLATFORM-UNAVAILABLE');
  const input=JSON.stringify(request);if(Buffer.byteLength(input)>1500000)fail('WIN-AUTH-INPUT');
