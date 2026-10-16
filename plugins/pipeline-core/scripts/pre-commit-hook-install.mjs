@@ -237,8 +237,9 @@ export function renderShim(implAbsPath) {
  * full scope/fail-closed contract. Kept as one exported render function (never copied inline at
  * each call site) so the installed hook's content stays byte-identical to whatever
  * `pre-commit-hook-install.test.mjs` exercises. */
-export function renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir }) {
+export function renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir, sourcePluginLibDir }) {
   const lib = JSON.stringify(pluginLibDir);
+  const staleCheck = renderSnapshotStaleCheck({ sourcePluginLibDir, installerName: "pre-commit-hook-install.mjs" });
   const hooksDir = JSON.stringify(pluginHooksDir);
   const scriptsDir = JSON.stringify(pluginScriptsDir);
   return `#!/usr/bin/env node
@@ -696,7 +697,9 @@ function block(lines) {
   process.exitCode = 1;
 }
 
+${staleCheck}
 async function main() {
+  if (await snapshotIsStale()) return;
   const projectRoot = resolveProjectRoot();
   const commonDir = resolveGitCommonDir();
   if (!projectRoot || !commonDir) {
@@ -926,7 +929,7 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, pl
   return { status: "ready", hookPath, commonDir, pluginLibDir, pluginHooksDir, pluginScriptsDir };
 }
 // ESM hoists this import; it sits beside its only use so the change stays one local edit.
-import { assessHookCurrentness } from "../lib/hook-currentness.mjs";
+import { assessHookCurrentness, renderSnapshotStaleCheck } from "../lib/hook-currentness.mjs";
 
 /** Read-only: whether a decline can be recorded (mirrors `planInstall`'s fail-closed root
  * resolution; declining never inspects hook content). */
@@ -964,11 +967,12 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, p
   const snapshotState = join(commonDir, "agent-pipeline", "pre-commit-hook");
   ensureHardenedPrivateDirectory(commonDir, snapshotState);
   const runtimeSnapshot = publishGitHookRuntimeSnapshot({ pluginLibDir, stateDir: snapshotState, onProgress, timeBudgetMs });
+  const sourcePluginLibDir = pluginLibDir;
   pluginLibDir = join(runtimeSnapshot.root, "lib");
   pluginHooksDir = join(runtimeSnapshot.root, "hooks");
   pluginScriptsDir = join(runtimeSnapshot.root, "scripts");
   const impl = implPath(commonDir);
-  const implContent = decorateInstalledImpl(renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir }), pluginLibDir, runtimeSnapshot.deadline);
+  const implContent = decorateInstalledImpl(renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir, sourcePluginLibDir }), pluginLibDir, runtimeSnapshot.deadline);
   const shimContent = renderShim(impl);
 
   ensureHardenedPrivateDirectory(commonDir, snapshotState);

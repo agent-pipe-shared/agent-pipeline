@@ -673,6 +673,7 @@ export function observePrePushHookInstallation({
     return {
       schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
       state: "installed-but-stale",
+      code: "HOOK-SNAPSHOT-STALE",
       installed: false,
       detail: "the pipeline-owned hook is intact but bound to an older plugin distribution; run the installer update",
       installCommand: prePushHookInstallCommand(rootDir),

@@ -52,6 +52,41 @@ export function createOnceSourceInspector(inspectSource = inspectGitHookSourceSn
   };
 }
 
+export const HOOK_SNAPSHOT_STALE_CODE = "HOOK-SNAPSHOT-STALE";
+
+/**
+ * Source text injected into a generated commit-msg / pre-commit implementation so the installed
+ * hook compares its own snapshot with the loaded plugin and refuses when they differ. It needs
+ * `PLUGIN_LIB_DIR` (the recorded snapshot lib) and `block(lines)` from the host template, and
+ * defines `snapshotIsStale()` (true = already refused, the caller returns). With no source
+ * library directory (or one that no longer exists) nothing can be compared and the hook behaves
+ * exactly as before; with a source that exists, an unassessable comparison is stale (fail closed).
+ * The one refresh command is the installer's own `--install`.
+ */
+export function renderSnapshotStaleCheck({ sourcePluginLibDir, installerName }) {
+  const source = typeof sourcePluginLibDir === "string" ? JSON.stringify(sourcePluginLibDir) : "null";
+  const command = typeof sourcePluginLibDir === "string"
+    ? JSON.stringify(`node "${resolve(sourcePluginLibDir, "..", "scripts", installerName)}" --install`)
+    : "null";
+  return `const SOURCE_PLUGIN_LIB_DIR = ${source};
+const SNAPSHOT_REFRESH_COMMAND = ${command};
+
+async function snapshotIsStale() {
+  if (!SOURCE_PLUGIN_LIB_DIR) return false;
+  try {
+    const { existsSync: sourceExists } = await import("node:fs");
+    if (!sourceExists(SOURCE_PLUGIN_LIB_DIR)) return false;
+    const { resolve: resolvePath } = await import("node:path");
+    const { pathToFileURL: toFileUrl } = await import("node:url");
+    const { assessHookCurrentness } = await import(toFileUrl(resolvePath(PLUGIN_LIB_DIR, "hook-currentness.mjs")).href);
+    if (assessHookCurrentness({ recordedPluginLibDir: PLUGIN_LIB_DIR, pluginLibDir: SOURCE_PLUGIN_LIB_DIR }).current === true) return false;
+  } catch { /* an unassessable comparison against an existing source is stale */ }
+  block(["HOOK-SNAPSHOT-STALE: this hook's runtime snapshot no longer matches the loaded plugin; refresh it with: " + SNAPSHOT_REFRESH_COMMAND]);
+  return true;
+}
+`;
+}
+
 export function assessHookCurrentness({ recordedPluginLibDir, pluginLibDir, inspectSource = inspectGitHookSourceSnapshot } = {}) {
   let current = typeof recordedPluginLibDir === "string" && recordedPluginLibDir === pluginLibDir;
   if (!current && typeof recordedPluginLibDir === "string") {
