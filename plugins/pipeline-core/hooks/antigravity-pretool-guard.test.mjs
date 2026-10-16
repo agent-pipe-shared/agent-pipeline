@@ -208,6 +208,15 @@ function readyLifecycleFixture(mode = "chat") {
   collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "AGY fixture." }]) });
   const generated = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "intake-generate-plan");
   invoke("intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "antigravity");
+  // The acknowledgement refuses a generated draft (BOOTSTRAP-ACK-PLACEHOLDER-CONTENT),
+  // so author a completed staging package and bind its spec digest through the
+  // public marker route, as the production walk does before the PO decision.
+  const prdFile = join(root, generated.targets.prd.path);
+  const language = readFileSync(prdFile, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+  writeFileSync(join(root, generated.targets.spec.path), "# Completed AGY fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the AGY adapter fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
+  writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n`);
+  const markerPlan = invoke("intake-spec-marker-plan", "--root", root, "--runner", "antigravity");
+  invoke("intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "antigravity");
   // Mini staging still requires the canonical chat acknowledgement before
   // bind planning. Execute its returned action and re-inspect for the bind.
   follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "bootstrap-acknowledge-chat-apply");
@@ -250,6 +259,7 @@ function readyLifecycleFixture(mode = "chat") {
 function run(input, root = fixture(), {
   claudeProjectDir = root,
   hookCwd = root,
+  timeoutMs = 8_000,
 } = {}) {
   const envelope = typeof input === "string" ? input : {
     workspacePaths: [root],
@@ -265,7 +275,7 @@ function run(input, root = fixture(), {
       env: { ...process.env, CLAUDE_PROJECT_DIR: claudeProjectDir },
       encoding: "utf8",
       stdio: [inputFd, "pipe", "pipe"],
-      timeout: 8_000,
+      timeout: timeoutMs,
     });
   } finally {
     closeSync(inputFd);
@@ -600,6 +610,47 @@ check("Antigravity pretool guard blocks write when Dev-Plan is not approved", ()
   assert.equal(res.decision, "deny");
   assert.match(res.reason, /guard-devplan|BLOCKED/);
   rmSync(root, { recursive: true, force: true });
+});
+
+// EL-01 write-time tripwire (AC-109): the Antigravity Edit/Write route runs the
+// same guard-el01-tripwire the Claude route runs. Role source is the open
+// dispatch record, never a prompt-asserted role.
+function el01RiskFixture(openDispatch) {
+  const root = fixture();
+  mkdirSync(join(root, "specs", "feat-1"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: true,
+    activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" },
+  }));
+  writeFileSync(join(root, "specs", "feat-1", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
+  if (openDispatch) {
+    writeFileSync(join(root, "dispatch-record.json"), JSON.stringify({
+      taskId: "T-1", model: "m", rulesetSha: "a".repeat(64), dispatcher: "elephant", outcome: "in-progress", log: [],
+    }));
+  }
+  return root;
+}
+
+check("Antigravity pretool guard refuses an Elephant-role production write via the EL-01 tripwire", () => {
+  const root = el01RiskFixture(false);
+  try {
+    const res = decision(run({
+      toolCall: { name: "write_to_file", args: { TargetFile: join(root, "src", "code.js"), CodeContent: "x" } },
+    }, root, { timeoutMs: 60_000 }));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /guard-el01-tripwire/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity pretool guard does not refuse an admitted (open-dispatch) write via the EL-01 tripwire", () => {
+  const root = el01RiskFixture(true);
+  try {
+    const res = decision(run({
+      toolCall: { name: "write_to_file", args: { TargetFile: join(root, "src", "code.js"), CodeContent: "x" } },
+    }, root, { timeoutMs: 60_000 }));
+    assert.doesNotMatch(String(res.reason ?? ""), /guard-el01-tripwire/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 check("Antigravity pretool guard blocks unapproved git push", () => {
