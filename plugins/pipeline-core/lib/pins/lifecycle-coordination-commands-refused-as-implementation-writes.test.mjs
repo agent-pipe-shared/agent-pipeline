@@ -56,14 +56,45 @@ test('AC-207 point 1 [RED]: forward-slash and MSYS spellings of an emitted comma
   }
 });
 
-test('AC-207 point 1 [RED]: continuity-cas and integrate-final (the V-1/V-4 routes) are admitted as coordination commands', { skip: 'PO decision pending (P20-04 b/c), owner Coordinator' }, () => {
-  for (const verb of ['continuity-cas', 'integrate-final']) {
-    assert.equal(admittedByClosedArgv(`node ${q(state)} ${verb} --root ${q(root)}`), true, verb);
+// PO decision 2026-10-16 #10 (A): the admission lives in sanctioned-args-scripts.mjs (commit-protected;
+// signature-bound patch scratch/patches/P22-03B.patch). The two positive cases are RED on HEAD until it lands.
+const cont = (verb, tail) => `node ${q(state)} ${verb} ${tail}`;
+const goodTail = '--expected-revision 3 --request-file scratch/req.json --lock-token tok-1.A_b';
+
+test('AC-207 point 1 [RED until protected patch P22-03B]: continuity-cas and continuity-integrate-final in the exact closed grammar are admitted', () => {
+  for (const verb of ['continuity-cas', 'continuity-integrate-final']) {
+    assert.equal(admittedByClosedArgv(cont(verb, goodTail)), true, verb);
+    assert.equal(admittedByClosedArgv(cont(verb, '--lock-token x --request-file scratch/r-1.json --expected-revision absent')), true, `${verb} reordered/absent`);
   }
 });
 
-test('AC-207 point 2 [RED]: a read-only scratch script is admitted as read-only execution in the draft lifecycle', { skip: 'PO decision pending (P20-04 b/c), owner Coordinator' }, () => {
+test('AC-207 point 1 control: continuity near-misses stay refused', () => {
+  const nears = {
+    'unknown verb': cont('continuity-other', goodTail),
+    'integrate-final bare verb': cont('integrate-final', goodTail),
+    '--root': cont('continuity-cas', `--root ${q(root)}`),
+    'extra flag': cont('continuity-cas', `${goodTail} --force`),
+    'repeated flag': cont('continuity-cas', `${goodTail} --lock-token y`),
+    'request outside scratch': cont('continuity-cas', '--expected-revision 1 --request-file docs/r.json --lock-token t'),
+    'dotdot': cont('continuity-cas', '--expected-revision 1 --request-file scratch/../r.json --lock-token t'),
+    'absolute': cont('continuity-cas', '--expected-revision 1 --request-file /tmp/r.json --lock-token t'),
+    'nested scratch': cont('continuity-cas', '--expected-revision 1 --request-file scratch/a/r.json --lock-token t'),
+    'bad revision': cont('continuity-cas', '--expected-revision -1 --request-file scratch/r.json --lock-token t'),
+    'env prefix': `FOO=1 ${cont('continuity-cas', goodTail)}`,
+    'composed': `${cont('continuity-cas', goodTail)} && echo x`,
+  };
+  for (const [name, command] of Object.entries(nears)) assert.equal(admittedByClosedArgv(command), false, name);
+});
+
+test('AC-207 point 2: exactly `node scratch/<name>.mjs` is admitted in the draft lifecycle', () => {
   assert.equal(refused('node scratch/forensics.mjs'), false);
+  assert.equal(refused('node scratch/a-b_c.1.mjs'), false);
+});
+
+test('AC-207 point 2 control: scratch-script near-misses stay refused', () => {
+  for (const command of ['node scratch/forensics.mjs arg', 'node scratch/sub/x.mjs', 'node scratch/x.js', 'node scratch/../src/x.mjs', 'node src/x.mjs', 'node /tmp/x.mjs']) {
+    assert.equal(refused(command), true, command);
+  }
 });
 
 test('AC-207 point 2: the recovery-prescribed repository checker is admitted by its absolute spelling', () => {

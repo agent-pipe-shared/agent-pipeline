@@ -489,6 +489,18 @@ export function sanctionedPipelineStateArgs(args, root) {
       return false;
     }
   }
+  // AC-207 (PO decision 2026-10-16 #10 A): the continuity writer verbs in the exact grammar
+  // `<verb> --expected-revision <absent|int> --request-file scratch/<name>.json --lock-token <token>`,
+  // each flag exactly once in any order; the writer still owns every CAS and lock check.
+  if (args[0] === "continuity-cas" || args[0] === "continuity-integrate-final") {
+    return matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        "--expected-revision": (value) => value === "absent" || /^[0-9]+$/u.test(value ?? ""),
+        "--request-file": (value) => /^scratch\/[A-Za-z0-9._-]+\.json$/u.test(value ?? ""),
+        "--lock-token": (value) => /^[A-Za-z0-9._-]{1,128}$/u.test(value ?? ""),
+      },
+    });
+  }
   if (args[0] === "set-phase") {
     const bareTransition = args[1] === "--phase"
       && new Set(["design", "implementation"]).has(args[2])

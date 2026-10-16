@@ -108,7 +108,11 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
     const ownedVerification = toolName === "Bash"
       && (isSourceOwnedContinuityVerificationCommand(command, root, dependencies)
         || isSourceOwnedOwningVerificationControllerCommand(command, root, dependencies));
-    const opaqueScript = words === null ? null : opaqueScriptExecutionCandidate(words, root);
+    // AC-207 (PO decision 2026-10-16 #10 B): exactly `node scratch/<name>.mjs` with no further
+    // argument is a draft-phase scratch script, not an opaque implementation write.
+    const draftScratchScript = words !== null && words.length === 2 && words[0] === "node"
+      && /^scratch\/[A-Za-z0-9._-]+\.mjs$/u.test(words[1]);
+    const opaqueScript = words === null || draftScratchScript ? null : opaqueScriptExecutionCandidate(words, root);
     if (opaqueScript !== null
       && !ownedVerification
       && !(invocation !== null && isSanctionedLifecycleCommand(command, root, lifecycleOptions))
