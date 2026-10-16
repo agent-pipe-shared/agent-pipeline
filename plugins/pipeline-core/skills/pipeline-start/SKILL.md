@@ -161,6 +161,8 @@ recommendation.
    Never print it without Steps 1–5. "Non-ready" excludes
    `plugin-refresh-required` (soft-refresh; carried forward, not withheld). No
    confirmation on non-ready, unavailable, stale, malformed or drifted state.
+   The ready envelope carries `modelRoleBootstrap` (`unavailable` is legal,
+   absent is not); the session consumes it before the confirmation.
    The four required confirmation facts are: `runtime.status`, `profile/model`
    and `role`, `calibration/handover`, and `Verify availability`; each is
    digest-bound to the machine readback and printed before continuation. If

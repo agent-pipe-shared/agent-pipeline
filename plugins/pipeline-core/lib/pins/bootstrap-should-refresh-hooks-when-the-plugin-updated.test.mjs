@@ -371,3 +371,21 @@ test("RED P3: a refresh that also installs over a foreign hook is caught", async
   refreshMandatoryHooks(work, deps);
   assert.deepEqual(applyCalls, [], "production never applies over a foreign hook");
 });
+
+// ===== P6 : the start skill states the confirmation-withheld and readback-consumed rules (ALF-C-P19-03B) =========
+const skillText = () => readFileSync(join(repoRoot, "plugins", "pipeline-core", "skills", "pipeline-start", "SKILL.md"), "utf8").replace(/\s+/gu, " ");
+function assertSkillRules(text) {
+  assert.match(text, /No confirmation on non-ready/u, "confirmation must be withheld on a non-ready preflight");
+  assert.match(text, /`plugin-refresh-required` \(soft-refresh; carried forward, not withheld\)/u, "soft refresh status is carried forward, not a confirmation gate");
+  assert.match(text, /ready envelope carries `modelRoleBootstrap`[^.]*session consumes it/u, "ready envelope carries modelRoleBootstrap which the session consumes");
+}
+
+test("P6: pipeline-start SKILL.md withholds the confirmation until ready and consumes modelRoleBootstrap", () => {
+  assertSkillRules(skillText());
+});
+
+test("RED P6: a SKILL.md lacking either rule is caught by the static assertions", () => {
+  const text = skillText();
+  assert.throws(() => assertSkillRules(text.replace(/ The ready envelope carries[^.]*\./u, "")), assert.AssertionError);
+  assert.throws(() => assertSkillRules(text.replace("No confirmation on non-ready", "")), assert.AssertionError);
+});
