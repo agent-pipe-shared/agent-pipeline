@@ -1342,7 +1342,22 @@ export function observePipelineStartPreflight({
           values: { provider: runner, version, installedPluginRoot: pluginRoot },
         },
       }
-    : installedPluginAttestationBase;
+    : runner === "antigravity" && installedPluginAttestationBase.status === "unavailable"
+      // Gitless loaded Antigravity root with no verifiable Git source: no executable action (the source path
+      // cannot be recovered safely from the path-only registry), only the documented manual recovery.
+      ? {
+          ...installedPluginAttestationBase,
+          manualRecovery: {
+            schema: "pipeline.installed-plugin-attestation-manual-recovery.v1",
+            kind: "manual-source-checkout-recovery",
+            executableAction: false,
+            script: "install-agy.mjs",
+            runFrom: "clean-git-source-checkout",
+            restartRunner: true,
+            reference: "skills/pipeline-start/references/local-plugin-attestation.md",
+          },
+        }
+      : installedPluginAttestationBase;
   const installedPluginAttestationFailed = installedPluginAttestation.status !== "not-required"
     && installedPluginAttestation.status !== "verified";
   // NVA-ARMEDPROOF-1: computed once, here, so both the `status` decision

@@ -229,15 +229,34 @@ test("AC3: an already-affected managed copy of the Git source is refused by pref
   assert.ok(action.argv.includes(f.sourcePluginRoot) && action.argv.includes(f.installedPluginRoot), "the action binds the exact source and copy");
 });
 
-// OPEN: the reported scenario registers a GITLESS marketplace copy as the plugin source. The preflight
-// derives its recovery action only when the registered source itself is a Git checkout
-// (pipeline-start-preflight.mjs, antigravityAttestationSource), so this affected copy gets
-// plugin-attestation-required / IPA-HOST-LOCATOR-UNAVAILABLE and NO action. Kept as RED evidence (todo).
-test("AC3: an already-affected GITLESS marketplace copy is refused by preflight with one exact host recovery action", { todo: "RED evidence: nextAction is null for a gitless registered source; fix belongs in plugins/pipeline-core/scripts/pipeline-start-preflight.mjs (installedPluginAttestationCommand / antigravityAttestationSource)" }, (t) => {
+// The reported scenario registers a GITLESS marketplace copy as the plugin source. Recovery must come from a
+// verified Git source checkout (local-plugin-attestation.md), never from the copy itself or a guessed path, so
+// the preflight emits NO executable action but a typed manual-recovery result naming the documented route.
+test("AC3: an already-affected GITLESS marketplace copy is refused by preflight with a typed manual recovery and no executable action", (t) => {
   const f = affected(t, "affected-gitless", "gitless");
   const preflight = preflightFor(f);
   assert.equal(preflight.status, "plugin-attestation-required");
-  assert.ok(preflight.nextAction && typeof preflight.nextAction === "object", "exactly one typed recovery action is named");
+  assert.equal(preflight.nextAction ?? null, null, "no executable action is invented for a gitless source");
+  const attestation = preflight.installedPluginAttestation;
+  assert.equal(attestation.setupAction, undefined, "no host setup action without a verified Git source");
+  const manual = attestation.manualRecovery;
+  assert.ok(manual && typeof manual === "object", "a typed manual recovery is named");
+  assert.equal(manual.schema, "pipeline.installed-plugin-attestation-manual-recovery.v1");
+  assert.equal(manual.kind, "manual-source-checkout-recovery");
+  assert.equal(manual.executableAction, false);
+  assert.equal(manual.script, "install-agy.mjs");
+  assert.equal(manual.runFrom, "clean-git-source-checkout");
+  assert.equal(manual.restartRunner, true);
+  const emitted = JSON.stringify(manual);
+  assert.equal(emitted.includes(f.marketplaceRoot), false, "the gitless copy path is not offered as a source");
+  assert.equal(emitted.includes(f.sourcePluginRoot), false, "no source path is guessed or emitted");
+});
+
+test("AC3: the Git-source affected copy carries an executable action and no manual recovery", (t) => {
+  const f = affected(t, "affected-git-nomanual", "git");
+  const attestation = preflightFor(f).installedPluginAttestation;
+  assert.ok(attestation.setupAction, "executable action present");
+  assert.equal(attestation.manualRecovery, undefined);
 });
 
 test("AC3 RED proof: a preflight that skips the receipt requirement fails the affected-copy pin (scratch mirror)", (t) => {
