@@ -5,7 +5,9 @@
 //   P2 the suite imports and runs on this host: no mkdir ENOENT, nothing is created above the repository root
 //   P3 the five pinned case IDs RC21C001..RC21C005 are kept (suite and harness/verify-suites.json)
 //   P4 RC21C003 carries the strictly reversed member order extension (P4a source), and on the LIVE suite it executes and passes (P4b)
-//   P5 (todo, known RED) the live suite is fully green on current source: RC21C003/005 pass, RC21C001/002/004 fail WIN-AUTH-DACL (owned private key directory on Windows)
+//   P5 the live suite is fully green on current source (all five cases pass)
+//   P6 the suite source uses createWindowsOwnedAuthorityDirectory and the encrypted-key seams (aes-256-cbc, -passin, isTTY)
+//   P7 RC21C001/002/004 drive the current design approval request; only po-private.pem signing counts as key use
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -28,7 +30,7 @@ const cleanEnv = () => {
   delete e.NODE_TEST_CONTEXT;
   return e;
 };
-const runSuite = (file, env) => spawnSync(process.execPath, ["--test", file], { cwd: repoRoot, env, encoding: "utf8", timeout: 240000 });
+const runSuite = (file, env) => spawnSync(process.execPath, ["--test", file], { cwd: repoRoot, env, encoding: "utf8", timeout: 1500000 });
 let liveRun;
 const runLive = () => (liveRun ??= runSuite(suitePath, cleanEnv()));
 const caseLine =(out, id, mark) => new RegExp(`${mark} ${id} `).test(out);
@@ -88,9 +90,21 @@ test("P4b fixture() builds a package the real validator admits, and the strictly
   assert.ok(caseLine(out, "RC21C005", "✔"), `RC21C005 must pass\n${out.slice(0, 1500)}`);
 });
 
-test("P5 live suite is fully green on current source (known RED: RC21C001/002/004 fail WIN-AUTH-DACL on Windows)", {
-  todo: "RC21C001/002/004 reach runHumanApproval and fail SDC-AUTHORITY-UNAVAILABLE / WIN-AUTH-DACL (owned private key directory); not a fixture() defect; needs the held encrypted-key / owned-authority successor, outside this pin's write scope",
-}, () => {
+test("P5 live suite is fully green on current source (all five cases)", () => {
   const r = runLive();
-  assert.equal(r.status, 0, "live suite must exit 0");
+  assert.equal(r.status, 0, `live suite must exit 0\n${`${r.stdout}\n${r.stderr}`.slice(0, 1500)}`);
+  for (const id of CASE_IDS) assert.ok(caseLine(`${r.stdout}\n${r.stderr}`, id, "✔"), `${id} must pass`);
+});
+
+test("P6 suite source uses the owned authority directory and the encrypted-key seams", () => {
+  assert.match(suiteSource, /createWindowsOwnedAuthorityDirectory/);
+  assert.match(suiteSource, /aes-256-cbc/);
+  assert.match(suiteSource, /-passin/);
+  assert.match(suiteSource, /isTTY/);
+});
+
+test("P7 signing cases drive the current design approval request and count only real-key signs", () => {
+  assert.match(suiteSource, /createDesignApprovalRequest/);
+  assert.match(suiteSource, /design-approval-request-/);
+  assert.match(suiteSource, /basename\(String\(a\[a\.indexOf\('-inkey'\)\+1\]\?\?''\)\)==='po-private\.pem'/);
 });

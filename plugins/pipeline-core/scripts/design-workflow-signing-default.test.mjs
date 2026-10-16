@@ -11,7 +11,9 @@ function test(name, run) {
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,existsSync} from 'node:fs';
 
-import {join,dirname} from 'node:path';
+import {join,dirname,basename} from 'node:path';
+import {createDesignReviewReceipt} from '../lib/design-review-receipt.mjs';
+import {createDesignApprovalBinding,createDesignApprovalRequest,verifyDesignApprovalRequest} from '../lib/design-approval-binding.mjs';
 import {execFileSync} from 'node:child_process';
 import {createHash,generateKeyPairSync} from 'node:crypto';
 import {loadRunnerProfilesV3Registry,validatePipelineUserV3} from '../lib/runner-profiles-v3.mjs';
@@ -25,6 +27,17 @@ import {readDesignWorkflowPackageFromRepository,designWorkflowAdvisorExceptionRa
 import {createDesignWorkflowPackageApprovalRequest,validateDesignWorkflowPackageApprovalRequest,verifyDesignWorkflowPackageApproval} from '../lib/design-workflow-approval.mjs';
 import {verifyPoApprovalProof} from '../lib/po-approval-proof.mjs';
 import {runHumanApproval} from './po-human-approval.mjs';
+import {createWindowsOwnedAuthorityDirectory} from '../lib/windows-owned-authority-backend.mjs';
+import {spawnOpenssl} from './po-human-approval.mjs';
+// Synthetic, non-secret passphrase for a throwaway fixture key. The encrypted key keeps the production TR-S1 gate real;
+// the passphrase seam answers OpenSSL's prompt (-passin env:) and the attended-terminal seam (isTTY) replaces the missing controlling terminal.
+const fixturePassphrase='synthetic-fixture-passphrase-not-a-secret';
+process.env.PIPELINE_SYNTHETIC_FIXTURE_PASSPHRASE=fixturePassphrase;
+const withPassphrase=(args)=>args[0]==='pkeyutl'&&args.includes('-sign')?[...args,'-passin','env:PIPELINE_SYNTHETIC_FIXTURE_PASSPHRASE']:args;
+const signingSeams=(extra={})=>({isTTY:true,spawn:(_name,args,options)=>spawnOpenssl(withPassphrase(args),options,{}),...extra});
+// Only a signing call whose -inkey is the real PO private key counts as "key use"; every other call (including probeSigningToolchain's own probe sign) passes through unchanged.
+const isRealKeySign=a=>a[0]==='pkeyutl'&&a.includes('-sign')&&basename(String(a[a.indexOf('-inkey')+1]??''))==='po-private.pem';
+const denyRealKeySeams=(counters,extra={})=>({isTTY:true,readConfirmation:()=>{counters.confirmations++;return 'approve';},spawn:(_n,a,o)=>{if(isRealKeySign(a)){counters.signs++;throw Error('unexpected signing');}return spawnOpenssl(a,o,{});},...extra});
 import {parseYaml} from '../lib/yaml-lite.mjs';
 import { devNull } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -36,8 +49,9 @@ function fixture(t){
  const root=mkdtempSync(join(fixtureRoot,'synthetic-dwp-default-repo-')),keys=mkdtempSync(join(fixtureRoot,'synthetic-dwp-default-keys-'));
  t.after(()=>{rmSync(root,{recursive:true,force:true});rmSync(keys,{recursive:true,force:true});});
  const put=(path,data)=>{mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),data);};
- const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+ const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe'],env:{...process.env,GIT_CEILING_DIRECTORIES:dirname(root)}}).trim();
  git(['init','--quiet']);git(['config','user.name','Synthetic authority']);git(['config','user.email','fixture@example.invalid']);
+ if(process.platform==='win32')createWindowsOwnedAuthorityDirectory({path:join(root,'.git','agent-pipeline')});
  const r=loadRunnerProfilesV3Registry(),config={schema:'pipeline.user.v3',language:{human_facing:'en',agent_facing:'en'},agent_runtime:'other',runners:{enabled:['claude','codex'],default:'codex'},routing:{profiles:r.profiles,duties:r.duties},usage:{common_projection:'pipeline.runner-usage.v1',raw_persistence:'none'},autonomy:{push_policy:'gated',branch_model:'feature-branch',wip_limit:1},gates:{dev_plan:'blocking',push:'blocking',security:'warn',claude_md_max_lines:300},session:{keep_awake:true},critic_export:r.criticExportPolicy};
  assert.equal(validatePipelineUserV3(config).ok,true);assert.deepEqual(parseYaml(yaml(config)),config);put('pipeline.user.yaml',yaml(config));
  const sources=Object.fromEntries(['input','prd','spec','design','traceability'].map(name=>{const path=`specs/synthetic/${name}.md`,data=Buffer.from(`# Synthetic ${name}\nSynthetic isolated authority, not provider evidence.\n`);put(path,data);return[name,{path,sha256:sha(data)}];}));
@@ -62,23 +76,45 @@ function fixture(t){
  const readCandidate=()=>({commit:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}'])});
  const read=()=>readDesignWorkflowPackageFromRepository({repoRoot:root,packagePath:refs.package,readCandidate});assert.equal(read().ok,true,JSON.stringify(read()));
  const prepared=createDesignWorkflowPackageApprovalRequest({repoRoot:root,packagePath:refs.package,readCandidate,featureId:pkg.featureId,planPath:sources.prd.path,planSha256:sources.prd.sha256,specPath:sources.spec.path,specSha256:sources.spec.sha256});assert.equal(prepared.ok,true,JSON.stringify(prepared));
- writeFileSync(join(keys,'po-private.pem'),pair.privateKey.export({type:'pkcs8',format:'pem'}),{mode:0o600});writeFileSync(join(keys,'po-public.pem'),publicKey);writeFileSync(join(keys,'trust-policy.json'),JSON.stringify({...trustPolicy,humanName:'Synthetic Test Operator'}));
+ writeFileSync(join(keys,'po-private.pem'),pair.privateKey.export({type:'pkcs8',format:'pem',cipher:'aes-256-cbc',passphrase:fixturePassphrase}),{mode:0o600});writeFileSync(join(keys,'po-public.pem'),publicKey);writeFileSync(join(keys,'trust-policy.json'),JSON.stringify({...trustPolicy,humanName:'Synthetic Test Operator'}));
  const requestPath='scratch/dwp-request.json';put(requestPath,bytes(prepared.request));return {root,keys,put,git,read,request:prepared.request,requestPath,trustPolicy,refs,sources,candidate,readCandidate};
 }
-test('synthetic non-Codex authority: complete DWP nested request signs via unchanged default package validator and real OpenSSL',t=>{
- const f=fixture(t),prompts=[];
- const result=runHumanApproval(['sign-intent','--repo-root',f.root,'--directory',f.keys,'--request',f.requestPath],{readConfirmation:p=>{prompts.push(p);return 'approve';}});
- assert.equal(result.ok,true,JSON.stringify(result));assert.equal(prompts.length,1);assert.match(prompts[0],/complete design workflow package/);assert.match(prompts[0],new RegExp(f.request.approvalIntent.sha256));
- for(const source of Object.values(f.sources))assert.match(prompts[0],new RegExp(source.path.replaceAll('.','\\.')));
- const proof=JSON.parse(readFileSync(result.paths.proof,'utf8'));assert.equal(verifyPoApprovalProof({intent:f.request.approvalIntent,proof,trustPolicy:f.trustPolicy}).verified,true);
- const verified=verifyDesignWorkflowPackageApproval({repoRoot:f.root,request:f.request,readCandidate:f.readCandidate,proof,anchors:[f.trustPolicy],featureId:'synthetic-feature',planPath:f.sources.prd.path,planSha256:f.sources.prd.sha256,specPath:f.sources.spec.path,specSha256:f.sources.spec.sha256});assert.equal(verified.ok,true,JSON.stringify(verified));
+// Re-base (follows the source-owned retirement of the DWP sign-intent route, PO-HUMAN-REQUEST-RETIRED; not a weakening): the signing/refusal
+// cases now drive the CURRENT design approval request (design review receipt -> approval binding -> request at scratch/design-approval-request-<bindingSha256>.json).
+function designFixture(t){
+ const f=fixture(t),featureId='synthetic-feature',reportPath='specs/synthetic/evidence/design-review-report.md',receiptPath='specs/synthetic/evidence/design-review-receipt.json';
+ f.put(reportPath,'# Design review 1\nVerdict: pass.\n');
+ const ref=path=>({path,sha256:sha(readFileSync(join(f.root,path)))});
+ const currentSources=()=>({prd:ref(f.sources.prd.path),spec:ref(f.sources.spec.path),companions:[f.sources.design.path,f.sources.traceability.path].map(ref)});
+ const created=createDesignReviewReceipt({featureId,previous:null,sources:currentSources(),reviewer:{runner:'claude',model:'claude-opus-4'},report:ref(reportPath),openFindingIds:[],reviewedAt:'2026-10-09T09:00:00.000Z'});
+ assert.equal(created.ok,true,JSON.stringify(created));
+ f.put(receiptPath,Buffer.from(created.bytes));f.git(['add',reportPath,receiptPath]);f.git(['commit','--quiet','-m','Synthetic design review receipt']);
+ const receipts=()=>[{path:receiptPath,bytes:readFileSync(join(f.root,receiptPath))}];
+ const built=createDesignApprovalBinding({featureId,receipts:receipts(),currentSources:currentSources()});assert.equal(built.ok,true,JSON.stringify(built));
+ const candidate={commit:f.git(['rev-parse','HEAD']),tree:f.git(['rev-parse','HEAD^{tree}'])};
+ const made=createDesignApprovalRequest({binding:built.binding,candidate});assert.equal(made.ok,true,JSON.stringify(made));
+ const designRequestPath=`scratch/design-approval-request-${built.bindingSha256}.json`;f.put(designRequestPath,bytes(made.request));
+ const verify=request=>verifyDesignApprovalRequest({request,featureId,receipts:receipts(),currentSources:currentSources()});
+ assert.equal(verify(made.request).ok,true);
+ return {...f,featureId,dreq:made.request,designRequestPath,verify,designCandidate:candidate};
+}
+const signDesign=(f,seams)=>runHumanApproval(['sign-intent','--repo-root',f.root,'--directory',f.keys,'--request',f.designRequestPath],seams);
+test('synthetic non-Codex authority: complete design approval request signs via the unchanged source-owned observer and real OpenSSL',t=>{
+ const f=designFixture(t),prompts=[],written=[],realWrite=process.stdout.write;
+ // The key is encrypted, so production skips the typed confirmation and prints the disclosure only (NVA-SIGNONCE-1); capture it.
+ process.stdout.write=(chunk,...rest)=>{written.push(String(chunk));return true;};
+ let result;try{result=signDesign(f,signingSeams({readConfirmation:p=>{prompts.push(p);return 'approve';}}));}finally{process.stdout.write=realWrite;}
+ assert.equal(result.ok,true,JSON.stringify(result));assert.equal(prompts.length,0);
+ const disclosure=written.join('');assert.match(disclosure,new RegExp(f.dreq.bindingSha256));assert.match(disclosure,new RegExp(f.designCandidate.commit));
+ const proof=JSON.parse(readFileSync(result.paths.proof,'utf8'));assert.equal(verifyPoApprovalProof({intent:f.dreq.approvalIntent,proof,trustPolicy:f.trustPolicy}).verified,true);
+ assert.equal(f.verify(f.dreq).ok,true);
 });
-test('synthetic complete DWP refuses changed intent, extra request keys and physical source drift before confirmation or key use',t=>{
- const f=fixture(t);let confirmations=0,signs=0;
- const deny=()=>assert.throws(()=>runHumanApproval(['sign-intent','--repo-root',f.root,'--directory',f.keys,'--request',f.requestPath],{readConfirmation:()=>{confirmations++;return 'approve';},spawn:()=>{signs++;throw Error('unexpected signing');}}),/current, complete package/);
- f.put(f.requestPath,bytes({...f.request,intentSha256:f.request.approvalIntent.sha256}));deny();
- f.put(f.requestPath,bytes({...f.request,approvalIntent:{...f.request.approvalIntent,sha256:'a'.repeat(64)}}));deny();
- f.put(f.requestPath,bytes(f.request));f.put(f.sources.design.path,'changed physical design\n');deny();assert.equal(confirmations,0);assert.equal(signs,0);assert.equal(existsSync(join(f.keys,`proof-${f.request.approvalIntent.sha256}.json`)),false);
+test('synthetic complete design request refuses changed intent, extra request keys and physical source drift before confirmation or key use',t=>{
+ const f=designFixture(t),counters={confirmations:0,signs:0};
+ const deny=()=>assert.throws(()=>signDesign(f,denyRealKeySeams(counters)),/DAB-SIGN-/);
+ f.put(f.designRequestPath,bytes({...f.dreq,intentSha256:f.dreq.approvalIntent.sha256}));deny();
+ f.put(f.designRequestPath,bytes({...f.dreq,approvalIntent:{...f.dreq.approvalIntent,sha256:'a'.repeat(64)}}));deny();
+ f.put(f.designRequestPath,bytes(f.dreq));f.put(f.sources.design.path,'changed physical design\n');deny();assert.equal(counters.confirmations,0);assert.equal(counters.signs,0);assert.equal(existsSync(join(f.keys,`proof-${f.dreq.approvalIntent.sha256}.json`)),false);
 });
 
 function approvalBinding(f){return {repoRoot:f.root,packagePath:f.refs.package,featureId:'synthetic-feature',planPath:f.sources.prd.path,planSha256:f.sources.prd.sha256,specPath:f.sources.spec.path,specSha256:f.sources.spec.sha256,readCandidate:f.readCandidate};}
@@ -96,12 +132,13 @@ test('canonical DWP equality accepts reordering at every object level without ch
  assert.deepEqual(reversedChecked.packageRead,original.packageRead);
 });
 test('canonical comparison retains exact shape, intent, package, source and candidate refusals before signing',t=>{
- const f=fixture(t),binding=approvalBinding(f),reordered=JSON.parse(canonicalJson(f.request));
- const mutations=[['extra outer',r=>{r.extra=true;}],['extra envelope',r=>{r.approvalIntent.extra=true;}],['extra intent',r=>{r.approvalIntent.value.extra=true;}],['extra candidate',r=>{r.approvalIntent.value.candidate.extra=true;}],['decision',r=>{r.approvalIntent.value.decision='decline';}],['feature',r=>{r.approvalIntent.value.featureId='different-feature';}],['plan',r=>{r.approvalIntent.value.planSha256='a'.repeat(64);}],['spec',r=>{r.approvalIntent.value.specSha256='b'.repeat(64);}],['subject',r=>{r.approvalIntent.value.subjectSha256='c'.repeat(64);}],['candidate',r=>{r.approvalIntent.value.candidate.commit='d'.repeat(40);}],['policy',r=>{r.approvalIntent.value.policyRevision='other-policy';}],['digest',r=>{r.approvalIntent.sha256='e'.repeat(64);}],['package digest',r=>{r.packageSha256='f'.repeat(64);}],['package path',r=>{r.packagePath='specs/synthetic/evidence/missing.json';}]];
- let confirmations=0,signs=0;
- for(const [name,mutate] of mutations){const request=structuredClone(reordered);mutate(request);assert.equal(validateDesignWorkflowPackageApprovalRequest({...binding,request}).ok,false,name);f.put(f.requestPath,bytes(request));assert.throws(()=>runHumanApproval(['sign-intent','--repo-root',f.root,'--directory',f.keys,'--request',f.requestPath],{readConfirmation:()=>{confirmations++;return 'approve';},spawn:()=>{signs++;throw Error('Unexpected signing');}}),/current, complete package/,name);}
- f.put(f.requestPath,bytes(reordered));f.put(f.sources.design.path,'Physical source drift\n');assert.equal(validateDesignWorkflowPackageApprovalRequest({...binding,request:reordered}).ok,false);assert.throws(()=>runHumanApproval(['sign-intent','--repo-root',f.root,'--directory',f.keys,'--request',f.requestPath],{readConfirmation:()=>{confirmations++;return 'approve';},spawn:()=>{signs++;throw Error('Unexpected signing');}}),/current, complete package/);
- assert.equal(confirmations,0);assert.equal(signs,0);assert.equal(existsSync(join(f.keys,`proof-${f.request.approvalIntent.sha256}.json`)),false);
+ // Re-based onto the current design approval request (see designFixture); each mutation maps the former DWP one onto the request's fields.
+ const f=designFixture(t),reordered=JSON.parse(canonicalJson(f.dreq));
+ const mutations=[['extra outer',r=>{r.extra=true;}],['extra envelope',r=>{r.approvalIntent.extra=true;}],['extra intent',r=>{r.approvalIntent.value.extra=true;}],['extra candidate',r=>{r.approvalIntent.value.candidate.extra=true;}],['decision',r=>{r.approvalIntent.value.decision='decline';}],['feature',r=>{r.approvalIntent.value.featureId='different-feature';}],['plan',r=>{r.approvalIntent.value.planSha256='a'.repeat(64);}],['spec',r=>{r.approvalIntent.value.specSha256='b'.repeat(64);}],['subject',r=>{r.approvalIntent.value.subjectSha256='c'.repeat(64);}],['candidate',r=>{r.approvalIntent.value.candidate.commit='d'.repeat(40);}],['policy',r=>{r.approvalIntent.value.policyRevision='other-policy';}],['digest',r=>{r.approvalIntent.sha256='e'.repeat(64);}],['binding digest',r=>{r.bindingSha256='f'.repeat(64);}],['binding content',r=>{r.binding.extra=true;}],['binding receipt path',r=>{r.binding.reviewReceipts[0].path='specs/synthetic/evidence/missing.json';}]];
+ const counters={confirmations:0,signs:0};
+ for(const [name,mutate] of mutations){const request=structuredClone(reordered);mutate(request);assert.equal(f.verify(request).ok,false,name);f.put(f.designRequestPath,bytes(request));assert.throws(()=>signDesign(f,denyRealKeySeams(counters)),/DAB-SIGN-/,name);}
+ f.put(f.designRequestPath,bytes(reordered));f.put(f.sources.design.path,'Physical source drift\n');assert.equal(f.verify(reordered).ok,false);assert.throws(()=>signDesign(f,denyRealKeySeams(counters)),/DAB-SIGN-/);
+ assert.equal(counters.confirmations,0);assert.equal(counters.signs,0);assert.equal(existsSync(join(f.keys,`proof-${f.dreq.approvalIntent.sha256}.json`)),false);
 });
 test('canonical equality cannot accept changed physical package or current repository candidate',t=>{
  const f=fixture(t),binding=approvalBinding(f),request=JSON.parse(canonicalJson(f.request)),packageBytes=readFileSync(join(f.root,f.refs.package));
