@@ -456,7 +456,7 @@ export function compactSigningDisclosure({ intentSha256, record, materialArtifac
   if (!SHA.test(intentSha256 ?? "")) fail("PO-SIGN-DISCLOSURE-DIGEST");
   const source = record?.resolved === true && Array.isArray(record.lines)
     ? record.lines.filter(line => typeof line === "string" && !/[\r\n]/u.test(line))
-    : ["purpose unavailable: this signs only the exact digest; no recorded authorization purpose is resolved."];
+    : ["purpose unavailable: no recorded request resolves for this digest; this signs exactly this digest and may be a guard-lift/guard-override authorization."];
   const facts = source.slice(0, 15).map(signingDisplayLine);
   if (materialArtifact !== null && (typeof materialArtifact.path !== "string" || materialArtifact.path.length > 240 || /\p{C}/u.test(materialArtifact.path) || !SHA.test(materialArtifact.sha256 ?? ""))) fail("PO-SIGN-DISCLOSURE-MATERIAL");
   return [
