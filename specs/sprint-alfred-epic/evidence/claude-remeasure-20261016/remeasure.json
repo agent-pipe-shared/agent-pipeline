@@ -1,0 +1,3562 @@
+{
+  "schema": "pipeline.alfred-claude-remeasure.v1",
+  "measuredAt": "2026-10-16",
+  "head": "20e3055c6",
+  "method": "8 read-only Explore readers (Sonnet), stage meanings of the 2026-10-12 matrix; no tests rerun; commit-message evidence lineage only",
+  "total": 174,
+  "baseline": {
+    "counts": {
+      "25": 55,
+      "50": 75,
+      "75": 9,
+      "100": 0,
+      "UNKNOWN": 35
+    },
+    "index": 33.33
+  },
+  "current": {
+    "counts": {
+      "25": 16,
+      "50": 141,
+      "75": 9,
+      "100": 0,
+      "UNKNOWN": 8
+    },
+    "index": 46.7
+  },
+  "integrity": {
+    "missing": [],
+    "extra": [],
+    "badStage": []
+  },
+  "moves": [
+    {
+      "itemId": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+      "from": "25",
+      "to": "75",
+      "reason": "Commit pins every proposal clause: env/printenv/set/export -p/env: drive/GetEnvironmentVariables/proc environ/whole process.env refused with GUARD-ENV-DUMP, main+subagent, no override route, plus Goldfish and Critic data-only sentences. No counts in message, so GREEN is inferred from the committed pin + mutants; confirm run at batch review. Wrapper forms (sudo env, bash -c env, xargs) documented out of reach, not an original clause."
+    },
+    {
+      "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Fix committed with GREEN pin (42 pass) covering git show HEAD:path | head -n N and advertised-example pairing; unexplained adjacent guard suite failures and host skips keep it at 50. Raised from UNKNOWN on this commit."
+    },
+    {
+      "itemId": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+      "from": "25",
+      "to": "50",
+      "reason": "Shared question contract, unchanged sources, revision after advice, wrong question, unrelated candidate, forged chain and no-child masking are GREEN (10 pass), but the item's central end-to-end clause is only a typed skip, so 75 is not allowed."
+    },
+    {
+      "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+      "from": "25",
+      "to": "50",
+      "reason": "Commit adds a contract case extracting the generated recommendation and running it through guard-push expecting admission (targeted green evidence for the main clause); missing path/counts and guard-union scope keep it at 50."
+    },
+    {
+      "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+      "from": "50",
+      "to": "75",
+      "reason": "Pin covers the item's required agreement: canonical and vendored obligations text equal the guard's six-segment bound and generated file matches fresh generation (source fix 7b1b4083b per Triage); optional 'export grammar from guard' improvement not a required clause. No counts in message — confirm run at batch review; host checklist is manual acceptance only."
+    },
+    {
+      "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+      "from": "25",
+      "to": "50",
+      "reason": "A Windows wiring-ownership repair is committed with a RED-to-GREEN case (code + targeted green evidence), but the commit fixes one defect while the backlog item's acceptance (spikes, topology observer, remediation, docs, version-correct run) is largely uncovered."
+    },
+    {
+      "itemId": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+      "from": "25",
+      "to": "50",
+      "reason": "Receipt creation, byte-for-byte copy match, partial failure, global-scope refusal and manual recovery for a gitless source are GREEN, but the acceptance requires a native fresh-runner observation and there are 2 typed skips, so 75 is not allowed."
+    },
+    {
+      "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Flag-forwarding and mirror cases are committed (repair with targeted evidence), but the core candidate-binding suites are typed skips on Windows, which blocks 75. Raised from UNKNOWN on this commit."
+    },
+    {
+      "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+      "from": "25",
+      "to": "75",
+      "reason": "All three proposal clauses GREEN: valid observation in approved and implementing, PORG-INVALID-OBSERVATION recovery admitted in four states, backlog/docs/scratch writes admitted in every state with src/ refused. The single skip is an extra link-escape security case, not an original clause; 'consider removing approved state' is an optional input, not acceptance. Run on native Windows — confirm at batch review."
+    },
+    {
+      "itemId": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+      "from": "25",
+      "to": "75",
+      "reason": "Clone provisioning path now installs a missing pre-push (current untouched, foreign preserved, failure non-gating) with 6/6 + 18/18 GREEN, and the plugin install path already did, so the whole 'provision during install or clone' proposal is covered. Pin written post-fix, RED-to-GREEN not shown (left to batch Critic) — a review risk for batch review, not a held clause."
+    },
+    {
+      "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+      "from": "25",
+      "to": "50",
+      "reason": "Stale-hook non-ready with one refresh action, Goldfish/Critic unaffected and refresh limited to stale managed hooks are GREEN (14 pass), but the actual refresh/install route is only skip-covered and the confirmation-line gate is unevidenced, so 50."
+    },
+    {
+      "itemId": "pipeline.bounded-reader-terminal-binding",
+      "from": "25",
+      "to": "50",
+      "reason": "The acceptance fixture clause (four rounds + terminal correction passes; unresolved finding, fifth round, mismatched commit/digest, changed document fail) is GREEN 11/11 on contained real-Git fixtures, but the real-course binding clause is not covered, so 75 is not allowed."
+    },
+    {
+      "itemId": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+      "from": "25",
+      "to": "75",
+      "reason": "Triage narrowed the item to documentation (state which source wins); the pin covers min(briefed, maxTurns-15), ceil(0.8 x cap) checkpoint for caps 1..200, the 45->35 case, and that the Goldfish template states the clamp rule. No counts in message — confirm run at batch review."
+    },
+    {
+      "itemId": "pipeline.capability-inventory-checker-is-red-at-head",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Inventory re-baselined, reader and sort defects fixed, and the pin asserts no other finding class remains, but the item's goal (checker not red) is still held as todo. Raised from UNKNOWN to 50 on this commit."
+    },
+    {
+      "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+      "from": "75",
+      "to": "50",
+      "reason": "PATHEXT fix and RED-to-GREEN pin are committed (code + green targeted evidence), but baseline 75 is lowered because the original acceptance cannot be mapped from a public original and the baseline itself lists native Windows qualification as open, which the 75 definition does not allow."
+    },
+    {
+      "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+      "from": "25",
+      "to": "50",
+      "reason": "Raised from 25 on f7c7e9240ca0 with green admission cases for most prescribed verbs; not 75 because continuity writes are not shown admitted and one case is skipped."
+    },
+    {
+      "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+      "from": "25",
+      "to": "50",
+      "reason": "Raised from 25 on 7fa1b4332448: K5-10, K3-17, K5-12 green, but the R4-9/R4-10 typed sub-reason clause is explicitly not present."
+    },
+    {
+      "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Acceptance now maps to a green plan-level pin, so UNKNOWN becomes 50; plan-only fakes leave platform matrix and real apply uncovered."
+    },
+    {
+      "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+      "from": "25",
+      "to": "50",
+      "reason": "Hook wiring and runner-neutral output are green with a positive control; the staleness-ref check is only weakly guarded, so not 75."
+    },
+    {
+      "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+      "from": "25",
+      "to": "50",
+      "reason": "V-9, V-12, V-13 green with RED proofs; V-10 todo and happy-path skip keep it below 75."
+    },
+    {
+      "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+      "from": "25",
+      "to": "50",
+      "reason": "Bounded first-failing-subcheck diagnostic has 4 green cases and four failing mutants; three skips and installed replay keep it below 75."
+    },
+    {
+      "itemId": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Acceptance maps to committed partly green pins; refusal clauses are typed skips and no counts stated."
+    },
+    {
+      "itemId": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Pin is green but qualifies only the deferral; the inclusion clause is held."
+    },
+    {
+      "itemId": "pipeline.codex-design-readiness-child-rejects-valid-review",
+      "from": "25",
+      "to": "50",
+      "reason": "Retirement, typed failures and schema binding green; a todo and 3 skips cover original clauses."
+    },
+    {
+      "itemId": "pipeline.codex-own-session-audit-export-missing",
+      "from": "75",
+      "to": "50",
+      "reason": "Lowered from 75: the positive export path is covered only by typed skips, which do not qualify."
+    },
+    {
+      "itemId": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+      "from": "25",
+      "to": "50",
+      "reason": "Honest unavailable route and no-throw green; receipts, trail, real run and answered path held."
+    },
+    {
+      "itemId": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+      "from": "75",
+      "to": "UNKNOWN",
+      "reason": "Lowered from 75: pin neither tracked nor present and the acceptance is only a reconstructed draft."
+    },
+    {
+      "itemId": "pipeline.critic-scratch-notes-write-is-refused-again",
+      "from": "25",
+      "to": "50",
+      "reason": "Windows owned-notes fix committed with RED-then-green pin; skips and open live check keep it below 75."
+    },
+    {
+      "itemId": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+      "from": "25",
+      "to": "50",
+      "reason": "Checkpoint-binding clause covered with 5 green; expiry, adapters and end-to-end proof held."
+    },
+    {
+      "itemId": "pipeline.declared-system-skill-read-requires-human-override",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Acceptance maps to a committed pin with 4 green; six clauses typed skips."
+    },
+    {
+      "itemId": "pipeline.denial-names-a-diagnosis-it-refuses",
+      "from": "25",
+      "to": "50",
+      "reason": "Partial coverage of the proposal; named diagnosis command and general rule uncovered."
+    },
+    {
+      "itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+      "from": "UNKNOWN",
+      "to": "25",
+      "reason": "Maps to a pin but no counts and the enforcement clause is only recorded."
+    },
+    {
+      "itemId": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+      "from": "25",
+      "to": "50",
+      "reason": "Seven green cases show retirement mapping; two skips hold it at 50."
+    },
+    {
+      "itemId": "pipeline.design-intake-generator-omits-question-answers",
+      "from": "75",
+      "to": "50",
+      "reason": "Pin covers verbatim ordered answers and binding, but the acceptance measured against was a draft at measurement, contradicting baseline 75."
+    },
+    {
+      "itemId": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+      "from": "25",
+      "to": "50",
+      "reason": "Six green cases; present-plan path and RED mirrors are admitted gaps."
+    },
+    {
+      "itemId": "pipeline.design-workflow-package-omits-contract",
+      "from": "25",
+      "to": "50",
+      "reason": "Five-source binding and refusals pinned; several clauses text-only."
+    },
+    {
+      "itemId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Cause measured (deliberate win32 platform gate); coverage loss converted to a skip; Linux run pending."
+    },
+    {
+      "itemId": "pipeline.desktop-app-support-is-unverified",
+      "from": "25",
+      "to": "50",
+      "reason": "Doc-contract clauses green; all four live points typed skips."
+    },
+    {
+      "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "from": "UNKNOWN",
+      "to": "25",
+      "reason": "Code repair committed but no counted GREEN evidence or pin."
+    },
+    {
+      "itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+      "from": "25",
+      "to": "50",
+      "reason": "Mechanical empty-log refusal implemented and pinned; measurement and fold-in parts and todos remain."
+    },
+    {
+      "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+      "from": "25",
+      "to": "75",
+      "reason": "Both proposal clauses covered by 15 green cases with RED mirrors."
+    },
+    {
+      "itemId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "9 green seam cases pin AC-166 behaviour, but the original acceptance could not be mapped."
+    },
+    {
+      "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+      "from": "UNKNOWN",
+      "to": "25",
+      "reason": "Commit adds measurement script; message states no tests and leaves real-data measurements open. Mapped to AC-168 requirement text, no GREEN evidence; backlog not read."
+    },
+    {
+      "itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Template fix committed with pin 7 pass, but message keeps the fresh-dispatch first-write proof open. Backlog not read."
+    },
+    {
+      "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+      "from": "25",
+      "to": "50",
+      "reason": "Key-pair mismatch fix committed with targeted cases passing; security review and consumer verification open. Backlog not read."
+    },
+    {
+      "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Commit fixes the last two win32 NUL sites with GREEN source-scan test, but real-git spawn regression and host checks held. Backlog read."
+    },
+    {
+      "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+      "from": "25",
+      "to": "50",
+      "reason": "Staleness reporting committed with pin 5 pass/1 skip; code and targeted evidence exist but stale-admission clause unqualified. Backlog not read."
+    },
+    {
+      "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "from": "25",
+      "to": "50",
+      "reason": "Fix and pin committed with RED-to-GREEN producer case; consumer verification open. Backlog not read."
+    },
+    {
+      "itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+      "from": "25",
+      "to": "50",
+      "reason": "Template pin 7 pass, commit labels AC-187 (partial), consumer coverage open. Backlog file does not exist; used AC-187 excerpt and matrix."
+    },
+    {
+      "itemId": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+      "from": "25",
+      "to": "50",
+      "reason": "GREEN 8/8 matrix on real driver, CLI and guard; historical-sequence and trust-anchor clauses uncovered."
+    },
+    {
+      "itemId": "pipeline.greenfield-machine-output-and-skill-budget",
+      "from": "25",
+      "to": "50",
+      "reason": "11-pass budget pin with negative control; help-action clause not evidenced."
+    },
+    {
+      "itemId": "pipeline.handover-doc-committed-without-governance-classification",
+      "from": "UNKNOWN",
+      "to": "25",
+      "reason": "Acceptance maps to a pin, but no counts."
+    },
+    {
+      "itemId": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+      "from": "25",
+      "to": "50",
+      "reason": "6-pass pin for zero-authority archive and refusals; crash simulation and reachable route unproven."
+    },
+    {
+      "itemId": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+      "from": "25",
+      "to": "50",
+      "reason": "20-pass pin for scaffold admission; several clauses uncovered and three skips."
+    },
+    {
+      "itemId": "pipeline.merge-commit-message-skips-conventional-type-check",
+      "from": "75",
+      "to": "50",
+      "reason": "No backlog file; AC-211 points to portable-original-requirements.json; the commit says acceptance was reconstructed, so baseline 75 cannot be mapped."
+    },
+    {
+      "itemId": "pipeline.model-family-approval-with-automatic-version-upgrades",
+      "from": "25",
+      "to": "50",
+      "reason": "A1-A6, B1-B3, D1-D4, C1-C4 green; installed-host clause only a skip."
+    },
+    {
+      "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "19 cells, cell-selective failure and real cell run pinned; wall-time skip."
+    },
+    {
+      "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+      "from": "25",
+      "to": "50",
+      "reason": "Opus-rationale refusal committed and green; rules 2-3 and triage items open."
+    },
+    {
+      "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Code and 8 green cases for counter lock and batch-critic slice; coverage partial."
+    },
+    {
+      "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+      "from": "75",
+      "to": "50",
+      "reason": "The first acceptance clause names /etc/shadow and is only a typed skip here; baseline 75 contradicted."
+    },
+    {
+      "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Real hook entrypoints and scope predicate pinned for git fixtures; non-git skip."
+    },
+    {
+      "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+      "from": "25",
+      "to": "50",
+      "reason": "Central acceptance and negatives pinned; no counts and two clauses unmentioned."
+    },
+    {
+      "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Maps to all four bullets; native and installed open, no counts."
+    },
+    {
+      "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+      "from": "75",
+      "to": "UNKNOWN",
+      "reason": "Pin that would support baseline 75 is absent on HEAD; baseline contradicted."
+    },
+    {
+      "itemId": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+      "from": "50",
+      "to": "75",
+      "reason": "19/19 GREEN pin committed with the fix covers backtick escape and executed here-strings; rated 75 with lineage caveat."
+    },
+    {
+      "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+      "from": "25",
+      "to": "50",
+      "reason": "fetch, git -C, git config escapes closed with 40 green; skips and lanes remain."
+    },
+    {
+      "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "6 green; 3 clauses typed skips."
+    },
+    {
+      "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Route retired; surviving observer 5 green; 2 skips."
+    },
+    {
+      "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+      "from": "25",
+      "to": "50",
+      "reason": "Per-runner preflight and fallback pinned 9/9; point 2b held."
+    },
+    {
+      "itemId": "pipeline.scratch-has-no-retention-and-no-durability-check",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Sweep, staging, WARN-only durability 12 green; skip and matrix held."
+    },
+    {
+      "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+      "from": "25",
+      "to": "50",
+      "reason": "All-state scratch matrix pinned; skips, counts and native sweeps hold 50."
+    },
+    {
+      "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Proposal maps fully; without counts not 75."
+    },
+    {
+      "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Routing and concurrency pinned; typed-reason and root-cause clauses uncovered."
+    },
+    {
+      "itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Placement suite registered and pinned; fixture clause and counts missing."
+    },
+    {
+      "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Absolute-path resolver committed; only baseline portable controls are green evidence."
+    },
+    {
+      "itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+      "from": "25",
+      "to": "50",
+      "reason": "Declined seed, first-round question, binding and refusal pinned; guard-admission clause missing."
+    },
+    {
+      "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Guard fix and pins map the acceptance; cross-platform and fresh intake held."
+    },
+    {
+      "itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+      "from": "25",
+      "to": "50",
+      "reason": "Assurance refusal and private root pinned; suite-wide effect unproven."
+    },
+    {
+      "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "First two clauses mapped; driver, onboarding and installed observation held."
+    },
+    {
+      "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+      "from": "UNKNOWN",
+      "to": "50",
+      "reason": "Durable write, absolute argv, marker, real push block green; skip and smoke runs block 75."
+    },
+    {
+      "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+      "from": "25",
+      "to": "50",
+      "reason": "One of five clauses gets targeted evidence on code the baseline marked present."
+    }
+  ],
+  "rows": [
+    {
+      "part": "01",
+      "itemId": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+      "baselineStage": "25",
+      "stage": "75",
+      "evidence": [
+        "3901ebee4e66 plugins/pipeline-core/lib/pins/a-read-only-probe-can-dump-the-process-environment-into-a-transcript.test.mjs no pass/fail counts stated; 5 mutated mirrors each stop classifying; no skip or todo named"
+      ],
+      "heldClauses": [],
+      "reason": "Commit pins every proposal clause: env/printenv/set/export -p/env: drive/GetEnvironmentVariables/proc environ/whole process.env refused with GUARD-ENV-DUMP, main+subagent, no override route, plus Goldfish and Critic data-only sentences. No counts in message, so GREEN is inferred from the committed pin + mutants; confirm run at batch review. Wrapper forms (sudo env, bash -c env, xargs) documented out of reach, not an original clause.",
+      "readerBaselineStage": "25",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "6b4d89ea1c29 plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs 7 RED -> 42 pass; P9-03B read-only guard pin 40 pass 2 host skips; guard-push PG09/PG10 FAIL (scratch-custody warning, not compared to HEAD)"
+      ],
+      "heldClauses": [
+        "guard-push PG09/PG10 failures not yet compared to HEAD (regression not excluded)",
+        "read-only guard pin has 2 typed host skips",
+        "native Agy/Windows readback and governed application still open",
+        "item has no Triage decision; done_when manual"
+      ],
+      "reason": "Fix committed with GREEN pin (42 pass) covering git show HEAD:path | head -n N and advertised-example pairing; unexplained adjacent guard suite failures and host skips keep it at 50. Raised from UNKNOWN on this commit.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "1e8986753f53 plugins/pipeline-core/lib/pins/advisor-demand-reuse-has-no-design-course-bound.test.mjs skip 2 (coordinator export-consent, POSIX file-mode drift); pass count not stated; 6 scratch mutants each fail"
+      ],
+      "heldClauses": [
+        "keep export consent for every admitted attempt: coordinator export-consent case is a typed host skip (Coordinator, due 2026-10-19, Linux/WSL)",
+        "POSIX file-mode drift case typed host skip",
+        "durable generic-question course authority needs bounded PO decision",
+        "final integrated and installed-host qualification; Claude/Agy truthful zero-child unavailability, not answered initial invocation"
+      ],
+      "reason": "Pin covers one-cycle-per-course, immutable initial record, reuse across dispatches, new course only with terminal parent + fresh decision, restart/tamper, 32-course cap; but the export-consent clause is skip-only and PO decision plus installed-host work remain, so baseline 50 holds.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "70b0907a96ae plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs no counts stated; covers churn, pre-existing siblings, junction refusal, mid-read swaps, fail-closed invalid paths",
+        "2037af586efe same-area Advisor ancestor test deterministic swapped-ancestor cases, no counts stated"
+      ],
+      "heldClauses": [
+        "keep the original cause as non-authoritative cause field instead of discarding it at design-workflow-package-v2.mjs:142 — not covered by any commit/pin",
+        "security-predicate change needs PO decision and architecture/security Critic — pending",
+        "DWP cause analysis and native consumer proof (baseline remaining)",
+        "neither commit states pass/fail counts"
+      ],
+      "reason": "Two committed pins now exercise the narrowed dev/ino/mode predicate with deterministic swap cases (code + targeted evidence), but the cause-field clause and the policy gate are uncovered, so it stays below 75.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "1a4852c381fd plugins/pipeline-core/lib/pins/advisor-question-contract-and-final-source-binding-conflict.test.mjs 10 pass 1 skip; 4 weakened mirrors of validateInitialToFinalBinding fail"
+      ],
+      "heldClauses": [
+        "exercise the real coordinator-to-package answered path — end-to-end route is a typed host skip (Linux-only readiness host store, Coordinator, due 2026-10-19)",
+        "both chat and signature approval modes — only chat-mode refusal by stored-signature verifier named; signature-mode success not evidenced"
+      ],
+      "reason": "Shared question contract, unchanged sources, revision after advice, wrong question, unrelated candidate, forged chain and no-child masking are GREEN (10 pass), but the item's central end-to-end clause is only a typed skip, so 75 is not allowed.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "afe6b7f61ef8 harness contract case (test path not named in message; no pin in input) — stated green on original source; no counts"
+      ],
+      "heldClauses": [
+        "pin must run the recommended spelling through the guard union — only the real guard-push hook is named",
+        "test path and pass counts not stated (lineage incomplete)",
+        "manual acceptance"
+      ],
+      "reason": "Commit adds a contract case extracting the generated recommendation and running it through guard-push expecting admission (targeted green evidence for the main clause); missing path/counts and guard-union scope keep it at 50.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+      "baselineStage": "50",
+      "stage": "75",
+      "evidence": [
+        "b46a4be58047 plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs no counts stated; 6 admitted, 7 refused, ; and redirects refused, generated text equals fresh generation"
+      ],
+      "heldClauses": [],
+      "reason": "Pin covers the item's required agreement: canonical and vendored obligations text equal the guard's six-segment bound and generated file matches fresh generation (source fix 7b1b4083b per Triage); optional 'export grammar from guard' improvement not a required clause. No counts in message — confirm run at batch review; host checklist is manual acceptance only.",
+      "readerBaselineStage": "50",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+      "baselineStage": "UNKNOWN",
+      "stage": "UNKNOWN",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commits since 2026-10-12",
+        "named pin plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs untracked and does not exist",
+        "native hold and consumer verification"
+      ],
+      "reason": "No commits and no pin file exist; baseline retained. Backlog item not read (no commits).",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agy-el01-write-authorization-gap",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [
+        "d4857c05ba79 docs-only draft of reconstructed acceptance for AC-109/122/146, no tests"
+      ],
+      "heldClauses": [
+        "no public original: portable-original-requirements.json lists association unresolved, candidateCount 0",
+        "reconstructed acceptance is a draft pending PO release (decision K6)",
+        "no implementation or qualification evidence"
+      ],
+      "reason": "Only commit is a documentation draft with no test evidence, so stage stays at 25. Original text unresolved in portable record (no backlog file exists).",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "da212b1879ea plugins/pipeline-core/lib/pins/agy-imported-plugin-snapshot-shadows-registered-plugin.test.mjs 12 pass 1 skip (directory symlinks, Linux/WSL, Coordinator, due 2026-10-19); P4 hand-wired-hooks case RED before, GREEN after"
+      ],
+      "heldClauses": [
+        "spikes S1-S6 on CLI load precedence remain manual",
+        "one-load-topology decision (option A or B) and PO decision",
+        "topology observer verdicts, preflight reason codes IPA-AGY-*, lock-version-mismatch reason — no evidence these clauses are covered",
+        "installer remediation via agy lifecycle, developer refresh replacement, docs",
+        "version-correct unsigned-refusal/signed-approval acceptance run",
+        "directory-symlink case typed skip; adjacent suites still fail on symlink EPERM"
+      ],
+      "reason": "A Windows wiring-ownership repair is committed with a RED-to-GREEN case (code + targeted green evidence), but the commit fixes one defect while the backlog item's acceptance (spikes, topology observer, remediation, docs, version-correct run) is largely uncovered.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "66fc2c94b930 plugins/pipeline-core/lib/pins/agy-managed-copy-first-start-lacks-attestation.test.mjs 10 pass 2 host skips; preflight suite 72 pass 1 pre-existing AC19 failure",
+        "ad1f150cadb3 same pin 8 pass 2 skip 1 todo (todo converted to real assertion by 66fc2c94b930)"
+      ],
+      "heldClauses": [
+        "2 host skips: POSIX mode bits and native-session cases",
+        "native fresh-runner observation of first Agy session passing attestation without manual repair",
+        "workspace and global refresh exact source/copy/registry readback only partly evidenced",
+        "pre-existing AC19 preflight failure"
+      ],
+      "reason": "Receipt creation, byte-for-byte copy match, partial failure, global-scope refusal and manual recovery for a gitless source are GREEN, but the acceptance requires a native fresh-runner observation and there are 2 typed skips, so 75 is not allowed.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "258d9b7281ff RC05C010 case in existing refresh suite (no pin path in input) pins agy 1.3.5 at prepare and refresh; lower and non-semver output stay refused; no counts; 4 Windows failures (symlink EPERM, wiring-ownership) pre-existing"
+      ],
+      "heldClauses": [
+        "re-run the actual Agy global update and first greenfield preflight on the installed candidate — a fixture pass alone does not close",
+        "1.2.13 stale-managed-copy case and three-runner manifest build after a fresh stamp not evidenced by this commit",
+        "4 remaining Windows failures in adjacent suites",
+        "test counts not stated"
+      ],
+      "reason": "Version gate now admits every strict-semver release from 1.2.12 on per PO decision with a green case, but the actual installed-host run is explicitly required and open, so the stage stays 50.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "377417425b5b plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs 'turns fully green', no counts stated"
+      ],
+      "heldClauses": [
+        "refuse at present-plan/approval time when a bound path is git-ignored — new CLI is warn-only and never refuses a close",
+        "bound artifacts written to a tracked evidence path — writers/State still name the ignored paths",
+        "private .git/agent-pipeline readiness receipt and Advisor course also required and not tracked",
+        "native/consumer device-switch proof"
+      ],
+      "reason": "ADR-0063 amendment and the close-block bound-path report (proposal points 3-4) are committed with a green pin, but points 1-2 (fail-closed refusal, tracked relocation) are not implemented, so stage stays 50.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "a62566df6ba6 plugins/pipeline-core/lib/pins/approval-verification-demands-head-equals-candidate.test.mjs 2 full candidate-binding suites typed host skip (Linux-only Codex readiness host store, Coordinator, due 2026-10-19); other pass counts not stated"
+      ],
+      "heldClauses": [
+        "one case per entry point proving the implementation boundary verifies with HEAD past candidate and presentation/approval still refuse moved HEAD — the full candidate-binding suites are skipped here",
+        "Codex readiness branch (codex-readiness-finalization re-read) coverage not evidenced",
+        "live/native consumer proof",
+        "pass counts not stated"
+      ],
+      "reason": "Flag-forwarding and mirror cases are committed (repair with targeted evidence), but the core candidate-binding suites are typed skips on Windows, which blocks 75. Raised from UNKNOWN on this commit.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+      "baselineStage": "25",
+      "stage": "75",
+      "evidence": [
+        "ab0f4cd32f80 plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs 4 pass 1 typed host skip (link escape under docs/, Linux/WSL, Coordinator, due 2026-10-19); scratch mirror of the gate fails producer shapes"
+      ],
+      "heldClauses": [],
+      "reason": "All three proposal clauses GREEN: valid observation in approved and implementing, PORG-INVALID-OBSERVATION recovery admitted in four states, backlog/docs/scratch writes admitted in every state with src/ refused. The single skip is an extra link-escape security case, not an original clause; 'consider removing approved state' is an optional input, not acceptance. Run on native Windows — confirm at batch review.",
+      "readerBaselineStage": "25",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+      "baselineStage": "25",
+      "stage": "75",
+      "evidence": [
+        "bc8215d13e74 plugins/pipeline-core/lib/pins/auto-install-pre-push-hook-with-the-plugin.test.mjs 6/6 pass; adjacent clone-hook-readiness suites 18/18 pass"
+      ],
+      "heldClauses": [],
+      "reason": "Clone provisioning path now installs a missing pre-push (current untouched, foreign preserved, failure non-gating) with 6/6 + 18/18 GREEN, and the plugin install path already did, so the whole 'provision during install or clone' proposal is covered. Pin written post-fix, RED-to-GREEN not shown (left to batch Critic) — a review risk for batch review, not a held clause.",
+      "readerBaselineStage": "25",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "a0eed89caa36 plugins/pipeline-core/lib/pins/bootstrap-should-refresh-hooks-when-the-plugin-updated.test.mjs 14 pass 2 typed host skips (real hook apply refused on native Windows PB-WINDOWS-ASSURANCE, Linux/WSL, Coordinator, due 2026-10-19); 5 scratch mutants fail"
+      ],
+      "heldClauses": [
+        "agent-operable install route — real hook apply is only a typed host skip",
+        "bootstrap confirmation line refused until readback is current — not evidenced",
+        "preflight runs the model-role bootstrap itself and the confirmation carries it — only 'ready envelope carries model-role bootstrap' pinned; separate item says it is unavailable on native Windows"
+      ],
+      "reason": "Stale-hook non-ready with one refresh action, Goldfish/Critic unaffected and refresh limited to stale managed hooks are GREEN (14 pass), but the actual refresh/install route is only skip-covered and the confirmation-line gate is unevidenced, so 50.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.bounded-reader-terminal-binding",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "1b185104ecac plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs 11/11 pass; 5 RED mirrors"
+      ],
+      "heldClauses": [
+        "current Alfred course binds its actual four reports and final correction without fabricated verdict — pin uses synthetic fixtures; exact original terminal/dependency CAS unavailable",
+        "release preflight acceptance and source protocol/skill/release-instruction alignment — not named in the commit",
+        "report-bound adjudication form for the 7 phase-two no-change adjudications — not evidenced",
+        "bounded correction review, PO/Reader acceptance"
+      ],
+      "reason": "The acceptance fixture clause (four rounds + terminal correction passes; unresolved finding, fifth round, mismatched commit/digest, changed document fail) is GREEN 11/11 on contained real-Git fixtures, but the real-course binding clause is not covered, so 75 is not allowed.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+      "baselineStage": "UNKNOWN",
+      "stage": "UNKNOWN",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commits since 2026-10-12",
+        "pin plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs exists but untracked (uncommitted, not qualifying)",
+        "baseline: net-new ratchet RED, established/deferred net-new target incorrectly admits",
+        "D3/D4 ratchet policy and library-only guard delegation need PO decisions"
+      ],
+      "reason": "No commits land, so the baseline is retained; the only artifact is an untracked pin on disk, which is not committed evidence. Backlog item not read (no commits).",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+      "baselineStage": "25",
+      "stage": "75",
+      "evidence": [
+        "6f8b1432ac3f plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs no counts stated; 3 mutated mirrors (no clamp, checkpoint on briefed cap, template without rule) each fail"
+      ],
+      "heldClauses": [],
+      "reason": "Triage narrowed the item to documentation (state which source wins); the pin covers min(briefed, maxTurns-15), ceil(0.8 x cap) checkpoint for caps 1..200, the 45->35 case, and that the Goldfish template states the clamp rule. No counts in message — confirm run at batch review.",
+      "readerBaselineStage": "25",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.capability-inventory-checker-is-red-at-head",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "d35c37e71d8a plugins/pipeline-core/lib/pins/capability-inventory-checker-is-red-at-head.test.mjs checker findings 30 -> 26; all-green and CLI-exit cases are todo; no pass counts stated"
+      ],
+      "heldClauses": [
+        "checker all-green and CLI exit 0 — todo pending PO decision",
+        "26 verify-phase findings remain: register 25 suites or remove all 26 (PO decision pending)",
+        "pass counts not stated"
+      ],
+      "reason": "Inventory re-baselined, reader and sort defects fixed, and the pin asserts no other finding class remains, but the item's goal (checker not red) is still held as todo. Raised from UNKNOWN to 50 on this commit.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+      "baselineStage": "75",
+      "stage": "50",
+      "evidence": [
+        "19600e9a509d plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs no counts stated; stock-PATHEXT case RED before fix; 4 capture-evidence.test.mjs runCli cases fail identically before and after"
+      ],
+      "heldClauses": [
+        "original acceptance has no public original (portable-original-requirements.json unresolved); reconstructed acceptance is a draft pending PO release",
+        "native Windows qualification open (baseline remaining)",
+        "4 unrelated runCli failures in adjacent suite",
+        "pass counts not stated"
+      ],
+      "reason": "PATHEXT fix and RED-to-GREEN pin are committed (code + green targeted evidence), but baseline 75 is lowered because the original acceptance cannot be mapped from a public original and the baseline itself lists native Windows qualification as open, which the 75 definition does not allow.",
+      "readerBaselineStage": "75",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "f7c7e9240ca0 plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs 9 pass, 1 skip (directory symlink host limitation), 0 fail"
+      ],
+      "heldClauses": [
+        "continuity writes named in the item not shown admitted (pin states continuity boundary stays refused)",
+        "mini profile asserts observed collect-input shape, not the prescribed verb as direct next action",
+        "symlink-directory case typed skip"
+      ],
+      "reason": "Raised from 25 on f7c7e9240ca0 with green admission cases for most prescribed verbs; not 75 because continuity writes are not shown admitted and one case is skipped.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "7fa1b4332448 plugins/pipeline-core/lib/pins/claude-design-readiness-cannot-start-on-windows.test.mjs 8 pass, 0 skip/todo"
+      ],
+      "heldClauses": [
+        "typed sub-reasons R4-9/R4-10 with bounded sanitized stderr absent in legacy child",
+        "readiness producer on native Windows without hotfix not demonstrated (route retired)",
+        "per-runner CLI schema contract covers only the Claude schema shape, not a live CLI",
+        "documented install locations trusted on every platform: only the win32 user bin pinned"
+      ],
+      "reason": "Raised from 25 on 7fa1b4332448: K5-10, K3-17, K5-12 green, but the R4-9/R4-10 typed sub-reason clause is explicitly not present.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "9f1d62fcf126 plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs 9/9 pass, plan-only with in-process fakes"
+      ],
+      "heldClauses": [
+        "verification across supported host platforms",
+        "real apply and Codex restart barrier not exercised (plan-only)",
+        "consumer greenfield run not performed"
+      ],
+      "reason": "Acceptance now maps to a green plan-level pin, so UNKNOWN becomes 50; plan-only fakes leave platform matrix and real apply uncovered.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "cfe33b24d724 plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs 11 pass, no source change"
+      ],
+      "heldClauses": [
+        "staleness-check ref=refs/heads/main vs feat branch only weakly guarded",
+        "native configured startup run missing",
+        "accepted branch-ref continuity open"
+      ],
+      "reason": "Hook wiring and runner-neutral output are green with a positive control; the staleness-ref check is only weakly guarded, so not 75.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "e2841ce900fc plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs 7 pass, 1 skip (two-approval happy path needs live interactive Claude on Windows), 1 todo (V-10)"
+      ],
+      "heldClauses": [
+        "two-approval happy path to implementation and push (typed skip)",
+        "V-10 continuity route digest bound to the briefing actually sent (todo, no producer)",
+        "CAS/missing failure not reproduced or located"
+      ],
+      "reason": "V-9, V-12, V-13 green with RED proofs; V-10 todo and happy-path skip keep it below 75.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "89e4011ec116 / 20858f029755 / 3f21822816de / 7fe199b9006d / 848261ee1d74 guard and session latency source (perf, not the read-refusal acceptance)",
+        "f3a8d1092f89, 7fb29f0ab664, 1db8f1f693a0 patches retained as docs (P1-10D pin 15/15 with patch; patches not applied)"
+      ],
+      "heldClauses": [
+        "pin file untracked",
+        "read-guard source patches (P1-10D, onboarding prefilter) unapplied on HEAD",
+        "case-differing session directory regression and per-root fail-closed diagnostics not committed",
+        "Grep/Glob in-root lanes and READ-TARGET-MISSING not shown",
+        "genuine native Windows proof after install"
+      ],
+      "reason": "New commits are latency work and retained patch documents; pin untracked and read-guard repair not applied, so 50 holds.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "e00366d0c8ec plugins/pipeline-core/lib/pins/codex-advisor-evidence-fails-after-host-update.test.mjs 4 pass, 3 typed host skips (Linux/WSL due 2026-10-19)"
+      ],
+      "heldClauses": [
+        "real-store diagnostic and typed-failure cases (3 typed host skips)",
+        "changed-executable and tampered-journal on real store",
+        "installed-build greenfield replay (native hold)"
+      ],
+      "reason": "Bounded first-failing-subcheck diagnostic has 4 green cases and four failing mutants; three skips and installed replay keep it below 75.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "3bcc405178be plugins/pipeline-core/lib/pins/codex-advisor-shared-namespace-rejects-fresh-repository-identity.test.mjs mode-bit cases typed-skipped on Windows, counts not stated",
+        "5cc985b24729 same pin: fresh mint, host process roots, linked worktrees; 3 POSIX mode cases skipped, counts not stated"
+      ],
+      "heldClauses": [
+        "0777 shared parent and 0755 private duty directory refusals (typed skips)",
+        "Readiness shared-parent policy verified independently",
+        "productive integration and installed Codex replay",
+        "pass counts not stated"
+      ],
+      "reason": "Acceptance maps to committed partly green pins; refusal clauses are typed skips and no counts stated.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "f41eecef2292 plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs 6/6 pass"
+      ],
+      "heldClauses": [
+        "premise (manual-toil record) unverified at measurement time (PO since decided: fold in for 0.7.0)",
+        "folding the bootstrap into the fresh-host typed next action not done (pin asserts the deferral)"
+      ],
+      "reason": "Pin is green but qualifies only the deferral; the inclusion clause is held.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-design-readiness-child-rejects-valid-review",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "4217cd5b8af2 plugins/pipeline-core/lib/pins/codex-design-readiness-child-rejects-valid-review.test.mjs 14 pass, 3 typed host skips, 1 todo"
+      ],
+      "heldClauses": [
+        "unknown commandActions must not abort a read-only review (todo)",
+        "live Codex/WSL run publishing a schema-valid receipt or typed unavailable",
+        "authenticated turn without credential reference exposure incl. after SIGKILL (skips)",
+        "host disabling plugins/MCP/hooks/tools and process ownership (skips)",
+        "time budget host deadline above child deadline"
+      ],
+      "reason": "Retirement, typed failures and schema binding green; a todo and 3 skips cover original clauses.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-own-session-audit-export-missing",
+      "baselineStage": "75",
+      "stage": "50",
+      "evidence": [
+        "ae5416903bbd plugins/pipeline-core/lib/pins/codex-own-session-audit-export-missing.test.mjs unavailable/refusal cases pass, 4 available-path cases skipped on Windows, counts not stated"
+      ],
+      "heldClauses": [
+        "available-path metadata after session and repo identity proof (4 typed skips)",
+        "observed model identity, phase wall time, token counters only when supplied (skipped)",
+        "Codex reconnect test",
+        "no pass counts"
+      ],
+      "reason": "Lowered from 75: the positive export path is covered only by typed skips, which do not qualify.",
+      "readerBaselineStage": "75",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "993f8c52d3fc docs only: draft acceptance delta for AC-134/AC-154, pending PO release K6"
+      ],
+      "heldClauses": [
+        "original acceptance delta beyond digests unknown, PO decision K6 pending",
+        "default package/native host and controller/root admission",
+        "no committed test of custody clauses"
+      ],
+      "reason": "Only commit is a documentation draft; baseline 50 kept.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "644d25d6a138 plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs 5 pass, 2 typed host skips"
+      ],
+      "heldClauses": [
+        "real Codex/WSL greenfield run to design-package validation",
+        "answered receipts bound to candidate, route and digests",
+        "unavailable receipt and attempt trail persistence (2 skips)",
+        "denied host export shows no alternate egress",
+        "supported matrix and skill agree with tested route"
+      ],
+      "reason": "Honest unavailable route and no-throw green; receipts, trail, real run and answered path held.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "29c83b29b831 plugins/pipeline-core/lib/pins/commit-grammar-hint-still-requires-scratch-message-file.test.mjs linux/win32 acceptance, newline denial, remediation ordering, RED mirror; counts not stated"
+      ],
+      "heldClauses": [
+        "conventional-commit skill guidance not covered",
+        "pass counts not stated",
+        "native Windows genuine commit, policy binding, 13 unchanged suite failures"
+      ],
+      "reason": "No counts and skill guidance uncovered; baseline 50 kept.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "8db1f0193101 CLI unsorted --path permutation case, green; counts and test path not stated"
+      ],
+      "heldClauses": [
+        "GF-COMMAND-INPUT mandatory --summary/--body not stated in template",
+        "multi-line POSIX copyCommand refused by shell grammar",
+        "native release host",
+        "no counts or pin path"
+      ],
+      "reason": "Pins only sorted-path behaviour; observed-again clauses uncovered.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "73ccccc96fa6 plugins/pipeline-core/lib/pins/completion-fd-suites-cannot-run-as-single-files.test.mjs inert no-fd, strict mode, real single file, RED mirror; counts not stated"
+      ],
+      "heldClauses": [
+        "pass counts not stated",
+        "one-line stderr note in no-Verify mode not stated",
+        "complete dependency-graph run and native checklist"
+      ],
+      "reason": "Covers proposal but no counts; baseline 50 kept.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "853af051d4a9 plugins/pipeline-core/lib/pins/concurrent-session-warning-never-fires-on-native-windows.test.mjs live/own/dead/previous-boot cases; counts not stated"
+      ],
+      "heldClauses": [
+        "pass counts not stated",
+        "warning wording and macOS not stated",
+        "native Windows run on release host"
+      ],
+      "reason": "Covers stated cases but no counts; baseline 50 kept.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+      "baselineStage": "75",
+      "stage": "UNKNOWN",
+      "evidence": [
+        "54c6b7af6a4c docs only: reconstructed acceptance AC-140/232/233, pending PO release K6"
+      ],
+      "heldClauses": [
+        "original acceptance has no public source; reconstructed draft unreleased",
+        "pin untracked and does not exist",
+        "no committed GREEN test with sha lineage",
+        "six-span historical locator, native and batch acceptance"
+      ],
+      "reason": "Lowered from 75: pin neither tracked nor present and the acceptance is only a reconstructed draft.",
+      "readerBaselineStage": "75",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "d1c27ae0e3cf plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs cap and closing-lane pass, 1 typed skip; counts not stated"
+      ],
+      "heldClauses": [
+        "notes persistence in closing lane (typed skip)",
+        "security-class Critic dispatch completes and persists notes (verification)",
+        "read-scope false positives tracked in sibling item",
+        "no pass counts"
+      ],
+      "reason": "Green cap pin but notes-persistence skip and live verification open.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "3d013231930e plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs 7 pass, 0 skip/todo"
+      ],
+      "heldClauses": [
+        "item acceptance refuses the third Critic dispatch; pin follows QG-13 1 FULL + 3 DIFF (PO has since decided 1+3; acceptance wording to amend)",
+        "at most one delta follow-up wording vs current cap"
+      ],
+      "reason": "Cap, delta binding and wording 7 green with RED mirror; cap number conflicts with original acceptance wording.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [
+        "ec4bc407eec8 feat critic-notes-write.mjs, no test, no pin, no counts"
+      ],
+      "heldClauses": [
+        "no committed test of notes writer",
+        "guard admission of the script",
+        "template/critic.md openssl example replacement",
+        "runaway-process hazard clause"
+      ],
+      "reason": "Source only, no evidence; baseline 25 kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.critic-scratch-notes-write-is-refused-again",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "6271ecab62f1 plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs 122 tests, 119 pass, 0 fail, 3 platform skips",
+        "deeadb42786d guard-dispatch-budget pin: 2 linux-injected mode cases; DLR035 and design-advisory-admission typed skips (due 2026-10-23)",
+        "facf39659e00 plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs own-create/append RED before fix, refusal green, 2 POSIX skips"
+      ],
+      "heldClauses": [
+        "POSIX-only owned-notes cases (2 skips)",
+        "DLR035 and design-advisory-admission inspect (skips)",
+        "3 platform skips",
+        "live Critic dispatch persisting notes",
+        "pin counts not stated"
+      ],
+      "reason": "Windows owned-notes fix committed with RED-then-green pin; skips and open live check keep it below 75.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "9412386c61ac plugins/pipeline-core/lib/pins/cross-runner-chat-intake-reference-needs-host-capture.test.mjs 5 pass, 10 typed host skips"
+      ],
+      "heldClauses": [
+        "reference expiry (A1) not implemented (PO since decided 24 h; P22 slice)",
+        "host capture adapters or typed-unavailable per runner not evidenced",
+        "chat-only path byte-exact multiline proof: typed skips",
+        "adjacent onboarding suites 50 baseline failures"
+      ],
+      "reason": "Checkpoint-binding clause covered with 5 green; expiry, adapters and end-to-end proof held.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [],
+      "heldClauses": [
+        "original private criterion and 11-case frozen proof without replay",
+        "Git-policy dependencies differ",
+        "authentic product/custody/AC14 proof",
+        "pin untracked"
+      ],
+      "reason": "No commits; pin untracked; baseline kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.declared-system-skill-read-requires-human-override",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "313e4364fd28 plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs 4 pass, 6 skipped (native-hold, incl. K7 symlink)"
+      ],
+      "heldClauses": [
+        "declared skill read via catalog authority (only generic host-visible rule today)",
+        "unlisted-sibling, transcript-file, traversal/tilde refusals: native-hold skips",
+        "catalog/file identity drift: skip",
+        "installed host readback: catalog producer unavailable (Codex-held)"
+      ],
+      "reason": "Acceptance maps to a committed pin with 4 green; six clauses typed skips.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.denial-names-a-diagnosis-it-refuses",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "65660d4cfa2e plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs 12 recovery commands admitted for 4 denial codes; counts not stated; AC-148 partial"
+      ],
+      "heldClauses": [
+        "design-advisory-admission.mjs inspect named by GUARD-DEVPLAN-SHELL has no emitter and is not pinned",
+        "DLR035 receipt not pinned",
+        "only 4 denial codes covered",
+        "PO decision BI (unverifiable approval degrades to advisory) not covered"
+      ],
+      "reason": "Partial coverage of the proposal; named diagnosis command and general rule uncovered.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-approval-validator-rejects-json-key-reordering",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "b5e1974886ce plugins/pipeline-core/lib/pins/design-approval-validator-rejects-json-key-reordering.test.mjs counts not stated; CLI signing case skipped on win32"
+      ],
+      "heldClauses": [
+        "CLI disposable-key signing and proof readback: skipped on win32",
+        "pass counts not stated"
+      ],
+      "reason": "Order-insensitive acceptance pinned; CLI signing clause typed skip.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+      "baselineStage": "UNKNOWN",
+      "stage": "25",
+      "evidence": [
+        "70eef1002c22 plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs counts not stated"
+      ],
+      "heldClauses": [
+        "implementation authority and release Verify rejecting deferred state: recorded, not enforced",
+        "typed verify-deferred state distinct from PASS: no counts",
+        "handover vs implementation-entry policy conflict unresolved"
+      ],
+      "reason": "Maps to a pin but no counts and the enforcement clause is only recorded.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "25"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "0e3a7439c22d plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs 7 pass, 2 typed host skips"
+      ],
+      "heldClauses": [
+        "authority-ancestor and POSIX directory-mode clauses: skips",
+        "Advisor host fixture on native Windows (R4-8): retired path only",
+        "superseding route pinned by retirement mapping, not live revision run"
+      ],
+      "reason": "Seven green cases show retirement mapping; two skips hold it at 50.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-generator-repeats-large-source-material",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "391360160f4a plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs counts not stated; summary <=8192 bytes, >=10x smaller"
+      ],
+      "heldClauses": [
+        "stored triple copy not pinned (PO 2026-10-16 #11: accepted as outside the acceptance)",
+        "host output budget unknown",
+        "routine inspect pendingAsks compaction not pinned",
+        "before/after token measurement and fresh-reviewer coverage"
+      ],
+      "reason": "Compact summary and refusals pinned; budget and reviewer clauses open; no counts.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-intake-generator-omits-question-answers",
+      "baselineStage": "75",
+      "stage": "50",
+      "evidence": [
+        "001c3001a146 plugins/pipeline-core/lib/pins/design-intake-generator-omits-question-answers.test.mjs counts not stated",
+        "e98e0fc13d5c docs draft of reconstructed AC-153 acceptance, pending PO release K6"
+      ],
+      "heldClauses": [
+        "no public original; reconstructed acceptance pending PO release (PO 2026-10-16 #21 released R1-R5 as a block)",
+        "one PO question per row",
+        "consumer/native requirements per baseline",
+        "pass counts not stated"
+      ],
+      "reason": "Pin covers verbatim ordered answers and binding, but the acceptance measured against was a draft at measurement, contradicting baseline 75.",
+      "readerBaselineStage": "75",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-package-parent-metadata-false-drift",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "eb886f010ff9 plugins/pipeline-core/lib/pins/design-package-parent-metadata-false-drift.test.mjs counts not stated; 2 symlink cases skipped"
+      ],
+      "heldClauses": [
+        "two symlink/alias cases skipped",
+        "21-case corpus preservation not shown",
+        "Verify registration (20 vs 21) not evidenced",
+        "installed runtime limits and historical attribution"
+      ],
+      "reason": "Sibling tolerance and refusals pinned; skips and corpus link absent.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "f7cd2cda1321 plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs 6 pass"
+      ],
+      "heldClauses": [
+        "RED mirror per case not produced",
+        "present-plan CLI path not covered",
+        "one-signature happy path end-to-end not evidenced",
+        "no mandatory Advisor stage on real driver route not proven"
+      ],
+      "reason": "Six green cases; present-plan path and RED mirrors are admitted gaps.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-trailer-verifier-lost-after-closure",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [
+        "731e457a0eac plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs counts not stated"
+      ],
+      "heldClauses": [
+        "identify merge/import that dropped verifier",
+        "admit design (elephant) form or remove from every printed example",
+        "merge-survival check across all closed items",
+        "pass counts"
+      ],
+      "reason": "No counts and two original clauses uncovered; baseline kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-workflow-package-omits-contract",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "5ecaac41870c plugins/pipeline-core/lib/pins/design-workflow-package-omits-contract.test.mjs counts not stated; real validateDesignWorkflowPackage refusals"
+      ],
+      "heldClauses": [
+        "Critic-before-Verify, plugin drift, chat signature, E1 freeze: text-only",
+        "fresh independent reviewer and host freshness evidence",
+        "installed-plugin readback checks not behavioral",
+        "five-source self-containment recheck",
+        "pass counts"
+      ],
+      "reason": "Five-source binding and refusals pinned; several clauses text-only.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "79ea8acff5bc plugins/pipeline-core/lib/pins/design-workflow-package-v2-readiness-fixture-fails-on-windows.test.mjs counts not stated; Linux route skips; RC12C001 explicit skip on win32"
+      ],
+      "heldClauses": [
+        "RC12C001 assertions do not run on Windows",
+        "Linux route cases never run green",
+        "original ask met only as a skip"
+      ],
+      "reason": "Cause measured (deliberate win32 platform gate); coverage loss converted to a skip; Linux run pending.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.desktop-app-support-is-unverified",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "70327236ca4f plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs 10 pass, 5 skips (native-pending)"
+      ],
+      "heldClauses": [
+        "Desktop bootstrap confirmation on real host: skip",
+        "guard denial in Desktop: skip",
+        "background Goldfish dispatch in Desktop: skip",
+        "statusLine identity in Desktop: skip"
+      ],
+      "reason": "Doc-contract clauses green; all four live points typed skips.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "baselineStage": "UNKNOWN",
+      "stage": "25",
+      "evidence": [
+        "348b421f30a2 no tracked pin; no counts"
+      ],
+      "heldClauses": [
+        "three disjoint signed actions with two deliveries: no counts",
+        "drift cases: no counts",
+        "Bash/plugin install status-bound: asserted only",
+        "signing preparer serial-dependence disclosure",
+        "no pin lineage"
+      ],
+      "reason": "Code repair committed but no counted GREEN evidence or pin.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "25"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "fb2e3d054395 plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs counts not stated; no RED mirror"
+      ],
+      "heldClauses": [
+        "macOS owner identity",
+        "no RED mirror",
+        "bounded wait with backoff (R7-11) not evidenced",
+        "counts; registry/Critic-template/review held"
+      ],
+      "reason": "Windows lock acquisition pinned; macOS held, no RED mirror.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "a6898252529b plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs counts not stated; RED mirrors"
+      ],
+      "heldClauses": [
+        "pass counts not stated (all three clauses appear covered)",
+        "native runner and sanctioned closure"
+      ],
+      "reason": "All three clauses appear pinned with RED mirrors; no green counts stated.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "edfc80d4c4bc dispatch-record.test.mjs 13/13; dispatch-record-write.test.mjs 3 fixture failures on Windows",
+        "37063240ee45 agy-final-return.test.mjs AFR17; AFR14/15 failing",
+        "a4029b8a6798 agy-final-return 16 pass, 2 todo; dispatch-record pin 7/7"
+      ],
+      "heldClauses": [
+        "why entries are skipped not measured",
+        "fold log appends into existing writes not done",
+        "AFR14/AFR15 todos",
+        "3 Windows fixture failures",
+        "AHC05 symlink privilege"
+      ],
+      "reason": "Mechanical empty-log refusal implemented and pinned; measurement and fold-in parts and todos remain.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [
+        "012333a888fa docs only; scratch-mirror OWN-7 RED then GREEN; pin untracked"
+      ],
+      "heldClauses": [
+        "F-3 clause (bind ownership to landed creation across linked worktrees) not addressed by the retained patch",
+        "patch not applied",
+        "guard-suite comparison and Critic pending",
+        "no tracked test lineage"
+      ],
+      "reason": "Retained patch only, pin untracked, and the patch maps to a different defect.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+      "baselineStage": "25",
+      "stage": "75",
+      "evidence": [
+        "b08351834291 plugins/pipeline-core/lib/pins/dispatch-records-land-under-specs-evidence.test.mjs 15 pass, 2 RED mirrors, no skips"
+      ],
+      "heldClauses": [
+        "decision whether to move two already-tracked misplaced records (historical data, unchanged)",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Both proposal clauses covered by 15 green cases with RED mirrors.",
+      "readerBaselineStage": "25",
+      "readerStage": "75"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "7eebbe101bc5 plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs 9/9 pass; RED mirror"
+      ],
+      "heldClauses": [
+        "original acceptance unmappable at measurement (no public original; PO 2026-10-16 #21 released reconstructions as a block)",
+        "original scanner inputs unavailable",
+        "real gitleaks binary unavailable"
+      ],
+      "reason": "9 green seam cases pin AC-166 behaviour, but the original acceptance could not be mapped.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "UNKNOWN",
+      "adjudication": "same PO decision #21 maps AC-166 to the committed 9/9 pin 7eebbe101bc5; real gitleaks reproduction stays held, so 50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [],
+      "heldClauses": [
+        "pin untracked; no committed GREEN evidence",
+        "literal variable/provisioning and modes",
+        "Main integration",
+        "lifecycle/model/native acceptance",
+        "original 11 GREEN/2 RED not replayed"
+      ],
+      "reason": "No Claude commits; pin untracked, baseline stage retained. Backlog file not read (budget); requirement inferred from baseline text.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+      "baselineStage": "UNKNOWN",
+      "stage": "25",
+      "evidence": [
+        "296c22e8e998 (no test path, no counts stated) elephant-context-measure.mjs added"
+      ],
+      "heldClauses": [
+        "per-cause before/after measurements on real data",
+        "committed GREEN test",
+        "admin share vs 10% target not shown met"
+      ],
+      "reason": "Commit adds measurement script; message states no tests and leaves real-data measurements open. Mapped to AC-168 requirement text, no GREEN evidence; backlog not read.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "25"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "ff4938d00e69 plugins/pipeline-core/lib/pins/every-dispatch-pays-a-bootstrap-receipt-detour.test.mjs 7 pass, C5 no longer todo"
+      ],
+      "heldClauses": [
+        "genuine fresh-dispatch first-write proof",
+        "batch review and acceptance"
+      ],
+      "reason": "Template fix committed with pin 7 pass, but message keeps the fresh-dispatch first-write proof open. Backlog not read.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.evidence-artifacts-carry-no-commit-identity",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "65d8334f2472 plugins/pipeline-core/lib/pins/evidence-artifacts-carry-no-commit-identity.test.mjs pin committed, counts not stated"
+      ],
+      "heldClauses": [
+        "test counts not stated",
+        "admission and coherent review",
+        "acceptance"
+      ],
+      "reason": "Pin now committed but message gives no counts; no explicit GREEN lineage for 75. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "5908b61345ac plugins/pipeline-core/lib/pins/existing-signing-key-reuse-deadlocks-onboarding.test.mjs A5 + 3 new pairing cases pass (total not stated)"
+      ],
+      "heldClauses": [
+        "batch security Critic pending",
+        "consumer verification",
+        "passphrase prompt behaviour for encrypted keys not test-shown"
+      ],
+      "reason": "Key-pair mismatch fix committed with targeted cases passing; security review and consumer verification open. Backlog not read.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.feature-branch-push-admitted-without-signature-approval",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "ebd52f9024cb plugins/pipeline-core/lib/pins/feature-branch-push-admitted-without-signature-approval.test.mjs pin committed, counts not stated"
+      ],
+      "heldClauses": [
+        "broader noncheckpoint/main-release pushes",
+        "batch review",
+        "sanctioned closure",
+        "test counts not stated"
+      ],
+      "reason": "Checkpoint-push pin committed with RED mirror, but baseline's broader clauses remain and counts absent. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.first-enrollment-enters-retirement-before-consent",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "8614a34323e8 plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs FRB001-004 + OBC298 pass, 1 symlink skipped (owner Coordinator, due 2026-10-19, Linux/WSL)"
+      ],
+      "heldClauses": [
+        "symlink case typed skip pending Linux/WSL run"
+      ],
+      "reason": "Pin committed and passing, but one clause covered only by a typed skip, so not qualified for 75. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.foreign-worktree-closes-the-implementation-gate",
+      "baselineStage": "UNKNOWN",
+      "stage": "UNKNOWN",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commits; pin untracked",
+        "original acceptance not mapped to committed evidence"
+      ],
+      "reason": "No commits and untracked pin; baseline stage retained. Backlog not read.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [
+        "29b400a4543b (no test path, no counts stated) audit-index.mjs added"
+      ],
+      "heldClauses": [
+        "no committed GREEN test cited",
+        "provenance hold",
+        "Codex/Antigravity transcript parts out of scope"
+      ],
+      "reason": "Commit adds generator but states no test results; stays at 25. Backlog not read.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.gh-delivery-classifier-is-not-wired",
+      "baselineStage": "75",
+      "stage": "75",
+      "evidence": [
+        "93cdc50a051e plugins/pipeline-core/lib/pins/gh-delivery-classifier-is-not-wired.test.mjs pin committed, counts not stated"
+      ],
+      "heldClauses": [
+        "batch review, Full Verify, PO acceptance",
+        "counts not stated in commit"
+      ],
+      "reason": "Sole acceptance clause is gh pr merge guard-refused; committed pin covers it and more (API merge, release upload, Codex/Antigravity routing, hooks.json); baseline retained. Backlog read.",
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "58ae0afed8f1 source-scan test (path not stated) RED 4/5 before, GREEN 5/5 after"
+      ],
+      "heldClauses": [
+        "regression test spawning real git with the constant",
+        "stub-git half of R7-1a (no injection seam)",
+        "Node-v24 NUL item acceptance line update",
+        "native Git for Windows 2.56 host run"
+      ],
+      "reason": "Commit fixes the last two win32 NUL sites with GREEN source-scan test, but real-git spawn regression and host checks held. Backlog read.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "16ea61d93169 (no test path or counts stated) byte-exact copy/digest/tamper/symlink-alias cases; alias skipped without symlink privilege"
+      ],
+      "heldClauses": [
+        "symlink-alias refusal is a typed skip on Windows",
+        "counts not stated"
+      ],
+      "reason": "New cases committed but one clause only typed-skip covered and no counts. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "e18a3395cf5b plugins/pipeline-core/lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs 5 pass, 1 host skip",
+        "90e83204db95 cp/mv destination change (no counts)"
+      ],
+      "heldClauses": [
+        "old active snapshot still admitted (stale-admission RED not shown fixed)",
+        "selected-plugin carrier/authority",
+        "postimage/native/fullcommit/update/operand clauses",
+        "1 host skip",
+        "pre-existing failures: commit-msg 2, pre-commit 3, preflight 1"
+      ],
+      "reason": "Staleness reporting committed with pin 5 pass/1 skip; code and targeted evidence exist but stale-admission clause unqualified. Backlog not read.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "5b3602b729c9 plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs pin committed, counts not stated"
+      ],
+      "heldClauses": [
+        "counts not stated",
+        "batch review and acceptance",
+        "baseline-held clauses unverified"
+      ],
+      "reason": "Pin committed with mirror check but no pass counts; 75 not supported. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.git-stash-list-classified-as-working-tree-write",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "0cf1b39c81e9 plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs pin committed, counts not stated"
+      ],
+      "heldClauses": [
+        "counts not stated",
+        "source integration hold not shown closed",
+        "related sed -i wrong-operand File: symptom from Description not covered"
+      ],
+      "reason": "Pin covers Proposal (list/show read-only, mutating verbs stay write) but no counts or integration evidence. Backlog read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "0f617733aeb2 plugins/pipeline-core/lib/pins/gitleaks-content-suppression-does-not-match-on-windows.test.mjs pin committed, counts not stated"
+      ],
+      "heldClauses": [
+        "counts not stated",
+        "real Windows/native scanner run",
+        "batch review"
+      ],
+      "reason": "Pin committed but no counts or native evidence. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "f63ddfce293c plugins/pipeline-core/lib/pins/gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.test.mjs pin committed, counts not stated"
+      ],
+      "heldClauses": [
+        "real scanner/native review",
+        "batch admission",
+        "counts not stated"
+      ],
+      "reason": "Pin committed but baseline's real-scanner and batch clauses open; no counts. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "925ecd409d97 plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs pin committed, counts not stated",
+        "c4a24714441c same file, backslash case skipped outside win32 (typed host skip)"
+      ],
+      "heldClauses": [
+        "genuine native Windows drive-letter execution (backlog Triage: closes after 0.7.0 host checklist)",
+        "backslash case typed skip on non-Windows",
+        "counts not stated"
+      ],
+      "reason": "CLI child-process pin committed but pass counts and native Windows run not evidenced. Backlog read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "79f2919f7730 plugins/pipeline-core/lib/pins/goldfish-budgets-omit-the-closing-ceremony.test.mjs producer case RED before fix, GREEN after (counts not stated)"
+      ],
+      "heldClauses": [
+        "consumer verification",
+        "counts not stated",
+        "batch review"
+      ],
+      "reason": "Fix and pin committed with RED-to-GREEN producer case; consumer verification open. Backlog not read.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "9d0d23523753 plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs P3 RED before, GREEN after (counts not stated)"
+      ],
+      "heldClauses": [
+        "counts not stated",
+        "sync receipt",
+        "reader/batch review",
+        "signed application per baseline"
+      ],
+      "reason": "Prepared postimage now applied and committed with GREEN pin, but no counts and baseline review/sync clauses unverified. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "4f64c267a37f plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs 7 pass"
+      ],
+      "heldClauses": [
+        "consumer coverage (no production code renders the quick field)",
+        "original item body not in repo; clause list partial"
+      ],
+      "reason": "Template pin 7 pass, commit labels AC-187 (partial), consumer coverage open. Backlog file does not exist; used AC-187 excerpt and matrix.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.governance-scope-rejects-readonly-host-git-control",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "065eca57eccb plugins/pipeline-core/lib/pins/governance-scope-rejects-readonly-host-git-control.test.mjs pin committed, counts not stated; points 1-5 and 8 typed skips on native Windows"
+      ],
+      "heldClauses": [
+        "points 1-5 and 8 need a POSIX host (typed skips)",
+        "counts not stated"
+      ],
+      "reason": "Pin committed but most points only typed-skip covered on this host; 75 not supported. Backlog not read.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "68b15433ae26 plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs 8/8 pass (incl. 3 negative controls)"
+      ],
+      "heldClauses": [
+        "historical Codex/WSL sequence and ready-but-exit-1 case",
+        "admission of the trust-anchor applyAction itself",
+        "no Codex/WSL-native run",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "GREEN 8/8 matrix on real driver, CLI and guard; historical-sequence and trust-anchor clauses uncovered.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [
+        "07d40028da98 docs only, no test counts"
+      ],
+      "heldClauses": [
+        "no public original; reconstructed draft (released by PO 2026-10-16 #21 as a block)",
+        "real derivative redaction/lineage",
+        "private custody",
+        "authenticated usage, publication, native, review"
+      ],
+      "reason": "Only a reconstructed acceptance draft; no implementation or qualification evidence.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.greenfield-design-course-cost-and-proportionality",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commit; pin untracked"
+      ],
+      "reason": "No committed evidence; baseline kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.greenfield-machine-output-and-skill-budget",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "d5eccc8a8ec9 plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs 11 pass"
+      ],
+      "heldClauses": [
+        "long override instructions behind a bounded read-only help action: not evidenced",
+        "runner-specific bootstrap detail in lazy references: only SKILL.md size bound pinned",
+        "exact-action following only partly shown",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "11-pass budget pin with negative control; help-action clause not evidenced.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.guard-override-request-digest-drifts-after-arming",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "8f10fb9025e1 plugins/pipeline-core/lib/pins/guard-override-request-digest-drifts-after-arming.test.mjs no counts; volatile-input mirror fails A2"
+      ],
+      "heldClauses": [
+        "no counts",
+        "POSIX seed/sign/arm/retry run",
+        "request digest reinterpreted as toolInputSha256 (needs review)",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Digest-stability clauses covered but no counts or POSIX evidence.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "c8a8f5c0e28c plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "universal git grep flag exemption not approved (BRE alternation stays refused)",
+        "native/installed, review, PO acceptance"
+      ],
+      "reason": "Exact shape pinned; exemption question open.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.guard-push-refuses-read-only-git-without-push",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "49e72ad707cf plugins/pipeline-core/lib/pins/guard-push-refuses-read-only-git-without-push.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "nested-shell clause superseded by decision Q12 (fail-closed)",
+        "review and PO acceptance"
+      ],
+      "reason": "--version and read-only git pinned; nested-shell clause held by Q12.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "3310b728f0f3 plugins/pipeline-core/lib/pins/guard-push-treats-gitleaks-as-a-git-command.test.mjs no counts; real hook plus old-prefix mirror"
+      ],
+      "heldClauses": [
+        "no counts",
+        "0.7.0 host checklist and batch review"
+      ],
+      "reason": "Both proposal clauses pinned; no result count.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+      "baselineStage": "UNKNOWN",
+      "stage": "UNKNOWN",
+      "evidence": [
+        "4f881f3d780b plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs RED on CRLF; DrvFs hint 0/2 -> 2/2"
+      ],
+      "heldClauses": [
+        "classification of the 60 guard-lifecycle-ready failures",
+        "fixtures aligned to activation model",
+        "recorded baseline count",
+        "link WPO-HELPER-CAS fix to the 60 failures"
+      ],
+      "reason": "Commit fixes a different Windows failure; original acceptance still unmapped.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.handover-doc-committed-without-governance-classification",
+      "baselineStage": "UNKNOWN",
+      "stage": "25",
+      "evidence": [
+        "d68cbae1f559 plugins/pipeline-core/lib/pins/handover-doc-committed-without-governance-classification.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no GREEN result stated",
+        "pre-commit check implemented or only pinned not stated",
+        "clone without hooks and handover-writer path",
+        "review and PO acceptance"
+      ],
+      "reason": "Acceptance maps to a pin, but no counts.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "25"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "e8568588ccfc plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "classifier fix commit not in input",
+        "unlisted-receiver boundary documented, not closed",
+        "review and PO acceptance"
+      ],
+      "reason": "Receiver list pinned; no counts; boundary open.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "3cf47c1f3f3f plugins/pipeline-core/lib/pins/hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows.test.mjs no counts; Linux control typed skip"
+      ],
+      "heldClauses": [
+        "Linux control typed skip",
+        "no counts",
+        "genuine Windows DACL/writer and consumer planning route",
+        "review and PO acceptance"
+      ],
+      "reason": "win32 shapes pinned; Linux control skip-only.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.hgo-patch-preflight-before-signature",
+      "baselineStage": "UNKNOWN",
+      "stage": "UNKNOWN",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commit; pin untracked"
+      ],
+      "reason": "No committed evidence; baseline kept.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.hgo-stale-capability-shadows-current-authorization",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [],
+      "heldClauses": [
+        "pin untracked, fix uncommitted",
+        "native contract/OriginalWrite nativev4 conflict, integration, review, acceptance"
+      ],
+      "reason": "No commits; baseline kept.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "0b179b354f00 plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs 6 pass"
+      ],
+      "heldClauses": [
+        "real crash simulation after install",
+        "readiness case pins only the warning decision",
+        "resource-bearing orphan archive route not reachable",
+        "review and PO acceptance"
+      ],
+      "reason": "6-pass pin for zero-authority archive and refusals; crash simulation and reachable route unproven.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commit; pin untracked",
+        "AC-204 acceptance only a reconstructed draft"
+      ],
+      "reason": "No committed evidence; baseline kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "8d0277665c69 plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "clause 2 'Dispatch: design (elephant)' accepted: pin asserts rejection (original-norm mismatch, PO decision)",
+        "shared classification for docs/evidence commits during implementation",
+        "disposition of stage-0 design commits",
+        "no counts"
+      ],
+      "reason": "Clause 1 pinned; pin contradicts clause 2 as written.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "dc0f02ec0b3f closure test 11/11, kernel-closure pin 6/6",
+        "c0af5b2fe728 plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs no counts; mirror reports 4/4"
+      ],
+      "heldClauses": [
+        "red ratchet blocks candidate stamp: route not located",
+        "live GMWKC01 red with 161 violations",
+        "pin exercises a mirror, not the real collector",
+        "review and PO acceptance"
+      ],
+      "reason": "Clause 1 covered by mirror; clause 2 unbound and live ratchet red.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "e2356940118c plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs 20 pass, 3 typed skips (2 await PO decision, since decided 2026-10-16 #3); guard-devplan-policy 6/6"
+      ],
+      "heldClauses": [
+        "continuity-cas, integrate-final, cancel-submitted-plan admitted by closed argv (P22 slice)",
+        "read-only scratch scripts and recovery checkers admitted (P22 slice)",
+        "F6 governed repair without override",
+        "design course on Windows Git Bash zero overrides: skip",
+        "review and PO acceptance"
+      ],
+      "reason": "20-pass pin for scaffold admission; several clauses uncovered and three skips.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "3463e72d7670 plugins/pipeline-core/lib/pins/lifecycle-inspect-omits-current-plan-spec-digests.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "unreadable source and structured recovery action not named",
+        "integration, verification, review, PO acceptance"
+      ],
+      "reason": "Drift cases pinned; no counts.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+      "baselineStage": "UNKNOWN",
+      "stage": "UNKNOWN",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commit; pin untracked"
+      ],
+      "reason": "No committed evidence; baseline kept.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "c17ea62e03c8 plugins/pipeline-core/lib/pins/mandatory-hook-readiness-returned-refusal-skips-rollback.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "source fix (ddabe0ae3) not in input",
+        "0.7.0 host checklist, Verify enrollment, batch review"
+      ],
+      "reason": "Pin appears to cover every proposal clause; closest 75 candidate once counts are cited.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.merge-commit-message-skips-conventional-type-check",
+      "baselineStage": "75",
+      "stage": "50",
+      "evidence": [
+        "15b5b2341af7 plugins/pipeline-core/lib/pins/merge-commit-message-skips-conventional-type-check.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "original acceptance not available; reconstructed from title, Merge20 seam and source",
+        "no pass count",
+        "no record mapping original acceptance to the pin"
+      ],
+      "reason": "No backlog file; AC-211 points to portable-original-requirements.json; the commit says acceptance was reconstructed, so baseline 75 cannot be mapped.",
+      "readerBaselineStage": "75",
+      "readerStage": "UNKNOWN",
+      "adjudication": "reader held the acceptance as an unreleased reconstruction; PO decision 2026-10-16 #21 released the reconstructed original acceptances R1-R5 as a block, so the acceptance maps to the committed pin 15b5b2341af7; no pass counts stated, so 50, not the 75 baseline"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.model-family-approval-with-automatic-version-upgrades",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "215108fc5ee6 plugins/pipeline-core/lib/pins/model-family-approval-with-automatic-version-upgrades.test.mjs 17 pass, 1 skip (C5 native-pending), 0 fail"
+      ],
+      "heldClauses": [
+        "C5 installed-host acceptance: typed skip",
+        "separate Source, installed-host and candidate acceptance proof",
+        "manual PO acceptance"
+      ],
+      "reason": "A1-A6, B1-B3, D1-D4, C1-C4 green; installed-host clause only a skip.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "fc8dabb456bb plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs 1 todo (import-cycle RED), since converted",
+        "71cd2bda0cce same pin todo now passes; MFH002/MFH003 fail on native Windows"
+      ],
+      "heldClauses": [
+        "MFH002/MFH003 fail on Windows (deferred to Linux/WSL)",
+        "clause 4 (POSIX-only path assumptions, realpath casing) not named",
+        "no counts",
+        "native Windows bootstrap readback"
+      ],
+      "reason": "First three clauses pinned and import cycle repaired; two failures and clause 4 keep it at 50.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "c4cd785a5024 plugins/pipeline-core/lib/pins/model-role-confirmation-prompt-obscures-required-digest.test.mjs no counts; all five acceptance points claimed"
+      ],
+      "heldClauses": [
+        "no counts",
+        "installed attended readback",
+        "dynamic binding and productive admission",
+        "batch Critic and manual acceptance"
+      ],
+      "reason": "Pin claims all five points; no green counts and installed acceptance pending.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.native-patch-rename-drops-protected-content-markers",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "dcf29893e714 plugins/pipeline-core/lib/pins/native-patch-rename-drops-protected-content-markers.test.mjs no counts; mirror REDs"
+      ],
+      "heldClauses": [
+        "clause 3 installed guard retains controls",
+        "no counts",
+        "combined candidate, lifecycle, admission"
+      ],
+      "reason": "Clauses 1-2 pinned; clause 3 needs installed guard.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "c5935770cce1 plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs no counts; alias and private-mode refusals skip"
+      ],
+      "heldClauses": [
+        "alias and private-mode refusals typed skips",
+        "shared-worktree refusal not covered",
+        "per-runner fixtures not shown",
+        "key-level strip, archive variant, AGENTS.md kept, native, docs, signed integration",
+        "no counts"
+      ],
+      "reason": "Main paths pinned through real Git; skips, uncovered refusal and broader scope.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "d934d69e8a14 plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs no counts; six offender fixtures and mirror turn scan RED"
+      ],
+      "heldClauses": [
+        "no GREEN pass count",
+        "0.7.0 host checklist and manual acceptance"
+      ],
+      "reason": "Both clauses covered with no skip; held only for the missing pass count.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "4231149c5167 plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs no counts; Linux cases skipped",
+        "0c8416ca5700 same pin, no counts"
+      ],
+      "heldClauses": [
+        "real-Linux cases skipped",
+        "23 governance-scope callbacks and completion policy",
+        "original 184-case controller qualification",
+        "fail-closed diagnostics for corrupt history",
+        "no counts"
+      ],
+      "reason": "Structural observe call pinned; controller-level clauses uncovered.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "2a5bd9feac5f plugins/pipeline-core/lib/pins/onboarding-home-override-does-not-bind-machine-plane.test.mjs 4/4 green; revert turns A1/A2 red",
+        "bc22e9f5db18 same pin adds A3b, A2b, A2c, no counts"
+      ],
+      "heldClauses": [
+        "explicit reader override and no-override caller behaviour not named",
+        "native-home vs substituted-provider evidence separately",
+        "batch review and manual acceptance"
+      ],
+      "reason": "Clauses 1-2 and part of 3 green; explicit override retention not shown.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "0f3c65c28882 plugins/pipeline-core/lib/pins/onboarding-init-greenfield-matrix-is-serial-and-slow.test.mjs 7 pass, 1 typed skip (wall time), 0 fail"
+      ],
+      "heldClauses": [
+        "measured lower wall time: typed skip (Linux/WSL)",
+        "process and memory pressure not measured"
+      ],
+      "reason": "19 cells, cell-selective failure and real cell run pinned; wall-time skip.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "378617cda792 plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs no counts; mirror without await fails"
+      ],
+      "heldClauses": [
+        "criterion 4 full 216-case run with final Verify",
+        "parent nonempty-coverage rule structural only",
+        "no counts"
+      ],
+      "reason": "Criteria 1-3 pinned; criterion 4 deferred.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "0359cc85acb5 plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs 7/7 pass; dispatch-policy.test.mjs 41 pass, 1 host skip"
+      ],
+      "heldClauses": [
+        "MP-07 German reference half",
+        "MECH-HAIKU mechanic tier not installed",
+        "one Critic per batch and diff-only re-critic not mechanically enforced",
+        "Critic-route/dispatch-budget evidence",
+        "manual acceptance"
+      ],
+      "reason": "Opus-rationale refusal committed and green; rules 2-3 and triage items open.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+      "baselineStage": "75",
+      "stage": "75",
+      "evidence": [
+        "a038ea597e15 plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs no counts; no skips/open clauses; mirror fails"
+      ],
+      "heldClauses": [
+        "batch review",
+        "Full Verify",
+        "manual PO acceptance",
+        "pass count not stated"
+      ],
+      "reason": "Both options in all forms with negatives and RED mirror; baseline already recorded criterion qualified; raise rests on clause coverage, not a count.",
+      "readerBaselineStage": "50",
+      "readerStage": "75"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "a0e3b1952e06 batch-critic delivery and drift admission tests, 8 cases",
+        "2010e87c919a fix; no counts",
+        "02bc07085bf1 interim candidate; coverage partial"
+      ],
+      "heldClauses": [
+        "dispatch-record collision atomic and repairable",
+        "liveness readback before second writer",
+        "one readiness definition for preflight and guard",
+        "commit-then-finalize regression test",
+        "overlap, deep-role, rebind not green",
+        "no registered pin"
+      ],
+      "reason": "Code and 8 green cases for counter lock and batch-critic slice; coverage partial.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+      "baselineStage": "75",
+      "stage": "50",
+      "evidence": [
+        "16e8bb340474 plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs no counts; /etc/shadow and directory-symlink cases skip on Windows"
+      ],
+      "heldClauses": [
+        "/etc/shadow refusal: typed skip",
+        "directory-symlink cases: typed skip",
+        "no counts"
+      ],
+      "reason": "The first acceptance clause names /etc/shadow and is only a typed skip here; baseline 75 contradicted.",
+      "readerBaselineStage": "75",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "d67981f4641c plugins/pipeline-core/lib/pins/pipeline-hooks-act-in-repositories-that-never-opted-in.test.mjs no counts; pure non-git case typed skip"
+      ],
+      "heldClauses": [
+        "pure non-git inert case skip",
+        "Codex/Antigravity payloads approximated",
+        "PO decision on GIT-03 and push policy outside enrolled repos",
+        "consumer verification across runners",
+        "no counts"
+      ],
+      "reason": "Real hook entrypoints and scope predicate pinned for git fixtures; non-git skip.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "39716c299f8d plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs no counts; central acceptance and negatives"
+      ],
+      "heldClauses": [
+        "unavailable-Advisor exception inside final decision",
+        "Advisor and readiness preceding final PO presentation",
+        "both approval modes through the actual writer",
+        "no counts",
+        "genuine Epic/Feature reviews, native, admission"
+      ],
+      "reason": "Central acceptance and negatives pinned; no counts and two clauses unmentioned.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "ee05ce971b7f plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs no counts; Bash/PowerShell outside-root incl. junction, Read/Grep/Glob, matcher registration"
+      ],
+      "heldClauses": [
+        "native Windows boundary and recovery consumer run",
+        "installed enforcement",
+        "no counts"
+      ],
+      "reason": "Maps to all four bullets; native and installed open, no counts.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "9b0890d5c596 plugins/pipeline-core/lib/pins/preflight-hides-the-git-error-behind-gs-git-unavailable.test.mjs trailers only, no counts"
+      ],
+      "heldClauses": [
+        "no counts or clause list",
+        "redacted cause, topologyDiagnostic, read-only nextAction unconfirmed",
+        "manual acceptance"
+      ],
+      "reason": "No clause can be shown qualified; baseline kept.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "b10c08eee976 plugins/pipeline-core/lib/pins/preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.test.mjs no counts; POSIX exact-path case skips"
+      ],
+      "heldClauses": [
+        "POSIX exact-path case: skip",
+        "case-variant spellings stay refused (PO 2026-10-16 #19 since decided to admit them)",
+        "no counts"
+      ],
+      "reason": "Slash spellings record receipts end to end; skip and case discrepancy keep 50.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "c02db98baa8c plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs no counts; POSIX chmod branch skipped"
+      ],
+      "heldClauses": [
+        "POSIX chmod branch: skip",
+        "native Windows assurance and cleanup",
+        "no counts",
+        "manual acceptance"
+      ],
+      "reason": "Seam committed and NOT_SECURE refusal pinned; skip and missing counts.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+      "baselineStage": "75",
+      "stage": "UNKNOWN",
+      "evidence": [
+        "no Claude commits; pin tracked=false exists=false"
+      ],
+      "heldClauses": [
+        "original acceptance not available (AC-232 cites portable requirements only)",
+        "no committed GREEN test on HEAD: pin missing",
+        "private correction never committed"
+      ],
+      "reason": "Pin that would support baseline 75 is absent on HEAD; baseline contradicted.",
+      "readerBaselineStage": "75",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "deabbe04ab0e plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs no counts; RED in scratch mirror; symlink-alias CLI case skipped on Windows"
+      ],
+      "heldClauses": [
+        "acceptance is the reconstructed R1 (AC-233)",
+        "which surfaces show the report is an open PO question",
+        "symlink-alias case typed skip",
+        "five original Quick scenarios no executed proof",
+        "native, review, manual acceptance"
+      ],
+      "reason": "Reporter pinned; no counts, a skip and the surface question held.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "a90869af9e89 no test; backslash fix in canonicalProjectPath (different defect)",
+        "2436a1c01527 pin 7/7 GREEN only with the fix retained as an unapplied patch"
+      ],
+      "heldClauses": [
+        "pin untracked",
+        "closedFeatures-absent fix only a PO-applied patch; protected-baseline.mjs unchanged on HEAD",
+        "guard CLI/fanout positives unqualified",
+        "bound correction receipts and candidate binding",
+        "installed acceptance"
+      ],
+      "reason": "Repair exists only as an unapplied patch and pin uncommitted.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "0adf9c761c49 plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs no counts; RED control is a test-local deny-list"
+      ],
+      "heldClauses": [
+        "no counts",
+        "removal of shape-specific checks not evidenced",
+        "PO question Q12 and manual acceptance",
+        "git-cmd.test.mjs 13 pre-existing failures"
+      ],
+      "reason": "Marker-based inversion pinned; no counts and gates open.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+      "baselineStage": "50",
+      "stage": "75",
+      "evidence": [
+        "585e5a0fe8dc plugins/pipeline-core/lib/pins/push-classifier-does-not-model-powershell-backtick-escapes.test.mjs 19/19 pass (was 16/19); siblings green; git-cmd 13 pre-existing failures unchanged"
+      ],
+      "heldClauses": [
+        "batch review, Full Verify, PO acceptance",
+        "$(...) in double quotes relies on earlier GPGL-8 checks 5-6",
+        "19/19 is at the commit, not re-run on HEAD"
+      ],
+      "reason": "19/19 GREEN pin committed with the fix covers backtick escape and executed here-strings; rated 75 with lineage caveat.",
+      "readerBaselineStage": "50",
+      "readerStage": "75"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "bd66f1086b18 plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "later git-cmd.mjs commits not re-run against this pin",
+        "security Critic and manual acceptance",
+        "git-cmd 13 pre-existing failures"
+      ],
+      "reason": "Shapes pinned; no counts.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "96bac29957cb plugins/pipeline-core/lib/pins/push-classifier-misses-nested-quotes-and-redirect-before-push.test.mjs 12/16 before, 16/16 after",
+        "5e7871e6d044 same pin +19 RED-before cases, +4 controls",
+        "04f5f3feae0c same pin +20 shapes, +7 controls"
+      ],
+      "heldClauses": [
+        "accepted false positives sit next to 13 failing Q12-ACCEPTED-FP and GREP-PINS-R2 cases",
+        "latest two commits no total count",
+        "Critic C6a re-verification, batch review, manual acceptance"
+      ],
+      "reason": "Detection well covered; accepted-false-positive clause contradicted by 13 red sibling cases.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "8679cc3d9cde plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs 11/11 pass; QP4-4 amended 3/3"
+      ],
+      "heldClauses": [
+        "Grep on in-repo subtree without glob not admitted (PO U2: stays)",
+        "directory-wide glob outside root stays refused",
+        "Glob with * and no path",
+        "cross-runner read-lane matrix",
+        "denial-text audit (blocked, never absence)",
+        "native/installed runs"
+      ],
+      "reason": "Exact-file Grep globs admitted with 11/11 and 3/3; most original clauses still held.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "e02c4024789e plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs 40 pass; seven shell-grammar suites 128/130, 2 host skips"
+      ],
+      "heldClauses": [
+        "symlink cases typed skips",
+        "independent security Critic with probes",
+        "native Read/Grep/Glob and PowerShell lanes",
+        "credential-root deny through every lane only partly shown",
+        "manual acceptance"
+      ],
+      "reason": "fetch, git -C, git config escapes closed with 40 green; skips and lanes remain.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "aa7dd64bacdd plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs 6 pass, 3 typed skips (Linux-only)"
+      ],
+      "heldClauses": [
+        "bootstrap-to-host-to-verifier delivery: skips",
+        "private custody binding: skips",
+        "independent readiness review not re-run",
+        "final package provenance validation",
+        "manual acceptance"
+      ],
+      "reason": "6 green; 3 clauses typed skips.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "e367c0e86419 plugins/pipeline-core/lib/pins/reconnect-sandbox-empty-child-output-breaks-bootstrap.test.mjs no counts; three output classes"
+      ],
+      "heldClauses": [
+        "real Codex reconnect bootstrap readback",
+        "no counts",
+        "manual acceptance"
+      ],
+      "reason": "Output classes pinned; native clause held.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "43419638cdfe plugins/pipeline-core/lib/pins/retirement-reader-masks-typed-unsafe-layout-inspection.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "admitted roots keep retirement/history validation",
+        "complete controller qualification (>600s, host run)",
+        "combined candidate gates",
+        "no counts"
+      ],
+      "reason": "Only typed-unsafe clause pinned.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "20e3055c69c3 plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs 5 pass, 2 typed skips"
+      ],
+      "heldClauses": [
+        "R5-6/R5-8 covered by retirement doctrine, not behaviour test",
+        "symlinked state file (K7) skip",
+        "Linux-only managed host fixture skip",
+        "retired route vs original acceptance needs PO decision"
+      ],
+      "reason": "Route retired; surviving observer 5 green; 2 skips.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "3c2eedb87023 plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs 9/9 GREEN (RED before fix); design-course-session 6/9 fail pre-existing (DESIGN-COURSE-RETIRED)"
+      ],
+      "heldClauses": [
+        "course accepts fallback result as role evidence (point 2b)",
+        "consumer execution and native adapters",
+        "readiness carrier and intake proof",
+        "manual acceptance"
+      ],
+      "reason": "Per-runner preflight and fallback pinned 9/9; point 2b held.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.scratch-has-no-retention-and-no-durability-check",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "3c02075407f7 plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs 12 pass, 1 skip (POSIX exec bit)"
+      ],
+      "heldClauses": [
+        "POSIX exec-bit skip",
+        "all runners and platforms incl. consumer repos",
+        "native, review, manual acceptance"
+      ],
+      "reason": "Sweep, staging, WARN-only durability 12 green; skip and matrix held.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "a6aa8705dad4 plugins/pipeline-core/lib/pins/scratch-must-remain-writable-across-lifecycle-states.test.mjs no counts; two symlink skips"
+      ],
+      "heldClauses": [
+        "symlink cases skips",
+        "live native blocked-session report save",
+        "apply_patch lanes, subagent bootstrap, installed Codex sweep",
+        "redirect capture boundary (GUARD-REDIRECT-UNAPPROVED)",
+        "matrix sampled",
+        "no counts",
+        "manual acceptance"
+      ],
+      "reason": "All-state scratch matrix pinned; skips, counts and native sweeps hold 50.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "f9c7c0a14ff3 plugins/pipeline-core/lib/pins/script-mediated-writes-bypass-protected-test-paths.test.mjs no counts; scratch mirror REDs"
+      ],
+      "heldClauses": [
+        "no counts",
+        "signed ceremony, installed hook, native runs",
+        "review and manual acceptance"
+      ],
+      "reason": "Codemod and redirect shapes pinned; no counts.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.security-scanner-failure-provenance",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "218fde856b24 plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs no counts; Linux-only sidecar case skipped"
+      ],
+      "heldClauses": [
+        "sidecar publication skip",
+        "native scanner acceptance",
+        "whole-candidate Verify, Critic, installation",
+        "no counts"
+      ],
+      "reason": "Four outcomes pinned; sidecar skip and native open.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "d12af9232e90 plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs no counts; baseline 22 checks GREEN"
+      ],
+      "heldClauses": [
+        "no counts (GREEN is a baseline claim)",
+        "history, review, installed, native, manual acceptance"
+      ],
+      "reason": "Proposal maps fully; without counts not 75.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.semgrep-offline-default-version-check",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "7d8c5a49d9e5 plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs no counts",
+        "ad0ad58d954a same pin, four cleanup cases"
+      ],
+      "heldClauses": [
+        "no counts",
+        "security-scan.test.mjs 4/156 host failures",
+        "native PUSHSEED acceptance",
+        "manual acceptance"
+      ],
+      "reason": "Seam and cleanup pinned; no counts and host failures.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "72dbaffeff52 plugins/pipeline-core/lib/pins/semgrep-partial-parsing-warnings-fail-the-whole-scan.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "real semgrep default-ruleset checklist",
+        "manual acceptance"
+      ],
+      "reason": "Distinction pinned; no counts and Windows skips held.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "12cdee0254c8 plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs no counts",
+        "1729332fe8b7 same pin; AC6 six child processes; cleanup cause typed uncovered"
+      ],
+      "heldClauses": [
+        "typed-reason transition recording",
+        "intermittent cleanup cause uncovered; FLAP fix not in input",
+        "no counts",
+        "manual acceptance"
+      ],
+      "reason": "Routing and concurrency pinned; typed-reason and root-cause clauses uncovered.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "07",
+      "itemId": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "7e23d06ff432 plugins/pipeline-core/lib/pins/shell-classifier-faults-on-heredoc-body-text.test.mjs no counts; mirror faults"
+      ],
+      "heldClauses": [
+        "no counts",
+        "sanctioned assembly, batch review, closure",
+        "manual acceptance"
+      ],
+      "reason": "Both clauses covered; no counts.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "6f1846f63d85 plugins/pipeline-core/lib/pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs four checks plus mutation cases; no counts; RGCP001-004 registered"
+      ],
+      "heldClauses": [
+        "fixture issue not addressed",
+        "no counts",
+        "grammar-generation binding",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Placement suite registered and pinned; fixture clause and counts missing.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "f77abbe52ef5 production fix (no test path, no counts)"
+      ],
+      "heldClauses": [
+        "decoy-openssl regression test not evidenced",
+        "readiness probe same rule",
+        "residual key-directory cwd risk",
+        "native Windows signing writer and readiness",
+        "other bare-name security spawns"
+      ],
+      "reason": "Absolute-path resolver committed; only baseline portable controls are green evidence.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "3898cb36820d plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs 5 pass, 1 skip, 0 fail"
+      ],
+      "heldClauses": [
+        "no timed CLI run against populated store",
+        "no RED mirror",
+        "live sweep and full CLI ceremony skipped",
+        "points 1 and 3 structural only",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Green but partial and structural; AC-257 marked partial.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commit",
+        "pin untracked",
+        "native hold and consumer verification"
+      ],
+      "reason": "No commits; baseline kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "a0762098a09a plugins/pipeline-core/lib/pins/signed-quality-package-route-is-not-agent-operable-on-windows.test.mjs 13 pass, 1 skip, RED proofs"
+      ],
+      "heldClauses": [
+        "POSIX mode-bit case skipped",
+        "real Windows agent route end to end and latency",
+        "replaced-path injection and signature",
+        "pre-prompt signing latency",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Six points pinned green; skip and native route absent.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "89d8446be69c plugins/pipeline-core/lib/pins/signing-default-test-fixture-root-escapes-the-repository.test.mjs 2/5 pass, 3 todo (RC21C001/002/004)"
+      ],
+      "heldClauses": [
+        "RC21C001/002/004 WIN-AUTH-DACL todo",
+        "encrypted successor controlling-terminal case"
+      ],
+      "reason": "Three of five cases todo.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.signing-prompt-prints-the-whole-review-package",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "2ab27e085a0a plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs no counts; 1 typed skip"
+      ],
+      "heldClauses": [
+        "end-to-end sign-intent route",
+        "original latency",
+        "progress line, single-switch dispatch, digest binding structural only",
+        "one skip",
+        "post-sign output and rule for other signing commands",
+        "no counts"
+      ],
+      "reason": "Compact disclosure pinned with uncapped mirror failing; route and latency held.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.signing-toolchain-readiness",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commit (P20-09 commit pending)",
+        "pin untracked",
+        "native hold and consumer verification"
+      ],
+      "reason": "No commits; baseline kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25",
+      "adjudication": "input-builder defect: the reader saw originalStage 25 as baseline; the 2026-10-12 matrix currentEngineering stage is 50 and no commit since contradicts it, so the keep-baseline rule yields 50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commit",
+        "pin neither tracked nor present",
+        "native hold and consumer verification"
+      ],
+      "reason": "No commits; baseline kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
+      "baselineStage": "25",
+      "stage": "25",
+      "evidence": [],
+      "heldClauses": [
+        "no Claude commit",
+        "pin neither tracked nor present",
+        "native hold and consumer verification"
+      ],
+      "reason": "No commits; baseline kept.",
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.transfer-redaction-alters-digest-bound-files",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "4229ea0e4a2b plugins/pipeline-core/lib/pins/transfer-redaction-alters-digest-bound-files.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "CLI case only typed host-capability refusal off Linux",
+        "ad hoc scratch bundler not shown as code under test",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Byte-exact carry pinned; no counts and CLI runs only as refusal.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "d3bb41a1134f plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "guard admission of generated first-answer command and trust-anchor flag refusal",
+        "every-runner lane counts",
+        "export-before-answer consumer, native run, first-commit path",
+        "no counts",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Declined seed, first-round question, binding and refusal pinned; guard-admission clause missing.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "80376b834e1d plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs five seam cases skip natively; permissive-directory case skips"
+      ],
+      "heldClauses": [
+        "five seam cases skipped on Windows",
+        "real DrvFs case skipped",
+        "full CLI on DrvFs checkout",
+        "native DACL and signed integration/review"
+      ],
+      "reason": "Most cases typed skips on this host.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "d832a5039856 plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs no counts; mirror REDs"
+      ],
+      "heldClauses": [
+        "no counts",
+        "-E flag and bare ex coverage not stated",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Pin matches proposal; no counts; reader's pin-file read refused by guard.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "e8adfcafb100 plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs W2 fix, no counts",
+        "743f2ea6aee7 same pin spelling/alias/link cases, no counts",
+        "0eaa8d0b3e21 physical root alias fix, no counts"
+      ],
+      "heldClauses": [
+        "no counts",
+        "macOS and Linux runs",
+        "fresh Windows intake",
+        "Claude Write route end to end",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Guard fix and pins map the acceptance; cross-platform and fresh intake held.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "491e76363ed6 plugins/pipeline-core/lib/pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs no counts; 1 POSIX skip"
+      ],
+      "heldClauses": [
+        "POSIX skip",
+        "v3 suite failure count drop not evidenced",
+        "fixtures across suites not moved",
+        "system-principal assurance change is a PO security decision",
+        "no counts"
+      ],
+      "reason": "Assurance refusal and private root pinned; suite-wide effect unproven.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "de316a75d6e4 plugins/pipeline-core/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs no counts"
+      ],
+      "heldClauses": [
+        "guided driver stops on unexpected status",
+        "fresh non-Git onboarding through runtime init",
+        "installed Claude candidate in fresh Windows session",
+        "Unix/macOS non-regression",
+        "no counts"
+      ],
+      "reason": "First two clauses mapped; driver, onboarding and installed observation held.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+      "baselineStage": "UNKNOWN",
+      "stage": "50",
+      "evidence": [
+        "beb54f495ad1 plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs 13 pass, 1 skip"
+      ],
+      "heldClauses": [
+        "POSIX mode-bit skip",
+        "macOS and Linux smoke",
+        "preflight install command names bare node",
+        "batch review, Full Verify, PO acceptance"
+      ],
+      "reason": "Durable write, absolute argv, marker, real push block green; skip and smoke runs block 75.",
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+      "baselineStage": "50",
+      "stage": "50",
+      "evidence": [
+        "fbe0b5ea5bfc plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs no counts; 2 real-Linux skips"
+      ],
+      "heldClauses": [
+        "two real-Linux-process skips",
+        "reused PID with spaced names",
+        "fix not bound to final candidate",
+        "no counts"
+      ],
+      "reason": "Parser pinned; real-process clauses skips.",
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "08",
+      "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+      "baselineStage": "25",
+      "stage": "50",
+      "evidence": [
+        "f08ca4e37010 two-worktree regression case (path not named; corpus 301; no counts)"
+      ],
+      "heldClauses": [
+        "legacy migration, foreign history, repeated enrollment",
+        "declined barrier, archived history, interrupted generation",
+        "first enrollment and unverifiable-history route",
+        "no test path",
+        "Critic and integrated qualification"
+      ],
+      "reason": "One of five clauses gets targeted evidence on code the baseline marked present.",
+      "readerBaselineStage": "25",
+      "readerStage": "50"
+    }
+  ]
+}
