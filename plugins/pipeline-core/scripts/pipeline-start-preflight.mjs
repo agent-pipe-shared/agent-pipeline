@@ -1518,6 +1518,7 @@ export function observePipelineStartPreflight({
   // and the action below becomes the read-only `inspect --intent session`, which re-asks the
   // same question and surfaces the typed way forward (or the real error) to the agent.
   let sessionReadinessNotReady = false;
+  let sessionReadiness = null;
   if (status === "ready" || status === "plugin-refresh-required") {
     let bootstrapProbeReady = false;
     try {
@@ -1532,8 +1533,14 @@ export function observePipelineStartPreflight({
     if (bootstrapProbeReady && status === "ready") {
       try {
         requireProjectOnboardingReadyFn({ rootDir: cwd, intent: "session", runner });
-      } catch {
+      } catch (error) {
         sessionReadinessNotReady = true;
+        // Additive typed reason; the boolean above still alone drives the argv switch.
+        const typed = error instanceof ProjectOnboardingReadyError && error.code === "PORG-NOT-READY";
+        sessionReadiness = {
+          reasonCode: typed ? "PORG-NOT-READY" : "session-probe-failed",
+          lifecycleStatus: typed && typeof error.lifecycleStatus === "string" ? error.lifecycleStatus : null,
+        };
       }
     }
   }
@@ -1667,6 +1674,7 @@ export function observePipelineStartPreflight({
     },
     effectiveDecisions,
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
+    ...(sessionReadiness ? { sessionReadiness } : {}),
     nextAction: resultStatus === "hook-provisioning-required"
       ? {
           kind: "command",
