@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -100,14 +100,14 @@ test("point 4 (lister): bound-path status flags ignored and untracked paths and 
   assert.equal(listBoundPathStatuses({ repoRoot: root, state: state(TRACKED) }).ok, true);
 });
 
-// RED evidence: the two acceptance gaps below hold on the current source.
-test("point 3 (RED): ADR-0063 states machine-regenerated means regenerable from tracked inputs / digest-bound artifacts are not eligible for evidence/", () => {
+// Acceptance for proposal points 3 and 4: both hold on the current source.
+test("point 3: ADR-0063 states machine-regenerated means regenerable from tracked inputs / digest-bound artifacts are not eligible for evidence/", () => {
   const adr = readFileSync(join(REPO, "docs", "adr", "0063-repository-directory-contract.md"), "utf8");
   assert.match(adr, /bit-for-bit|digest-bound|bound by digest/iu,
     "ADR-0063 never says that a digest-bound artifact is ineligible for the ignored root evidence/");
 });
 
-test("point 4 (RED): the bound-path lister is wired into a handover/close path, not only into its own test", () => {
+test("point 4: the bound-path lister is wired into a handover/close path, not only into its own test", () => {
   const callers = [
     "plugins/pipeline-core/scripts/pipeline-state.mjs",
     "plugins/pipeline-core/skills/close-block/SKILL.md",
@@ -256,4 +256,55 @@ test("[AC-113 present-plan ignored bound path] control: with every bound path tr
   assert.equal(fx.requests().length, 1, "exactly one pending PO request is written");
   assert.equal(typeof fx.readState().planPresentation?.designApprovalRequestPath, "string");
   assert.match(presented.stdout, /Exact PO request: scratch\/design-approval-request-/u);
+});
+
+// ALF-C-AC113-P3 / AC-113 point 1 -- the tracked-home decision against REAL git. The design-course
+// inspection derives the producer's --output-prefix; this case runs it on a throwaway repository that
+// carries the repository's own .gitignore and asks git itself whether a package under that prefix is
+// ignored. Containment: the fixture `git init`s its own root before any other git call, and every git
+// call (the test's own and the wrapper handed to the production code, whose cleanGitEnv strips GIT_*)
+// carries GIT_CEILING_DIRECTORIES set to the fixture's parent so discovery can never climb out of it.
+test("[AC-113 point 1] the output prefix the inspection derives is a tracked home that git does not ignore; the root evidence/ control is ignored", async (t) => {
+  const { inspectDesignCourseSubmission } = await import("../../scripts/design-course-session.mjs");
+  mkdirSync(join(REPO, "scratch"), { recursive: true });
+  const parent = realpathSync(join(REPO, "scratch"));
+  const root = realpathSync(mkdtempSync(join(parent, "alf-c-ac113-p3-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const feature = "feature-x";
+  const runner = "claude";
+  const contained = { GIT_CEILING_DIRECTORIES: parent, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" };
+  const rgit = (args) => execFileSync("git", ["-C", root, "-c", "core.autocrlf=false", "-c", "commit.gpgsign=false",
+    "-c", "user.name=Pin Fixture", "-c", "user.email=pin@example.invalid", ...args],
+  { encoding: "utf8", windowsHide: true, timeout: 60000, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...contained } }).trim();
+  const containedGit = (executable, args, options = {}) => execFileSync(executable, args,
+    { ...options, env: { ...(options.env ?? process.env), ...contained } });
+
+  rgit(["init", "-q"]);
+  assert.equal(realpathSync(rgit(["rev-parse", "--show-toplevel"])), root, "the fixture must be its own git root");
+  const body = { input: "# design input\n", prd: "# prd\n", spec: "# spec\n", design: "# design\n", traceability: "| ID | Evidence |\n" };
+  const paths = Object.fromEntries(Object.keys(body).map((name) => [name,
+    `specs/${feature}/${name === "input" ? "design-input" : name}.md`]));
+  put(root, ".gitignore", readFileSync(join(REPO, ".gitignore"), "utf8"));
+  for (const name of Object.keys(body)) put(root, paths[name], body[name]);
+  rgit(["add", "--", ".gitignore", ...Object.values(paths)]);
+  rgit(["commit", "-q", "-m", "fixture: committed design sources"]);
+
+  const readState = () => ({ status: "ok", state: { activeFeature: { id: feature },
+    planSubmission: { featureId: feature, profile: "feature", planPath: paths.prd, planSha256: sha(body.prd),
+      specPath: paths.spec, specSha256: sha(body.spec) },
+    continuity: { queueHead: { dispatch: { dispatchId: "author-x" } } } } });
+  const inspected = await inspectDesignCourseSubmission({ root, runner }, { readState, execFileSync: containedGit });
+  assert.equal(inspected.status, "advisor-ready", JSON.stringify(inspected));
+  const argv = inspected.nextAction.argv;
+  const prefix = argv[argv.indexOf("--output-prefix") + 1];
+  assert.equal(prefix, `specs/${feature}/evidence/design-course/${runner}`);
+
+  const checkIgnore = (path) => { // 0 = ignored, 1 = not ignored (git check-ignore --quiet)
+    try { rgit(["check-ignore", "--quiet", "--", path]); return 0; } catch (error) { return error.status; }
+  };
+  for (const artifact of ["package", "preparation"]) {
+    assert.equal(checkIgnore(`${prefix}.${artifact}.json`), 1, `${prefix}.${artifact}.json must not be git-ignored`);
+  }
+  assert.equal(checkIgnore(`evidence/design-course/${feature}/${runner}.package.json`), 0,
+    "control: the same package under the git-ignored root evidence/ is ignored, so the check can tell the two homes apart");
 });

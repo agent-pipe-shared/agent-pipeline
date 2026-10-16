@@ -159,8 +159,52 @@ test('genuine initial consultation survives an advised committed revision and fr
  }
 });
 
+// ALF-C-AC113-P3 / AC-113: the root evidence/ is git-ignored, so the tracked home for a digest-bound package is
+// specs/<feature-id>/evidence/design-course/. The reader must accept the same genuine package at either layout:
+// nothing in it may depend on the package living under the root evidence/.
+test('the v2 package reader accepts a genuine initial-consultation package at the root evidence/ and at the tracked specs/<feature>/evidence/design-course/ home',async t=>{
+ if(process.platform==='win32'){t.skip('win32: readinessFixture needs the linux-only codex-design-readiness-host-store (CRHS-INPUT); run via WSL: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs"');return;}
+ for(const layout of ['evidence','specs/advisor-feature/evidence/design-course']){
+  const f=advisorHostFixture(t),readinessProcess=readinessFixture(t);
+  const consultation=await coordinateInitialDesignAdvisory({repoRoot:f.root,featureId:'advisor-feature',authoringDispatchId:'elephant-author',sources:f.sources,reason:'risk-review',profile:'feature',dispatch:f.args.dispatch,route:f.route,hostExecution:f.execution});
+  assert.equal(consultation.ok,true,`${layout}: ${JSON.stringify(consultation)}`);
+  const git=args=>execFileSync('git',['-C',f.root,...args],{encoding:'utf8',timeout:10000}).trim();
+  writeFileSync(join(f.root,'design.md'),'Synthetic revised design adopting proposal-1.\n');
+  git(['add','design.md']);git(['commit','-qm','adopt actual managed Advisor proposal']);
+  const finalCandidate=observeAdvisorCandidate(f.root);
+  const final=observeInitialAdvisorSources({repoRoot:f.root,candidate:finalCandidate,sourcePaths:Object.fromEntries(Object.entries(f.sources).map(([name,s])=>[name,s.path]))});
+  assert.equal(final.ok,true,`${layout}: ${JSON.stringify(final)}`);
+  const finalRoute={...f.route,candidateCommit:finalCandidate.commit};
+  mkdirSync(join(f.root,...layout.split('/')),{recursive:true});
+  const publish=(name,bytes)=>{const path=`${layout}/${name}`;writeFileSync(join(f.root,path),bytes);return {path,sha256:sha(bytes)};};
+  const initialRef=publish('initial.json',JSON.stringify(consultation.initialContext)+'\n');
+  const receiptRef=publish('advisor.json',consultation.receiptBytes);
+  const reportRef=publish('advisor-report.json',canonicalJson(consultation.report));
+  const disposition={schema:'pipeline.design-advisor-disposition.v1',courseId:consultation.courseBinding.courseId,consultationSha256:designAdvisorValueSha256(consultation.consultation),proposalSetSha256:consultation.consultation.proposalSetSha256,items:[{proposalId:'proposal-1',decision:'adopt',rationale:'Document the suggested path.',revisionCommit:finalCandidate.commit}],ownerDispatchId:'author-revision',createdAt:new Date().toISOString()};
+  const revision={schema:'pipeline.design-advisor-revision.v1',courseId:consultation.courseBinding.courseId,seq:1,priorRevisionSha256:null,candidate:finalCandidate,sources:final.sources,parentCommit:f.candidate.commit,proposalIds:['proposal-1'],reason:'advisor-disposition'};
+  const preparation={schema:'pipeline.design-readiness-preparation.v2',featureId:'advisor-feature',authoringDispatchId:'elephant-author',candidate:finalCandidate,sources:final.sources,advisor:{status:'answered',runner:'codex',profile:'feature',route:f.route,initialContext:initialRef,courseBinding:consultation.courseBinding,consultation:consultation.consultation,hostReceipt:consultation.hostReceipt,receipt:receiptRef,report:reportRef,disposition,revisions:[revision]},createdAt:new Date().toISOString()};
+  publish('preparation.json',canonicalJson(preparation));
+  const prepared=readDesignReadinessPreparationFromRepository({repoRoot:f.root,packagePath:`${layout}/preparation.json`,trustedAdvisorExecutablePath:process.execPath});assert.equal(prepared.ok,true,`${layout}: ${JSON.stringify(prepared)}`);
+  const ready=await runCodexToolFreeDesignReadiness({repoRoot:f.root,repoFingerprint:f.repoFingerprint,codexPath:process.execPath,store:f.store,dispatchId:'final-readiness',candidate:finalCandidate,sources:final.sources,route:finalRoute,inputDirectory:readinessProcess.input,advisorObservation:prepared.advisorObservation,
+   invokeHost:input=>{assert.ok(input.prompt.includes(canonicalJson(prepared.advisorObservation)));assert.equal(input.readinessAdvisorObservation.report.answer,consultation.report.answer);assert.deepEqual(input.readinessAdvisorObservation.advisor.disposition,disposition);return runIsolatedStructuredHost(input);},readCandidate:()=>observeAdvisorCandidate(f.root),readCommittedSource:(_root,commit,path)=>Buffer.from(execFileSync('git',['-C',f.root,'show',`${commit}:${path}`],{timeout:10000}))});
+  assert.equal(ready.status,'reviewed',`${layout}: ${JSON.stringify(ready)}`);
+  const readyRef=publish('readiness.json',canonicalJson(ready.report));
+  const pkg={...preparation,schema:'pipeline.design-workflow-package.v2',readiness:{...readyRef,dispatchId:'final-readiness'}};
+  const packagePath=`${layout}/package.json`;
+  writeFileSync(join(f.root,packagePath),JSON.stringify(pkg)+'\n');
+  const verifyReadinessExecution=input=>verifyDesignReadinessHostExecution({...input,resolveRoute:()=>({state:'default',runner:'codex',...finalRoute}),resolveCodexExecutable:()=>process.execPath});
+  const accepted=readDesignWorkflowPackageV2FromRepository({repoRoot:f.root,packagePath,trustedAdvisorExecutablePath:process.execPath,verifyReadinessExecution});
+  assert.equal(accepted.ok,true,`${layout}: ${JSON.stringify(accepted)}`);
+  assert.equal(accepted.packagePath,packagePath,`${layout}: the reader reports the package at the path it was given`);
+  assert.equal(accepted.implementationAuthority,false);
+  assert.equal(accepted.approvalReview.approvalStatus,'pending-po-approval');
+  assert.equal(accepted.advisorDispatchId,'advisor-fixture');
+  assert.equal(accepted.readinessDispatchId,'final-readiness');
+ }
+});
+
 // Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 1) throw new Error("Required completion declared case count drift");
+if (completionCases.length !== 2) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
