@@ -6,10 +6,10 @@
  *   A1. The check reports ALL violations per run, not only the first.
  *   A2. A red ratchet blocks the candidate stamp (here: a red ratchet exits non-zero as a CLI).
  *
- * The closure checker lives inside guard-maintenance-window-kernel-closure.test.mjs (not exported), so
- * this pin drives the REAL file two ways: (a) as a CLI on the live repository, and (b) as a scratch
- * MIRROR of the same source text with one extra check injected before its summary line. The mirror runs
- * the production kernelClosureViolations code unchanged; the mutant mirror shows the pin can fail (RED).
+ * The closure checker lives inside guard-maintenance-window-kernel-closure.test.mjs, which exports
+ * kernelClosureViolations/assertKernelClosed, so this pin drives the REAL file three ways: (a) imported
+ * directly (the real collector, no mirror), (b) as a CLI on the live repository, and (c) as a scratch
+ * MIRROR with one extra check injected before its summary line; the mutant mirror shows the pin can fail.
  * Production is never edited. Fixtures live under scratch/ (host fact: no OS temp dir).
  */
 import assert from "node:assert/strict";
@@ -111,6 +111,35 @@ test("A2 a red ratchet exits non-zero as a CLI (mirror with a deliberately red c
   const r = mirror("ratchet-red", { inject: INJECTED_RED });
   assert.match(r.stderr, /FAIL PIN-RED/);
   assert.equal(r.status, 1);
+});
+
+// The REAL collector, imported (not mirrored): the closure test file exports it and does not run its suite
+// or exit the importer when it is not the process entry point.
+const real = await import(pathToFileURL(REAL).href);
+
+test("A1 the REAL exported collector reports ALL violations of one run (no mirror, direct import)", () => {
+  assert.equal(typeof real.kernelClosureViolations, "function");
+  assert.equal(typeof real.assertKernelClosed, "function");
+  const sources = new Map([
+    ["k/a.mjs", 'import "./s1.mjs";\nimport "./s2.mjs";\nexport const d = (n) => import(n);'],
+    ["k/s1.mjs", "export const s1 = 1;"],
+    ["k/s2.mjs", "export const s2 = 1;"],
+  ]);
+  const roots = ["k/a.mjs", "k/ghost.mjs"];
+  const v = real.kernelClosureViolations({ roots, kernelSet: new Set(roots), loadSource: (p) => sources.get(p) ?? null, dynamicEdges: {} });
+  assert.equal(v.length, 4, v.join("\n"));
+  assert.equal(v.filter((m) => m.includes("NOT in NEVER_LIFTABLE_KERNEL_PATHS")).length, 2);
+  assert.ok(v.some((m) => m.includes("dynamic import() the static scanner cannot classify")));
+  assert.ok(v.some((m) => m.includes("k/ghost.mjs is listed")));
+  assert.throws(() => real.assertKernelClosed(v), (e) => /\(4 violation\(s\)\)/.test(e.message) && e.message.includes("s1.mjs") && e.message.includes("s2.mjs") && e.message.includes("ghost"));
+});
+
+test("A2 the REAL collector yields zero violations for a closed fixture and assertKernelClosed then passes", () => {
+  const sources = new Map([["k/a.mjs", 'import "./b.mjs";'], ["k/b.mjs", "export const b = 1;"]]);
+  const roots = ["k/a.mjs", "k/b.mjs"];
+  const v = real.kernelClosureViolations({ roots, kernelSet: new Set(roots), loadSource: (p) => sources.get(p) ?? null, dynamicEdges: {} });
+  assert.deepEqual(v, []);
+  assert.doesNotThrow(() => real.assertKernelClosed(v));
 });
 
 test("cleanup scratch mirror", () => {

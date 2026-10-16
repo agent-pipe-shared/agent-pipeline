@@ -121,13 +121,16 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { NEVER_LIFTABLE_KERNEL_PATHS, isNeverLiftableKernelPath } from "./guard-maintenance-window.mjs";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_DISPATCHER } from "./consumer-verify.mjs";
 
 // plugins/pipeline-core/lib/ -> plugins/pipeline-core/ -> plugins/ -> <repo root>
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+// True only when this file is the process entry point. An importer (the AC-206 pin) gets the REAL
+// collector below without running the suite or exiting the importing process.
+const IS_MAIN = typeof process.argv[1] === "string" && pathToFileURL(process.argv[1]).href === import.meta.url;
 
 const IMPORT_FROM_RE = /\b(?:import|export)\s+[A-Za-z0-9_$,{}*\s]*?\bfrom\s+["']([^"']+)["']/g;
 const SIDE_EFFECT_IMPORT_RE = /^\s*import\s+["']([^"']+)["']\s*;?\s*$/gm;
@@ -512,6 +515,7 @@ function resolveRepoRelative(fromRepoRelativePath, specifier) {
 let passed = 0;
 let failed = 0;
 function check(name, callback) {
+  if (!IS_MAIN) return;
   try {
     callback();
     console.log(`PASS ${name}`);
@@ -906,5 +910,9 @@ check("GMWKC10 every FIXTURE_STRING_IMPORTS exemption names a target that does N
   }
 });
 
-console.log(`\nguard-maintenance-window-kernel-closure: ${passed} passed, ${failed} failed`);
-process.exit(failed === 0 ? 0 : 1);
+export { kernelClosureViolations, assertKernelClosed, DYNAMIC_IMPORT_EDGES };
+
+if (IS_MAIN) {
+  console.log(`\nguard-maintenance-window-kernel-closure: ${passed} passed, ${failed} failed`);
+  process.exit(failed === 0 ? 0 : 1);
+}
