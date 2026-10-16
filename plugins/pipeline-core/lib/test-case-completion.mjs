@@ -137,6 +137,7 @@ function buildRecorder(configuration, registrationRoute) {
   // The registration route without the Verify signal has no claim on any descriptor: it is inert from
   // the start, decided once here, before the first write, rather than after a write has already failed.
   const inert = registrationRoute && !verifySignalled();
+  if (inert) process.stderr.write("test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)\n");
   function emit(record) {
     if (inert) return;
     const output = Buffer.from(line(record), "utf8");

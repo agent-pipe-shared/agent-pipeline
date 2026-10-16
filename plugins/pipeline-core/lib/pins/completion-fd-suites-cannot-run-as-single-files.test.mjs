@@ -97,6 +97,9 @@ test("A1 outside Verify a hard-coded fd:3 suite runs as a plain single file and 
   assert.equal(run.marks, "PR01\nPR03\n");
   for (const id of ["PR01", "PR02", "PR03"]) assert.match(run.stdout, new RegExp(id, "u"));
   assert.doesNotMatch(run.stderr, /TCC-FD-WRITE|EBADF/u);
+  const notes = run.stderr.split("\n").filter((row) => /outside Verify/u.test(row));
+  assert.equal(notes.length, 1, `exactly one single-line stderr note expected: ${run.stderr}`);
+  assert.doesNotMatch(notes[0], /TCC-FD-WRITE|EBADF/u);
 });
 
 test("A2 outside Verify an unannounced writable descriptor 3 receives no completion bytes", () => {
@@ -117,6 +120,7 @@ test("A3b inside Verify a writable descriptor receives the complete DECLARED-to-
   const run = runFixtureSuite({ verifySignal: true, fd3: true });
   assert.equal(run.status, 0, run.stderr);
   assert.equal(run.marks, "PR01\nPR03\n");
+  assert.doesNotMatch(run.stderr, /outside Verify/u, "no no-Verify note inside Verify");
   const rows = run.fd3.trim().split("\n").filter(Boolean).map((row) => JSON.parse(row));
   assert.deepEqual(rows.map((row) => row.event), ["DECLARED", "DISPOSED", "DISPOSED", "DISPOSED", "TERMINAL"]);
   assert.deepEqual(rows.at(-1).counts, { pass: 2, fail: 0, skip: 1, todo: 0 });
