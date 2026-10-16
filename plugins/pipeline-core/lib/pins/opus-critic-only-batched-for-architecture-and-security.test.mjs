@@ -107,6 +107,19 @@ test("MP-07 German reference half states one full review plus at most three delt
   assert.match(mp07(), /at most three correction-diff re-critics/);
 });
 
+test("item (e): the Mechanic tier is installed as Haiku at effort medium in agent, authority and runner mapping", () => {
+  const front = read("plugins/pipeline-core/agents/goldfish-mechanic.md").split(/\r?\n---/)[0];
+  assert.match(front, /^model:\s*haiku\s*$/m);
+  assert.match(front, /^effort:\s*medium\s*$/m);
+  const authority = JSON.parse(read("plugins/pipeline-core/config/routing-authority.json"));
+  assert.deepEqual(authority.agentAssignments["plugins/pipeline-core/agents/goldfish-mechanic.md"], { capability: "mechanic", effort: "medium" });
+  assert.deepEqual(authority.directDefaults.claude.duties.mechanic, { capability: "mechanic", effort: "medium" });
+  const claude = JSON.parse(read("plugins/pipeline-core/config/runner-mappings.json")).runners.claude;
+  assert.equal(claude.capabilities.mechanic, "haiku");
+  assert.equal(claude.directSelectors.mechanic.value, "haiku");
+  assert.match(read("policies/model-policy.md"), /^\| `models\.mechanic`\s*\| Goldfish \(Mechanic\)\s*\| haiku\s*\| medium\s*\|$/m);
+});
+
 test("work item 3: an Opus choice on the Requested route line also fires without rationale", () => {
   const prompt = "Ruleset SHA: abc123def456\n- Requested route: claude-opus-5 at max\nDispatch metadata: tool budget 30";
   const r = dispatchFindings({ subagentType: "pipeline-core:critic", prompt });

@@ -143,7 +143,9 @@ const CLAUDE_654EBAF_MODEL_ROUTING = Object.freeze({
   elephant_mini_execution: { model: "sonnet-5", effort: "high" },
   advisor_mini: { model: "opus", effort: "not-applicable" },
   goldfish: { model: "sonnet-5", effort: "medium" },
-  goldfish_mechanic: { model: "sonnet-5", effort: "low" },
+  // PO decision 2026-10-16 (decision #22): the Mechanic tier is Haiku at effort
+  // medium (MP-03/MP-27); only this one entry deviates from the 654ebaf shape.
+  goldfish_mechanic: { model: "haiku", effort: "medium" },
   goldfish_deep: { model: "sonnet-5", effort: "xhigh" },
   critic: { model: "sonnet-5", effort: "max" },
 });
