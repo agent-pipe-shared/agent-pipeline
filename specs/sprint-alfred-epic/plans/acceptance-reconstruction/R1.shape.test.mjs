@@ -12,8 +12,9 @@ function sections() {
   return parts.map((p) => ({ heading: p.split('\n', 1)[0], body: p }));
 }
 
-test('header carries the draft status', () => {
-  assert.ok(text.includes('DRAFT - pending PO release'));
+test('header says RELEASED by PO decision K6', () => {
+  assert.ok(text.includes('Status: RELEASED - PO decision 2026-10-16 (K6)'));
+  assert.ok(!text.split(/^## /m)[0].includes('DRAFT'));
 });
 
 test('one section per AC id, in order', () => {

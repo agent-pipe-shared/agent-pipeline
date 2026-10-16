@@ -37,9 +37,10 @@ test("every section has all five labelled bullets non-empty", () => {
   }
 });
 
-test("header says DRAFT - pending PO release", () => {
+test("header says RELEASED by PO decision K6", () => {
   const header = text.split(/^## /m)[0];
-  assert.ok(header.includes("DRAFT - pending PO release"));
+  assert.ok(header.includes("Status: RELEASED - PO decision 2026-10-16 (K6)"));
+  assert.ok(!header.includes("DRAFT"));
 });
 
 test("no absolute host path", () => {

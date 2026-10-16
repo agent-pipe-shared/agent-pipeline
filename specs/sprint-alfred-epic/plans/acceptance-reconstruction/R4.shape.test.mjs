@@ -27,8 +27,9 @@ test("every section has all five labelled bullets non-empty", () => {
   }
 });
 
-test("header carries the draft status", () => {
-  assert.ok(header.includes("DRAFT - pending PO release"));
+test("header says RELEASED by PO decision K6", () => {
+  assert.ok(header.includes("Status: RELEASED - PO decision 2026-10-16 (K6)"));
+  assert.ok(!header.includes("DRAFT"));
 });
 
 test("no absolute host path", () => {
