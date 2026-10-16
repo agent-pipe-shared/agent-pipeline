@@ -329,12 +329,17 @@ test("retired child: explicit mutation, file change and unexpected server reques
 // The original acceptance (an `unknown` command action alone must not abort a read-only review) belongs to the
 // RETIRED selected-sandbox route. The legacy child still classifies it as a write attempt. It is unreachable from the
 // ordinary route (pinned above) and the retained tool-free host forbids every tool item outright, so it is recorded
-// as a todo, not a gate: fixing it would revive nothing, and ignoring it must stay visible.
-test("retired child: an unknown command action alone does not abort a read-only review", { todo: "legacy retired child: scripts/codex-readiness-app-server-child.mjs inspectItem treats unknown as write-attempt" }, (context) => {
+// is now closed in the legacy child: unknown is inconclusive, while write/delete/malformed stay write attempts.
+test("retired child: an unknown command action alone does not abort a read-only review", (context) => {
   const { run } = childHarness(context);
-  for (const actions of [["unknown"], [{ type: "unknown" }]]) {
+  for (const actions of [["unknown"], [{ type: "unknown" }], [{ type: "read" }, "unknown"]]) {
     const outcome = run({ item: { type: "commandExecution", commandActions: actions } });
     assert.equal(outcome.result.code, "reviewed", JSON.stringify(actions));
+    assert.equal(outcome.result.ok, true, JSON.stringify(actions));
+  }
+  for (const actions of [[{ type: "unknown" }, { type: "write" }], ["unknown", { type: "delete" }], ["write"], [null]]) {
+    const outcome = run({ item: { type: "commandExecution", commandActions: actions } });
+    assert.equal(outcome.result.code, "write-attempt", JSON.stringify(actions));
   }
 });
 

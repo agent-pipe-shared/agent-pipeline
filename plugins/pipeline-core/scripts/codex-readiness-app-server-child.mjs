@@ -90,7 +90,10 @@ if (!process.exitCode) {
     if (!item || typeof item !== "object") { protocolError = true; return; }
     if (item.type === "fileChange") { writeAttempt = true; return; }
     if (item.type === "commandExecution") {
-      if (!Array.isArray(item.commandActions) || item.commandActions.some((action) => !["read", "listFiles", "search"].includes(action?.type))) writeAttempt = true;
+      // An action the App Server could not classify ("unknown", bare or typed) is inconclusive, not a mutation;
+      // anything else outside the read-only set (write, delete, malformed) remains a write attempt.
+      const actionType = (action) => (action === "unknown" ? "unknown" : action?.type);
+      if (!Array.isArray(item.commandActions) || item.commandActions.some((action) => !["read", "listFiles", "search", "unknown"].includes(actionType(action)))) writeAttempt = true;
     }
     if (item.type === "agentMessage") {
       if (typeof item.text !== "string") { protocolError = true; return; }
