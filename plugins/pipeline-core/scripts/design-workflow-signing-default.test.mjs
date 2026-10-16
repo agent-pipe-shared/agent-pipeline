@@ -21,7 +21,7 @@ import {createDesignReadinessRunnerHostStore} from '../lib/design-readiness-runn
 import {designReadinessReportSha256,designReadinessRunnerSelectionSha256} from '../lib/design-readiness-host-evidence.mjs';
 import {canonicalJson} from '../lib/codex-sandbox-compatibility.mjs';
 import {createAdvisoryRouteSelection} from '../lib/advisory-route-selection.mjs';
-import {readDesignWorkflowPackageFromRepository} from '../lib/design-workflow-package.mjs';
+import {readDesignWorkflowPackageFromRepository,designWorkflowAdvisorExceptionRationale} from '../lib/design-workflow-package.mjs';
 import {createDesignWorkflowPackageApprovalRequest,validateDesignWorkflowPackageApprovalRequest,verifyDesignWorkflowPackageApproval} from '../lib/design-workflow-approval.mjs';
 import {verifyPoApprovalProof} from '../lib/po-approval-proof.mjs';
 import {runHumanApproval} from './po-human-approval.mjs';
@@ -56,7 +56,9 @@ function fixture(t){
  const receiptBytes=bytes(receipt),selection=createAdvisoryRouteSelection({receipt,receiptBytes,code:'ordinary-consult-host-callback-unavailable'}),selectionBytes=bytes(selection);
  const refs={receipt:'specs/synthetic/evidence/advisor.json',route:'specs/synthetic/evidence/route.json',readiness:'specs/synthetic/evidence/readiness.json',package:'specs/synthetic/evidence/package.json'};
  put(refs.receipt,receiptBytes);put(refs.route,selectionBytes);const readinessBytes=bytes(readiness);put(refs.readiness,readinessBytes);
- const pkg={schema:'pipeline.design-workflow-package.v1',featureId:'synthetic-feature',authoringDispatchId:'synthetic-author',candidate,sources,advisor:{status:'unavailable',runner:'codex',nativeAvailable:false,receipt:{path:refs.receipt,sha256:sha(receiptBytes)},attemptTrail:{path:refs.route,sha256:sha(selectionBytes)},disposition:null,exception:{status:'proposed',failureCode:'route-unavailable',rationale:'Synthetic no-child route for isolated signing transport only.'}},readiness:{path:refs.readiness,sha256:sha(readinessBytes),dispatchId:report.dispatchId},createdAt:'2026-09-28T10:00:00.000Z'};put(refs.package,bytes(pkg));
+ const pkg={schema:'pipeline.design-workflow-package.v1',featureId:'synthetic-feature',authoringDispatchId:'synthetic-author',candidate,sources,advisor:{status:'unavailable',runner:'codex',nativeAvailable:false,receipt:{path:refs.receipt,sha256:sha(receiptBytes)},attemptTrail:{path:refs.route,sha256:sha(selectionBytes)},disposition:null,exception:{status:'proposed',failureCode:'route-unavailable',rationale:designWorkflowAdvisorExceptionRationale({advisorReceipt:receipt,attemptTrail:selection})}},readiness:{path:refs.readiness,sha256:sha(readinessBytes),dispatchId:report.dispatchId},createdAt:'2026-09-28T10:00:00.000Z'};put(refs.package,bytes(pkg));
+ // Production requires the digest-bound package tracked and unmodified at HEAD, while HEAD may only be the candidate or an evidence-only descendant of it: commit the bound evidence (package, readiness, advisor receipt) as a descendant of the candidate.
+ git(['add',refs.package,refs.readiness,refs.receipt]);git(['commit','--quiet','-m','Synthetic bound design evidence']);
  const readCandidate=()=>({commit:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}'])});
  const read=()=>readDesignWorkflowPackageFromRepository({repoRoot:root,packagePath:refs.package,readCandidate});assert.equal(read().ok,true,JSON.stringify(read()));
  const prepared=createDesignWorkflowPackageApprovalRequest({repoRoot:root,packagePath:refs.package,readCandidate,featureId:pkg.featureId,planPath:sources.prd.path,planSha256:sources.prd.sha256,specPath:sources.spec.path,specSha256:sources.spec.sha256});assert.equal(prepared.ok,true,JSON.stringify(prepared));
