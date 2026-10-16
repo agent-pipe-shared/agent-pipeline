@@ -103,6 +103,20 @@ test('observed Antigravity 1.2.13 admits the same bounded plugin refresh route',
  assert.equal(result.status,'refreshed',JSON.stringify(result));
  assert.deepEqual(f.calls.map(argv=>argv[1]),[undefined,'uninstall','validate','install']);
 });
+test('Antigravity 1.2.13 stale managed copy is refresh-required and the plan replaces it, never reports current',t=>{
+ const f=fixture(t,'1.2.13'),loadedArgs={loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot};
+ const staleBytes=readFileSync(join(f.old,'hooks','antigravity-start-hint.mjs'),'utf8');assert.match(staleBytes,/stale/);
+ const loaded=observeAntigravityLoadedTopology(loadedArgs);
+ assert.equal(loaded.status,'refresh-required',JSON.stringify(loaded));assert.equal(loaded.managedContentMismatch,true);assert.equal(loaded.loadedKind,'managed-copy');assert.notEqual(loaded.loadedContentSha256,loaded.sourceContentSha256);
+ const wired=observeAntigravityLoadedTopologyWithWiring(loadedArgs);assert.notEqual(wired.status,'current');
+ const observation=observeAntigravityPluginTopology(f.args),plan=planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion:'1.2.13'});
+ assert.equal(plan.status,'prepared',JSON.stringify(plan));assert.notEqual(plan.status,'metadata-current');
+ assert.deepEqual(plan.actions.filter(a=>a.kind==='cli').map(a=>a.argv[1]),['uninstall','validate','install']);
+ const result=createAntigravityRefreshHost(f.args).refresh();assert.equal(result.status,'refreshed',JSON.stringify(result));
+ assert.deepEqual(f.calls.map(argv=>argv[1]),[undefined,'uninstall','validate','install']);
+ const replaced=readFileSync(join(f.old,'hooks','antigravity-start-hint.mjs'),'utf8');assert.doesNotMatch(replaced,/stale/);assert.match(replaced,/current/);
+ const after=observeAntigravityLoadedTopology(loadedArgs);assert.equal(after.status,'current',JSON.stringify(after));assert.equal(after.managedContentMismatch,false);
+});
 test('PO decision 2026-10-14: live Antigravity 1.3.5 is admitted at prepare and refresh; lower or non-semver output stays refused',t=>{
  const f=fixture(t,'1.3.5'),host=createAntigravityRefreshHost(f.args);
  assert.equal(host.prepare().status,'prepared');
@@ -147,7 +161,7 @@ test('prepared source, actual hook bytes and registry preimages are bound before
 });
 
 // Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 14) throw new Error("Required completion declared case count drift");
+if (completionCases.length !== 15) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
