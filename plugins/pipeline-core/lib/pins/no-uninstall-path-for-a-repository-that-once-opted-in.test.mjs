@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {existsSync,mkdirSync,readFileSync,rmSync} from 'node:fs';
+import {existsSync,mkdirSync,readdirSync,readFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createProjectUninstallController,PROJECT_UNINSTALL_FAULT_STAGES} from '../project-uninstall.mjs';
@@ -116,6 +116,33 @@ test('RED control: removing private state without retiring the shims breaks git 
  f.put('README','change\n');git(f.root,['add','README']);
  const r=spawnSync('git',['commit','-m','must fail without impl'],{cwd:f.root,encoding:'utf8',timeout:30000});
  assert.notEqual(r.status,0,'commit unexpectedly succeeded; B1 control is not meaningful on this host');
+});
+
+test('a shared worktree that is still governed refuses with a typed error and changes no byte',t=>{
+ const f=fixture(t),sibling=join(f.base,'sibling');
+ git(f.root,['worktree','add','-q','--detach',sibling]);
+ const before=f.digests(),config=readFileSync(join(f.root,'.git/config')),statuses=hookStatuses(f);
+ assert.throws(()=>f.controller.plan({rootDir:f.root}),e=>e.code==='PU-SHARED-ACTIVE-WORKTREE');
+ assert.deepEqual(f.digests(),before);assert.deepEqual(readFileSync(join(f.root,'.git/config')),config);assert.deepEqual(hookStatuses(f),statuses);
+ assert.equal(f.scope.observe({rootDir:f.root}).state,'active');assert(!existsSync(join(f.root,'.git/pipeline-uninstall')));
+});
+
+for(const runners of [['claude'],['codex']])test('per-runner fixture ('+runners[0]+' only): uninstall keeps AGENTS.md/CLAUDE.md, strips owned keys only, and archives private hook state',t=>{
+ const f=fixture(t,{runners}),before=f.digests(),plan=f.controller.plan({rootDir:f.root});
+ assert.deepEqual(plan.conflicts,[]);
+ const result=f.controller.apply(plan,options(plan));
+ assert.equal(result.status,'uninstalled');assert.equal(f.scope.observe({rootDir:f.root}).state,'declined');
+ assert.deepEqual(f.digests(),before);assert.equal(readFileSync(join(f.root,'AGENTS.md'),'utf8'),'User instructions unchanged\n');
+ // Key-level strip: only owned keys are removed from project-owned files; unowned bytes survive.
+ const json=readFileSync(join(f.root,'.claude/pipeline.json'),'utf8');
+ assert(json.includes('"foreign" : { "escaped" : "\\u00df", "n" : 1e+2 }'));assert.equal(Object.hasOwn(JSON.parse(json).humanRoles.po,'displayLabel'),false);
+ assert(readFileSync(join(f.root,'.claude/pipeline.yaml'),'utf8').includes('foreign: keep-exact'));
+ assert.equal(readFileSync(join(f.root,'.codex/config.toml'),'utf8'),'profile = "keep"\n');
+ // Archive variant: private hook state is moved, not deleted, under the uninstall controls.
+ const retained=join(result.retainedMetadataPath);assert(existsSync(retained));
+ assert.equal(plan.privateArchives.length>0,true);
+ for(const [index,archive] of plan.privateArchives.entries()){assert(!existsSync(archive.path));assert(existsSync(join(retained,'private-'+index)));assert.deepEqual(readdirSync(join(retained,'private-'+index)).sort(),archive.names.filter(n=>/^runtime-[a-f0-9]{64}$/.test(n)));}
+ assert.deepEqual(hookStatuses(f),['absent','absent','absent']);
 });
 
 test('alias and private-directory mode refusals (PU-ALIAS, PU-PRIVATE-MODE) need symlinks and mode bits',{skip:process.platform==='win32'?'host-limitation: directory symlinks and POSIX directory mode bits are unavailable on native Windows; owner Coordinator, due 2026-10-19, Linux/WSL run (PO decision K7)':false},t=>{
