@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -115,4 +115,145 @@ test("point 4 (RED): the bound-path lister is wired into a handover/close path, 
   ].map((rel) => { try { return readFileSync(join(REPO, ...rel.split("/")), "utf8"); } catch { return ""; } });
   assert.ok(callers.some((text) => /listBoundPathStatuses|bound-path-status|renderHandoverBoundPaths/u.test(text)),
     "listBoundPathStatuses has no caller outside r7-3-bound-paths.test.mjs");
+});
+
+// ALF-C-P2-02C / AC-113 -- the points 2 cases above drive the retired package library
+// (createDesignWorkflowPackageApprovalRequest). The cases below drive the REAL route:
+// `present-plan --review-receipt` (ADR-0085) through the in-process pipeline-state `run`,
+// on a throwaway repository with the same PO-gate authority fixture route that
+// po-gate-authority.test.mjs uses. The fixture lives under the repository's scratch/.
+const GATE_NOW = "2026-07-18T18:00:00.000Z";
+const ROUTE_FEATURE = "feature";
+const ROUTE_PLAN = "specs/feature/prd_feature.md";
+const ROUTE_SPEC = "specs/feature/spec.md";
+const ROUTE_DESIGN = "specs/feature/design.md";
+const ROUTE_TRACE = "specs/feature/traceability.md";
+const ROUTE_REPORT = "specs/feature/review/design-review-1.md";
+const ROUTE_RECEIPT = "specs/feature/review/design-review-receipt-1.json";
+
+async function routeFixture(t, { ignored = null } = {}) {
+  const gate = await import("../po-gate-authority.mjs");
+  const { createDesignReviewReceipt } = await import("../design-review-receipt.mjs");
+  const { run } = await import("../../../../harness/scripts/pipeline-state.mjs");
+  mkdirSync(join(REPO, "scratch"), { recursive: true });
+  const base = mkdtempSync(join(REPO, "scratch", "alf-c-p2-02c-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const common = join(base, "common.git");
+  const primary = join(base, "primary");
+  mkdirSync(common, { recursive: true });
+  mkdirSync(primary, { recursive: true });
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: base, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" };
+  const fgit = (...args) => execFileSync("git", ["-C", primary, "-c", "core.autocrlf=false", "-c", "commit.gpgsign=false",
+    "-c", "user.name=Pin Fixture", "-c", "user.email=pin@example.invalid", ...args],
+  { encoding: "utf8", windowsHide: true, timeout: 60000, env }).trim();
+  fgit("init", "-q");
+  if (process.platform === "win32") {
+    // Native Windows: <root>/.git/agent-pipeline must be created through the owned-authority backend.
+    const { createWindowsOwnedAuthorityDirectory } = await import("../windows-owned-authority-backend.mjs");
+    createWindowsOwnedAuthorityDirectory({ path: join(primary, ".git", "agent-pipeline") });
+  }
+  const userYaml = "schema: pipeline.user.v1\nlanguage:\n  human_facing: de\n  agent_facing: en\n";
+  const runtimeYaml = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: de\n";
+  const specBytes = "# Technical Spec\n";
+  const prdBytes = `${gate.PO_GATE_PRD_LANGUAGE_MARKER("de")}\n<!-- technical-spec-sha256: ${sha(specBytes)} -->\n${gate.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n# PRD\n`;
+  put(primary, "pipeline.user.yaml", userYaml);
+  put(primary, ".claude/pipeline.yaml", runtimeYaml);
+  put(primary, ".claude/pipeline-state.json", `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: ROUTE_FEATURE, planPath: ROUTE_PLAN, phase: "design" },
+    planApproved: false,
+    continuity: {
+      schema: "pipeline.continuity.v0", featureId: ROUTE_FEATURE, revision: 0,
+      runtime: { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null },
+      authority: { prd: { path: ROUTE_PLAN, sha256: "a".repeat(64) }, spec: { path: ROUTE_SPEC, sha256: "b".repeat(64) }, result: null },
+      queueHead: { packageId: "continuity-adoption", actionId: "review-active-feature", nextAction: "review",
+        productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+      blocker: null, acknowledgedFinal: null,
+      resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, closeTransition: null,
+      capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+    },
+  }, null, 2)}\n`);
+  put(primary, ROUTE_SPEC, specBytes);
+  put(primary, ROUTE_PLAN, prdBytes);
+  const receipt = gate.createPoGateProfileReceipt({
+    repositoryFingerprint: gate.derivePoGateRepositoryFingerprint({ gitCommonDir: common, primaryRoot: primary }),
+    primaryRoot: primary, sourceBytes: Buffer.from(userYaml), runtimeBytes: Buffer.from(runtimeYaml), updatedAt: GATE_NOW,
+  });
+  const receiptPath = gate.poGateProfileReceiptPath(common);
+  mkdirSync(dirname(receiptPath), { recursive: true });
+  if (process.platform === "win32") {
+    const { hardenWindowsPrivateDirectory } = await import("../windows-private-state.mjs");
+    let cursor = common;
+    for (const part of dirname(gate.PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH).split(/[\\/]/u).filter(Boolean)) {
+      cursor = join(cursor, part);
+      assert.equal(hardenWindowsPrivateDirectory(cursor).status, "secure");
+    }
+  }
+  writeFileSync(receiptPath, gate.serializePoGateProfileReceipt(receipt));
+  const topology = { repoRoot: primary, gitCommonDir: common, primaryRoot: primary, registeredWorktreeRoots: [primary] };
+  const authority = gate.validatePoGateAuthority(topology);
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  const profile = gate.validatePoGateProfileForRepository({ repoRoot: primary }, { topology });
+  assert.equal(profile.ok, true, JSON.stringify(profile));
+
+  put(primary, ROUTE_DESIGN, "# Design\n");
+  put(primary, ROUTE_TRACE, "| ID | Evidence |\n| --- | --- |\n");
+  put(primary, ROUTE_REPORT, "# Design review 1\nVerdict: pass.\n");
+  const sourceFor = (path) => ({ path, sha256: sha(readFileSync(join(primary, ...path.split("/")))) });
+  const created = createDesignReviewReceipt({
+    featureId: ROUTE_FEATURE, previous: null,
+    sources: { prd: sourceFor(ROUTE_PLAN), spec: sourceFor(ROUTE_SPEC), companions: [ROUTE_DESIGN, ROUTE_TRACE].map(sourceFor) },
+    reviewer: { runner: "claude", model: "claude-opus-4" }, report: sourceFor(ROUTE_REPORT),
+    openFindingIds: [], reviewedAt: "2026-10-09T09:00:00.000Z",
+  });
+  assert.equal(created.ok, true, JSON.stringify(created));
+  put(primary, ROUTE_RECEIPT, Buffer.from(created.bytes));
+  // The only difference between the two scenarios: one digest-bound path is git-ignored (and so never committed).
+  if (ignored !== null) put(primary, ".gitignore", `/${ignored}\n`);
+  const bound = [ROUTE_PLAN, ROUTE_SPEC, ROUTE_DESIGN, ROUTE_TRACE, ROUTE_REPORT, ROUTE_RECEIPT].filter((path) => path !== ignored);
+  fgit("add", "--", ...bound, ...(ignored === null ? [] : [".gitignore"]));
+  fgit("commit", "-q", "-m", "fixture: finished design sources");
+
+  const drive = (argv, deps = {}) => {
+    const saved = { log: console.log, error: console.error, warn: console.warn };
+    const out = [], err = [];
+    console.log = (...values) => out.push(values.map(String).join(" "));
+    console.error = console.warn = (...values) => err.push(values.map(String).join(" "));
+    try { return { status: run(argv, { dir: primary, now: () => GATE_NOW, ...deps }), stdout: out.join("\n"), stderr: err.join("\n") }; }
+    finally { Object.assign(console, saved); }
+  };
+  const submitted = drive(["submit-plan", "--by", "coordinator", "--profile", "feature"],
+    { poGateAuthority: () => authority, poGateProfile: () => profile });
+  assert.equal(submitted.status, 0, `submit-plan must succeed on the fixture: ${submitted.stderr}`);
+  const readState = () => JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
+  const requests = () => {
+    try { return readdirSync(join(primary, "scratch")).filter((name) => /^design-approval-request-/u.test(name)); } catch { return []; }
+  };
+  return { primary, drive, readState, requests };
+}
+
+const IGNORED_ROUTE_CASES = [
+  ["the review report", ROUTE_REPORT],
+  ["a design companion", ROUTE_DESIGN],
+  ["the review receipt itself", ROUTE_RECEIPT],
+];
+for (const [label, ignoredPath] of IGNORED_ROUTE_CASES) {
+  test(`[AC-113 present-plan ignored bound path] ${label} is git-ignored: present-plan refuses before the PO signs, writes no request`, async (t) => {
+    const fx = await routeFixture(t, { ignored: ignoredPath });
+    const presented = fx.drive(["present-plan", "--by", "coordinator", "--review-receipt", ROUTE_RECEIPT]);
+    assert.notEqual(presented.status, 0, `present-plan must refuse; stdout: ${presented.stdout}`);
+    assert.match(presented.stderr, /present-plan refused \(DCC-PATH-IGNORED\)/u, presented.stderr);
+    assert.deepEqual(fx.requests(), [], "no PO request may exist for a refused presentation");
+    assert.equal(fx.readState().planPresentation, undefined, "no presentation may be recorded");
+    assert.doesNotMatch(presented.stdout, /sign-intent|Exact PO request/u, "no signing hand-over may be printed");
+  });
+}
+
+test("[AC-113 present-plan ignored bound path] control: with every bound path tracked, the same fixture still presents", async (t) => {
+  const fx = await routeFixture(t);
+  const presented = fx.drive(["present-plan", "--by", "coordinator", "--review-receipt", ROUTE_RECEIPT]);
+  assert.equal(presented.status, 0, `present-plan must succeed; stderr: ${presented.stderr}`);
+  assert.equal(fx.requests().length, 1, "exactly one pending PO request is written");
+  assert.equal(typeof fx.readState().planPresentation?.designApprovalRequestPath, "string");
+  assert.match(presented.stdout, /Exact PO request: scratch\/design-approval-request-/u);
 });
