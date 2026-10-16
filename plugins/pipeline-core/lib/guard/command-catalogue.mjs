@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, posix, resolve, sep, win32 } from "node:path";
 import { inspectSourceOwnedContinuityVerificationGuardContext, inspectSourceOwnedApprovedControllerCourse } from "../session-requester-bridge.mjs";
 import { readOwnedVerificationPhysicalFile, recheckOwnedVerificationPhysicalRefs, readOwnedVerificationRegistration } from "../owned-continuity-verification.mjs";
 import { inspectOwningVerificationControllerTaskSource } from "../../scripts/owning-verification-controller.mjs";
@@ -368,10 +368,20 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
  * validator. A neighbouring executable, an altered argument, a ready or
  * foreign-root observation, and any producer action outside that validator all
  * remain refused.
+ *
+ * ALF-C-HK-01C: the inspection below is expensive (on native Windows one
+ * PowerShell DACL probe per private path) and every shell command reaches it,
+ * so a pure precondition on the parsed words runs first. Every producer of a
+ * `kind: "command"` next action publishes the executable as the literal `node`
+ * or an absolute Node path, with an absolute script path as argv[0]; a command
+ * whose words do not have that shape cannot equal any observed action, so it
+ * returns null without an inspection. The set of matching commands is unchanged.
  */
 export function observedOnboardingCommandMatch(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
   if (!words) return null;
+  const abs = (word) => win32.isAbsolute(word) || posix.isAbsolute(word);
+  if (words.length < 2 || !(words[0] === "node" || abs(words[0])) || !abs(words[1])) return null;
   let observed;
   try {
     observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
