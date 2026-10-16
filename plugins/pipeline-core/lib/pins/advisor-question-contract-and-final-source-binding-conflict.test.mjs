@@ -10,7 +10,8 @@ import {readFileSync,mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {createHash} from 'node:crypto';
+import {createHash,generateKeyPairSync,sign as cryptoSign} from 'node:crypto';
+import {createPoApprovalIntent,canonical as canonicalJson} from '../po-approval-proof.mjs';
 import {
   createInitialAdvisorContext,validateInitialAdvisorContext,validateInitialToFinalBinding,
   hashInitialAdvisorQuestion,buildInitialAdvisorQuestion,designAdvisorValueSha256,SOURCE_NAMES,
@@ -170,6 +171,49 @@ test('AC-105 approval modes: the stored-signature verifier admits signature reco
     const r=verifyStoredDesignWorkflowPackageSignature({repoRoot,packagePath:'x.json',packageSha256:H('1'),featureId:'feat-x',planPath:'docs/prd.md',planSha256:H('3'),specPath:'docs/spec.md',specSha256:H('4'),approval,anchors:[]});
     assert.equal(r.ok,false,mode);assert.equal(r.code,'DWP-APPROVAL-RECORD-SHAPE',mode);
   }
+});
+
+test('AC-105 approval modes: signature-mode success - a validly signed approval record over a real answered v2 package verifies; drift is refused',()=>{
+  mkdirSync(join(repoRoot,'scratch'),{recursive:true});
+  const dir=mkdtempSync(join(repoRoot,'scratch','ac105-sig-'));
+  try{
+    const w=worlds();
+    mkdirSync(join(dir,'docs'),{recursive:true});
+    const prdBytes=Buffer.from('prd bytes\n'),specBytes=Buffer.from('spec bytes\n');
+    writeFileSync(join(dir,'docs/prd.md'),prdBytes);writeFileSync(join(dir,'docs/spec.md'),specBytes);
+    const sources={...w.revisedSources,prd:{path:'docs/prd.md',sha256:sha(prdBytes)},spec:{path:'docs/spec.md',sha256:sha(specBytes)}};
+    const pkg={schema:'pipeline.design-workflow-package.v2',featureId:'feat-x',authoringDispatchId:'author-2',candidate:REV,sources,
+      advisor:{status:'answered',runner:'codex',profile:'feature',route:{model:'gpt-x',effort:'high',sourceSha256:H('d'),candidateCommit:INIT.commit},
+        initialContext:{path:'ev/initial.json',sha256:w.ctx.contextSha256},
+        courseBinding:{courseId:'course-1',initialContextSha256:w.ctx.contextSha256,reservationId:'res-1',slot:1,routeStepSha256:H('e')},
+        consultation:w.consultation,hostReceipt:{id:'hr-1',sha256:H('f')},receipt:{path:'ev/receipt.json',sha256:H('7')},report:{path:'ev/report.json',sha256:H('9')},
+        disposition:w.disposition(),revisions:[w.rev]},
+      readiness:{path:'ev/readiness.json',sha256:H('a'),dispatchId:'ready-1'},createdAt:'2026-10-16T11:30:00.000Z'};
+    const pkgBytes=Buffer.from(JSON.stringify(pkg));
+    writeFileSync(join(dir,'package.json'),pkgBytes);
+    const packageSha256=sha(pkgBytes);
+    const intent=createPoApprovalIntent({kind:'design-workflow-package',featureId:'feat-x',planSha256:pkg.sources.prd.sha256,specSha256:pkg.sources.spec.sha256,candidate:REV,policyRevision:'design-workflow-package-v2',subjectSha256:packageSha256,decision:'approve'});
+    const {publicKey,privateKey}=generateKeyPairSync('ed25519');
+    const publicKeyPem=publicKey.export({type:'spki',format:'pem'});
+    const keyReference='po-test-key';
+    const proof={schema:'pipeline.po-approval-proof.v1',intentSha256:intent.sha256,keyReference,publicKey:publicKeyPem,signatureBase64:cryptoSign(null,Buffer.from(intent.sha256,'utf8'),privateKey).toString('base64')};
+    const anchors=[{keyReference,publicKeySha256:sha(publicKeyPem)}];
+    const approval={schema:'pipeline.design-workflow-package-approval.v1',mode:'signature',approvedBy:`verified:${keyReference}`,approvedAt:'2026-10-16T12:00:00.000Z',packageSha256,intentSha256:intent.sha256,proofSha256:sha(canonicalJson(proof)),proof};
+    const run=(over={})=>verifyStoredDesignWorkflowPackageSignature({repoRoot:dir,packagePath:'package.json',packageSha256,featureId:'feat-x',planPath:'docs/prd.md',planSha256:pkg.sources.prd.sha256,specPath:'docs/spec.md',specSha256:pkg.sources.spec.sha256,approval,anchors,...over});
+    const ok=run();
+    assert.equal(ok.ok,true,JSON.stringify(ok));
+    assert.equal(ok.code,'DWP-APPROVAL-STORED-SIGNATURE-VERIFIED');
+    assert.equal(ok.intentSha256,intent.sha256);
+    assert.equal(ok.signer.keyReference,keyReference);
+    // controls: each drift is refused, so the success is not a vacuous accept
+    assert.equal(run({anchors:[{keyReference,publicKeySha256:H('0')}]}).ok,false,'foreign trust anchor');
+    assert.equal(run({approval:{...approval,approvedBy:'verified:someone-else'}}).code,'DWP-APPROVAL-RECORD-DRIFT');
+    assert.equal(run({approval:{...approval,intentSha256:H('0')}}).code,'DWP-APPROVAL-INTENT-DRIFT');
+    assert.equal(run({approval:{...approval,proof:{...proof,signatureBase64:Buffer.alloc(64).toString('base64')}}}).ok,false,'forged signature');
+    assert.equal(run({packageSha256:H('0')}).ok,false,'package digest drift');
+    writeFileSync(join(dir,'docs/spec.md'),Buffer.from('spec changed\n'));
+    assert.equal(run().code,'DWP-APPROVAL-SOURCE-DRIFT','source bytes changed after approval');
+  }finally{rmSync(dir,{recursive:true,force:true});}
 });
 
 test('AC-105 host limitation: coordinator -> package answered route and both approval modes end to end',t=>{
