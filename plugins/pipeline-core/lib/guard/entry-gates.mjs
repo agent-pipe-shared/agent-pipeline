@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { checkPlanningAdoptionDisposition } from "../../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness } from "../../scripts/architecture-fitness.mjs";
-import { inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
+import { architectureTouchedContracts, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
 import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../../scripts/rigor-floor.mjs";
 import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
 import { ARCHITECTURE_ADOPTION_DENIAL_CODE, ARCHITECTURE_FITNESS_DENIAL_CODE, MINIMUM_RIGOR_ADVISORY_CODE, PIPELINE_STATE_SCRIPT } from "./constants.mjs";
@@ -160,7 +160,7 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
       mode: "planning",
       candidatePaths: surface.paths,
       files: surface.paths,
-      touchedContracts: surface.paths.filter(isContractPath),
+      touchedContracts: architectureTouchedContracts(surface.paths),
     });
   } catch {
     fitness = null;

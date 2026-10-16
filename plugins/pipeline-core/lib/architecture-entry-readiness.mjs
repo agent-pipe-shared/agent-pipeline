@@ -27,6 +27,11 @@ import { inspectArchitectureDecisionContinuity } from "./architecture-decision-c
 export const ARCHITECTURE_ENTRY_SCHEMA = "pipeline.architecture-entry-readiness.v1";
 export const ARCHITECTURE_ENTRY_SCOPE = "architecture/map/";
 
+/** The single definition of which planning-surface paths are architecture contracts (library and guard share it). */
+export function architectureTouchedContracts(paths) {
+  return (Array.isArray(paths) ? paths : []).filter((candidate) => /^(architecture\/|docs\/adr\/|schemas\/)/u.test(candidate));
+}
+
 const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../scripts/architecture-adoption.mjs", import.meta.url));
 const PLAN_PATH_TOKEN = /(?:^|[\s`"'([{])((?:(?:\.claude|app|architecture|backlog|bin|config|docs|governance|harness|lib|plugins|policies|project|roles|schemas|scripts|specs|src|templates|test|tests)\/[A-Za-z0-9_@+./-]+)|(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn-lock\.yaml|pipeline-manifest\.schema\.json|pipeline\.user\.schema\.json))/gmu;
 
@@ -408,7 +413,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       mode: "planning",
       candidatePaths: surface.paths,
       files: surface.paths,
-      touchedContracts: surface.paths.filter((candidate) => /^(architecture\/|docs\/adr\/|schemas\/)/u.test(candidate)),
+      touchedContracts: architectureTouchedContracts(surface.paths),
       now,
     });
   } catch (error) {
@@ -430,7 +435,18 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   // enforced until the recorded review. Physical artifacts and the signed
   // disposition above remain mandatory; this never fabricates a passing
   // fitness result and keeps every outcome visible for the later adoption.
-  if (disposition.disposition === "deferred") {
+  // Net-new ratchet (PO decision 2026-10-16 #5): the deferral covers only paths
+  // that already existed; a net-new implementation path gets the full check.
+  // KNOWN LIMITATION: "existed" is judged by on-disk existence at entry time. The
+  // deferral record (architecture-adoption.mjs: schema/state/scope/decidedAt/
+  // expiresAt/reviewDate/decisionRef/...) carries neither a commit nor a captured
+  // path list, so a path created by an earlier implementation entry reads as
+  // established at a later entry. Tightening needs the record to capture a
+  // baseline commit or path list (a schema/decision change, out of this scope).
+  const netNewPaths = disposition.disposition === "deferred"
+    ? surface.paths.filter((candidate) => !(deps.pathExists ?? existsSync)(resolve(root, candidate)))
+    : [];
+  if (disposition.disposition === "deferred" && netNewPaths.length === 0) {
     return {
       schema: ARCHITECTURE_ENTRY_SCHEMA,
       status: "ready",
@@ -457,6 +473,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       outcomes: fitness.outcomes,
       summary: fitness.summary,
       planningSurface: surface,
+      ...(netNewPaths.length > 0 ? { netNewPaths } : {}),
     });
   }
 

@@ -110,8 +110,10 @@ test("a materialized map without a project-owned AGENTS pointer has an actionabl
 });
 
 test("a PO-deferred adoption reports complete fitness observations without enforcing them", () => {
+  // Injected surface of established (existing) paths: the real plan surface may name not-yet-created paths, which are net-new and enforced.
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,
+    planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
     deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }) },
   });
   assert.equal(result.status, "ready", JSON.stringify(result));
@@ -121,6 +123,30 @@ test("a PO-deferred adoption reports complete fitness observations without enfor
   assert.equal(result.artifacts.fitnessModel.status, "current");
   assert.equal(result.artifacts.baseline.status, "current");
   assert.equal(result.disposition.disposition, "deferred");
+});
+
+test("a PO-deferred adoption still enforces fitness for a net-new path and names it", () => {
+  const netNew = "plugins/pipeline-core/lib/not-yet-created-net-new-module.mjs";
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs", netNew] },
+    deps: {
+      readCheckpointArchitectureDebt: clearCheckpointDebt,
+      checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }),
+      evaluateArchitectureFitness: () => ({
+        overallStatus: "finding",
+        summary: { passCount: 9, findingCount: 1, exceptedCount: 0, unavailableCount: 0, unsupportedCount: 0, unknownCount: 0, totalClasses: 10 },
+        outcomes: [
+          { classId: 1, outcome: "finding" },
+          ...Array.from({ length: 9 }, (_, index) => ({ classId: index + 2, outcome: "pass" })),
+        ],
+      }),
+    },
+  });
+  assert.notEqual(result.fitness?.blockingOverallStatus, "deferred", JSON.stringify(result));
+  assert.equal(result.status, "blocked", JSON.stringify(result));
+  assert.equal(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
+  assert.deepEqual(result.fitness.netNewPaths, [netNew]);
 });
 
 test("checkpoint map debt blocks the next planning boundary even during adoption deferral", () => {
