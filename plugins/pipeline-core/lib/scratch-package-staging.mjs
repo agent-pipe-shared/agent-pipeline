@@ -250,7 +250,7 @@ function inspect(r,store,ownedLock=null) {
   }catch(e){result.delete=[];result.unknownScope=true;result.holds.push({stagingPath:null,code:code(e)});}
   return {result,groups};
 }
-function syncDirectory(path) {let fd;try{fd=openSync(path,constants.O_RDONLY|constants.O_DIRECTORY);fsyncSync(fd);}catch{fault('SPC-STORAGE-DURABILITY-UNAVAILABLE');}finally{if(fd!==undefined)closeSync(fd);}}
+function syncDirectory(path) {if(process.platform==='win32')return;let fd;try{fd=openSync(path,constants.O_RDONLY|constants.O_DIRECTORY);fsyncSync(fd);}catch{fault('SPC-STORAGE-DURABILITY-UNAVAILABLE');}finally{if(fd!==undefined)closeSync(fd);}}
 function publish(store,value,r) {
   const bytes=Buffer.from(canonical(value));if(bytes.length>LIMIT.receipt)fault('SPC-BOUND');
   const hash=digest(bytes),name=`${hash}.json`,path=join(store.path,name);
