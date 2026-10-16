@@ -8,7 +8,7 @@ import { delimiter, isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { resolveOpensslExecutable, spawnOpenssl } from "./po-human-approval.mjs";
+import { resolveOpensslExecutable, spawnOpenssl, spawnTrustedGit } from "./po-human-approval.mjs";
 
 const WIN = process.platform === "win32";
 const NAME = WIN ? "openssl.exe" : "openssl";
@@ -108,4 +108,54 @@ test("the real spawn reports ENOENT-style non-start, not a bare-name lookup, whe
     if (result.error) assert.equal(result.error.code, "ENOENT");
     else assert.equal(result.status, 0);
   } finally { process.env[key] = saved; cleanup(decoyDir); }
+});
+
+// ALF-C-N1-04B (AC-256): git is started by a trusted absolute path only, never by bare name.
+const GIT_NAME = WIN ? "git.exe" : "git";
+const plantGitDecoy = (dir, hook) => {
+  mkdirSync(dir, { recursive: true });
+  const decoy = join(dir, GIT_NAME);
+  if (WIN) { try { linkSync(process.execPath, decoy); } catch { copyFileSync(process.execPath, decoy); } }
+  else { writeFileSync(decoy, `#!/bin/sh\nprintf 'decoy-started\\n' >> "$ALF_N104B_MARKER"\nexit 0\n`); chmodSync(decoy, 0o755); }
+  return decoy;
+};
+
+test("a decoy git first on PATH and in the working directory is never started by the git spawn", () => {
+  const aux = fresh("gitaux");
+  const decoyDir = fresh("gitdecoy");
+  const saved = process.env.NODE_OPTIONS;
+  const savedMarker = process.env.ALF_N104B_MARKER;
+  const savedPath = process.env.PATH;
+  const pathKey = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+  try {
+    const marker = join(aux, "started.txt");
+    const hook = join(aux, "marker.cjs");
+    writeFileSync(hook, 'require("node:fs").appendFileSync(process.env.ALF_N104B_MARKER, "decoy-started\\n");\nprocess.exit(0);\n');
+    const decoy = plantGitDecoy(decoyDir, hook);
+    process.env.ALF_N104B_MARKER = marker;
+    process.env.NODE_OPTIONS = `--require ${JSON.stringify(hook.replaceAll("\\", "/"))}`;
+    // Positive control: started by its explicit path the decoy must leave its marker.
+    spawnSync(decoy, ["rev-parse", "HEAD"], { stdio: "pipe" });
+    assert.equal(existsSync(marker), true, "harness defect: the decoy cannot report that it ran");
+    rmSync(marker, { force: true });
+    process.env[pathKey] = [decoyDir, savedPath].join(delimiter);
+    const result = spawnTrustedGit(["rev-parse", "--is-inside-work-tree"], { cwd: decoyDir, stdio: "pipe", encoding: "utf8" });
+    delete process.env.NODE_OPTIONS;
+    assert.equal(existsSync(marker), false, "the decoy git was started");
+    if (result.error) assert.equal(result.error.code, "PO-SIGN-GIT-UNAVAILABLE");
+    else assert.equal(typeof result.status, "number");
+  } finally {
+    process.env[pathKey] = savedPath;
+    if (saved === undefined) delete process.env.NODE_OPTIONS; else process.env.NODE_OPTIONS = saved;
+    if (savedMarker === undefined) delete process.env.ALF_N104B_MARKER; else process.env.ALF_N104B_MARKER = savedMarker;
+    cleanup(aux, decoyDir);
+  }
+});
+
+test("the git spawn fails closed with a typed code when git does not resolve, and spawns the resolved absolute path otherwise", () => {
+  const unavailable = spawnTrustedGit(["--version"], { stdio: "pipe" }, { resolve: () => ({ ok: false, status: "binary_missing" }) });
+  assert.equal(unavailable.status, null);
+  assert.equal(unavailable.error.code, "PO-SIGN-GIT-UNAVAILABLE");
+  const viaNode = spawnTrustedGit(["-e", "process.stdout.write('abs')"], { stdio: "pipe", encoding: "utf8" }, { resolve: () => ({ ok: true, path: process.execPath }) });
+  assert.equal(viaNode.stdout, "abs");
 });

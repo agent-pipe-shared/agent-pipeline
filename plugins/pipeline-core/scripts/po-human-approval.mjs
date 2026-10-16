@@ -55,6 +55,7 @@ import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-
 import { ORGANIZATION_ARCHITECTURE_CONFIG_PATH, organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA, describeModelFamilyApprovalRequest } from "./model-family-approval-request.mjs";
 import { canonical as canonicalProofJson } from "../lib/po-approval-proof.mjs";
+import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 
 // NVA-SIGENTRY-1: the same resolved-plugin-root derivation guard-human-override.mjs
 // already uses (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`) -- needed
@@ -252,12 +253,21 @@ function describeAdoptionApprovalRequest(record, intentSha256) {
   } catch { return null; }
 }
 
+/** ALF-C-N1-04B (AC-256): start git only by a trusted ABSOLUTE path (shared trusted-tool resolution, which
+ * never consults PATH or the working directory). Fails closed with the typed code PO-SIGN-GIT-UNAVAILABLE
+ * as a not-started result when git does not resolve. `dependencies.resolve` is a test seam only. */
+export function spawnTrustedGit(args, options = {}, dependencies = {}) {
+  const resolved = (dependencies.resolve ?? resolveTrustedSystemExecutable)("git");
+  if (!resolved?.ok) return { status: null, signal: null, stdout: "", stderr: "", error: Object.assign(new Error("PO-SIGN-GIT-UNAVAILABLE: git did not resolve to a trusted executable"), { code: "PO-SIGN-GIT-UNAVAILABLE" }) };
+  return spawnSync(resolved.path, args, { ...options, shell: false });
+}
+
 function currentGitCandidate(repository) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
-  const commit = spawnSync("git", ["-C", repository, "rev-parse", "HEAD"], {
+  const commit = spawnTrustedGit(["-C", repository, "rev-parse", "HEAD"], {
     encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
   });
-  const tree = spawnSync("git", ["-C", repository, "rev-parse", "HEAD^{tree}"], {
+  const tree = spawnTrustedGit(["-C", repository, "rev-parse", "HEAD^{tree}"], {
     encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
   });
   const commitId = String(commit.stdout ?? "").trim();
@@ -333,7 +343,7 @@ function readDesignSigningFile(repository, path, { optional = false, request = f
 }
 function designSigningGit(repository, argv) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
-  const result = spawnSync("git", ["-C", repository, ...argv], { env, shell: false, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000, maxBuffer: DESIGN_SIGNING_MAX_BYTES });
+  const result = spawnTrustedGit(["-C", repository, ...argv], { env, shell: false, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000, maxBuffer: DESIGN_SIGNING_MAX_BYTES });
   if (result.error || result.signal || result.status !== 0) throw Error("DAB-SIGN-GIT-UNAVAILABLE");
   return result.stdout;
 }
