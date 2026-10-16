@@ -25,7 +25,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
@@ -201,6 +201,54 @@ test("AC-270 P4: the helper imports only the existing adapter (no second policy)
 test("AC-270 host-limitation: POSIX branch hardens with chmod 0700 (mode bits)", { skip: POSIX_ONLY }, () => {
   const report = runScenario(HELPER_URL);
   assert.equal(report.rootCode, null);
+});
+
+// ---- P6 (win32): retention-parent check is platform-correct (ALF-C-P22-06H) ---------------------------------------------
+
+const DDB_PATH = join(LIB, "design-decision-bindings.mjs");
+const LIB_URL_PREFIX = pathToFileURL(LIB + "/").href;
+/** Scratch mirror of design-decision-bindings.mjs exposing the two retention-parent helpers; `mutate` edits its text. */
+function mirrorBindings(name, mutate) {
+  return mirror(name, DDB_PATH,
+    (text) => text.replace(/from (['"])\.\//g, (_m, q) => `from ${q}${LIB_URL_PREFIX}`)
+      + "\nexport { evidenceDirectory as __evidenceDirectory, architectureReferenceDirectory as __architectureReferenceDirectory };\n",
+    mutate);
+}
+const RETENTION_RE = /DDB-RETENTION-PARENT-UNSAFE/;
+function refuses(run) {
+  try { run(); } catch (error) { return RETENTION_RE.test(`${error?.code ?? ""} ${error?.message ?? ""}`); }
+  return false;
+}
+
+test("AC-270 P6: the retention-parent checks admit an ordinary owned directory on win32 and still refuse a linked parent", { skip: WIN_ONLY }, async () => {
+  const mod = await import(mirrorBindings("ddb-control", null));
+  mkdirSync(SCRATCH, { recursive: true });
+  const root = mkdtempSync(join(SCRATCH, "retention-ok-"));
+  assert.equal(mod.__evidenceDirectory(root), join(root, "project", "design-approval-evidence"));
+  assert.equal(mod.__architectureReferenceDirectory(root, true), join(root, "project", "aggregate-design-architecture-references"));
+
+  const real = mkdtempSync(join(SCRATCH, "retention-real-"));
+  const linked = mkdtempSync(join(SCRATCH, "retention-link-"));
+  let linkMade = true;
+  try { symlinkSync(real, join(linked, "project"), "junction"); } catch { linkMade = false; }
+  if (linkMade) {
+    assert.ok(refuses(() => mod.__evidenceDirectory(linked)), "a linked project parent must stay refused");
+  }
+});
+
+test("AC-270 P6 RED: a scratch mirror with the original POSIX-only mode term refuses an ordinary owned directory on win32", { skip: WIN_ONLY }, async () => {
+  const url = mirrorBindings("ddb-mutant-posix-mode", (text) => text.split("(process.platform === 'win32' || (stat.mode & 0o022n) === 0n), 'DDB-RETENTION-PARENT-UNSAFE'")
+    .join("(stat.mode & 0o022n) === 0n, 'DDB-RETENTION-PARENT-UNSAFE'")
+    .replace("&& (process.platform === 'win32' || (stat.mode & 0o022n) === 0n), 'DDB-RETENTION-PARENT-UNSAFE'", "&& (stat.mode & 0o022n) === 0n, 'DDB-RETENTION-PARENT-UNSAFE'"));
+  const mod = await import(url);
+  mkdirSync(SCRATCH, { recursive: true });
+  const root = mkdtempSync(join(SCRATCH, "retention-red-"));
+  assert.ok(refuses(() => mod.__evidenceDirectory(root)), "the original code refuses an ordinary directory on win32 (the defect)");
+  const root2 = mkdtempSync(join(SCRATCH, "retention-red2-"));
+  mkdirSync(join(root2, "project"), { mode: 0o700 });
+  mkdirSync(join(root2, "project", "design-approval-evidence"), { mode: 0o700 });
+  mkdirSync(join(root2, "project", "aggregate-design-architecture-references"), { mode: 0o700 });
+  assert.ok(refuses(() => mod.__architectureReferenceDirectory(root2, false)), "the architecture-reference check is refused too");
 });
 
 // ---- P5 (win32): State-authority fixtures ---------------------------------------------------------------------------

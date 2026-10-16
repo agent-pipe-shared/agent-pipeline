@@ -451,7 +451,7 @@ function evidenceDirectory(root) {
   for (const path of [project,directory]) {
     if (!existsSync(path)) mkdirSync(path, { mode: 0o700 });
     const stat = lstatSync(path,{bigint:true});
-    requireValue(stat.isDirectory() && !stat.isSymbolicLink() && realpathSync(path) === path && (stat.mode & 0o022n) === 0n, 'DDB-RETENTION-PARENT-UNSAFE');
+    requireValue(stat.isDirectory() && !stat.isSymbolicLink() && realpathSync(path) === path && (process.platform === 'win32' || (stat.mode & 0o022n) === 0n), 'DDB-RETENTION-PARENT-UNSAFE');
   }
   return directory;
 }
@@ -537,7 +537,7 @@ function architectureReferenceDirectory(root, create = false) {
   for (const path of [join(root, 'project'), target]) {
     const stat = lstatSync(path, { bigint: true });
     requireValue(stat.isDirectory() && !stat.isSymbolicLink() && realpathSync(path) === path
-      && (stat.mode & 0o022n) === 0n, 'DDB-RETENTION-PARENT-UNSAFE');
+      && (process.platform === 'win32' || (stat.mode & 0o022n) === 0n), 'DDB-RETENTION-PARENT-UNSAFE');
   }
   return target;
 }
