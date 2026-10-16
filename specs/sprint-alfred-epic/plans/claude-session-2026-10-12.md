@@ -693,7 +693,19 @@ All commits are by the orchestrator through `scratch/alfred-claude-20261012/comm
 | ALF-C-P12-01 (AC-272) | committed in batch c6p | Pre-push installer pin 13/13, 1 POSIX skip; real push blocked/allowed, durable write RED mirror. |
 | ALF-C-P12-03 → B (AC-163) | committed in batch c6q | Real gap: `validateRecord` accepted a terminal record with an empty log. Now refused (v4 completed-undelivered exempt: no worker activity). Pin 7/7, `dispatch-record.test.mjs` 13/13; `dispatch-record-write.test.mjs` 3 Windows EBUSY/EPERM fixture failures, unrelated (Elephant checked the error text). |
 | Critic C6b FULL | FAIL, 1 major 3 minor | Over `facf39659`, `79f2919f7`, `a6aa8705d`, `65660d4cf`; result `specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/C6b-full-result.md`. F1 (AC-185 clause C reinterpreted) → PO topic; F2-F4 → ALF-C-C6B-CORR (running). |
-| ALF-C-P13-01..03 (AC-165, AC-142, AC-246) | running | Pin wave P13. |
+| ALF-C-P13-01..03 (AC-165, AC-142, AC-246) | `b08351834`, c6s, `3c0207540` | Dispatch-record root path pin 15/15; Critic round-cap pin 7/7; `syncDirectory` skips the directory fsync on win32 (real defect, RED shown). |
+| ALF-C-P14-01B, P14-02 (AC-203, AC-187 partial) | `0b179b354`, `4f64c267a` | Orphan descriptor recovery pin 6/6; goldfish brief route pin (template-only, no emitter for the quick field). |
+| ALF-C-C6B-CORR2 (Critic C6b F2-F4) | `deeadb427` | Injected platform for the notes mode checks, honest sampling titles, typed skips; Elephant self-verified (no DIFF Critic). |
+| ALF-C-P14-03B | blocked, no change | Trusted git resolution returns `binary_missing` on this host: Git moved from the 2026-07-24 PO-exception root. PO topic. |
+| ALF-C-C6B-CORR3 → CORR4 (AC-144) | c7a | Three pre-existing `guard-dispatch-budget.test.mjs` failures: stale `critic-abc` literal plus a virtual-only fixture; the three cases now run on a real governed root under scratch/. Whole file 119/122, 0 fail, 3 platform skips. |
+| ALF-C-P15-01 → B (AC-239) | held uncommitted | Pin 6 green, 3 real gaps. U1 Grep glob on an exact file: fixed in `read-scope.mjs`, but this contradicts the deliberate examiner QP4-4 (`guard-lifecycle-ready.test.mjs` line 11536); held with patch `scratch/held-patches/p15-01b-read-scope.patch`. U2 (Grep subtree vs SEC-11) and U3 (WSL UNC read) are PO decisions, pinned as todo. |
+| ALF-C-P15-02 (AC-146) | held uncommitted | Git-backed suite skipped on this host (same trusted-git cause as P14-03B); original acceptance text is private, so the points were derived from the matrix row. |
+| ALF-C-P15-03 (AC-157) | c6x | Design workflow package contract pin 15/15. |
+| Critic C6c FULL | FAIL, 1 blocker 1 minor (partial) | Over `edfc80d4c`, `d35c37e71`, `3c0207540`, `deeadb427`; result `specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/C6c-full-result.md`. F1: the empty-log refusal broke every Antigravity authored return; F2: todo cases without owner/due. |
+| ALF-C-C6C-CORR (F1, F2) | `37063240e` | Antigravity authored record now carries a truthful one-entry log; todo owners and due dates added. Elephant self-verified the diff. |
+| ALF-C-C6C-CORR2 → CORR3 | running | Diagnosis found two masked production defects in the Antigravity path: a Windows separator mismatch in `captureHostCommitBaseline` and a missing `root` in `agy-host-observed-finalize.mjs`. |
+| ALF-C-P16-01..04 (AC-158, AC-226, AC-152, AC-261) | c6y, c7b, c7c | Four pins green; host-limitation skips typed; stored request duplication (AC-152) is a PO topic. |
+| ALF-C-P17-01..03 | running | Pin wave P17. |
 
 - **Observed transient:** dispatched Goldfish and the Elephant both saw `GUARD-LIFECYCLE-NOT-READY repository-mount-read-only` for one call while a commit batch was running; the next call passed. Briefings now tell the Goldfish to retry once.
 - **Stale lock:** `registry.lock` (about 5 minutes, no owner) blocked two dispatches with `SDC-LOCK-HELD`; removed by the Elephant.
