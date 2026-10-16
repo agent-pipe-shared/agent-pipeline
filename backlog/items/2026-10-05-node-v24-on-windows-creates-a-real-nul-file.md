@@ -27,7 +27,9 @@ signed package.
 
 - No `"NUL"` literal as a Node open target anywhere: a ratchet scan in an existing
   registered test or a registered new one.
-- `GIT_CONFIG_GLOBAL: "NUL"` (read by git, not opened by Node) is explicitly allowed.
+- Git null-device values (`GIT_CONFIG_GLOBAL` and similar, read by git, not opened by Node) use
+  `GIT_NULL_DEVICE` (`/dev/null`) from `lib/git-null-device.mjs`, never the `"NUL"` literal, which
+  Git for Windows 2.56 rejects (item `pipeline.git-for-windows-2-56-rejects-git-config-global-nul`).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

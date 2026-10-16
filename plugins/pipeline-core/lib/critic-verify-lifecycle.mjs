@@ -306,8 +306,9 @@ export function projectConsumedCriticFindings({ packetId, findings }) {
   });
 }
 
-function courseGitBytes(root, args) {
-  const result = spawnSync("git", ["-C", root, ...args], { shell: false, encoding: null,
+// `spawn` is a test seam (default: the real spawnSync) so a stub can capture the git child environment.
+export function courseGitBytes(root, args, spawn = spawnSync) {
+  const result = spawn("git", ["-C", root, ...args], { shell: false, encoding: null,
     timeout: 10000, maxBuffer: 1024 * 1024, env: { PATH: process.env.PATH ?? "", LANG: "C", LC_ALL: "C",
       GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: GIT_NULL_DEVICE,
       GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_COUNT: "0", GIT_TERMINAL_PROMPT: "0" } });
