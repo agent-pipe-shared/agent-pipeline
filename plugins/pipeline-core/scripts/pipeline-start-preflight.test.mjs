@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -298,21 +298,30 @@ test("all three runner bootstraps expose the same nonblocking decision digest", 
   assert.equal(malformed.effectiveDecisions.projectionSha256, null);
 });
 
-test("AC19 source parity uses the same physical decision projection for fresh runner bootstrap invocations", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "pipeline-ac19-bootstrap-parity-"));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  mkdirSync(join(root, "docs", "adr"), { recursive: true });
-  const body = Buffer.from("# Shared project decision\n\nAll supported runners read this exact decision.\n", "utf8");
-  writeFileSync(join(root, "docs", "adr", "ADR-0001.md"), body);
-  writeFileSync(join(root, "docs", "adr", "ADR-0001.json"), `${JSON.stringify({
-    schema: "pipeline.architecture-decision.v1",
-    id: "ADR-0001",
-    title: "Shared project decision",
-    status: "accepted",
-    digest: createHash("sha256").update(body).digest("hex"),
-    scope: "project",
-    date: "2026-09-27",
-  })}\n`);
+test("AC19 source parity uses the same physical decision projection for fresh runner bootstrap invocations", async (t) => {
+  // Production accepts a structurally valid decision only when a retained, approved
+  // design-architecture aggregate lists it (inspectEffectiveArchitectureDecisions ->
+  // readEffectiveDesignArchitectureAuthority). A bare ADR plus sidecar is therefore advisory
+  // ("decision-adoption-unverified"), never "ready". This fixture is the genuine route that
+  // architecture-prospective-materialization.test.mjs (APM001/APM012) already uses: a signed,
+  // approved aggregate design package whose decision is materialised and retained by the real
+  // `materialize-architecture` action. The examiner is unchanged: the real inspector, no
+  // structural-only stand-in. The fixture is imported on demand so its heavy module graph
+  // (lifecycle state, governance, PO gate) is not loaded for the rest of this suite.
+  const { makeAggregateFixture, must, ddb } = await import("../lib/architecture-prospective-materialization.fixture.mjs");
+  const fixture = makeAggregateFixture();
+  const root = fixture.dir;
+  t.after(() => {
+    // The fixture keeps its audit logs in a per-process parent under scratch/; remove it with
+    // the fixture so nothing is left behind (restore-before-yield).
+    const parent = dirname(root);
+    rmSync(root, { recursive: true, force: true });
+    if (basename(parent).startsWith("architecture-prospective-method-")) rmSync(parent, { recursive: true, force: true });
+  });
+  must(fixture, ["materialize-architecture"]);
+  const authority = ddb.readEffectiveDesignArchitectureAuthority({ rootDir: root });
+  assert.equal(authority.ok, true, `SETUP retained approved aggregate authority: ${JSON.stringify(authority)}`);
+  assert.equal(authority.decisions.length, 1, "SETUP the approved aggregate lists exactly the one shared project decision");
 
   const invocations = [
     ["claude", { CLAUDECODE: "1" }],
