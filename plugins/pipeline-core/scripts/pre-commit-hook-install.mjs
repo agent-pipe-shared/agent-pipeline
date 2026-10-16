@@ -169,7 +169,10 @@ function decorateInstalledImpl(content, pluginLibDir, deadline) {
   const runtimeSnapshot = {root:matched[1],manifestSha256:matched[2]};
   verifyGitHookRuntimeSnapshot({snapshotRoot:runtimeSnapshot.root,manifestSha256:runtimeSnapshot.manifestSha256,deadline});
   if (content.split("  const paths = stagedPaths(projectRoot);").length !== 2) throw Error("GHA-RENDER-ANCHOR");
-  return content.replace("  const paths = stagedPaths(projectRoot);", "  if (!await admitPipelineScope(projectRoot)) return;\n  const paths = stagedPaths(projectRoot);") + renderGitHookSnapshotAdmission(runtimeSnapshot);
+  // The stale-snapshot refusal runs AFTER scope admission (mirrors commit-msg): a repository outside governance scope stays inert.
+  const staleFirst = "  if (await snapshotIsStale()) return;\n";
+  if (content.split(staleFirst).length !== 2) throw Error("GHA-RENDER-ANCHOR");
+  return content.replace(staleFirst, "").replace("  const paths = stagedPaths(projectRoot);", "  if (!await admitPipelineScope(projectRoot)) return;\n  if (await snapshotIsStale()) return;\n  const paths = stagedPaths(projectRoot);") +renderGitHookSnapshotAdmission(runtimeSnapshot);
 }
 
 
