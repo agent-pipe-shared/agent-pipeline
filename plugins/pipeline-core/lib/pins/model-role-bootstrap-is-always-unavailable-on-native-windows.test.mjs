@@ -190,6 +190,37 @@ test("P4 realpath casing: a differently-cased spelling of an existing win32 repo
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("P4 clause 4 (POSIX-only path assumptions): module source has no hard-coded separator or slice(1) path handling", () => {
+  const stripped = moduleSource.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/^\s*\/\/.*$/gmu, "");
+  assert.doesNotMatch(stripped, /\.slice\(1\)/u, "no first-character drop on a path");
+  assert.doesNotMatch(stripped, /split\(["']\/["']\)/u, "no hard-coded POSIX separator split");
+  assert.doesNotMatch(stripped, /\b(?:startsWith|indexOf)\(["']\/["']\)/u, "no POSIX-root test");
+  assert.match(stripped, /isAbsolute\(/u, "absoluteness is decided by the platform flavour");
+});
+
+test("P4 clause 4 realpath casing via resolvePhysicalRoot/safeExistingPath: a differently-cased injected common dir is accepted or fails closed, never throws", (t) => {
+  if (process.platform !== "win32") { t.skip("win32-only casing case"); return; }
+  const root = makeRealRepo("alfp501-case2");
+  try {
+    const commonDir = path.join(root, ".git");
+    const flipped = commonDir.replace(/^[A-Za-z]/u, (c) => c.toLowerCase())
+      .replace(/alfp501-case2-/u, "ALFP501-CASE2-");
+    assert.notEqual(flipped, commonDir);
+    const host = createModelFamilyRuntimeHost({ cwd: root, resolveCommonDir: () => flipped });
+    let result;
+    assert.doesNotThrow(() => { result = host.observeActivation(); });
+    // Any outcome must be a typed, fail-closed-or-correct observation; inactive is the correct one here.
+    assert.equal(typeof result.ok, "boolean");
+    if (result.ok) assert.equal(result.status, "inactive");
+    else assert.match(result.code, /^MODEL-FAMILY-/u);
+    // The same spelling in canonical native casing must be inactive (the correct observation).
+    const canonical = createModelFamilyRuntimeHost({ cwd: root, resolveCommonDir: () => realpathSync.native(commonDir) })
+      .observeActivation();
+    assert.equal(canonical.ok, true, canonical.code);
+    assert.equal(canonical.status, "inactive");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("model-family-runtime-host.mjs can be entered first (no import-cycle TDZ)",
   () => {
     const url = new URL("../model-family-runtime-host.mjs", import.meta.url).href;
