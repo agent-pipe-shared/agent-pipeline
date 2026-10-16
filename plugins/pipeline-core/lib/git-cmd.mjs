@@ -1436,5 +1436,17 @@ function classifyPush(cmd, reading) {
   // A bare `git.exe` (any letter case) after a separator: same word as `git`, at an executable boundary only
   // (`xgit.exe`, `git.exe.bak` and `gitk` stay non-git).
   const nonLeadingGitExePush = /(?:^|[\s;&|(`'"/\\])git\.exe\s+push\b/iu.test(commandRegion);
-  return /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush || nonLeadingGitExePush;
+  // Redirections between `git`, its global options and the subcommand do not change which command runs. Drop each
+  // operator (`>`, `>>`, `>|`, `<`, `<>`, `<<<`, `&>`, `N>`, `>&N`) and its target BEFORE global-option normalization, so
+  // `git -c k=v 2>&1 push` and `git 2>&1 --no-pager push` collapse to `git push`. Additive only: it can add a push
+  // classification, never remove one.
+  const redirectFreeRegion = normalizeGlobalGitOptions(
+    commandRegion.replace(
+      /(^|\s)(?:\d*|&)(?:>>?\|?|<<<|<>|<)(?:&(?:\d+-?|-)|[ \t]*[^\s;&|()<>]+)?/gu,
+      "$1",
+    ),
+  );
+  const redirectedPush =
+    /\bgit\s+push\b/.test(redirectFreeRegion) || /(?:^|[\s;&|(`'"/\\])git\.exe\s+push\b/iu.test(redirectFreeRegion);
+  return /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush || nonLeadingGitExePush || redirectedPush;
 }

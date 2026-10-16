@@ -55,3 +55,43 @@ for (const cmd of [
     assert.equal(commandIsGitPush(cmd), false);
   });
 }
+
+// ALF-C-C6A-CORR (Critic F1/C2): a redirect combined with ANY recognized global option still reaches the push word.
+const REDIRECT_WITH_GLOBAL_OPTIONS = [
+  "git -c k=v 2>&1 push origin main",
+  "git 2>&1 -c k=v push origin main",
+  "git --no-pager 2>&1 push origin main",
+  "git 2>&1 --no-pager push origin main",
+  "git -c k=v push origin main",
+  "git --git-dir=x 2>&1 push origin main",
+  "git 2>&1 --git-dir=x push origin main",
+  "git -C dir -c k=v 2>&1 push origin main",
+  "git -C dir 2>&1 -c k=v push origin main",
+  "git -c k=v 2> /dev/null push origin main",
+  "git --no-pager >out.txt push origin main",
+  "git -c k=v >>out.txt push origin main",
+  "git 2>&1 -c k=v 2>&1 push origin main",
+  "git <<< x push origin main",
+  "git >| out.txt push origin main",
+  "git <> out.txt push origin main",
+  "git -c k=v <<< x push origin main",
+  "git -c k=v >| out.txt push origin main",
+  "git --no-pager <> out.txt push origin main",
+  "git 2>&1 -C repo --no-pager push origin main",
+];
+for (const cmd of REDIRECT_WITH_GLOBAL_OPTIONS) {
+  test(`A2b redirect plus global option before the push word is a push: ${cmd}`, () => {
+    assert.equal(commandIsGitPush(cmd), true);
+  });
+}
+
+for (const cmd of [
+  "git -c k=v 2>&1 status",
+  "git --no-pager 2>&1 log",
+  "git -C dir 2>&1 -c k=v status",
+  "git <<< x status",
+]) {
+  test(`A4b negative control with redirect and option stays not-a-push: ${cmd}`, () => {
+    assert.equal(commandIsGitPush(cmd), false);
+  });
+}
