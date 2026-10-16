@@ -422,6 +422,13 @@ export function normalizeGlobalGitOptions(str) {
   return str.replace(GIT_GLOBAL_OPT_PREFIX_RE, "git");
 }
 
+const GIT_EXE_GLOBAL_OPT_PREFIX_RE = new RegExp(`\\bgit\\.exe\\b(?:\\s+(?:${GIT_GLOBAL_OPT_ALT}))*`, "gi");
+
+/** Same collapse as `normalizeGlobalGitOptions`, for the `git.exe` spelling (classifier-local, additive use only). */
+function normalizeGlobalGitExeOptions(str) {
+  return str.replace(GIT_EXE_GLOBAL_OPT_PREFIX_RE, "git.exe");
+}
+
 // ---- quote-aware argv tokenizer + ref-glob matcher ------------------------------------
 
 /**
@@ -1440,12 +1447,16 @@ function classifyPush(cmd, reading) {
   // operator (`>`, `>>`, `>|`, `<`, `<>`, `<<<`, `&>`, `N>`, `>&N`) and its target BEFORE global-option normalization, so
   // `git -c k=v 2>&1 push` and `git 2>&1 --no-pager push` collapse to `git push`. Additive only: it can add a push
   // classification, never remove one.
-  const redirectFreeRegion = normalizeGlobalGitOptions(
-    commandRegion.replace(
-      /(^|\s)(?:\d*|&)(?:>>?\|?|<<<|<>|<)(?:&(?:\d+-?|-)|[ \t]*[^\s;&|()<>]+)?/gu,
-      "$1",
+  // The operator alphabet is at least as wide as the word-path pattern above: a `N`/`&`/PowerShell `*` prefix, `>&`
+  // with any target (`>&2`, `>&out`, `>& out`), and operators glued to the previous word (`git>out`, `--no-pager>&2`).
+  const redirectFreeRegion = normalizeGlobalGitExeOptions(
+    normalizeGlobalGitOptions(
+      commandRegion.replace(/(?:\d*|[&*])(?:>>?\|?|<<<|<>|<)(?:&[ \t]*)?[ \t]*[^\s;&|()<>]*/gu, ""),
     ),
   );
+  // Fail-closed check #2 again, on the redirect-free copy: an unrecognized option after the git word that a redirect
+  // used to separate from it (`git 2>&1 --config-env=x push`) must fail closed exactly like its redirect-free twin.
+  if (GIT_EXECUTABLE_THEN_OPTION_RE.test(redirectFreeRegion)) return true;
   const redirectedPush =
     /\bgit\s+push\b/.test(redirectFreeRegion) || /(?:^|[\s;&|(`'"/\\])git\.exe\s+push\b/iu.test(redirectFreeRegion);
   return /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush || nonLeadingGitExePush || redirectedPush;

@@ -95,3 +95,46 @@ for (const cmd of [
     assert.equal(commandIsGitPush(cmd), false);
   });
 }
+
+// ALF-C-C6A-CORR2 (Critic F1/F2): redirects before unlisted options, git.exe spellings, and the wider redirect alphabet.
+const REDIRECT_CORR2 = [
+  "git.exe 2>&1 -c k=v push origin main",
+  "git.exe -c k=v push origin main",
+  "git.exe --no-pager 2>&1 push origin main",
+  "git.exe 2>&1 --no-pager push origin main",
+  "git.exe --git-dir=x 2>&1 push origin main",
+  "git.exe 2>&1 --git-dir=x push origin main",
+  "git 2>&1 --config-env=core.sshCommand=VAR push origin HEAD",
+  "git 2>&1 --exec-path=x push origin main",
+  "git.exe 2>&1 --config-env=core.sshCommand=VAR push origin HEAD",
+  "git -c k=v >&out push origin main",
+  "git --no-pager >& out push origin main",
+  "git >&out push origin main",
+  "git >& out push origin main",
+  "git>out push origin main",
+  "git --no-pager>&2 push origin main",
+  "git -c k=v>out push origin main",
+  "git *> out push origin main",
+  "git *>&1 push origin main",
+  "git -c k=v *>&1 push origin main",
+  "git.exe -c k=v >&out push origin main",
+];
+for (const cmd of REDIRECT_CORR2) {
+  test(`A2c redirect shapes (git.exe, unlisted options, wide alphabet) classify as a push: ${cmd}`, () => {
+    assert.equal(commandIsGitPush(cmd), true);
+  });
+}
+
+for (const cmd of [
+  "git.exe 2>&1 -c k=v status",
+  "git -c k=v >&out status",
+  "git --no-pager >& out log",
+  "git>out status",
+  "git --no-pager>&2 log",
+  "git *> out status",
+  "git *>&1 log",
+]) {
+  test(`A4c negative control for the CORR2 shapes stays not-a-push: ${cmd}`, () => {
+    assert.equal(commandIsGitPush(cmd), false);
+  });
+}
