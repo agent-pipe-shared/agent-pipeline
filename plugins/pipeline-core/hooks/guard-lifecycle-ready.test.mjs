@@ -11533,12 +11533,18 @@ test("QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G
         { pattern: "x", path: join(path, "scratch"), glob: "../*.md" },
         { pattern: "x", path: join(path, "scratch"), glob: ".git/*.md" },
         { pattern: "x", path: join(outside, "scratch"), glob: "*.md" },
-        { pattern: "x", path: join(path, "scratch", "notes.md"), glob: "*.md" },
+        // Non-exact targets keep refusing with a glob filter: a missing file, and an exact file in an outside root.
+        { pattern: "x", path: join(path, "scratch", "missing-notes.md"), glob: "*.md" },
+        { pattern: "x", path: join(outside, "scratch", "notes.md"), glob: "*.md" },
       ]) {
         const r = tool("Grep", input);
         assert.equal(r.exitCode, 2, JSON.stringify(input));
         assert.match(r.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
       }
+      // ALF-C-P15-01C (AC-239, PO decision U1, 2026-10-16; bounded QG-04 examiner amendment): a glob filter on native Grep naming ONE exact,
+      // admitted in-root file can only narrow that search, so it is admitted. It was previously asserted refused here; every directory,
+      // secret, hidden and out-of-root target above keeps refusing.
+      assert.equal(tool("Grep", { pattern: "x", path: join(path, "scratch", "notes.md"), glob: "*.md" }).exitCode, 0);
       assert.equal(tool("Read", { file_path: join(path, "scratch", "notes.md") }).exitCode, 0);
       assert.equal(tool("Read", { file_path: join(path, "vault", "id_rsa") }).exitCode, 2);
     });

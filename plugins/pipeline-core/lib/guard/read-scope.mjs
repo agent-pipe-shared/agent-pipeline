@@ -3,7 +3,7 @@
 
 import { lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
-import { isAllowedPassiveReadTarget } from "../passive-read-policy.mjs";
+import { isAllowedPassiveReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
 import { readClaudeTaskOutputReadScope } from "../claude-task-output-read-scope.mjs";
 import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, MAX_CLAUDE_TASK_OUTPUT_READ_BYTES } from "./constants.mjs";
@@ -576,9 +576,27 @@ function qp4MissingInRootTarget(raw, root) {
   } catch { return false; }
 }
 
+// ALF-C-P15-01C (AC-239, PO decision U3): native Read of ONE exact file under a WSL UNC share
+// (\\wsl.localhost\<distro>\... or \\wsl$\<distro>\...) on a Windows host. Lexical only (no stat: a stopped distro must
+// not hang the guard). Wildcards, dot segments, alternate data streams, credential roots (home-relative and system
+// pseudo roots inside the distro) and secret basenames stay denied; Grep/Glob/Bash get no UNC lane.
+function wslUncExactFile(raw) {
+  if (process.platform !== "win32" || typeof raw !== "string") return false;
+  const match = /^[\\/]{2}(?:wsl\.localhost|wsl\$)[\\/]([^\\/:*?"<>|\0]+)[\\/](.+)$/iu.exec(raw);
+  if (match === null || /[\0$\x60*?\[\]{}"<>|:~]/u.test(match[2])) return false;
+  const segments = match[2].split(/[\\/]+/u);
+  if (segments.some((segment) => segment === "" || segment === "." || segment === ".." || /[. ]$/u.test(segment))) return false;
+  const lowered = `/${segments.join("/").toLowerCase()}/`;
+  const roots = PASSIVE_READ_CREDENTIAL_ROOTS;
+  if ([...roots.homeRelativePaths, ...roots.posixAbsolutePaths.map((path) => path.slice(1)),
+    ...roots.systemPseudoRoots.map((path) => path.slice(1))].some((path) => lowered.includes(`/${path.toLowerCase()}/`))) return false;
+  return !new RegExp(roots.secretBasenameRegex.source, roots.secretBasenameRegex.flags).test(segments[segments.length - 1]);
+}
+
 export function readToolScopeVerdict(input, root, dependencies) {
   const toolName = String(input.tool_name);
   const params = input.tool_input ?? {};
+  if (toolName === "Read" && wslUncExactFile(params.file_path)) return verdict(0);
   const pluginRoots = registeredPluginReadScopeRoots(dependencies);
   const sessionRoots = [...sessionReadScopeRoots(input, dependencies), ...pluginRoots];
   const path = toolName === "Read" ? params.file_path : params.path ?? ".";
@@ -587,6 +605,13 @@ export function readToolScopeVerdict(input, root, dependencies) {
   const taskOutput = toolName === "Read" || toolName === "Grep"
     ? claudeTaskOutputReadScope(path, input, root, dependencies)
     : null;
+  // ALF-C-P15-01B (AC-239): a glob filter on native Grep can only narrow, never widen, a search that names one
+  // exact, admitted file, so it is admitted for that shape alone (SEC-11 stays: no Grep directory lane).
+  // ALF-C-P15-01D: the glob lane additionally requires the resolved, physical target to be inside the project root
+  // (qp4PhysicallyInsideProject: lexical + realpath containment, fails closed on escape, missing or unresolvable path).
+  const grepExactFile = toolName === "Grep" && pluginPath !== false
+    && (taskOutput !== null || isSafeExactPassiveFile(path, root, sessionRoots))
+    && typeof path === "string" && qp4PhysicallyInsideProject(passiveCandidate(path, root), root);
   const targetSafe = (toolName === "Read"
     ? pluginPath !== false && (taskOutput !== null
       || isAllowedPassiveReadTarget(path, { rootDir: root, recursive: true, additionalRecursiveRoots: sessionRoots }))
@@ -602,7 +627,8 @@ export function readToolScopeVerdict(input, root, dependencies) {
         : isAllowedPassiveReadTarget(join(path, selector), {
           rootDir: root, recursive: true, additionalRecursiveRoots: sessionRoots,
         }))
-    : selector === undefined;
+    : selector === undefined
+      || (grepExactFile && typeof selector === "string" && selector !== "" && !selector.includes("\0"));
   const scoped = targetSafe && selectorSafe;
   if (scoped) return verdict(0);
   if (toolName === "Glob" && qp4InRootWildcardListing(path, selector, root, sessionRoots)) return verdict(0);
