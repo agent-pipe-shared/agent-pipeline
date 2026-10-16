@@ -320,10 +320,20 @@ function installHook(dir) {
   return install;
 }
 
+/* The kill timeout of an installed-hook commit is a harness guard against a HUNG hook, not an
+ * acceptance examiner: a slow commit must be measured, not killed. Measured on win32 (ALF-C-P19-12G
+ * A/B timing): a commit with NO protected finding takes 9-17 s even at HEAD (installer median 12.7 s
+ * at HEAD, 13.2 s current), and under parallel load 56-67 s. */
+const COMMIT_KILL_TIMEOUT_MS = 120000;
+/* Fixture-building headroom added on top of the commit() calls when sizing a per-test node:test timeout. */
+const TEST_FIXTURE_HEADROOM_MS = 120000;
+/* Per-test timeout comfortably above the sum of that test's commit() calls. */
+const commitTestTimeout = (commitCalls) => commitCalls * COMMIT_KILL_TIMEOUT_MS + TEST_FIXTURE_HEADROOM_MS;
+
 function commit(dir, message, { allowEmpty = false } = {}) {
   const args = ["commit", "-m", message];
   if (allowEmpty) args.push("--allow-empty");
-  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 20000 });
+  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: COMMIT_KILL_TIMEOUT_MS });
   return { code: result.status, stderr: result.stderr ?? "", stdout: result.stdout ?? "" };
 }
 
@@ -438,7 +448,7 @@ test("installed hook impl: repository root unresolvable (invoked outside any git
 // never gated) so the later re-write is genuinely a re-write of ALREADY-TRACKED history --
 // the exact property that must stay blocked.
 
-test("installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused", () => {
+test("installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-gate-strength-block");
   writeFileSync(join(dir, "pipeline.user.yaml"), "gates:\n  push_approval: signature\n");
   git("add", "pipeline.user.yaml");
@@ -456,7 +466,7 @@ test("installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) AL
   assert.match(stderr, /agent MUST NOT/);
 });
 
-test("installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption)", () => {
+test("installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption)", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-gate-strength-first-appearance");
   installHook(dir);
   writeFileSync(join(dir, "pipeline.user.yaml"), "gates:\n  push_approval: chat\n");
@@ -465,7 +475,7 @@ test("installed hook: gate-strength-protected path's FIRST appearance in git his
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused", () => {
+test("installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-testpath-block");
   writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }]);
   writeFileSync(join(dir, "protected-suite.test.mjs"), "// original\n");
@@ -481,7 +491,7 @@ test("installed hook: testpath-protected path ALREADY tracked, re-write with no 
   assert.match(stderr, /fixture protected suite/);
 });
 
-test("installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption)", () => {
+test("installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption)", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-testpath-first-appearance");
   writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }]);
   git("add", ".claude/guard-config.json");
@@ -493,7 +503,7 @@ test("installed hook: testpath-protected path's FIRST appearance in git history,
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit", () => {
+test("installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit", { timeout: commitTestTimeout(1) }, () => {
   // This is the backlog item's own reported repro shape verbatim: "an already-committed
   // project/pipeline.json being bypass-written" -- the exact case the first-appearance
   // exemption must NOT reopen. Reproduced without any Edit/Write tool call: fs.writeFileSync
@@ -513,7 +523,7 @@ test("installed hook: a spawned Node process re-writing an ALREADY-COMMITTED pro
   assert.match(stderr, /GS-10/);
 });
 
-test("installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override", () => {
+test("installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-sanctioned-verify-transition");
   writeVerifyTransitionFixture(dir);
   git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
@@ -527,7 +537,7 @@ test("installed hook: admits only the complete sanctioned baseline-verify to imp
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery", () => {
+test("installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-sanctioned-late-verify-recovery");
   writeEstablishedLateVerifyFixture(dir);
   git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
@@ -540,7 +550,7 @@ test("installed hook: admits only the two calibration twins for the sanctioned l
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: refuses a late verify rewrite when it also stages lifecycle state", () => {
+test("installed hook: refuses a late verify rewrite when it also stages lifecycle state", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-sanctioned-late-verify-state-rewrite");
   writeEstablishedLateVerifyFixture(dir, { updatedAt: "2026-09-13T12:00:00.000Z" });
   git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
@@ -556,7 +566,7 @@ test("installed hook: refuses a late verify rewrite when it also stages lifecycl
   assert.notEqual(code, 0);
 });
 
-test("installed hook: refuses late verify recovery when committed plan approval is stale", () => {
+test("installed hook: refuses late verify recovery when committed plan approval is stale", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-sanctioned-late-verify-stale-approval");
   writeEstablishedLateVerifyFixture(dir);
   const statePath = join(dir, "project", "pipeline-state.json");
@@ -577,7 +587,7 @@ test("installed hook: refuses late verify recovery when committed plan approval 
   assert.notEqual(code, 0);
 });
 
-test("installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction", () => {
+test("installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-sanctioned-verify-transition-extra-field");
   writeVerifyTransitionFixture(dir);
   git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
@@ -595,7 +605,7 @@ test("installed hook: refuses a wider calibration rewrite that merely resembles 
   assert.notEqual(code, 0);
 });
 
-test("installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition", () => {
+test("installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-sanctioned-verify-transition-missing-state");
   writeVerifyTransitionFixture(dir);
   git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
@@ -608,7 +618,7 @@ test("installed hook: refuses the verify rewrite when the lifecycle state is not
   assert.notEqual(code, 0);
 });
 
-test("installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED", () => {
+test("installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED", { timeout: commitTestTimeout(1) }, () => {
   // Documents the deliberate residual scope of the PO's chosen candidate: the first-appearance
   // exemption is drawn on git history, not on the write mechanism, so a spawned-process bypass
   // that creates a never-before-tracked protected path is exempt exactly like a normal
@@ -625,7 +635,7 @@ test("installed hook: a spawned Node process CREATING a brand-new protected path
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED", () => {
+test("installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-consumed-allowed");
   installHook(dir);
   writeConsumedCapability(dir, ["pipeline.user.yaml"]);
@@ -635,7 +645,7 @@ test("installed hook: staged path with a matching CONSUMED capability -> commit 
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: admits one complete proof-bound quality package, never a widened index", () => {
+test("installed hook: admits one complete proof-bound quality package, never a widened index", { timeout: commitTestTimeout(2) }, () => {
   const { dir, git } = freshRepo("e2e-quality-package-commit");
   const pair = generateKeyPairSync("ed25519");
   const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
@@ -669,7 +679,7 @@ test("installed hook: admits one complete proof-bound quality package, never a w
   assert.notEqual(result.code, 0);
 });
 
-test("installed hook: matching signed GMW permits a non-kernel TP rewrite", () => {
+test("installed hook: matching signed GMW permits a non-kernel TP rewrite", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-gmw-tp-allowed");
   writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }]);
   writeFileSync(join(dir, "protected-suite.test.mjs"), "// original\n");
@@ -683,7 +693,7 @@ test("installed hook: matching signed GMW permits a non-kernel TP rewrite", () =
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: wrong-scope signed GMW does not permit a TP rewrite", () => {
+test("installed hook: wrong-scope signed GMW does not permit a TP rewrite", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-gmw-wrong-scope");
   writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }]);
   writeFileSync(join(dir, "protected-suite.test.mjs"), "// original\n");
@@ -698,7 +708,7 @@ test("installed hook: wrong-scope signed GMW does not permit a TP rewrite", () =
   assert.match(stderr, /TP-1/);
 });
 
-test("installed hook: matching signed GMW never permits hooks.json kernel rewrite", () => {
+test("installed hook: matching signed GMW never permits hooks.json kernel rewrite", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-gmw-kernel-refused");
   writeTestPathConfig(dir, [{ pattern: "plugins/pipeline-core/hooks/hooks\\.json$", reason: "fixture kernel path", id: "TP-4" }]);
   mkdirSync(join(dir, "plugins", "pipeline-core", "hooks"), { recursive: true });
@@ -714,7 +724,7 @@ test("installed hook: matching signed GMW never permits hooks.json kernel rewrit
   assert.match(stderr, /TP-4/);
 });
 
-test("installed hook: staged NON-protected path is unaffected -> commit succeeds", () => {
+test("installed hook: staged NON-protected path is unaffected -> commit succeeds", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-non-protected");
   installHook(dir);
   writeFileSync(join(dir, "notes.txt"), "an ordinary file\n");
@@ -723,7 +733,7 @@ test("installed hook: staged NON-protected path is unaffected -> commit succeeds
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: nothing staged (--allow-empty) -> commit succeeds", () => {
+test("installed hook: nothing staged (--allow-empty) -> commit succeeds", { timeout: commitTestTimeout(1) }, () => {
   const { dir } = freshRepo("e2e-empty-commit");
   installHook(dir);
   const { code, stderr } = commit(dir, "empty", { allowEmpty: true });
@@ -1000,7 +1010,7 @@ test("handoverSizeFinding: below cap and not a decrease -> not blocked (unaffect
 
 // ---- end-to-end: a real `git commit` against the installed hook -----------------------
 
-test("installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit", () => {
+test("installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit", { timeout: commitTestTimeout(1) }, () => {
   // AC-2: the Bash/Node lane the backlog item reports as unseen by guard-handover-size.mjs
   // (a PreToolUse hook) is caught here instead, at the commit boundary.
   const { dir, git } = freshRepo("e2e-handover-bash-lane-block");
@@ -1022,7 +1032,7 @@ test("installed hook: a spawned Node process growing the handover file past its 
   assert.match(stderr, /hard size cap/);
 });
 
-test("installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink", () => {
+test("installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink", { timeout: commitTestTimeout(1) }, () => {
   // AC-3: the escape route that makes an over-cap file repairable must survive -- a shrink is
   // admitted even when the resulting size is STILL over the cap.
   const { dir, git } = freshRepo("e2e-handover-shrink-allowed");
@@ -1039,7 +1049,7 @@ test("installed hook: a commit that shrinks the handover file is allowed even wh
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour)", () => {
+test("installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour)", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-handover-below-cap-allowed");
   writeHandoverCalibration(dir, { path: "docs/state.md", maxBytes: 40 });
   git("add", ".claude/pipeline.json");
@@ -1051,7 +1061,7 @@ test("installed hook: staged handover file below cap and not a decrease -- commi
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed", () => {
+test("installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed", { timeout: commitTestTimeout(1) }, () => {
   // AC-4 (module cannot be loaded): the same fail-closed doctrine this file's protected-path
   // import already used before this dispatch, now also covering the handover-config import.
   const { dir, git } = freshRepo("e2e-handover-module-broken");
@@ -1070,7 +1080,7 @@ test("installed hook: the handover-size measurement module is broken -- commit r
   assert.match(stderr, /could not be loaded/);
 });
 
-test("installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content", () => {
+test("installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content", { timeout: commitTestTimeout(1) }, () => {
   // AC-1/AC-3 (NVA-B-HANDOVERPATH-FIX): reproduces and then pins the fix for the defect this
   // dispatch closes. handoverSizeFinding() reads the committed (HEAD) size FIRST, via
   // gitObjectBytes(). Before this fix, that read went through `git show` piped through
@@ -1095,7 +1105,7 @@ test("installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) 
   assert.equal(code, 0, stderr);
 });
 
-test("installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap", () => {
+test("installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap", { timeout: commitTestTimeout(1) }, () => {
   // AC-2/AC-3 (NVA-B-HANDOVERPATH-FIX): before the fix, this exact 2 MiB fixture exceeded
   // spawnSync's default 1 MiB stdout buffer when read via `git show`, and gitObjectBytes()
   // reported ok:false -- the commit failed closed as "could not have its size measured", NOT
@@ -1226,7 +1236,7 @@ test("handoverSizeFinding: the staged (index) blob is corrupted -> measurable:fa
   assert.match(finding.detail, /staged \(index\) version/, "detail must name the staged/index side specifically, not the HEAD side");
 });
 
-test("installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters", () => {
+test("installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters", { timeout: commitTestTimeout(1) }, () => {
   // AC-5: pins the encoding half of F-1. The OLD implementation decoded `git show`'s stdout
   // with Node's `encoding: 'utf8'`, which replaces an invalid byte sequence with U+FFFD
   // (re-encoding at 3 bytes) before `Buffer.byteLength` ever ran -- a byte-level measurement
@@ -1258,7 +1268,7 @@ test("installed hook: non-UTF-8 content in the handover file is measured as its 
   assert.equal(Number(sizeRes.stdout.trim()), grownInvalid.length);
 });
 
-test("installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary", () => {
+test("installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary", { timeout: commitTestTimeout(1) }, () => {
   // AC-6 (F-2): resolveHandoverConfig() applies no normalization to `handover.path`, so a
   // calibration authored with a leading "./" must still resolve to the SAME absolute path as
   // the canonical git-relative spelling the staged-paths list actually carries, matching
