@@ -4,7 +4,7 @@
 // Cases that currently FAIL are the RED evidence that the point is not satisfied (see report).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,existsSync} from 'node:fs';
+import {readFileSync,existsSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
 import {join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readDesignWorkflowPackageV2FromRepository} from '../design-workflow-package-v2.mjs';
@@ -65,10 +65,38 @@ test('AC4 reopen-design (RED today): onboarding offers reopen-design only for a 
     'branch `if (!architecture.ok)` in designToImplementationHandoverAction (lib/project-onboarding-v3.mjs) offers reopen-design for every failure code');
 });
 
-test('AC3 named read-only diagnosis (RED today): design-advisory-admission inspect is an admitted sanctioned script while the gate is closed',()=>{
-  const sanctioned=src('guard/sanctioned-args-scripts.mjs');
-  assert.match(sanctioned,/design-advisory-admission/u,
-    'lib/guard/sanctioned-args-scripts.mjs does not admit the gate\'s own named diagnosis command');
+test('AC3 named diagnosis: the closed-gate denial names only admitted recovery commands, never the retired inspect script',async()=>{
+  // AC-148 course (PO decision 2026-10-16): design-advisory-admission.mjs is retired and stays refused;
+  // the denial must not name it, and every recovery verb it does name must be admitted in the denying state.
+  const {designAdvisoryRemediation}=await import('../guard-devplan-policy.mjs');
+  const {devPlanShellRefusalHit}=await import('../guard/devplan-shell-lane.mjs');
+  const {isSanctionedLifecycleCommand}=await import('../guard/command-catalogue.mjs');
+  const script=join(pluginRoot,'scripts','pipeline-state.mjs');
+  const blockedDraft={devPlanGateVerdictFn:()=>({verdict:'block',reason:'fixture',lifecycleStatus:'implementing'})};
+  const retired=`node "${join(pluginRoot,'scripts','design-advisory-admission.mjs')}" inspect --repo-root ${repoRoot} --feature f --plan p --spec s`;
+  const namesRetired=t=>/design-advisory-admission|\binspect\b|\.mjs\b|\bnode\b/u.test(t);
+  const receiptRel='scratch/foreign-worktree-pin-ac3-receipt.json';
+  const shapes={'reopen-design':'--by tester','present-plan':`--by tester --review-receipt ${receiptRel}`,'approve-plan':'--by tester','set-phase':'--phase implementation'};
+  const codes=['DAA-DESIGN-APPROVAL-BINDING-DRIFT','DAA-DESIGN-SOURCE-DRIFT','DAA-PUBLIC-UNAVAILABLE','DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP'];
+  // Precondition: the guard really refuses the retired command in the denying state.
+  assert.equal(devPlanShellRefusalHit(retired,repoRoot,blockedDraft)?.lane,'opaque-script-execution');
+  assert.equal(isSanctionedLifecycleCommand(retired,repoRoot,{}),false);
+  mkdirSync(join(repoRoot,'scratch'),{recursive:true});
+  writeFileSync(join(repoRoot,receiptRel),'{}');
+  try{
+    let named=0;
+    for(const code of codes){
+      const text=designAdvisoryRemediation(code);
+      assert.ok(!namesRetired(text),`${code}: denial names the retired inspect command`);
+      for(const verb of Object.keys(shapes).filter(v=>text.includes(v))){
+        named+=1;
+        const command=`node "${script}" ${verb} ${shapes[verb]}`;
+        assert.equal(isSanctionedLifecycleCommand(command,repoRoot,{}),true,`${code}: named "${verb}" not admitted`);
+        assert.equal(devPlanShellRefusalHit(command,repoRoot,blockedDraft),null,`${code}: named "${verb}" refused by lane`);
+      }
+    }
+    assert.ok(named>=codes.length,'each denial must name at least one admitted recovery verb');
+  }finally{rmSync(join(repoRoot,receiptRel),{force:true});}
 });
 
 test('AC5 ADR-0085 C2 legacy re-read removes the hot-path read (mode constant exists)',()=>{
