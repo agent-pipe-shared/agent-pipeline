@@ -250,7 +250,14 @@ normative shape is:
    checks and fixes. Keep the same live owner while that outcome is active; a
    large outcome may be divided only into vertical sub-outcomes that can each
    be verified independently. Do not dispatch test authorship and implementation
-   as separate default phases. The six-field briefing names the outcome, exact
+   as separate default phases. Independence moves from test authorship to test
+   execution: the owner writes the tests, but its self-reported pass is not
+   acceptance evidence. The declared targeted checks are executed again outside
+   the owner's context (the host's declared item checks after return, then Full
+   Verify on the integrated candidate), and a fresh Critic reviews the
+   evidence. Criterion-bound regression tests ("pins") follow QG-04 in
+   `guardrails/quality-gates.md` and the QUALIFY module in
+   `templates/prompts/goldfish-task.md`. The six-field briefing names the outcome, exact
    write/read scopes, original criteria, targeted checks, prohibitions, stop
    conditions and route metadata.
 
@@ -887,7 +894,15 @@ Die normative Form lautet:
    Implementierung bis zu gezielten Checks und Korrekturen. Derselbe aktive
    Owner bleibt zuständig; ein großes Outcome wird nur in vertikale,
    eigenständig prüfbare Teil-Outcomes geteilt. Testautorenschaft und
-   Implementierung sind keine getrennten Standardphasen. Das Briefing nennt
+   Implementierung sind keine getrennten Standardphasen. Die Unabhängigkeit
+   verschiebt sich von der Testautorschaft zur Testausführung: Der Owner
+   schreibt die Tests, sein selbst gemeldeter Erfolg ist aber kein
+   Abnahmenachweis. Die deklarierten gezielten Checks laufen außerhalb des
+   Owner-Kontexts erneut (die deklarierten Item-Checks des Hosts nach der
+   Rückgabe, danach Full Verify auf dem integrierten Kandidaten), und ein
+   frischer Critic prüft die Evidenz. Kriteriengebundene Regressionstests
+   („Pins“) folgen QG-04 in `guardrails/quality-gates.md` und dem
+   QUALIFY-Modul in `templates/prompts/goldfish-task.md`. Das Briefing nennt
    Outcome, Schreib-/Lesebereiche, ursprüngliche Kriterien, Checks, Verbote,
    Stop-Bedingungen und Route-Metadaten.
 

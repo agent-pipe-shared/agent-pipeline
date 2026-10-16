@@ -531,6 +531,18 @@ until the allowed correction is established.
 
 ---
 
+## Optional module: QUALIFY briefing (criterion-bound pin, drop-in)
+
+Use this module when an outcome qualifies an original acceptance criterion against the current source. It is NOT a seventh field — copy its lines into the matching fields above. The rule is QG-04 ("Criterion-bound regression tests").
+
+**The briefer fills in:** the item and its original requirement path; the criterion locator (source path, criterion id, byte range, excerpt digest); the pin path at the project's documented pin location (this repository: `plugins/pipeline-core/lib/pins/<item-slug>.test.mjs`) as the write scope; and the host-skip owner and due date for cases this host cannot run.
+
+**The owner must:** verify every acceptance point live on the current source; cover each point with at least one case that drives the real module or CLI, without mocking the behavior under test; where cheap, prove each case can fail (RED) against a scratch mirror of the production function, never by editing production; skip a case only with a typed host-limitation reason naming the owner, the due date and the host that will run it.
+
+**The owner returns:** a verdict per acceptance point; the RED proof per case or the reason none was cheap; every skipped case by name with its typed reason; and, when a point does not hold, outcome blocked with that case kept as RED evidence and the exact source file and function the fix needs. The pin is re-executed outside the owner's context; the owner's pass alone is not acceptance.
+
+---
+
 ## Final report (mandatory format, target ≤ 1,000 tokens, hard max 40 lines)
 
 For ordinary write tasks **outside native host-commit mode**, first run the

@@ -320,6 +320,7 @@
           "docs/adr/draft-claude-hook-session-owner.md",
           "docs/adr/draft-content-bound-review-before-full-verify.json",
           "docs/adr/draft-content-bound-review-before-full-verify.md",
+          "docs/adr/draft-criterion-bound-regression-pins.md",
           "docs/adr/draft-critic-report-durable-write-location.md",
           "docs/adr/draft-design-advisory-admission-storage.json",
           "docs/adr/draft-design-advisory-admission-storage.md",
