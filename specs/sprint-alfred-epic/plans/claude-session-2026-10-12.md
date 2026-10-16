@@ -670,3 +670,25 @@ Status is "implementation complete, targeted GREEN by the dispatch" for each com
   | P1-10B guard-suite comparison | — | P1-10B mirror: 84 → 90 failures on win32, 6 new (none of them the SEC-11 case). P1-10D mirror comparison running; P1-10D enters the signature set only with no new failure. |
   | Critic C4 FULL | `2c57888a3` | Partial; four minor findings C4-F1..F4 ([result](../implementation/claude-2026-10-12/critic/C4-full-result.md)). Correction: ALF-C-C4-CORR analysed and stopped at its checkpoint; split into C4-CORR-B (F3, F4), -C (F2), -D (F1), running in parallel. |
   | ALF-C-ACR-R1..R5 | `54c6b7af6`, `d4857c05b`, `e98e0fc13`, `07d40028d`, `993f8c52d` | Acceptance drafts for the 14 unresolved originals (spec l.3013-3020, K6), each with one PO question per row, shape tests 4/4. R4's RED-first run was not shown. Pending PO release. |
+
+### Night, 2026-10-16: pin waves P9-P11 and Critic C6a corrections (PO away)
+
+All commits are by the orchestrator through `scratch/alfred-claude-20261012/commit-set.mjs` (re-runs the pin, then commits by pathspec with hooks enabled). Every Goldfish ran on Sonnet.
+
+| Slice | Commit | State |
+|---|---|---|
+| ALF-C-C6A-CORR2 (AC-238) | `04f5f3fea` | Critic C6a DIFF F1/F2 fixed: option normalization after `git` and `git.exe` and the fail-closed unknown-option check now also run on the redirect-free copy; redirect alphabet widened (`>&word`, glued operators, PowerShell `*>`). Pin 67/67, 12 RED before. Elephant self-verification (no further Critic per K12): `git-cmd.test.mjs` failure names identical before/after (14 lines), `scratch/fails-before.json` / `fails-after.json`, compared by `scratch/alfred-claude-20261012/cmp-fails.mjs`. |
+| ALF-C-P9-06 (AC-114) | `a62566df6` | Pin 7/7, 2 Linux-only skips. |
+| ALF-C-P6-07B (AC-193) | `8f10fb902` | Guard override digest stability pin. |
+| ALF-C-P10-01 (AC-270) | `491e76363` | OS-temp DACL refusal pin 8/8, 1 POSIX skip. |
+| ALF-C-P7-05C | `8614a3432` | First-enrollment pin 8/8, 1 skip; FRB003 fixture gained the trailered base commit (GIT-03 hook is active right after the first apply). |
+| ALF-C-P9-04B → C (AC-144) | `facf39659` | Real Windows defect: owned Critic notes create was refused `critic-notes-partial-held` because `prepareOwnedCriticNotesDirectory` compared POSIX mode bits (Windows reports 0o777); the leftover directory then blocked every later Write. Mode checks now skip on win32 only. Pin 15/15, 2 POSIX skips. Needs batch Critic (security-adjacent). |
+| ALF-C-P10-02 → B (AC-247) | `a6aa8705d` | Scratch writability pin 8/8, 2 symlink skips; runtime 553 s → about 80 s by sampling; point 5 was a test assumption (live plugin layout), not a source gap. |
+| ALF-C-P11-02 → B (AC-185) | `79f2919f7` | Real gap: the commit producer had no index.lock retry. Producer now renders `onIndexLock {retries:1, then:stop-and-report}` on both steps plus one disclaimer sentence; still preview-only. Pin + producer test 35/35. |
+| ALF-C-P9-05 → B (AC-102) | held | Real gap: `isBoundedGitPipeline` treats rev operands (`HEAD`, `HEAD:path`, `-n 5`) as paths, so the advertised `git show HEAD:<path> | head` is refused. Pin 7 RED on HEAD; fixed copy GREEN. Patch `scratch/p9-05b/shell-grammar.patch`; signature-bound (same file as held P9-03B). PO topic. |
+| ALF-C-P11-01 → B → C → D (AC-121) | running | Checker red at HEAD: stale baseline `d214726e6`, and `committedSource()` hit the 1 MiB `execFileSync` buffer (ENOBUFS) on any current tree. Buffer raised to 256 MiB, baseline re-bound to `a6aa8705d`: 967 → 31 findings; 27 reference verify-phase suites absent from `verify.mjs`. P11-01D classifies them and prepares register/remove alternatives. |
+| ALF-C-P11-03 → B → C (AC-148) | running | Denial recovery verbs vs catalogue argument shapes; emitter of `design-advisory-admission.mjs inspect` not yet located. |
+| ALF-C-P11-04 (AC-123) | running | Catalogue lifecycle verbs pin. |
+
+- **Observed transient:** dispatched Goldfish and the Elephant both saw `GUARD-LIFECYCLE-NOT-READY repository-mount-read-only` for one call while a commit batch was running; the next call passed. Briefings now tell the Goldfish to retry once.
+- **Stale lock:** `registry.lock` (about 5 minutes, no owner) blocked two dispatches with `SDC-LOCK-HELD`; removed by the Elephant.
