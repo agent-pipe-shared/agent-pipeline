@@ -326,6 +326,33 @@ export function isBootstrapReadCommand(value, {
   catch { return false; }
 }
 
+/** The one command the session bootstrap barrier admits, spelled so that
+ * `isBootstrapReadCommand` accepts it: a `cat` of the quoted pipeline-start
+ * SKILL path, with forward slashes on Windows. Returns null when no copy-safe
+ * spelling exists, so a denial never advertises a command the barrier would
+ * itself refuse. Authority is unchanged: this only names the admitted read. */
+export function bootstrapBarrierConsumeCommand({
+  pipelineStartSkill = PIPELINE_START_SKILL,
+  platform = process.platform,
+} = {}) {
+  const path = platform === "win32" ? pipelineStartSkill.replaceAll("\\", "/") : pipelineStartSkill;
+  const quote = !/["$`\\\r\n\0]/u.test(path) ? "\"" : (!/['\r\n\0]/u.test(path) ? "'" : null);
+  if (quote === null) return null;
+  const command = `cat ${quote}${path}${quote}`;
+  return isBootstrapReadCommand(command, { pipelineStartSkill, platform }) ? command : null;
+}
+
+/** Denial text for a Bash/Edit/Write call while the session bootstrap barrier
+ * is pending. The `Mandatory Session Bootstrap` prefix is matched by callers
+ * and tests; the admitted command is appended so a denied session has a stated
+ * way out. */
+export function bootstrapBarrierDenialReason(options = {}) {
+  const reason = "BLOCKED (Hardening Layer): Mandatory Session Bootstrap. You must execute 'pipeline-start' before performing any implementation work in this session.";
+  const command = bootstrapBarrierConsumeCommand(options);
+  if (command === null) return reason;
+  return `${reason} Every Bash, Edit and Write call is refused until the barrier is consumed. The only admitted command is this read of the pipeline-start skill; run it as its own Bash call: ${command}`;
+}
+
 /** Inspect a scratch shell script before its contents can bypass the literal
  * `git` command selector below. A script containing any Git invocation is
  * routed through the user's next direct Git command, where the lifecycle and
@@ -510,7 +537,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
     if (toolName === "Bash" && isBootstrap) {
       try { rmSync(sessionBootstrapMarker, { force: true }); } catch (e) {}
     } else if (["Bash", "Edit", "Write"].includes(toolName)) {
-      deny("BLOCKED (Hardening Layer): Mandatory Session Bootstrap. You must execute 'pipeline-start' before performing any implementation work in this session.");
+      deny(bootstrapBarrierDenialReason());
     }
   }
 
