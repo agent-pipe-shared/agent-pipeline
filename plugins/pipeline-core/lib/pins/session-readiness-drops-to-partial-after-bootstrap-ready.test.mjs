@@ -187,3 +187,26 @@ test("AC6: real parallel read-only preflight processes over the same probe state
   assert.equal(intentOf(results[0].nextAction), "session");
   assert.equal(results[0].nextAction.mutation, false);
 });
+
+// Typed-reason transition (AC-253, ALF-C-P1-01B). Finding F: pipeline-start-preflight.mjs lines
+// 1532-1537 swallow the session probe's error (`catch { sessionReadinessNotReady = true; }`), so the
+// PORG-NOT-READY code and `lifecycleStatus` (a typed ProjectOnboardingReadyError field) never reach
+// the preflight result; the only trace is the boolean that flips `--intent bootstrap` to `session`.
+// The field needed: a result field such as `sessionReadiness: { reasonCode, lifecycleStatus }`.
+// Marked `todo` so the missing field is reported as a named RED expectation without failing the run.
+const TYPED_PARTIAL_CAUSES = [
+  { name: "typed PORG-NOT-READY partial", thrown: () => partial("session"), reasonCode: "PORG-NOT-READY", lifecycleStatus: "partial" },
+  { name: "unexpected probe failure", thrown: () => new Error("cleanup_recovery_observation_unavailable"), reasonCode: null, lifecycleStatus: null },
+];
+for (const cause of TYPED_PARTIAL_CAUSES) {
+  test(`[typed partial reason missing] ${cause.name}: preflight result carries a typed session-readiness reason`, { todo: "F: preflight drops the typed reason (pipeline-start-preflight.mjs:1535)" }, () => {
+    const result = preflight(({ intent }) => {
+      if (intent === "session") throw cause.thrown();
+      return readyGate(intent);
+    });
+    const reason = result.sessionReadiness;
+    assert.ok(reason && typeof reason === "object", "result.sessionReadiness typed reason object is absent");
+    assert.equal(reason.reasonCode, cause.reasonCode);
+    assert.equal(reason.lifecycleStatus, cause.lifecycleStatus);
+  });
+}
