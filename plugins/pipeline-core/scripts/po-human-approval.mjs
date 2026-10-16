@@ -1132,7 +1132,7 @@ const PROBE_PAYLOAD = "pipeline signing-readiness probe payload";
 const UNREADABLE_CODES = new Set(["EACCES", "EPERM"]);
 const NOT_STARTED_CODES = new Set(["ENOENT", "EACCES", "EPERM", "ENOTDIR"]);
 // Candidate directory NAMES inside a Git installation: data, not code.
-const GIT_NATIVE_BIN_DIRECTORIES = Object.freeze(["mingw64/bin", "usr/bin", "bin"]);
+const GIT_NATIVE_BIN_DIRECTORIES = Object.freeze(["mingw64/bin", "ucrt64/bin", "usr/bin", "bin"]);
 // An absolute path can hold spaces (a Windows profile directory, a macOS home), so the generic pattern
 // cannot stop at the first space. A QUOTED absolute path is taken up to its closing quote (a quote that
 // is followed by a word character is part of the name). An UNQUOTED one continues through a space only
@@ -1151,7 +1151,7 @@ const REDACTION_WINDOW_CHARS = 4096;
 // Known install locations searched after the PATH entries (data, not code). Windows: relative to the
 // program-files style environment roots; POSIX: absolute system directories.
 const WINDOWS_ENVIRONMENT_ROOTS = Object.freeze(["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"]);
-const WINDOWS_OPENSSL_LOCATIONS = Object.freeze(["Git/mingw64/bin", "Git/usr/bin", "Git/bin", "Programs/Git/mingw64/bin", "Programs/Git/usr/bin", "OpenSSL-Win64/bin", "OpenSSL/bin"]);
+const WINDOWS_OPENSSL_LOCATIONS = Object.freeze(["Git/mingw64/bin", "Git/ucrt64/bin", "Git/usr/bin", "Git/bin", "Programs/Git/mingw64/bin", "Programs/Git/ucrt64/bin", "Programs/Git/usr/bin", "OpenSSL-Win64/bin", "OpenSSL/bin"]);
 const POSIX_OPENSSL_DIRECTORIES = Object.freeze(["/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]);
 
 /** Resolve the OpenSSL executable to an ABSOLUTE path outside every repository (ALF-C-N1-04). Never searches
