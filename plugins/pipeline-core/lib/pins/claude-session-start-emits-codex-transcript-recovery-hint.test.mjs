@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import test, { after } from "node:test";
 
 import { createGovernanceScopeController } from "../governance-scope.mjs";
+import { buildAvailabilityContext } from "../../hooks/staleness-check.mjs";
 
 const pluginRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const hookScript = join(pluginRoot, "hooks", "codex-session-start-hint.mjs");
@@ -135,6 +136,16 @@ test("A7 optional (not enrolled) folder: the Claude output also names no other r
   });
   assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stdout, OTHER_RUNNER);
+});
+
+test("A9 per-channel ref (PO decision #25): the staleness context line names a configured ref and its source", () => {
+  const line = buildAvailabilityContext({
+    status: "current", channel: "alpha", channelSource: "project-config",
+    ref: "refs/heads/feat/x", refSource: "configured", reason: null,
+  });
+  assert.match(line, /ref=refs\/heads\/feat\/x · refSource=configured/u);
+  assert.doesNotMatch(line, OTHER_RUNNER);
+  assert.doesNotMatch(line, /refs\/heads\/main/u);
 });
 
 test("A8 staleness-check ref question is outside this hint script: the hint wiring carries no ref/channel claim", () => {

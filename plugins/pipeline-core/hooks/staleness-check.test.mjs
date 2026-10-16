@@ -50,6 +50,7 @@ function availability(status, channel, ref, fields = {}) {
     channel,
     channelSource: fields.channelSource ?? "project-config",
     ref,
+    refSource: fields.refSource ?? "default",
     version: fields.version ?? null,
     commit: fields.commit ?? "a".repeat(40),
     updateAvailable: status === "update-available",
@@ -68,7 +69,7 @@ for (const [channel, ref] of [
   test(`current ${channel} output names channel/ref and separates repository freshness`, () => {
     const result = decideOutput(availability("current", channel, ref));
     assert.equal(result.json, false);
-    assert.match(result.stdout, new RegExp(`pipelineUpdateAvailability=current.*channel=${channel}.*ref=${ref}`, "u"));
+    assert.match(result.stdout, new RegExp(`pipelineUpdateAvailability=current.*channel=${channel}.*ref=${ref}.*refSource=default`, "u"));
     assert.match(result.stdout, /repositoryFreshness=not-observed \(writeAdmission=not-evaluated\)/u);
     assert.match(result.stdout, new RegExp(BOOTSTRAP_LINE, "u"));
     assert.doesNotMatch(result.stdout, /fresh repository|write permitted|write blocked/iu);
@@ -89,6 +90,11 @@ for (const [channel, ref] of [
     assert.doesNotMatch(result.payload.systemMessage, /write permitted|write blocked/iu);
   });
 }
+
+test("a configured per-channel ref is named with refSource=configured in the context line", () => {
+  const result = decideOutput(availability("current", "alpha", "refs/heads/feat/x", { refSource: "configured" }));
+  assert.match(result.stdout, /channel=alpha.*ref=refs\/heads\/feat\/x.*refSource=configured/u);
+});
 
 test("offline/timeout is visible unknown and fail-open without false freshness", async () => {
   const writes = [];

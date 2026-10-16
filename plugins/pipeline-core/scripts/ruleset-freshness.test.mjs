@@ -191,12 +191,16 @@ test("loaded Pipeline equal/ahead results are metadata and never mutate the sour
     "policyDisposition",
     "reason",
     "ref",
+    "refDiagnostic",
+    "refSource",
     "schema",
     "status",
     "updateAvailable",
     "updateRecommended",
     "version",
   ]);
+  assert.equal(value.refSource, "default");
+  assert.equal(value.refDiagnostic, null);
   assert.equal("branch" in value || "upstream" in value || "writePermitted" in value, false);
   assert.equal(value.status, "current");
   assert.equal(value.channel, "alpha");
@@ -814,4 +818,102 @@ test("a remote git process that ignores SIGTERM still settles within timeoutMs, 
   assert.equal(value.status, "unknown");
   assert.equal(value.reason, "timeout");
   assert.equal(value.blocking, false);
+});
+
+// ---- PO decision #25 (2026-10-16): the ref is configurable per channel;
+// every channel keeps refs/heads/main unless a valid override is persisted. ----
+
+/** Publish refs/heads/feat/x at a newer version; main stays at the base version. */
+function publishFeatureBranch(root, remote, version = "0.4.8") {
+  const publisher = join(root, "publisher");
+  git(root, "clone", "-q", remote, publisher);
+  configure(publisher);
+  git(publisher, "checkout", "-q", "-b", "feat/x");
+  commitVersion(publisher, version, "feature-x-next");
+  git(publisher, "push", "-q", "origin", "feat/x");
+}
+
+test("per-channel ref: alpha without an override follows main with refSource=default", () => {
+  const { root, remote, source, pluginRoot } = fixture("ref-alpha-default");
+  publishFeatureBranch(root, remote);
+  writeNeutralCalibration(source, { pipelineUpdateChannel: "alpha" });
+  const value = inspectPipelineUpdateAvailability(source, { remoteUrl: remote, pluginRoot, policy: null });
+  assert.equal(value.channel, "alpha");
+  assert.equal(value.ref, "refs/heads/main");
+  assert.equal(value.refSource, "default");
+  assert.equal(value.refDiagnostic, null);
+  assert.equal(value.version, "0.4.7");
+});
+
+test("per-channel ref: alpha with a configured branch follows that branch", () => {
+  const { root, remote, source, pluginRoot } = fixture("ref-alpha-configured");
+  publishFeatureBranch(root, remote);
+  writeNeutralCalibration(source, {
+    pipelineUpdateChannel: "alpha",
+    pipelineUpdateRefs: { alpha: "refs/heads/feat/x" },
+  });
+  const value = inspectPipelineUpdateAvailability(source, { remoteUrl: remote, pluginRoot, policy: null });
+  assert.equal(value.channel, "alpha");
+  assert.equal(value.ref, "refs/heads/feat/x");
+  assert.equal(value.refSource, "configured");
+  assert.equal(value.refDiagnostic, null);
+  assert.equal(value.version, "0.4.8");
+  assert.equal(value.status, "update-available");
+});
+
+test("per-channel ref: an invalid override falls back to main with a typed diagnostic and never throws", () => {
+  for (const bad of ["feat/x", "refs/heads/../x", "refs/tags/v1", 42, "refs/heads/a b"]) {
+    const { root, remote, source, pluginRoot } = fixture("ref-alpha-invalid");
+    publishFeatureBranch(root, remote);
+    writeNeutralCalibration(source, { pipelineUpdateChannel: "alpha", pipelineUpdateRefs: { alpha: bad } });
+    const value = inspectPipelineUpdateAvailability(source, { remoteUrl: remote, pluginRoot, policy: null });
+    assert.equal(value.channel, "alpha", String(bad));
+    assert.equal(value.ref, "refs/heads/main", String(bad));
+    assert.equal(value.refSource, "default", String(bad));
+    assert.equal(value.refDiagnostic, "invalid-channel-ref", String(bad));
+    assert.equal(value.version, "0.4.7", String(bad));
+  }
+});
+
+test("per-channel ref: stable keeps main as its baseline and reports refSource=default", () => {
+  const { root, remote, source, pluginRoot } = fixture("ref-stable-default");
+  publishFeatureBranch(root, remote);
+  writeNeutralCalibration(source, { pipelineUpdateChannel: "stable", pipelineUpdateRefs: { alpha: "refs/heads/feat/x" } });
+  const value = inspectPipelineUpdateAvailability(source, { remoteUrl: remote, pluginRoot, policy: null });
+  assert.equal(value.channel, "stable");
+  assert.equal(value.refSource, "default");
+  assert.equal(value.refDiagnostic, null);
+  // An alpha-only override never leaks into the stable channel (no tag exists here).
+  assert.equal(value.status, "unknown");
+  assert.equal(value.reason, "channel-unavailable");
+});
+
+test("per-channel ref: an unknown channel stays unavailable and carries no ref", () => {
+  const { remote, source, pluginRoot } = fixture("ref-unknown-channel");
+  writeNeutralCalibration(source, { pipelineUpdateChannel: "nightly", pipelineUpdateRefs: { nightly: "refs/heads/feat/x" } });
+  const value = inspectPipelineUpdateAvailability(source, { remoteUrl: remote, pluginRoot, policy: null });
+  assert.equal(value.status, "unknown");
+  assert.equal(value.reason, "channel-unavailable");
+  assert.equal(value.channel, null);
+  assert.equal(value.ref, null);
+  assert.equal(value.refSource, null);
+});
+
+test("per-channel ref: a timeout reports the effective (configured) ref", () => {
+  const { root, remote, source, pluginRoot } = fixture("ref-timeout");
+  publishFeatureBranch(root, remote);
+  writeNeutralCalibration(source, {
+    pipelineUpdateChannel: "alpha",
+    pipelineUpdateRefs: { alpha: "refs/heads/feat/x" },
+  });
+  const spawn = (command, args, opts) => (args.includes("ls-remote")
+    ? spawnSync(process.execPath, ["-e", "process.on('SIGTERM', () => {}); setTimeout(() => {}, 3000);"], opts)
+    : spawnSync(command, args, opts));
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote, pluginRoot, policy: null, timeoutMs: 200, spawn,
+  });
+  assert.equal(value.status, "unknown");
+  assert.equal(value.reason, "timeout");
+  assert.equal(value.ref, "refs/heads/feat/x");
+  assert.equal(value.refSource, "configured");
 });

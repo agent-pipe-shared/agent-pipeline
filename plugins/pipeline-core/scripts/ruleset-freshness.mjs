@@ -25,6 +25,7 @@ import {
 import {
   readProjectPipelineUpdateAlphaRef,
   readProjectPipelineUpdateChannel,
+  readProjectPipelineUpdateRef,
   resolvePipelineUpdateChannel,
 } from "./pipeline-update-channel.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -115,7 +116,12 @@ function result(status, fields = {}) {
     pipelineUpdateAvailability: status,
     channel: fields.channel?.channel ?? null,
     channelSource: fields.channel?.source ?? null,
-    ref: fields.selected?.ref ?? null,
+    // On a failed ls-remote (timeout / remote-unavailable) nothing was selected,
+    // but the effective ref was the one asked for, so it is reported.
+    ref: fields.selected?.ref
+      ?? (["timeout", "remote-unavailable"].includes(fields.reason) ? fields.refInfo?.ref ?? null : null),
+    refSource: fields.refInfo?.refSource ?? null,
+    refDiagnostic: fields.refInfo?.refDiagnostic ?? null,
     version: fields.selected?.version ?? null,
     commit: fields.selected?.commit ?? null,
     loaded: {
@@ -185,14 +191,39 @@ function selectedTagFromRemote(output, channel) {
     : { selected: null, reason: "channel-unavailable" };
 }
 
+const DEFAULT_CHANNEL_REF = "refs/heads/main";
+// Module-level handle so inspect can shadow `result` locally.
+const resultBase = (status, fields) => result(status, fields);
+
+/**
+ * Effective branch ref for a resolved channel (PO decision #25): the built-in
+ * default (`refs/heads/main`, unchanged for every channel) unless the persisted
+ * per-channel override is valid. An invalid override never throws; it yields a
+ * typed diagnostic and the default. Returns null when the channel is not ready.
+ */
+function effectiveChannelRef(channel) {
+  if (channel?.status !== "ready") return null;
+  const override = channel.refOverride;
+  if (override?.status === "ready") {
+    return { ref: override.ref, refSource: "configured", refDiagnostic: null };
+  }
+  return {
+    ref: DEFAULT_CHANNEL_REF,
+    refSource: "default",
+    refDiagnostic: override?.status === "unknown" ? override.reason ?? "invalid-channel-ref" : null,
+  };
+}
+
 /**
  * `channel` is the full resolved channel-config object. Alpha follows main,
  * beta selects a prerelease tag on main, and stable selects a final tag.
  */
 function selectedChannelTarget(remoteUrl, channel, options) {
+  const branchRef = effectiveChannelRef(channel)?.ref ?? DEFAULT_CHANNEL_REF;
+  const escapedRef = branchRef.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const selectors = channel.channel === "alpha"
-    ? ["refs/heads/main"]
-    : ["refs/heads/main", "refs/tags/*"];
+    ? [branchRef]
+    : [branchRef, "refs/tags/*"];
   const remote = run("git", ["ls-remote", remoteUrl, ...selectors], {
     ...options,
     timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -202,8 +233,8 @@ function selectedChannelTarget(remoteUrl, channel, options) {
     return { selected: null, reason: remote.error?.code === "ETIMEDOUT" || remote.signal ? "timeout" : "remote-unavailable" };
   }
   if (channel.channel === "alpha") {
-    const ref = "refs/heads/main";
-    const line = String(remote.stdout ?? "").trim().match(/^([0-9a-f]{40})\s+refs\/heads\/main$/imu);
+    const ref = branchRef;
+    const line = String(remote.stdout ?? "").trim().match(new RegExp(`^([0-9a-f]{40})\\s+${escapedRef}$`, "imu"));
     return line
       ? { selected: { ref, version: null, commit: line[1].toLowerCase() }, reason: null }
       : { selected: null, reason: "channel-unavailable" };
@@ -211,11 +242,11 @@ function selectedChannelTarget(remoteUrl, channel, options) {
   if (channel.channel === "beta" || channel.channel === "stable") {
     const prefix = channel.channel;
     const mainLines = String(remote.stdout ?? "").trim().split("\n")
-      .filter((line) => line.endsWith("\trefs/heads/main"));
+      .filter((line) => line.endsWith(`\t${branchRef}`));
     if (mainLines.length !== 1) {
       return { selected: null, reason: mainLines.length ? `${prefix}-main-ambiguous` : `${prefix}-main-unavailable` };
     }
-    const main = mainLines[0].match(/^([0-9a-f]{40})\s+refs\/heads\/main$/iu);
+    const main = mainLines[0].match(new RegExp(`^([0-9a-f]{40})\\s+${escapedRef}$`, "iu"));
     if (!main) return { selected: null, reason: `${prefix}-main-ambiguous` };
     const tag = selectedTagFromRemote(remote.stdout, channel.channel);
     if (!tag.selected) {
@@ -226,7 +257,7 @@ function selectedChannelTarget(remoteUrl, channel, options) {
     }
     return {
       selected: tag.selected,
-      baseline: { ref: "refs/heads/main", version: null, commit: main[1].toLowerCase() },
+      baseline: { ref: branchRef, version: null, commit: main[1].toLowerCase() },
       reason: null,
     };
   }
@@ -239,12 +270,24 @@ function selectedChannelTarget(remoteUrl, channel, options) {
  * this boundary.
  */
 export function resolvePipelineUpdateChannelConfig(repoPath, options = {}) {
-  return resolvePipelineUpdateChannel({
+  const base = {
     projectConfig: options.projectConfig ?? readProjectPipelineUpdateChannel(repoPath),
     alphaRefConfig: options.alphaRefConfig ?? readProjectPipelineUpdateAlphaRef(repoPath),
     distributionTopology: options.distributionTopology,
     selfApplication: options.selfApplication === true,
-  });
+  };
+  const first = resolvePipelineUpdateChannel(base);
+  if (first.status !== "ready") return first;
+  // PO decision #25: the optional per-channel ref override comes only from the
+  // same persisted project configuration as the channel -- never from the
+  // user's working-repository branch or any caller-provided Git ref string.
+  let refConfig;
+  try {
+    refConfig = options.refConfig ?? readProjectPipelineUpdateRef(repoPath, first.channel);
+  } catch {
+    refConfig = { status: "unknown", ref: null, reason: "channel-unavailable" };
+  }
+  return resolvePipelineUpdateChannel({ ...base, refConfig });
 }
 
 function statusFromVersions(loadedVersion, marketplaceVersion) {
@@ -329,6 +372,9 @@ export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
     ...options,
     pluginRoot: loaded.pluginRoot,
   });
+  const refInfo = effectiveChannelRef(channel);
+  // Every result below carries the effective ref and its source.
+  const result = (status, fields = {}) => resultBase(status, { ...fields, refInfo });
   const settingsPath = options.settingsPath ?? join(repo, ".claude", "settings.json");
   const remoteUrl = options.remoteUrl ?? resolveMarketplaceUrl({ settingsPath });
   const policy = options.policy !== undefined

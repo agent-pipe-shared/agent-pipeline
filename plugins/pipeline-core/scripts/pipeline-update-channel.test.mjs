@@ -25,6 +25,8 @@ import {
   applyPipelineUpdateAlphaRef,
   applyPipelineUpdateChannel,
   isPipelineUpdateAlphaRef,
+  isPipelineUpdateChannelRef,
+  readProjectPipelineUpdateRef,
   PIPELINE_UPDATE_ALPHA_REF_PLAN_SCHEMA,
   PIPELINE_UPDATE_CHANNEL_PLAN_SCHEMA,
   planPipelineUpdateAlphaRef,
@@ -451,6 +453,57 @@ test("alpha-ref field follows the channel field's read/validate/default pattern 
   assert.equal(isPipelineUpdateAlphaRef("has space"), false);
   assert.equal(isPipelineUpdateAlphaRef("has..dotdot"), false);
   assert.equal(isPipelineUpdateAlphaRef("-leading-dash"), false);
+});
+
+test("per-channel ref validator admits only fully qualified refs/heads names (PO decision #25)", () => {
+  assert.equal(isPipelineUpdateChannelRef("refs/heads/x"), true);
+  assert.equal(isPipelineUpdateChannelRef("refs/heads/feat/x"), true);
+  assert.equal(isPipelineUpdateChannelRef("refs/heads/../x"), false);
+  assert.equal(isPipelineUpdateChannelRef("refs/tags/v1"), false);
+  assert.equal(isPipelineUpdateChannelRef("feat/x"), false);
+  assert.equal(isPipelineUpdateChannelRef(123), false);
+  assert.equal(isPipelineUpdateChannelRef(null), false);
+  assert.equal(isPipelineUpdateChannelRef("refs/heads/has space"), false);
+});
+
+test("per-channel ref reader follows the closed read/validate/default shape (PO decision #25)", () => {
+  const ready = fixture("ref-ready", '{"pipelineUpdateRefs":{"alpha":"refs/heads/feat/x"}}\n');
+  assert.deepEqual(readProjectPipelineUpdateRef(ready, "alpha"), {
+    status: "ready", ref: "refs/heads/feat/x", source: "project-config", reason: null,
+  });
+  // A bad entry for one channel never affects another channel.
+  const absent = { status: "absent", ref: null, source: null, reason: null };
+  assert.deepEqual(readProjectPipelineUpdateRef(ready, "stable"), absent);
+  assert.deepEqual(readProjectPipelineUpdateRef(ready, "bogus"), absent);
+
+  assert.deepEqual(readProjectPipelineUpdateRef(fixture("ref-missing-key"), "alpha"), absent);
+
+  const invalid = { status: "unknown", ref: null, source: "project-config", reason: "invalid-channel-ref" };
+  for (const [name, value] of [
+    ["dotdot", '"refs/heads/../x"'],
+    ["tag", '"refs/tags/v1"'],
+    ["non-string", "123"],
+    ["space", '"refs/heads/a b"'],
+  ]) {
+    const root = fixture(`ref-${name}`, `{"pipelineUpdateRefs":{"alpha":${value}}}\n`);
+    assert.deepEqual(readProjectPipelineUpdateRef(root, "alpha"), invalid, name);
+  }
+  const notObject = fixture("ref-not-object", '{"pipelineUpdateRefs":"refs/heads/x"}\n');
+  assert.deepEqual(readProjectPipelineUpdateRef(notObject, "alpha"), invalid);
+
+  const dup = fixture("ref-dup", '{"pipelineUpdateRefs":{"alpha":"refs/heads/a"},"pipelineUpdateRefs":{"alpha":"refs/heads/b"}}\n');
+  assert.deepEqual(readProjectPipelineUpdateRef(dup, "alpha"), {
+    status: "unknown", ref: null, source: "project-config", reason: "malformed-configuration",
+  });
+
+  const missingFile = mkdtempSync(join(tmpdir(), "pipeline-update-channel-ref-nofile-"));
+  roots.push(missingFile);
+  assert.deepEqual(readProjectPipelineUpdateRef(missingFile, "alpha"), absent);
+
+  const unreadable = fixture("ref-unreadable", "{not json\n");
+  assert.deepEqual(readProjectPipelineUpdateRef(unreadable, "alpha"), {
+    status: "unknown", ref: null, source: "project-config", reason: "channel-unavailable",
+  });
 });
 
 test("resolvePipelineUpdateChannel threads alphaRef only when the config is ready, and never blocks an unrelated channel", () => {

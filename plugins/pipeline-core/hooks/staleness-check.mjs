@@ -121,6 +121,7 @@ export function buildAvailabilityContext(value) {
     `channel=${display(value.channel)}`,
     `channelSource=${display(value.channelSource)}`,
     `ref=${display(value.ref)}`,
+    `refSource=${display(value.refSource)}`,
     `reason=${display(value.reason)}`,
   ].join(" · ");
 }

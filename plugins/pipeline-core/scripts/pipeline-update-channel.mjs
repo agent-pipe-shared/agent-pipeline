@@ -186,6 +186,19 @@ export function isPipelineUpdateAlphaRef(value) {
   return true;
 }
 
+// Per-channel ref override (PO decision #25, 2026-10-16): a fully qualified
+// `refs/heads/<name>` only -- no `..`, no wildcard, no whitespace/control
+// character, at most 200 characters. Anything else is a typed diagnostic and
+// the built-in default applies; it is never an exception at session start.
+const CHANNEL_REF_UNSAFE = /[\x00-\x20\x7F~^:?*[\\]/u;
+
+export function isPipelineUpdateChannelRef(value) {
+  if (typeof value !== "string" || value.length > 200) return false;
+  if (!value.startsWith("refs/heads/")) return false;
+  if (CHANNEL_REF_UNSAFE.test(value)) return false;
+  return isPipelineUpdateAlphaRef(value.slice("refs/heads/".length));
+}
+
 function neutralCalibrationAuthority(repoPath, readAuthority) {
   const root = resolve(repoPath);
   const path = join(root, NEUTRAL_CALIBRATION);
@@ -455,6 +468,40 @@ export function readProjectPipelineUpdateAlphaRef(repoPath, deps = {}) {
   return { status: "ready", alphaRef: raw, source: "project-config", reason: null };
 }
 
+/**
+ * Read back the optional per-channel ref override from the same neutral
+ * calibration file as the channel: `pipelineUpdateRefs`, an object keyed by
+ * channel name (`{"alpha": "refs/heads/feat/x"}`). Read-only here; the value is
+ * validated per requested channel, so a bad entry for one channel never
+ * affects another. Absent -> `{status:"absent"}`; invalid -> typed `unknown`.
+ */
+export function readProjectPipelineUpdateRef(repoPath, channel, deps = {}) {
+  const observed = readCalibration(repoPath, deps);
+  if (observed.status === "absent") {
+    return { status: "absent", ref: null, source: null, reason: null };
+  }
+  if (observed.status !== "ready") {
+    return { status: "unknown", ref: null, source: "project-config", reason: "channel-unavailable" };
+  }
+  if (duplicateFieldKey(observed, "pipelineUpdateRefs")) {
+    return { status: "unknown", ref: null, source: "project-config", reason: "malformed-configuration" };
+  }
+  if (!Object.hasOwn(observed.value, "pipelineUpdateRefs")) {
+    return { status: "absent", ref: null, source: null, reason: null };
+  }
+  const map = observed.value.pipelineUpdateRefs;
+  if (!isObject(map)) {
+    return { status: "unknown", ref: null, source: "project-config", reason: "invalid-channel-ref" };
+  }
+  if (!isPipelineUpdateChannel(channel) || !Object.hasOwn(map, channel)) {
+    return { status: "absent", ref: null, source: null, reason: null };
+  }
+  if (!isPipelineUpdateChannelRef(map[channel])) {
+    return { status: "unknown", ref: null, source: "project-config", reason: "invalid-channel-ref" };
+  }
+  return { status: "ready", ref: map[channel], source: "project-config", reason: null };
+}
+
 function trustedTopology({ distributionTopology, selfApplication }) {
   if (distributionTopology !== undefined) {
     return TOPOLOGIES.has(distributionTopology) ? distributionTopology : null;
@@ -470,6 +517,22 @@ function trustedTopology({ distributionTopology, selfApplication }) {
  * longer consumes it, because Alpha follows published main.
  */
 export function resolvePipelineUpdateChannel(options = {}) {
+  const resolved = resolvePipelineUpdateChannelBase(options);
+  const refConfig = options.refConfig;
+  // Additive: the key exists only when an override read was supplied, so every
+  // pre-existing resolution shape is byte-identical.
+  if (refConfig === undefined || refConfig === null || resolved.status !== "ready") return resolved;
+  return {
+    ...resolved,
+    refOverride: refConfig.status === "ready" && isPipelineUpdateChannelRef(refConfig.ref)
+      ? { status: "ready", ref: refConfig.ref, reason: null }
+      : refConfig.status === "absent"
+        ? { status: "absent", ref: null, reason: null }
+        : { status: "unknown", ref: null, reason: refConfig.reason ?? "invalid-channel-ref" },
+  };
+}
+
+function resolvePipelineUpdateChannelBase(options = {}) {
   const projectConfig = options.projectConfig;
   const alphaRefConfig = options.alphaRefConfig;
   const alphaRef = alphaRefConfig?.status === "ready" ? alphaRefConfig.alphaRef : null;
