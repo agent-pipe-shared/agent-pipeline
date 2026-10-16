@@ -17,7 +17,7 @@ import { test } from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../governance-scope.mjs";
 
 const GUARD = fileURLToPath(new URL("../../hooks/guard-dispatch-budget.mjs", import.meta.url));
@@ -47,8 +47,12 @@ writeFileSync(RUNNER, [
   "  const owner = { platform: 'win32', hostId: s.forge.otherHost ? 'some-other-host' : hostname().toLowerCase(), bootId: 'w32boot-' + boot, pid: s.forge.self ? process.pid : 999999, processStart: '1', nonce: 'a'.repeat(32) };",
   "  writeFileSync(s.lockPath, JSON.stringify({ schema: 'pipeline.dispatch-budget-counter-lock.v1', owner }) + '\\n');",
   "}",
-  "const first = mod.acquireDispatchBudgetCounterLock(s.lockPath, deps);",
+  "const sleeps = [];",
+  "if (s.fakeClock) { let t = 0; deps.now = () => t; deps.sleep = (ms) => { sleeps.push(ms); t += ms; }; }",
+  "const t0 = performance.now();",
+  "const first = s.wait ? mod.acquireDispatchBudgetCounterLockWithWait(s.lockPath, deps) : mod.acquireDispatchBudgetCounterLock(s.lockPath, deps);",
   "const out = { status: first.status, code: first.code ?? null, recovered: first.recovered ?? false };",
+  "if (s.wait) { out.elapsedMs = performance.now() - t0; out.sleeps = sleeps; out.holderAgeMs = first.holderAgeMs ?? null; }",
   "if (first.status === 'acquired') {",
   "  out.owner = JSON.parse(readFileSync(s.lockPath, 'utf8')).owner;",
   "  if (s.second) { const again = mod.acquireDispatchBudgetCounterLock(s.lockPath, deps); out.second = { status: again.status, code: again.code ?? null }; }",
@@ -58,11 +62,11 @@ writeFileSync(RUNNER, [
 ].join("\n"));
 
 let seq = 0;
-function lockRun(scenario) {
+function lockRun(scenario, guardPath = GUARD) {
   const lockPath = join(FIXTURE, `lock-${seq += 1}`, "agent.json.binding.lock");
   mkdirSync(join(lockPath, ".."), { recursive: true });
   const b64 = Buffer.from(JSON.stringify({ ...scenario, lockPath }), "utf8").toString("base64");
-  const res = spawnSync(process.execPath, [RUNNER, GUARD, b64], { encoding: "utf8", input: "", timeout: 60000 });
+  const res = spawnSync(process.execPath, [RUNNER, guardPath, b64], { encoding: "utf8", input: "", timeout: 60000 });
   assert.equal(res.status, 0, `lock runner exited ${res.status}: ${(res.stderr ?? "").slice(0, 400)}`);
   const line = (res.stdout ?? "").split("\n").find((l) => l.startsWith("LOCKRUN: "));
   assert.ok(line, `no LOCKRUN line in runner output: ${JSON.stringify(res.stdout)}`);
@@ -111,6 +115,60 @@ test("AC1e: win32 identity semantics: a lock recorded by a different host is amb
   const r = lockRun({ platform: "win32", forge: { otherHost: true } });
   assert.deepEqual([r.status, r.code], ["rejected", "counter-lock-owner-ambiguous"]);
   assert.equal(existsSync(r.lockPath), true, "foreign-host lock must be left untouched");
+});
+
+// ---- (1b) R7-11 bounded wait: the module HAS acquireDispatchBudgetCounterLockWithWait (3000 ms bound, 5..100 ms backoff)
+const WAIT_BOUND_MS = 3000;
+const WAIT_UPPER_MS = WAIT_BOUND_MS + 6000; // generous slack for a loaded host; still proves "no unbounded loop"
+
+test("R7-11a: a live foreign owner holds the lock -> the wait returns a typed counter-lock-timeout within the stated bound, never taking the lock over", () => {
+  const r = lockRun({ platform: "win32", forge: {}, killMode: "alive", wait: true });
+  assert.deepEqual([r.status, r.code], ["rejected", "counter-lock-timeout"]);
+  assert.ok(r.elapsedMs >= WAIT_BOUND_MS - 100, `returned after ${r.elapsedMs} ms, before the ${WAIT_BOUND_MS} ms bound: it did not wait`);
+  assert.ok(r.elapsedMs <= WAIT_UPPER_MS, `waited ${r.elapsedMs} ms, beyond the upper bound ${WAIT_UPPER_MS} ms`);
+  assert.ok(Number.isFinite(r.holderAgeMs) && r.holderAgeMs >= 0, "timeout names the holder age");
+  assert.equal(existsSync(r.lockPath), true, "a live holder's lock is never taken over or deleted");
+});
+
+test("R7-11b: the wait backs off 5 -> 100 ms (capped), sleeps never exceed the bound in total, and a non-transient owner state (ambiguous) is returned at once without sleeping", () => {
+  const r = lockRun({ platform: "win32", forge: {}, killMode: "alive", wait: true, fakeClock: true });
+  assert.deepEqual([r.status, r.code], ["rejected", "counter-lock-timeout"]);
+  assert.deepEqual(r.sleeps.slice(0, 6), [5, 10, 20, 40, 80, 100]);
+  assert.ok(r.sleeps.every((ms) => ms >= 1 && ms <= 100), `sleep outside 1..100 ms: ${JSON.stringify(r.sleeps)}`);
+  assert.ok(r.sleeps.reduce((a, b) => a + b, 0) <= WAIT_BOUND_MS, "total slept time exceeds the wait bound");
+  const amb = lockRun({ platform: "win32", forge: { otherHost: true }, wait: true, fakeClock: true });
+  assert.deepEqual([amb.status, amb.code], ["rejected", "counter-lock-owner-ambiguous"]);
+  assert.deepEqual(amb.sleeps, [], "ambiguous must fail closed with no wait");
+});
+
+// ---- (1c) RED mirror: a mutant lock module that drops the win32 owner identity must fail the pin's own cases ----
+// The mutant is a scratch copy of the guard with every recorded win32 owner read as ambiguous (the pre-fix
+// behaviour: nothing is ever provably live or dead). Relative imports are rewritten to absolute URLs so the
+// copy loads from the scratch fixture through the same RUNNER seam as the real module.
+function buildMutantGuard() {
+  let src = readFileSync(GUARD, "utf8");
+  const libUrl = pathToFileURL(join(GUARD, "..", "..", "lib")).href;
+  src = src.replaceAll('from "../lib/', `from "${libUrl}/`);
+  const anchor = "function win32CounterLockOwnerState(record, dependencies = {}) {";
+  assert.ok(src.includes(anchor), "mutation anchor missing: the win32 owner-state function was renamed; update the RED mirror");
+  src = src.replace(anchor, `${anchor}\n  return "ambiguous";`);
+  const path = join(FIXTURE, "guard-dispatch-budget.mutant.mjs");
+  writeFileSync(path, src);
+  return path;
+}
+
+test("RED mirror: a mutant lock module without win32 owner identity FAILS the AC1b/AC1c/AC1d expectations that the real module meets", () => {
+  const mutant = buildMutantGuard();
+  const ac1b = (r) => r.status === "acquired" && r.recovered === true;
+  const realB = lockRun({ platform: "win32", forge: { bootOffset: -100000 } });
+  assert.ok(ac1b(realB), "control: the real module meets the AC1b expectation");
+  const mutB = lockRun({ platform: "win32", forge: { bootOffset: -100000 } }, mutant);
+  assert.equal(ac1b(mutB), false, `mutant must break AC1b (dead owner recovered), got ${mutB.status}/${mutB.code}`);
+  assert.equal(mutB.code, "counter-lock-owner-ambiguous");
+  const mutC = lockRun({ platform: "win32", forge: { self: true } }, mutant);
+  assert.notEqual(mutC.status, "acquired", "mutant must break AC1c (pid reuse recovered)");
+  const mutD = lockRun({ platform: "win32", forge: {}, killMode: "alive" }, mutant);
+  assert.notEqual(mutD.code, "counter-lock-busy", "mutant must break AC1d (live foreign pid is busy)");
 });
 
 // ---- (2) budget-counted subagent through the real hook ----------------------------------------------
