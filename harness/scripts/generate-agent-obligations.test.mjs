@@ -155,7 +155,11 @@ test("AC-9 (contract): the command §5 prints is the command the lifecycle guard
  * drives the real guard-push hook with the commit command the document recommends.
  */
 function runGuardPush(command, cwd) {
-  const guard = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-push.mjs");
+  return runGuardHook("guard-push.mjs", command, cwd);
+}
+
+function runGuardHook(hookFile, command, cwd) {
+  const guard = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", hookFile);
   const res = spawnSync(process.execPath, [guard], {
     input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
     encoding: "utf8",
@@ -178,6 +182,46 @@ test("AC-106 (contract): the commit spelling the document recommends is admitted
   assert.equal(admitted.code, 0, `guard-push refuses the recommended spelling (${concrete}): ${admitted.stderr.trim().slice(0, 300)}`);
 
   assert.doesNotMatch(document, /prefer[^\n]*--trailer/iu, "the document must not recommend --trailer");
+});
+
+test("AC-106 (contract): the recommended commit spelling is admitted by every guard in the union, not only guard-push", () => {
+  const document = readFileSync(OBLIGATIONS_PATH, "utf8");
+  const recommended = /commit with `(git commit -F <msgfile> -- <paths>)`/u.exec(document);
+  assert.ok(recommended, "§1 must recommend `git commit -F <msgfile> -- <paths>` as the provenance-bearing commit");
+
+  // The repository root, not a bare temp root: guard-git and guard-lifecycle-ready only
+  // enforce their project rules (the --trailer refusal, the closed shell grammar) in a
+  // governed root; in an ungoverned one they fail open, so an admission there is vacuous.
+  // The negative controls below fail if that ever stops being true.
+  const cwd = REPO_ROOT;
+  // guard-git (GIT-03) reads the message file named by -F and requires the provenance
+  // trailer in it, so the fixture is a real message file under the gitignored scratch/.
+  const msgDir = join(REPO_ROOT, "scratch", "commit-msg-ac106");
+  mkdirSync(msgDir, { recursive: true });
+  roots.push(msgDir);
+  writeFileSync(join(msgDir, "msg.txt"), "docs: fixture subject\n\nFixture body.\n\nAI-Assisted: true\nDispatch: ALF-FIXTURE (goldfish)\n");
+  const concrete = recommended[1].replace("<msgfile>", "scratch/commit-msg-ac106/msg.txt").replace("<paths>", "a.md");
+  // guard-lifecycle-ready is deliberately not driven here: in a session that is not
+  // lifecycle-ready it denies EVERY command with GUARD-LIFECYCLE-NOT-READY before the
+  // grammar is consulted (probed: composed and trailer commands get the same code), so
+  // its verdict on a spelling is session-state dependent and a subprocess admission or
+  // refusal would be meaningless. Open hold, reported to the dispatcher.
+  for (const hook of ["guard-push.mjs", "guard-git.mjs"]) {
+    const verdict = runGuardHook(hook, concrete, cwd);
+    assert.equal(
+      verdict.code,
+      0,
+      `${hook} refuses the recommended spelling (${concrete}): ${verdict.stderr.trim().slice(0, 300)}`,
+    );
+  }
+
+  // Negative controls in the same fixture root: an admission result only means
+  // something if the same harness can see each guard refuse.
+  assert.notEqual(
+    runGuardHook("guard-git.mjs", "git commit -m x --trailer a=b -- a.md", cwd).code,
+    0,
+    "guard-git must still refuse the --trailer spelling, otherwise its admission above proves nothing",
+  );
 });
 
 test("AC-7: the document carries no absolute or machine-specific path", () => {
