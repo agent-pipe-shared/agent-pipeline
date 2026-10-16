@@ -1,0 +1,424 @@
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * Regression pin: pipeline.signature-ceremony-requires-operator-work-and-breaks (AC-258).
+ * Item: backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md
+ *
+ * Cases tagged "RED:" assert the item's INTENDED behaviour and are expected to
+ * FAIL while the named source gap exists. Fixtures live under scratch/ (native
+ * Windows host rule), never the OS temp dir. No passphrase exists and no key is
+ * persisted: the commit-scoped override-course cases at the end of this file sign
+ * their own fixture request with an in-memory ephemeral Ed25519 pair, generated per
+ * run and never written to disk.
+ */
+import assert from "node:assert/strict";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
+import test, { after, before, describe } from "node:test";
+
+import { main } from "../../scripts/guard-human-override.mjs";
+import { recordHumanGuardDenial } from "../human-guard-override.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const PLUGIN_ROOT = join(HERE, "..", "..");
+const REPO_ROOT = join(PLUGIN_ROOT, "..", "..");
+const FIXTURES = join(REPO_ROOT, "scratch", "ac258-pin-fixtures");
+const DUMMY_ANCHOR = "0".repeat(64); // dummy digest, not a real key
+
+function git(root, ...args) {
+  const r = spawnSync("git", ["-c", "commit.gpgsign=false", ...args], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(r.status, 0, r.stderr);
+}
+
+function fixture({ born }) {
+  mkdirSync(FIXTURES, { recursive: true });
+  const root = mkdtempSync(join(FIXTURES, born ? "born-" : "unborn-"));
+  git(root, "init", "-q", "-b", "main");
+  git(root, "config", "user.name", "Fixture");
+  git(root, "config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push"],
+    trustAnchor: { keyReference: "ac258-dummy", publicKeySha256: DUMMY_ANCHOR },
+  }));
+  if (born) {
+    git(root, "commit", "-q", "--allow-empty", "-m", "initial");
+    git(root, "add", "pipeline.user.yaml", "project/critical-human-proof.json");
+    git(root, "commit", "-q", "-m", "fixture");
+  }
+  return root;
+}
+
+function io() {
+  let stdout = "";
+  let stderr = "";
+  return {
+    write: (c) => { stdout += c; return true; },
+    writeError: (c) => { stderr += c; return true; },
+    get stdout() { return stdout; },
+    get stderr() { return stderr; },
+  };
+}
+
+function prepare(root) {
+  const recorded = recordHumanGuardDenial({
+    rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+    toolInput: { file_path: "notes.md", content: "ac258\n" },
+    denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+  });
+  assert.equal(recorded.status, "planned");
+  const out = io();
+  const status = main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], out);
+  return { status, out };
+}
+
+test("RED: signature preparation works in an unborn-HEAD repository (HGO-SIGNATURE-INTENT-INVALID today)", () => {
+  const root = fixture({ born: false });
+  try {
+    const { status, out } = prepare(root);
+    assert.equal(status, 0, `unborn HEAD must not break prepare-for-signature: ${out.stderr}`);
+    assert.equal(JSON.parse(out.stdout).status, "prepared");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("the agent prepares: one call yields both commands; only sign-intent is the human's external step", () => {
+  const root = fixture({ born: true });
+  try {
+    const { status, out } = prepare(root);
+    assert.equal(status, 0, out.stderr);
+    const v = JSON.parse(out.stdout);
+    assert.equal(v.status, "prepared");
+    assert.equal(v.signIntentCommand.executionBoundary, "attended-external-terminal");
+    assert.equal(v.signIntentCommand.mutation, false);
+    // proof import is an agent-side local-process command, not human copy-back
+    assert.equal(v.authorizeBySignatureCommand.executionBoundary, "local-process");
+    assert.ok(v.authorizeBySignatureCommand.argv.includes("--proof"));
+    assert.doesNotMatch(out.stdout, /Step:|POSIX:|PowerShell:/u, "stdout stays machine-readable");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("signing command handed to the human is paste-safe for PowerShell and Bash: bounded lines, no continuation", () => {
+  const root = fixture({ born: true });
+  try {
+    const { status, out } = prepare(root);
+    assert.equal(status, 0, out.stderr);
+    const lines = out.stderr.trimEnd().split(/\r?\n/u);
+    assert.ok(lines.every((l) => l.length <= 72), "every line within the 72-column bound");
+    assert.match(out.stderr, /POSIX:/u);
+    assert.match(out.stderr, /PowerShell:/u);
+    const offenders = lines.filter((l) => /\\$/u.test(l) || /`$/u.test(l));
+    assert.deepEqual(offenders, [], "no backslash/backtick line continuation (the 2026-10-03 WSL paste failure)");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("RED: a commit refused by the git pre-commit hook seeds a human-override request and prints a signing command", () => {
+  // Source of the gap: the generated hook impl in
+  // plugins/pipeline-core/scripts/pre-commit-hook-install.mjs (renderImpl template; the
+  // block([...]) at the "staged path(s) are protected" finding, ~line 869) only
+  // prints text. A commit-scoped request bound to the staged index tree would have to be
+  // seeded there via recordHumanGuardDenial().
+  const src = readFileSync(join(PLUGIN_ROOT, "scripts", "pre-commit-hook-install.mjs"), "utf8");
+  assert.match(src, /recordHumanGuardDenial/u);
+});
+
+test("RED-pending: a PO-signed configuration override survives later migrations (not reached; no case written)", { skip: "typed-not-reached: owner Coordinator, follow-up dispatch" }, () => {});
+
+// ---------------------------------------------------------------------------------------------
+// COMMIT-SCOPED OVERRIDE COURSE (ALF-C-P19-12F pins what ALF-C-P19-12E implemented in the
+// generated hook of plugins/pipeline-core/scripts/pre-commit-hook-install.mjs).
+//
+// These cases drive a REAL generated pre-commit hook inside a contained fixture repository: its
+// own `git init` under scratch/, GIT_CEILING_DIRECTORIES on every git call (so a lost `.git` can
+// never resolve to this repository), and a frozen COPY of the plugin (so a concurrent edit of the
+// live tree cannot make the installed runtime snapshot stale mid-run). The fixture key is an
+// in-memory ephemeral Ed25519 pair: it signs only the fixture's own request and the committed
+// trust anchor is merely its public digest.
+//
+// TIMING (measured on the native Windows host, accepted for 0.7.0): SEEDED 95-175 s, PENDING
+// 31-62 s, consume+commit 42-46 s. So each case carries an explicit 600 s timeout, the cases run
+// serially over ONE shared fixture, and none of them goes through the hook suite's 20 s commit()
+// helper. Execution order is (1) (2) (4) (3) on purpose: SCOPE-DRIFT needs a still-LIVE record of
+// ANOTHER scope, and the consume-once commit retires that record.
+//
+// RED on HEAD by construction: HEAD's generated hook prints no PB-COMMIT-OVERRIDE line at all, so
+// cases (1)-(5) fail there; they are GREEN only against the 12E implementation.
+// Machine-written evidence of the last run (stderr per commit attempt, timings.json) stays under
+// scratch/ac258-pin-fixtures/last-run/.
+// ---------------------------------------------------------------------------------------------
+const CASE_TIMEOUT_MS = 600_000;
+const GIT_TIMEOUT_MS = 540_000;
+const CEILING = join(REPO_ROOT, "scratch");
+const EVIDENCE_DIR = join(FIXTURES, "last-run");
+const PROTECTED_FILE = "protected-suite.test.mjs";
+const COMMIT_MESSAGE = "attempt protected rewrite";
+const CONTENT_A = "// tampered\n";
+const CONTENT_B = "// restaged\n";
+const KEY_REFERENCE = "ac258-fixture-key";
+
+const course = { timings: [], cleanup: [] };
+
+function fxGit(dir, args, timeout = 240_000) {
+  return spawnSync("git", ["-c", "commit.gpgsign=false", ...args], {
+    cwd: dir, encoding: "utf8", shell: false, timeout,
+    env: { ...process.env, GIT_CEILING_DIRECTORIES: CEILING },
+  });
+}
+
+function fxMust(result, what) {
+  assert.equal(result.status, 0, `${what} failed (status ${result.status}, signal ${result.signal}): ${result.stderr}`);
+  return String(result.stdout).trim();
+}
+
+function jsonFiles(dir) {
+  try { return readdirSync(dir).filter((name) => name.endsWith(".json")); } catch { return []; }
+}
+
+function readJson(path) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function countOf(text, needle) {
+  return String(text).split(needle).length - 1;
+}
+
+function stageProtected(dir, content) {
+  writeFileSync(join(dir, PROTECTED_FILE), content);
+  fxMust(fxGit(dir, ["add", PROTECTED_FILE]), "stage protected file");
+}
+
+/** One contained fixture: own `git init`, a protected-path config, an enrolled scope and the REAL
+ * generated pre-commit hook installed from the frozen plugin copy. */
+function buildCourseFixture({ withTrustAnchor }) {
+  mkdirSync(FIXTURES, { recursive: true });
+  const dir = mkdtempSync(join(FIXTURES, withTrustAnchor ? "course-anchored-" : "course-unanchored-"));
+  course.cleanup.push(dir);
+  fxMust(fxGit(dir, ["init", "-q", "-b", "main"]), "git init");
+  fxMust(fxGit(dir, ["config", "user.name", "Fixture"]), "git config user.name");
+  fxMust(fxGit(dir, ["config", "user.email", "fixture@example.invalid"]), "git config user.email");
+  const normalise = (p) => realpathSync(p).replace(/\\/gu, "/").toLowerCase();
+  assert.equal(normalise(fxMust(fxGit(dir, ["rev-parse", "--show-toplevel"]), "show-toplevel")), normalise(dir), "containment: the fixture must be its own repository root");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "guard-config.json"), JSON.stringify({ protectedTestPaths: [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }] }));
+  writeFileSync(join(dir, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+  writeFileSync(join(dir, PROTECTED_FILE), "// original\n");
+  if (withTrustAnchor) {
+    mkdirSync(join(dir, "project"), { recursive: true });
+    writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1",
+      requiredKinds: ["push"],
+      trustAnchor: { keyReference: KEY_REFERENCE, publicKeySha256: createHash("sha256").update(course.publicKeyPem).digest("hex") },
+    }));
+  }
+  fxMust(fxGit(dir, ["add", "-A"]), "stage seed");
+  fxMust(fxGit(dir, ["commit", "-q", "-m", "seed"]), "commit seed");
+
+  const governance = course.createGovernanceScopeController({ hostStateRoot: join(dir, "unused-host") });
+  const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "ac258-pin" });
+  governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  const install = course.installer.applyInstall({
+    rootDir: dir,
+    pluginLibDir: join(course.copy, "lib"),
+    pluginHooksDir: join(course.copy, "hooks"),
+    pluginScriptsDir: join(course.copy, "scripts"),
+  });
+  assert.equal(install.status, "installed", `hook install: ${JSON.stringify(install).slice(0, 400)}`);
+
+  const commonDir = fxMust(fxGit(dir, ["rev-parse", "--path-format=absolute", "--git-common-dir"]), "git-common-dir");
+  return {
+    dir,
+    requestsDir: join(commonDir, "agent-pipeline", "human-guard-overrides", "requests"),
+    scopeDir: join(commonDir, "agent-pipeline", "pre-commit-hook", "commit-scope"),
+  };
+}
+
+/** `git commit` through the real hook, timed; stderr is kept as machine-written evidence. */
+function attempt(fx, name) {
+  const started = Date.now();
+  const result = fxGit(fx.dir, ["commit", "-m", COMMIT_MESSAGE], GIT_TIMEOUT_MS);
+  const out = {
+    name,
+    code: result.status,
+    signal: result.signal,
+    ms: Date.now() - started,
+    stderr: String(result.stderr ?? ""),
+    requests: jsonFiles(fx.requestsDir).length,
+    records: jsonFiles(fx.scopeDir).length,
+  };
+  course.timings.push({ name, code: out.code, signal: out.signal, ms: out.ms, requests: out.requests, records: out.records });
+  writeFileSync(join(EVIDENCE_DIR, `${name}.stderr.txt`), out.stderr);
+  return out;
+}
+
+function why(out) {
+  const lines = out.stderr.split(/\r?\n/u).filter((line) => /BLOCKED|PB-COMMIT-OVERRIDE|^Scope:/u.test(line)).join(" | ").slice(0, 900);
+  return `${out.name}: exit ${out.code} signal ${out.signal} in ${out.ms} ms, ${out.requests} request(s), ${out.records} record(s); ${lines}`;
+}
+
+function assertSigningBlocks(out) {
+  const note = why(out);
+  assert.deepEqual([...out.stderr.matchAll(/^Step: (\S+)$/gmu)].map((m) => m[1]), ["sign-intent", "authorize-by-signature"], note);
+  assert.equal(countOf(out.stderr, "POSIX:"), 2, note);
+  assert.equal(countOf(out.stderr, "PowerShell:"), 2, note);
+  assert.equal(countOf(out.stderr, 'eval "$CMD"'), 2, note);
+  assert.equal(countOf(out.stderr, "Invoke-Expression $CMD"), 2, note);
+}
+
+describe("commit-scoped override course through the real pre-commit hook (AC-258)", () => {
+  before(async () => {
+    course.previousCeiling = process.env.GIT_CEILING_DIRECTORIES;
+    process.env.GIT_CEILING_DIRECTORIES = CEILING;
+    rmSync(EVIDENCE_DIR, { recursive: true, force: true });
+    mkdirSync(EVIDENCE_DIR, { recursive: true });
+    course.copy = join(FIXTURES, `plugin-copy-${process.pid}-${Date.now()}`);
+    course.cleanup.push(course.copy);
+    cpSync(PLUGIN_ROOT, course.copy, { recursive: true });
+    const load = (relative) => import(pathToFileURL(join(course.copy, relative)).href);
+    course.installer = await load("scripts/pre-commit-hook-install.mjs");
+    course.createGovernanceScopeController = (await load("lib/governance-scope.mjs")).createGovernanceScopeController;
+    course.hgo = await load("lib/human-guard-override.mjs");
+    course.proofSchema = (await load("lib/po-approval-proof.mjs")).PO_APPROVAL_PROOF_SCHEMA;
+    course.keyPair = generateKeyPairSync("ed25519");
+    course.publicKeyPem = course.keyPair.publicKey.export({ type: "spki", format: "pem" });
+    course.anchored = buildCourseFixture({ withTrustAnchor: true });
+  }, { timeout: CASE_TIMEOUT_MS });
+
+  after(() => {
+    try { writeFileSync(join(EVIDENCE_DIR, "timings.json"), JSON.stringify({ cases: course.timings }, null, 2) + "\n"); } catch { /* evidence only */ }
+    if (course.previousCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+    else process.env.GIT_CEILING_DIRECTORIES = course.previousCeiling;
+    for (const target of course.cleanup) rmSync(target, { recursive: true, force: true, maxRetries: 3 });
+  }, { timeout: CASE_TIMEOUT_MS });
+
+  test("(1) the first protected-path refusal reports SEEDED: one request, POSIX and PowerShell signing blocks, no bypass flag", { timeout: CASE_TIMEOUT_MS }, () => {
+    const fx = course.anchored;
+    course.head = fxMust(fxGit(fx.dir, ["rev-parse", "HEAD"]), "rev-parse HEAD");
+    stageProtected(fx.dir, CONTENT_A);
+    course.treeA = fxMust(fxGit(fx.dir, ["write-tree"]), "write-tree");
+    const first = attempt(fx, "commit-1-seeded");
+    const note = why(first);
+    assert.equal(first.code, 1, note);
+    assert.match(first.stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/u, note);
+    assert.ok(first.stderr.includes(`TP-1 ${PROTECTED_FILE}`), note);
+    assert.equal(countOf(first.stderr, "PB-COMMIT-OVERRIDE-SEEDED"), 1, note);
+    assert.doesNotMatch(first.stderr, /PB-COMMIT-OVERRIDE-(?:PENDING|SCOPE-DRIFT|UNAVAILABLE|NONOVERRIDABLE|DRIFT|EXPIRED|ALREADY-CONSUMED)/u, note);
+    assertSigningBlocks(first);
+    assert.doesNotMatch(first.stderr, /--no-verify/u, "the refusal must not hand out a bypass flag");
+    assert.match(first.stderr, /HUMAN OPERATOR ONLY/u, note);
+    assert.match(first.stderr, /agent MUST NOT/u, note);
+    assert.equal(first.requests, 1, note);
+    assert.equal(first.records, 1, note);
+    const recordFile = jsonFiles(fx.scopeDir)[0];
+    const record = readJson(join(fx.scopeDir, recordFile));
+    assert.equal(record.status, "live");
+    assert.deepEqual(record.scope.protectedPaths, [PROTECTED_FILE]);
+    assert.equal(record.scope.head, course.head, "the scope binds the commit it was seeded on");
+    assert.equal(record.scope.indexTree, course.treeA, "the scope binds the staged index tree");
+    assert.match(record.requestSha256, /^[a-f0-9]{64}$/u);
+    course.recordA = record;
+  });
+
+  test("(2) the identical second refusal reports PENDING and creates no second request", { timeout: CASE_TIMEOUT_MS }, () => {
+    const fx = course.anchored;
+    assert.ok(course.recordA, "case (1) must have seeded the first scope record");
+    const second = attempt(fx, "commit-2-pending");
+    const note = why(second);
+    assert.equal(second.code, 1, note);
+    assert.equal(countOf(second.stderr, "PB-COMMIT-OVERRIDE-PENDING"), 1, note);
+    assert.doesNotMatch(second.stderr, /PB-COMMIT-OVERRIDE-(?:SEEDED|SCOPE-DRIFT|UNAVAILABLE|NONOVERRIDABLE|DRIFT|EXPIRED|ALREADY-CONSUMED)/u, note);
+    assertSigningBlocks(second);
+    assert.doesNotMatch(second.stderr, /--no-verify/u);
+    assert.match(second.stderr, /HUMAN OPERATOR ONLY/u, note);
+    assert.equal(second.requests, 1, `still exactly one request: ${note}`);
+    assert.equal(second.records, 1, `still exactly one scope record: ${note}`);
+    const record = readJson(join(fx.scopeDir, jsonFiles(fx.scopeDir)[0]));
+    assert.equal(record.requestSha256, course.recordA.requestSha256, "the pending request is re-used, not replaced");
+    assert.equal(record.seededAt, course.recordA.seededAt, "the original seeding time is kept");
+    assert.equal(record.status, "live");
+  });
+
+  test("(4) restaged content reports SCOPE-DRIFT and seeds a fresh request while the earlier one stays live", { timeout: CASE_TIMEOUT_MS }, () => {
+    const fx = course.anchored;
+    assert.ok(course.recordA, "case (1) must have seeded the first scope record");
+    stageProtected(fx.dir, CONTENT_B);
+    const treeB = fxMust(fxGit(fx.dir, ["write-tree"]), "write-tree restaged");
+    assert.notEqual(treeB, course.treeA, "restaged content must change the staged index tree");
+    const drift = attempt(fx, "commit-4-scope-drift");
+    const note = why(drift);
+    assert.equal(drift.code, 1, note);
+    assert.equal(countOf(drift.stderr, "PB-COMMIT-OVERRIDE-SCOPE-DRIFT"), 1, note);
+    assert.doesNotMatch(drift.stderr, /PB-COMMIT-OVERRIDE-(?:SEEDED|PENDING|UNAVAILABLE|NONOVERRIDABLE|ALREADY-CONSUMED)/u, note);
+    assertSigningBlocks(drift);
+    assert.equal(drift.requests, 2, `a fresh request was seeded: ${note}`);
+    assert.equal(drift.records, 2, `a second scope record exists: ${note}`);
+    const records = jsonFiles(fx.scopeDir).map((name) => readJson(join(fx.scopeDir, name)));
+    const recordB = records.find((record) => record.scope.indexTree === treeB);
+    const recordA = records.find((record) => record.scope.indexTree === course.treeA);
+    assert.ok(recordB && recordA, "one record per staged scope");
+    assert.equal(recordB.status, "live");
+    assert.notEqual(recordB.requestSha256, recordA.requestSha256, "the fresh request is a different request");
+    assert.equal(recordA.requestSha256, course.recordA.requestSha256, "the earlier scope keeps its own request");
+    assert.equal(recordA.status, "live", "the earlier scope stays pending");
+  });
+
+  test("(3) after a fixture-key authorize-by-signature the identical retry commits once and the index record is consumed", { timeout: CASE_TIMEOUT_MS }, () => {
+    const fx = course.anchored;
+    assert.ok(course.recordA, "case (1) must have seeded the first scope record");
+    stageProtected(fx.dir, CONTENT_A);
+    assert.equal(fxMust(fxGit(fx.dir, ["write-tree"]), "write-tree restored"), course.treeA, "restoring the first content must reproduce the first scope exactly");
+    const recordFile = jsonFiles(fx.scopeDir).find((name) => readJson(join(fx.scopeDir, name)).scope.indexTree === course.treeA);
+    assert.ok(recordFile, "the first scope record is still on disk");
+    const record = readJson(join(fx.scopeDir, recordFile));
+    assert.equal(record.status, "live");
+    const proof = {
+      schema: course.proofSchema,
+      intentSha256: record.intentSha256,
+      keyReference: KEY_REFERENCE,
+      publicKey: course.publicKeyPem,
+      signatureBase64: sign(null, Buffer.from(record.intentSha256, "utf8"), course.keyPair.privateKey).toString("base64"),
+    };
+    const armed = course.hgo.authorizeHumanGuardOverrideBySignature({
+      rootDir: fx.dir,
+      pluginRoot: course.copy,
+      requestSha256: record.requestSha256,
+      planSha256: record.planSha256,
+      proof,
+      scriptPath: join(course.copy, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(armed.status, "armed", `authorize-by-signature: ${JSON.stringify(armed).slice(0, 600)}`);
+
+    const retry = attempt(fx, "commit-3-consume");
+    const note = why(retry);
+    assert.equal(retry.code, 0, note);
+    assert.doesNotMatch(retry.stderr, /BLOCKED|PB-COMMIT-OVERRIDE/u, note);
+    const headAfter = fxMust(fxGit(fx.dir, ["rev-parse", "HEAD"]), "rev-parse HEAD after");
+    assert.notEqual(headAfter, course.head, "the retried commit advanced HEAD");
+    assert.equal(fxMust(fxGit(fx.dir, ["log", "-1", "--format=%s"]), "log subject"), COMMIT_MESSAGE);
+    assert.equal(fxMust(fxGit(fx.dir, ["show", `HEAD:${PROTECTED_FILE}`]), "show committed content"), CONTENT_A.trim(), "the protected content landed");
+    const consumed = readJson(join(fx.scopeDir, recordFile));
+    assert.equal(consumed.status, "consumed", "the index record is spent after the one admitted commit");
+    assert.equal(typeof consumed.consumedAt, "string");
+    assert.equal(consumed.requestSha256, record.requestSha256);
+  });
+
+  test("(5) without a committed trust anchor the course reports UNAVAILABLE, keeps the refusal and seeds nothing", { timeout: CASE_TIMEOUT_MS }, () => {
+    const fx = buildCourseFixture({ withTrustAnchor: false });
+    stageProtected(fx.dir, CONTENT_A);
+    const out = attempt(fx, "commit-5-unavailable");
+    const note = why(out);
+    assert.equal(out.code, 1, note);
+    assert.match(out.stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/u, note);
+    assert.ok(out.stderr.includes(`TP-1 ${PROTECTED_FILE}`), `the original finding still stands: ${note}`);
+    assert.equal(countOf(out.stderr, "PB-COMMIT-OVERRIDE-UNAVAILABLE"), 1, note);
+    assert.match(out.stderr, /no committed human-proof trust anchor/u, note);
+    assert.doesNotMatch(out.stderr, /PB-COMMIT-OVERRIDE-(?:SEEDED|PENDING|SCOPE-DRIFT|NONOVERRIDABLE|DRIFT|EXPIRED|ALREADY-CONSUMED)/u, note);
+    assert.doesNotMatch(out.stderr, /^Step: |POSIX:|PowerShell:/mu, "no signing block is offered when nobody can sign");
+    assert.doesNotMatch(out.stderr, /--no-verify/u);
+    assert.equal(out.requests, 0, `nothing seeded: ${note}`);
+    assert.equal(out.records, 0, `no scope record written: ${note}`);
+    assert.equal(existsSync(fx.scopeDir), false, "the fail-fast leaves no commit-scope directory behind");
+  });
+});

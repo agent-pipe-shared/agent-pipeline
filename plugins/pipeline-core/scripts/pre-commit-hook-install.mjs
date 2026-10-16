@@ -124,6 +124,27 @@
  * `gitObjectBytes()` in the generated `renderImpl()` output; never a silent allow on "cannot
  * measure", matching this hook's own overriding fail-closed doctrine below.
  *
+ * COMMIT-SCOPED OVERRIDE COURSE (AC-258, ALF-C-P19-12E, PO decision 2026-10-16) — a protected
+ * commit used to end in manual operator work: the refusal seeded no override request. After
+ * the protected-path findings loop the generated hook now (1) pre-screens every protected path
+ * with the HGO `eligibility()` (any non-eligible path -> PB-COMMIT-OVERRIDE-NONOVERRIDABLE,
+ * nothing seeded); (2) tries `consumeHumanGuardOverride()` for the exact scope {head, staged
+ * index tree via `git write-tree`, sorted protected paths} (consumed -> the commit is admitted,
+ * once); otherwise (3) walks a small state machine over a hook-owned index record under
+ * `.git/agent-pipeline/pre-commit-hook/commit-scope/<scopeSha256>.json`: SEEDED (first
+ * refusal: one request recorded, `prepare-for-signature` run, the PowerShell and Bash signing
+ * blocks printed), PENDING (identical refusal: prepare re-run and re-printed, no second
+ * request), SCOPE-DRIFT / ALREADY-CONSUMED / EXPIRED (a fresh seed), DRIFT (a signed
+ * capability exists but the repository moved after signing: no re-seed while it is live) and
+ * UNAVAILABLE (any fault: fail closed, the original findings are still printed). The HGO module
+ * and CLI load from the SOURCE plugin root (`SOURCE_PLUGIN_LIB_DIR/..`, fallback
+ * `PLUGIN_LIB_DIR/..`) because the runtime snapshot carries no plugin manifest. The commit
+ * message is deliberately NOT bound. DISCLOSED: consumption happens in pre-commit, so a later
+ * commit-msg failure burns the capability (the next attempt reports ALREADY-CONSUMED and
+ * seeds fresh); the chat approval mode is not special-cased; a first commit (unborn HEAD) has
+ * no override path; and Layer 1 `check-protected-path-integrity` still flags a commit-scoped
+ * capability (its `eligiblePaths` is []) until that baseline is re-recorded.
+ *
  * NOT installed into this repository's own `.git/hooks/pre-commit` by this dispatch — that is
  * a separate, machine-local deployment decision (onboarding's own `applyInstall` call, or an
  * operator running `--install` directly), out of scope for a change to the generator itself;
@@ -697,6 +718,206 @@ function block(lines) {
   process.exitCode = 1;
 }
 
+// ---------------------------------------------------------------------------------------------
+// COMMIT-SCOPED OVERRIDE COURSE (AC-258). A protected-path refusal used to end in manual operator
+// work: the hook refused and seeded nothing. This course seeds ONE human-guard-override request
+// bound to the staged index tree and the exact protected paths, prints one copy-safe signing
+// command for PowerShell and Bash, and lets the retried identical commit CONSUME the armed
+// capability exactly once. Every fault fails closed: the original findings are always printed.
+// Written with string concatenation only: this body lives inside a template literal.
+// ---------------------------------------------------------------------------------------------
+const COMMIT_SCOPE_SCHEMA = "pipeline.pre-commit-protected-scope.v1";
+const COMMIT_SCOPE_RECORD_SCHEMA = "pipeline.pre-commit-commit-scope-record.v1";
+const COMMIT_SCOPE_HEX64 = /^[a-f0-9]{64}$/;
+const COMMIT_SCOPE_OBJECT_ID = /^[a-f0-9]{40,64}$/;
+
+function overrideFault(code, detail) {
+  const error = new Error(detail);
+  error.code = code;
+  return error;
+}
+
+function overrideNote(code, detail) {
+  return ["", "PB-COMMIT-OVERRIDE-" + code + ": " + detail];
+}
+
+/** Returns { admit, lines }. admit === true only when an armed capability bound to exactly this
+ * scope was consumed (once); otherwise lines are APPENDED to the base refusal. */
+async function commitOverrideCourse(projectRoot, commonDir, findings) {
+  const NL = String.fromCharCode(10);
+  const startedAt = Date.now();
+  let phase = "load";
+  try {
+    const fs = await import("node:fs");
+    const { createHash } = await import("node:crypto");
+    const protectedPaths = [...new Set(findings.map((finding) => finding.path))].sort();
+    const ruleIds = [...new Set(findings.map((finding) => finding.id))].sort();
+    // Cheap fail-fast (no HGO import, no PowerShell): a repository whose HEAD carries no human-proof
+    // trust anchor has nobody who can sign, so a seeded request could never be honoured. Measured
+    // on win32 the full seed costs minutes, so it is never spent on an unsignable repository.
+    if (git(["cat-file", "-e", "HEAD:" + CRITICAL_HUMAN_PROOF_POLICY_PATH], projectRoot).status !== 0) {
+      return { admit: false, lines: overrideNote("UNAVAILABLE", "no committed human-proof trust anchor (" + CRITICAL_HUMAN_PROOF_POLICY_PATH + " at HEAD): nothing could be signed for this repository, so no request was seeded.") };
+    }
+    // The runtime snapshot carries no plugin manifest, so the HGO module and CLI come from the
+    // SOURCE plugin (fallback: the snapshot root) and that root is the pluginRoot.
+    const libDir = typeof SOURCE_PLUGIN_LIB_DIR === "string" && fs.existsSync(SOURCE_PLUGIN_LIB_DIR) ? SOURCE_PLUGIN_LIB_DIR : PLUGIN_LIB_DIR;
+    const pluginRoot = resolve(libDir, "..");
+    const root = resolve(projectRoot);
+    const hgo = await import(pathToFileURL(resolve(pluginRoot, "lib", "human-guard-override.mjs")).href);
+    const cli = await import(pathToFileURL(resolve(pluginRoot, "scripts", "guard-human-override.mjs")).href);
+    const { ensureHardenedPrivateDirectory } = await import(pathToFileURL(resolve(pluginRoot, "lib", "hardened-private-directory.mjs")).href);
+
+    phase = "eligibility";
+    const nonOverridable = [];
+    for (const relPath of protectedPaths) {
+      let eligible = false;
+      try { eligible = hgo.humanGuardOverrideInternals.eligibility(root, "Write", { file_path: resolve(root, relPath) }).eligible === true; } catch { eligible = false; }
+      if (!eligible) nonOverridable.push(relPath);
+    }
+    if (nonOverridable.length > 0) {
+      return { admit: false, lines: overrideNote("NONOVERRIDABLE", "no commit-scoped override can cover " + nonOverridable.join(", ") + "; nothing was seeded.") };
+    }
+
+    phase = "scope";
+    const headResult = git(["rev-parse", "--verify", "-q", "HEAD"], projectRoot);
+    const head = headResult.status === 0 ? String(headResult.stdout || "").trim() : "";
+    if (!COMMIT_SCOPE_OBJECT_ID.test(head)) {
+      return { admit: false, lines: overrideNote("UNAVAILABLE", "no commit exists yet (unborn HEAD); the commit-scoped override does not cover a first commit, nothing was seeded.") };
+    }
+    const treeResult = git(["write-tree"], projectRoot);
+    const indexTree = treeResult.status === 0 ? String(treeResult.stdout || "").trim() : "";
+    if (!COMMIT_SCOPE_OBJECT_ID.test(indexTree)) throw overrideFault("WRITE-TREE", "the staged index tree could not be computed");
+    const scope = { schema: COMMIT_SCOPE_SCHEMA, head, indexTree, protectedPaths };
+    const scopeSha256 = createHash("sha256").update(JSON.stringify(scope)).digest("hex");
+    const toolName = "Bash";
+    const toolInput = { command: "git commit", pipelineCommitScope: scope };
+    // The reason binds head, index tree, exact paths and rule ids. The commit message is NOT bound.
+    const denials = [{ guard: "pre-commit-hook", reason: "PB-GUARD-HOOKS: protected path(s) staged for commit; head " + head + "; index tree " + indexTree + "; paths " + protectedPaths.join(", ") + "; rules " + ruleIds.join(", ") + "; scope " + scopeSha256 }];
+
+    const scopeDir = resolve(commonDir, "agent-pipeline", "pre-commit-hook", "commit-scope");
+    const recordPath = resolve(scopeDir, scopeSha256 + ".json");
+    const readRecord = (path) => {
+      try {
+        const value = JSON.parse(fs.readFileSync(path, "utf8"));
+        return value && value.schema === COMMIT_SCOPE_RECORD_SCHEMA && typeof value.expiresAt === "string" ? value : null;
+      } catch { return null; }
+    };
+    const writeRecord = (value) => {
+      const temporary = recordPath + "." + process.pid + ".tmp";
+      fs.writeFileSync(temporary, JSON.stringify(value, null, 2) + NL, { encoding: "utf8", mode: 0o600 });
+      fs.renameSync(temporary, recordPath);
+    };
+
+    // The retried identical commit consumes first: an armed capability bound to exactly this
+    // scope admits it once. (Consumption happens here, before commit-msg: a later commit-msg
+    // failure therefore burns the capability and the next attempt reports ALREADY-CONSUMED.)
+    phase = "consume";
+    // Nothing armed means nothing to consume: skip the (slow on win32) store walk when the
+    // capability directory is absent or holds no capability file.
+    let anyCapability = false;
+    try { anyCapability = fs.readdirSync(resolve(commonDir, "agent-pipeline", "human-guard-overrides", "capabilities")).some((name) => name.endsWith(".json")); } catch { anyCapability = false; }
+    const consumption = anyCapability ? hgo.consumeHumanGuardOverride({ rootDir: root, pluginRoot, toolName, toolInput, denials }) : { status: "absent" };
+    if (consumption && consumption.status === "consumed") {
+      try {
+        const prior = readRecord(recordPath);
+        if (prior) writeRecord({ ...prior, status: "consumed", consumedAt: new Date().toISOString() });
+      } catch { /* the capability is spent: a bookkeeping fault must not strand the authorized commit */ }
+      return { admit: true, lines: [] };
+    }
+    const consumptionStatus = String(consumption && consumption.status);
+    const consumptionCode = String(consumption && consumption.code);
+    const driftSeen = consumptionStatus === "replan" && consumptionCode === "HGO-DRIFT";
+    const capabilityExpired = consumptionStatus === "replan" && consumptionCode === "HGO-EXPIRED";
+    const otherScopeCapability = consumptionStatus === "replan" && consumptionCode === "HGO-INPUT-MISMATCH";
+    if (consumptionStatus !== "absent" && !driftSeen && !capabilityExpired && !otherScopeCapability) {
+      throw overrideFault(consumptionCode !== "undefined" ? consumptionCode : consumptionStatus, "the override store did not answer with a usable verdict");
+    }
+
+    phase = "state";
+    ensureHardenedPrivateDirectory(commonDir, scopeDir);
+    const nowMs = Date.now();
+    const existing = readRecord(recordPath);
+    const isLive = (record) => Boolean(record) && record.status === "live" && Date.parse(record.expiresAt) > nowMs;
+    let state;
+    if (existing && existing.status === "consumed") state = "ALREADY-CONSUMED";
+    else if (existing && !isLive(existing)) state = "EXPIRED";
+    else if (existing) state = driftSeen ? "DRIFT" : "PENDING";
+    else if (capabilityExpired) state = "EXPIRED";
+    else {
+      let otherLive = false;
+      for (const name of fs.readdirSync(scopeDir)) {
+        if (!name.endsWith(".json") || name === scopeSha256 + ".json") continue;
+        if (isLive(readRecord(resolve(scopeDir, name)))) otherLive = true;
+      }
+      state = otherLive ? "SCOPE-DRIFT" : "SEEDED";
+    }
+
+    if (state === "DRIFT") {
+      return { admit: false, lines: overrideNote("DRIFT", "a signed override exists for this exact scope but the repository drifted after signing, so it cannot be consumed. Nothing is re-seeded while the signed request is live (until " + existing.expiresAt + "). Run a plain git commit of the same staged index and touch nothing after signing: no edits, no new files, no stash, and keep the proof file outside this repository.") };
+    }
+
+    let requestSha256;
+    if (state === "PENDING") {
+      requestSha256 = existing.requestSha256;
+      if (!COMMIT_SCOPE_HEX64.test(String(requestSha256))) throw overrideFault("RECORD", "the pending scope record carries no usable request identity");
+    } else {
+      phase = "seed";
+      const recorded = hgo.recordHumanGuardDenial({ rootDir: root, pluginRoot, toolName, toolInput, denials });
+      if (!recorded || recorded.status !== "planned" || !COMMIT_SCOPE_HEX64.test(String(recorded.requestSha256))) {
+        throw overrideFault(String((recorded && (recorded.code || recorded.status)) || "none"), "the denial could not be recorded as a plannable override request");
+      }
+      requestSha256 = recorded.requestSha256;
+    }
+
+    phase = "prepare";
+    const sink = { out: "", err: "" };
+    const exitCode = cli.main(["prepare-for-signature", "--repo", root, "--request-sha256", requestSha256], {
+      write: (chunk) => { sink.out += chunk; return true; },
+      writeError: (chunk) => { sink.err += chunk; return true; },
+    });
+    if (exitCode !== 0) throw overrideFault("PREPARE", "prepare-for-signature exited " + exitCode);
+    const prepared = JSON.parse(sink.out);
+    if (!prepared || prepared.status !== "prepared" || !COMMIT_SCOPE_HEX64.test(String(prepared.planSha256)) || !COMMIT_SCOPE_HEX64.test(String(prepared.intentSha256)) || !(Date.parse(prepared.expiresAt) > nowMs)) {
+      throw overrideFault("PREPARE", "prepare-for-signature returned no signable preparation");
+    }
+
+    phase = "record";
+    writeRecord({
+      schema: COMMIT_SCOPE_RECORD_SCHEMA,
+      status: "live",
+      scopeSha256,
+      scope,
+      requestSha256,
+      planSha256: prepared.planSha256,
+      intentSha256: prepared.intentSha256,
+      expiresAt: prepared.expiresAt,
+      seededAt: state === "PENDING" && typeof existing.seededAt === "string" ? existing.seededAt : new Date().toISOString(),
+      preparedAt: new Date().toISOString(),
+    });
+
+    const summary = {
+      "SEEDED": "a commit-scoped override request was seeded for this exact staged scope",
+      "PENDING": "the commit-scoped override request seeded earlier is still pending; no second request was created",
+      "SCOPE-DRIFT": "the staged scope differs from an earlier still-pending request, which no longer matches; a fresh request was seeded",
+      "ALREADY-CONSUMED": "the earlier signature for this exact scope was already consumed (it admits one commit only); a fresh request was seeded",
+      "EXPIRED": "the earlier request or capability for this scope expired; a fresh request was seeded",
+    }[state];
+    return {
+      admit: false,
+      lines: [
+        "",
+        "PB-COMMIT-OVERRIDE-" + state + ": " + summary + " (" + (Date.now() - startedAt) + " ms).",
+        "Scope: head " + head + ", index tree " + indexTree + ", " + protectedPaths.length + " protected path(s), rules " + ruleIds.join(", ") + ". The commit message is not bound. Valid until " + prepared.expiresAt + ".",
+        "Human operator: run the two steps below in an attended terminal (write the proof file outside this repository), then retry the identical commit once and touch nothing between signing and the retry.",
+        ...sink.err.split(NL),
+      ],
+    };
+  } catch (error) {
+    const code = error && error.code ? error.code : (error && error.name ? error.name : "fault");
+    return { admit: false, lines: overrideNote("UNAVAILABLE", "the commit-scoped override could not be prepared (" + code + " during " + phase + "); failing closed, the findings above stand.") };
+  }
+}
+
 ${staleCheck}
 async function main() {
   if (await snapshotIsStale()) return;
@@ -865,10 +1086,17 @@ async function main() {
 
   if (findings.length === 0) return;
 
+  // AC-258: before refusing, consume an armed commit-scoped capability (admit once) or seed /
+  // re-print the signing course. Any fault inside degrades to the plain refusal below.
+  let override = { admit: false, lines: [] };
+  try { override = await commitOverrideCourse(projectRoot, commonDir, findings); } catch { override = { admit: false, lines: [] }; }
+  if (override.admit === true) return;
+
   block([
     \`\${findings.length} staged path(s) are protected and carry no matching consumed human-guard-override capability:\`,
     ...findings.map((finding) => \`  - \${finding.id} \${finding.path}: \${finding.reason}\`),
     "Why: this is the git-level backstop for guard-testpath.mjs / guard-gate-strength.mjs -- it exists because a spawned process (a different interpreter, a shelled-out redirect) can write these paths without ever crossing a PreToolUse hook boundary; this commit boundary is the one such a process cannot walk around.",
+    ...override.lines,
   ]);
 }
 
