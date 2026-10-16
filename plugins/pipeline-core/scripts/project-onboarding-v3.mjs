@@ -139,6 +139,12 @@ function privateIntakeRepositoryCapability(options, deps) {
  * either caller, so this stays the one place that owns them.
  */
 function resolveIntakeCaptureText(options) {
+  return resolveIntakeCaptureInput(options).text;
+}
+
+// ALF-C-P19-09B: same resolution, plus the parsed host chat-turn reference (null on the
+// inline/file routes) so intake-capture-apply can bind the reference into the checkpoint entry.
+function resolveIntakeCaptureInput(options) {
   if ([options.text, options.textFile, options.textTurnRef].filter((value) => value !== undefined).length > 1) {
     const conflict = new Error("accepts exactly one of --text, --text-file, or --text-turn-ref");
     conflict.code = "INTAKE-CAPTURE-TEXT-AMBIGUOUS";
@@ -163,15 +169,18 @@ function resolveIntakeCaptureText(options) {
       const code = typeof resolved?.code === "string" ? resolved.code : "INTAKE-CHAT-TURN-REFERENCE-UNAVAILABLE";
       throw Object.assign(new Error(code), { code });
     }
-    return resolved.text;
+    return { text: resolved.text, captureReference: reference };
   }
   if (options.textFileSha256 !== undefined && options.textFile === undefined) {
     throw Object.assign(new Error("--text-file-sha256 requires --text-file"), { code: "INTAKE-CAPTURE-TEXT-FILE-DIGEST-WITHOUT-FILE" });
   }
-  if (options.textFile === undefined) return options.text;
-  return readIntakeMaterialReference({
-    rootDir: options.root, filePath: options.textFile, expectedSha256: options.textFileSha256 ?? null,
-  }).text;
+  if (options.textFile === undefined) return { text: options.text, captureReference: null };
+  return {
+    text: readIntakeMaterialReference({
+      rootDir: options.root, filePath: options.textFile, expectedSha256: options.textFileSha256 ?? null,
+    }).text,
+    captureReference: null,
+  };
 }
 
 /**
@@ -937,9 +946,10 @@ export function main(args = process.argv.slice(2), {
         // A Claude reference is consumed only after the canonical consent write/readback.
         // The reference readers bind to that checkpoint and never accept a transcript path.
         const consent = applyOnboardingIntakeConsent({ ...consentArgs, text: null });
-        const text = resolveIntakeCaptureText(options);
+        const input = resolveIntakeCaptureInput(options);
         const capture = applyOnboardingIntakeCapture({
-          rootDir: options.root, repositoryCapability, text, activate: options.activate, deps,
+          rootDir: options.root, repositoryCapability, text: input.text, activate: options.activate, deps,
+          captureReference: input.captureReference,
         });
         output = {
           ...consent,
@@ -970,9 +980,13 @@ export function main(args = process.argv.slice(2), {
       }
       if (languageProjection.status !== "not-required") output = { ...output, languageProjection };
     }
-    else if (options.command === "intake-capture-apply") output = applyOnboardingIntakeCapture({
-      rootDir: options.root, repositoryCapability, text: resolveIntakeCaptureText(options), activate: options.activate, deps,
-    });
+    else if (options.command === "intake-capture-apply") {
+      const input = resolveIntakeCaptureInput(options);
+      output = applyOnboardingIntakeCapture({
+        rootDir: options.root, repositoryCapability, text: input.text, activate: options.activate, deps,
+        captureReference: input.captureReference,
+      });
+    }
     else if (["intake-design-questions-apply", "intake-design-questions-replace"].includes(options.command)) {
       let answers;
       const resolvedAnswers = resolveIntakeAnswers(options);

@@ -6124,8 +6124,21 @@ function validIntakeConsent(value) {
     && value.granted === true && canonicalIsoTimestamp(value.at));
 }
 
+// ALF-C-P19-09B: an entry captured from a host chat-turn reference additionally carries
+// `captureReference` {referenceSchema, referenceSha256, captureId}; entries from files/inline text
+// (and checkpoints written before this field existed) omit it and stay valid.
+function validIntakeCaptureReferenceBinding(binding) {
+  return exactKeys(binding, new Set(["referenceSchema", "referenceSha256", "captureId"]))
+    && typeof binding.referenceSchema === "string" && binding.referenceSchema.length > 0
+    && SHA256_RE.test(binding.referenceSha256)
+    && (binding.captureId === null || /^[a-f0-9]{48}$/u.test(binding.captureId));
+}
+
 function validIntakeMaterialInputEntry(entry) {
-  return exactKeys(entry, new Set(["sha256", "evidencePath", "byteLength", "receivedAt"]))
+  const { captureReference, ...rest } = entry ?? {};
+  if (entry !== null && typeof entry === "object" && Object.hasOwn(entry, "captureReference")
+    && !validIntakeCaptureReferenceBinding(captureReference)) return false;
+  return exactKeys(rest, new Set(["sha256", "evidencePath", "byteLength", "receivedAt"]))
     && SHA256_RE.test(entry.sha256)
     && entry.evidencePath === `${INTAKE_CHECKPOINT_EVIDENCE_DIRNAME}/${entry.sha256}.txt`
     && Number.isSafeInteger(entry.byteLength) && entry.byteLength >= 0
@@ -6519,12 +6532,29 @@ export function applyOnboardingIntakeConsent({
  * already moved past that point).
  */
 export function applyOnboardingIntakeCapture({
-  rootDir, repositoryCapability = "local", text, activate = false, deps = {},
+  rootDir, repositoryCapability = "local", text, activate = false, deps = {}, captureReference = null,
 } = {}) {
   if (activate !== true) fail("INTAKE-CAPTURE-ACTIVATION-REQUIRED", "intake capture apply requires explicit activation");
   if (typeof text !== "string" || text.length === 0) fail("INTAKE-CAPTURE-EMPTY", "intake capture requires non-empty material text");
   const bytes = Buffer.from(text, "utf8");
   if (bytes.length > INTAKE_MAX_MATERIAL_BYTES) fail("INTAKE-CAPTURE-TOO-LARGE", "intake capture chunk exceeds the per-chunk byte limit");
+  // ALF-C-P19-09B: when the text came from a host chat-turn reference, bind that reference into the
+  // entry and verify it against the resolved bytes (the reference must describe exactly these bytes).
+  let referenceBinding = null;
+  if (captureReference !== null && captureReference !== undefined) {
+    const ref = captureReference;
+    if (typeof ref !== "object" || Array.isArray(ref) || typeof ref.schema !== "string"
+      || (ref.promptSha256 !== undefined && ref.promptSha256 !== createHash("sha256").update(bytes).digest("hex"))
+      || (ref.byteLength !== undefined && ref.byteLength !== bytes.length)
+      || (ref.captureId !== undefined && !/^[a-f0-9]{48}$/u.test(String(ref.captureId)))) {
+      fail("INTAKE-CAPTURE-REFERENCE-MISMATCH", "the chat-turn reference does not describe the captured bytes");
+    }
+    referenceBinding = {
+      referenceSchema: ref.schema,
+      referenceSha256: canonicalSha256(ref),
+      captureId: ref.captureId ?? null,
+    };
+  }
   const nowIso = deps.now ? deps.now() : new Date().toISOString();
 
   // Evidence is written BEFORE the checkpoint entry that references it: a
@@ -6546,6 +6576,7 @@ export function applyOnboardingIntakeCapture({
         evidencePath: `${INTAKE_CHECKPOINT_EVIDENCE_DIRNAME}/${evidence.sha256}.txt`,
         byteLength: evidence.byteLength,
         receivedAt: nowIso,
+        ...(referenceBinding === null ? {} : { captureReference: referenceBinding }),
       };
       const { contentSha256: dropSha, ...baseUnsigned } = base;
       void dropSha;
