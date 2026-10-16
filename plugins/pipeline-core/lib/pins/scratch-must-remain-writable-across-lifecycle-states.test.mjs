@@ -2,6 +2,16 @@
 // Pin for pipeline.scratch-must-remain-writable-across-lifecycle-states (AC-247, slice ALF-C-P10-02).
 // Exercises the real lifecycle guard, the shared physical-scratch predicate, the test-path rule
 // matcher and the gate-strength rule matcher. Fixtures live under the repository's scratch/.
+//
+// Sampled coverage (stated exactly, measured 2026-10-16 on a native Windows host: ~60 s for this file, readiness
+// states = ALL_STATES = the controlling non-ready statuses + "unavailable" + "ready"). Full cross-product coverage was NOT taken:
+// the outside-root refusal alone costs ~12 s per call, so one per state would exceed the ~150 s budget.
+//  - Point 1: every state runs at least one of the three tool shapes (Write/Edit/mkdir); the tool shape rotates by state
+//    index, and only the first and the last (ready) state run all three.
+//  - Point 2: the first non-ready state runs all four cheap near-miss classes plus the outside-root class; each later
+//    non-ready state runs ONE cheap class chosen by rotation (the outside-root class is not repeated).
+//  - Point 3: the first non-ready state runs both shell lanes; each later non-ready state runs ONE lane by rotation.
+//  - Points 4-6 and the predicate checks are exhaustive over their own listed inputs.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -51,7 +61,7 @@ const stateDeps = (projectDir, status) => ({
 });
 const ALL_STATES = [...PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES, "unavailable", "ready"];
 
-test("AC-247 point 1: Write/Edit/mkdir of contained scratch is admitted in every readiness state", (t) => {
+test("AC-247 point 1: Write/Edit/mkdir of contained scratch is admitted in every readiness state (at least one tool shape per state, all three in first and ready states)", (t) => {
   const root = fixture(t);
   // Runtime: every readiness state is exercised at least once; the three tool shapes rotate across
   // states, and the first and last (ready) states run all three.
@@ -67,7 +77,7 @@ test("AC-247 point 1: Write/Edit/mkdir of contained scratch is admitted in every
   assert.ok(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length > 0);
 });
 
-test("AC-247 point 2: near-miss paths escaping scratch/ and machine state stay refused in every state", (t) => {
+test("AC-247 point 2: near-miss paths escaping scratch/ and machine state stay refused (every class in the first non-ready state, one rotated class in each later non-ready state)", (t) => {
   const root = fixture(t);
   // Runtime: the outside-root refusal class costs ~12 s per call (override planning), so it runs in the
   // first state only. The first state runs every near-miss class; each later state runs one of the
@@ -92,7 +102,7 @@ test("AC-247 point 2: near-miss paths escaping scratch/ and machine state stay r
   assert.equal(isPhysicalScratchTarget("scratch/new/dir/file.md", { rootDir: root, liveRoots: [] }), true);
 });
 
-test("AC-247 point 3: no arbitrary shell mutation - opaque interpreter and redirect lanes stay refused (typed host boundary)", (t) => {
+test("AC-247 point 3: no arbitrary shell mutation - opaque interpreter and redirect lanes stay refused (typed host boundary; both lanes in the first non-ready state, one rotated lane in each later one)", (t) => {
   const root = fixture(t);
   // Runtime: both lanes run in the first state; each later state runs one lane in rotation.
   const lanes = ["printf x > scratch/out.txt", "node -e \"require('fs').writeFileSync('scratch/a','b')\""];

@@ -8,9 +8,10 @@
  *
  * Host limitation (owner Coordinator, due 2026-10-19, PO decision K7): cases that need POSIX
  * directory mode bits or directory symlinks are skipped on native Windows and must run on Linux/WSL.
- * The own-create case is deliberately NOT skipped on Windows: on a native Windows host the guard's
- * prepareOwnedCriticNotesDirectory() demands (mode & 0o7777) === 0o700 after mkdir (and 0o600 on the
- * receipt), which Windows never reports; that is the item's reported defect and stays RED there.
+ * The own-create case is NOT skipped on Windows and is GREEN there: prepareOwnedCriticNotesDirectory() applies the
+ * 0o700/0o600 mode comparisons off Windows only (Windows reports synthetic mode bits), through the injected
+ * `platform` dependency (default process.platform). The off-Windows mode refusals are exercised in-process at the
+ * end of this file by injecting platform "linux" against the real Windows filesystem (synthetic 0o777/0o666 bits).
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -173,6 +174,33 @@ test("a symlinked own directory is never admitted as the notes target", { skip: 
   assert.equal(res.status, 2, res.stderr);
   assert.match(res.stderr, /DISPATCH-BUDGET-CRITIC-WRITE-CONFINED/u);
   assert.equal(existsSync(join(elsewhere, "critic-notes.md")), false);
+});
+
+// --- Critic C6b F3 correction: off-Windows mode checks via the injected platform (in-process, real filesystem) ---
+const SYNTHETIC_MODE_ONLY = IS_WINDOWS ? false : "needs a host reporting synthetic mode bits (native Windows); on POSIX the real modes are correct and the mode cases above cover admission";
+const lockSeams = { acquireDispatchBudgetCounterLockFn: () => ({ status: "acquired", lock: {} }), releaseDispatchBudgetCounterLockFn: () => true };
+async function inProcess(root, platform) {
+  const { evaluateDispatchBudgetGuard } = await import("../../hooks/guard-dispatch-budget.mjs");
+  const input = { session_id: "notes-pin-session", transcript_path: join(root, "parent-session.jsonl"), tool_name: "Write", tool_input: { file_path: join(root, notesRel()), content: "# notes\n" }, agent_id: ID, agent_type: CRITIC };
+  return evaluateDispatchBudgetGuard(input, { rootDir: root, platform, ...lockSeams });
+}
+
+test("injected platform linux: a wrong-mode notes directory (synthetic 0777 from the real fs) is refused, never adopted", { skip: SYNTHETIC_MODE_ONLY }, async () => {
+  const root = criticRoot();
+  const res = await inProcess(root, "linux");
+  assert.equal(res.exitCode, 2, res.stderr);
+  assert.match(res.stderr, /DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: critic-notes-partial-held/u);
+  assert.equal(existsSync(receiptOf(root)), false, "no receipt is published for a wrong-mode directory");
+});
+
+test("injected platform linux: a wrong-mode receipt (synthetic 0666) is refused on re-entry", { skip: SYNTHETIC_MODE_ONLY }, async () => {
+  const root = criticRoot();
+  const first = await inProcess(root, "win32"); // the Windows rule creates directory and receipt
+  assert.equal(first.exitCode, 0, first.stderr);
+  assert.ok(existsSync(receiptOf(root)));
+  const second = await inProcess(root, "linux");
+  assert.equal(second.exitCode, 2, second.stderr);
+  assert.match(second.stderr, /DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: critic-notes-binding-unavailable/u);
 });
 
 test("own directory is created with mode 0700 and the receipt with 0600", { skip: IS_WINDOWS ? HOST_LIMIT : false }, async () => {

@@ -612,7 +612,9 @@ function prepareOwnedCriticNotesDirectory({ path, counter, identity, input, root
   const image = info => ({ dev: String(info.dev), ino: String(info.ino), mode: info.mode & 0o7777 });
   // Windows reports synthetic POSIX mode bits (0o777 / 0o666): the bits carry no ownership information there,
   // so the mode comparisons are applied on every other platform only. dev/ino identity checks stay everywhere.
-  const modeIs = (info, expected) => process.platform === "win32" || (info.mode & 0o7777) === expected;
+  // The platform is the injected one (same seam as the counter-lock owner), so off-Windows checks are testable here.
+  const hostPlatform = dependencies?.platform ?? process.platform;
+  const modeIs = (info, expected) => hostPlatform === "win32" || (info.mode & 0o7777) === expected;
   let created = false;
   try {
     // Only fixed shared ancestors may exist without a notes ownership receipt.

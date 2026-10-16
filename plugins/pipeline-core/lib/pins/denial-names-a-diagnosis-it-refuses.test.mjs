@@ -53,3 +53,23 @@ try {
 } finally {
   rmSync(join(root, receiptRel), { force: true });
 }
+
+// --- AC-148 correction (Critic C6b F2), added 2026-10-16 ---
+const { test } = await import('node:test');
+const SKIP_OWNER = 'owner Coordinator, due 2026-10-23 (QG-06)';
+test('headline case: a denial naming `design-advisory-admission.mjs inspect` is admitted under opaque-script-execution',
+  { skip: `uncovered ${SKIP_OWNER}: the opaque-script-execution lane is emitted at plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs line 118 (targets.push lane "opaque-script-execution"); no denial text in guard-devplan-policy.mjs designAdvisoryRemediation names design-advisory-admission.mjs inspect (script exists at plugins/pipeline-core/scripts/design-advisory-admission.mjs), so the emitter that would name it was not found` }, () => {});
+test('DLR035 receipt: the recovery named by a DLR035 denial is admitted in the state that produced it',
+  { skip: `uncovered ${SKIP_OWNER}: no emitter of a DLR035 receipt was found in guard-devplan-policy.mjs or guard/devplan-shell-lane.mjs (rg for DLR035 in both returned nothing); the emitter does not exist in the files searched` }, () => {});
+test('exact rendered recovery text: the denial spelling is observed against the guard, not a hand-built spelling', () => {
+  const text = designAdvisoryRemediation('DAA-DESIGN-SOURCE-DRIFT');
+  const rendered = /Run (reopen-design --by <human attribution>)/u.exec(text)?.[1];
+  assert.equal(rendered, 'reopen-design --by <human attribution>', 'denial text no longer renders the pinned recovery spelling');
+  // The spelling exactly as rendered, bare and with the sanctioned script prefix.
+  const bare = isSanctionedLifecycleCommand(rendered, root, {});
+  const prefixed = isSanctionedLifecycleCommand(`node "${script}" ${rendered}`, root, {});
+  console.log(`observed: rendered bare sanctioned=${bare}; prefixed sanctioned=${prefixed}`);
+  // Observed value: the placeholder text is not runnable, so the guard refuses the literal spelling.
+  assert.equal(bare, false);
+  assert.equal(prefixed, false);
+});
