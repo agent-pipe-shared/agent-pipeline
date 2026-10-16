@@ -1186,6 +1186,14 @@ if (verificationActionPlan !== null) {
 
 console.log(`\nEvidence written: ${evidencePath} (run record: ${runEvidencePath})`);
 console.log(`Overall: ${steps.map((s) => `${s.name}=${s.exitCode}`).join(", ")} -> exit ${overallExitCode}`);
+// Run-time budget headroom (AC-233, PO decisions 2026-10-16 #26/#29): ONE information line, never a gate.
+// Every failure here prints "unknown"; this block cannot alter finalExitCode below.
+try {
+  const { runHeadroomInfoLine } = await import("../../plugins/pipeline-core/lib/project-resource-headroom.mjs");
+  console.log(runHeadroomInfoLine({ kind: "verify", measuredSeconds: (Date.now() - Date.parse(verifyStartedAt)) / 1000, calibration: manualVerifyCalibration }));
+} catch {
+  console.log("Resource headroom (run time): unknown - headroom could not be computed (information only)");
+}
 
 const finalExitCode = overallExitCode === 0 && verificationActionResult?.status === "source-complete/event-unavailable" ? 2 : overallExitCode;
 process.exit(finalExitCode);
