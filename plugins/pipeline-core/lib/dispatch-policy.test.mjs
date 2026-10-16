@@ -16,11 +16,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { briefingRoutePath, evaluateBriefingRoute } from "../hooks/guard-dispatch.mjs";
 import { readAgentMaxTurns } from "./dispatch-budget-binding.mjs";
 import { CLOSING_ALLOWANCE } from "./dispatch-budget-core.mjs";
 import { dispatchBudgetBinding, dispatchBudgetLineForRole, dispatchFindings } from "./dispatch-policy.mjs";
@@ -758,7 +759,79 @@ check("DP28 an Opus model-selection line without a Batch-scope rationale yields 
   assert.ok(critic("Requested route: claude-opus-5 at high (design tier)").includes(NO_BATCH));
 });
 
-assert.equal(cases.length, 42,"the complete dispatch-policy corpus must be registered before execution begins");
+// DP29a-DP29c -- ALF-C-P19-05E, AC-127, V-10 of pipeline.claude-windows-greenfield-lifecycle-not-walkable:
+// the batch launcher wires the briefing route producer (recordDispatchBriefingRoute) for a direct packet.
+const ROUTE_SLICE = "DPT-ROUTE-1";
+const routePacketFor = (index, transport = "direct") => {
+  const packet = packetFor("goldfish-implementor", index);
+  packet.prompt = `${CLEAN_GOLDFISH}\n- **Slice:** ${ROUTE_SLICE}`;
+  packet.transport = transport;
+  return packet;
+};
+
+fixtureCheck("DP29a a direct packet writes the briefing route record before the launcher runs", async () => {
+  const packet = routePacketFor(320);
+  const seen = [];
+  try {
+    const result = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: [packet],
+      launch: async (sent) => {
+        seen.push(evaluateBriefingRoute({ prompt: sent.prompt, root: dispatchFixture }).status);
+        return sent.dispatchId;
+      },
+    });
+    assert.equal(result.status, "completed", JSON.stringify(result));
+    assert.equal(result.launcherCalls, 1);
+    assert.deepEqual(seen, ["match"], "the record must already bind the sent text when the launcher runs");
+    assert.equal(existsSync(briefingRoutePath(dispatchFixture, ROUTE_SLICE)), true);
+  } finally {
+    rmSync(join(dispatchFixture, "evidence"), { recursive: true, force: true });
+  }
+});
+
+fixtureCheck("DP29b a refused route record stops before any launch with RDB-ROUTE-RECORD", async () => {
+  const packet = routePacketFor(321);
+  writeFileSync(join(dispatchFixture, "evidence"), "not a directory"); // a non-directory where the evidence directory belongs
+  let launches = 0;
+  try {
+    const result = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: [packet],
+      launch: async () => { launches += 1; },
+    });
+    assert.equal(result.status, "rejected");
+    assert.equal(result.code, "RDB-ROUTE-RECORD");
+    assert.equal(result.failedRoute.status, "refused");
+    assert.equal(result.failedRoute.code, "DBRR-EVIDENCE-DIR");
+    assert.equal(launches, 0);
+    assert.equal(result.launcherCalls, 0);
+    assert.equal(readFileSync(join(dispatchFixture, "evidence"), "utf8"), "not a directory");
+  } finally {
+    rmSync(join(dispatchFixture, "evidence"), { recursive: true, force: true });
+  }
+});
+
+fixtureCheck("DP29c a non-direct transport neither records a route nor is blocked by a refusing record", async () => {
+  const packet = routePacketFor(322, "workflow");
+  writeFileSync(join(dispatchFixture, "evidence"), "not a directory");
+  let launches = 0;
+  try {
+    const result = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: [packet],
+      launch: async (sent) => { launches += 1; return sent.dispatchId; },
+    });
+    assert.equal(result.status, "completed", JSON.stringify(result));
+    assert.equal(result.code, "RDB-COMPLETED");
+    assert.equal(launches, 1);
+    assert.equal(readFileSync(join(dispatchFixture, "evidence"), "utf8"), "not a directory", "the evidence entry is untouched");
+  } finally {
+    rmSync(join(dispatchFixture, "evidence"), { recursive: true, force: true });
+  }
+});
+
+assert.equal(cases.length, 45,"the complete dispatch-policy corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

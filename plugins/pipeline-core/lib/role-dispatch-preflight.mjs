@@ -8,6 +8,7 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
 import { dispatchFindings } from "./dispatch-policy.mjs";
+import { recordDispatchBriefingRoute } from "./dispatch-briefing-route-record.mjs";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 
@@ -367,6 +368,12 @@ export async function runRoleDispatchBatch({ root, resultRoot = root, packets, l
         results,
         launcherCalls: results.length,
       };
+    }
+    if (current.packet.transport === "direct") {
+      const route = recordDispatchBriefingRoute({ root, prompt: current.packet.prompt });
+      if (route.status === "refused") {
+        return { ...prepared, status: "rejected", code: "RDB-ROUTE-RECORD", failedRoute: route, results, launcherCalls: results.length };
+      }
     }
     results.push(await launch(structuredClone(current.packet)));
   }
