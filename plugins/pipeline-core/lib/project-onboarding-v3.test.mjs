@@ -10316,6 +10316,8 @@ export const FRESH_ENROLLMENT_REGRESSION_CASES = [
       const controller=createGovernanceScopeController({hostStateRoot:join(path,"unused-host")}),decision=controller.planDecision({rootDir:path,decision:"decline",by:"disposable-fixture"});const declined=controller.applyDecision(decision,{activate:true,planSha256:decision.planSha256});assert.equal(declined.state,"declined");
       const config=readFileSync(join(path,".git/config")),digest=createHash("sha256").update(config).digest("hex"),writer=PLUGIN_PIPELINE_STATE_SCRIPT;
       const args=["--root",path,"--scope-key",declined.scopeKey,"--barrier-sha256",digest,"--by","disposable-fixture"];
+      // Host fact (measured): retire-enrollment fails WT-GIT-FAILED on a Git root with no HEAD commit.
+      const firstBase=spawnSync("git",["-c","user.name=fixture","-c","user.email=fixture@example.invalid","commit","--allow-empty","-m","test: fixture base","-m","AI-Assisted: true\nDispatch: ALF-C-P7-05C (goldfish)"],{cwd:path,encoding:"utf8"});assert.equal(firstBase.status,0,firstBase.stderr);
       const retired=spawnSync(process.execPath,[writer,"retire-enrollment",...args],{cwd:path,encoding:"utf8"});assert.equal(retired.status,0,retired.stderr);
       const stateBytes=readFileSync(statePath),checkpoint=readOnboardingIntakeCheckpoint({rootDir:path});assert.equal(derivePlanLifecycle(JSON.parse(stateBytes)).approvalCurrent,false);assert.equal(checkpoint.value.consent,null);
       const observed=inspectProjectOnboardingV3Core({rootDir:path,runner:"codex",intent:"bootstrap"});assert.equal(observed.status,"intake-required",JSON.stringify(observed));
@@ -10325,6 +10327,8 @@ export const FRESH_ENROLLMENT_REGRESSION_CASES = [
     }finally{dispose(path);}
     const readyPath=root();try{
       const portable=planProjectOnboardingV3({rootDir:readyPath,runner:"claude"});assert.equal(applyProjectOnboardingV3(portable,{rootDir:readyPath,activate:true}).status,"applied");
+      // Host fact (measured): writer routes (discard-feature) fail WT-GIT-FAILED on a Git root with no HEAD commit; the active GIT-03 commit-msg hook requires the trailer block.
+      const baseCommit=spawnSync("git",["-c","user.name=fixture","-c","user.email=fixture@example.invalid","commit","--allow-empty","-m","test: fixture base","-m","AI-Assisted: true\nDispatch: ALF-C-P7-05C (goldfish)"],{cwd:readyPath,encoding:"utf8"});assert.equal(baseCommit.status,0,baseCommit.stderr);
       const runtime=planProjectOnboardingLifecycleV4({rootDir:readyPath,runner:"claude",operation:"runtime"}),runtimeDigest=runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256")+1];
       assert.equal(applyProjectOnboardingLifecycleV4({rootDir:readyPath,runner:"claude",operation:"runtime",planSha256:runtimeDigest,activate:true}).status,"intake-required");
       const idleStatePath=join(readyPath,"project/pipeline-state.json");writeFileSync(idleStatePath,JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"retirement-fixture",planPath:"specs/retirement-fixture/prd.md",phase:"design"},planApproved:false})+"\n");
@@ -10351,8 +10355,22 @@ export const FRESH_ENROLLMENT_REGRESSION_CASES = [
       if(concurrent){assert.equal(readFileSync(join(path,".git/concurrent-fixture"),"utf8"),"foreign exact bytes");assert.match(result.diagnostics[0].message,/created Git control tree changed/);}else assert.deepEqual(readdirSync(path),[]);
     }finally{dispose(path);}}
   }},
+  // standalone: not registered in the 216-callback sharded suite (216 = 6 shards x 2 chunks x 18 is a closed partition
+  // contract, EXPECTED_CASE_COUNT); executed by plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs.
+  {id:"OBC298",standalone:true,name:"first enrollment of a never-enrolled repository never enters retirement before consent",run:()=>{
+    for(const initialized of [false,true]){const path=root();try{
+      if(initialized)assert.equal(spawnSync("git",["init","--initial-branch=main"],{cwd:path}).status,0);
+      assert.equal(observeOnboardingEnrollmentHistory({rootDir:path}).retained,false);assert.equal(readGovernanceEnrollmentRetirement({rootDir:path}),null);
+      const plan=planProjectOnboardingV3({rootDir:path,runner:"claude"});assert.equal(plan.status,"ready");
+      const result=applyProjectOnboardingV3(plan,{rootDir:path,activate:true});assert.equal(result.status,"applied",JSON.stringify(result));
+      assert.equal(result.governanceEnrollment.state,"active");
+      const controller=createGovernanceScopeController({hostStateRoot:join(path,"unused-host")});assert.equal(controller.observe({rootDir:path}).state,"active");
+      assert.equal(readGovernanceEnrollmentRetirement({rootDir:path}),null);assert.equal(readOnboardingIntakeCheckpoint({rootDir:path}).status,"absent");
+      assert.equal(existsSync(join(path,".agent-pipeline/enrollment-git-creation-barrier.json")),false);
+    }finally{dispose(path);}}
+  }},
 ];
-for(const entry of FRESH_ENROLLMENT_REGRESSION_CASES)test(entry.name,entry.run);
+for(const entry of FRESH_ENROLLMENT_REGRESSION_CASES)if(entry.standalone!==true)test(entry.name,entry.run);
 Object.freeze(ONBOARDING_TEST_CASES);
 export const ONBOARDING_CASE_IDS = Object.freeze(ONBOARDING_TEST_CASES.map((entry) => entry.id).sort());
 if (DIRECT_INVOCATION) {
