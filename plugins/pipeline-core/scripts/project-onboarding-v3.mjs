@@ -29,6 +29,7 @@ import {
 import {
   applyOnboardingIntakeConsent,
   applyOnboardingIntakeCapture,
+  assertIntakeCaptureReferenceLifetime,
   applyOnboardingIntakeDesignQuestions,
   applyOnboardingIntakeGenerate,
   planOnboardingIntakeGenerate,
@@ -159,6 +160,8 @@ function resolveIntakeCaptureInput(options) {
     }
     let resolved;
     if (reference.schema === CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA) {
+      // AC-226 A1: refuse an expired/expiry-less/over-long reference before any store access.
+      assertIntakeCaptureReferenceLifetime(reference);
       resolved = readClaudeIntakePromptCapture({ rootDir: options.root, sessionId: reference.sessionId, reference });
     } else if (reference.schema === CLAUDE_INITIAL_PROMPT_REFERENCE_SCHEMA) {
       resolved = readClaudeInitialPromptPointerAfterConsent({ rootDir: options.root, sessionId: reference.sessionId, reference });

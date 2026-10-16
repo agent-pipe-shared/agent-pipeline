@@ -18,7 +18,11 @@ import {
   readPrivateFile,
   writePrivateFileNoReplaceAtomic,
 } from "./private-boundary.mjs";
-import { readOnboardingIntakeCheckpoint } from "./onboarding-continuity.mjs";
+import {
+  assertIntakeCaptureReferenceLifetime,
+  INTAKE_CAPTURE_REFERENCE_LIFETIME_MS,
+  readOnboardingIntakeCheckpoint,
+} from "./onboarding-continuity.mjs";
 import { captureClaudeInitialPromptPointer } from "./claude-initial-prompt-pointer.mjs";
 
 export const CLAUDE_INTAKE_PROMPT_CAPTURE_SCHEMA = "pipeline.claude-intake-prompt-capture.v1";
@@ -108,11 +112,15 @@ function makeReference(record) {
     transcriptPathSha256: record.transcriptPathSha256,
     promptSha256: record.promptSha256,
     byteLength: record.byteLength,
+    issuedAt: record.capturedAt,
+    expiresAt: record.expiresAt,
   };
 }
 
 /** Capture only the native current prompt when intake is explicitly pending. */
-export function captureClaudeIntakePrompt(input, { readCheckpoint = readOnboardingIntakeCheckpoint } = {}) {
+export function captureClaudeIntakePrompt(input, {
+  readCheckpoint = readOnboardingIntakeCheckpoint, now = Date.now,
+} = {}) {
   let values;
   try { values = eventValues(input); }
   catch (error) { return unavailable(error?.message || "CLAUDE-INTAKE-HOST-EVENT-INVALID"); }
@@ -126,6 +134,7 @@ export function captureClaudeIntakePrompt(input, { readCheckpoint = readOnboardi
   try { privateDirectory = ensurePrivateDirectory(directory); }
   catch (error) { return unavailable(error?.code || "CLAUDE-INTAKE-PRIVATE-STORE-UNAVAILABLE"); }
   const captureId = randomBytes(24).toString("hex");
+  const issuedMs = now();
   const record = {
     schema: CLAUDE_INTAKE_PROMPT_CAPTURE_SCHEMA,
     root: values.root,
@@ -135,7 +144,8 @@ export function captureClaudeIntakePrompt(input, { readCheckpoint = readOnboardi
     checkpointRevision: checkpoint.value.revision,
     promptSha256: sha256(values.promptBytes),
     byteLength: values.promptBytes.length,
-    capturedAt: new Date().toISOString(),
+    capturedAt: new Date(issuedMs).toISOString(),
+    expiresAt: new Date(issuedMs + INTAKE_CAPTURE_REFERENCE_LIFETIME_MS).toISOString(),
     captureId,
     promptBase64: values.promptBytes.toString("base64"),
   };
@@ -168,7 +178,7 @@ function decodeRecord(bytes) {
   try { record = JSON.parse(bytes.toString("utf8")); }
   catch { throw new Error("CLAUDE-INTAKE-RECORD-MALFORMED"); }
   const keys = ["schema", "root", "sessionId", "transcriptPathSha256", "checkpointSha256",
-    "checkpointRevision", "promptSha256", "byteLength", "capturedAt", "captureId", "promptBase64"];
+    "checkpointRevision", "promptSha256", "byteLength", "capturedAt", "expiresAt", "captureId", "promptBase64"];
   if (!exactKeys(record, keys) || record.schema !== CLAUDE_INTAKE_PROMPT_CAPTURE_SCHEMA
     || typeof record.root !== "string" || !SESSION_ID.test(record.sessionId)
     || !SHA256.test(record.transcriptPathSha256) || !SHA256.test(record.checkpointSha256)
@@ -177,6 +187,8 @@ function decodeRecord(bytes) {
     || record.byteLength < 1 || record.byteLength > MAX_PROMPT_BYTES
     || typeof record.capturedAt !== "string" || !Number.isFinite(Date.parse(record.capturedAt))
     || new Date(record.capturedAt).toISOString() !== record.capturedAt
+    || typeof record.expiresAt !== "string" || !Number.isFinite(Date.parse(record.expiresAt))
+    || new Date(record.expiresAt).toISOString() !== record.expiresAt
     || !CAPTURE_ID.test(record.captureId) || typeof record.promptBase64 !== "string"
     || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(record.promptBase64)) {
     throw new Error("CLAUDE-INTAKE-RECORD-SHAPE");
@@ -193,9 +205,13 @@ function decodeRecord(bytes) {
 
 /** Resolve an opaque adapter reference while its exact intake stage is current. */
 export function readClaudeIntakePromptCapture({ rootDir, sessionId, reference }, {
-  readCheckpoint = readOnboardingIntakeCheckpoint,
+  readCheckpoint = readOnboardingIntakeCheckpoint, now = Date.now,
 } = {}) {
-  if (!exactKeys(reference, ["schema", "captureId", "sessionId", "transcriptPathSha256", "promptSha256", "byteLength"])
+  // issuedAt/expiresAt are optional at the shape layer so that a reference without an expiry reaches
+  // the dedicated INTAKE-CAPTURE-EXPIRY-MISSING refusal instead of a generic shape error.
+  const { issuedAt: _issuedAt, expiresAt: _expiresAt, ...core } = reference !== null && typeof reference === "object"
+    && !Array.isArray(reference) ? reference : {};
+  if (!exactKeys(core, ["schema", "captureId", "sessionId", "transcriptPathSha256", "promptSha256", "byteLength"])
     || reference.schema !== CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA
     || !CAPTURE_ID.test(reference.captureId) || !SESSION_ID.test(sessionId || "")
     || reference.sessionId !== sessionId || !SHA256.test(reference.transcriptPathSha256)
@@ -203,6 +219,8 @@ export function readClaudeIntakePromptCapture({ rootDir, sessionId, reference },
     || reference.byteLength < 1 || reference.byteLength > MAX_PROMPT_BYTES) {
     return unavailable("CLAUDE-INTAKE-REFERENCE-SHAPE");
   }
+  try { assertIntakeCaptureReferenceLifetime(reference, { now: now() }); }
+  catch (error) { return unavailable(error?.code || "INTAKE-CAPTURE-REFERENCE-MALFORMED"); }
   let root;
   let checkpoint;
   try {
@@ -226,7 +244,8 @@ export function readClaudeIntakePromptCapture({ rootDir, sessionId, reference },
     || record.checkpointRevision !== checkpoint.value.revision
     || reference.captureId !== record.captureId || reference.sessionId !== record.sessionId
     || reference.transcriptPathSha256 !== record.transcriptPathSha256
-    || reference.promptSha256 !== record.promptSha256 || reference.byteLength !== record.byteLength) {
+    || reference.promptSha256 !== record.promptSha256 || reference.byteLength !== record.byteLength
+    || reference.issuedAt !== record.capturedAt || reference.expiresAt !== record.expiresAt) {
     return unavailable("CLAUDE-INTAKE-CAPTURE-BINDING");
   }
   return { status: "available", text: parsed.text, reference: makeReference(record) };

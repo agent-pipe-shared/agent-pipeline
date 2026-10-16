@@ -22,7 +22,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, resolve } from "node:path";
 import baseTest, { after } from "node:test";
 import { fileURLToPath } from "node:url";
-import { applyOnboardingIntakeCapture, applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
+import { applyOnboardingIntakeCapture, applyOnboardingIntakeConsent, assertIntakeCaptureReferenceLifetime, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
 import {
   captureClaudeIntakePrompt,
   CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA,
@@ -128,6 +128,75 @@ test("A1 KNOWN-GAP expiry: the host reference carries an explicit expiry that th
   const { reference } = captureClaudeIntakePrompt(hostEvent(root, "expiry probe"));
   assert.equal(Object.keys(reference).some((key) => /expir/iu.test(key)), true,
     "MISSING: reference/record have no expiresAt; captureClaudeIntakePrompt and readClaudeIntakePromptCapture must add and enforce one");
+});
+
+// ---------------------------------------------------------------- A1 lifetime (ALF-C-P22-01, PO decision 2026-10-16 #1)
+// Store-free (plain baseTest): the lifetime contract is enforced before any private-store access.
+const HOUR = 3_600_000;
+const T0 = Date.parse("2026-10-16T08:00:00.000Z");
+function lifetimeRef(overrides = {}, issued = T0, lifetime = 24 * HOUR) {
+  return {
+    schema: CLAUDE_INTAKE_PROMPT_REFERENCE_SCHEMA, captureId: "d".repeat(48), sessionId: "session-pin-001",
+    transcriptPathSha256: "b".repeat(64), promptSha256: sha256(Buffer.from("x", "utf8")), byteLength: 1,
+    issuedAt: new Date(issued).toISOString(), expiresAt: new Date(issued + lifetime).toISOString(), ...overrides,
+  };
+}
+const refusedWith = (code) => (error) => error.code === code
+  && !/Brief|Caf|session-pin|[\\/]/u.test(String(error.message));
+
+baseTest("A1 lifetime: a fresh reference is admitted, up to and including its expiry instant", () => {
+  assertIntakeCaptureReferenceLifetime(lifetimeRef(), { now: T0 + HOUR });
+  assertIntakeCaptureReferenceLifetime(lifetimeRef(), { now: T0 + 24 * HOUR });
+});
+
+baseTest("A1 lifetime: one second after expiry the reference is refused INTAKE-CAPTURE-EXPIRED", () => {
+  assert.throws(() => assertIntakeCaptureReferenceLifetime(lifetimeRef(), { now: T0 + 24 * HOUR + 1000 }),
+    refusedWith("INTAKE-CAPTURE-EXPIRED"));
+  const old = readClaudeIntakePromptCapture({ rootDir: repoRoot, sessionId: "session-pin-001", reference: lifetimeRef(),
+    }, { now: () => T0 + 24 * HOUR + 1000 });
+  assert.deepEqual(old, { status: "unavailable", code: "INTAKE-CAPTURE-EXPIRED" });
+  const root = fixture("a1-expired-cli");
+  const viaCli = captureApply(root, lifetimeRef({}, Date.now() - 25 * HOUR));
+  assert.equal(viaCli.status, 2, viaCli.output);
+  assert.match(viaCli.output, /INTAKE-CAPTURE-EXPIRED/u);
+  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).value.materialInput.length, 0);
+});
+
+baseTest("A1 lifetime: a reference without expiresAt is refused INTAKE-CAPTURE-EXPIRY-MISSING (library, reader and CLI)", () => {
+  const { expiresAt: _drop, ...noExpiry } = lifetimeRef();
+  assert.throws(() => assertIntakeCaptureReferenceLifetime(noExpiry, { now: T0 }), refusedWith("INTAKE-CAPTURE-EXPIRY-MISSING"));
+  assert.deepEqual(readClaudeIntakePromptCapture({ rootDir: repoRoot, sessionId: "session-pin-001", reference: noExpiry },
+    { now: () => T0 }), { status: "unavailable", code: "INTAKE-CAPTURE-EXPIRY-MISSING" });
+  const root = fixture("a1-noexpiry-cli");
+  const viaCli = captureApply(root, noExpiry);
+  assert.equal(viaCli.status, 2, viaCli.output);
+  assert.match(viaCli.output, /INTAKE-CAPTURE-EXPIRY-MISSING/u);
+});
+
+baseTest("A1 lifetime: an over-long lifetime is refused as malformed", () => {
+  assert.throws(() => assertIntakeCaptureReferenceLifetime(lifetimeRef({}, T0, 24 * HOUR + 1000), { now: T0 }),
+    refusedWith("INTAKE-CAPTURE-REFERENCE-MALFORMED"));
+  assert.throws(() => assertIntakeCaptureReferenceLifetime(lifetimeRef({}, T0, 0), { now: T0 }),
+    refusedWith("INTAKE-CAPTURE-REFERENCE-MALFORMED"));
+  const root = fixture("a1-overlong-cli");
+  const viaCli = captureApply(root, lifetimeRef({}, Date.now(), 24 * HOUR + 1000));
+  assert.equal(viaCli.status, 2, viaCli.output);
+  assert.match(viaCli.output, /INTAKE-CAPTURE-REFERENCE-MALFORMED/u);
+});
+
+baseTest("A1 lifetime: an issuedAt more than 5 minutes in the future is refused as malformed", () => {
+  assert.throws(() => assertIntakeCaptureReferenceLifetime(lifetimeRef({}, T0 + 5 * 60_000 + 1000), { now: T0 }),
+    refusedWith("INTAKE-CAPTURE-REFERENCE-MALFORMED"));
+  assertIntakeCaptureReferenceLifetime(lifetimeRef({}, T0 + 5 * 60_000), { now: T0 });
+});
+
+test("A1 lifetime writer: the host capture records issuedAt and expiresAt = issuedAt + 24 h from an injected clock", () => {
+  const root = fixture("a1-writer-clock");
+  const { reference } = captureClaudeIntakePrompt(hostEvent(root, "clock probe"), { now: () => T0 });
+  assert.equal(reference.issuedAt, "2026-10-16T08:00:00.000Z");
+  assert.equal(reference.expiresAt, "2026-10-17T08:00:00.000Z");
+  assert.equal(readClaudeIntakePromptCapture({ rootDir: root, sessionId: reference.sessionId, reference },
+    { now: () => T0 + 24 * HOUR + 1000 }).code, "INTAKE-CAPTURE-EXPIRED");
 });
 
 // ---------------------------------------------------------------- A2

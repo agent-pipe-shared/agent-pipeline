@@ -6523,6 +6523,35 @@ export function applyOnboardingIntakeConsent({
   };
 }
 
+export const INTAKE_CAPTURE_REFERENCE_LIFETIME_MS = 24 * 60 * 60 * 1000;
+export const INTAKE_CAPTURE_REFERENCE_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * AC-226 / A1: a host capture reference lives for 24 hours. Closed typed refusals, none of which
+ * carries captured content or a path: INTAKE-CAPTURE-EXPIRY-MISSING, INTAKE-CAPTURE-EXPIRED,
+ * INTAKE-CAPTURE-REFERENCE-MALFORMED. `now` is a millisecond clock value (injectable, no sleeping).
+ * `requireExpiry: false` lets a bytes-only binding check (no host reference lifecycle) pass a
+ * reference that carries neither field; a reference carrying either field is always validated.
+ */
+export function assertIntakeCaptureReferenceLifetime(reference, { now = Date.now(), requireExpiry = true } = {}) {
+  const hasIssued = isObject(reference) && Object.hasOwn(reference, "issuedAt");
+  const hasExpires = isObject(reference) && Object.hasOwn(reference, "expiresAt");
+  if (!hasExpires) {
+    if (!requireExpiry && !hasIssued) return;
+    fail("INTAKE-CAPTURE-EXPIRY-MISSING", "the chat-turn reference carries no expiry");
+  }
+  if (!canonicalIsoTimestamp(reference.expiresAt) || !hasIssued || !canonicalIsoTimestamp(reference.issuedAt)) {
+    fail("INTAKE-CAPTURE-REFERENCE-MALFORMED", "the chat-turn reference lifetime is malformed");
+  }
+  const issued = Date.parse(reference.issuedAt);
+  const expires = Date.parse(reference.expiresAt);
+  if (expires <= issued || expires - issued > INTAKE_CAPTURE_REFERENCE_LIFETIME_MS
+    || !Number.isFinite(now) || issued > now + INTAKE_CAPTURE_REFERENCE_SKEW_MS) {
+    fail("INTAKE-CAPTURE-REFERENCE-MALFORMED", "the chat-turn reference lifetime is malformed");
+  }
+  if (now > expires) fail("INTAKE-CAPTURE-EXPIRED", "the chat-turn reference has expired");
+}
+
 /**
  * Step 2: appends one material-input chunk as a new evidence file +
  * materialInput entry. Called once per PO message containing requirements;
@@ -6549,6 +6578,9 @@ export function applyOnboardingIntakeCapture({
       || (ref.captureId !== undefined && !/^[a-f0-9]{48}$/u.test(String(ref.captureId)))) {
       fail("INTAKE-CAPTURE-REFERENCE-MISMATCH", "the chat-turn reference does not describe the captured bytes");
     }
+    assertIntakeCaptureReferenceLifetime(ref, {
+      now: deps.now ? Date.parse(deps.now()) : Date.now(), requireExpiry: false,
+    });
     referenceBinding = {
       referenceSchema: ref.schema,
       referenceSha256: canonicalSha256(ref),
