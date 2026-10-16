@@ -19,7 +19,8 @@ const causes=Object.freeze([
  'advisor-store-root-invalid','advisor-store-trusted-executable-unavailable','advisor-store-private-root-invalid',
  'advisor-store-topology-drift','advisor-store-root-drift','advisor-store-executable-drift','host-executable-invalid',
  'advisor-initial-input-invalid','DAP-PHYSICAL-INPUT','DAP-PHYSICAL-PARENT','DAP-PHYSICAL-ESCAPE','DAP-PHYSICAL-FILE',
- 'DAP-PHYSICAL-OPEN','DAP-PHYSICAL-BOUND','DAP-PHYSICAL-DRIFT','DAP-PHYSICAL-PARENT-DRIFT','DAP-UTF8'
+ 'DAP-PHYSICAL-OPEN','DAP-PHYSICAL-BOUND','DAP-PHYSICAL-DRIFT','DAP-PHYSICAL-PARENT-DRIFT','DAP-UTF8',
+ 'git-unavailable','foreign-worktree'
 ]);
 function causeOf(value){
  try{for(const candidate of [value,typeof value==='object'&&value!==null?value.code:null,typeof value==='object'&&value!==null?value.message:null])if(typeof candidate==='string'&&causes.includes(candidate))return candidate;}catch{}

@@ -278,6 +278,11 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
     for (const target of targets) physical(root, target.path);
     return { ok: true, status: "materialization-required", input, targets, receipt, scope: input.disposition.scope };
   } catch (error) {
+    // A typed environment condition (e.g. a registered worktree this host cannot
+    // resolve) keeps its own code and status; it is not architecture evidence failure.
+    if (error?.code === "DWP2-ENVIRONMENT-UNAVAILABLE" || error?.message === "DWP2-ENVIRONMENT-UNAVAILABLE") {
+      return { ok: false, status: "environment-unavailable", code: "DWP2-ENVIRONMENT-UNAVAILABLE", cause: "foreign-worktree" };
+    }
     return { ok: false, status: "design-required", code: error.message,
       ...(error.message === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && prdPath ? { prdPath } : {}),
       ...(error.field ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };

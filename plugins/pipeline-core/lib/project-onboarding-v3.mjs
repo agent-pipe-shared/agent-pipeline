@@ -3239,6 +3239,16 @@ function designToImplementationHandoverAction(root, fs) {
     ["materialized"],
   );
   if (!architecture.ok) {
+    // An unreachable/foreign registered worktree is an ENVIRONMENT condition, not verified
+    // content drift: never offer reopen-design (it would discard a valid approval).
+    if (architecture.code === "DWP2-ENVIRONMENT-UNAVAILABLE") {
+      return {
+        kind: "architecture-design-required",
+        prdPath: authority.planPath,
+        code: "DWP2-ENVIRONMENT-UNAVAILABLE",
+        guidance: "The approved design is not shown to be invalid: a registered git worktree cannot be resolved from this host (environment condition, not content drift). Do not reopen design. Run the check from the environment that owns that worktree, or remove/prune the stale registration with git, then inspect again.",
+      };
+    }
     if (["approved", "implementing"].includes(authority.lifecycleStatus)) {
       const action = reopenDesignAction();
       action.guidance = `The approved PRD is immutable and its architecture evidence is invalid (${architecture.code ?? "ARCHITECTURE-DESIGN-INVALID"}). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.`;

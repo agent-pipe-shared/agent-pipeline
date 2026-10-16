@@ -169,5 +169,11 @@ export function readDesignWorkflowPackageV2FromRepository(options={}){
   if(!same(verifyCourse(),course))return fail('DWP2-DURABLE-COURSE-DRIFT');
   if(!same(observeAdvisorCandidate(repoRoot),beforeCandidate))return fail('DWP2-CANDIDATE-DRIFT');
   return {ok:true,code:'DWP2-INITIAL-FINAL-VERIFIED',schema:pkg.schema,workflowPackage:detached(pkg),packagePath,packageSha256:sha(packageBytes),candidate:detached(pkg.candidate),readinessDispatchId:readiness.dispatchId,advisorDispatchId:receipt.dispatch.dispatchId,approvalReview:{schema:'pipeline.design-workflow-approval-review.v2',featureId:pkg.featureId,candidate:detached(pkg.candidate),packageSha256:sha(packageBytes),sources:SOURCE_NAMES.map(name=>({name,...pkg.sources[name],content:finalSourceBytes[name].toString('utf8')})),initialConsultation:{initialContext:detached(initial),consultation:detached(a.consultation),report:detached(report),disposition:detached(a.disposition),revisions:detached(a.revisions)},readiness:detached(readiness),approvalStatus:'pending-po-approval',implementationAuthority:false},implementationAuthority:false};
- }catch(e){const code=typeof e?.message==='string'&&e.message.startsWith('DWP2-')?e.message:'DWP2-PHYSICAL-OR-GIT',diagnostics=createAdvisorBindingDiagnosticRecorder();diagnostics.record('source-provenance',e);return diagnosticFailure(code,diagnostics.snapshot());}
+ }catch(e){
+  // A typed environment condition (registered worktree this host cannot resolve) is never content drift.
+  if(e?.code==='DWP2-ENVIRONMENT-UNAVAILABLE'){const env=createAdvisorBindingDiagnosticRecorder();env.record('source-provenance','foreign-worktree');return diagnosticFailure('DWP2-ENVIRONMENT-UNAVAILABLE',env.snapshot());}
+  const code=typeof e?.message==='string'&&e.message.startsWith('DWP2-')?e.message:'DWP2-PHYSICAL-OR-GIT',diagnostics=createAdvisorBindingDiagnosticRecorder();diagnostics.record('source-provenance',e);
+  // Keep a bounded, closed underlying cause: a non-enumerated git/physical failure is a git failure, not the generic stage label.
+  const kept=diagnostics.snapshot();if(code==='DWP2-PHYSICAL-OR-GIT'&&kept&&kept.cause.startsWith('advisor-binding-')){const git=createAdvisorBindingDiagnosticRecorder();git.record('source-provenance','git-unavailable');return diagnosticFailure(code,git.snapshot());}
+  return diagnosticFailure(code,kept);}
 }
