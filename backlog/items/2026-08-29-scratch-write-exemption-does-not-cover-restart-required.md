@@ -10,7 +10,7 @@ closure_repository: self
 closure_commit: 9639d91ee78f42ca0fbe6c3a424321a9d3c492d8
 closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
-done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs RESTART_LIFECYCLE_SCRATCH_WRITE
+done_when: contains plugins/pipeline-core/lib/guard/lifecycle-gate.mjs SCRATCH_LIFECYCLE_STATUSES.has(error.lifecycleStatus)
 source: "Claude/Windows self-audit section 3.2 from the 2026-08-29 three-runner greenfield test (finding F23 of scratch/greenfield-triage-2026-08-29.md); Codex on the same runtime-restart mechanism could not persist its own audit report and delivered it in chat instead (the exact 'exists only in chat' failure GL-07 forbids)."
 ---
 

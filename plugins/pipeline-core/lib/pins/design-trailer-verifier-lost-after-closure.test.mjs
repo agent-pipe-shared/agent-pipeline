@@ -9,9 +9,10 @@
  *      needle disappears.
  *   (The "identify the dropping merge" point is a one-off forensic act, not a code property.)
  *
- * Decision pinned here (PO T12, as for the sibling trailer item): NO design-trailer verifier
- * remains. The single direct-Elephant form is `stage-0 (elephant)`. This pin proves the removal
- * is complete and the stage-0 route stays admitted. Nothing is mocked: the real policy module,
+ * Decision pinned here: PO decision 2026-10-16 #12 (commit 8e7dce0f4) admits the exact
+ * `design (elephant)` trailer (re-base of the earlier T12 removal). This pin proves the verifier
+ * is alive: the exact admitted form and stage-0 pass, near-misses stay refused, the lost symbol
+ * stays gone. Nothing is mocked: the real policy module,
  * the real source tree and the real done_when predicate evaluator are exercised.
  */
 import assert from "node:assert/strict";
@@ -46,8 +47,23 @@ test("AC-A1: the stage-0 Elephant route stays admitted (finished message)", () =
   assert.deepEqual(codes(msg("stage-0 (elephant)")), []);
 });
 
-test("AC-A2: the design (elephant) form is rejected as a malformed Dispatch binding", () => {
-  assert.deepEqual(codes(msg(REJECTED_FORM)), ["GIT-03-DISPATCH-MALFORMED"]);
+// Re-based per PO decision 2026-10-16 #12 (commit 8e7dce0f4): the exact `design (elephant)` form is
+// ADMITTED. This is a re-base of the old rejection expectation, not a weakening: the verifier must
+// still run and refuse every near-miss the decision did not admit.
+const NEAR_MISSES = [
+  ["Design", "(elephant)"].join(" "),
+  ["design-x", "(elephant)"].join(" "),
+  ["design", "(Elephant)"].join(" "),
+  ["design", " (elephant)"].join(" "),
+  ["design", "(elephant) extra"].join(" "),
+  ["design", "elephant"].join(" "),
+];
+
+test("AC-A2: the exact admitted design (elephant) form passes; near-misses are still refused as malformed", () => {
+  assert.deepEqual(codes(msg(REJECTED_FORM)), []);
+  for (const value of NEAR_MISSES) {
+    assert.deepEqual(codes(msg(value)), ["GIT-03-DISPATCH-MALFORMED"], `near-miss must stay refused: ${JSON.stringify(value)}`);
+  }
 });
 
 test("AC-A3: the same verdicts hold through the --trailer commit lane", () => {
@@ -55,14 +71,26 @@ test("AC-A3: the same verdicts hold through the --trailer commit lane", () => {
     `git commit -m "fix(y): tidy up" --trailer "AI-Assisted: true" --trailer "Dispatch: ${value}"`,
     { readFile: () => { throw new Error("no file expected"); }, requireMarker: true, requireDispatch: true },
   );
-  const ok = run("stage-0 (elephant)");
-  assert.equal(ok.inspected, true);
-  assert.deepEqual(ok.findings, []);
-  const bad = run(REJECTED_FORM);
-  assert.deepEqual(bad.findings.map((f) => f.code), ["GIT-03-DISPATCH-MALFORMED"]);
+  for (const value of ["stage-0 (elephant)", REJECTED_FORM]) {
+    const ok = run(value);
+    assert.equal(ok.inspected, true);
+    assert.deepEqual(ok.findings, [], `admitted form must pass: ${value}`);
+  }
+  for (const value of NEAR_MISSES) {
+    const bad = run(value);
+    assert.equal(bad.inspected, true);
+    assert.deepEqual(bad.findings.map((f) => f.code), ["GIT-03-DISPATCH-MALFORMED"], `near-miss must stay refused: ${JSON.stringify(value)}`);
+  }
 });
 
-test("AC-A4: no non-test source, generator or printed template emits or requires the lost form", () => {
+test("AC-A4: no non-test source, generator or printed template emits or requires the lost symbol or a malformed design-form variant", () => {
+  // The exact admitted form is allowed anywhere; any other design-flavoured `(elephant)` variant is not.
+  const variant = new RegExp("[\\w-]*[Dd]esign[\\w-]* \\(elephant\\)", "gu");
+  const malformedVariants = (text) => (text.match(variant) ?? []).filter((m) => m !== REJECTED_FORM);
+  // Liveness of the scan itself: it flags malformed variants and passes the admitted form.
+  assert.deepEqual(malformedVariants(`x ${REJECTED_FORM} y`), []);
+  assert.equal(malformedVariants(`x ${NEAR_MISSES[0]} y`).length, 1);
+  assert.equal(malformedVariants(`x ${NEAR_MISSES[1]} y`).length, 1);
   const roots = ["plugins/pipeline-core", "harness", "templates", "roles", "guardrails", "policies"].map((p) => join(ROOT, p));
   const offenders = [];
   let scanned = 0;
@@ -70,7 +98,7 @@ test("AC-A4: no non-test source, generator or printed template emits or requires
     for (const file of sourceFiles(root)) {
       scanned += 1;
       const text = readFileSync(file, "utf8");
-      if (text.includes(LOST_SYMBOL) || text.includes(REJECTED_FORM)) offenders.push(file.slice(ROOT.length + 1));
+      if (text.includes(LOST_SYMBOL) || malformedVariants(text).length > 0) offenders.push(file.slice(ROOT.length + 1));
     }
   }
   assert.ok(scanned > 100, `scan must cover the real tree (scanned ${scanned})`);
@@ -140,11 +168,7 @@ test("AC-B2: the all-items sweep reports a REGRESSION when a closed item's needl
 // (2026-10-16). They are real merge-survival losses, tracked as open functional work, not
 // exemptions: the ratchet below tolerates only these and fails on any NEW disappearance.
 const KNOWN_LOST_AT_FIRST_SWEEP = new Set([
-  "backlog/items/2026-08-28-a-heredoc-refusal-teaches-no-substitute.md",
-  "backlog/items/2026-08-28-the-guards-root-admission-compares-a-typed-path-to-a-realpathed-one.md",
   "backlog/items/2026-08-29-approve-announce-test-fixture-missing-present-plan-step.md",
-  "backlog/items/2026-08-29-scratch-write-exemption-does-not-cover-restart-required.md",
-  "backlog/items/2026-09-03-the-unparsed-command-lane-still-carries-the-false-denial-claim.md",
 ]);
 
 test("AC-B3: the sweep over the real backlog at HEAD evaluates closed items and no closed item loses a needle beyond the recorded set", () => {

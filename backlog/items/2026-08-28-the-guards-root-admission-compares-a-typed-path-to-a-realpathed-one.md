@@ -10,7 +10,7 @@ closure_repository: self
 closure_commit: fdc02abcdf4d05f299ccd32ee210cba76283f801
 closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
-done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs rootValueIdentityMatcher
+done_when: contains plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs function rootValueIdentityMatcher
 tracking: "NOW / Nova A — the surviving candidate cause for a consumer session that lost both its lanes on Windows, and a platform-neutrality defect in the guard that decides whether any recovery command runs at all"
 source: "Found 2026-08-28 while independently verifying dispatch NVA-G-GUARDDEADLOCK's negative result against guard-lifecycle-ready.mjs. The dispatch refuted the reported cause of HA incident report S56 finding B3 and named this as the most plausible remaining one; the code was then re-read here to confirm the mechanism exists."
 ---

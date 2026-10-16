@@ -10,7 +10,7 @@ closure_repository: self
 closure_commit: 015f8a772d66b51ec5b312fb4c5f86e4744a73d6
 closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nightwing
-done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs heredocFileRemediation
+done_when: contains plugins/pipeline-core/lib/guard/shell-grammar.mjs function heredocFileRemediation
 source: "PO question, 2026-08-28: 'wäre es nicht sinnvoll heredoc gehärtet zuzulassen?' — asked after the Elephant hit the heredoc refusal twice in one session (a `cat >> … << 'CLOSURE'` append and a multi-line commit message), each time paying a detour through a scratch file or the Edit tool. Measured against guard-lifecycle-ready.mjs the same day."
 ---
 
