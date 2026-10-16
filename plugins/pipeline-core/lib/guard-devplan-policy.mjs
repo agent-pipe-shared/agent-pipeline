@@ -305,6 +305,14 @@ export function designAdvisoryRemediation(code) {
  */
 export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claude/", "backlog/", "scratch/"]);
 
+// ALF-C-P20-04B (AC-207): the scaffold the onboarding route itself writes
+// (lib/project-onboarding-v3.mjs plan targets: .gitignore, AGENTS.md, pipeline.user.yaml,
+// architecture/map/*, project/*) is lifecycle coordination, not product implementation, so it is
+// committable in the draft lifecycle. Kept separate from DEFAULT_EXEMPT_PREFIXES (which generated
+// guidance mirrors). Exact files match exactly; no product path (src/, tests/) is admitted.
+const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", "AGENTS.md", "pipeline.user.yaml"]);
+const ONBOARDING_SCAFFOLD_PREFIXES = Object.freeze(["architecture/", "project/"]);
+
 // A dispatched role must create this receipt as its opening act. It is
 // coordination evidence rather than product implementation, so only this
 // canonical receipt filename is admitted before plan approval.
@@ -493,7 +501,11 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
   const isExempt = !forceLifecycleGate && (
     isDraftAuthority
     || (!touchesAuthority
-      && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))))
+      && (exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)))
+        // normalizedPath is case-folded by normalize(); fold the constants the same way,
+        // otherwise a mixed-case entry such as "AGENTS.md" can never match.
+        || ONBOARDING_SCAFFOLD_EXACT_PATHS.some((exact) => normalizedPath === normalize(exact))
+        || ONBOARDING_SCAFFOLD_PREFIXES.some((prefix) => normalizedPath.startsWith(normalize(prefix)))))
   );
   if (isExempt) return { verdict: "allow" };
 

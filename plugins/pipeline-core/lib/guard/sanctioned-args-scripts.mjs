@@ -10,6 +10,7 @@ import { observeReaderPlanScope } from "../doc-reader-plan-scope.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
 import { GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT, HEX, START_PREFLIGHT_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { isRealpathedWithinBoundary, pathInside } from "./path-containment.mjs";
+import * as SANCTIONED_CONSTANTS from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 
 export function sanctionedSessionCriticFinalizerArgs(args, root) {
@@ -653,9 +654,30 @@ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
   const [script, ...args] = words.slice(1);
   // Windows accepts either separator spelling of this one trusted script identity.
   // Keep every other script lexical and preserve case, roots, segments and argv.
-  const sameStartPreflight = platform === "win32"
-    && script.replace(/\//gu, "\\") === START_PREFLIGHT_SCRIPT.replace(/\//gu, "\\");
-  return { script: sameStartPreflight ? START_PREFLIGHT_SCRIPT : script, args };
+  // ALF-C-P20-04B: every sanctioned script constant (plus the project's own F6 checker) is
+  // matched by physical identity, so forward-slash, backslash, MSYS (/d/...) and
+  // repository-relative spellings of the SAME file resolve to the canonical spelling
+  // (case-folded on win32). A different file, or any spelling with a "." / ".." segment, stays lexical.
+  return { script: canonicalSanctionedScript(script, root, platform) ?? script, args };
+}
+
+function canonicalSanctionedScript(script, root, platform) {
+  if (typeof script !== "string" || script === "" || /[\x00-\x1f\x7f]/u.test(script)) return null;
+  const win = platform === "win32";
+  let text = script;
+  if (win) {
+    text = text.replace(/^\/([A-Za-z])\/(?=.)/u, (_m, d) => `${d.toUpperCase()}:/`).replace(/\\/gu, "/");
+  }
+  if (text.split("/").some(part => part === "." || part === "..")) return null;
+  const absolute = win ? /^[A-Za-z]:\//u.test(text) : text.startsWith("/");
+  if (!absolute && typeof root !== "string") return null;
+  const flat = value => (win ? value.replace(/\\/gu, "/").toLowerCase() : value);
+  const key = flat(absolute ? text : `${String(root).replace(/[\\/]+$/u, "")}/${text}`);
+  const candidates = Object.entries(SANCTIONED_CONSTANTS)
+    .filter(([name, value]) => name.endsWith("_SCRIPT") && typeof value === "string");
+  const canonical = candidates.map(([, value]) => value);
+  if (typeof root === "string") canonical.push(resolve(root, "harness/scripts/check-observation-governance.mjs"));
+  return canonical.find(value => flat(value) === key) ?? null;
 }
 
 /**
