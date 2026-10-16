@@ -94,13 +94,13 @@ test('AC-167 control: admission is closed -- extra argv, a foreign script and in
   assertRefusedAsOpaque('node -e "1"', 'inline interpreter code');
 });
 
-// ---- Cases below name acceptance points the current source does not satisfy (RED evidence) ----
+// ---- Cases below name acceptance points the current source satisfies (they pass) ----
 
-test('AC-167 point 4 [RED]: the skill-prescribed literal ${PIPELINE_PLUGIN_ROOT} spelling is not refused as opaque execution', () => {
+test('AC-167 point 4: the skill-prescribed literal ${PIPELINE_PLUGIN_ROOT} spelling is not refused as opaque execution', () => {
   assertAdmitted('node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"', 'literal-variable preflight');
 });
 
-test('AC-167 point 5 [RED]: the preflight-published hook-provisioning action is executable while a feature is in draft', () => {
+test('AC-167 point 5: the preflight-published hook-provisioning action is executable while a feature is in draft', () => {
   const refresh = join(pluginScripts, 'refresh-mandatory-hooks.mjs');
   assertAdmitted(`node ${quote(refresh)} --root ${quote(root)}`, 'refresh-mandatory-hooks nextAction');
 });
@@ -112,7 +112,7 @@ test('AC-167 point 5 [RED]: the preflight-published hook-provisioning action is 
 const pluginRoot = fileURLToPath(new URL('../../', import.meta.url)).replace(/[\\/]$/u, '');
 const literalPreflight = '${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs';
 
-test('AC-167 point 4b [RED]: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity', () => {
+test('AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity', () => {
   const env = { PIPELINE_PLUGIN_ROOT: pluginRoot };
   assertAdmitted(`node ${quote(literalPreflight)}`, 'literal preflight with the variable set to this plugin', { env });
   const variant = '${pipeline_plugin_root}/SCRIPTS/Pipeline-Start-Preflight.mjs';
@@ -120,7 +120,7 @@ test('AC-167 point 4b [RED]: the literal spelling is admitted when PIPELINE_PLUG
   else assertRefusedAsOpaque(`node ${quote(variant)}`, 'case variant on a case-sensitive host', { env });
 });
 
-test('AC-167 point 5b [RED]: the exact published provisioning action, clone-hook-readiness --apply, is executable while a feature is in draft', () => {
+test('AC-167 point 5b: the exact published provisioning action, clone-hook-readiness --apply, is executable while a feature is in draft', () => {
   const provision = join(pluginScripts, 'clone-hook-readiness.mjs');
   assertAdmitted(`node ${quote(provision)} --root ${quote(root)} --apply`, 'clone-hook-readiness nextAction');
   assertAdmitted(`node ${quote(forwardSlash(provision))} --root ${quote(root)} --apply`, 'forward-slash clone-hook-readiness nextAction');

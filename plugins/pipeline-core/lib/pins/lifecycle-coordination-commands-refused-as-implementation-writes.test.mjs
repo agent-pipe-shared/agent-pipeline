@@ -49,7 +49,7 @@ test('AC-207 point 1 control: admission stays closed (altered argv, foreign scri
   assert.equal(refused(`node ${q(join(root, 'hostile.mjs'))} inspect`), true);
 });
 
-test('AC-207 point 1 [RED]: forward-slash and MSYS spellings of an emitted command are normalised before matching', () => {
+test('AC-207 point 1: forward-slash and MSYS spellings of an emitted command are normalised before matching', () => {
   for (const spell of [forward, msys]) {
     assert.equal(admittedByClosedArgv(`node ${q(spell(state))} inspect`), true, `inspect ${spell.name}`);
     assert.equal(admittedByClosedArgv(`node ${q(spell(state))} reopen-design --by X`), true, `reopen-design ${spell.name}`);
@@ -57,11 +57,11 @@ test('AC-207 point 1 [RED]: forward-slash and MSYS spellings of an emitted comma
 });
 
 // PO decision 2026-10-16 #10 (A): the admission lives in sanctioned-args-scripts.mjs (commit-protected;
-// signature-bound patch scratch/patches/P22-03B.patch). The two positive cases are RED on HEAD until it lands.
+// signature-bound patch scratch/patches/P22-03B.patch). The two positive cases pass.
 const cont = (verb, tail) => `node ${q(state)} ${verb} ${tail}`;
 const goodTail = '--expected-revision 3 --request-file scratch/req.json --lock-token tok-1.A_b';
 
-test('AC-207 point 1 [RED until protected patch P22-03B]: continuity-cas and continuity-integrate-final in the exact closed grammar are admitted', () => {
+test('AC-207 point 1: continuity-cas and continuity-integrate-final in the exact closed grammar are admitted', () => {
   for (const verb of ['continuity-cas', 'continuity-integrate-final']) {
     assert.equal(admittedByClosedArgv(cont(verb, goodTail)), true, verb);
     assert.equal(admittedByClosedArgv(cont(verb, '--lock-token x --request-file scratch/r-1.json --expected-revision absent')), true, `${verb} reordered/absent`);
@@ -101,11 +101,11 @@ test('AC-207 point 2: the recovery-prescribed repository checker is admitted by 
   assert.equal(admittedByClosedArgv(`node ${q(join(root, 'harness/scripts/check-observation-governance.mjs'))}`), true);
 });
 
-test('AC-207 point 2 [RED]: the checker as the recovery text spells it (repository-relative) is admitted', () => {
+test('AC-207 point 2: the checker as the recovery text spells it (repository-relative) is admitted', () => {
   assert.equal(admittedByClosedArgv('node harness/scripts/check-observation-governance.mjs'), true);
 });
 
-test('AC-207 point 3 [RED]: onboarding scaffold paths are committable in the draft lifecycle (control: scratch is)', async (t) => {
+test('AC-207 point 3: onboarding scaffold paths are committable in the draft lifecycle (control: scratch is)', async (t) => {
   const verdict = path => evaluateStagedDevPlanPaths({ projectDir: root, stagedPaths: [path] }).code;
   assert.equal(verdict('scratch/x'), 'PIPELINE-STAGED-LIFECYCLE-ALLOW');
   // One independent sub-assertion per scaffold path (no stop-at-first).

@@ -170,7 +170,7 @@ test("under a PO deferral the guard defers to the library entry verdict for the 
   assert.match(blocked.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
 });
 
-test("RED: the guard feeds the fitness evaluator the same touchedContracts as the library (lib/guard/entry-gates.mjs architectureFitnessAuthorityVerdict re-derives with isContractPath, lib/architecture-entry-readiness.mjs inspectArchitectureEntryReadiness uses its own regex)", () => {
+test("the guard feeds the fitness evaluator the same touchedContracts as the library (lib/guard/entry-gates.mjs architectureFitnessAuthorityVerdict re-derives with isContractPath, lib/architecture-entry-readiness.mjs inspectArchitectureEntryReadiness uses its own regex)", () => {
   let guardTouched; let libraryTouched;
   architectureFitnessAuthorityVerdict(repoRoot, COMMAND, guardDeps({ evaluateArchitectureFitnessFn: (input) => { guardTouched = input.touchedContracts; return { overallStatus: "pass", outcomes: tenOutcomes(false) }; } }));
   inspectArchitectureEntryReadiness({ rootDir: repoRoot, planningSurface: SURFACE, deps: {
@@ -183,7 +183,7 @@ test("RED: the guard feeds the fitness evaluator the same touchedContracts as th
 });
 
 // ---- (c) model gap: an established project under a PO deferral must not admit a net-new implementation path unratcheted ----
-test("RED: a deferred established project is admitted for a net-new target path (fix site: lib/architecture-entry-readiness.mjs inspectArchitectureEntryReadiness, `disposition.disposition === \"deferred\"` branch)", () => {
+test("a deferred established project is admitted for a net-new target path (fix site: lib/architecture-entry-readiness.mjs inspectArchitectureEntryReadiness, `disposition.disposition === \"deferred\"` branch)", () => {
   const result = inspectArchitectureEntryReadiness({ rootDir: repoRoot, planningSurface: { planPath: PLAN, paths: ["src/brand-new.mjs"] }, deps: {
     inspectArchitectureDesign: () => ({ ok: true, status: "not-required", required: false, scope: null }),
     readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }),
