@@ -172,6 +172,39 @@ const selectedValue = (line) => {
 const selectsOpus = (text) => text.split(/\r?\n/).some((l) => { const v = selectedValue(l); return v !== null && OPUS_TIER.test(v); });
 const NAMES_RULESET =/\bruleset[- ]?sha\s*[:=]\s*\S/i;
 
+// MP-07 batch rule, mechanically (AC-222): ONE full Critic per batch plus at most three
+// correction-diff re-critics, each restricted to the delta since the previous reviewed
+// candidate. A dispatch DECLARES itself a re-critic with a leading
+// `Re-critic (MP-07): <delta range>` line; only a declared re-critic is judged here, so an
+// ordinary full-Critic prompt (and every existing fixture) is unaffected.
+const RECRITIC_LINE = /^\s*(?:[-*]\s*)?\**\s*re-critic\b[^:\n]*:\**\s*(.*)$/i;
+const RANGE = /\b[0-9a-f]{7,40}\.{2,3}[0-9a-f]{7,40}\b/gi;
+const SEARCH_SURFACE_LINE = /^\s*(?:[-*]\s*)?\**\s*(?:diff range|candidate diff|search surface)\b[^:\n]*:/i;
+const REVIEW_ORDINAL_LINE = /^\s*(?:[-*]\s*)?\**\s*review ordinal\b[^:\n]*:\**\s*(\d+)/im;
+function recriticFindings(text) {
+  const lines = text.split(/\r?\n/);
+  const declared = lines.map((l) => RECRITIC_LINE.exec(l)).find((m) => m !== null);
+  if (!declared) return [];
+  const out = [];
+  if (!lines.some((l) => /Batch scope \(MP-07\)\s*\**\s*:\s*\S/i.test(l))) {
+    out.push({ code: "DISPATCH-RECRITIC-NO-BATCH-SCOPE", why: "a re-critic belongs to one batch (MP-07): the prompt needs a non-empty `Batch scope (MP-07)` field" });
+  }
+  const delta = declared[1].match(RANGE) ?? [];
+  if (delta.length !== 1) {
+    out.push({ code: "DISPATCH-RECRITIC-NO-DELTA-RANGE", why: "a re-critic names exactly one delta range (previous reviewed candidate..new candidate) as its only search surface (MP-07)" });
+  } else {
+    const wider = lines.filter((l) => SEARCH_SURFACE_LINE.test(l)).flatMap((l) => l.match(RANGE) ?? []).filter((r) => r.toLowerCase() !== delta[0].toLowerCase());
+    if (wider.length > 0) {
+      out.push({ code: "DISPATCH-RECRITIC-BEYOND-DELTA", why: `a re-critic is restricted to the delta ${delta[0]}; it also names ${wider.join(", ")} as a search surface (MP-07)` });
+    }
+  }
+  const ordinal = REVIEW_ORDINAL_LINE.exec(text);
+  if (ordinal && Number(ordinal[1]) > 4) {
+    out.push({ code: "DISPATCH-RECRITIC-ORDINAL", why: "a batch allows ONE full review plus at most three correction-diff reviews; a fifth review is refused (MP-07)" });
+  }
+  return out;
+}
+
 /**
  * @param {{subagentType: string, prompt: string, transport?: "direct"|"workflow"|"antigravity"|"codex"}} dispatch
  * @returns {{role: "critic"|"goldfish"|"other", findings: {code: string, why: string}[]}}
@@ -234,6 +267,7 @@ export function dispatchFindings({ subagentType, prompt, transport = "direct" } 
         });
       }
     }
+    findings.push(...recriticFindings(text));
     return { role: "critic", findings };
   }
 
