@@ -594,17 +594,32 @@ export function resolvePoGateRepositoryTopology(repoRoot, deps = {}) {
   // the current root, because the current root demonstrably exists (it was just
   // realpath'd above). Non-prunable entries still go through the unrelaxed
   // assertPhysicalDirectory/realpathSync check below and still throw on failure.
-  const registeredWorktreeRoots = worktrees
-    .filter((entry) => !entry.prunable)
-    .map(({ root }) => assertPhysicalDirectory(realpathSync(root)));
+  // A registered, non-prunable worktree this host cannot resolve (for example a
+  // WSL `/mnt` registration seen from native Windows) is an ENVIRONMENT condition,
+  // not content drift: surface it as a typed, bounded error, never free text.
+  let registeredWorktreeRoots;
+  let primaryRoot;
+  try {
+    registeredWorktreeRoots = worktrees
+      .filter((entry) => !entry.prunable)
+      .map(({ root }) => assertPhysicalDirectory(realpathSync(root)));
+    primaryRoot = assertPhysicalDirectory(realpathSync(primary.root));
+  } catch {
+    throw Object.assign(new Error(PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE), {
+      code: PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE,
+      cause: "foreign-worktree",
+    });
+  }
   return {
     repoRoot: observedRoot,
     gitCommonDir,
-    primaryRoot: assertPhysicalDirectory(realpathSync(primary.root)),
+    primaryRoot,
     registeredWorktreeRoots,
     worktrees,
   };
 }
+
+export const PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE = "DWP2-ENVIRONMENT-UNAVAILABLE";
 
 /** Production entry used by pipeline-start, Verify and the approval writer. */
 export function validatePoGateAuthorityForRepository({
