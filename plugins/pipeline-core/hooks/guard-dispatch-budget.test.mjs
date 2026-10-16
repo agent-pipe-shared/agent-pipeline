@@ -39,7 +39,7 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const GUARD = fileURLToPath(new URL("./guard-dispatch-budget.mjs", import.meta.url));
@@ -2132,7 +2132,7 @@ test("TR-G T34: a governance state change between two guard calls takes effect o
 //   (b) the first checkpoint notice is on call 40, not on call 39.
 //   (c) five closing acts after the 50th call pass; the sixth names the exhausted closing allowance.
 //   (d) after the cap, a Write to scratch/dispatch/critic-<id>/critic-notes.md is the one admitted write; scratch/x.md,
-//       evidence/other.json, scratch/dispatch/critic-abc/other.md, scratch/critic-notes.md, an Edit of another path and
+//       evidence/other.json, scratch/dispatch/critic-abc123/other.md, scratch/critic-notes.md, an Edit of another path and
 //       scratch/dispatch/other/critic-notes.md stay refused. Control: a goldfish-deep Write to a critic-notes.md path stays
 //       refused after its own cap. The (d) cases reach "after the cap" by measuring the cap with a probe run, so they do not
 //       depend on which cap the shipped definition yields.
@@ -2142,7 +2142,7 @@ import { readAgentMaxTurns } from "../lib/dispatch-budget-binding.mjs";
 
 const CKPT_BASE_CALLS = 50;
 const CKPT_TOOL_USE_ID = "parent-tool-critic-1";
-const CKPT_NOTES_PATH = "scratch/dispatch/critic-abc/critic-notes.md";
+const CKPT_NOTES_PATH = "scratch/dispatch/critic-abc123/critic-notes.md";
 
 function ckptCriticFiles() {
   const definition = readFileSync(fileURLToPath(new URL("../agents/critic.md", import.meta.url)), "utf8");
@@ -2191,6 +2191,38 @@ function ckptRun(scenario) {
 const ckptScenario = (steps) => ({ rootDir: FAKE_ROOT, realBudgetBinding: true, files: ckptCriticFiles(), steps });
 const ckptWhy = (verdict) => `${verdict.stderr.trim().slice(0, 300)}`;
 
+/**
+ * ALF-C-C6B-CORR4: the confined notes write is the one admitted Critic act whose preparation
+ * (prepareOwnedCriticNotesDirectory) reads the parent meta.json, creates the notes directory and publishes its receipt
+ * through the REAL filesystem, not the injected doubles. A case that admits that write therefore runs against a fresh
+ * real root under the repository's scratch/ (never OS temp): a real transcript location, subagents/agent-abc123.meta.json
+ * and counter directory; the pending binding and agent definition stay in the virtual map, re-keyed onto that root. The
+ * root is removed after the run (restore-before-yield). Assertions of the cases that use it are unchanged.
+ */
+function ckptRealRun(steps) {
+  const root = activeGovernanceRoot("ckpt");
+  try {
+    const commonDir = join(root, ".git");
+    mkdirSync(join(commonDir, "agent-pipeline", "dispatch-budget"), { recursive: true });
+    const transcriptPath = join(root, "session", "parent.jsonl");
+    const metaPath = join(root, "session", "parent", "subagents", "agent-abc123.meta.json");
+    mkdirSync(dirname(metaPath), { recursive: true });
+    const files = {};
+    for (const [key, value] of Object.entries(ckptCriticFiles())) {
+      const mapped = key === PARENT_META_PATH ? metaPath
+        : key.startsWith(COMMON_DIR) ? commonDir + key.slice(COMMON_DIR.length)
+        : key.startsWith(FAKE_ROOT) ? root + key.slice(FAKE_ROOT.length)
+        : key;
+      files[mapped] = value;
+    }
+    writeFileSync(metaPath, files[metaPath]);
+    const realSteps = steps.map((step) => (step.input === undefined ? step : { ...step, input: { ...step.input, transcript_path: transcriptPath } }));
+    return ckptRun({ rootDir: root, commonDir, realBudgetBinding: true, files, steps: realSteps });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 let ckptMeasuredCap;
 /** The number of working calls the shipped definition admits for a base cap of 50: the index of the first refusal in a long run of reads. */
 function ckptCap() {
@@ -2220,7 +2252,7 @@ test("CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call
 });
 
 test("CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance", () => {
-  const { results } = ckptRun(ckptScenario([ckptReads(50), { ...ckptWrite(CKPT_NOTES_PATH), repeat: 6 }]));
+  const { results } = ckptRealRun([ckptReads(50), { ...ckptWrite(CKPT_NOTES_PATH), repeat: 6 }]);
   const refusedWorking = results.slice(0, 50).findIndex((verdict) => verdict.exitCode !== 0);
   assert.equal(refusedWorking, -1, `all 50 working calls must be admitted; call ${refusedWorking + 1} was refused: ${ckptWhy(results[Math.max(refusedWorking, 0)])}`);
   for (let ordinal = 1; ordinal <= 5; ordinal += 1) {
@@ -2232,14 +2264,14 @@ test("CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the six
 
 test("CRITIC-CKPT-T2 (d1): after the cap a Critic Write to scratch/dispatch/critic-<id>/critic-notes.md is admitted as a closing act (green today)", () => {
   const cap = ckptCap();
-  const { results } = ckptRun(ckptScenario([ckptReads(cap), ckptWrite(CKPT_NOTES_PATH)]));
+  const { results } = ckptRealRun([ckptReads(cap), ckptWrite(CKPT_NOTES_PATH)]);
   assert.ok(results.slice(0, cap).every((verdict) => verdict.exitCode === 0), `the ${cap} working calls are admitted`);
   assert.equal(results[cap].exitCode, 0, `the confined notes write must be admitted after the cap -- got: ${ckptWhy(results[cap])}`);
 });
 
 test("CRITIC-CKPT-T2 (d2): after the cap a Critic Write anywhere else, or to another file name, stays refused (green today)", () => {
   const cap = ckptCap();
-  const refused = ["scratch/x.md", "evidence/other.json", "scratch/dispatch/critic-abc/other.md", "scratch/critic-notes.md"];
+  const refused = ["scratch/x.md", "evidence/other.json", "scratch/dispatch/critic-abc123/other.md", "scratch/critic-notes.md"];
   const { results } = ckptRun(ckptScenario([ckptReads(cap), ...refused.map(ckptWrite)]));
   refused.forEach((path, index) => trgAssertRefusedAfterCap(results[cap + index], path));
 });
@@ -2283,7 +2315,7 @@ test("CRITIC-CKPT-T2 (d5, control): a goldfish-deep Write to a critic-notes.md p
 const CKPT3_REFUSED_PATHS = [
   "scratch/x.md",
   "evidence/other.json",
-  "scratch/dispatch/critic-abc/other.md",
+  "scratch/dispatch/critic-abc123/other.md",
   "scratch/critic-notes.md",
   "plugins/pipeline-core/lib/x.mjs",
   "evidence/x.json",
@@ -2323,7 +2355,7 @@ test("CRITIC-CKPT-T3 (a): a Critic Write and a Critic Edit of scratch/dispatch/c
   for (const call of [1, 20]) {
     for (const tool of ["Write", "Edit"]) {
       const reads = call - 1;
-      const { results } = ckptRun(ckptAt(call, [ckptMutate(tool, CKPT_NOTES_PATH)]));
+      const { results } = ckptRealRun([...(call > 1 ? [ckptReads(call - 1)] : []), ckptMutate(tool, CKPT_NOTES_PATH)]);
       assert.ok(results.slice(0, reads).every((verdict) => verdict.exitCode === 0), `the ${reads} working reads before the ${tool} are admitted`);
       assert.equal(results[reads].exitCode, 0, `a ${tool} of the confined notes file must be admitted at call ${call} -- got: ${ckptWhy(results[reads])}`);
     }
