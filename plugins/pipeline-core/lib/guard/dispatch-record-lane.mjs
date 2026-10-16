@@ -282,10 +282,12 @@ function creationDirectories(repository, root, create = false) {
   }
   secureDirectory(join(root, "evidence"));
 }
+// win32: the claim/record file is judged RIGHT NOW (fresh: true), never from the process-local DACL observation memo -- that memo is keyed by
+// object identity and would keep honouring a claim whose DACL was loosened after an earlier "secure" observation in the same process.
 function physicalCreationFile(path, expected = null) {
   const before = lstatSync(path);
   if (!before.isFile() || before.isSymbolicLink() || realpathSync(path) !== path || before.nlink !== 1 || before.size > CREATION_LIMIT
-    || (process.platform === "win32" ? assessWindowsPrivatePath(path).status !== "secure" : ((before.mode & 0o022) !== 0 || (typeof process.getuid === "function" && before.uid !== process.getuid())))) creationFailure("DRO-RECORD");
+    || (process.platform === "win32" ? assessWindowsPrivatePath(path, { fresh: true }).status !== "secure" : ((before.mode & 0o022) !== 0 || (typeof process.getuid === "function" && before.uid !== process.getuid())))) creationFailure("DRO-RECORD");
   const fd = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
   try {
     const opened = fstatSync(fd), buffer = Buffer.alloc(CREATION_LIMIT + 1);

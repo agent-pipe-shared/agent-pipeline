@@ -32,7 +32,7 @@ childProcess.spawnSync = function countingSpawnSync(file, ...rest) {
   return realSpawnSync(file, ...rest);
 };
 syncBuiltinESMExports();
-const { assessWindowsPrivatePath, evaluateWindowsPrivateState, observeWindowsPrivatePath } = await import(`${modulePath}?memo-test=${Date.now()}`);
+const { assessWindowsPrivatePath, evaluateWindowsPrivateState, hardenWindowsPrivateDirectory, observeWindowsPrivatePath } = await import(`${modulePath}?memo-test=${Date.now()}`);
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const scratchRoot = join(here, "..", "..", "..", "scratch");
@@ -189,6 +189,24 @@ test("injected options.run or options.environment bypasses the memo", { skip: !w
   const before = state.powershell;
   assessWindowsPrivatePath(file, { environment: process.env });
   assert.equal(state.powershell - before, 1);
+});
+
+// A guard that judges a path now (the dispatch-record claim reader) passes fresh: true: the memo cannot see an in-process DACL change of an
+// object it already observed as private, so without the opt-out a loosened claim would keep its earlier "secure" verdict.
+test("fresh: true bypasses the memo, sees an in-process DACL grant on an already-observed object and drops the stale entry", { skip: !win32 }, () => {
+  const sub = join(dir, `h${counter += 1}`);
+  mkdirSync(sub);
+  assert.equal(hardenWindowsPrivateDirectory(sub).status, "secure");
+  const file = join(sub, "claim.json");
+  writeFileSync(file, "{}");
+  assert.equal(assessWindowsPrivatePath(file).status, "secure");
+  const grant = realSpawnSync("icacls", [file, "/grant", "*S-1-1-0:(M)"], { encoding: "utf8", windowsHide: true });
+  assert.equal(grant.status, 0, String(grant.stderr || grant.stdout));
+  assert.equal(assessWindowsPrivatePath(file).status, "secure", "the memoized verdict for the same object is kept (PO decision A)");
+  const before = state.powershell;
+  assert.equal(assessWindowsPrivatePath(file, { fresh: true }).status, "insecure");
+  assert.equal(state.powershell - before, 1, "one single-path native observation, no batch");
+  assert.equal(assessWindowsPrivatePath(file).status, "insecure", "the stale memo entry was dropped, so later memoized readers agree");
 });
 
 test("the verdict for a non-private path is unchanged by the memo", { skip: !win32 }, () => {

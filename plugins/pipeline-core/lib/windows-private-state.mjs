@@ -171,8 +171,12 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
  */
 export function observeWindowsPrivatePath(path, options = {}) {
   if (typeof path !== "string" || path.length === 0) return { ...unavailable("private path is unavailable"), observation: null };
-  // Process-local memo of SUCCESSFUL native observations only. Test seams (injected run/environment) bypass it.
-  const memoable = options.run === undefined && options.environment === undefined;
+  // Process-local memo of SUCCESSFUL native observations only. Test seams (injected run/environment) bypass it. So does `fresh: true`, for a
+  // caller that judges a path RIGHT NOW (a guard's security decision): the memo key is the object identity, so it cannot see an in-process DACL
+  // change of an object it already observed as private. A fresh observation also drops the stale entry so later memoized readers agree with it.
+  const fresh = options.fresh === true;
+  const memoable = options.run === undefined && options.environment === undefined && !fresh;
+  if (fresh) OBSERVATION_MEMO.delete(path);
   const identity = memoable ? lstatIdentity(path) : null;
   if (identity !== null) {
     const hit = OBSERVATION_MEMO.get(path);
