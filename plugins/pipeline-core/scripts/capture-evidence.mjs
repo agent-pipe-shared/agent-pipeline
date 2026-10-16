@@ -326,11 +326,17 @@ export function planEvidenceCommandLaunch(command, {
     if (/^[A-Za-z]:(?![\\/])/u.test(command[0])) throw windowsNpmLaunchError("NPM-LAUNCHER-UNSUPPORTED");
     launcher = windowsNpmRegularFile(win32.resolve(root, command[0]), lstatSyncFn, "NPM-LAUNCHER-UNAVAILABLE");
   } else {
-    const extensions = selector === "npm.cmd" ? [""]
+    let extensions = selector === "npm.cmd" ? [""]
       : (windowsNpmEnvironmentValue(environment, "PATHEXT") ?? WINDOWS_NPM_DEFAULT_PATHEXT).split(";");
-    if (extensions.length === 0 || extensions.length > 16
-      || (selector === "npm" && extensions.some((extension) => ![".COM", ".EXE", ".BAT", ".CMD"].includes(extension.toUpperCase())))) {
-      throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+    if (extensions.length === 0 || extensions.length > 16) throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+    if (selector === "npm") {
+      // A stock PATHEXT also lists script hosts (.VBS, .JS, ...): well-formed entries outside
+      // the four executable extensions are ignored; a malformed entry or none of the four fails closed.
+      if (extensions.some((extension) => !/^\.[^\0-\x20\\/:*?"<>|]+$/u.test(extension))) {
+        throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
+      }
+      extensions = extensions.filter((extension) => [".COM", ".EXE", ".BAT", ".CMD"].includes(extension.toUpperCase()));
+      if (extensions.length === 0) throw windowsNpmLaunchError("ENVIRONMENT-UNSUPPORTED");
     }
     for (const directory of windowsNpmSearchDirectories(root, environment)) {
       for (const extension of extensions) {
