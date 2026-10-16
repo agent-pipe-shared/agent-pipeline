@@ -91,3 +91,59 @@ test("the multi-stage design course is retired: the coordinator refuses to start
 test("an Advisor admission with no consultation does not exist as a pass: the Advisor gate remains an explicit on-demand record, never auto-satisfied", () => {
   assert.equal(evaluateDesignAdvisoryAdmission(null).ok, false);
 });
+
+// RED mirrors: each case below is the negative counterpart of one case above. A regression that re-introduced a
+// mandatory Advisor/readiness stage, skipped the review chain, or uncapped the rounds would flip these.
+function approvalFixture() {
+  const r1 = receipt("spec-v1");
+  const receipts = [{ path: "specs/f1/receipt-1.json", bytes: r1.bytes }];
+  const binding = createDesignApprovalBinding({ featureId: "f1", receipts, currentSources: sources("spec-v1") });
+  const request = createDesignApprovalRequest({ binding: binding.binding, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) } });
+  return { receipts, binding, request };
+}
+
+test("RED mirror (one review is enough): with no review receipt at all no binding exists", () => {
+  const none = createDesignApprovalBinding({ featureId: "f1", receipts: [], currentSources: sources("spec-v1") });
+  assert.equal(none.ok, false);
+});
+
+test("RED mirror (only the review chain is signed): a request smuggling an Advisor or readiness field no longer verifies", () => {
+  const { receipts, request } = approvalFixture();
+  for (const key of ["advisor", "readiness"]) {
+    const inRequest = structuredClone(request.request);
+    inRequest[key] = { injected: true };
+    assert.equal(verifyDesignApprovalRequest({ request: inRequest, featureId: "f1", receipts, currentSources: sources("spec-v1") }).ok, false, `request.${key}`);
+    const inBinding = structuredClone(request.request);
+    inBinding.binding[key] = { injected: true };
+    assert.equal(verifyDesignApprovalRequest({ request: inBinding, featureId: "f1", receipts, currentSources: sources("spec-v1") }).ok, false, `binding.${key}`);
+  }
+});
+
+test("RED mirror (request re-verifies): a request verified against drifted sources is refused", () => {
+  const { receipts, request } = approvalFixture();
+  assert.equal(verifyDesignApprovalRequest({ request: request.request, featureId: "f1", receipts, currentSources: sources("spec-v2") }).ok, false);
+});
+
+test("RED mirror (round cap): the cap is exactly two, so a zero-finding second round never turns into an unbounded loop", () => {
+  const r1 = receipt("spec-v1", null, ["F-ONE"]);
+  const r2 = receipt("spec-v2", { path: "specs/f1/receipt-1.json", bytes: r1.bytes }, ["F-ONE"]);
+  const third = createDesignReviewReceipt({
+    featureId: "f1", previous: { path: "specs/f1/receipt-2.json", bytes: r2.bytes }, sources: sources("spec-v3"), reviewer,
+    report: ref("specs/f1/review-3.md", "r3"), openFindingIds: ["F-ONE"], reviewedAt: "2026-10-11T00:00:00.000Z",
+  });
+  assert.equal(third.ok, false);
+  assert.equal(third.code, "DRR-ROUND-EXCEEDED");
+});
+
+test("RED mirror (course retired): no runner value revives the multi-stage course", () => {
+  for (const runner of ["claude", "codex", undefined]) {
+    const result = inspectDesignCourse({ rootDir: "/nonexistent-root", runner });
+    assert.equal(result.ok, false, String(runner));
+    assert.equal(result.code, "DESIGN-COURSE-RETIRED", String(runner));
+    assert.equal(result.implementationAuthority, false, String(runner));
+  }
+});
+
+test("RED mirror (Advisor on demand): malformed or empty Advisor admissions never pass", () => {
+  for (const input of [undefined, {}, [], "ok"]) assert.equal(evaluateDesignAdvisoryAdmission(input).ok, false, JSON.stringify(input));
+});
