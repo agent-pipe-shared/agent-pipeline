@@ -33,7 +33,7 @@ const matching = (result, re) => result.findings.filter((f) => re.test(f));
 // (node:test `todo`: reported, failure does not fail the run) -- never silently passing.
 const GROUP2 = /references missing surface verify-phase:harness\/scripts\/verify\.mjs:/;
 const nonGroup2 = live.findings.filter((f) => !GROUP2.test(f));
-const PO_PENDING = "PO decision pending: register the unregistered verify suites or remove their inventory references";
+const PO_PENDING = "PO decision pending (owner Coordinator, due 2026-10-23): register the unregistered verify suites or remove their inventory references";
 
 test("AC-121 apart from the PO-pending verify-suite references, the checker reports no findings", () => {
   assert.deepEqual(nonGroup2, [], `non-Group-2 findings: ${nonGroup2.length}`);

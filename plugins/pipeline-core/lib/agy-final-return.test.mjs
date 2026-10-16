@@ -19,6 +19,7 @@ import { finalizeAgyHostObservedReturn } from "../scripts/agy-host-observed-fina
 import { gitDeps } from "../scripts/dispatch-authorship-verify.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "./critic-skip-decision.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { validateDispatchRecord } from "./dispatch-record.mjs";
 
 const cases = [];
 function test(name, run) { cases.push({ id: name.slice(0, 5), name: name.slice(6), run }); }
@@ -434,7 +435,20 @@ test("AFR16 the mechanic route retains its role through precommit validation and
     "AGY-RECORD-DRAFT-MODEL-WITNESS");
 });
 
-assert.equal(cases.length, 16, "the complete Agy Final Return corpus must be registered before execution begins");
+test("AFR17 the built authored record carries a non-empty truthful log and validates", () => {
+  const input = authoredDraftInput();
+  const draft = draftAgyAuthoredRecordAfterCommit(input);
+  assert.equal(draft.code, "AGY-RECORD-DRAFT-READY");
+  assert.equal(draft.record.outcome, "completed");
+  assert.equal(Array.isArray(draft.record.log) && draft.record.log.length >= 1, true);
+  for (const entry of draft.record.log) {
+    assert.equal(typeof entry.phase, "string");
+    assert.equal(Number.isSafeInteger(entry.toolUseCount), true);
+  }
+  assert.doesNotThrow(() => validateDispatchRecord(draft.record));
+});
+
+assert.equal(cases.length, 17,"the complete Agy Final Return corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
