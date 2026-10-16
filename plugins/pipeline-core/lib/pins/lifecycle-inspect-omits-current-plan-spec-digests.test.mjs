@@ -27,16 +27,21 @@ import { afterEach, test } from "node:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { linkSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { run, statePath as resolveStatePath } from "../../scripts/pipeline-state.mjs";
+import { createWindowsOwnedAuthorityDirectory } from "../windows-owned-authority-backend.mjs";
 import { mkdtempTestScratch } from "../test-tmpdir.mjs";
 
 const NOW = "2026-08-18T12:00:00.000Z";
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../scripts/pipeline-state.mjs", import.meta.url));
 const roots = [];
-afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
+const ORIGINAL_CEILING = process.env.GIT_CEILING_DIRECTORIES;
+afterEach(() => {
+  while (roots.length) rmSync(roots.pop(), { recursive: true, force: true });
+  if (ORIGINAL_CEILING === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = ORIGINAL_CEILING;
+});
 
 function sha256Hex(value) { return createHash("sha256").update(value).digest("hex"); }
 
@@ -52,6 +57,17 @@ function fixture(name) {
   const root = mkdtempTestScratch(`lifecycle-inspect-pin-${name}-`);
   roots.push(root);
   mkdirSync(join(root, ".claude"), { recursive: true });
+  // Containment: the fixture owns its own git root and authority directory so
+  // set-feature never reaches the enclosing repository's session-authority.
+  process.env.GIT_CEILING_DIRECTORIES = dirname(root);
+  const fixtureGit = (...args) => {
+    const result = spawnSync("git", args, { cwd: root, encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(root) } });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  fixtureGit("init", "-q", "-b", "main");
+  // A born HEAD is required: the State authority route fails on an unborn HEAD (WT-GIT-FAILED).
+  fixtureGit("-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "init");
+  if (process.platform === "win32") createWindowsOwnedAuthorityDirectory({ path: join(root, ".git", "agent-pipeline") });
   const planPath = "specs/widget/prd.md";
   const specPath = "specs/widget/spec.md";
   assert.equal(run(["set-feature", "--id", "widget", "--plan-path", planPath], { dir: root, now: () => NOW }), 0);
@@ -143,6 +159,33 @@ for (const which of ["planFile", "specFile"]) {
     const f = fixture(`a3-hardlink-${which}`);
     const payload = inspectReadOnly(f, () => linkSync(f[which], `${f[which]}.alias`), `hardlink-${which}`);
     assertDriftWithReopen(payload, `hardlink-${which}`);
+  });
+}
+
+for (const [which, role] of [["planFile", "prd"], ["specFile", "spec"]]) {
+  test(`A3: unreadable ${which} is named as the unobservable artifact and the typed recovery action is returned`, () => {
+    const f = fixture(`a3-named-${which}`);
+    const payload = inspectReadOnly(f, () => { unlinkSync(f[which]); mkdirSync(f[which]); }, `named-${which}`);
+    // Unreadable source is named explicitly, by role and path, as unobservable (not merely "not current").
+    const drift = payload.continuityAuthorityDrift;
+    assert.equal(drift.status, "drift");
+    const named = drift.artifacts.find((artifact) => artifact.role === role);
+    assert.equal(named.state, "unobservable");
+    assert.equal(named.observedSha256, null);
+    assert.equal(named.path, which === "planFile" ? "specs/widget/prd.md" : "specs/widget/spec.md");
+    for (const other of drift.artifacts.filter((artifact) => artifact.role !== role)) {
+      assert.notEqual(other.state, "unobservable", "the readable sibling is not mislabelled unobservable");
+    }
+    // Structured recovery action: collect the actor, then the sanctioned mutating reopen-design command.
+    assert.equal(payload.nextAction.kind, "collect-input");
+    assert.equal(payload.nextAction.mutation, false);
+    assert.deepEqual(payload.nextAction.inputs.map((input) => input.name), ["by"]);
+    const apply = payload.nextAction.applyAction;
+    assert.equal(apply.kind, "command");
+    assert.equal(typeof apply.executable, "string");
+    assert.deepEqual(apply.argv.slice(1, 3), ["reopen-design", "--by"]);
+    assert.equal(apply.mutation, true);
+    assert.equal(apply.requiresConfirmation, true);
   });
 }
 
