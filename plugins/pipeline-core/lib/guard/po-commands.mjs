@@ -189,7 +189,18 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
     "ln", "install", "truncate", "tee", "rsync",
   ]);
   if (mutatingTargets.has(executable)) {
-    return args.some((arg) => {
+    let written = args;
+    if (["cp", "mv", "install"].includes(executable)) {
+      // Only the destination is written: the -t/--target-directory value, else the last operand.
+      // Sources are reads; `-t` may also be glued (-tDIR / --target-directory=DIR).
+      const targetOption = args.findIndex((arg) => arg === "-t" || arg === "--target-directory");
+      const glued = args.find((arg) => /^--target-directory=/u.test(arg) || /^-t.+/u.test(arg));
+      const operands = args.filter((arg) => arg === "-" || !arg.startsWith("-"));
+      if (targetOption >= 0 && args[targetOption + 1] !== undefined) written = [args[targetOption + 1]];
+      else if (glued) written = [glued.replace(/^--target-directory=|^-t/u, "")];
+      else if (operands.length > 0) written = [operands[operands.length - 1]];
+    }
+    return written.some((arg) => {
       const target = commandPath(arg, root);
       return target !== null && isShellExternalPathToken(arg) && !pathInside(root, target);
     });
