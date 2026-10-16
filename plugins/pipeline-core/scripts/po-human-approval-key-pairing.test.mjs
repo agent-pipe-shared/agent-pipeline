@@ -95,4 +95,41 @@ test("reuse of a complete directory refuses a swapped-in foreign private key and
   assert.deepEqual(readFileSync(authorityFile(fx)), authorityBefore);
 });
 
+// AC-171 passphrase prompt behaviour: the injected spawn only records and delegates; it never supplies a passphrase.
+const recordingSpawn = (calls) => (executable, args, options) => {
+  calls.push({ args: Array.isArray(args) ? [...args] : [], stdio: options?.stdio });
+  const list = Array.isArray(args) ? args : [];
+  const derives = list[0] === "pkey" && list.includes("-pubout") && !list.includes("-passin");
+  return spawnSync(executable, derives ? [...list, "-passin", `pass:${PASSPHRASE}`] : list, { ...options, stdio: undefined, encoding: "utf8" });
+};
+
+test("an encrypted key is derived through the terminal-inheriting spawn with no passphrase in argv", () => {
+  const fx = arrange();
+  const keys = pair();
+  writeFileSync(fx.files.privateKey, keys.privateKey, { mode: 0o600 });
+  writeFileSync(fx.files.publicKey, keys.publicKey, { mode: 0o600 });
+  const calls = [];
+  const result = runHumanApproval(["setup", "--repo-root", join(fx.directory, "..", "..", "repo"), "--directory", fx.directory, "--human-name", NAME],
+    { spawn: recordingSpawn(calls), homedirFn: () => join(fx.directory, ".."), isTTY: true });
+  assert.equal(result.code, "PO-HUMAN-AUTHORITY-READY");
+  const derive = calls.find((call) => call.args[0] === "pkey" && call.args.includes("-pubout"));
+  assert.ok(derive, "the pairing derivation spawned openssl pkey -pubout");
+  assert.deepEqual(derive.stdio, ["inherit", "pipe", "inherit"], "stdin and stderr are inherited so the passphrase prompt reaches the terminal");
+  assert.equal(derive.args.some((arg) => /^pass:|^env:|^file:|^fd:/u.test(arg)) || derive.args.includes("-passin"), false,
+    "the module itself never supplies a passphrase");
+});
+
+test("an unencrypted PKCS#8 key is refused with PO-KEY-UNENCRYPTED before any spawn and nothing is written", () => {
+  const fx = arrange();
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  writeFileSync(fx.files.privateKey, privateKey.export({ format: "pem", type: "pkcs8" }), { mode: 0o600 });
+  writeFileSync(fx.files.publicKey, publicKey.export({ format: "pem", type: "spki" }), { mode: 0o600 });
+  const calls = [];
+  assert.throws(() => runHumanApproval(["setup", "--repo-root", join(fx.directory, "..", "..", "repo"), "--directory", fx.directory, "--human-name", NAME],
+    { spawn: recordingSpawn(calls), homedirFn: () => join(fx.directory, ".."), isTTY: true }),
+  (error) => error.code === "PO-KEY-UNENCRYPTED" && /PO-KEY-UNENCRYPTED/u.test(error.message));
+  assert.equal(calls.length, 0, "no openssl spawn happens for an unencrypted key");
+  assert.equal(existsSync(authorityFile(fx)), false, "no authority record is written");
+});
+
 after(() => { for (const base of created) rmSync(base, { recursive: true, force: true }); });
