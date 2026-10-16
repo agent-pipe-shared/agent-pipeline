@@ -2,7 +2,7 @@
 // Host-owned lifecycle coordinator. No API accepts a deserialized action plan.
 import {spawnSync} from 'node:child_process';
 import {mkdirSync,lstatSync,realpathSync,openSync,closeSync,writeFileSync,fsyncSync,renameSync,unlinkSync,existsSync} from 'node:fs';
-import {join,dirname,resolve,isAbsolute} from 'node:path';
+import {join,dirname,resolve,isAbsolute,relative,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {randomUUID} from 'node:crypto';
 import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256,supportsAntigravityPluginCliVersion} from './antigravity-plugin-topology.mjs';
@@ -33,6 +33,8 @@ function templates(root){
     for(const value of Object.values(v))visit(value);}}
  visit(f.value);return set;
 }
+// Separator-aware containment: the relative path (always '/'-separated) when `path` lies strictly inside `root`, else null.
+function within(root,path){const rel=relative(root,path);if(rel===''||rel==='..'||rel.startsWith('..'+sep)||rel.startsWith('../')||isAbsolute(rel))return null;return rel.split(sep).join('/');}
 function wiring(observation,configRoot,workspaceRoot){
  if(/["'\r\n$`;&|<>]/.test(observation.source.root))throw Error('ATR-UNSAFE-COMMAND-PATH');
  const roots=[observation.source,...observation.managed.candidates,...Object.values(observation.registries).flatMap(r=>r.entries)].filter(c=>c.status==='observed');
@@ -46,7 +48,7 @@ function wiring(observation,configRoot,workspaceRoot){
    if(value===null||typeof value!=='object')return value;
    if(Object.hasOwn(value,'command')){
     const c=command(value.command);let owner=null,key=null;
-    if(c&&isAbsolute(c.path))for(const [root,set] of sets){if(c.path.startsWith(root+'/')){const rel=c.path.slice(root.length+1),candidate=rel+'\0'+(c.arg??'');if(set.has(candidate)){owner=root;key=candidate;break;}}}
+    if(c&&isAbsolute(c.path))for(const [root,set] of sets){{const rel=within(root,c.path);if(rel===null)continue;const candidate=rel+'\0'+(c.arg??'');if(set.has(candidate)){owner=root;key=candidate;break;}}}
     if(owner!==null){if(!desired.has(key)){if(!parentArray)throw Error('ATR-WIRING-OWNERSHIP-UNVERIFIABLE');changes++;deletions.push(location);return;}const [rel,arg]=key.split('\0'),next='node "'+join(observation.source.root,rel)+'"'+(arg?' '+arg:'');if(next!==value.command){changes++;replacements.push({path:[...location,'command'],value:next});}return;}
     // A pipeline-shaped but unproved command is held, not foreign-classified.
     if(typeof value.command==='string'&&(/pipeline-core|antigravity-(?:pretool|start|stop|slicing)/.test(value.command)||roots.some(r=>value.command.includes(r.root))))throw Error('ATR-WIRING-OWNERSHIP-UNVERIFIABLE');
