@@ -13,12 +13,10 @@
 // same file is a "near miss", so no receipt is recorded and the first Write is refused with
 // GUARD-BOOTSTRAP-RECEIPT-MISSING.
 //
-// The guard is a frozen, protected surface for this task, so the equivalence cases below are `todo`:
-// they demonstrate the defect through the two exported functions without failing the suite. The
-// proposed change is specs/sprint-alfred-epic/design/fslash-guard-fix.patch; once it is applied the
-// `todo` marker on the equivalence cases is removed. The remaining cases pass today and must keep
-// passing after the fix: they pin that the fix folds separators and (win32 only) case for
-// comparison and never admits a different file, another drive, a dot-segment detour or extra argv.
+// The fix has landed in the guard, so the equivalence cases below are real, passing cases. They pin
+// that every separator/case spelling of the same file is recognised, and the remaining cases pin
+// that the fix folds separators and (win32 only) case for comparison and never admits a different
+// file, another drive, a dot-segment detour or extra argv.
 //
 // Hermetic: the command is only parsed -- no filesystem or Git state of any repository is touched,
 // and no private state is written.
@@ -34,8 +32,6 @@ const ON_WIN32 = process.platform === "win32";
 const NOT_WIN32 = ON_WIN32 ? false : "win32-only: POSIX has exactly one spelling of a path";
 const ROOT = resolve("/projects/current");
 const SCRIPT = fileURLToPath(new URL("./pipeline-start-preflight.mjs", import.meta.url));
-const TODO = "FSLASH: guard-lifecycle-ready.mjs compares the spelled script with strict string equality; "
-  + "proposed change in specs/sprint-alfred-epic/design/fslash-guard-fix.patch (frozen guard, not edited here)";
 
 const forward = (value) => value.replaceAll("\\", "/");
 const swapCase = (value) => [...value].map((char) => (char === char.toLowerCase() ? char.toUpperCase() : char.toLowerCase())).join("");
@@ -64,7 +60,7 @@ const EQUIVALENT_SPELLINGS = [
 ];
 
 for (const [label, spell] of EQUIVALENT_SPELLINGS) {
-  test(`FSLASH: ${label} name the same file and are recognised`, { skip: NOT_WIN32, todo: TODO }, () => {
+  test(`FSLASH: ${label} name the same file and are recognised`, { skip: NOT_WIN32 }, () => {
     assert.match(SCRIPT, /^[A-Za-z]:\\/u, "fixture precondition: a drive-letter script path");
     assertRecognised(spell(), true, label);
   });
