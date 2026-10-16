@@ -546,7 +546,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
       ...((commandIsGitPush(command) || classifyGhCommand(command).kind === "refused") ? ["guard-push.mjs"] : []),
     ]
     : ["Edit", "Write"].includes(toolName)
-      ? ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs", "guard-handover-size.mjs"]
+      ? ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs", "guard-handover-size.mjs", "guard-el01-tripwire.mjs"]
       : toolName === "Task" || toolName === "Agent"
         ? ["guard-dispatch.mjs"]
         : [];
