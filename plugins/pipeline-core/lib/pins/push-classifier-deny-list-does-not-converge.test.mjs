@@ -90,6 +90,19 @@ test("A2 convergence: a fresh unlisted spelling carrying a marker is a candidate
   }
 });
 
+test("A5 removal evidenced: git-cmd.mjs holds no unreferenced top-level helper and no quoted-substitution exemption", () => {
+  const src = readFileSync(join(libDir, "git-cmd.mjs"), "utf8");
+  const names = [...src.matchAll(/^(?:export\s+)?(?:function|const)\s+([A-Za-z_][A-Za-z0-9_]*)/gmu)].map((m) => m[1]);
+  assert.ok(names.length > 20);
+  const dead = names.filter((n) => (src.match(new RegExp(`\\b${n}\\b`, "gu")) ?? []).length < 2);
+  assert.deepEqual(dead, [], "a declared helper is never used (leftover shape-specific check)");
+  assert.match(src, /Rejected Ruling 157 grants no quoted-substitution exemption/u);
+  // The one marker gate decides, quoted or not: the shapes the removed checks #5/#6 handled stay candidates.
+  for (const cmd of ['git commit -m "$(date)"', 'git log --grep="$(date)"', "git diff -- \"$NAME\""]) {
+    assert.equal(commandIsGitPush(cmd), true, cmd);
+  }
+});
+
 test("A4 both consumers route through the shared classifier (source wiring)", () => {
   const guardPush = readFileSync(join(hooksDir, "guard-push.mjs"), "utf8");
   const codex = readFileSync(join(hooksDir, "codex-pretool-guard.mjs"), "utf8");

@@ -957,16 +957,15 @@ const Q12_PLAIN_TABLE = [
 ];
 recordQ12Table("Q12-PLAIN", false, Q12_PLAIN_TABLE);
 
-// GREP-PUSH-F reconciles only the quoted date substitution's expectation. Historical
-// case identifiers and fixture descriptions are retained for comparison; the unquoted
-// revision substitution remains a candidate, as do every real push and ambiguous case.
+// ALF-C-I19 re-base: the decided Q12 option-B contract (and the source's "Rejected Ruling 157 grants no quoted-substitution
+// exemption") makes EVERY marker a candidate, quoted or not -- the accepted cost of the allowlist. An earlier GREP-PUSH-F
+// edit expected `git commit -m "$(date)"` to be plain; the source no longer carries that exemption, so the expectation is
+// re-based to the decision (candidate), not the source loosened. Both rows are candidates.
 const Q12_ACCEPTED_FALSE_POSITIVE_TABLE = [
   ['git commit -m "$(date)"', "ACCEPTED false positive: command substitution inside a double-quoted commit message"],
   ["git diff $(git merge-base HEAD main)", "ACCEPTED false positive: command substitution as a revision argument"],
 ];
-for (const row of Q12_ACCEPTED_FALSE_POSITIVE_TABLE) {
-  recordQ12Table("Q12-ACCEPTED-FP", row[0] !== 'git commit -m "$(date)"', [row]);
-}
+recordQ12Table("Q12-ACCEPTED-FP", true, Q12_ACCEPTED_FALSE_POSITIVE_TABLE);
 
 // ---- commandIsGitPush: the heredoc narrowing, both sides (PO decision X, Q12-T3) ----
 // Test-only pin. Contract: PO decision X (2026-10-07), recorded in specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md
@@ -1348,7 +1347,10 @@ const GREP_PINS_R2_ACCEPT_TABLE = [
   ['git diff -- "$NAME"', "plain variable in double quotes"],
   ['git status -- "(dir){x}"', "double-quoted balanced parentheses and brace"],
 ];
-recordQ12Table("GREP-PINS-R2: ACCEPT", false, GREP_PINS_R2_ACCEPT_TABLE);
+// ALF-C-I19 re-base: these quoted-marker shapes were once expected plain (a quoted-data exemption that Ruling 157 rejected and
+// the source no longer carries). Under the decided Q12 allowlist a marker anywhere with a git word is a candidate routed to
+// guard-push, which refuses every non-exact push form; the accepted cost is a false positive, never a missed push.
+recordQ12Table("GREP-PINS-R2: QUOTED-MARKER-CANDIDATE", true, GREP_PINS_R2_ACCEPT_TABLE);
 const GREP_PINS_R2_DENY_TABLE = [
   ["git push origin main", "literal real push stays a candidate"],
   ["git push 'origin' 'main'", "quoted real push operands stay candidates"],
