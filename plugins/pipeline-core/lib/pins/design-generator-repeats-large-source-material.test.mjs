@@ -154,3 +154,36 @@ test("RED mirror: the compactness assertion fails against a mutant that embeds t
   const mutant = JSON.stringify({ ...summarizeOnboardingIntakeGeneratePlan(plan, { runner: "claude" }), targets: plan.targets }, null, 2);
   assert.throws(() => assertCompact(mutant, text, fullText, 8192));
 });
+
+function inspect(root) {
+  let out = "";
+  const code = main(["inspect", "--root", root, "--runner", "claude"], {
+    write: (chunk) => { out += chunk; return true; }, writeError: () => true,
+  });
+  return { code, out };
+}
+
+// Routine inspect on the same Unicode/CRLF fixture: nothing in its output (and so nothing in
+// nextAction.pendingAsks, where present) may repeat the request, and its size must not scale
+// with the input. Measured on this fixture: status "partial", nextAction null, pendingAsks absent
+// and continuity digests null, so this pins non-repetition and size independence only; it does
+// not exercise a populated pendingAsks nor a digest binding.
+test("[pendingAsks compaction] routine inspect repeats no request text and is size-independent", (t) => {
+  const text = request(14030);
+  const small = readyRoot(text);
+  const large = readyRoot(request(56000));
+  t.after(() => { rmSync(small, { recursive: true, force: true }); rmSync(large, { recursive: true, force: true }); });
+  const s = inspect(small);
+  const l = inspect(large);
+  const asksOf = (out) => JSON.stringify(JSON.parse(out).nextAction?.pendingAsks ?? []);
+  for (const run of [s, l]) {
+    assert.equal(countOf(run.out, "REQ-START"), 0, "inspect must not repeat the source material");
+    assert.equal(countOf(run.out, "REQ-END"), 0);
+    assert.equal(countOf(run.out, "Anforderung"), 0);
+    assert.equal(countOf(asksOf(run.out), "Anforderung"), 0, "pendingAsks carries no request text");
+    assert.ok(bytes(run.out) <= 8192, `inspect ${bytes(run.out)} exceeds 8192`);
+  }
+  assert.ok(bytes(l.out) < bytes(text), "inspect is smaller than even the small input");
+  assert.ok(Math.abs(bytes(l.out) - bytes(s.out)) < 256, "inspect size does not scale with the source size");
+  assert.ok(bytes(asksOf(l.out)) <= bytes(asksOf(s.out)) + 256, "pendingAsks size does not scale with the source size");
+});
