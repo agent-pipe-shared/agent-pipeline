@@ -550,7 +550,8 @@ read-only `goldfish-commit-command-flow.mjs` producer through the plugin root
 (the absolute `<plugin-root>` path the bootstrap printed; the guard admits only that path).
 Supply the exact task ID, Conventional Commit type/scope/summary, one to four
 single-line WHY body paragraphs, and the complete sorted changed-path list
-(repeat `--body` and `--path`). Example:
+(repeat `--body` and `--path`). `--summary` and at least one `--body` are
+mandatory; omitting either is refused with `GF-COMMAND-INPUT`. Example:
 
 ```text
 node "<plugin-root>/scripts/goldfish-commit-command-flow.mjs" --task-id {{TASK_ID}} --type docs --scope pipeline --summary 'update guidance' --body 'Explain the supported route.' --path path/to/file

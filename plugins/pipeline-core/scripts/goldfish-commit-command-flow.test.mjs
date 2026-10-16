@@ -80,6 +80,19 @@ test("CLI maps repeated body/path flags exactly and never executes Git", () => {
     "GF-COMMAND-CLI-ARGUMENTS");
 });
 
+test("ALF-C-I03 AC-137: the template states that --summary and --body are mandatory and omitting either gives GF-COMMAND-INPUT", () => {
+  const base = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope];
+  const pathArgs = input.paths.flatMap((path) => ["--path", path]);
+  const noSummary = runGoldfishCommitCommandFlow([...base, "--body", "why", ...pathArgs]);
+  const noBody = runGoldfishCommitCommandFlow([...base, "--summary", "s", ...pathArgs]);
+  assert.equal(noSummary.code, "GF-COMMAND-INPUT");
+  assert.equal(noBody.code, "GF-COMMAND-INPUT");
+  for (const rel of ["../../../templates/prompts/goldfish-task.md", "../templates/prompts/goldfish-task.md"]) {
+    const text = readFileSync(new URL(rel, import.meta.url), "utf8").replace(/\s+/g, " ");
+    assert.match(text, /`--summary` and at least one `--body` are mandatory; omitting either is refused with `GF-COMMAND-INPUT`/, rel);
+  }
+});
+
 test("CLI normalizes unsorted --path input to the sorted output and still refuses duplicates", () => {
   // PRODSORT: unsorted input is normalized, not refused
   const base = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope,
