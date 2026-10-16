@@ -17,6 +17,7 @@ import {createGovernanceScopeController} from './governance-scope.mjs';
 import {NEUTRAL_MANIFEST,NEUTRAL_STATE} from './project-authority.mjs';
 import {derivePlanLifecycle} from './plan-spec-state-v2.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
+import {createWindowsOwnedAuthorityDirectory} from './windows-owned-authority-backend.mjs';
 
 export const AT='2026-10-10T10:00:00.000Z';
 export const TWINS=['project/pipeline.json','.claude/pipeline.json'];
@@ -111,7 +112,10 @@ export function makeFixture(mode='signature',{trackedState=false,stage='implemen
   prospectiveSubjects(f, COMPANIONS);
 
   const common=join(f.dir,'.git'),profile=po.createPoGateProfileReceipt({repositoryFingerprint:po.derivePoGateRepositoryFingerprint({gitCommonDir:common,primaryRoot:f.dir}),primaryRoot:f.dir,sourceBytes:bytes(f,'pipeline.user.yaml'),runtimeBytes:bytes(f,'.claude/pipeline.yaml'),updatedAt:AT});
-  const profilePath=po.poGateProfileReceiptPath(common);mkdirSync(dirname(profilePath),{recursive:true,mode:0o700});writeFileSync(profilePath,po.serializePoGateProfileReceipt(profile),{mode:0o600});chmodSync(profilePath,0o600);
+  const profilePath=po.poGateProfileReceiptPath(common);
+  // Native Windows: the private-state root must carry the production-owned protected DACL (mkdirSync mode is a no-op there and would inherit).
+  if(process.platform==='win32')createWindowsOwnedAuthorityDirectory({path:join(common,'agent-pipeline')});
+  mkdirSync(dirname(profilePath),{recursive:true,mode:0o700});writeFileSync(profilePath,po.serializePoGateProfileReceipt(profile),{mode:0o600});chmodSync(profilePath,0o600);
   const source=path=>({path,sha256:hash(bytes(f,path))});
   const review=createDesignReviewReceipt({featureId:'e2e',previous:null,sources:{prd:source(PLAN),spec:source(SPEC),companions:COMPANIONS.map(source)},reviewer:{runner:'claude',model:'claude-opus-4'},report:source(REPORT),openFindingIds:[],reviewedAt:AT});
   assert(review.ok,'SETUP actual review producer: '+review.code);write(f,RECEIPT,Buffer.from(review.bytes));
