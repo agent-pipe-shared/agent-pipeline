@@ -831,7 +831,21 @@ fixtureCheck("DP29c a non-direct transport neither records a route nor is blocke
   }
 });
 
-assert.equal(cases.length, 45,"the complete dispatch-policy corpus must be registered before execution begins");
+// AC-222 -- the template's optional re-critic lines must be whole-line placeholders, so a
+// generic fill of a full review never leaves a declared re-critic behind; a real declaration
+// is still judged.
+check("DP30 the filled full-review template declares no re-critic; a declared one needs its delta range", () => {
+  const raw = readFileSync(join(repoRoot, "templates/prompts/critic-review.md"), "utf8");
+  assert.equal(/^- Re-critic \(MP-07\)/m.test(raw), false, "template must not carry a literal Re-critic declaration line");
+  const full = filledTemplateBody("templates/prompts/critic-review.md");
+  assert.deepEqual(codes(dispatchFindings({ subagentType: "pipeline-core:critic", prompt: full })), []);
+  const noRange = `${full}\n- Re-critic (MP-07): FILLED\n`;
+  assert.ok(codes(dispatchFindings({ subagentType: "pipeline-core:critic", prompt: noRange })).includes("DISPATCH-RECRITIC-NO-DELTA-RANGE"));
+  const ranged = `${full}\n- Re-critic (MP-07): 1234567..89abcde\n- Review ordinal: 2\n`;
+  assert.equal(codes(dispatchFindings({ subagentType: "pipeline-core:critic", prompt: ranged })).includes("DISPATCH-RECRITIC-NO-DELTA-RANGE"), false);
+});
+
+assert.equal(cases.length, 46,"the complete dispatch-policy corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
