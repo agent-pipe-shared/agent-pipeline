@@ -7,8 +7,8 @@
 //   P3 a recognised spelling really records the bootstrap receipt and opens the first-Write gate,
 //      while an unrecognised spelling records nothing and the gate refuses (GUARD-BOOTSTRAP-RECEIPT-MISSING);
 //   P4 normalization never widens: other file, other dir, other drive, dot-segment, extra argv stay refused;
-//   P5 case: the accepted identity authority is SEPARATOR-ONLY. A case-variant spelling is an explicit,
-//      retained discrepancy against the backlog Proposal ("separator and case"); pinned as current behaviour.
+//   P5 case: PO #19 decided to admit case-variant spellings on win32 (separator AND case, per the Proposal);
+//      the earlier pin asserted refusal and went RED against the case-folding source (true !== false).
 // RED discriminator: a scratch mirror of the pre-fix strict-equality matcher rejects P2's spelling.
 
 import assert from "node:assert/strict";
@@ -111,10 +111,15 @@ test("P4: either spelling plus any extra argument stays refused", { skip: NOT_WI
   }
 });
 
-test("P5: case-variant spelling is NOT accepted -- identity authority is separator-only (retained discrepancy vs Proposal 'separator and case')", { skip: NOT_WIN32 }, () => {
-  assertRecognised(flipDrive(START_PREFLIGHT_SCRIPT), false, "opposite-case drive, backslash");
-  assertRecognised(flipDrive(forward(START_PREFLIGHT_SCRIPT)), false, "opposite-case drive, forward slash");
-  assertRecognised(START_PREFLIGHT_SCRIPT.toUpperCase(), false, "upper-cased path");
+test("P5: case-variant spellings are admitted on win32 (PO #19), in both separator spellings", { skip: NOT_WIN32 }, () => {
+  assertRecognised(flipDrive(START_PREFLIGHT_SCRIPT), true, "opposite-case drive, backslash");
+  assertRecognised(flipDrive(forward(START_PREFLIGHT_SCRIPT)), true, "opposite-case drive, forward slash");
+  assertRecognised(START_PREFLIGHT_SCRIPT.toUpperCase(), true, "upper-cased path, backslash");
+  assertRecognised(forward(START_PREFLIGHT_SCRIPT).toUpperCase(), true, "upper-cased path, forward slash");
+  assertRecognised(START_PREFLIGHT_SCRIPT.toLowerCase(), true, "lower-cased path, backslash");
+  const r = runScenario(flipDrive(forward(START_PREFLIGHT_SCRIPT)), "fslash-case-1");
+  assert.equal(r.receiptRecorded, true, "a case-variant preflight records the receipt");
+  assert.equal(r.gate, null, "first Write must not be refused");
 });
 
 test("POSIX: exact path recognised, case-variant refused", { skip: ON_WIN32 ? HOST_LIMITATION : false }, () => {
