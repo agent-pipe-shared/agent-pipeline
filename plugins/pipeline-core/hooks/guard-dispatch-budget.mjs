@@ -610,6 +610,9 @@ function prepareOwnedCriticNotesDirectory({ path, counter, identity, input, root
   const receiptPath = path + ".notes-directory.json";
   const directory = join(resolve(rootDir), dirname(notesPath));
   const image = info => ({ dev: String(info.dev), ino: String(info.ino), mode: info.mode & 0o7777 });
+  // Windows reports synthetic POSIX mode bits (0o777 / 0o666): the bits carry no ownership information there,
+  // so the mode comparisons are applied on every other platform only. dev/ino identity checks stay everywhere.
+  const modeIs = (info, expected) => process.platform === "win32" || (info.mode & 0o7777) === expected;
   let created = false;
   try {
     // Only fixed shared ancestors may exist without a notes ownership receipt.
@@ -621,25 +624,25 @@ function prepareOwnedCriticNotesDirectory({ path, counter, identity, input, root
     const retained = launchRead(receiptPath);
     if (retained !== null) {
       const receipt = JSON.parse(retained.bytes.toString("utf8"));
-      if ((retained.identity.mode & 0o7777) !== 0o600 || !launchExact(receipt, ["schema", "binding", "directoryIdentity"])
+      if (!modeIs(retained.identity, 0o600) || !launchExact(receipt, ["schema", "binding", "directoryIdentity"])
         || receipt.schema !== CRITIC_NOTES_DIRECTORY_SCHEMA
         || launchCanonical(receipt.binding) !== launchCanonical(binding)) throw new Error("critic-notes-receipt");
       const info = lstatSync(directory);
-      if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o7777) !== 0o700
+      if (!info.isDirectory() || info.isSymbolicLink() || !modeIs(info, 0o700)
         || launchCanonical(image(info)) !== launchCanonical(receipt.directoryIdentity)) throw new Error("critic-notes-directory-drift");
       return { ok: true, notesPath };
     }
     // Bare exclusive mkdir: never adopt a foreign or interrupted directory.
     mkdirSync(directory, { mode: 0o700 }); created = true;
     const info = lstatSync(directory);
-    if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o7777) !== 0o700) throw new Error("critic-notes-directory");
+    if (!info.isDirectory() || info.isSymbolicLink() || !modeIs(info, 0o700)) throw new Error("critic-notes-directory");
     const receipt = { schema: CRITIC_NOTES_DIRECTORY_SCHEMA, binding, directoryIdentity: image(info) };
     const bytes = Buffer.from(launchCanonical(receipt) + "\n", "utf8");
     let fd = null;
     try {
       fd = openSync(receiptPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
       const opened = fstatSync(fd);
-      if (!opened.isFile() || opened.nlink !== 1 || (opened.mode & 0o7777) !== 0o600) throw new Error("critic-notes-receipt");
+      if (!opened.isFile() || opened.nlink !== 1 || !modeIs(opened, 0o600)) throw new Error("critic-notes-receipt");
       writeFileSync(fd, bytes); fsyncSync(fd);
     } finally { if (fd !== null) closeSync(fd); }
     const observed = launchRead(receiptPath), fresh = lstatSync(directory);
