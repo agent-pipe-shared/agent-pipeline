@@ -403,6 +403,22 @@
       "nonOverlapNote": "Private prelaunch binding, bounded unstarted-state TTL, and Codex start-stop correlation are separate from returned-final validation and commit readback"
     },
     {
+      "name": "shell-grammar-capability-placement-tests",
+      "file": "harness/scripts/shell-grammar-capability-placement.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "RGCP001",
+          "RGCP002",
+          "RGCP003",
+          "RGCP004"
+        ],
+        "maxBytes": 32768
+      },
+      "invariantPinned": "The shell grammar kernel file has exactly one concrete capability placement (claude-hook-safety), an architecture-map contract line and guard-split-map ownership",
+      "nonOverlapNote": "Placement of the grammar file only; the grammar's behaviour is pinned by guard-split-contract and the kernel-closure suites"
+    },
+    {
       "name": "native-goldfish-host-return-tests",
       "file": "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs",
       "caseCompletion": {
