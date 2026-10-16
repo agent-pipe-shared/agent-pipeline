@@ -1042,6 +1042,14 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
   let index = 0;
   while (index < args.length && args[index].startsWith("-")) {
     if (args[index] === "-C") {
+      // The directory must be a real (non-symlink) directory inside the project/approved roots.
+      const target = args[index + 1];
+      if (typeof target !== "string" || target === "" || target.startsWith("-")) return false;
+      const directory = resolve(root, target);
+      try {
+        if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) return false;
+        if (!isApprovedSingleCommandReadArg(realpathSync(directory), root, extraRoots, true)) return false;
+      } catch { return false; }
       index += 2;
     } else if (["--no-pager", "-p", "--literal-pathspecs"].includes(args[index])) {
       index += 1;
@@ -1088,10 +1096,29 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
   // index or working tree.  A stale or migration-required lifecycle must not
   // prevent an operator from observing the current upstream.  Destructive
   // adoption remains separately guarded at checkout/switch time.
-  if (subcommand === "fetch") return true;
-  return subcommand === "config"
-    && (subargs.includes("--list") || subargs.includes("-l")
-      || (subargs.length >= 2 && ["--get", "--get-all", "--get-regexp"].includes(subargs[0])));
+  // Only closed boolean flags and plain remote/ref names: --upload-pack, -u, --server-option,
+  // -c, ext::/URL-style transports and refspecs can name an executable or helper.
+  if (subcommand === "fetch") {
+    return subargs.every((arg) =>
+      ["--all", "--prune", "-p", "--tags", "-t", "--no-tags", "--dry-run", "-n", "--quiet", "-q",
+        "--verbose", "-v"].includes(arg)
+      || /^[A-Za-z0-9][A-Za-z0-9._/@-]*$/u.test(arg));
+  }
+  if (subcommand !== "config") return false;
+  const isListMode = subargs.includes("--list") || subargs.includes("-l");
+  const isGetMode = subargs.length >= 2 && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);
+  if (!isListMode && !isGetMode) return false;
+  const pureFlags = new Set(["--list", "-l", "--get", "--get-all", "--get-regexp", "--show-origin",
+    "--show-scope", "--name-only", "--null", "-z", "--local", "--global", "--system", "--worktree"]);
+  for (let i = 0; i < subargs.length; i += 1) {
+    const arg = subargs[i];
+    if (!arg.startsWith("-")) continue;
+    if (pureFlags.has(arg)) continue;
+    if (/^--type=[a-z-]+$/u.test(arg)) continue;
+    if (arg === "--type" && /^[a-z-]+$/u.test(subargs[i + 1] ?? "")) { i += 1; continue; }
+    return false;
+  }
+  return true;
 }
 
 /**
