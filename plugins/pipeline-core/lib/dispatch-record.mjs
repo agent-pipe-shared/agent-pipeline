@@ -161,6 +161,8 @@ function validateRecord(record, { legacy, v3 = false }) {
   const undeliveredV4 = !legacy && !v3 && record.outcomeClassification?.kind === "completed-undelivered";
   if (isTerminalOutcome(record.outcome) && record.resultSha256 === null && !undeliveredV4) fail("record-result", "terminal dispatch record requires resultSha256");
   if (!Array.isArray(record.log) || record.log.length > 2048) fail("record-log", "log must be a bounded array");
+  // completed-undelivered is a host observation of a worker that returned nothing: no report, no worker activity to log.
+  if (!legacy && isTerminalOutcome(record.outcome) && !undeliveredV4 && record.log.length === 0) fail("record-log", "terminal dispatch record requires at least one log entry");
   record.log.forEach((entry, index) => {
     exactKeys(entry, ["phase", "toolUseCount", "note"], `log[${index}]`, ["phase", "toolUseCount"]);
     nonempty(entry.phase, `log[${index}].phase`);
