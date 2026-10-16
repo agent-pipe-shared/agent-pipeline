@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { run as runPipelineState } from "../../../harness/scripts/pipeline-state.mjs";
 
 import {
+  PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE,
   PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
   PO_GATE_PRD_LANGUAGE_MARKER,
   PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH,
@@ -43,8 +44,9 @@ import {
 } from "./po-gate-authority.mjs";
 import { main as poGateProfileRepair } from "../scripts/po-gate-profile-repair.mjs";
 import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+import { createWindowsOwnedAuthorityDirectory } from "./windows-owned-authority-backend.mjs";
 import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
-import { materializeTestDesignWorkflowPackage } from "./test-design-workflow-fixture.mjs";
+import { createDesignReviewReceipt } from "./design-review-receipt.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..", "..");
@@ -194,13 +196,30 @@ function publishReceipt(common, primary) {
   return { path, receipt };
 }
 
+// Native Windows: the OS temp root's DACL grants other principals mutation rights, which the owned-authority
+// ancestor inspection correctly refuses. Fixtures that must reach the State authority therefore live under the
+// project's gitignored scratch/ (owner-only ancestors); production DACL assurance is untouched.
+function fixtureBase(prefix) {
+  if (process.platform !== "win32") return mkdtempSync(join(tmpdir(), prefix));
+  const root = join(REPO_ROOT, "scratch", `po-gate-authority-${process.pid}`);
+  mkdirSync(root, { recursive: true });
+  return mkdtempSync(join(root, prefix));
+}
+
+// Native Windows: mkdirSync mode is a no-op, so a <root>/.git/agent-pipeline created later would inherit the parent
+// DACL; create it through the owned-authority backend (same call shape as the materialization fixture).
+function ownPrivateStateRoot(root) {
+  if (process.platform === "win32") createWindowsOwnedAuthorityDirectory({ path: join(root, ".git", "agent-pipeline") });
+}
+
 function fixture({ linkedLanguage = null } = {}) {
-  const base = mkdtempSync(join(tmpdir(), "po-gate-authority-"));
+  const base = fixtureBase("po-gate-authority-");
   const common = join(base, "common.git");
   const primary = join(base, "primary");
   mkdirSync(common, { recursive: true });
   mkdirSync(primary, { recursive: true });
-  execFileSync("git", ["init", "-q"], { cwd: primary, windowsHide: true });
+  execFileSync("git", ["init", "-q"], { cwd: primary, windowsHide: true, env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(primary) } });
+  ownPrivateStateRoot(primary);
   populateRoot(primary, "de");
   const current = linkedLanguage === null ? primary : join(base, "linked");
   if (linkedLanguage !== null) {
@@ -245,6 +264,13 @@ function withFixture(options, fn) {
   } finally {
     value.cleanup();
   }
+}
+
+// pipeline-state resolves the repository candidate (`rev-parse HEAD`) before it parses the subcommand,
+// so a fixture repository driven through runPipelineState needs a HEAD commit (else WT-GIT-FAILED).
+function commitFixtureHead(primary) {
+  execFileSync("git", ["-c", "user.name=PO Gate Test", "-c", "user.email=po-gate@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"],
+    { cwd: primary, windowsHide: true, env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(primary) } });
 }
 
 check("closed profile receipt and canonical serialization bind the validated projection", () => {
@@ -689,12 +715,35 @@ check("a bound Spec digest alone accepts the current PRD's neighboring spec.md",
 
 function submitFixturePlan(primary, authority, profile) {
   const state = JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
-  const designFixture = materializeTestDesignWorkflowPackage({
-    root: primary, featureId: state.activeFeature.id,
-    planPath: authority.value.planPath, specPath: authority.value.specPath,
-    // R7-3-T2d: the bound-path gate refuses to present a package that is not tracked and clean at HEAD.
-    commitPackage: true,
+  // Retired route (DWP-PRESENT-RETIRED): present-plan now takes a design review receipt over finished,
+  // tracked and clean sources. The receipt is minted by the production createDesignReviewReceipt API.
+  const featureId = state.activeFeature.id;
+  const planPath = authority.value.planPath, specPath = authority.value.specPath;
+  const baseDir = dirname(planPath).replaceAll("\\", "/");
+  const companionPaths = [`${baseDir}/design.md`, `${baseDir}/traceability.md`];
+  const reportPath = `${baseDir}/review/design-review-1.md`;
+  const receiptPath = `${baseDir}/review/design-review-receipt-1.json`;
+  write(join(primary, companionPaths[0]), "# Design\n");
+  write(join(primary, companionPaths[1]), "| ID | Evidence |\n| --- | --- |\n");
+  write(join(primary, reportPath), "# Design review 1\nVerdict: pass.\n");
+  const sourceFor = (path) => ({ path, sha256: sha256(readFileSync(join(primary, ...path.split("/")))) });
+  const created = createDesignReviewReceipt({
+    featureId,
+    previous: null,
+    sources: { prd: sourceFor(planPath), spec: sourceFor(specPath), companions: companionPaths.map(sourceFor) },
+    reviewer: { runner: "claude", model: "claude-opus-4" },
+    report: sourceFor(reportPath),
+    openFindingIds: [],
+    reviewedAt: "2026-10-09T09:00:00.000Z",
   });
+  assert.equal(created.ok, true, JSON.stringify(created));
+  write(join(primary, receiptPath), Buffer.from(created.bytes));
+  const fixtureGit = (...args) => execFileSync("git", ["-C", primary, "-c", "user.name=po-gate-test", "-c", "user.email=po-gate-test@example.invalid",
+    "-c", "commit.gpgsign=false", ...args], { encoding: "utf8", windowsHide: true, timeout: 15000,
+    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", GIT_CEILING_DIRECTORIES: dirname(primary) } }).trim();
+  // R7-3-T2d: the bound-path gate refuses to present sources that are not tracked and clean at HEAD.
+  fixtureGit("add", "--", planPath, specPath, ...companionPaths, reportPath, receiptPath);
+  fixtureGit("commit", "-q", "-m", `Commit the finished design sources for ${featureId}`);
   const status = runPipelineState(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
     dir: primary,
     now: () => NOW,
@@ -704,13 +753,12 @@ function submitFixturePlan(primary, authority, profile) {
   assert.equal(status, 0);
   // NVA-R22-PLANSHOWN: approve-plan now refuses an approval of unseen content
   // -- a prior present-plan record bound to this exact submission is required.
-  const presented = runPipelineState(["present-plan", "--by", "coordinator", "--design-workflow-package", designFixture.packagePath], {
+  const presented = runPipelineState(["present-plan", "--by", "coordinator", "--review-receipt", receiptPath], {
     dir: primary,
     now: () => NOW,
-    ...designFixture.deps,
   });
   assert.equal(presented, 0);
-  return designFixture;
+  return { receiptPath };
 }
 
 check("approve-plan rejects bare attribution when the shared human-approval receipt is required", () => {
@@ -887,7 +935,11 @@ check("a stale worktree registration that Git has NOT marked prunable still thro
     // (c) no `prunable` field means the entry is still fed into the unrelaxed
     // physical-directory assertion, exactly as before this fix -- this is the
     // security property that must not be relaxed.
-    assert.throws(() => resolvePoGateRepositoryTopology(current, { spawn }), /ENOENT/u);
+    // The throw is now a typed bounded environment error (foreign-worktree), not free text.
+    assert.throws(
+      () => resolvePoGateRepositoryTopology(current, { spawn }),
+      (error) => error?.code === PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE && error?.cause === "foreign-worktree",
+    );
   });
 });
 
@@ -968,6 +1020,8 @@ function run(command, args, cwd) {
       ...process.env,
       GIT_CONFIG_NOSYSTEM: "1",
       GIT_TERMINAL_PROMPT: "0",
+      // Containment: never let discovery climb out of the fixture into the project repository.
+      GIT_CEILING_DIRECTORIES: dirname(cwd),
     },
   });
   assert.equal(result.error, undefined, result.error?.message);
@@ -981,12 +1035,13 @@ function git(cwd, ...args) {
 }
 
 check("literal linked detached worktree uses the primary receipt without reconciling legacy profile bytes", () => {
-  const base = mkdtempSync(join(tmpdir(), "po-gate-worktree-"));
+  const base = fixtureBase("po-gate-worktree-");
   const primary = join(base, "repository");
   const linked = join(base, "linked detached");
   try {
     mkdirSync(primary, { recursive: true });
     git(primary, "init", "-b", "main");
+    ownPrivateStateRoot(primary);
     git(primary, "config", "user.name", "PO Gate Test");
     git(primary, "config", "user.email", "po-gate@example.invalid");
     populateRoot(primary, "de");
@@ -1032,10 +1087,11 @@ function quotedSource(language) {
 }
 
 function consumerProject(language) {
-  const base = realpathSync(mkdtempSync(join(tmpdir(), "po-gate-consumer-")));
+  const base = realpathSync(fixtureBase("po-gate-consumer-"));
   const root = join(base, "consumer-project");
   mkdirSync(root, { recursive: true });
   git(root, "init", "-b", "main");
+  ownPrivateStateRoot(root);
   git(root, "config", "user.name", "PO Gate Test");
   git(root, "config", "user.email", "po-gate@example.invalid");
   populateRoot(root, language);
@@ -1433,6 +1489,7 @@ check("the Spec guidance names a rebind route pipeline-state actually provides",
     return validate().repair;
   });
   withFixture({}, ({ primary }) => {
+    commitFixtureHead(primary);
     // The writer's own command list is the contract for the subcommand names ...
     const allowed = captureStderr(() => {
       assert.equal(runPipelineState(["po-authority-rebind-plan-typo"], { dir: primary, now: () => NOW }), 2);
@@ -1465,6 +1522,7 @@ check("the acknowledgement guidance names an acknowledge route pipeline-state ac
     return validate({ expectedPlanSha256: "a".repeat(64), expectedSpecSha256: "b".repeat(64) }).repair;
   });
   withFixture({}, ({ primary }) => {
+    commitFixtureHead(primary);
     // The writer's own command list is the contract for the subcommand names ...
     const allowed = captureStderr(() => {
       assert.equal(runPipelineState(["po-authority-acknowledge-plan-typo"], { dir: primary, now: () => NOW }), 2);
