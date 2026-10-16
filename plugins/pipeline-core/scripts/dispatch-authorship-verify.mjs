@@ -365,7 +365,7 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.fail, "trailer-malformed", `\`Dispatch: ${dispatch.raw}\` does not match \`<ID> (<role>)\``);
   }
   if (dispatch.role === "elephant") {
-    if (dispatch.id !== ELEPHANT_STAGE0_ID) {
+    if (dispatch.id !== ELEPHANT_STAGE0_ID && dispatch.id !== "design") {
       return result(
         sha,
         VERDICT.unverifiable,

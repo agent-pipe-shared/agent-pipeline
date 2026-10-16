@@ -4,11 +4,10 @@
 // Regression pin: pipeline.installed-design-trailer-example-is-rejected-by-git-guard (ALF-C-P1-13, AC-205).
 //
 // Original acceptance (backlog item): (1) every printed commit example is accepted by the command
-// guard and the commit-msg backstop; (2) the direct-design form is handled consistently -- the item
-// proposed admitting `Dispatch: design (elephant)`, the PO decision T12 instead REMOVED that form
-// (the Elephant still commits via `Dispatch: stage-0 (elephant)` + `AI-Assisted: true`), so the pin
-// asserts the removal is uniform: printed text never teaches it, and the guard lanes and the
-// authorship verifier all refuse to bless it while still admitting stage-0; (3) verifier, generator
+// guard and the commit-msg backstop; (2) the direct-design form is handled consistently -- PO decision
+// 2026-10-16 #12 (superseding T12) admits exactly `Dispatch: design (elephant)` alongside
+// `Dispatch: stage-0 (elephant)`; the pin asserts the guard lanes and the authorship verifier admit
+// exactly those two Elephant forms and still refuse near-misses (other roles/ids); (3) verifier, generator
 // and guard share one classification; (4) provenance debt is a disposition of history, not behavior,
 // and is not testable here (named, not claimed).
 //
@@ -96,33 +95,49 @@ test("AC2: stage-0 (elephant) with AI-Assisted: true stays admitted, via -F, --t
   assert.deepEqual(codes(viaTrailer), []);
 });
 
-test("AC2: Dispatch: design (elephant) is rejected as malformed by the command guard and the backstop", () => {
+test("AC2: Dispatch: design (elephant) is admitted by the command guard and the backstop (PO decision 2026-10-16 #12)", () => {
   const message = messageWith("design (elephant)");
-  assert.deepEqual(codes(guardLane(message)), ["GIT-03-DISPATCH-MALFORMED"]);
-  assert.deepEqual(codes(backstopLane(message)), ["GIT-03-DISPATCH-MALFORMED"]);
+  assert.deepEqual(codes(guardLane(message)), []);
+  assert.deepEqual(codes(backstopLane(message)), []);
   const viaTrailer = commitMessageFindings(
     'git commit -m "docs: record design" --trailer "AI-Assisted: true" --trailer "Dispatch: design (elephant)"',
     { readFile: () => { throw new Error("no file expected"); }, requireMarker: true, requireDispatch: true },
   );
-  assert.deepEqual(codes(viaTrailer), ["GIT-03-DISPATCH-MALFORMED"]);
+  assert.deepEqual(codes(viaTrailer), []);
 });
 
-test("AC2: the removed design form is not accepted for production files or design files alike (no path-based admission)", () => {
-  for (const paths of [["docs/design.md"], ["plugins/pipeline-core/lib/production.mjs"]]) {
-    const outcome = verify(messageWith("design (elephant)"), paths);
-    assert.notEqual(outcome.verdict ?? outcome.status, VERDICT.pass, JSON.stringify(outcome));
+test("AC2: near-miss design forms stay refused (only the exact elephant form is admitted)", () => {
+  // Elephant-role near-misses are refused by the guard grammar itself.
+  for (const value of ["Design (elephant)", "design  (elephant)", "design-x (elephant)"]) {
+    assert.deepEqual(codes(backstopLane(messageWith(value))), ["GIT-03-DISPATCH-MALFORMED"], value);
   }
+  // `design (goldfish)` is a well-formed goldfish task binding (id "design"), never an Elephant grant:
+  // with no dispatch record the verifier cannot pass it.
+  for (const value of ["design (goldfish)", "design (critic)", "Design (elephant)", "design-x (elephant)"]) {
+    const outcome = verify(messageWith(value));
+    assert.notEqual(outcome.verdict ?? outcome.status, VERDICT.pass, `${value}: ${JSON.stringify(outcome)}`);
+  }
+});
+
+test("AC2: the design form gets no path-based admission beyond the stage-0 size bound", () => {
+  const oversized = Array.from({ length: ELEPHANT_STAGE0_MAX_PATHS + 1 }, (_, index) => `docs/f${index}.md`);
+  const outcome = verify(messageWith("design (elephant)"), oversized);
+  assert.notEqual(outcome.verdict ?? outcome.status, VERDICT.pass, JSON.stringify(outcome));
+  assert.match(JSON.stringify(outcome), /elephant-direct-oversized/u);
 });
 
 test("AC3: guard and verifier share one classification of the Elephant forms", () => {
   const stage0 = verify(messageWith("stage-0 (elephant)"));
   assert.equal(stage0.verdict ?? stage0.status, VERDICT.pass, JSON.stringify(stage0));
   const design = verify(messageWith("design (elephant)"));
-  assert.equal(design.verdict ?? design.status, VERDICT.unverifiable, JSON.stringify(design));
-  assert.match(JSON.stringify(design), /elephant-direct-nonstandard-id/u);
-  // The guard refuses exactly the form the verifier will not bless, and admits exactly the one it passes.
+  assert.equal(design.verdict ?? design.status, VERDICT.pass, JSON.stringify(design));
+  const other = verify(messageWith("implementation (elephant)"));
+  assert.equal(other.verdict ?? other.status, VERDICT.unverifiable, JSON.stringify(other));
+  assert.match(JSON.stringify(other), /elephant-direct-nonstandard-id/u);
+  // The guard admits exactly the forms the verifier passes, and refuses the one it will not bless.
   assert.deepEqual(codes(backstopLane(messageWith("stage-0 (elephant)"))), []);
-  assert.deepEqual(codes(backstopLane(messageWith("design (elephant)"))), ["GIT-03-DISPATCH-MALFORMED"]);
+  assert.deepEqual(codes(backstopLane(messageWith("design (elephant)"))), []);
+  assert.deepEqual(codes(backstopLane(messageWith("implementation (elephant)"))), ["GIT-03-DISPATCH-MALFORMED"]);
 });
 
 test("AC3: stage-0 does not become a production-implementation grant (verifier size bound still applies)", () => {
@@ -135,10 +150,10 @@ test("AC3: stage-0 does not become a production-implementation grant (verifier s
 test("AC3: documentation-only commits during implementation use the same grammar (no phase-specific trailer)", () => {
   // The grammar has no phase slot: a doc/evidence commit during implementation uses the identical
   // admitted forms, and the identical rejection of any other direct-Elephant id.
-  for (const value of ["stage-0 (elephant)", "ALF-C-P1-13 (goldfish)"]) {
+  for (const value of ["stage-0 (elephant)", "design (elephant)", "ALF-C-P1-13 (goldfish)"]) {
     assert.deepEqual(codes(backstopLane(`docs: add evidence\n\nBody.\n\nAI-Assisted: true\nDispatch: ${value}\n`)), [], value);
   }
-  for (const value of ["design (elephant)", "implementation (elephant)", "stage-1 (elephant)"]) {
+  for (const value of ["implementation (elephant)", "stage-1 (elephant)"]) {
     assert.deepEqual(codes(backstopLane(messageWith(value))), ["GIT-03-DISPATCH-MALFORMED"], value);
   }
 });

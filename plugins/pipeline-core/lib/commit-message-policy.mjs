@@ -86,7 +86,7 @@ const DISPATCH_VALUE = /^(\S+) \((goldfish|critic|elephant-generated)\)$/u;
 const PROVENANCE_SIGNAL = /^\s*(?:AI-Assisted|Dispatch)\s*:/imu;
 
 function admittedDispatchValue(value) {
-  if (value === "stage-0 (elephant)" || value === "administrative (elephant)") return true;
+  if (value === "stage-0 (elephant)" || value === "design (elephant)" || value === "administrative (elephant)") return true;
   if (/^quality-package-[a-f0-9]{64} \(integration\)$/u.test(value)) return true;
   const match = DISPATCH_VALUE.exec(value);
   if (!match) return false;
