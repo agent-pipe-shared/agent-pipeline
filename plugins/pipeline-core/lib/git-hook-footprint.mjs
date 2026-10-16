@@ -26,16 +26,23 @@ export function observeGitHookFootprint({rootDir}={}){
  return {schema:'pipeline.git-hook-footprint.v1',root,rootIdentity:footprintIdentity(physicalFootprintPath(root,{directory:true})),commonDir:common,commonIdentity:footprintIdentity(physicalFootprintPath(common,{directory:true})),worktrees:repo.worktrees.map(r=>resolve(r.path)).sort(),hooks};
 }
 export function planManagedGitHookRemoval({rootDir,name}={}){if(!GIT_HOOK_NAMES.includes(name))footprintFail('PU-HOOK-NAME');const all=observeGitHookFootprint({rootDir}),entry=all.hooks.find(h=>h.name===name);return {status:['owned','owned-partial'].includes(entry.status)?'ready':entry.status==='absent'?'nothing-to-remove':'refused-modified-hook',root:all.root,rootIdentity:all.rootIdentity,commonIdentity:all.commonIdentity,entry};}
-export function removeManagedGitHook({rootDir,name,deps={},expectedEntry}={}){
+export function removeManagedGitHook({rootDir,name,deps={},expectedEntry,expectedRepository,observeSiblingScope}={}){
  if(expectedEntry){
   if(expectedEntry.name!==name||!GIT_HOOK_NAMES.includes(name))footprintFail("PU-HOOK-NAME");
   const observed=observeGitHookFootprint({rootDir}),actual=observed.hooks.find(row=>row.name===name);
-  if(observed.worktrees.length!==1||observed.worktrees[0]!==resolve(rootDir)||observed.commonDir!==join(resolve(rootDir),".git"))footprintFail("PU-HOOK-SHARED");
+  const requireExclusiveRetirement=()=>{
+   const now=observeGitHookFootprint({rootDir});
+   if(expectedRepository){
+    if(now.root!==expectedRepository.root||now.commonDir!==expectedRepository.commonDir||JSON.stringify(now.commonIdentity)!==JSON.stringify(expectedRepository.commonIdentity)||JSON.stringify(now.rootIdentity)!==JSON.stringify(expectedRepository.rootIdentity)||JSON.stringify(now.worktrees)!==JSON.stringify(expectedRepository.worktrees))footprintFail("PU-HOOK-SHARED");
+    for(const sibling of now.worktrees){if(sibling===resolve(rootDir))continue;if(typeof observeSiblingScope!=="function"||observeSiblingScope(sibling)?.state!=="declined")footprintFail("PU-HOOK-SHARED");}
+   }else if(now.worktrees.length!==1||now.worktrees[0]!==resolve(rootDir)||now.commonDir!==join(resolve(rootDir),".git"))footprintFail("PU-HOOK-SHARED");
+  };
+  requireExclusiveRetirement();
   if(["hookPath","state","markerPath","implPath"].some(key=>actual[key]!==expectedEntry[key]))footprintFail("PU-HOOK-PATH");
   const rows=[[expectedEntry.hookPath,"hook"],[expectedEntry.implPath,"impl"],[expectedEntry.markerPath,"marker"]];
   // Durable caller binding authorizes only the original physical objects.
   for(const [path,key] of rows){const row=readPhysicalFootprint(path),bound=expectedEntry[key];if(row&&(!bound||row.sha256!==bound.sha256||JSON.stringify(row.identity)!==JSON.stringify(bound.identity)||(key==="hook"&&row.mode!==bound.mode)))footprintFail("PU-HOOK-DRIFT");}
-  for(const [path,key] of rows){const row=readPhysicalFootprint(path),bound=expectedEntry[key];if(row){if(!bound||row.sha256!==bound.sha256||JSON.stringify(row.identity)!==JSON.stringify(bound.identity))footprintFail("PU-HOOK-DRIFT");unlinkSync(path);fsyncDirectoryDurable(dirname(path));}if(key==="hook")deps.afterShim?.();}
+  for(const [path,key] of rows){requireExclusiveRetirement();const row=readPhysicalFootprint(path),bound=expectedEntry[key];if(row){if(!bound||row.sha256!==bound.sha256||JSON.stringify(row.identity)!==JSON.stringify(bound.identity))footprintFail("PU-HOOK-DRIFT");unlinkSync(path);fsyncDirectoryDurable(dirname(path));}if(key==="hook")deps.afterShim?.();}
   return {status:"removed",hookPath:expectedEntry.hookPath};
  }
  const plan=planManagedGitHookRemoval({rootDir,name});if(plan.status!=='ready')return plan;

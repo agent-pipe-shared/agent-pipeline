@@ -127,6 +127,38 @@ test('a shared worktree that is still governed refuses with a typed error and ch
  assert.equal(f.scope.observe({rootDir:f.root}).state,'active');assert(!existsSync(join(f.root,'.git/pipeline-uninstall')));
 });
 
+function declineSibling(f,sibling){const d=f.scope.planDecision({rootDir:sibling,decision:'decline',by:'Fixture Owner'});f.scope.applyDecision(d,options(d));assert.equal(f.scope.observe({rootDir:sibling}).state,'declined');}
+
+test('a shared worktree that has itself declined does not block the uninstall of the other worktree, and stays declined',t=>{
+ const f=fixture(t),sibling=join(f.base,'sibling');
+ git(f.root,['worktree','add','-q','--detach',sibling]);declineSibling(f,sibling);
+ const before=f.digests(),plan=f.controller.plan({rootDir:f.root});
+ assert.deepEqual(plan.conflicts,[]);assert.equal(plan.git.worktrees.length,2);
+ const result=f.controller.apply(plan,options(plan));
+ assert.equal(result.status,'uninstalled');assert.equal(f.scope.observe({rootDir:f.root}).state,'declined');assert.equal(f.scope.observe({rootDir:sibling}).state,'declined');
+ assert.deepEqual(hookStatuses(f),['absent','absent','absent']);assert.deepEqual(f.digests(),before);
+ assert.equal(git(sibling,['rev-parse','HEAD']),f.head);assert(existsSync(join(sibling,'docs/guide.md')));
+});
+
+test('RED: a declined sibling that becomes governed again between plan and apply stays refused and removes nothing',t=>{
+ const f=fixture(t),sibling=join(f.base,'sibling');
+ git(f.root,['worktree','add','-q','--detach',sibling]);declineSibling(f,sibling);
+ const plan=f.controller.plan({rootDir:f.root}),before=f.digests(),statuses=hookStatuses(f);
+ const enroll=f.scope.planDecision({rootDir:sibling,decision:'enroll',by:'Fixture Owner'});f.scope.applyDecision(enroll,options(enroll));
+ assert.equal(f.scope.observe({rootDir:sibling}).state,'active');
+ assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-SHARED-SCOPE-DRIFT'||e.code==='PU-SHARED-ACTIVE-WORKTREE'||e.code==='PU-HOOK-SHARED');
+ assert.deepEqual(hookStatuses(f),statuses);assert.deepEqual(f.digests(),before);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
+});
+
+test('RED: a worktree added after the plan is a still-governed sibling: apply refuses typed and keeps every hook',t=>{
+ const f=fixture(t),sibling=join(f.base,'sibling'),late=join(f.base,'late');
+ git(f.root,['worktree','add','-q','--detach',sibling]);declineSibling(f,sibling);
+ const plan=f.controller.plan({rootDir:f.root}),statuses=hookStatuses(f);
+ git(f.root,['worktree','add','-q','--detach',late]);
+ assert.throws(()=>f.controller.apply(plan,options(plan)),e=>['PU-SHARED-ACTIVE-WORKTREE','PU-SHARED-SCOPE-DRIFT','PU-HOOK-SHARED'].includes(e.code));
+ assert.deepEqual(hookStatuses(f),statuses);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
+});
+
 for(const runners of [['claude'],['codex']])test('per-runner fixture ('+runners[0]+' only): uninstall keeps AGENTS.md/CLAUDE.md, strips owned keys only, and archives private hook state',t=>{
  const f=fixture(t,{runners}),before=f.digests(),plan=f.controller.plan({rootDir:f.root});
  assert.deepEqual(plan.conflicts,[]);
