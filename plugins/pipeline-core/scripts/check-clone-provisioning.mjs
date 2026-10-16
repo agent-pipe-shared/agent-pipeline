@@ -18,17 +18,30 @@ import { planInstall as planCommitMsgHookInstall } from "./commit-msg-hook-insta
 
 export const CLONE_PROVISIONING_REPORT_SCHEMA = "pipeline.clone-provisioning-report.v1";
 
+/** The hooks readiness GATES on. Single source for assessment and the clone apply step. */
+export const MANDATORY_HOOK_IDS = Object.freeze(["pre-commit-hook", "commit-msg-hook"]);
+/** AC-116 / PO decision 13: hooks the clone apply step installs but readiness never gates on (the pre-push backstop). */
+export const NON_GATING_INSTALLED_HOOK_IDS = Object.freeze(["pre-push-hook"]);
+
 export function assessMandatoryHookReadiness(report) {
   const checks = Array.isArray(report?.checks) ? report.checks : [];
   const byId = new Map(checks.map((entry) => [entry.id, entry]));
-  const observed = ["pre-commit-hook", "commit-msg-hook"].map((id) => byId.get(id));
+  const observed = MANDATORY_HOOK_IDS.map((id) => byId.get(id));
   if (observed.some((entry) => !entry)) return { status: "unresolved", code: "HOOK-READINESS-OBSERVATION-INCOMPLETE", required: [] };
   const projection = observed.map(({ id, status, repairAction, path }) => ({ id, status, path, repairAction }));
+  // Non-gating observation only: reported beside the verdict, never an input to it.
+  const nonGatingEntries = NON_GATING_INSTALLED_HOOK_IDS.map((id) => byId.get(id)).filter(Boolean)
+    .map(({ id, status, repairAction, path }) => ({ id, status, path, repairAction }));
+  const withNonGating = (verdict) => (nonGatingEntries.length > 0 ? { ...verdict, nonGating: nonGatingEntries } : verdict);
+  return withNonGating(assessGatingProjection(projection));
+}
+
+function assessGatingProjection(projection) {
   // `refresh` (HOOKREFRESH-S1) is an installed, still-owned hook bound to an older plugin snapshot. It
   // keeps enforcing its older rules, so for readiness it counts as `current` and is only listed: it
   // must never turn a mixed current+stale pair into `blocked / HOOK-READINESS-STATE-UNSUPPORTED`.
   const refreshAvailable = projection.filter((entry) => entry.status === "refresh").map((entry) => entry.id);
-  const required = observed.map((entry) => (entry.status === "refresh" ? { ...entry, status: "current" } : entry));
+  const required = projection.map((entry) => (entry.status === "refresh" ? { ...entry, status: "current" } : entry));
   if (required.every((entry) => entry.status === "current")) {
     return { status: "ready", code: null, required: projection, ...(refreshAvailable.length > 0 ? { refreshAvailable } : {}) };
   }

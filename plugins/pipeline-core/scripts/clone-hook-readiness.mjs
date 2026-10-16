@@ -7,6 +7,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
 import { applyInstall as applyPreCommit, applyRemoval as removePreCommit } from "./pre-commit-hook-install.mjs";
 import { applyInstall as applyCommitMsg } from "./commit-msg-hook-install.mjs";
+import { applyInstall as applyPrePush } from "./pre-push-hook-install.mjs";
 
 /** Result statuses by which an installer reports that the hook is now in place. Anything else a second
  * install RETURNS (a `refused-*` result, or no recognisable status) is a failed install, like a throw. */
@@ -103,12 +104,43 @@ export function inspectMandatoryHookReadiness(rootDir = process.cwd()) {
     requiresConfirmation: true,
     expected: { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" },
   } : null;
-  return { schema: "pipeline.mandatory-hook-readiness.v1", root, status: readiness.status, code: readiness.code, required: readiness.required, nextAction };
+  return {
+    schema: "pipeline.mandatory-hook-readiness.v1", root, status: readiness.status, code: readiness.code, required: readiness.required, nextAction,
+    ...(readiness.nonGating ? { nonGating: readiness.nonGating } : {}),
+  };
+}
+
+/** AC-116 / PO decision 13: install the pre-push backstop beside the gating hooks WITHOUT making it a readiness gate.
+ * Only a missing (`install`) pre-push is installed; a current/stale one is left alone, a foreign or declined one is
+ * never overwritten and is only reported. A failure (thrown or returned) is recorded here and never propagates, so it
+ * can neither roll back nor fail the gating hooks. */
+function installNonGatingHooks({ root, observed, installPrePush }) {
+  const results = [];
+  for (const entry of observed ?? []) {
+    if (entry.id !== "pre-push-hook") continue;
+    if (entry.status !== "install") { results.push({ id: entry.id, outcome: "left-alone", observedStatus: entry.status }); continue; }
+    try {
+      const result = installPrePush({ rootDir: root });
+      results.push(APPLIED_INSTALL_STATUSES.has(result?.status)
+        ? { id: entry.id, outcome: "installed", result }
+        : { id: entry.id, outcome: "failed", failure: describeFailure(result), result });
+    } catch (error) {
+      results.push({ id: entry.id, outcome: "failed", failure: describeFailure(error) });
+    }
+  }
+  return results;
 }
 
 export function applyMandatoryHookReadiness(rootDir = process.cwd(), dependencies = {}) {
   const before = inspectMandatoryHookReadiness(rootDir);
-  if (before.status !== "provisioning-required") return { ...before, status: before.status === "ready" ? "ready" : "refused" };
+  const installPrePush = dependencies.applyPrePush ?? applyPrePush;
+  if (before.status === "ready") {
+    // Gating hooks are already in place; a missing pre-push is still installed (non-gating).
+    const nonGatingInstallResults = installNonGatingHooks({ root: resolve(rootDir), observed: before.nonGating, installPrePush });
+    if (!nonGatingInstallResults.some((entry) => entry.outcome !== "left-alone")) return { ...before, status: "ready" };
+    return { ...inspectMandatoryHookReadiness(rootDir), status: "ready", nonGatingInstallResults };
+  }
+  if (before.status !== "provisioning-required") return { ...before, status: "refused" };
   const required = new Map(before.required.map((entry) => [entry.id, entry]));
   // Ruling 84 F1: a partly provisioned pair is installable. Only the `install` entries are installed; a `current`
   // entry (and a stale `refresh` one, which counts as current here and is refreshed by its own helper) is left
@@ -139,12 +171,15 @@ export function applyMandatoryHookReadiness(rootDir = process.cwd(), dependencie
     }
     results.push({ id: "commit-msg-hook", result: commitMsgResult });
   }
+  // Gating hooks are in place (or were attempted without failure): now the non-gating pre-push, whose failure is reported only.
+  const nonGatingInstallResults = installNonGatingHooks({ root, observed: before.nonGating, installPrePush });
   const after = inspectMandatoryHookReadiness(rootDir);
   return {
     ...after,
     status: after.status === "ready" ? "ready" : "readback-failed",
     code: after.status === "ready" ? null : "HOOK-READINESS-READBACK-FAILED",
     installResults: results,
+    nonGatingInstallResults,
   };
 }
 
