@@ -349,15 +349,58 @@ export function isBoundedGitPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE
   const subcommand = sourceArgv[index];
   const subargs = sourceArgv.slice(index + 1);
   if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
-  if (!subargs.every((arg) => isApprovedSingleCommandReadArg(arg, root, extraRoots))) return false;
+  if (!areGitPipelineOperandsContained(subargs, root, extraRoots)) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   if (sinkName !== (windows ? "head.exe" : "head")) return false;
   if (parsed.redirects.length === 1) {
     const redirect = parsed.redirects[0];
-    if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
+    if ((redirect.segment !== 0 && redirect.segment !== 1) || redirect.fd !== 2 || redirect.direction !== ">"
       || (windows ? redirect.target.toLowerCase() !== "nul" : redirect.target !== "/dev/null")) return false;
   }
   return isValidPipelineHeadArgs(parsed.segments[1].argv);
+}
+
+// Git operand classification for the bounded git-to-head pipeline (AC-102). A git operand is
+// not always a filesystem path: revisions (HEAD, HEAD~1, abbreviated SHAs, refs) and <rev>:<path>
+// object names are git syntax. The existing containment check stays the first and default test;
+// only a token that FAILS it may be re-admitted, and only as (a) a strictly shaped revision or
+// (b) <strict-revision>:<path> whose <path> part passes the same containment check. Paths after
+// `--` always keep the plain check, and a numeric value after -n/--max-count/-U/--unified is
+// consumed as the flag's value instead of being treated as a path.
+const GIT_VALUE_FLAGS = new Set(["-n", "--max-count", "-U", "--unified"]);
+const GIT_REV_ATOM = String.raw`(?:(?:HEAD|ORIG_HEAD|FETCH_HEAD|MERGE_HEAD|CHERRY_PICK_HEAD)|[0-9a-f]{4,40}|refs/(?:heads|tags|remotes)/[A-Za-z0-9._/-]+|origin/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*)(?:[~^][0-9]*)*`;
+const GIT_REV_PATTERN = new RegExp(`^${GIT_REV_ATOM}(?:\\.{2,3}${GIT_REV_ATOM})?$`, "u");
+
+function isStrictGitRevision(token) {
+  return !/(?:^|\/)\.\.(?:\/|$)/u.test(token) && GIT_REV_PATTERN.test(token);
+}
+
+function isGitRevisionOperand(arg, root, extraRoots) {
+  if (isStrictGitRevision(arg)) return true;
+  if (/^[A-Za-z]:[\\/]/u.test(arg)) return false;
+  const colon = arg.indexOf(":");
+  if (colon <= 0) return false;
+  const rev = arg.slice(0, colon);
+  const path = arg.slice(colon + 1);
+  if (!isStrictGitRevision(rev)) return false;
+  if (path === "") return true;
+  if (path.startsWith("/") || path.startsWith("~") || path.includes("\\")) return false;
+  return isApprovedSingleCommandReadArg(path, root, extraRoots);
+}
+
+function areGitPipelineOperandsContained(subargs, root, extraRoots) {
+  let afterDashDash = false;
+  for (let i = 0; i < subargs.length; i += 1) {
+    const arg = subargs[i];
+    if (!afterDashDash && arg === "--") { afterDashDash = true; continue; }
+    if (isApprovedSingleCommandReadArg(arg, root, extraRoots)) {
+      if (!afterDashDash && GIT_VALUE_FLAGS.has(arg) && /^[0-9]+$/u.test(subargs[i + 1] ?? "")) i += 1;
+      continue;
+    }
+    if (afterDashDash || arg.startsWith("-")) return false;
+    if (!isGitRevisionOperand(arg, root, extraRoots)) return false;
+  }
+  return true;
 }
 
 /**
