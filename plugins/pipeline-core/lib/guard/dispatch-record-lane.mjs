@@ -13,6 +13,7 @@ import { isTerminalOutcome } from "../dispatch-record.mjs";
 import { resolveGitCommonDir } from "../../hooks/guard-dispatch-budget.mjs";
 import { verdict } from "./verdict.mjs";
 import { lifecycleSubagentIdentity } from "./bootstrap-receipt.mjs";
+import { assessWindowsPrivatePath } from "../windows-private-state.mjs";
 
 export const EVIDENCE_HOST_PATH_DENIAL_CODE = "GUARD-EVIDENCE-HOST-PATH";
 
@@ -284,7 +285,7 @@ function creationDirectories(repository, root, create = false) {
 function physicalCreationFile(path, expected = null) {
   const before = lstatSync(path);
   if (!before.isFile() || before.isSymbolicLink() || realpathSync(path) !== path || before.nlink !== 1 || before.size > CREATION_LIMIT
-    || (before.mode & 0o022) !== 0 || (typeof process.getuid === "function" && before.uid !== process.getuid())) creationFailure("DRO-RECORD");
+    || (process.platform === "win32" ? assessWindowsPrivatePath(path).status !== "secure" : ((before.mode & 0o022) !== 0 || (typeof process.getuid === "function" && before.uid !== process.getuid())))) creationFailure("DRO-RECORD");
   const fd = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
   try {
     const opened = fstatSync(fd), buffer = Buffer.alloc(CREATION_LIMIT + 1);
