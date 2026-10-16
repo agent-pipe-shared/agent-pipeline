@@ -119,6 +119,29 @@ test("AC-247 point 3: no arbitrary shell mutation - opaque interpreter and redir
   assert.equal(isBoundedScratchOnlyWords(["rm", "scratch/a"], { rootDir: root, liveRoots: [] }), false);
 });
 
+test("AC-247 point 3b: redirect capture boundary - a shell redirect is refused as GUARD-REDIRECT-UNAPPROVED even into contained scratch/, and non-scratch/outside-root targets are refused in every state", (t) => {
+  const root = fixture(t);
+  // Documented contract (closed shell grammar, measured 2026-10-16): redirects are not an admitted shape, so capturing
+  // output INTO scratch/ is refused with the typed code and no scratch carve-out exists; scratch writes go through the
+  // Write/Edit/mkdir -p lanes (point 1). An outside-root target is refused by the cross-repo rule. Sampled: the first and
+  // the last (ready) state run every case; each other state runs one case chosen by rotation.
+  const cases = [
+    { command: "printf x > scratch/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
+    { command: "rg -n needle scratch/a.txt > scratch/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
+    { command: "rg -n needle scratch/a.txt > src/out.txt", code: /GUARD-REDIRECT-UNAPPROVED/u },
+    { command: "rg -n needle scratch/a.txt > ../out.txt", code: /GUARD-CROSS-REPO-MUTATION/u },
+  ];
+  ALL_STATES.forEach((status, index) => {
+    const deps = stateDeps(root, status);
+    const full = index === 0 || index === ALL_STATES.length - 1;
+    for (const { command, code } of full ? cases : [cases[index % cases.length]]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), deps);
+      assert.equal(result.exitCode, 2, `${status}/${command}`);
+      assert.match(result.stderr, code, `${status}/${command}`);
+    }
+  });
+});
+
 test("AC-247 point 4: inert marker quotation in scratch is admitted; real authority, aliases and traversal are not", (t) => {
   const root = fixture(t);
   const quote = (path, translated = false, tool = "Write") => ({
