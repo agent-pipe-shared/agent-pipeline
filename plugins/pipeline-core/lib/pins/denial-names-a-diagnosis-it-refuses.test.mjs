@@ -56,11 +56,57 @@ try {
 
 // --- AC-148 correction (Critic C6b F2), added 2026-10-16 ---
 const { test } = await import('node:test');
-const SKIP_OWNER = 'owner Coordinator, due 2026-10-23 (QG-06)';
-test('headline case: a denial naming `design-advisory-admission.mjs inspect` is admitted under opaque-script-execution',
-  { skip: `uncovered ${SKIP_OWNER}: the opaque-script-execution lane is emitted at plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs line 118 (targets.push lane "opaque-script-execution"); no denial text in guard-devplan-policy.mjs designAdvisoryRemediation names design-advisory-admission.mjs inspect (script exists at plugins/pipeline-core/scripts/design-advisory-admission.mjs), so the emitter that would name it was not found` }, () => {});
-test('DLR035 receipt: the recovery named by a DLR035 denial is admitted in the state that produced it',
-  { skip: `uncovered ${SKIP_OWNER}: no emitter of a DLR035 receipt was found in guard-devplan-policy.mjs or guard/devplan-shell-lane.mjs (rg for DLR035 in both returned nothing); the emitter does not exist in the files searched` }, () => {});
+const { readFileSync } = await import('node:fs');
+const policySource = readFileSync(fileURLToPath(new URL('../guard-devplan-policy.mjs', import.meta.url)), 'utf8');
+// Every denial code the emitter file knows (quoted DAA-/DWP- literals), plus an unknown code (fallthrough branch)
+// and DLR035 (a code with no dedicated emitter: it must render the generic text, never a refused command).
+const ALL_CODES = [...new Set([...policySource.matchAll(/"((?:DAA|DWP)-[A-Z0-9-]+)"/gu)].map(m => m[1]).concat(['DAA-UNKNOWN-CODE', 'DLR035']))];
+const inspectCommand = `node "${fileURLToPath(new URL('../../scripts/design-advisory-admission.mjs', import.meta.url))}" inspect --repo-root ${root} --feature f --plan p --spec s`;
+const refusedNames = text => /design-advisory-admission|\binspect\b|\.mjs\b|\bnode\b/u.test(text);
+
+test('headline case: the diagnosis command the original defect named is refused, so no rendered denial may name it', () => {
+  // Precondition: under the denial-producing state the guard really refuses it (opaque-script-execution).
+  const hit = devPlanShellRefusalHit(inspectCommand, root, blockedDraft);
+  assert.equal(hit?.lane, 'opaque-script-execution');
+  assert.equal(isSanctionedLifecycleCommand(inspectCommand, root, {}), false);
+  // Consequence: no emitted denial (every code) names that command or any raw script invocation.
+  assert.ok(ALL_CODES.length >= 8, `expected the emitter's full code set, got ${ALL_CODES.length}`);
+  for (const code of ALL_CODES) {
+    const text = designAdvisoryRemediation(code);
+    assert.ok(!refusedNames(text), `${code}: rendered denial names a refused script command`);
+  }
+  assert.ok(!refusedNames(designAdvisoryRemediation()), 'undefined code: rendered denial names a refused script command');
+});
+test('DLR035 receipt: a DLR035 denial has no dedicated emitter and names only admitted recovery verbs', () => {
+  const text = designAdvisoryRemediation('DLR035');
+  assert.ok(text.includes('(DLR035)'), 'DLR035 receipt is rendered in the denial header');
+  assert.ok(!refusedNames(text));
+  for (const verb of VERBS.filter(v => text.includes(v))) {
+    const command = build(verb);
+    mkdirSync(join(root, 'scratch'), { recursive: true });
+    writeFileSync(join(root, receiptRel), '{}');
+    try {
+      assert.equal(isSanctionedLifecycleCommand(command, root, {}), true, `DLR035: named "${verb}" not admitted`);
+      assert.equal(devPlanShellRefusalHit(command, root, blockedDraft), null, `DLR035: named "${verb}" refused by lane`);
+    } finally { rmSync(join(root, receiptRel), { force: true }); }
+  }
+});
+test('all denial codes: every recovery verb a rendered denial names is admitted in the producing state', () => {
+  mkdirSync(join(root, 'scratch'), { recursive: true });
+  writeFileSync(join(root, receiptRel), '{}');
+  try {
+    let named = 0;
+    for (const code of ALL_CODES) {
+      for (const verb of VERBS.filter(v => designAdvisoryRemediation(code).includes(v))) {
+        named += 1;
+        const command = build(verb);
+        assert.equal(isSanctionedLifecycleCommand(command, root, {}), true, `${code}: "${verb}" not sanctioned`);
+        assert.equal(devPlanShellRefusalHit(command, root, blockedDraft), null, `${code}: "${verb}" refused by lane`);
+      }
+    }
+    assert.ok(named >= ALL_CODES.length, 'every code must name at least one recovery verb');
+  } finally { rmSync(join(root, receiptRel), { force: true }); }
+});
 test('exact rendered recovery text: the denial spelling is observed against the guard, not a hand-built spelling', () => {
   const text = designAdvisoryRemediation('DAA-DESIGN-SOURCE-DRIFT');
   const rendered = /Run (reopen-design --by <human attribution>)/u.exec(text)?.[1];
