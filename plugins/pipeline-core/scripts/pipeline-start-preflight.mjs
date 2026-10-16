@@ -13,6 +13,8 @@ import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { observeArchitectureAdoptionOrientation } from "../lib/architecture-adoption-orientation.mjs";
 import { inspectArchitectureDecisionContinuity } from "../lib/architecture-decision-continuity.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { projectContinuityAuthorityDrift } from "../lib/continuity-authority-drift.mjs";
+import { readState as readContinuityState } from "./continuity-status.mjs";
 // NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
 // runnable.md): the same typed readiness check the readiness guard itself uses
 // (guard-lifecycle-ready.mjs), reused here read-only to decide whether THIS bootstrap's
@@ -822,6 +824,70 @@ export function freshnessHostActionForPreflight(preflight) {
   });
 }
 
+const CONTINUITY_DRIFT_MAX_SOURCE_BYTES = 64 * 1024 * 1024;
+
+/**
+ * SHA-256 of one repo-relative regular file, or null when it cannot be observed. The same
+ * physical-file rules the State `inspect` verb applies to the digests continuity records (no
+ * absolute or dot-segment path, no symlink or junction on the way, a single-link regular file,
+ * unchanged across the read), so bootstrap and `inspect` agree on what "unobservable" means.
+ * Never throws and never echoes a path or an error text.
+ */
+function observeContinuitySourceSha256(rootDir, relativePath) {
+  if (typeof relativePath !== "string" || relativePath.length < 1 || relativePath.length > 240
+    || isAbsolute(relativePath) || relativePath.includes("\\") || relativePath.includes("\0")) return null;
+  const parts = relativePath.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return null;
+  try {
+    let cursor = realpathSync(resolve(rootDir));
+    for (const part of parts) {
+      cursor = resolve(cursor, part);
+      if (lstatSync(cursor).isSymbolicLink()) return null;
+    }
+    const before = lstatSync(cursor);
+    if (!before.isFile() || before.nlink !== 1 || before.size > CONTINUITY_DRIFT_MAX_SOURCE_BYTES) return null;
+    const bytes = readFileSync(cursor);
+    const after = lstatSync(cursor);
+    if (!after.isFile() || after.isSymbolicLink() || after.nlink !== 1 || before.dev !== after.dev
+      || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs
+      || bytes.length !== after.size) return null;
+    return createHash("sha256").update(bytes).digest("hex");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ALF-C-N1-02B (item pipeline.forensics-and-audit-evidence-not-reconstructable, Acceptance
+ * "Bootstrap ... compare continuity source digests with the checkout and surface drift"): the
+ * recorded continuity PRD/Spec digests are compared with the bytes now in the checkout, reusing the
+ * projection the State `inspect` verb already emits (`continuityAuthorityDrift`). The result is a
+ * typed ADVISORY only: it is returned solely when a recorded digest differs from, or cannot be
+ * compared with, the checkout; it never influences `status`, `nextAction` or the exit code, and a
+ * project without a State, without continuity, with a malformed continuity object, or with no
+ * drift reports nothing at all (an absent key, so every existing envelope keeps its key set).
+ * Fail-open on every fault: a bootstrap must not fail because this observation could not run.
+ */
+export function observeContinuityAuthorityDrift({
+  rootDir,
+  readStateFn = readContinuityState,
+  observeSha256 = (relativePath) => observeContinuitySourceSha256(rootDir, relativePath),
+} = {}) {
+  try {
+    const read = readStateFn(rootDir);
+    const continuity = read?.status === "ok" ? read.state?.continuity : null;
+    if (continuity === null || typeof continuity !== "object" || Array.isArray(continuity)) return null;
+    for (const role of ["prd", "spec"]) {
+      const recorded = continuity.authority?.[role];
+      if (typeof recorded?.path !== "string" || typeof recorded.sha256 !== "string") return null;
+    }
+    const projection = projectContinuityAuthorityDrift(continuity, observeSha256);
+    return projection.status === "drift" ? { ...projection, advisory: true } : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Best-effort, read-only scan for another LIVE session already registered
  * under the SAME physical repository root as `startPath` -- the cheap,
@@ -1054,6 +1120,7 @@ export function observePipelineStartPreflight({
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
   observeArchitectureAdoptionOrientationFn = observeArchitectureAdoptionOrientation,
   inspectEffectiveArchitectureDecisionsFn = inspectArchitectureDecisionContinuity,
+  observeContinuityAuthorityDriftFn = observeContinuityAuthorityDrift,
   checkCloneProvisioningFn = checkCloneProvisioning,
   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
   resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
@@ -1641,6 +1708,10 @@ export function observePipelineStartPreflight({
       taskScopeResolved: false,
     };
   }
+  // Advisory only (ALF-C-N1-02B): never read by `status`, `nextAction` or the exit code below.
+  let continuityAuthorityDrift = null;
+  try { continuityAuthorityDrift = observeContinuityAuthorityDriftFn({ rootDir: resolve(cwd) }) ?? null; }
+  catch { continuityAuthorityDrift = null; }
   const cloneProvisioning = checkCloneProvisioningFn(cwd);
   const mandatoryHookReadiness = assessMandatoryHookReadiness(cloneProvisioning);
   const hookRefresh = planMandatoryHookRefresh({
@@ -1673,6 +1744,7 @@ export function observePipelineStartPreflight({
       nextAction: architectureOrientationAction,
     },
     effectiveDecisions,
+    ...(continuityAuthorityDrift !== null ? { continuityAuthorityDrift } : {}),
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
     ...(sessionReadiness ? { sessionReadiness } : {}),
     nextAction: resultStatus === "hook-provisioning-required"

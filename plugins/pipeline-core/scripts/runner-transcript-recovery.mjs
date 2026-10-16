@@ -14,6 +14,7 @@
 import {
   lstatSync, openSync, readFileSync, readdirSync, readSync, realpathSync, closeSync, statSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 
@@ -340,6 +341,279 @@ export function readRunnerTranscript({ sessionId, ...options } = {}) {
     segmentCount: snapshots.length, segmentOrder: "storage-mtime-then-path", bytes: Buffer.concat(chunks) };
 }
 
+// ---------------------------------------------------------------------------------------------
+// export (ALF-C-N1-02C; item pipeline.forensics-and-audit-evidence-not-reconstructable)
+//
+// A project-bound, data-minimising export of ONE session: its project-authenticated segments are
+// merged and described by counts, per-segment sha256, record counts and first/last timestamps,
+// plus the token usage the host recorded. Neither a storage path nor a transcript body is emitted.
+//
+// Storage adapters (the only runner-specific part):
+//   codex        the existing Codex session collection (same candidate authentication as read).
+//   claude       <CLAUDE_CONFIG_DIR or ~/.claude>/projects/<project path, every non-alphanumeric
+//                character replaced by "-">/<id>.jsonl, direct children only. A file is a segment of
+//                session S when its records declare exactly one sessionId, S, and every cwd they
+//                declare is this project. Child (sub-agent) sessions are not inferred.
+//   antigravity  typed unavailable: its transcript layout is not established, so none is invented.
+//                Its usage extractor below is still pure and exported.
+// ---------------------------------------------------------------------------------------------
+const CLAUDE_RUNNER = "claude";
+const ANTIGRAVITY_RUNNER = "antigravity";
+const EXPORT_SEGMENT_ORDER = "first-record-timestamp-then-mtime-then-path";
+const CODEX_USAGE_KEYS = ["input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens", "total_tokens"];
+const CLAUDE_USAGE_KEYS = ["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"];
+const ANTIGRAVITY_USAGE_KEYS = ["input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens"];
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T/u;
+
+const noUsage = () => ({ status: "unavailable", reason: "transcript-carries-no-usage" });
+const isCounter = (value) => Number.isSafeInteger(value) && value >= 0;
+
+/** The counters a usage object reports, restricted to `keys`; null unless at least one is present and every present one is valid. */
+function observedCounters(usage, keys) {
+  if (usage === null || typeof usage !== "object" || Array.isArray(usage)) return null;
+  const counters = {};
+  for (const key of keys) {
+    if (usage[key] === undefined) continue;
+    if (!isCounter(usage[key])) return null;
+    counters[key] = usage[key];
+  }
+  return Object.keys(counters).length === 0 ? null : counters;
+}
+
+function summedUsage(source, observations) {
+  if (observations.length === 0) return noUsage();
+  const counters = {};
+  for (const observation of observations) {
+    for (const [key, value] of Object.entries(observation)) counters[key] = (counters[key] ?? 0) + value;
+  }
+  return Object.values(counters).every(isCounter)
+    ? { status: "available", source, observations: observations.length, counters }
+    : noUsage();
+}
+
+/** Codex: the last COMPLETE token_count total_token_usage; an invalid one never replaces a valid one. */
+function codexUsage(records) {
+  let last = null;
+  for (const row of records) {
+    if (row?.type !== "event_msg" || row.payload?.type !== "token_count") continue;
+    const usage = row.payload.info?.total_token_usage;
+    if (usage && typeof usage === "object" && CODEX_USAGE_KEYS.every((key) => isCounter(usage[key]))) {
+      last = Object.fromEntries(CODEX_USAGE_KEYS.map((key) => [key, usage[key]]));
+    }
+  }
+  return last === null ? noUsage() : { status: "available", source: "codex-token-count-total", observations: 1, counters: last };
+}
+
+/**
+ * Claude: assistant message.usage, counted ONCE per unique message.id across the merged segments (a
+ * message is streamed as several rows and re-appears in a continuation segment); the last row of an
+ * id carries its final figures. Synthetic messages and rows without an id or usage are never counted.
+ */
+function claudeUsage(records) {
+  const byMessage = new Map();
+  for (const row of records) {
+    const message = row?.type === "assistant" ? row.message : null;
+    if (message === null || typeof message !== "object" || typeof message.id !== "string" || message.id === ""
+      || message.model === "<synthetic>") continue;
+    const counters = observedCounters(message.usage, CLAUDE_USAGE_KEYS);
+    if (counters !== null) byMessage.set(message.id, counters);
+  }
+  return summedUsage("claude-assistant-message-usage", [...byMessage.values()]);
+}
+
+/** Antigravity: the sum of every turn.completed usage. Pure; no storage adapter exists for this runner yet. */
+function antigravityUsage(records) {
+  const turns = [];
+  for (const row of records) {
+    if (row?.type !== "turn.completed") continue;
+    const counters = observedCounters(row.usage, ANTIGRAVITY_USAGE_KEYS);
+    if (counters !== null) turns.push(counters);
+  }
+  return summedUsage("antigravity-turn-completed", turns);
+}
+
+/** Per-runner usage over already-parsed, merged records; `{status:"unavailable"}` when the transcript carries none. */
+export function extractRunnerUsage(runner, records) {
+  if (!Array.isArray(records)) return noUsage();
+  if (runner === CODEX_RUNNER) return codexUsage(records);
+  if (runner === CLAUDE_RUNNER) return claudeUsage(records);
+  if (runner === ANTIGRAVITY_RUNNER) return antigravityUsage(records);
+  return noUsage();
+}
+
+function parseJsonLinesCounted(bytes) {
+  const records = [];
+  let unparsedLineCount = 0;
+  for (const line of bytes.toString("utf8").split("\n")) {
+    if (line.trim() === "") continue;
+    try { records.push(JSON.parse(line)); } catch { unparsedLineCount += 1; }
+  }
+  return { records, unparsedLineCount };
+}
+
+function recordTimestampMs(record) {
+  if (record === null || typeof record !== "object") return null;
+  for (const candidate of [record.timestamp, record.payload?.timestamp]) {
+    if (typeof candidate !== "string" || !ISO_TIMESTAMP.test(candidate)) continue;
+    const ms = Date.parse(candidate);
+    if (Number.isFinite(ms)) return ms;
+  }
+  return null;
+}
+
+const isoOrNull = (ms) => (ms === null ? null : new Date(ms).toISOString());
+
+function claudeCandidateMetadata(filePath, projectIdentity) {
+  const metadataBytes = readTranscriptMetadataBytes(filePath);
+  if (metadataBytes === null) return null;
+  const sessionIds = [];
+  const projectPaths = [];
+  for (const record of parseJsonLines(metadataBytes, MAX_METADATA_LINES)) {
+    if (record === null || typeof record !== "object") continue;
+    if (typeof record.sessionId === "string" && record.sessionId.trim() !== "") sessionIds.push(record.sessionId);
+    if (typeof record.cwd === "string" && record.cwd.trim() !== "") projectPaths.push(record.cwd);
+  }
+  if (sessionIds.length === 0 || projectPaths.length === 0) return null;
+  const identities = projectPaths.map(metadataIdentity);
+  if (identities.some((identity) => identity === null) || !identities.every((identity) => identity === projectIdentity)) return null;
+  const uniqueSessionIds = [...new Set(sessionIds)];
+  if (uniqueSessionIds.length !== 1) return null;
+  try { return { filePath, sessionId: uniqueSessionIds[0], mtimeMs: statSync(filePath).mtimeMs }; } catch { return null; }
+}
+
+function claudeProjectCandidates({ rootDir, excludeSession, env = process.env, homedirFn = homedir } = {}) {
+  if (typeof excludeSession !== "string" || excludeSession.trim() === "") {
+    return { unavailable: unavailable(CLAUDE_RUNNER, "current-session-identity-unavailable") };
+  }
+  const root = realDirectory(rootDir);
+  if (root === null) return { unavailable: unavailable(CLAUDE_RUNNER, "project-root-unavailable") };
+  const configured = env?.CLAUDE_CONFIG_DIR;
+  const claudeHome = typeof configured === "string" && isAbsolute(configured) ? configured : join(homedirFn(), ".claude");
+  const projectDirectory = realDirectory(join(claudeHome, "projects", root.replace(/[^A-Za-z0-9]/gu, "-")));
+  if (projectDirectory === null) return { unavailable: unavailable(CLAUDE_RUNNER, "runner-session-storage-unavailable") };
+  const projectIdentity = repositoryPathIdentityOrSelf(root);
+  let entries;
+  try { entries = readdirSync(projectDirectory, { withFileTypes: true }); } catch { entries = []; }
+  const candidates = [];
+  for (const entry of entries) {
+    if (candidates.length >= MAX_CANDIDATES) break;
+    // Never follow a storage symlink; direct children only.
+    if (entry.isSymbolicLink() || !entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+    try {
+      const real = realpathSync(join(projectDirectory, entry.name));
+      if (!pathInside(projectDirectory, real) || !lstatSync(real).isFile()) continue;
+      const candidate = claudeCandidateMetadata(real, projectIdentity);
+      if (candidate !== null && candidate.sessionId !== excludeSession) candidates.push(candidate);
+    } catch { /* An unreadable candidate is not evidence. */ }
+  }
+  if (candidates.length === 0) return { unavailable: unavailable(CLAUDE_RUNNER, "no-prior-project-matching-transcript") };
+  return { candidates };
+}
+
+function exportCandidates(options) {
+  // Codex, Antigravity and unknown runners resolve through the Codex adapter, which types every non-Codex
+  // runner as `runner-transcript-source-unavailable`; only Claude has a second adapter.
+  return options.runner === CLAUDE_RUNNER ? claudeProjectCandidates(options) : priorProjectMatchingCandidates(options);
+}
+
+/** Read every segment under physical-identity checks, then recheck membership and identity before any output. */
+function snapshotExportSegments({ segments, sessionId, authenticate, refreshedPaths }) {
+  const snapshots = [];
+  for (const segment of segments) {
+    const before = lstatSync(segment.filePath);
+    if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) throw new Error("segment-unsafe");
+    if (authenticate(segment.filePath)?.sessionId !== sessionId) throw new Error("segment-identity-changed");
+    const bytes = readTranscriptBytes(segment.filePath);
+    const after = lstatSync(segment.filePath);
+    if (bytes === null || before.dev !== after.dev || before.ino !== after.ino
+      || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs
+      || bytes.length !== after.size || !after.isFile() || after.nlink !== 1) throw new Error("segment-changed");
+    snapshots.push({ segment, identity: after, bytes });
+  }
+  if (JSON.stringify([...refreshedPaths()].sort()) !== JSON.stringify(segments.map((segment) => segment.filePath).sort())) {
+    throw new Error("segments-changed");
+  }
+  for (const snapshot of snapshots) {
+    const after = lstatSync(snapshot.segment.filePath), before = snapshot.identity;
+    if (!after.isFile() || after.nlink !== 1 || before.dev !== after.dev || before.ino !== after.ino
+      || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new Error("segment-changed");
+  }
+  return snapshots;
+}
+
+/**
+ * Export one prior project-matching session: counts, per-segment sha256, record counts, first/last
+ * timestamps and per-runner usage; no path and no content. Segments are ordered by the timestamp of
+ * their first timestamped record (a segment with none sorts last), then by mtime, then by path, so a
+ * touched earlier segment does not reorder the session. Like `read`, this has no transcript size cap.
+ */
+export function exportRunnerTranscript({ sessionId, ...options } = {}) {
+  const runner = typeof options.runner === "string" && options.runner !== "" ? options.runner : "unknown";
+  const found = exportCandidates(options);
+  if (found.unavailable) return found.unavailable;
+  const failed = () => unavailable(runner, "requested-session-unavailable");
+  if (typeof sessionId !== "string" || sessionId.trim() === "") return failed();
+  const matches = found.candidates.filter((candidate) => candidate.sessionId === sessionId);
+  const currentRoot = realDirectory(options.rootDir);
+  if (matches.length === 0 || currentRoot === null) return failed();
+  const projectIdentity = repositoryPathIdentityOrSelf(currentRoot);
+  const authenticate = (filePath) => (runner === CLAUDE_RUNNER ? claudeCandidateMetadata : candidateMetadata)(filePath, projectIdentity);
+  let snapshots;
+  try {
+    snapshots = snapshotExportSegments({
+      segments: matches,
+      sessionId,
+      authenticate,
+      refreshedPaths: () => (exportCandidates(options).candidates ?? [])
+        .filter((candidate) => candidate.sessionId === sessionId).map((candidate) => candidate.filePath),
+    });
+  } catch { return failed(); }
+  const parsed = snapshots.map((snapshot) => {
+    const { records, unparsedLineCount } = parseJsonLinesCounted(snapshot.bytes);
+    const stamps = records.map(recordTimestampMs).filter((ms) => ms !== null);
+    return {
+      records,
+      unparsedLineCount,
+      filePath: snapshot.segment.filePath,
+      mtimeMs: snapshot.identity.mtimeMs,
+      sha256: createHash("sha256").update(snapshot.bytes).digest("hex"),
+      byteLength: snapshot.bytes.length,
+      firstMs: stamps.length > 0 ? stamps[0] : null,
+      lastMs: stamps.length > 0 ? stamps[stamps.length - 1] : null,
+    };
+  });
+  parsed.sort((left, right) => {
+    if ((left.firstMs === null) !== (right.firstMs === null)) return left.firstMs === null ? 1 : -1;
+    if (left.firstMs !== right.firstMs) return left.firstMs - right.firstMs;
+    return left.mtimeMs - right.mtimeMs
+      || (left.filePath < right.filePath ? -1 : left.filePath > right.filePath ? 1 : 0);
+  });
+  const firsts = parsed.map((segment) => segment.firstMs).filter((ms) => ms !== null);
+  const lasts = parsed.map((segment) => segment.lastMs).filter((ms) => ms !== null);
+  return {
+    schema: SCHEMA,
+    status: "available",
+    runner,
+    sessionId,
+    segmentCount: parsed.length,
+    segmentOrder: EXPORT_SEGMENT_ORDER,
+    recordCount: parsed.reduce((total, segment) => total + segment.records.length, 0),
+    unparsedLineCount: parsed.reduce((total, segment) => total + segment.unparsedLineCount, 0),
+    firstTimestamp: isoOrNull(firsts.length > 0 ? Math.min(...firsts) : null),
+    lastTimestamp: isoOrNull(lasts.length > 0 ? Math.max(...lasts) : null),
+    segments: parsed.map((segment, ordinal) => ({
+      ordinal,
+      sha256: segment.sha256,
+      byteLength: segment.byteLength,
+      recordCount: segment.records.length,
+      unparsedLineCount: segment.unparsedLineCount,
+      firstTimestamp: isoOrNull(segment.firstMs),
+      lastTimestamp: isoOrNull(segment.lastMs),
+    })),
+    usage: extractRunnerUsage(runner, parsed.flatMap((segment) => segment.records)),
+  };
+}
+
 function parseArgs(argv) {
   if (argv[0] === "audit-current") {
     if (argv.length !== 7) return null;
@@ -352,12 +626,13 @@ function parseArgs(argv) {
     }
     return { operation: "audit-current", rootDir: fields.get("--root"), runner: fields.get("--runner"), metadataConsent: fields.get("--metadata-consent") };
   }
-  const operation = argv[0] === "list" || argv[0] === "read" ? argv[0] : "legacy";
+  const operation = argv[0] === "list" || argv[0] === "read" || argv[0] === "export" ? argv[0] : "legacy";
   const values = operation === "legacy" ? argv : argv.slice(1);
-  const expectedLength = operation === "read" ? 8 : 6;
+  const takesSessionId = operation === "read" || operation === "export";
+  const expectedLength = takesSessionId ? 8 : 6;
   if (values.length !== expectedLength) return null;
   const fields = new Map();
-  const permitted = operation === "read"
+  const permitted = takesSessionId
     ? ["--root", "--runner", "--exclude-session", "--session-id"]
     : ["--root", "--runner", "--exclude-session"];
   for (let index = 0; index < values.length; index += 2) {
@@ -381,6 +656,7 @@ export function main(argv = process.argv.slice(2)) {
     if (args.operation === "audit-current") return auditCurrentRunnerSession(args);
     if (args.operation === "list") return listRunnerTranscripts(args);
     if (args.operation === "read") return readRunnerTranscript(args);
+    if (args.operation === "export") return exportRunnerTranscript(args);
     return recoverRunnerTranscript(args);
   })();
   if (args?.operation === "read" && result.status === "available") process.stdout.write(result.bytes);
