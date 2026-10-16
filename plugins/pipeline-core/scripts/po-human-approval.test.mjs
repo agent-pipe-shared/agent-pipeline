@@ -53,12 +53,50 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+import test, { after } from "node:test";
 
 import { authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, keyDirectoryUnsetFinding, outside, parseHumanArgs as parseHumanArgsUnguarded, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, resolvePoKeyDirectory, runForkDispositionApproval as runForkDispositionApprovalUnguarded, runHumanApproval as runHumanApprovalUnguarded } from "./po-human-approval.mjs";
 import { organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { GIT_NULL_DEVICE } from "../lib/git-null-device.mjs";
+
+/**
+ * ALF-C-W2-03D: where the fixtures of this suite live.
+ *
+ * On native Windows the OS temporary root's DACL grants other principals mutation rights, which the
+ * owned-authority ancestor inspection (createWindowsOwnedAuthorityDirectory, run when a ceremony opens
+ * its private state under the fixture repository's .git) correctly refuses as WIN-AUTH-ANCESTOR-MUTATION.
+ * Production assurance is untouched; the fixtures move instead. Every fixture directory therefore lives
+ * under ONE per-process subdirectory of this repository's own gitignored scratch/ tree
+ * (fixtureTemp), created on first use and removed when the file's tests end (after hook, plus an exit
+ * hook for an abnormal end). Nothing here is rooted in the OS temporary directory EXCEPT the
+ * fixtures production itself demands lie OUTSIDE EVERY repository (outsideRepositoryTemp): the fixture
+ * homes (the readiness probe takes its working directory from the home and refuses one with a `.git`
+ * ancestor -- outsideEveryRepository, po-human-approval.mjs), the PO key directories handed to
+ * set-po-key-directory (it refuses a path inside any repository) and the injected probe temp roots.
+ * This repository's scratch/ lives inside its own checkout, so those can never be placed there.
+ *
+ * Containment: GIT_CEILING_DIRECTORIES is pinned to the per-process root for this whole process, so no
+ * git process started from a plain fixture directory can ever ascend to (and discover, read or commit to)
+ * this project's own checkout; every fixture that reaches a git-backed verb is additionally a real,
+ * contained checkout made by initFixtureGitRepository below.
+ */
+const FIXTURE_SCRATCH_ROOT = join(fileURLToPath(new URL("../../../scratch/", import.meta.url)), `po-human-approval-fixtures-${process.pid}`);
+mkdirSync(FIXTURE_SCRATCH_ROOT, { recursive: true });
+process.env.GIT_CEILING_DIRECTORIES = realpathSync(FIXTURE_SCRATCH_ROOT);
+function fixtureTemp(prefix) {
+  mkdirSync(FIXTURE_SCRATCH_ROOT, { recursive: true });
+  return mkdtempSync(join(FIXTURE_SCRATCH_ROOT, prefix));
+}
+function outsideRepositoryTemp(prefix) {
+  return mkdtempSync(join(tmpdir(), prefix));
+}
+function removeFixtureScratchRoot() {
+  try { rmSync(FIXTURE_SCRATCH_ROOT, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* best effort: the root is gitignored and per-process */ }
+}
+after(removeFixtureScratchRoot);
+process.on("exit", removeFixtureScratchRoot);
 
 /**
  * R7-6-T9 safety audit (decision AC): `setup --directory` and `set-po-key-directory` WRITE the
@@ -69,7 +107,7 @@ import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoAp
  * before each call so no plane leaks from one case into another. A case that injects its own
  * `homedirFn` (every multi-step case, to keep its plane between calls) is passed through unchanged.
  */
-const DEFAULT_FIXTURE_HOME = mkdtempSync(join(tmpdir(), "po-human-approval-default-home-"));
+const DEFAULT_FIXTURE_HOME = outsideRepositoryTemp("po-human-approval-default-home-");
 process.on("exit", () => rmSync(DEFAULT_FIXTURE_HOME, { recursive: true, force: true }));
 function withFixtureHome(dependencies = {}) {
   if (dependencies.homedirFn !== undefined) return dependencies;
@@ -401,10 +439,53 @@ function fakeSignSpawn(privateKeyPem, passphrase) {
   };
 }
 
+/**
+ * ALF-C-W2-03C: every signing verb that opens a ceremony (setup, approve, approve-critical,
+ * authorize-critical, sign-intent) starts with inspectSignedDescriptorCustodyRepository(repoRoot),
+ * which runs discoverRepository: the root must be a REAL, physical, primary Git checkout with a HEAD
+ * (WT-GIT-FAILED otherwise). A fixture repoRoot that reaches one of those verbs is therefore a
+ * genuine contained repository -- `git init` plus one fixture commit -- and the custody check
+ * itself runs unmodified (no fake, no resolver stub bypasses it).
+ *
+ * Containment: every git call here pins GIT_CEILING_DIRECTORIES to the ABSOLUTE PARENT of the fixture
+ * root, so git can never discover (and therefore never init in, commit to or read) an enclosing
+ * repository such as this project's own checkout, even for a fixture placed under it. The environment
+ * is an allowlist with no inherited GIT_* variable, no global or system configuration, no hooks and
+ * a fixed fixture identity; `init` runs in the fixture root only, and the root is proven to be its own
+ * top level BEFORE the one commit is made.
+ */
+const FIXTURE_GIT_IDENTITY = Object.freeze({ name: "Fixture Identity", email: "fixture@example.invalid" });
+function fixtureGit(repoRoot, args) {
+  const root = realpathSync(repoRoot);
+  const env = {
+    GIT_CEILING_DIRECTORIES: dirname(root),
+    GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_TERMINAL_PROMPT: "0",
+    GIT_AUTHOR_NAME: FIXTURE_GIT_IDENTITY.name, GIT_AUTHOR_EMAIL: FIXTURE_GIT_IDENTITY.email,
+    GIT_COMMITTER_NAME: FIXTURE_GIT_IDENTITY.name, GIT_COMMITTER_EMAIL: FIXTURE_GIT_IDENTITY.email,
+  };
+  for (const key of ["PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "TMP", "TEMP", "TMPDIR", "LANG"]) {
+    if (typeof process.env[key] === "string") env[key] = process.env[key];
+  }
+  const result = spawnSync("git", ["-c", `core.hooksPath=${GIT_NULL_DEVICE}`, "-c", "commit.gpgSign=false", "-C", root, ...args],
+    { encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "pipe"], timeout: 30000 });
+  if (result.error || result.status !== 0) {
+    throw new Error(`fixture git ${args[0]} failed (${result.status ?? result.error?.code}): ${String(result.stderr ?? "").trim().slice(0, 300)}`);
+  }
+  return String(result.stdout).trim();
+}
+function initFixtureGitRepository(repoRoot) {
+  const root = realpathSync(repoRoot);
+  fixtureGit(root, ["init", "-q"]);
+  const fold = (path) => (process.platform === "win32" ? path.toLowerCase() : path);
+  if (fold(realpathSync(fixtureGit(root, ["rev-parse", "--show-toplevel"]))) !== fold(root)) throw new Error("fixture git root is not its own top level");
+  fixtureGit(root, ["commit", "-q", "--allow-empty", "--no-verify", "-m", "fixture: initial commit"]);
+  return repoRoot;
+}
+
 function fixtureDirs() {
   return {
-    repoRoot: mkdtempSync(join(tmpdir(), "po-sign-intent-repo-")),
-    directory: mkdtempSync(join(tmpdir(), "po-sign-intent-external-")),
+    repoRoot: initFixtureGitRepository(fixtureTemp("po-sign-intent-repo-")),
+    directory: fixtureTemp("po-sign-intent-external-"),
   };
 }
 
@@ -443,7 +524,7 @@ import { prepareAdoptionAuthority as adoptSignPrepare } from "../lib/architectur
 
 /** A genuine pipeline.adoption-approval-request.v1, prepared in its own throwaway git-backed root. */
 function adoptSignRequest() {
-  const adoptionRoot = mkdtempSync(join(tmpdir(), "po-adopt-sign-root-"));
+  const adoptionRoot = fixtureTemp("po-adopt-sign-root-");
   try {
     adoptSignSetupFixture(adoptionRoot);
     return adoptSignPrepare({ rootDir: adoptionRoot, decision: "approved-scoped", scope: ["src/", "docs/adr/"], rationale: "Adoption signing fixture decision", decidedAt: "2026-01-01T00:00:00.000Z", expiresAt: null, reviewDate: null, decisionRef: "ADOPT-SIGN-FIXTURE-1" });
@@ -662,7 +743,7 @@ const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url)
  * behaviour they did before this task. */
 function noMachinePlaneHomeFixture() {
   mkdirSync(SCRATCH_ROOT, { recursive: true });
-  return mkdtempSync(join(SCRATCH_ROOT, "po-human-approval-no-plane-home-"));
+  return fixtureTemp("po-human-approval-no-plane-home-");
 }
 
 /** A fixture home directory carrying a valid machine plane with the given
@@ -670,7 +751,7 @@ function noMachinePlaneHomeFixture() {
  * JSON) so the fixture matches the real on-disk contract. */
 function machinePlaneHomeFixture(poKeyDirectory) {
   mkdirSync(SCRATCH_ROOT, { recursive: true });
-  const home = mkdtempSync(join(SCRATCH_ROOT, "po-human-approval-plane-home-"));
+  const home = fixtureTemp("po-human-approval-plane-home-");
   writeMachinePlane({
     schema: MACHINE_PLANE_SCHEMA,
     poKeyDirectory,
@@ -820,7 +901,7 @@ test("setup's recovered branch (private+public key exist, no authority yet) does
 // tests above already rely on), so this needs no new spawn fake.
 test("NVA-CF-KEYBOOTSTRAP: setup --existing-key registers a pre-existing key file as the trust anchor with zero repair-command detours", () => {
   const dirs = fixtureDirs();
-  const existingKeyDir = mkdtempSync(join(tmpdir(), "po-existing-key-source-"));
+  const existingKeyDir = fixtureTemp("po-existing-key-source-");
   try {
     // Simulate a key the PO already has on their machine, from before this
     // repository (or this --directory) ever existed -- generated independently of
@@ -859,7 +940,7 @@ test("NVA-CF-KEYBOOTSTRAP: setup --existing-key registers a pre-existing key fil
 
 test("NVA-CF-KEYBOOTSTRAP: setup --existing-key refuses to overwrite key material already present at --directory", () => {
   const dirs = fixtureDirs();
-  const existingKeyDir = mkdtempSync(join(tmpdir(), "po-existing-key-source-"));
+  const existingKeyDir = fixtureTemp("po-existing-key-source-");
   try {
     runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
     const { privateKey } = generateKeyPairSync("ed25519", {
@@ -1343,7 +1424,7 @@ test("NVA-SWEEP-F2: sign-intent --request fails closed on malformed JSON, a miss
 // paths and would otherwise leave a dangling symlink target behind.
 test("NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
-  const outsideDir = mkdtempSync(join(tmpdir(), "po-sign-intent-outside-target-"));
+  const outsideDir = fixtureTemp("po-sign-intent-outside-target-");
   try {
     keyFixture(dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.gmw-reconcile-symlink-sibling-fixture").digest("hex");
@@ -1373,7 +1454,7 @@ test("NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink pl
 
 test("NVA-SWEEP-F2f-REWORK: sign-intent --request rejects a symlink planted at the --request path itself, pointing outside scratch/", () => {
   const dirs = fixtureDirs();
-  const outsideDir = mkdtempSync(join(tmpdir(), "po-sign-intent-outside-request-"));
+  const outsideDir = fixtureTemp("po-sign-intent-outside-request-");
   try {
     keyFixture(dirs.directory);
     const outsideRequestPath = join(outsideDir, "planted-request.json");
@@ -1835,7 +1916,7 @@ function tr1AssertNothingRegistered(directory, spawnCalls, label) {
 
 test("TR-S1-T pin 1: setup --existing-key refuses an UNENCRYPTED key with a typed code and copies nothing", () => {
   const dirs = fixtureDirs();
-  const source = mkdtempSync(join(tmpdir(), "po-tr1-source-"));
+  const source = fixtureTemp("po-tr1-source-");
   try {
     const { privatePath } = tr1Key(source);
     const { spawn, calls } = tr1Spawn();
@@ -1853,7 +1934,7 @@ test("TR-S1-T pin 1: setup --existing-key refuses an UNENCRYPTED key with a type
 
 test("TR-S1-T pin 2 (regression guard, green today): setup --existing-key accepts an ENCRYPTED key and copies it verbatim", () => {
   const dirs = fixtureDirs();
-  const source = mkdtempSync(join(tmpdir(), "po-tr1-source-"));
+  const source = fixtureTemp("po-tr1-source-");
   try {
     const { privatePath, publicPath } = tr1Key(source, { passphrase: TR1_PASSPHRASE });
     assert.match(readFileSync(privatePath, "utf8"), /-----BEGIN ENCRYPTED PRIVATE KEY-----/u, "fixture sanity: the key must carry the encrypted PKCS#8 armor");
@@ -1933,7 +2014,7 @@ test("TR-S1-T pin 5: setup --existing-key refuses an UNREADABLE key with a typed
   ];
   for (const variant of variants) {
     const dirs = fixtureDirs();
-    const source = mkdtempSync(join(tmpdir(), "po-tr1-source-"));
+    const source = fixtureTemp("po-tr1-source-");
     try {
       const keyPath = variant.make(source);
       const { spawn, calls } = tr1Spawn();
@@ -2044,8 +2125,7 @@ function envelope(fingerprint, capturePolicyDigest, overrides = {}) {
 }
 
 async function forkedRepositoryFixture() {
-  const repoRoot = mkdtempSync(join(tmpdir(), "po-fork-disposition-repo-"));
-  execFileSync("git", ["init", "-q", repoRoot]);
+  const repoRoot = initFixtureGitRepository(fixtureTemp("po-fork-disposition-repo-"));
   const repository = discoverRepository(repoRoot);
   // NVA-REPOID-3: two distinct fingerprints now serve two distinct needs.
   // `fingerprint` is the store's BOUND identity (governance-event-store.mjs's
@@ -2070,7 +2150,7 @@ async function forkedRepositoryFixture() {
   await appendPortableGovernanceEvent({ repositoryRoot: repoRoot, repositoryFingerprint: fingerprint, intent: intent({ eventId: "evt-2", idempotencyKey: "idem-2", occurredAtEpochMs: 2, observedAtEpochMs: 2, payload: { ...intent().payload, eventId: "lifecycle-2", reasonCode: "CONTINUED" } }) });
   const fork = sealGovernanceEvent({ ...intent({ eventId: "evt-fork", idempotencyKey: "idem-fork" }), sequence: 2, previousEventDigest: first.eventDigest, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
   writeFileSync(join(repoRoot, "governance/events/lifecycle/2-evt-fork.json"), `${canonicalizeJson(fork)}\n`);
-  const directory = mkdtempSync(join(tmpdir(), "po-fork-disposition-external-"));
+  const directory = fixtureTemp("po-fork-disposition-external-");
   return { repoRoot, directory, fingerprint, derivedFingerprint };
 }
 
@@ -2366,8 +2446,8 @@ const SPEC = "spec.md";
 /** A fixture repository (plan/spec only; the candidate is injected, never observed via git). */
 function criticalDirs() {
   const dirs = {
-    repoRoot: mkdtempSync(join(tmpdir(), "po-authorize-critical-repo-")),
-    directory: mkdtempSync(join(tmpdir(), "po-authorize-critical-external-")),
+    repoRoot: initFixtureGitRepository(fixtureTemp("po-authorize-critical-repo-")),
+    directory: fixtureTemp("po-authorize-critical-external-"),
   };
   writeFileSync(join(dirs.repoRoot, PLAN), "# plan fixture\n");
   writeFileSync(join(dirs.repoRoot, SPEC), "# spec fixture\n");
@@ -2536,16 +2616,24 @@ function criticalRequestArgs(dirs, { kind = "push", subjectSha256 = "a".repeat(6
 
 /**
  * PO-KEYDIR-01(B): mirrors production's own fallback exactly (runHumanApproval's
- * `gitCommonDir ?? repository`) -- these fixture repositories are plain tmpdirs, not
- * real Git checkouts, so `resolveGitCommonDir` (po-human-approval.mjs) always returns
- * null for them and the fingerprint falls back to the repository root itself for
- * both `gitCommonDir` and `primaryRoot`. Never hardcodes a hex value: computed the
- * same way production computes it, from the same derivePoGateRepositoryFingerprint()
- * this script reuses.
+ * `gitCommonDir ?? repository`). Every fixture repository that reaches a signing verb is a
+ * REAL, contained Git checkout (initFixtureGitRepository, rooted under this repository's own
+ * scratch/ tree -- fixtureTemp), so production's gitCommonDir is the physical `.git` that
+ * discoverRepository reports; the repository-root fallback applies only to a root that is not a
+ * checkout. Never hardcodes a hex value: computed the same way production computes it, from the
+ * same derivePoGateRepositoryFingerprint() this script reuses.
  */
 function repositoryFingerprintFor(repoRoot) {
   const repository = resolve(repoRoot);
-  return derivePoGateRepositoryFingerprint({ gitCommonDir: repository, primaryRoot: repository }).slice(0, 12);
+  // ALF-C-W2-03C: the fixture repositories ARE real checkouts now (initFixtureGitRepository), so
+  // production's gitCommonDir is the physical `.git` that discoverRepository reports (the same pair
+  // forkedRepositoryFixture already derives); the non-git fallback below is production's own
+  // `gitCommonDir ?? repository` for a root that is not a checkout.
+  let found = null;
+  try { found = discoverRepository(repository); } catch { /* not a checkout: production's fallback */ }
+  return derivePoGateRepositoryFingerprint(found === null
+    ? { gitCommonDir: repository, primaryRoot: repository }
+    : { gitCommonDir: found.commonDir, primaryRoot: repository }).slice(0, 12);
 }
 
 function criticalArtifacts(dirs, kind = "push") {
@@ -3085,17 +3173,15 @@ const WINDOW_REASON = "fix the release-preflight base-commit peel inside the liv
 
 /** A real git repository plus a synthetic live plugin root, the two things a GMW request binds. */
 function windowFixture() {
-  const repoRoot = mkdtempSync(join(tmpdir(), "po-gmw-repo-"));
-  execFileSync("git", ["init", "-q"], { cwd: repoRoot });
-  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repoRoot });
-  execFileSync("git", ["config", "user.name", "Test"], { cwd: repoRoot });
+  const repoRoot = fixtureTemp("po-gmw-repo-");
+  fixtureGit(repoRoot, ["init", "-q"]);
   writeFileSync(join(repoRoot, "README.md"), "# fixture\n");
-  execFileSync("git", ["add", "-A"], { cwd: repoRoot });
-  execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: repoRoot });
-  const plugin = mkdtempSync(join(tmpdir(), "po-gmw-plugin-"));
+  fixtureGit(repoRoot, ["add", "-A"]);
+  fixtureGit(repoRoot, ["commit", "-q", "--no-verify", "-m", "init"]);
+  const plugin = fixtureTemp("po-gmw-plugin-");
   mkdirSync(join(plugin, "hooks"), { recursive: true });
   writeFileSync(join(plugin, "hooks", "guard-example.mjs"), "// example\n");
-  return { repoRoot, directory: mkdtempSync(join(tmpdir(), "po-gmw-external-")), plugin };
+  return { repoRoot, directory: fixtureTemp("po-gmw-external-"), plugin };
 }
 
 function cleanupWindow(dirs) {
@@ -3136,15 +3222,13 @@ const HGO_SIGNATURE_INTENT_SPEC_SHA256 = createHash("sha256").update("pipeline.h
 
 /** A real git repository committing signature mode, the topology an HGO request binds. */
 function hgoFixtureDirs() {
-  const repoRoot = mkdtempSync(join(tmpdir(), "po-hgo-repo-"));
-  execFileSync("git", ["init", "-q"], { cwd: repoRoot });
-  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repoRoot });
-  execFileSync("git", ["config", "user.name", "Test"], { cwd: repoRoot });
+  const repoRoot = fixtureTemp("po-hgo-repo-");
+  fixtureGit(repoRoot, ["init", "-q"]);
   writeFileSync(join(repoRoot, "README.md"), "# fixture\n");
   writeFileSync(join(repoRoot, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
-  execFileSync("git", ["add", "-A"], { cwd: repoRoot });
-  execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: repoRoot });
-  return { repoRoot, directory: mkdtempSync(join(tmpdir(), "po-hgo-external-")) };
+  fixtureGit(repoRoot, ["add", "-A"]);
+  fixtureGit(repoRoot, ["commit", "-q", "--no-verify", "-m", "init"]);
+  return { repoRoot, directory: fixtureTemp("po-hgo-external-") };
 }
 
 /** denial -> plan -> prepare-authorization (fixed HGO_SIGNATURE_REASON) -> the independently-reconstructed intent digest sign-intent must resolve, mirroring lib/human-guard-override.test.mjs's prepareSignedArming() shape without calling into any of this module's own new exports. */
@@ -3487,7 +3571,7 @@ test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly li
 // is the per-terminal selection of a non-default key and now wins over the machine plane; the plane resolves without it.
 test("AC-11: PIPELINE_PO_APPROVAL_DIRECTORY wins over the machine plane's poKeyDirectory when --directory is absent; the plane resolves the directory only when the variable is unset", () => {
   const dirs = fixtureDirs();
-  const envDirectory = mkdtempSync(join(tmpdir(), "po-env-wins-"));
+  const envDirectory = fixtureTemp("po-env-wins-");
   const home = machinePlaneHomeFixture(dirs.directory);
   try {
     const argv = ["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"];
@@ -3508,7 +3592,7 @@ test("AC-11: PIPELINE_PO_APPROVAL_DIRECTORY wins over the machine plane's poKeyD
 
 test("AC-11/AC-13: an explicit --directory still wins over a present, valid machine plane", () => {
   const dirs = fixtureDirs();
-  const otherDirectory = mkdtempSync(join(tmpdir(), "po-machine-plane-unused-"));
+  const otherDirectory = fixtureTemp("po-machine-plane-unused-");
   const home = machinePlaneHomeFixture(otherDirectory);
   try {
     const parsed = parseHumanArgs(
@@ -3626,8 +3710,8 @@ test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machin
 
 test("NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that no longer exists on disk IS replaced by a later call", () => {
   const home = machinePlaneHomeFixture(null);
-  const dead = mkdtempSync(join(tmpdir(), "po-human-approval-dead-keydir-"));
-  const alive = mkdtempSync(join(tmpdir(), "po-human-approval-alive-keydir-"));
+  const dead = fixtureTemp("po-human-approval-dead-keydir-");
+  const alive = fixtureTemp("po-human-approval-alive-keydir-");
   try {
     // Seed the plane with a directory, then remove it from disk -- exactly
     // the dangling-pointer shape measured live on the development machine
@@ -3650,9 +3734,9 @@ test("NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that no longer exists on disk 
 });
 
 test("NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that DOES exist on disk is never replaced -- the property this change must not break", () => {
-  const existing = mkdtempSync(join(tmpdir(), "po-human-approval-existing-keydir-"));
+  const existing = fixtureTemp("po-human-approval-existing-keydir-");
   const home = machinePlaneHomeFixture(existing);
-  const other = mkdtempSync(join(tmpdir(), "po-human-approval-other-keydir-"));
+  const other = fixtureTemp("po-human-approval-other-keydir-");
   try {
     persistExplicitDirectoryIntoMachinePlane({ directorySource: "flag" }, other, { homedirFn: () => home });
 
@@ -3668,7 +3752,7 @@ test("NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that DOES exist on disk is nev
 
 test("2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-error: a writeMachinePlane() failure produces a visible warning and still does not throw", () => {
   const home = machinePlaneHomeFixture(null);
-  const alive = mkdtempSync(join(tmpdir(), "po-human-approval-warn-keydir-"));
+  const alive = fixtureTemp("po-human-approval-warn-keydir-");
   try {
     let warned = null;
     const dependencies = {
@@ -3705,7 +3789,7 @@ test("2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-err
  * `dependencies.gitCommonDirFn`, which the production code never routes
  * through real `git`. */
 function repoScopeCommonDirFixture() {
-  return mkdtempSync(join(tmpdir(), "po-human-approval-repo-scope-common-"));
+  return fixtureTemp("po-human-approval-repo-scope-common-");
 }
 
 function repoScopeStorePath(gitCommonDir) {
@@ -3726,7 +3810,7 @@ function legacyRepoStoreFixture(gitCommonDir, poKeyDirectory) {
  * directory from the home and refuses one inside a repository, which is where the scratch/ homes above live.
  * With `poKeyDirectory` the machine plane is written there through the library's own writer. */
 function outsideRepoHomeFixture(poKeyDirectory) {
-  const home = mkdtempSync(join(tmpdir(), "po-human-approval-outside-home-"));
+  const home = outsideRepositoryTemp("po-human-approval-outside-home-");
   if (poKeyDirectory !== undefined) {
     writeMachinePlane({
       schema: MACHINE_PLANE_SCHEMA, poKeyDirectory, pushApprovalDefault: "chat",
@@ -3745,7 +3829,7 @@ function treeListing(root) {
 test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the MACHINE PLANE (decision AC), never the legacy REPO-SCOPED store or the repository; a later command resolves it without repeating --directory in the SAME repo and, the plane being machine-wide, in a DIFFERENT repo too", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
   const home = outsideRepoHomeFixture();
-  const otherRepo = mkdtempSync(join(tmpdir(), "po-gapA-other-repo-"));
+  const otherRepo = initFixtureGitRepository(fixtureTemp("po-gapA-other-repo-"));
   const commonA = repoScopeCommonDirFixture();
   const commonOther = repoScopeCommonDirFixture();
   try {
@@ -3899,8 +3983,8 @@ function r7kAssertAccepted(outcome, label) {
 const r7kMentions = (text, path) => text.includes(path) || text.includes(realpathSync(path));
 
 test("R7-6k: set-po-key-directory on a home with no machine plane creates a valid plane that holds the directory, with every other field not configured and nothing else written (decision AC)", () => {
-  const home = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
-  const directory = mkdtempSync(join(tmpdir(), "r7-6k-keys-"));
+  const home = outsideRepositoryTemp("r7-6k-home-");
+  const directory = outsideRepositoryTemp("r7-6k-keys-");
   try {
     assert.equal(r7kPlaneBytes(home), null, "harness: the home starts without a plane");
     r7kAssertAccepted(r7kSet(home, directory), "set-po-key-directory");
@@ -3917,8 +4001,8 @@ test("R7-6k: set-po-key-directory on a home with no machine plane creates a vali
 });
 
 test("R7-6k: set-po-key-directory replaces a different existing default only when --replace names the current value exactly: none and a wrong value are refused with the plane byte-identical, the exact value succeeds and changes only poKeyDirectory and updatedAt (decision AC, ruling 5)", () => {
-  const home = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
-  const [first, second, third] = ["a", "b", "c"].map((name) => mkdtempSync(join(tmpdir(), `r7-6k-keys-${name}-`)));
+  const home = outsideRepositoryTemp("r7-6k-home-");
+  const [first, second, third] = ["a", "b", "c"].map((name) => outsideRepositoryTemp(`r7-6k-keys-${name}-`));
   try {
     const seeded = { ...R7K_OTHER_FIELDS, poKeyDirectory: first, updatedAt: "2020-01-01T00:00:00.000Z" };
     writeMachinePlane(seeded, { homedirFn: () => home });
@@ -3946,9 +4030,9 @@ test("R7-6k: set-po-key-directory replaces a different existing default only whe
 
 function r7kRefusalCase(label, makeBadPath, reason) {
   test(`R7-6k: set-po-key-directory refuses ${label} and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC)`, () => {
-    const home = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
-    const good = mkdtempSync(join(tmpdir(), "r7-6k-keys-"));
-    const workspace = mkdtempSync(join(tmpdir(), "r7-6k-bad-"));
+    const home = outsideRepositoryTemp("r7-6k-home-");
+    const good = outsideRepositoryTemp("r7-6k-keys-");
+    const workspace = fixtureTemp("r7-6k-bad-");
     try {
       const refused = r7kSet(home, makeBadPath(workspace));
       assert.equal(r7kRefused(refused), true, `${label}: observed ${r76Describe(refused)}`);
@@ -3961,16 +4045,16 @@ function r7kRefusalCase(label, makeBadPath, reason) {
     }
   });
 }
-const r7kGitRepository = (workspace) => { const repository = join(workspace, "work"); mkdirSync(repository); execFileSync("git", ["init", "-q", repository]); return repository; };
+const r7kGitRepository = (workspace) => { const repository = join(workspace, "work"); mkdirSync(repository); return initFixtureGitRepository(repository); };
 r7kRefusalCase("a relative path", () => "relative-po-keys", /absolute/iu);
 r7kRefusalCase("a path that is not a directory", (workspace) => { const file = join(workspace, "a-file"); writeFileSync(file, "not a directory\n"); return file; }, /director/iu);
 r7kRefusalCase("a path inside a repository", (workspace) => { const keys = join(r7kGitRepository(workspace), "keys"); mkdirSync(keys); return keys; }, /repositor|\.git/iu);
 r7kRefusalCase("a path inside .git", (workspace) => { const inside = join(r7kGitRepository(workspace), ".git", "po-keys"); mkdirSync(inside); return inside; }, /repositor|\.git/iu);
 
 test("R7-6k: set-po-key-directory reports an invalid machine plane and leaves it byte-identical, never repairing it; the same command on a valid home succeeds (positive control) (decision AC)", () => {
-  const goodHome = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
-  const badHome = mkdtempSync(join(tmpdir(), "r7-6k-home-"));
-  const directory = mkdtempSync(join(tmpdir(), "r7-6k-keys-"));
+  const goodHome = outsideRepositoryTemp("r7-6k-home-");
+  const badHome = outsideRepositoryTemp("r7-6k-home-");
+  const directory = outsideRepositoryTemp("r7-6k-keys-");
   try {
     r7kAssertAccepted(r7kSet(goodHome, directory), "positive control");
     const garbage = "{ not valid json";
@@ -4066,7 +4150,7 @@ test("R7-6k: the catalogue entry for set-po-key-directory is agent-runnable, wit
 
 test("PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid repo-scoped value", () => {
   const dirs = fixtureDirs();
-  const otherDirectory = mkdtempSync(join(tmpdir(), "po-repo-scope-unused-"));
+  const otherDirectory = fixtureTemp("po-repo-scope-unused-");
   const common = repoScopeCommonDirFixture();
   try {
     const gitCommonDirFn = () => common;
@@ -4089,7 +4173,7 @@ test("PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid 
 
 test("PO-KEYDIR-01(A) / Spec 22.6 (R7-6-T3, D1): the machine-wide value resolves the directory when --directory is absent and wins over a present legacy repo-scoped value", () => {
   const dirs = fixtureDirs();
-  const machineDirectory = mkdtempSync(join(tmpdir(), "po-machine-wins-"));
+  const machineDirectory = fixtureTemp("po-machine-wins-");
   const home = machinePlaneHomeFixture(machineDirectory);
   const common = repoScopeCommonDirFixture();
   try {
@@ -4115,8 +4199,8 @@ test("R7-6-T3 (Spec 22.6, D1): poKeyDirectory resolves explicit argument, then m
   // Every other source (flag, machine-plane, environment) leaves  legacy  absent or false.
   // directorySource keeps its existing values and is not pinned for the legacy case here.
   const dirs = fixtureDirs();
-  const explicitDirectory = mkdtempSync(join(tmpdir(), "po-order-explicit-"));
-  const machineDirectory = mkdtempSync(join(tmpdir(), "po-order-machine-"));
+  const explicitDirectory = fixtureTemp("po-order-explicit-");
+  const machineDirectory = fixtureTemp("po-order-machine-");
   const machineHome = machinePlaneHomeFixture(machineDirectory);
   const emptyHome = noMachinePlaneHomeFixture();
   const common = repoScopeCommonDirFixture();
@@ -4319,9 +4403,9 @@ test("GF-112: setup still fails with the original message for a legacy-shape rec
  * ------------------------------------------------------------------ */
 
 test("PO-KEYDIR-01(B): two repositories sharing one external directory and the same feature id get DISJOINT request/proof/signer filenames (repository-fingerprint segment), while the shared key/authority filenames stay UNCHANGED and usable by both", { skip: REQUIRES_OPENSSL }, () => {
-  const directory = mkdtempSync(join(tmpdir(), "po-fingerprint-shared-external-"));
-  const dirsA = { repoRoot: mkdtempSync(join(tmpdir(), "po-fingerprint-repo-a-")), directory };
-  const dirsB = { repoRoot: mkdtempSync(join(tmpdir(), "po-fingerprint-repo-b-")), directory };
+  const directory = fixtureTemp("po-fingerprint-shared-external-");
+  const dirsA = { repoRoot: initFixtureGitRepository(fixtureTemp("po-fingerprint-repo-a-")), directory };
+  const dirsB = { repoRoot: initFixtureGitRepository(fixtureTemp("po-fingerprint-repo-b-")), directory };
   writeFileSync(join(dirsA.repoRoot, PLAN), "# plan A\n");
   writeFileSync(join(dirsA.repoRoot, SPEC), "# spec A\n");
   writeFileSync(join(dirsB.repoRoot, PLAN), "# plan B\n");
@@ -4985,7 +5069,7 @@ function r76Spy(mode = "healthy", events = []) {
  * null (no machine-wide value), "own" (this fixture's key directory) or a path. */
 function r76Env({ plane = null } = {}) {
   const dirs = fixtureDirs();
-  const home = mkdtempSync(join(tmpdir(), "r76-home-"));
+  const home = outsideRepositoryTemp("r76-home-");
   writeMachinePlane({
     schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: plane === "own" ? dirs.directory : plane,
     pushApprovalDefault: "chat", routing: null, language: null, session: null, usage: null,
@@ -5118,7 +5202,7 @@ test("R7-6b(i): a spawn that cannot find openssl yields the typed openssl-not-on
 
 test("R7-6b(i), real lookup: with a PATH holding no openssl at all the same typed openssl-not-on-path result ends sign-intent before any prompt", () => {
   const env = r76Env();
-  const emptyPath = mkdtempSync(join(tmpdir(), "r76-emptypath-"));
+  const emptyPath = fixtureTemp("r76-emptypath-");
   try {
     r76KeyFixture(env);
     const outcome = r76WithPath(emptyPath, () => r76Sign(env, null));
@@ -5263,7 +5347,7 @@ test("R7-6e (dynamic): the signing flow only ever names the constant bare execut
 
 test("R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the PO key directory is never started when sign-intent runs from the repository root with the real lookup", { skip: process.platform === "win32" ? "win32-known residual (PO decision R 2026-10-07): libuv resolves a bare name in the child cwd before PATH; the signing spawn's cwd is the PO key directory" : false }, () => {
   const env = r76Env();
-  const aux = mkdtempSync(join(tmpdir(), "r76-decoy-aux-"));
+  const aux = fixtureTemp("r76-decoy-aux-");
   const startCwd = process.cwd();
   const previous = { options: process.env.NODE_OPTIONS, marker: process.env.R76_MARKER };
   try {
@@ -5460,7 +5544,7 @@ test("R7-6g(i) (F5): with NO committed trust anchor sign-intent reports key-anch
 test("R7-6g(ii)-a (F6): the probe child's working directory is the OS user's home directory, never the OS temporary directory", () => {
   const env = r76Env();
   const spy = r76Spy("healthy", env.events);
-  const scratch = mkdtempSync(join(tmpdir(), "r76g-"));
+  const scratch = outsideRepositoryTemp("r76g-");
   try {
     r76KeyFixture(env);
     const tmp = join(scratch, "tmp");
@@ -5482,7 +5566,7 @@ test("R7-6g(ii)-b (F6): with no admissible working directory outside every repos
   for (const variant of ["home-inside-a-repository", "home-names-no-directory"]) {
     const env = r76Env();
     const spy = r76Spy("healthy", env.events);
-    const scratch = mkdtempSync(join(tmpdir(), "r76g-"));
+    const scratch = outsideRepositoryTemp("r76g-");
     try {
       const tmp = join(scratch, "tmp");
       mkdirSync(tmp);
@@ -5511,7 +5595,7 @@ test("R7-6g(ii)-b (F6): with no admissible working directory outside every repos
 test("R7-6g(ii)-c (F6): a local I/O failure while preparing the throwaway material is not classified openssl-no-ed25519", () => {
   const env = r76Env();
   const spy = r76Spy("healthy", env.events);
-  const scratch = mkdtempSync(join(tmpdir(), "r76g-"));
+  const scratch = outsideRepositoryTemp("r76g-");
   try {
     r76KeyFixture(env);
     const blocker = join(scratch, "not-a-directory");
@@ -5597,8 +5681,8 @@ function r76hKeyFixture(directory, keyReference) {
  * true (valid value), "malformed" or "unreadable" (an invalid plane), or falsy (no plane). */
 function r76hResolverFixture() {
   const made = [];
-  const fresh = (prefix) => { const path = mkdtempSync(join(tmpdir(), prefix)); made.push(path); return path; };
-  const repoRoot = fresh("r76h-repo-");
+  const fresh = (prefix) => { const path = fixtureTemp(prefix); made.push(path); return path; };
+  const repoRoot = initFixtureGitRepository(fresh("r76h-repo-"));
   const dirs = Object.fromEntries(R76H_TIERS.map((tier) => [tier, fresh(`r76h-${tier}-`)]));
   return {
     repoRoot,
@@ -5692,7 +5776,7 @@ function r76hSign(env, spy, { flag = null, environment = undefined } = {}) {
 /** Person A holds two keys; K1 is the machine-wide default, K2 arrives by `route`. Both anchors are committed. */
 function r76hPersonAChoosesK2(route) {
   const env = r76Env({ plane: "own" });
-  const directoryK2 = mkdtempSync(join(tmpdir(), "r76h-k2-"));
+  const directoryK2 = fixtureTemp("r76h-k2-");
   try {
     const k1 = r76hKeyFixture(env.dirs.directory, "person-a-key-1");
     const k2 = r76hKeyFixture(directoryK2, "person-a-key-2");
@@ -5739,7 +5823,7 @@ function r76oStrings(value, path = "result", found = []) {
 test("R7-6o: handed-over commands carry no --directory (decision AC, test-list 12)", () => {
   for (const route of ["default", "environment"]) {
     const env = r76Env({ plane: "own" });
-    const directoryK2 = mkdtempSync(join(tmpdir(), "r76o-k2-"));
+    const directoryK2 = fixtureTemp("r76o-k2-");
     try {
       const k1 = r76hKeyFixture(env.dirs.directory, "person-a-key-1");
       const k2 = r76hKeyFixture(directoryK2, "person-a-key-2");
@@ -5775,7 +5859,7 @@ function r76iAssertAnchorRefused(result, label) {
 
 test("R7-6i: with two committed trust anchors A and B, the key directories of A and of B each pass step (c) of the readiness probe and the key of B signs (decision AD, test-list 8)", () => {
   const env = r76Env();
-  const directoryB = mkdtempSync(join(tmpdir(), "r76i-b-"));
+  const directoryB = fixtureTemp("r76i-b-");
   try {
     const a = r76hKeyFixture(env.dirs.directory, "person-a-key");
     const b = r76hKeyFixture(directoryB, "person-b-key");
@@ -5797,8 +5881,8 @@ test("R7-6i: with two committed trust anchors A and B, the key directories of A 
 
 test("R7-6i: a key C outside the committed anchor set fails key-anchor-mismatch at the probe and at sign-intent before its private key is read (decision AD, test-list 8)", () => {
   const env = r76Env();
-  const directoryB = mkdtempSync(join(tmpdir(), "r76i-b-"));
-  const directoryC = mkdtempSync(join(tmpdir(), "r76i-c-"));
+  const directoryB = fixtureTemp("r76i-b-");
+  const directoryC = fixtureTemp("r76i-c-");
   try {
     const a = r76hKeyFixture(env.dirs.directory, "person-a-key");
     const b = r76hKeyFixture(directoryB, "person-b-key");

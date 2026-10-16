@@ -2723,12 +2723,14 @@ function executeHumanApprovalCore(args, dependencies = {}) {
     // TR-S1 (Ruling 78): refuse an unreadable or unencrypted key before the confirmation prompt.
     assertPoPrivateKeyProtected(paths.privateKey, dependencies);
     const kind = critical ? request?.action?.kind : request?.approvalIntent?.value?.kind;
-    const summary = [`kind: ${kind}`, `intent sha256: ${intentSha256}`, `candidate commit: ${request?.candidate?.commit}`];
+    const facts = [`kind: ${kind}`, `candidate commit: ${request?.candidate?.commit}`];
     if (critical) {
-      summary.push(`action subject sha256: ${request?.action?.subjectSha256}`);
-      summary.push(`action expires at: ${request?.action?.expiresAt}`);
+      facts.push(`action subject sha256: ${request?.action?.subjectSha256}`);
+      facts.push(`action expires at: ${request?.action?.expiresAt}`);
     }
-    requireExplicitConfirmation(summary, dependencies, humanFacingLanguage);
+    // AC-261: the push/critical-action signing command shows the same compact,
+    // digest-bound disclosure as sign-intent, never a free-form dump.
+    requireExplicitConfirmation(compactSigningDisclosure({ intentSha256, record: { resolved: true, lines: facts } }), dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
     // NVA-CLI-FEEDBACK-1: state the paths this call just wrote (proof/signer
     // survive; intent/signature are removed by signIntentIntoProof).
