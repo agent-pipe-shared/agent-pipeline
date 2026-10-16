@@ -125,6 +125,22 @@ function equalSources(left, right) {
   return SOURCE_NAMES.every((name) => left[name].path === right[name].path
     && left[name].sha256 === right[name].sha256);
 }
+/**
+ * The E1 freeze is the first authorized foundation act: implementation
+ * authority must not depend on it, while work-package readiness must. A Spec
+ * or PRD that states the opposite order contradicts the readiness predicate
+ * and is refused. Sources that do not state the predicate are not judged here.
+ */
+function e1FreezeOrderContradiction(sourceBytes) {
+  const text = (name) => (bytes(sourceBytes?.[name]?.bytes) ?? Buffer.alloc(0)).toString("utf8").replace(/\s+/gu, " ");
+  const spec = text("spec");
+  const authorized = /\*\*Implementation-authorized:\*\*(.*?)(?=\*\*Work-package implementation-ready:\*\*|\*\*Wave-complete:\*\*|$)/u.exec(spec);
+  if (authorized !== null && /\bE1\b/u.test(authorized[1]) && !/not a prerequisite/u.test(authorized[1])) return true;
+  const ready = /\*\*Work-package implementation-ready:\*\*(.*?)(?=\*\*Wave-complete:\*\*|$)/u.exec(spec);
+  if (ready !== null && !/\bfreeze\b/u.test(ready[1])) return true;
+  const prd = text("prd");
+  return /\bE1\b[^.]{0,120}\b(?:is |are )?(?:a )?(?:prerequisite (?:to|for) |required (?:for|before) |precedes |before )(?:the )?implementation[- ]authori(?:[sz]|ty)/iu.test(prd);
+}
 function sourceBytesMatch(sources, sourceBytes) {
   if (!exact(sourceBytes, SOURCE_NAMES)) return false;
   let total = 0;
@@ -406,6 +422,7 @@ export function validateDesignWorkflowPackage({
     || rawPackage === null || rawPackage.length > MAX_PACKAGE_BYTES
     || !sameJsonBytes(workflowPackage, packageBytes)
     || !sourceBytesMatch(workflowPackage.sources, sourceBytes)) return fail("DWP-PACKAGE-INVALID");
+  if (e1FreezeOrderContradiction(sourceBytes)) return fail("DWP-E1-FREEZE-ORDER");
 
   const advisor = workflowPackage.advisor;
   if (!exact(advisor, ["status", "runner", "nativeAvailable", "receipt", "attemptTrail", "disposition", "exception"])

@@ -33,22 +33,22 @@ const id = (prefix) => `${prefix}-dispatch`;
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const serialized = (value) => Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
 
-function makeSources() {
+function makeSources(texts = {}) {
   const sourceBytes = {};
   const sources = {};
   for (const [name, path] of Object.entries({
     input: "specs/feature/input.md", prd: "specs/feature/prd.md", spec: "specs/feature/spec.md",
     design: "specs/feature/design.md", traceability: "specs/feature/traceability.md",
   })) {
-    const data = Buffer.from(`${name} source\n`, "utf8");
+    const data = Buffer.from(texts[name] ?? `${name} source\n`, "utf8");
     sources[name] = { path, sha256: sha(data) };
     sourceBytes[name] = { path, bytes: data };
   }
   return { sources, sourceBytes };
 }
 
-function fixture({ unavailable = false } = {}) {
-  const { sources, sourceBytes } = makeSources();
+function fixture({ unavailable = false, texts = {} } = {}) {
+  const { sources, sourceBytes } = makeSources(texts);
   const advisorReceipt = {
     schema: "pipeline.advisory-receipt.v1", receiptId: "advisor-receipt-1",
     dispatch: { dispatchId: id("advisor"), queueRevision: 0, candidateCommit: candidate.commit, candidateTree: candidate.tree },
@@ -297,6 +297,40 @@ test("AC6 a stale or mismatched E1 freeze is not enough: the Spec predicate says
   const spec = flat(read("specs/sprint-alfred-epic/spec.md"));
   assert.match(spec, /A stale or mismatched freeze does not\./u);
   assert.match(spec, /Every dependent WP waits for this predicate/u);
+});
+
+const CORRECT_SPEC = "- **Implementation-authorized:** PRD/Spec PO-accepted. E1 is the first authorized foundation act and is not a prerequisite for the authority that permits it.\n"
+  + "- **Work-package implementation-ready:** implementation authorized and E1 freeze artifact committed. A stale or mismatched freeze does not.\n"
+  + "- **Wave-complete:** each wave green.\n";
+
+test("AC6 behavioral: a Spec/PRD whose E1 freeze order contradicts the readiness predicate is refused", () => {
+  const control = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC,
+    prd: "Wave 0 runs immediately after implementation authority: E1 freeze.\n" } }));
+  assert.equal(control.ok, true, JSON.stringify(control));
+  // authority made to depend on E1 output (the cycle)
+  const cycle = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC.replace(
+    "and is not a prerequisite for the authority that permits it", "and its freeze must be committed before this authority") } }));
+  assert.equal(cycle.code, "DWP-E1-FREEZE-ORDER");
+  // readiness predicate that no longer requires the freeze
+  const noFreeze = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC.replace("E1 freeze artifact committed. A stale or mismatched freeze does not.", "nothing else.") } }));
+  assert.equal(noFreeze.code, "DWP-E1-FREEZE-ORDER");
+  // PRD placing E1 ahead of implementation authority
+  const prd = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC,
+    prd: "The E1 freeze is a prerequisite for implementation authority.\n" } }));
+  assert.equal(prd.code, "DWP-E1-FREEZE-ORDER");
+});
+
+test("AC5 behavioral: the owning modules refuse invalid input rather than only existing", async () => {
+  const critic = await import("../critic-verify-lifecycle.mjs");
+  assert.throws(() => critic.criticVerifyLifecycleId({ candidate: null, criticPacketId: "", verifyEvidenceSha256: "x" }),
+    (error) => error.code === "CVL-IDENTITY");
+  const plugin = await import("../installed-plugin-attestation.mjs");
+  const drift = plugin.verifyInstalledPluginAttestation({});
+  assert.equal(drift.status, "rejected");
+  assert.deepEqual(drift.reasonCodes, ["IPA-INPUT"]);
+  const chat = await import("../chat-gate-ceremony.mjs");
+  assert.equal(chat.chatAttributionRecord({ kind: "gate" }).mode, "chat-attributed-unattested",
+    "chat clearance is an attribution record, not signature proof");
 });
 
 test("AC7 freshness and read-only are host evidence, never reviewer self-assertion", () => {
