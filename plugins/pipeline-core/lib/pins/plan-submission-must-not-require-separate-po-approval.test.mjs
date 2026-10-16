@@ -22,6 +22,9 @@ import { fileURLToPath } from "node:url";
 import { run, statePath } from "../../scripts/pipeline-state.mjs";
 import { applyOnboardingIntakeConsent } from "../onboarding-continuity.mjs";
 import { initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+import { designWorkflowAdvisorExceptionRationale, designWorkflowAdvisorQuestionSha256, validateDesignWorkflowPackage } from "../design-workflow-package.mjs";
+import { createAdvisoryAttemptTrail } from "../advisory-attempt-trail.mjs";
+import { designReadinessReportSha256 } from "../design-readiness-host-evidence.mjs";
 
 const SCRATCH = fileURLToPath(new URL("../../../../scratch/", import.meta.url));
 const SCRIPT = fileURLToPath(new URL("../../scripts/pipeline-state.mjs", import.meta.url));
@@ -273,6 +276,141 @@ test("AC6: replayed approval - a second approve-plan never changes the recorded 
   assert.equal(after.planApproved, true);
   assert.deepEqual(after.planApproval, approved.planApproval, `replay must not rewrite the approval (status ${second.status})`);
   assert.equal(after.activeFeature.phase, approved.activeFeature.phase, "replay must not advance the phase");
+});
+
+// ---- AC3 / AC5 (bullets 3 and 5): Advisor + independent readiness precede the final presentation;
+// an unavailable-Advisor exception folds into the one final decision and cannot waive readiness.
+// Driven through the real validateDesignWorkflowPackage (the Advisor/readiness gate) and the real
+// present-plan writer; nothing under test is mocked.
+const FEATURE_CANDIDATE = Object.freeze({ commit: "a".repeat(40), tree: "b".repeat(40) });
+const fsha = (value) => sha256Hex(value);
+const fserialized = (value) => Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
+
+function packageFixture({ unavailable = false, outcome = "ready-for-po-review", blocking = false, readinessDispatch = "readiness-dispatch", advisorDispatch = "advisor-dispatch", rationale } = {}) {
+  const sourceBytes = {}; const sources = {};
+  for (const [name, path] of Object.entries({ input: "specs/f/input.md", prd: "specs/f/prd.md", spec: "specs/f/spec.md", design: "specs/f/design.md", traceability: "specs/f/traceability.md" })) {
+    const data = Buffer.from(`${name} source\n`, "utf8");
+    sources[name] = { path, sha256: fsha(data) }; sourceBytes[name] = { path, bytes: data };
+  }
+  const advisorReceipt = {
+    schema: "pipeline.advisory-receipt.v1", receiptId: "advisor-receipt-1",
+    dispatch: { dispatchId: advisorDispatch, queueRevision: 0, candidateCommit: FEATURE_CANDIDATE.commit, candidateTree: FEATURE_CANDIDATE.tree },
+    duty: "advisory", profile: "feature",
+    configuredRoute: { runner: "codex", selector: { kind: "model-id", value: "gpt-6-sol" }, effort: "high" },
+    adapter: "consult",
+    observed: unavailable ? { status: "unavailable", identity: null } : { status: "answered", identity: { provider: "openai", modelId: "gpt-6-sol", effort: "high" } },
+    questionSha256: designWorkflowAdvisorQuestionSha256(sources),
+    answerSha256: unavailable ? null : "c".repeat(64),
+    fallback: unavailable ? { reason: "consult-unavailable", redactedErrorClass: "unavailable" } : { reason: "none", redactedErrorClass: null },
+    emittedAtMs: 1,
+  };
+  const advisorReceiptBytes = fserialized(advisorReceipt);
+  const attemptTrail = unavailable ? createAdvisoryAttemptTrail({ receipt: advisorReceipt, receiptBytes: advisorReceiptBytes,
+    attempts: [{ adapter: "consult", kind: "consult", runner: "codex", status: "unavailable" }] }) : null;
+  const attemptTrailBytes = attemptTrail === null ? null : fserialized(attemptTrail);
+  const readinessReport = {
+    schema: "pipeline.design-readiness-receipt.v1", dispatchId: readinessDispatch, runner: "codex",
+    candidate: FEATURE_CANDIDATE, sources, outcome,
+    findings: [blocking ? { code: "TRACE-GAP", severity: "blocking", summary: "A requirement is untraced." }
+      : { code: "TRACE-OK", severity: "non-blocking", summary: "Traceability is complete." }],
+    unresolvedChoices: [], summary: "Readiness verdict for the exact sources.",
+  };
+  const readinessReceipt = { ...readinessReport, hostExecution: {
+    schema: "pipeline.design-readiness-host-execution.v1", runner: "codex", repoFingerprint: "f".repeat(64),
+    selectionId: `css_${"a".repeat(25)}e`, selectionSha256: "b".repeat(64), executionReceiptSha256: "c".repeat(64),
+    dutyReceiptSha256: designReadinessReportSha256(readinessReport),
+    route: { model: "gpt-6-luna", effort: "high", sourceSha256: "8".repeat(64), candidateCommit: FEATURE_CANDIDATE.commit } } };
+  const readinessBytes = fserialized(readinessReceipt);
+  const workflowPackage = {
+    schema: "pipeline.design-workflow-package.v1", featureId: "feature-1", authoringDispatchId: "authoring-dispatch",
+    candidate: FEATURE_CANDIDATE, sources,
+    advisor: unavailable ? {
+      status: "unavailable", runner: "codex", nativeAvailable: false,
+      receipt: { path: "specs/f/evidence/advisor.json", sha256: fsha(advisorReceiptBytes) },
+      attemptTrail: { path: "specs/f/evidence/advisor-attempts.json", sha256: fsha(attemptTrailBytes) },
+      disposition: null,
+      exception: { status: "proposed", failureCode: "capacity-unavailable",
+        rationale: rationale ?? designWorkflowAdvisorExceptionRationale({ advisorReceipt, attemptTrail }) },
+    } : {
+      status: "answered", runner: "codex", nativeAvailable: false,
+      receipt: { path: "specs/f/evidence/advisor.json", sha256: fsha(advisorReceiptBytes) },
+      attemptTrail: null, disposition: { decision: "accept", rationale: "The advice is incorporated in the revised design." }, exception: null,
+    },
+    readiness: { path: "specs/f/evidence/readiness.json", sha256: fsha(readinessBytes), dispatchId: readinessReceipt.dispatchId },
+    createdAt: "2026-10-12T10:11:12.000Z",
+  };
+  return { workflowPackage, packageBytes: fserialized(workflowPackage), readinessReceipt, readinessBytes,
+    advisorReceipt, advisorReceiptBytes, attemptTrail, attemptTrailBytes, sourceBytes, candidate: FEATURE_CANDIDATE,
+    repoRoot: SCRATCH, requireReadinessExecution: false };
+}
+
+test("AC3: a complete package with Advisor disposition and independent readiness is ready for the single final approval and grants no authority", () => {
+  const result = validateDesignWorkflowPackage(packageFixture());
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.status, "ready-for-single-final-approval");
+  assert.equal(result.implementationAuthority, false);
+  assert.notEqual(result.readinessDispatchId, result.advisorDispatchId);
+});
+
+test("AC3: independent readiness is required - a not-ready, blocking, or self-authored readiness blocks the final presentation", () => {
+  const notReady = validateDesignWorkflowPackage(packageFixture({ outcome: "not-ready", blocking: true }));
+  assert.equal(notReady.ok, false);
+  assert.equal(notReady.code, "DWP-READINESS-BINDING");
+  const blocking = validateDesignWorkflowPackage(packageFixture({ blocking: true }));
+  assert.equal(blocking.ok, false);
+  assert.equal(blocking.code, "DWP-READINESS-BINDING");
+  const selfReviewed = validateDesignWorkflowPackage(packageFixture({ readinessDispatch: "authoring-dispatch" }));
+  assert.equal(selfReviewed.ok, false);
+  assert.equal(selfReviewed.code, "DWP-READINESS-BINDING");
+});
+
+test("AC3: the Advisor step precedes presentation - an Advisor receipt authored by the authoring dispatch, or with no disposition, is refused", () => {
+  const selfAdvised = validateDesignWorkflowPackage(packageFixture({ advisorDispatch: "authoring-dispatch" }));
+  assert.equal(selfAdvised.ok, false);
+  assert.equal(selfAdvised.code, "DWP-ADVISOR-RECEIPT-BINDING");
+  const fixture = packageFixture();
+  const noDisposition = { ...fixture, workflowPackage: { ...fixture.workflowPackage, advisor: { ...fixture.workflowPackage.advisor, disposition: null } } };
+  noDisposition.packageBytes = fserialized(noDisposition.workflowPackage);
+  const refused = validateDesignWorkflowPackage(noDisposition);
+  assert.equal(refused.ok, false, "an answered Advisor without a disposition cannot reach the final presentation");
+});
+
+test("AC5: an unavailable Advisor is a proposed exception inside the same package and still requires independent readiness", () => {
+  const proposed = validateDesignWorkflowPackage(packageFixture({ unavailable: true }));
+  assert.equal(proposed.ok, true, JSON.stringify(proposed));
+  assert.equal(proposed.status, "ready-for-single-final-approval", "the exception travels with the one final approval package");
+  assert.equal(proposed.implementationAuthority, false);
+  assert.equal(proposed.workflowPackage.advisor.exception.status, "proposed", "the exception is only proposed, never self-granted");
+  // The exception cannot waive readiness.
+  const waived = validateDesignWorkflowPackage(packageFixture({ unavailable: true, outcome: "not-ready", blocking: true }));
+  assert.equal(waived.ok, false);
+  assert.equal(waived.code, "DWP-READINESS-BINDING");
+  const selfReviewed = validateDesignWorkflowPackage(packageFixture({ unavailable: true, readinessDispatch: "authoring-dispatch" }));
+  assert.equal(selfReviewed.ok, false);
+  assert.equal(selfReviewed.code, "DWP-READINESS-BINDING");
+});
+
+test("AC5: an unavailable-Advisor exception may state only receipt-backed facts", () => {
+  const forged = validateDesignWorkflowPackage(packageFixture({ unavailable: true, rationale: "The Advisor is not needed for this plan." }));
+  assert.equal(forged.ok, false);
+  assert.equal(forged.code, "DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED");
+});
+
+test("AC3/AC5: the real present-plan writer refuses an epic/feature presentation without an independent review receipt and the retired package route", () => {
+  const f = fixture("pin-feature-present");
+  assert.equal(capture(submitArgs(), f.deps).status, 0);
+  const statePathFile = statePath(f.root);
+  const state = readState(f.root);
+  state.planSubmission = { ...state.planSubmission, profile: "feature" };
+  writeFileSync(statePathFile, `${JSON.stringify(state, null, 2)}\n`);
+  const noReceipt = capture(["present-plan", "--by", "coordinator"], f.deps);
+  assert.equal(noReceipt.status, 2, `${noReceipt.out} ${noReceipt.err}`);
+  assert.match(noReceipt.err, /DCC-REVIEW-RECEIPT-MISSING|DCC-INPUT|refused/);
+  assert.equal(readState(f.root).planPresentation, undefined, "no presentation without readiness evidence");
+  const retired = capture(["present-plan", "--by", "coordinator", "--design-workflow-package", "specs/x/design-workflow-package.json"], f.deps);
+  assert.equal(retired.status, 2);
+  assert.match(retired.err, /DWP-PRESENT-RETIRED/);
+  assert.equal(readState(f.root).planApproved, false);
 });
 
 test("pin hygiene: fixtures live under the repository scratch directory and are cleaned up", () => {
