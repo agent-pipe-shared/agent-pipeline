@@ -416,7 +416,14 @@ export function isBoundedSingleRg(argv, root, additionalRoots = []) {
 function isContainedGitShowObject(argv, root) {
   const args = argv[0] === "--no-pager" ? argv.slice(1) : argv;
   if (args.length !== 2 || args[0] !== "show") return false;
-  const match = /^(?:HEAD|[0-9a-fA-F]{7,40}):(.+)$/u.exec(args[1]);
+  return isContainedGitObjectSpec(args[1], root);
+}
+
+// The `<object>` half of the lane above, exported so the generic git-to-head pipeline (lib/guard/shell-grammar.mjs,
+// isBoundedGitPipeline) clears every `<rev>:<path>` operand through the SAME checks whichever lane matches (ALF-C-P1-10G, AC-128):
+// `HEAD` or a 7..40 digit hex revision, and a contained, passive-read-approved path with no hidden, dash-led or empty part.
+export function isContainedGitObjectSpec(spec, root) {
+  const match = /^(?:HEAD|[0-9a-fA-F]{7,40}):(.+)$/u.exec(spec);
   if (!match) return false;
   const path = match[1];
   // Git object paths are repository-relative slash paths, never host paths.

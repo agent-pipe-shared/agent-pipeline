@@ -9,7 +9,7 @@ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isAllowedPassiveReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
 // Expose the policy-owned binding; shell decisions continue through the same policy function.
 export { PASSIVE_READ_CREDENTIAL_ROOTS };
-import { isBoundedReadOnlyPipeline, isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+import { isBoundedReadOnlyPipeline, isBoundedSingleRg, isContainedGitObjectSpec, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM } from "./constants.mjs";
 import { MAX_AND_CHAIN_SEGMENTS } from "./grammar-denials.mjs";
 import { commandPath, isProjectWritePath, isRealpathedWithinBoundary, pathInside, rawReadCandidatePath } from "./path-containment.mjs";
@@ -349,6 +349,7 @@ export function isBoundedGitPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE
   const subcommand = sourceArgv[index];
   const subargs = sourceArgv.slice(index + 1);
   if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
+  if (!areGitObjectSpecOperandsContained(subcommand, subargs, root)) return false;
   if (!areGitPipelineOperandsContained(subargs, root, extraRoots)) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   if (sinkName !== (windows ? "head.exe" : "head")) return false;
@@ -386,6 +387,27 @@ function isGitRevisionOperand(arg, root, extraRoots) {
   if (path === "") return true;
   if (path.startsWith("/") || path.startsWith("~") || path.includes("\\")) return false;
   return isApprovedSingleCommandReadArg(path, root, extraRoots);
+}
+
+// A `<rev>:<path>` operand names a git object, not a host path. Whichever lane matches -- the dedicated git-show lane in
+// hooks/guard-command-grammar.mjs or this generic one -- it clears the same checks (ALF-C-P1-10G, AC-128, pin
+// lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs AP11): `show` only, `HEAD` or a 7..40 digit hex revision, and a
+// contained path with no hidden, dash-led or empty part. The operand check below judges the path half like a host path, which
+// admitted hidden, dash-led, aliased and empty-part paths, other revisions, extra flags and other subcommands. This only adds
+// refusals: every other operand shape keeps its existing verdict, and a `-U N`/`--unified N` style numeric value flag stays admitted.
+function isGitObjectSpecOperand(arg) {
+  return !arg.startsWith("-") && !/^[A-Za-z]:[\\/]/u.test(arg) && arg.includes(":");
+}
+
+function areGitObjectSpecOperandsContained(subcommand, subargs, root) {
+  if (!subargs.some(isGitObjectSpecOperand)) return true;
+  if (subcommand !== "show") return false;
+  const operands = [];
+  for (let i = 0; i < subargs.length; i += 1) {
+    if (GIT_VALUE_FLAGS.has(subargs[i]) && /^[0-9]+$/u.test(subargs[i + 1] ?? "")) { i += 1; continue; }
+    operands.push(subargs[i]);
+  }
+  return operands.length === 1 && isContainedGitObjectSpec(operands[0], root);
 }
 
 function areGitPipelineOperandsContained(subargs, root, extraRoots) {
