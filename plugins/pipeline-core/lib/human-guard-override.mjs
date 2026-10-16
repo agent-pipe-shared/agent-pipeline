@@ -86,7 +86,11 @@ const SAFE_ID = /^[A-Za-z0-9._-]{1,120}$/u;
 const REQUEST_SCHEMA = "pipeline.human-guard-override-request.v3";
 const PLAN_SCHEMA = "pipeline.human-guard-override-plan.v3";
 const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v3";
-const NATIVE_REQUEST_SCHEMA = "pipeline.human-guard-override-request.v4";
+// v5 adds `patchInput` (AC-264 point 1): the exact private tool input of an apply_patch denial,
+// bound by toolInputSha256, so the patch can be dry-run before a signature is requested.
+const NATIVE_REQUEST_SCHEMA = "pipeline.human-guard-override-request.v5";
+const LEGACY_NATIVE_REQUEST_SCHEMA = "pipeline.human-guard-override-request.v4";
+const isNativeRequestSchema = (schema) => schema === NATIVE_REQUEST_SCHEMA || schema === LEGACY_NATIVE_REQUEST_SCHEMA;
 const NATIVE_PLAN_SCHEMA = "pipeline.human-guard-override-plan.v4";
 const NATIVE_CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v4";
 export const HGO_NATIVE_TARGET_PREIMAGES_SCHEMA = "pipeline.hgo-native-target-preimages.v1";
@@ -3245,12 +3249,18 @@ function hasAuthorizedAuditEntry(paths, capability) {
 }
 
 function validatedRequest(paths, requestSha256, request = readJson(requestPath(paths, requestSha256))) {
-  const native = request.schema === NATIVE_REQUEST_SCHEMA;
+  const native = isNativeRequestSchema(request.schema);
+  const patchBearing = request.schema === NATIVE_REQUEST_SCHEMA;
   if (!exactKeys(request, [
     "schema", "root", "plugin", "repository", "toolName", "toolInputSha256", "denials",
     "policy", "preview", "eligiblePaths", "commandClass", "externalReadOnly", "mode", "authorSourceRoot", "createdAt", "expiresAt",
     ...(native ? ["nativeTargets"] : []),
+    ...(patchBearing ? ["patchInput"] : []),
   ])
+    || (patchBearing && !(request.toolName === "apply_patch"
+      ? object(request.patchInput) && typeof request.patchInput.command === "string"
+        && toolInputIdentitySha256(request.toolName, request.patchInput) === request.toolInputSha256
+      : request.patchInput === null))
     || !(request.schema === REQUEST_SCHEMA || native) || request.root === undefined
     || (native && (!NATIVE_FILE_TOOLS.has(request.toolName) || !nativeTargetsValid(request.nativeTargets, request.eligiblePaths)))
     || !new Set(["standard", "pipeline-author-repair-candidate", "global-plugin-install"]).has(request.mode)
@@ -3259,6 +3269,240 @@ function validatedRequest(paths, requestSha256, request = readJson(requestPath(p
     || !SHA256.test(request.toolInputSha256) || !persistedDenialsValid(request)
     || sha(request) !== requestSha256) fail("HGO-REQUEST", "override request is invalid");
   return request;
+}
+
+// ---------------------------------------------------------------------------------
+// AC-264 point 1 (item pipeline.hgo-patch-preflight-before-signature): dry-run the stored
+// apply_patch text against the frozen preimage BEFORE a human signature is requested. A small
+// closed converter turns the `*** Begin Patch` envelope (Add File / Update File with @@ hunks /
+// Delete File) into a unified diff; `git apply --check` is the independent second opinion.
+// Move, an unparsed line, a duplicate path, CR-bearing or non-UTF-8 text are refused with
+// HGO-PATCH-UNSUPPORTED, never guessed. Every message is a constant: no path and no patch
+// content ever reaches an error, a log or a report.
+// ---------------------------------------------------------------------------------
+const PATCH_PREFLIGHT_MESSAGE = "patch does not apply to the frozen preimage";
+const PATCH_UNSUPPORTED_MESSAGE = "patch form is outside the closed preflight grammar";
+const PATCH_NO_NEWLINE_MARKER = "\\ No newline at end of file";
+const PATCH_PATH = /^[A-Za-z0-9._@+=,~-]+(?:\/[A-Za-z0-9._@+=,~-]+)*$/u;
+
+function patchPreflightFail() { fail("HGO-PATCH-PREFLIGHT", PATCH_PREFLIGHT_MESSAGE); }
+function patchUnsupportedFail() { fail("HGO-PATCH-UNSUPPORTED", PATCH_UNSUPPORTED_MESSAGE); }
+
+function parsePatchEnvelope(command) {
+  if (typeof command !== "string") patchUnsupportedFail();
+  const normalized = command.replace(/\r\n/gu, "\n").replace(/\n+$/u, "");
+  if (/[\r\0]/u.test(normalized)) patchUnsupportedFail();
+  const all = normalized.split("\n");
+  if (all.length < 3 || all[0] !== "*** Begin Patch" || all[all.length - 1] !== "*** End Patch") patchUnsupportedFail();
+  const body = all.slice(1, -1);
+  const marker = (line) => line.startsWith("*** ");
+  const sections = [];
+  let index = 0;
+  while (index < body.length) {
+    const line = body[index];
+    const add = /^\*\*\* Add File: (.+)$/u.exec(line);
+    const del = /^\*\*\* Delete File: (.+)$/u.exec(line);
+    const update = /^\*\*\* Update File: (.+)$/u.exec(line);
+    index += 1;
+    if (add) {
+      const lines = [];
+      while (index < body.length && !marker(body[index])) {
+        if (!body[index].startsWith("+")) patchUnsupportedFail();
+        lines.push(body[index].slice(1));
+        index += 1;
+      }
+      sections.push({ kind: "add", path: add[1], lines });
+    } else if (del) {
+      sections.push({ kind: "delete", path: del[1] });
+    } else if (update) {
+      // `*** Move to:` is itself a marker line: it ends the hunk scan and a rename is refused below.
+      const hunks = [];
+      let current = null;
+      while (index < body.length) {
+        const row = body[index];
+        if (row === "*** End of File") {
+          if (current === null) patchUnsupportedFail();
+          current.eof = true;
+          index += 1;
+          continue;
+        }
+        if (marker(row)) break;
+        index += 1;
+        if (row === "@@" || row.startsWith("@@ ")) {
+          current = { header: row === "@@" ? null : row.slice(3), changes: [], eof: false };
+          hunks.push(current);
+          continue;
+        }
+        if (current === null) {
+          current = { header: null, changes: [], eof: false };
+          hunks.push(current);
+        }
+        if (current.eof) patchUnsupportedFail();
+        const op = row === "" ? " " : row[0];
+        if (op !== " " && op !== "-" && op !== "+") patchUnsupportedFail();
+        current.changes.push({ op, text: row === "" ? "" : row.slice(1) });
+      }
+      if (hunks.length === 0 || hunks.some((hunk) => !hunk.changes.some((change) => change.op !== " "))) patchUnsupportedFail();
+      sections.push({ kind: "update", path: update[1], hunks });
+    } else {
+      patchUnsupportedFail();
+    }
+  }
+  if (sections.length === 0 || sections.length > NATIVE_TARGET_MAX_FILES
+    || new Set(sections.map((section) => section.path)).size !== sections.length) patchUnsupportedFail();
+  return sections;
+}
+
+function splitPatchPreimage(text) {
+  const newline = text === "" || text.endsWith("\n");
+  const lines = text === "" ? [] : text.split("\n");
+  if (text !== "" && newline) lines.pop();
+  return { lines, newline };
+}
+
+// Exact match first, then trailing-whitespace-insensitive, then fully trimmed: the same
+// tolerance ladder the applying tool uses. The emitted diff carries the PREIMAGE text for every
+// context and removed line, so `git apply --check` stays byte-exact whatever level matched.
+function seekPatchLines(lines, pattern, from, endOfFile) {
+  for (const norm of [(value) => value, (value) => value.trimEnd(), (value) => value.trim()]) {
+    const want = pattern.map(norm);
+    const last = lines.length - pattern.length;
+    const fits = (at) => want.every((value, offset) => norm(lines[at + offset]) === value);
+    if (endOfFile && last >= from && fits(last)) return last;
+    for (let at = from; at <= last; at += 1) if (fits(at)) return at;
+  }
+  return -1;
+}
+
+function patchUpdateHunks(hunks, { lines, newline }) {
+  const out = [];
+  let cursor = 0;
+  let delta = 0;
+  for (const hunk of hunks) {
+    if (hunk.header !== null) {
+      const at = seekPatchLines(lines, [hunk.header], cursor, false);
+      if (at < 0) patchPreflightFail();
+      cursor = at + 1;
+    }
+    let changes = hunk.changes;
+    let start;
+    if (!changes.some((change) => change.op !== "+")) {
+      // A pure insertion appends at the end of the file, as the applying tool does. When the file
+      // lacks a final newline the last line joins the hunk so the diff can express that.
+      if (lines.length > 0 && !newline) {
+        changes = [{ op: " ", text: lines[lines.length - 1] }, ...changes];
+        start = lines.length - 1;
+      } else {
+        start = lines.length;
+      }
+    } else {
+      start = seekPatchLines(lines, changes.filter((change) => change.op !== "+").map((change) => change.text), cursor, hunk.eof);
+    }
+    if (start < cursor) patchPreflightFail();
+    const body = [];
+    let oldCount = 0;
+    let newCount = 0;
+    let position = start;
+    for (const change of changes) {
+      if (change.op === "+") {
+        body.push(`+${change.text}`);
+        newCount += 1;
+        continue;
+      }
+      const actual = lines[position];
+      const unterminated = position === lines.length - 1 && !newline;
+      position += 1;
+      oldCount += 1;
+      if (change.op === "-") {
+        body.push(`-${actual}`);
+        if (unterminated) body.push(PATCH_NO_NEWLINE_MARKER);
+        continue;
+      }
+      newCount += 1;
+      if (unterminated) body.push(`-${actual}`, PATCH_NO_NEWLINE_MARKER, `+${actual}`);
+      else body.push(` ${actual}`);
+    }
+    out.push(`@@ -${oldCount > 0 ? start + 1 : start},${oldCount} +${newCount > 0 ? start + delta + 1 : start + delta},${newCount} @@`, ...body);
+    delta += newCount - oldCount;
+    cursor = start + oldCount;
+  }
+  return out;
+}
+
+/**
+ * Pure converter (exported for unit tests): `resolveTarget(rawPath)` returns
+ * `{ path: <repo-relative path>, text: <frozen preimage text> | null when absent }`.
+ * Returns a unified diff string; throws HGO-PATCH-PREFLIGHT when a hunk cannot be located in
+ * the preimage, HGO-PATCH-UNSUPPORTED for anything outside the closed grammar.
+ */
+export function convertPatchEnvelopeToUnifiedDiff(command, resolveTarget) {
+  const sections = parsePatchEnvelope(command);
+  const seen = new Set();
+  const out = [];
+  for (const section of sections) {
+    const target = resolveTarget(section.path);
+    const relative = target?.path;
+    if (typeof relative !== "string" || !PATCH_PATH.test(relative)
+      || relative.split("/").some((part) => part === "." || part === "..") || seen.has(relative)
+      || !(target.text === null || (typeof target.text === "string" && !/[\r\0]/u.test(target.text)))) patchUnsupportedFail();
+    seen.add(relative);
+    out.push(`diff --git a/${relative} b/${relative}`);
+    if (section.kind === "add") {
+      if (target.text !== null) patchPreflightFail();
+      out.push("new file mode 100644", "--- /dev/null", `+++ b/${relative}`);
+      if (section.lines.length > 0) out.push(`@@ -0,0 +1,${section.lines.length} @@`, ...section.lines.map((line) => `+${line}`));
+      continue;
+    }
+    if (target.text === null) patchPreflightFail();
+    const preimage = splitPatchPreimage(target.text);
+    if (section.kind === "delete") {
+      out.push("deleted file mode 100644", `--- a/${relative}`, "+++ /dev/null");
+      if (preimage.lines.length > 0) {
+        out.push(`@@ -1,${preimage.lines.length} +0,0 @@`, ...preimage.lines.map((line) => `-${line}`));
+        if (!preimage.newline) out.push(PATCH_NO_NEWLINE_MARKER);
+      }
+      continue;
+    }
+    out.push(`--- a/${relative}`, `+++ b/${relative}`, ...patchUpdateHunks(section.hunks, preimage));
+  }
+  return `${out.join("\n")}\n`;
+}
+
+// Runs inside prepareHumanGuardOverrideForSignature after planning and before any
+// authorization, intent or signature material exists. Consume-time behaviour is unchanged.
+function preflightPatchBeforeSignature(repo, paths, requestSha256, spawn) {
+  const request = validatedRequest(paths, requestSha256);
+  if (request.toolName !== "apply_patch") return;
+  if (request.schema !== NATIVE_REQUEST_SCHEMA) {
+    fail("HGO-PATCH-LEGACY", "request predates the stored patch text; record a fresh denial");
+  }
+  const frozen = new Map(request.nativeTargets.targets.map((row) => [row.path, row.preimage]));
+  const diff = convertPatchEnvelopeToUnifiedDiff(request.patchInput.command, (rawPath) => {
+    const safe = safePath(repo.root, rawPath);
+    const preimage = safe === null ? undefined : frozen.get(safe.relative);
+    if (preimage === undefined) patchUnsupportedFail();
+    if (preimage.status === "absent") return { path: safe.relative, text: null };
+    const bytes = readFileSync(safe.absolute);
+    if (sha(bytes) !== preimage.sha256) fail("HGO-NATIVE-TARGET-DRIFT", "signed native target preimages changed");
+    const text = bytes.toString("utf8");
+    if (!Buffer.from(text, "utf8").equals(bytes)) patchUnsupportedFail();
+    return { path: safe.relative, text };
+  });
+  const scratch = `${requestPath(paths, requestSha256)}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
+  let applied;
+  try {
+    writeExclusive(scratch, Buffer.from(diff, "utf8"));
+    applied = spawn("git", ["apply", "--check", "--unidiff-zero", "--whitespace=nowarn", "--", scratch], {
+      cwd: repo.root,
+      encoding: "utf8",
+      shell: false,
+      timeout: 30000,
+      env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(repo.root) },
+    });
+  } finally {
+    try { unlinkSync(scratch); } catch {}
+  }
+  if (applied?.status !== 0 || applied?.error) patchPreflightFail();
 }
 
 // ---------------------------------------------------------------------------------
@@ -3498,9 +3742,13 @@ export function recordHumanGuardDenial({
     && (eligible.mode === "standard" || eligible.authorCandidate === true)
     && eligible.paths.length > 0
     ? captureNativeTargetPreimages(repo.root, eligible.paths) : null;
+  if (nativeTargets !== null && toolName === "apply_patch"
+    && (!object(toolInput) || typeof toolInput.command !== "string" || toolInput.command.length > NATIVE_TARGET_MAX_BYTES)) {
+    fail("HGO-PATCH-BOUND", "patch input is outside its closed bound");
+  }
   const request = {
     schema: nativeTargets === null ? REQUEST_SCHEMA : NATIVE_REQUEST_SCHEMA,
-    ...(nativeTargets === null ? {} : { nativeTargets }),
+    ...(nativeTargets === null ? {} : { nativeTargets, patchInput: toolName === "apply_patch" ? toolInput : null }),
     root: repo.root,
     plugin: pluginIdentity(pluginRoot, provider),
     repository,
@@ -3683,10 +3931,10 @@ export function planHumanGuardOverride({
   } else if (selectedAuthorSourceRoot !== null) {
     fail("HGO-AUTHOR-SCOPE", "author repair root does not match this request");
   }
-  if (request.schema === NATIVE_REQUEST_SCHEMA) assertNativeTargets(repo.root, request);
+  if (isNativeRequestSchema(request.schema)) assertNativeTargets(repo.root, request);
   const payload = {
-    schema: request.schema === NATIVE_REQUEST_SCHEMA ? NATIVE_PLAN_SCHEMA : PLAN_SCHEMA,
-    ...(request.schema === NATIVE_REQUEST_SCHEMA ? { nativeTargets: request.nativeTargets } : {}),
+    schema: isNativeRequestSchema(request.schema) ? NATIVE_PLAN_SCHEMA : PLAN_SCHEMA,
+    ...(isNativeRequestSchema(request.schema) ? { nativeTargets: request.nativeTargets } : {}),
     status: "planned",
     root: repo.root,
     requestSha256,
@@ -3921,6 +4169,9 @@ export function prepareHumanGuardOverrideForSignature({
     scriptPath,
     authorSourceRoot,
   });
+  // AC-264 point 1: dry-run the stored patch against the frozen preimage BEFORE any
+  // authorization, intent or signature material exists.
+  preflightPatchBeforeSignature(auditRepo, auditPaths, requestSha256, spawn);
   const prepared = prepareHumanGuardOverrideAuthorization({
     rootDir,
     pluginRoot,
