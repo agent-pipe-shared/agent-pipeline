@@ -45,7 +45,7 @@ export function canonicalProjectPath(rootDir, pathValue, adapters = {}) {
   const physicalRoot = realpath(root);
   const physical = exists(candidate) ? realpath(candidate) : candidate;
   if (physical === physicalRoot || relative(physicalRoot, physical).startsWith(`..${sep}`)) throw new Error("physical path escapes repository root");
-  return normal(relative(physicalRoot, physical));
+  return normal(relative(physicalRoot, physical).split(sep).join("/"));
 }
 
 export function loadShippedProtectedBaseline({ readFileSyncFn = readFileSync } = {}) {
