@@ -82,7 +82,9 @@ function repository(rootDir) {
   };
   if (realpathSync(git(["rev-parse", "--show-toplevel"]).toString("utf8").trim()) !== root) fail("CVCT-ROOT");
   const common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]).toString("utf8").trim();
-  if (!isAbsolute(common) || realpathSync(common) !== common || lstatSync(common).isSymbolicLink()) fail("CVCT-COMMON-DIR");
+  // `--path-format=absolute` prints a forward-slash path on win32 (`D:/x/.git`) while realpathSync returns the
+  // native spelling (`D:\x\.git`), so the identity check compares against the native-normalized form.
+  if (!isAbsolute(common) || realpathSync(common) !== resolve(common) || lstatSync(common).isSymbolicLink()) fail("CVCT-COMMON-DIR");
   const head = git(["rev-parse", "--verify", "HEAD"]).toString("ascii").trim();
   const tree = git(["rev-parse", "--verify", "HEAD^{tree}"]).toString("ascii").trim();
   if (!OID.test(head) || !OID.test(tree)) fail("CVCT-HEAD");
