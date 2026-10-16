@@ -6,8 +6,10 @@
 //   V-9   covered: --answers-file route carries answers beyond the ~10 KB command-line limit.
 //   V-12  covered: once consent holds a language, no later intake nextAction asks for one.
 //   V-13  covered: the docs/state.md "## Next action" projection is re-rendered from live state.
-//   V-10  NOT COVERED (interim): producer of the briefing-digest vs inline-briefing binding not located
-//         within the dispatch tool budget; reported as unlocated, not faked.
+//   V-10  covered (ALF-C-P19-05C, PO decision #19): hooks/guard-dispatch.mjs binds the route digest of a
+//         dispatch to the briefing INLINE in the Agent/Task prompt it actually received. A route record
+//         (evidence/dispatch-route-<sliceId>.json) carries the digest; the guard recomputes it over the
+//         canonical inline text and refuses a mismatch typed; no record = behaviour unchanged.
 //   two-approval happy path (reaches implementation and push) -- native: pending. It needs a live
 //         interactive Claude/Windows session. A native run exercises
 //         plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeGenerate and the
@@ -17,10 +19,15 @@
 // (If one is ever added: skip with owner Coordinator, due 2026-10-19, Linux/WSL run, PO decision K7.)
 
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test, before, after } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { observeGovernanceScope } from "../governance-scope.mjs";
+import { recordConsentGiven } from "../onboarding-consent-marker.mjs";
 
 import {
   applyProjectOnboardingLifecycleV4,
@@ -159,13 +166,116 @@ describe("V-13 docs/state.md next-action projection tracks live state", () => {
   });
 });
 
-// V-10 stays an explicit RED todo: single-file searches of guard-dispatch.mjs, onboarding-continuity.mjs and
-// pipeline-state.mjs found no producer that derives a continuity route digest from a briefing. The binding
-// belongs where the intake/dispatch nextAction is built (onboarding-continuity.mjs, the dispatch nextAction
-// builder) and must hash the inline briefing the guard (hooks/guard-dispatch.mjs) receives, not a briefing file.
-test("V-10 continuity route digest equals the digest of the inline briefing actually sent", {
-  todo: "RED: producer not located (no briefing-digest code in guard-dispatch.mjs, onboarding-continuity.mjs, pipeline-state.mjs); needs a decision on where the binding lives",
-}, () => {
-  assert.fail("V-10: no function derives the route digest from the inline briefing");
+// V-10: ALF-C-P19-05B found no producer of a continuity route digest (single-file searches of
+// guard-dispatch.mjs, onboarding-continuity.mjs, pipeline-state.mjs). ALF-C-P19-05C (PO decision #19) puts the
+// binding where the briefing is actually received: hooks/guard-dispatch.mjs. The digest is computed by ONE
+// exported function (briefingSha256: CRLF normalised to LF, nothing else stripped) that the route record
+// producer (buildBriefingRoute) and the guard both use, so the two sides cannot drift.
+const GUARD = fileURLToPath(new URL("../../hooks/guard-dispatch.mjs", import.meta.url));
+const V10_SLICE = "ALF-V10-PIN";
+const V10_BRIEFING = [
+  "Independent Critic review. Build your own input from the references below.",
+  "DIFF RANGE: 754b32b..1568fe3",
+  "SPEC: specs/sprint-nova-epic/spec.md",
+  "GUARDRAILS: guardrails/global.md",
+  "EVIDENCE ARTIFACTS: evidence/verify-latest.json",
+  "TASK FRAME: risk class high; Ruleset-SHA: 0f38b425; Model: claude-opus-5.",
+  "- **Tool budget (hard cap, first-class field):** ≤24 tool uses.",
+  `- **Slice:** ${V10_SLICE}`,
+].join("\n");
+const sha256Of = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+
+// The hook module is exercised through a child process, never imported into this one: its entrypoint gate
+// is what makes an import safe, and a regression of that gate must fail loudly, not end this run silently.
+// A runner FILE (not `node -e`): the hook's entrypoint check reads argv[1], which must be the runner's own path.
+function guardExport(name, argument, runnerDir) {
+  const runner = join(runnerDir, "export-runner.mjs");
+  writeFileSync(runner, "const m = await import(process.argv[2]); process.stdout.write(JSON.stringify(await m[process.argv[3]](JSON.parse(process.argv[4]))));\n");
+  const res = spawnSync(process.execPath, [runner, pathToFileURL(GUARD).href, name, JSON.stringify(argument)],
+    { input: "", encoding: "utf8", timeout: 15000 });
+  assert.equal(res.status, 0, `guard export ${name} failed: ${(res.stderr ?? "").slice(0, 300)}`);
+  return JSON.parse(res.stdout);
+}
+
+/** The V-10 clause as one reusable check: bind a route to the sent briefing; same text admitted, one byte off refused typed. */
+function checkV10({ bind, send }) {
+  bind(V10_SLICE, V10_BRIEFING);
+  const admitted = send(V10_BRIEFING);
+  assert.equal(admitted.code, 0, `the briefing the route names must be admitted: ${admitted.stderr.slice(0, 300)}`);
+  const altered = V10_BRIEFING.replace("risk class high", "risk class hugh"); // exactly one byte differs
+  assert.equal(altered.length, V10_BRIEFING.length);
+  assert.notEqual(altered, V10_BRIEFING);
+  const refused = send(altered);
+  assert.equal(refused.code, 2, `a one-byte-changed briefing must be refused: ${refused.stderr.slice(0, 300)}`);
+  assert.ok(refused.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"), refused.stderr.slice(0, 300));
+  assert.ok(refused.stderr.includes(sha256Of(V10_BRIEFING)), "the refusal names the expected digest");
+  assert.ok(refused.stderr.includes(sha256Of(altered)), "the refusal names the observed digest");
+}
+
+describe("V-10 route digest is bound to the inline briefing actually sent", () => {
+  let root = null;
+  let sequence = 0;
+  const send = (prompt) => {
+    sequence += 1;
+    const res = spawnSync(process.execPath, [GUARD], {
+      input: JSON.stringify({ tool_use_id: `v10-pin-${process.pid}-${sequence}`, tool_name: "Task",
+        tool_input: { subagent_type: "pipeline-core:critic", prompt } }),
+      encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    return { code: res.status, stderr: res.stderr ?? "" };
+  };
+  const bind = (sliceId, briefing) => {
+    const record = guardExport("buildBriefingRoute", { sliceId, briefing }, root);
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, "evidence", `dispatch-route-${sliceId}.json`), `${JSON.stringify(record)}\n`);
+    return record;
+  };
+
+  before(() => {
+    root = scratchDir("alf-c-p19-05c-v10");
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    recordConsentGiven({ rootDir: root });
+    assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true, "the fixture must be an enrolled governed root");
+  });
+  after(() => { if (root !== null) rmSync(root, { recursive: true, force: true }); });
+
+  test("V-10 the route digest equals the digest of the inline briefing actually sent: match admitted, one byte off refused typed", () => {
+    checkV10({ bind, send });
+  });
+
+  test("V-10 the digest is computed once: the route producer and the guard agree, and a CRLF copy of the same briefing is admitted", () => {
+    const record = bind(V10_SLICE, V10_BRIEFING);
+    assert.equal(record.briefingSha256, sha256Of(V10_BRIEFING));
+    assert.equal(guardExport("briefingSha256", V10_BRIEFING.replace(/\n/g, "\r\n"), root), record.briefingSha256);
+    const crlf = send(V10_BRIEFING.replace(/\n/g, "\r\n"));
+    assert.equal(crlf.code, 0, crlf.stderr.slice(0, 300));
+  });
+
+  test("V-10 no route digest: a dispatch without a record, or without a Slice line, is unchanged", () => {
+    const unrouted = V10_BRIEFING.replace(V10_SLICE, `${V10_SLICE}-UNROUTED`);
+    assert.equal(send(unrouted).code, 0);
+    assert.equal(send(unrouted.replace("risk class high", "risk class hugh")).code, 0);
+    bind(V10_SLICE, V10_BRIEFING); // a record for another slice never constrains a briefing that names none
+    const sliceless = V10_BRIEFING.split("\n").filter((line) => !line.includes("Slice:")).join("\n");
+    assert.equal(send(sliceless).code, 0);
+  });
+
+  test("V-10 a route record that exists but cannot be verified refuses typed instead of admitting", () => {
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    const invalid = `${V10_SLICE}-INVALID`;
+    writeFileSync(join(root, "evidence", `dispatch-route-${invalid}.json`), "{ not json\n");
+    const refused = send(V10_BRIEFING.replace(V10_SLICE, invalid));
+    assert.equal(refused.code, 2);
+    assert.ok(refused.stderr.includes("DISPATCH-BRIEFING-ROUTE-INVALID"), refused.stderr.slice(0, 300));
+  });
+
+  test("V-10 RED proof: a guard that does not bind the digest to the inline text (admits everything) fails the same check", () => {
+    const unbound = { bind: () => {}, send: () => ({ code: 0, stderr: "" }) };
+    assert.throws(() => checkV10(unbound));
+    const digestOfStaleFile = { bind: () => {}, send: (prompt) => ({ code: prompt === V10_BRIEFING ? 0 : 2, stderr: "DISPATCH-BRIEFING-DIGEST-MISMATCH" }) };
+    assert.throws(() => checkV10(digestOfStaleFile)); // names no expected/observed digest -> not a typed, evidenced refusal
+  });
 });
+
 test("two-approval happy path to implementation and push", { skip: "native: pending (live interactive Claude/Windows session)" }, () => {});

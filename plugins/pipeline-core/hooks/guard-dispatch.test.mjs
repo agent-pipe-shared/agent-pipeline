@@ -17,7 +17,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   ADVISOR_PROHIBITION_AUDIT_SCHEMA,
@@ -610,7 +610,123 @@ manualCheck("GD20 extractAntigravityDispatches is importable and callable direct
   }
 });
 
-assert.equal(cases.length, 49, "the complete dispatch guard corpus must register before execution");
+// GD21-GD27 -- ALF-C-P19-05C / V-10: the route digest is bound to the briefing INLINE in the dispatch. A route
+// record `evidence/dispatch-route-<sliceId>.json` carries the digest; the guard hashes the canonical inline
+// briefing (CRLF -> LF, nothing else) and refuses a mismatch typed. The expected digests below are computed
+// here with createHash directly, so the cases do not depend on the guard's own digest function being right.
+const routeSha = (text) => createHash("sha256").update(text.replace(/\r\n/g, "\n"), "utf8").digest("hex");
+const routePrompt = (sliceId) => `${CLEAN_CRITIC}\n- **Slice:** ${sliceId}`;
+function writeRoute(sliceId, record) {
+  mkdirSync(join(bindingRepo, "evidence"), { recursive: true });
+  writeFileSync(join(bindingRepo, "evidence", `dispatch-route-${sliceId}.json`),
+    typeof record === "string" ? record : `${JSON.stringify(record)}\n`);
+}
+const routeRecord = (sliceId, text) => ({ schema: "pipeline.dispatch-briefing-route.v1", sliceId, briefingSha256: routeSha(text) });
+const routeDispatch = (toolUseId, prompt) => ({
+  tool_use_id: toolUseId, tool_name: "Task", tool_input: { subagent_type: "pipeline-core:critic", prompt },
+});
+
+manualCheck("GD21 allow  the inline briefing hashes to the digest its route record carries", () => {
+  const prompt = routePrompt("GD-ROUTE-MATCH");
+  writeRoute("GD-ROUTE-MATCH", routeRecord("GD-ROUTE-MATCH", prompt));
+  const { code, stderr } = run(routeDispatch("gd21", prompt));
+  assert.equal(code, ALLOW, stderr.slice(0, 300));
+});
+
+manualCheck("GD22 block  a one-byte-changed inline briefing, typed, naming the expected and the observed digest", () => {
+  const prompt = routePrompt("GD-ROUTE-BYTE");
+  writeRoute("GD-ROUTE-BYTE", routeRecord("GD-ROUTE-BYTE", prompt));
+  const changed = prompt.replace("risk class high", "risk class hugh");
+  assert.equal(changed.length, prompt.length);
+  const { code, stderr } = run(routeDispatch("gd22", changed));
+  assert.equal(code, BLOCK, stderr.slice(0, 300));
+  for (const needle of ["DISPATCH-BRIEFING-DIGEST-MISMATCH", routeSha(prompt), routeSha(changed), "evidence/dispatch-route-GD-ROUTE-BYTE.json"]) {
+    assert.ok(stderr.includes(needle), `stderr missing "${needle}"`);
+  }
+});
+
+manualCheck("GD23 allow  a CRLF copy of the routed briefing (the canonical form is LF; nothing else is normalised)", () => {
+  const prompt = routePrompt("GD-ROUTE-CRLF");
+  writeRoute("GD-ROUTE-CRLF", routeRecord("GD-ROUTE-CRLF", prompt));
+  const crlf = run(routeDispatch("gd23", prompt.replace(/\n/g, "\r\n")));
+  assert.equal(crlf.code, ALLOW, crlf.stderr.slice(0, 300));
+  const trailing = run(routeDispatch("gd23b", `${prompt}\n`)); // a trailing newline IS a different briefing
+  assert.equal(trailing.code, BLOCK, trailing.stderr.slice(0, 300));
+  assert.ok(trailing.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"));
+});
+
+manualCheck("GD24 allow  no route digest: a slice without a record, or a briefing without a Slice line, is unchanged", () => {
+  writeRoute("GD-ROUTE-OTHER", routeRecord("GD-ROUTE-OTHER", routePrompt("GD-ROUTE-OTHER")));
+  const unrouted = run(routeDispatch("gd24", routePrompt("GD-ROUTE-NONE").replace("risk class high", "risk class hugh")));
+  assert.equal(unrouted.code, ALLOW, unrouted.stderr.slice(0, 300));
+  const sliceless = run(routeDispatch("gd24b", CLEAN_CRITIC));
+  assert.equal(sliceless.code, ALLOW, sliceless.stderr.slice(0, 300));
+});
+
+manualCheck("GD25 block  a route record that exists but cannot be verified refuses typed, never reads as no route", () => {
+  const prompt = routePrompt("GD-ROUTE-BAD");
+  const good = routeRecord("GD-ROUTE-BAD", prompt);
+  const variants = {
+    "not JSON": "{ not json\n",
+    "another slice's record": { ...good, sliceId: "GD-ROUTE-ELSE" },
+    "an extra key": { ...good, note: "x" },
+    "a short digest": { ...good, briefingSha256: good.briefingSha256.slice(0, 63) },
+    "an upper-case digest": { ...good, briefingSha256: good.briefingSha256.toUpperCase() },
+    "another schema": { ...good, schema: "pipeline.dispatch-briefing-route.v0" },
+    "an array": [good],
+  };
+  let n = 0;
+  for (const [label, record] of Object.entries(variants)) {
+    writeRoute("GD-ROUTE-BAD", record);
+    n += 1;
+    const { code, stderr } = run(routeDispatch(`gd25-${n}`, prompt));
+    assert.equal(code, BLOCK, `${label}: ${stderr.slice(0, 200)}`);
+    assert.ok(stderr.includes("DISPATCH-BRIEFING-ROUTE-INVALID"), `${label}: ${stderr.slice(0, 200)}`);
+  }
+});
+
+manualCheck("GD26 block  the existing contamination finding still wins over the route check", () => {
+  const prompt = `${routePrompt("GD-ROUTE-POLICY")}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x`;
+  writeRoute("GD-ROUTE-POLICY", routeRecord("GD-ROUTE-POLICY", "a different briefing"));
+  const { code, stderr } = run(routeDispatch("gd26", prompt));
+  assert.equal(code, BLOCK);
+  assert.ok(stderr.includes("DISPATCH-CONTAMINATION-CLAIMS-LIST") && !stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"), stderr.slice(0, 300));
+});
+
+// GD27 -- the digest definition is exported ONCE and reused: subprocess-only, same hardening as GD16/GD20.
+manualCheck("GD27 briefingSha256 / buildBriefingRoute are importable, share one canonical form, and refuse unusable input", () => {
+  const successMarker = "GD27-IMPORT-OK";
+  const runnerDir = mkdtempSync(join(tmpdir(), "guard-dispatch-route-export-check-"));
+  try {
+    const runnerPath = join(runnerDir, "import-check.mjs");
+    writeFileSync(runnerPath, [
+      "const mod = await import(process.argv[2]);",
+      "const lf = 'a\\nb\\n', crlf = 'a\\r\\nb\\r\\n';",
+      "const route = mod.buildBriefingRoute({ sliceId: 'S-1', briefing: crlf });",
+      "const refusals = [];",
+      "for (const bad of [{ sliceId: '../x', briefing: lf }, { sliceId: 'S-1', briefing: '' }, {}]) {",
+      "  try { mod.buildBriefingRoute(bad); refusals.push('admitted'); } catch { refusals.push('refused'); }",
+      "}",
+      "const none = mod.evaluateBriefingRoute({ prompt: 'no slice line here', root: process.argv[3] });",
+      "console.log('GD27-RESULT: ' + JSON.stringify({ same: mod.briefingSha256(lf) === mod.briefingSha256(crlf), digest: mod.briefingSha256(lf), route, refusals, none: none.status }));",
+      `console.log('${successMarker}');`,
+    ].join("\n"));
+    const res = spawnSync(process.execPath, [runnerPath, pathToFileURL(GUARD).href, bindingRepo], { input: "", encoding: "utf8", timeout: 10000 });
+    const stdout = res.stdout ?? "";
+    const problems = [];
+    if (res.status !== 0) problems.push(`child exited ${res.status} (expected 0) -- ${(res.stderr ?? "").trim().slice(0, 200)}`);
+    if (!stdout.includes(successMarker)) problems.push(`child stdout missing success marker "${successMarker}" -- got ${JSON.stringify(stdout)}`);
+    const expectedLine = `GD27-RESULT: ${JSON.stringify({ same: true, digest: routeSha("a\nb\n"),
+      route: { schema: "pipeline.dispatch-briefing-route.v1", sliceId: "S-1", briefingSha256: routeSha("a\nb\n") },
+      refusals: ["refused", "refused", "refused"], none: "none" })}`;
+    if (!stdout.split("\n").includes(expectedLine)) problems.push(`child stdout missing the exact line "${expectedLine}" -- got ${JSON.stringify(stdout)}`);
+    assert.deepEqual(problems, []);
+  } finally {
+    rmSync(runnerDir, { recursive: true, force: true });
+  }
+});
+
+assert.equal(cases.length, 56, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

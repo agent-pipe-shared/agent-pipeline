@@ -51,9 +51,21 @@
  * exactly like a direct Agent-tool dispatch. The pure extractor keeps ignoring malformed
  * entries for its other consumers; this hook rejects an empty or malformed native envelope
  * before invoking the extractor.
+ *
+ * BRIEFING ROUTE BINDING (ALF-C-P19-05C, AC-127, V-10 of
+ * pipeline.claude-windows-greenfield-lifecycle-not-walkable; PO decision #19). This guard demands the
+ * full briefing INLINE in the Agent/Task prompt, while a route digest used to name a briefing FILE,
+ * so a dispatch could carry a different briefing than the one its route named. The digest is now
+ * bound to the text actually received: when `evidence/dispatch-route-<sliceId>.json` exists for the
+ * `Slice:` the briefing names, the guard hashes the canonical inline briefing with
+ * `briefingSha256` and refuses a mismatch typed (DISPATCH-BRIEFING-DIGEST-MISMATCH, naming expected
+ * and observed digests). A record that exists but cannot be verified refuses typed too
+ * (DISPATCH-BRIEFING-ROUTE-INVALID); no record, or no `Slice:` line, changes nothing. The route
+ * record producer calls `buildBriefingRoute`, which calls the same `briefingSha256`, so the two
+ * sides cannot drift. Canonical form: CRLF normalised to LF, nothing else stripped or altered.
  */
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
 import {
@@ -61,7 +73,7 @@ import {
   prepareAdvisorProhibitionBindings,
 } from "../lib/advisor-prohibition-binding.mjs";
 import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
-import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings } from "../lib/dispatch-policy.mjs";
+import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
@@ -131,6 +143,102 @@ export function extractAntigravityDispatches(subagents) {
 // A caller's prompt cannot turn a writable Goldfish capability into read-only.
 export function requiresGovernedItemAdmission(policy) {
   return policy?.role === "goldfish";
+}
+
+// ---------------------------------------------------------------------------------------------
+// Briefing route binding (see the header). ONE canonical form and ONE digest function, shared by the
+// route record producer (`buildBriefingRoute`) and the guard (`evaluateBriefingRoute`): both sides call
+// `briefingSha256`, so they cannot drift. Exported without side effects: importing this module never
+// runs the hook body (isDirectInvocation gate below).
+export const BRIEFING_ROUTE_SCHEMA = "pipeline.dispatch-briefing-route.v1";
+const BRIEFING_ROUTE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const BRIEFING_ROUTE_DIGEST = /^[a-f0-9]{64}$/u;
+const BRIEFING_ROUTE_MAX_BYTES = 4096;
+
+/** The canonical briefing text: CRLF normalised to LF, nothing else stripped or altered. */
+export function canonicalBriefing(prompt) {
+  return typeof prompt === "string" ? prompt.replace(/\r\n/gu, "\n") : "";
+}
+
+/** sha256 (lowercase hex) over the UTF-8 bytes of the canonical briefing: the one digest definition. */
+export function briefingSha256(prompt) {
+  return createHash("sha256").update(canonicalBriefing(prompt), "utf8").digest("hex");
+}
+
+/** Repo-relative location of the route record of a slice, under the project root. */
+export function briefingRoutePath(root, sliceId) {
+  return join(root, "evidence", `dispatch-route-${sliceId}.json`);
+}
+
+/**
+ * The route record a producer writes for a dispatch: it binds `sliceId` to the digest of the briefing
+ * text that will actually be sent inline. Throws on an unusable slice id or an empty briefing.
+ */
+export function buildBriefingRoute({ sliceId, briefing } = {}) {
+  if (typeof sliceId !== "string" || !BRIEFING_ROUTE_ID.test(sliceId)) throw new TypeError("buildBriefingRoute: sliceId must be a safe slice id");
+  if (typeof briefing !== "string" || briefing === "") throw new TypeError("buildBriefingRoute: briefing must be the non-empty text actually sent");
+  return { schema: BRIEFING_ROUTE_SCHEMA, sliceId, briefingSha256: briefingSha256(briefing) };
+}
+
+/**
+ * Judges ONE inline briefing against the route record of the slice it names. Pure apart from reading
+ * that one bounded file; never throws.
+ *   none      no `Slice:` line, no usable root, or no route record for the slice: nothing to enforce
+ *   match     the canonical inline briefing hashes to the digest the route record carries
+ *   mismatch  it does not; `expected` and `observed` are both digests
+ *   invalid   a route record exists but cannot be verified (unreadable, oversized, not a regular file,
+ *             not an exact v1 record of this slice): refused rather than treated as "no route"
+ */
+export function evaluateBriefingRoute({ prompt, root } = {}) {
+  try {
+    const sliceId = parseDispatchSlice(prompt).sliceId;
+    if (sliceId === null || typeof root !== "string" || root === "") return { status: "none" };
+    const path = briefingRoutePath(root, sliceId);
+    const shown = `evidence/dispatch-route-${sliceId}.json`;
+    const invalid = (reason) => ({ status: "invalid", sliceId, path: shown, reason });
+    let info;
+    try {
+      info = lstatSync(path);
+    } catch (error) {
+      return error?.code === "ENOENT" || error?.code === "ENOTDIR" ? { status: "none" } : invalid("the route record cannot be inspected");
+    }
+    if (!info.isFile() || info.size > BRIEFING_ROUTE_MAX_BYTES) return invalid("the route record is not a regular file of bounded size");
+    let record;
+    try {
+      record = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      return invalid("the route record is not readable JSON");
+    }
+    const exact = record !== null && typeof record === "object" && !Array.isArray(record)
+      && Object.keys(record).sort().join(",") === "briefingSha256,schema,sliceId";
+    if (!exact || record.schema !== BRIEFING_ROUTE_SCHEMA || record.sliceId !== sliceId
+      || typeof record.briefingSha256 !== "string" || !BRIEFING_ROUTE_DIGEST.test(record.briefingSha256)) {
+      return invalid(`the route record is not an exact ${BRIEFING_ROUTE_SCHEMA} record of this slice`);
+    }
+    const observed = briefingSha256(prompt);
+    return observed === record.briefingSha256
+      ? { status: "match", sliceId, digest: observed }
+      : { status: "mismatch", sliceId, path: shown, expected: record.briefingSha256, observed };
+  } catch {
+    return { status: "invalid", sliceId: null, path: "evidence/dispatch-route-*.json", reason: "the route check itself faulted" };
+  }
+}
+
+function briefingRouteRefusal(route) {
+  return route.status === "mismatch"
+    ? [
+        `BLOCKED (guard-dispatch, plugin pipeline-core): DISPATCH-BRIEFING-DIGEST-MISMATCH: the briefing inline in this dispatch is not the briefing its route names (slice ${route.sliceId}).`,
+        `  expected: ${route.expected}`,
+        `  observed: ${route.observed}`,
+        `  route record: ${route.path}`,
+        "The digest binds the text actually sent (CRLF normalised to LF, nothing else). Dispatch the briefing the route names, or issue a new route record for the briefing you intend to send.",
+        "",
+      ].join("\n")
+    : [
+        `BLOCKED (guard-dispatch, plugin pipeline-core): DISPATCH-BRIEFING-ROUTE-INVALID: ${route.reason} (${route.path}).`,
+        "A route record that exists but cannot be verified is not treated as \"no route\". Repair or remove it, then dispatch again.",
+        "",
+      ].join("\n");
 }
 
 // FANOUT slice S7: the dispatch-time slice-scope check (design:
@@ -442,6 +550,19 @@ if (isDirectInvocation(import.meta.url)) {
     budget: dispatchBudgetBinding(dispatch),
   }));
   const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
+  if (blocked.length === 0) {
+    // V-10: bind the route digest to the briefing actually received. It runs before any admission
+    // effect (item reservation, budget/prohibition binding, fan-out launch), so a refused briefing
+    // leaves nothing behind. No route record for the named slice: nothing changes.
+    const routeRoot = process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd());
+    for (const { dispatch } of evaluated) {
+      const route = evaluateBriefingRoute({ prompt: dispatch.prompt, root: routeRoot });
+      if (route.status === "mismatch" || route.status === "invalid") {
+        process.stderr.write(briefingRouteRefusal(route));
+        process.exit(2);
+      }
+    }
+  }
   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
   let itemGovernanceRequired = false;
   if (productive.length > 0) {
