@@ -87,6 +87,44 @@ test("K3-17: the POSIX branch trusts ~/.local/bin; PATH is never consulted", () 
   assert.deepEqual(result, { ok: false, status: "binary_missing" });
 });
 
+const dir = { isFile: () => false, isSymbolicLink: () => false };
+const link = { isFile: () => false, isSymbolicLink: () => true };
+const posixFs = (entries, links = {}) => ({
+  lstatSync(path) { const hit = entries[path] ?? (links[path] ? link : undefined); if (!hit) throw Object.assign(new Error("missing"), { code: "ENOENT" }); return hit; },
+  realpathSync: (path) => links[path] ?? path,
+});
+
+test("K3-17: darwin trusts its documented roots in order; linux trusts only its own roots (no Homebrew)", () => {
+  const roots = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/home/dev/.local/bin", "/home/dev/go/bin"];
+  for (const root of roots) {
+    const path = `${root}/claude`;
+    const opts = (platform) => ({ platform, homeDir: "/home/dev", fsOps: posixFs({ [path]: file }) });
+    assert.deepEqual(resolveTrustedSystemExecutable("claude", opts("darwin")), { ok: true, path }, `darwin ${root}`);
+    const expectLinux = root === "/opt/homebrew/bin" ? { ok: false, status: "binary_missing" } : { ok: true, path };
+    assert.deepEqual(resolveTrustedSystemExecutable("claude", opts("linux")), expectLinux, `linux ${root}`);
+  }
+  const both = posixFs({ "/opt/homebrew/bin/claude": file, "/usr/bin/claude": file });
+  assert.equal(resolveTrustedSystemExecutable("claude", { platform: "darwin", homeDir: "/home/dev", fsOps: both }).path, "/opt/homebrew/bin/claude");
+});
+
+test("K3-17: POSIX rejects wrappers, non-files and undocumented directories; a symlink must resolve to a regular file", () => {
+  const opts = (fsOps, platform = "linux") => ({ platform, homeDir: "/home/dev", fsOps });
+  for (const platform of ["linux", "darwin"]) {
+    for (const wrapper of ["claude.cmd", "claude.bat", "claude.ps1", "claude.exe"]) {
+      assert.deepEqual(resolveTrustedSystemExecutable("claude", opts(posixFs({ [`/usr/bin/${wrapper}`]: file }), platform)), { ok: false, status: "binary_missing" }, `${platform} ${wrapper}`);
+    }
+    assert.deepEqual(resolveTrustedSystemExecutable("claude", opts(posixFs({ "/usr/bin/claude": dir }), platform)), { ok: false, status: "probe_error" }, `${platform} directory`);
+    assert.deepEqual(resolveTrustedSystemExecutable("claude", opts(posixFs({ "/usr/bin/claude": file, "/tmp/claude": file }, {}), platform)).path, "/usr/bin/claude");
+    assert.deepEqual(resolveTrustedSystemExecutable("claude", opts(posixFs({ "/tmp/claude": file, "/home/dev/bin/claude": file }), platform)), { ok: false, status: "binary_missing" }, `${platform} undocumented dirs`);
+    assert.deepEqual(resolveTrustedSystemExecutable("claude", opts({ ...posixFs({ "/usr/bin/claude": file }), lstatSync() { throw Object.assign(new Error("denied"), { code: "EACCES" }); } }, platform)), { ok: false, status: "probe_error" }, `${platform} probe error`);
+  }
+  const toFile = posixFs({ "/opt/real/claude": file }, { "/usr/local/bin/claude": "/opt/real/claude" });
+  assert.deepEqual(resolveTrustedSystemExecutable("claude", opts(toFile, "darwin")), { ok: true, path: "/opt/real/claude" });
+  const toDir = { lstatSync: (p) => (p === "/opt/real" ? dir : link), realpathSync: () => "/opt/real" };
+  assert.deepEqual(resolveTrustedSystemExecutable("claude", opts(toDir, "darwin")), { ok: false, status: "probe_error" });
+  for (const bad of ["../claude", "a/claude", "", "cl\0aude"]) assert.deepEqual(resolveTrustedSystemExecutable(bad, opts(posixFs({}))), { ok: false, status: "probe_error" });
+});
+
 const SCHEMA = { $schema: "https://json-schema.org/draft/2020-12/schema", $id: "urn:probe", type: "object", properties: { a: { type: "string" } } };
 const jsonSchemaOf = (argv) => JSON.parse(argv[argv.indexOf("--json-schema") + 1]);
 const claudeCliAcceptsSchema = (argv) => { const s = jsonSchemaOf(argv); return !("$schema" in s) && !("$id" in s); };
