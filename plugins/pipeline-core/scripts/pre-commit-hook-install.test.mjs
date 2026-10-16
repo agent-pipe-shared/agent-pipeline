@@ -38,6 +38,7 @@ import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../lib/signed-quality-package.mjs";
 import { assessWindowsPrivatePaths } from "../lib/windows-private-state.mjs";
+import { ensureAgentPipelineRoot } from "../lib/hardened-private-directory.mjs";
 
 // TR-J-T3d (TOILRES T44/T58, Ruling 116): applyInstall inventories the plugin root twice (publishGitHookRuntimeSnapshot)
 // and the signed-window cases hash it, so a parallel writer into the LIVE tree fails these cases (the GHS-SOURCE-DRIFT
@@ -250,6 +251,12 @@ function installSignedWindow(dir, scopeRuleIds) {
   assert.equal(seeded.status, 0, seeded.stderr);
   const committed = spawnSync("git", ["commit", "-q", "-m", "seed signed-window authority"], { cwd: dir, encoding: "utf8" });
   assert.equal(committed.status, 0, committed.stderr);
+  // win32: installGuardMaintenanceWindow stores the window with a recursive mkdir, which leaves the intermediate
+  // <git-common-dir>/agent-pipeline segment with the DACL it inherits from the repository, and the applyInstall that
+  // follows refuses that existing, insecure segment (PB-WINDOWS-ASSURANCE). Create the repository-private root first with
+  // the product's own creator (the one the installer's private-state directories are built on), so the window store lands
+  // under an owner-only root exactly as it does in a real checkout. The product's DACL check is untouched.
+  ensureAgentPipelineRoot(commonDirOf(dir));
   const planSha256 = createHash("sha256").update("plan\n").digest("hex");
   const specSha256 = createHash("sha256").update("spec\n").digest("hex");
   const { intent, request } = prepareGuardMaintenanceWindowRequest({
@@ -573,6 +580,38 @@ test("installed hook: refuses the sanctioned late verify recovery when an unprot
   assert.match(stderr, /GS-11 \.claude\/pipeline\.json/);
   assert.equal(git("rev-parse", "HEAD").stdout.trim(), before, "no new commit");
   assert.equal(existsSync(join(dir, "extra.txt")), true, "the extra file is left in the working tree");
+});
+
+// AC-140, same exact-set rule on the design-to-implementation route: its complete staged set is the two calibration twins
+// plus the lifecycle State and nothing else. A file no protection rule names, staged beside them, must withhold the
+// twins' exemption exactly as it does for the late recovery above. The control inside the case unstages only that file
+// and commits the identical remaining index: the exact twins+State set still commits.
+test("installed hook: refuses the sanctioned design-to-implementation verify transaction when an unprotected extra file is staged beside the twins and the State", { timeout: commitTestTimeout(2) }, () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-verify-transition-extra-file");
+  writeVerifyTransitionFixture(dir);
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and approved design");
+  installHook(dir);
+  const before = git("rev-parse", "HEAD").stdout.trim();
+
+  writeVerifyTransitionFixture(dir, { command: "node --test test.mjs", phase: "implementation", updatedAt: "2026-09-13T12:01:00.000Z" });
+  writeFileSync(join(dir, "extra.txt"), "extra\n");
+  assert.equal(git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json", "extra.txt").status, 0);
+  assert.deepEqual(git("diff", "--cached", "--name-only", "HEAD").stdout.trim().split(/\r?\n/u).sort(), [".claude/pipeline.json", "extra.txt", "project/pipeline-state.json", "project/pipeline.json"], "precondition: exactly the two twins, the State and the extra file are staged");
+  const refused = commit(dir, "attempt design transition with an extra staged file");
+  assert.notEqual(refused.code, 0, "the twins are no longer exempt once the staged set is wider than the twins plus the State");
+  assert.match(refused.stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
+  assert.match(refused.stderr, /GS-10 project\/pipeline\.json/);
+  assert.match(refused.stderr, /GS-11 \.claude\/pipeline\.json/);
+  assert.equal(git("rev-parse", "HEAD").stdout.trim(), before, "no new commit");
+  assert.equal(existsSync(join(dir, "extra.txt")), true, "the extra file is left in the working tree");
+
+  // Control: only the extra file leaves the index; the exact twins+State set then commits.
+  assert.equal(git("reset", "-q", "--", "extra.txt").status, 0);
+  assert.deepEqual(git("diff", "--cached", "--name-only", "HEAD").stdout.trim().split(/\r?\n/u).sort(), [".claude/pipeline.json", "project/pipeline-state.json", "project/pipeline.json"], "control precondition: exactly the two twins and the State are staged");
+  const admitted = commit(dir, "configure verify while entering implementation without the extra file");
+  assert.equal(admitted.code, 0, admitted.stderr);
+  assert.deepEqual(git("diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD").stdout.trim().split(/\r?\n/u).sort(), [".claude/pipeline.json", "project/pipeline-state.json", "project/pipeline.json"], "the control commit holds exactly the twins and the State");
 });
 
 test("installed hook: refuses a late verify rewrite when it also stages lifecycle state", { timeout: commitTestTimeout(1) }, () => {

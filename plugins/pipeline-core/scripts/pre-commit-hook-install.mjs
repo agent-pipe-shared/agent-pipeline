@@ -587,8 +587,17 @@ function establishedImplementationState(state) {
 }
 
 /** Returns the exact calibration paths exempted by the sanctioned writer's
- * complete three-file transaction, or an empty set for every other diff. */
+ * complete three-file transaction, or an empty set for every other diff.
+ *
+ * The WHOLE staged set is judged, not only its protected delta: the same
+ * exact-set rule sanctionedLateVerifyRecoveryPaths enforces (AC-140), here with
+ * the lifecycle State as the one additional admitted path. The writer stages
+ * the calibration twins plus the State and nothing else, so a file that no
+ * protection rule names, staged beside them, would otherwise ride along in a
+ * commit whose twins were exempted for that exact transaction. It withholds the
+ * exemption instead, and the ordinary refusal stands. */
 function sanctionedVerifyTransitionPaths(projectRoot, paths) {
+  if (!paths.every((path) => VERIFY_CALIBRATION_PATHS.includes(path) || path === VERIFY_TRANSITION_STATE_PATH)) return new Set();
   const stagedCalibrations = paths.filter((path) => VERIFY_CALIBRATION_PATHS.includes(path));
   if (stagedCalibrations.length === 0 || !paths.includes(VERIFY_TRANSITION_STATE_PATH)) return new Set();
   const expected = [];
