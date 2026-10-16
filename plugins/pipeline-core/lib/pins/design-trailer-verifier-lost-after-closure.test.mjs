@@ -21,7 +21,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { commitMessageFindings, finishedCommitMessageFindings } from "../commit-message-policy.mjs";
-import { evaluateDoneWhen, parseDoneWhen } from "../../scripts/check-backlog-done-predicate.mjs";
+import { checkBacklogDonePredicate, evaluateDoneWhen, exitCodeFor, parseDoneWhen } from "../../scripts/check-backlog-done-predicate.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 // Built by concatenation so this file never contains the needles it hunts for.
@@ -103,4 +103,57 @@ test("AC-B1: the done_when `contains` predicate is the merge-survival needle che
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
+});
+
+test("AC-B2: the all-items sweep reports a REGRESSION when a closed item's needle vanishes, and passes while it survives", () => {
+  const scratch = join(ROOT, "scratch");
+  mkdirSync(scratch, { recursive: true });
+  const fixtureRoot = mkdtempSync(join(scratch, "design-trailer-sweep-"));
+  try {
+    mkdirSync(join(fixtureRoot, "backlog", "items"), { recursive: true });
+    mkdirSync(join(fixtureRoot, "lib"), { recursive: true });
+    const item = (id, status, doneWhen) =>
+      `---\nschema: pipeline.backlog-item.v1\nid: ${id}\ntype: defect\nowner: pipeline\nstatus: ${status}\ncreated: 2026-10-04\nsource: "fixture"\nsprint: alfred\ndone_when: ${doneWhen}\n---\n\n# ${id}\n`;
+    writeFileSync(join(fixtureRoot, "backlog", "items", "2026-10-04-closed-a.md"), item("p.a", "closed", '"contains lib/a.mjs export const KEPT_A"'));
+    writeFileSync(join(fixtureRoot, "backlog", "items", "2026-10-04-closed-b.md"), item("p.b", "closed", '"contains lib/b.mjs export const LOST_B"'));
+    writeFileSync(join(fixtureRoot, "lib", "a.mjs"), "export const KEPT_A = 1;\n");
+    writeFileSync(join(fixtureRoot, "lib", "b.mjs"), "export const LOST_B = 1;\n");
+    const intact = checkBacklogDonePredicate(fixtureRoot);
+    assert.equal(intact.total, 2);
+    assert.equal(intact.ok, true);
+    assert.deepEqual(intact.regressionItems, []);
+    // A merge drops one closed item's needle: the sweep must fail naming exactly that item.
+    writeFileSync(join(fixtureRoot, "lib", "b.mjs"), "export const OTHER = 1;\n");
+    const dropped = checkBacklogDonePredicate(fixtureRoot);
+    assert.equal(dropped.ok, false);
+    assert.equal(exitCodeFor(dropped), 1);
+    assert.deepEqual(dropped.regressionItems, ["backlog/items/2026-10-04-closed-b.md"]);
+    // A vanished file fails the other item too.
+    rmSync(join(fixtureRoot, "lib", "a.mjs"));
+    assert.equal(checkBacklogDonePredicate(fixtureRoot).regression, 2);
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+// Closed items whose needle was ALREADY gone when this sweep was first run against HEAD
+// (2026-10-16). They are real merge-survival losses, tracked as open functional work, not
+// exemptions: the ratchet below tolerates only these and fails on any NEW disappearance.
+const KNOWN_LOST_AT_FIRST_SWEEP = new Set([
+  "backlog/items/2026-08-28-a-heredoc-refusal-teaches-no-substitute.md",
+  "backlog/items/2026-08-28-the-guards-root-admission-compares-a-typed-path-to-a-realpathed-one.md",
+  "backlog/items/2026-08-29-approve-announce-test-fixture-missing-present-plan-step.md",
+  "backlog/items/2026-08-29-scratch-write-exemption-does-not-cover-restart-required.md",
+  "backlog/items/2026-09-03-the-unparsed-command-lane-still-carries-the-false-denial-claim.md",
+]);
+
+test("AC-B3: the sweep over the real backlog at HEAD evaluates closed items and no closed item loses a needle beyond the recorded set", () => {
+  const result = checkBacklogDonePredicate(ROOT);
+  assert.notEqual(result.usageError, true);
+  assert.ok(result.total > 100, `sweep must enumerate the real backlog (total ${result.total})`);
+  assert.equal(result.malformed, 0, result.findings.join("\n"));
+  const closedMachine = result.total - result.undeclared;
+  assert.ok(closedMachine > 50, `sweep must evaluate declared predicates (declared ${closedMachine})`);
+  const newLosses = result.regressionItems.filter((p) => !KNOWN_LOST_AT_FIRST_SWEEP.has(p));
+  assert.deepEqual(newLosses, [], `closed items lost their needle at HEAD:\n${result.findings.join("\n")}`);
 });
