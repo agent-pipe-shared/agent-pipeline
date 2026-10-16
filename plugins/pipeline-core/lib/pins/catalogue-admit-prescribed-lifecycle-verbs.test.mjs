@@ -222,6 +222,29 @@ test("AC-123 emitted command: the concrete present-plan action inspect emits is 
   });
 });
 
+test("AC-123 emitted command: mini inspect with a local git user.name emits the prescribed present-plan verb as a ready command the guard admits as emitted", () => {
+  withFixture("mini", f => {
+    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))),
+      GIT_CEILING_DIRECTORIES: dirname(f.root) };
+    runFixtureGit("git", ["-C", f.root, "config", "--local", "user.name", "Fixture"], { env });
+    const observed = capture(() => run(["inspect"], f.deps));
+    assert.equal(observed.code, 0);
+    const action = JSON.parse(observed.stdout).nextAction;
+    // The prescribed verb is the direct next action, not a collect-input asking for a presenter.
+    assert.equal(action.kind, "command", JSON.stringify(action));
+    assert.equal(action.mutation, true);
+    assert.equal(action.requiresConfirmation, false);
+    assert.deepEqual(action.argv.slice(1), ["present-plan", "--by", "Fixture"]);
+    const emitted = { executable: action.executable, argv: action.argv };
+    assert.equal(admitted(emitted, f), true, JSON.stringify(emitted.argv));
+    assert.equal(guardCode(emitted, f), 0);
+    // No broad relaxation: the same emitted command with an extra flag stays refused.
+    const tampered = { executable: action.executable, argv: [...action.argv, "--extra", "x"] };
+    assert.equal(admitted(tampered, f), false);
+    assert.equal(guardCode(tampered, f), 2);
+  });
+});
+
 test("AC-123 submit-plan, reopen-design and set-phase prescribed by the course are admitted; wrong shapes are not", () => {
   withFixture("feature", f => {
     for (const profile of ["epic", "feature", "mini"]) {
