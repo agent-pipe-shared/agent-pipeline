@@ -42,7 +42,8 @@ function filledTemplateBody(relativePath) {
   const markerIndex = raw.indexOf(marker);
   assert.ok(markerIndex >= 0, `${relativePath}: copy marker not found -- template shape changed`);
   let body = raw.slice(markerIndex + marker.length);
-  body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-opus-5");
+  // AC-222 (P20-06D): Opus Critic now requires batch rationale; this examiner tests a cleanly filled template, so it uses the Sonnet default.
+  body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-sonnet-5");
   body = body.replace(/\{\{EFFORT\}\}/g, "max");
   body = body.replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium");
   body = body.replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses");
@@ -73,6 +74,7 @@ EVIDENCE (reproduce, do not take on trust):
 
 DISPATCH METADATA: model claude-opus-5, effort high.`;
 
+// AC-222 (P20-06D): Opus Critic now requires batch rationale; this examiner tests missing-ruleset-SHA detection, so its Model line uses the Sonnet default.
 const CLEAN_CRITIC = `Independent Critic review. Build your own input from the references below.
 
 DIFF RANGE: 754b32b..1568fe3
@@ -82,7 +84,7 @@ EVIDENCE ARTIFACTS: evidence/verify-latest.json evidence/security-latest.json
 DECISION AUTHORITY: docs/adr/0056-push-approval-mode.md
 
 TASK FRAME: project agent-pipeline; risk class high; rigor T2;
-Ruleset-SHA: 0f38b425; Model: claude-opus-5; effort high.
+Ruleset-SHA: 0f38b425; Model: claude-sonnet-5; effort high.
 - **Tool budget (hard cap, first-class field):** ≤24 tool uses.`;
 
 const CLEAN_GOLDFISH = `## Briefing NVA-1: close the thing
@@ -746,7 +748,17 @@ check("DP27 the default Critic budget binds base 30 under working cap 50 with 30
   assert.equal(binding.maxTurns - closingEnd, 30, "turns left in reserve below maxTurns (65 - 35; was 50 - 35 = 15)");
 });
 
-assert.equal(cases.length, 41, "the complete dispatch-policy corpus must be registered before execution begins");
+check("DP28 an Opus model-selection line without a Batch-scope rationale yields DISPATCH-OPUS-NO-BATCH-RATIONALE; examples never select (AC-222)", () => {
+  const NO_BATCH = "DISPATCH-OPUS-NO-BATCH-RATIONALE";
+  const critic = (line) => codes(dispatchFindings({ subagentType: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n${line}\n` }));
+  assert.ok(critic("Model/effort for this run: claude-opus-5 at high").includes(NO_BATCH));
+  assert.ok(!critic("Model/effort for this run: claude-sonnet-5 at high").includes(NO_BATCH));
+  assert.ok(!critic('Requested route: claude-sonnet-5 at high (e.g. "claude-opus-5 at max")').includes(NO_BATCH));
+  assert.ok(!critic('Requested route: claude-sonnet-5 at high e.g. "claude-opus-5 at max"').includes(NO_BATCH));
+  assert.ok(critic("Requested route: claude-opus-5 at high (design tier)").includes(NO_BATCH));
+});
+
+assert.equal(cases.length, 42,"the complete dispatch-policy corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

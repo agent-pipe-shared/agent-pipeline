@@ -159,7 +159,18 @@ const GOLDFISH_FIELDS = Object.freeze([
  * none: it trains the dispatcher to ignore it.
  */
 const NAMES_MODEL = /\b(?:claude|gpt|o[0-9]|gemini|sonnet|opus|haiku|fable|codex)[-a-z0-9.[\]]*/i;
-const NAMES_RULESET = /\bruleset[- ]?sha\s*[:=]\s*\S/i;
+const OPUS_TIER = /\bopus\b/i;
+// Only the lines that SELECT the run's model count; explanatory prose ("A Design-tier (Opus)
+// Critic is used only for ...", filled into every template-built Batch scope) must never fire.
+const MODEL_SELECTION_LINE = /^\s*(?:[-*]\s*)?\**\s*(?:Model\/effort for this run|Requested route|Criticality\s*(?:→|->)\s*model(?:\s*\(MP-07\))?|model)\s*\**\s*:/i;
+// Judge only the SELECTED value: the text after the label's colon up to the first "(", " e.g.",
+// ";" or end of line. A parenthetical or "e.g." tail is an example and never selects a model.
+const selectedValue = (line) => {
+  const m = MODEL_SELECTION_LINE.exec(line);
+  return m ? line.slice(m[0].length).split(/\(|\se\.g\.|;/i)[0] : null;
+};
+const selectsOpus = (text) => text.split(/\r?\n/).some((l) => { const v = selectedValue(l); return v !== null && OPUS_TIER.test(v); });
+const NAMES_RULESET =/\bruleset[- ]?sha\s*[:=]\s*\S/i;
 
 /**
  * @param {{subagentType: string, prompt: string, transport?: "direct"|"workflow"|"antigravity"|"codex"}} dispatch
@@ -208,6 +219,20 @@ export function dispatchFindings({ subagentType, prompt, transport = "direct" } 
     }
     if (!NAMES_MODEL.test(text)) {
       findings.push({ code: "DISPATCH-NO-MODEL", why: "every dispatch names its model explicitly (MP-05); subagents otherwise inherit the session's silently" });
+    }
+    if (selectsOpus(text)) {
+      const lines = text.split(/\r?\n/);
+      const hasBatchScope = lines.some((l) => /Batch scope \(MP-07\)\s*\**\s*:\s*\S/i.test(l));
+      const hasJustification = lines.some((l) =>
+        /\b(?:rationale|justification)\b/i.test(l)
+        && /\bcritical\b/i.test(l)
+        && /\b(?:architecture|security)\b/i.test(l));
+      if (!hasBatchScope || !hasJustification) {
+        findings.push({
+          code: "DISPATCH-OPUS-NO-BATCH-RATIONALE",
+          why: "a Design-tier (Opus) Critic is admitted only for genuinely critical architecture or security and one batch (MP-07): the prompt needs a non-empty `Batch scope (MP-07)` field and a rationale/justification line naming critical architecture or security",
+        });
+      }
     }
     return { role: "critic", findings };
   }
