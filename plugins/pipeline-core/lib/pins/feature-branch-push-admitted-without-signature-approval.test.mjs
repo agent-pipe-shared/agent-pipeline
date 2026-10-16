@@ -183,7 +183,7 @@ function runGuard(command, dir, pluginRoot = PLUGIN_ROOT) {
 }
 
 /** Runs the REAL rendered pre-push hook implementation exactly as git would (stdin = ref updates). */
-function runHook(dir, head, { remote = "origin" } = {}) {
+function runHook(dir, head, { remote = "origin", dest = DEST } = {}) {
   const home = join(dir, ".git", "fixture-home");
   const controller = createGovernanceScopeController({ hostStateRoot: join(home, ".local", "state", "agent-pipeline", "activation") });
   const probe = controller.observe({ rootDir: dir });
@@ -195,7 +195,7 @@ function runHook(dir, head, { remote = "origin" } = {}) {
   writeFileSync(implFile, renderImpl(join(PLUGIN_ROOT, "lib")));
   const res = spawnSync(process.execPath, [implFile, remote, "https://example.invalid/repo.git"], {
     cwd: dir,
-    input: `${DEST} ${head} ${DEST} ${ZERO40}\n`,
+    input: `${DEST} ${head} ${dest} ${ZERO40}\n`,
     encoding: "utf8",
     timeout: 30000,
     env: { ...process.env, HOME: home, USERPROFILE: home },
@@ -311,6 +311,27 @@ test("A4 hook: a valid approval admits the checkpoint with no Verify evidence", 
   assert.equal(r.code, 0, r.stderr);
   assert.equal(existsSync(join(dir, "evidence")), false);
 });
+
+// ---- A5b: the slim approval-only prerequisite set is NOT extended to main/release or other branches ----
+// A valid signed approval bound to the exact non-checkpoint destination, with no Verify/security
+// evidence present, must still be refused by BOTH lanes: only the checkpoint namespace is slimmed.
+for (const [label, dest] of [["main release", "refs/heads/main"], ["non-checkpoint branch", "refs/heads/topic/other"]]) {
+  test(`A5b guard: a valid approval bound to a ${label} push does not admit it without the full evidence chain`, () => {
+    const { dir } = checkpointRepo(`a5b-g-${dest.length}`, { destination: dest });
+    const r = runGuard(`git push origin ${BRANCH}:${dest}`, dir);
+    assert.equal(r.code, 2, r.stderr);
+    assert.doesNotMatch(r.stderr, /feature checkpoint/);
+    assert.equal(existsSync(join(dir, ".git", "agent-pipeline", "feature-checkpoint-audit.jsonl")), false, "no checkpoint audit record for a non-checkpoint push");
+  });
+
+  test(`A5b hook: a valid approval bound to a ${label} push is still blocked for missing verify evidence`, () => {
+    const { dir, head } = checkpointRepo(`a5b-h-${dest.length}`, { destination: dest });
+    const r = runHook(dir, head, { dest });
+    assert.equal(r.code, 1, r.stderr);
+    assert.match(r.stderr, /verify-latest/);
+    assert.doesNotMatch(r.stderr, NEEDS);
+  });
+}
 
 // ---- A5: chat mode unchanged --------------------------------------------------------------------
 test("A5 guard: chat mode (committed push waiver) keeps admitting a clean exact checkpoint without an approval", () => {
