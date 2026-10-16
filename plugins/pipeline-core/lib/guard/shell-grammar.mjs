@@ -964,6 +964,62 @@ function isResourceHeadroomReadOnlyInvocation(args, root) {
   } catch { return false; }
 }
 
+// LANE (declared under backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read; ALF-C-P1-10, AC-128; PO decision K3, 2026-10-14):
+// formatted stat metadata read -- `stat -c|--format <FORMAT> <path...>` (predicate isFormattedStatReadArgs below).
+// Bounds (all must hold, anything else is not this lane): the option is the FIRST argument and a separate token, `-c` or `--format` (an
+// attached value such as `--format=...` or `-c%a` is refused); <FORMAT> is exactly one of the two fixed strings below, which GNU stat
+// treats as inert display data; at least one operand follows; every operand is an existing file or directory that lies inside the project
+// root, is not reached through a link or alias (its realpath equals the path itself) and is approved by the passive-read policy
+// (a dot-directory file such as .claude/settings.json is judged exactly as plain `stat` and `cat` judge it; credential names stay refused).
+// isReadOnlySimpleWords routes every stat call that carries a format-bearing argument (predicate isStatFormatBearingArg below) into this
+// lane: `--format` and `--printf` (attached `=value` or a separate value), `-c` and `-f` (also `--file-system`), a clustered short option
+// that contains `c` or `f` (`-Lc`, `-cL`, `-Lc%a`) and any unambiguous long-option abbreviation of those (`--form`, `--print`). Only the two
+// fixed shapes above are admitted; every other such argument is refused, so no spelling of a format option is admitted through the generic
+// flag treatment.
+// Pinned by lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs (AP12 admitted shapes, AP13 fail-closed shapes, AP14 attached spellings,
+// AP15 --printf, -f, clusters and abbreviations).
+const STAT_METADATA_FORMATS = new Set(["%a %s %n", "%a %s %h %n"]);
+
+// Lane predicate: the declaration above STAT_METADATA_FORMATS is its contract (backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read, K3).
+export function isFormattedStatReadArgs(args, root, extraRoots = [], dependencies = {}) {
+  if (!Array.isArray(args) || args.length < 3
+    || !["-c", "--format"].includes(args[0])
+    || !STAT_METADATA_FORMATS.has(args[1])) return false;
+  const realpath = dependencies.realpath ?? realpathSync;
+  const lstat = dependencies.lstat ?? lstatSync;
+  const passive = dependencies.passive ?? isAllowedPassiveReadTarget;
+  return args.slice(2).every((arg) => {
+    const candidate = rawReadCandidatePath(arg, root);
+    if (candidate === null || !pathInside(root, resolve(candidate))) return false;
+    try {
+      const physicalRoot = realpath(root);
+      const physical = realpath(candidate);
+      const observed = lstat(candidate);
+      if (physicalRoot !== resolve(root) || physical !== resolve(candidate)
+        || !pathInside(physicalRoot, physical)
+        || (!observed.isFile() && !observed.isDirectory())) return false;
+    } catch { return false; }
+    return passive(arg, {
+      rootDir: root, recursive: true, additionalRecursiveRoots: extraRoots,
+    });
+  });
+}
+
+// Routing predicate of the stat lane above (backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read, K3): true for every argument
+// that bears a stat format or format-like mode, so isReadOnlySimpleWords hands the whole call to isFormattedStatReadArgs. GNU getopt_long also
+// accepts any unambiguous prefix of a long option (`--form`, `--print`), so a long argument counts when its name part (before any `=`) is a
+// prefix of `--format`, `--printf` or `--file-system`. A short argument counts when it contains `c` or `f` anywhere, so clusters such as
+// `-Lc`, `-cL`, `-Lf` and attached values such as `-Lc%a` are covered. Over-matching only narrows: the lane refuses everything but the two fixed shapes.
+const STAT_FORMAT_LONG_OPTIONS = ["--format", "--printf", "--file-system"];
+function isStatFormatBearingArg(arg) {
+  if (typeof arg !== "string" || arg.length < 2 || arg[0] !== "-") return false;
+  if (arg[1] === "-") {
+    const name = arg.split("=", 1)[0];
+    return name.length > 2 && STAT_FORMAT_LONG_OPTIONS.some((option) => option.startsWith(name));
+  }
+  return /[cf]/u.test(arg);
+}
+
 export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
@@ -1019,6 +1075,12 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
       && isApprovedSingleCommandReadArg(args[1], root, extraRoots);
   }
   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
+    // Stat lane routing (backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read, K3; see isStatFormatBearingArg and isFormattedStatReadArgs; pinned by AP12-AP15):
+    // route every format-bearing spelling to the closed lane, including unsupported
+    // attached values, --printf, -f and clustered short options, so generic flag treatment cannot admit them indirectly.
+    if (executable === "stat" && args.some((arg) => isStatFormatBearingArg(arg))) {
+      return isFormattedStatReadArgs(args, root, extraRoots);
+    }
     if (executable === "rg") return isBoundedSingleRg(args, root, extraRoots);
     if (executable === "grep") return isSafeExactGrepArgs(args, root, extraRoots);
     if (executable === "ls" && isNamesOnlyLsArgs(args, root, extraRoots)) return true;

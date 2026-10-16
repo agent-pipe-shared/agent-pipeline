@@ -17,14 +17,14 @@ const SEARCH_BOOLEAN = new Set([
   "-n", "--line-number", "-S", "--smart-case", "-i", "--ignore-case",
   "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
   "-x", "--line-regexp", "-l", "--files-with-matches",
-  "--files-without-match", "--no-messages",
+  "--files-without-match", "--no-messages", "--no-heading",
   // TR-B-F (T74): match-output spellings. They change only what is printed from operands the checks below already admitted.
   "-o", "--only-matching",
 ]);
 const SEARCH_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
   "-t", "--type", "-T", "--type-not", "-e", "--regexp",
-  "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
+  "-m", "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
   "--max-columns",
 ]);
 // Recursive rg must use its default hidden/ignore policy. Only a basename
@@ -34,8 +34,11 @@ const FILE_BOOLEAN = new Set(["--no-messages"]);
 const FILE_VALUE = new Set(["-t", "--type", "-T", "--type-not", "--max-depth", "-g", "--glob"]);
 const NUMERIC_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
-  "--max-count", "--max-depth", "--max-columns",
+  "-m", "--max-count", "--max-depth", "--max-columns",
 ]);
+// Only the type filters (-t/-T) may repeat. -g/--glob is deliberately NOT repeatable: a recursive rg carries at most one bounded basename
+// glob, and a second one (in either spelling) is refused so the traversal stays selective in one place only (SEC-11; examiner: the
+// "recursive rg keeps default hidden/ignore semantics; globs may expose private paths" case of hooks/guard-lifecycle-ready.test.mjs).
 const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
 
 function isBoundedFilenameFilter(value) {
@@ -400,6 +403,31 @@ export function isBoundedSingleRg(argv, root, additionalRoots = []) {
   return validateRg(argv, root, false, additionalRoots);
 }
 
+// LANE (declared under backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read; ALF-C-P1-10, AC-128; PO decision K3, 2026-10-14):
+// contained git-show object read -- `git [--no-pager] show <HEAD|7..40-hex>:<path> | head -N`.
+// Why: a `<rev>:<path>` operand names a git object, not a host path, and the generic git-pipeline lane (which judges each operand as a
+// host path) refused it on Windows although the path itself is an ordinary in-repo file.
+// Bounds (all must hold, anything else is not this lane): the git side is exactly `show <object>` with at most a leading `--no-pager`;
+// <object> is `HEAD` or a 7..40 digit hex id (no ref name, no `~`/`^` suffix); <path> is a repository-relative slash path whose every part
+// is non-empty and starts with neither `.` nor `-`, with no backslash, colon, `$`, backtick, glob or brace character; it must stay inside
+// the project root after realpath and be approved by the passive-read policy (credential names stay refused). The only sink is `head`
+// with the 1..500 line count of this pipeline family -- never tail, sort or rg -- and a bare `git show` is not this lane.
+// Pinned by lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs (AP10 admitted shapes, AP11 fail-closed shapes).
+function isContainedGitShowObject(argv, root) {
+  const args = argv[0] === "--no-pager" ? argv.slice(1) : argv;
+  if (args.length !== 2 || args[0] !== "show") return false;
+  const match = /^(?:HEAD|[0-9a-fA-F]{7,40}):(.+)$/u.exec(args[1]);
+  if (!match) return false;
+  const path = match[1];
+  // Git object paths are repository-relative slash paths, never host paths.
+  // Hidden/private roots and traversal stay closed even when a host passive
+  // reader would permit an unrelated external file.
+  if (path.split("/").some((part) => !part || part.startsWith(".") || part.startsWith("-"))
+    || /[\\:$`*?\[\]{}]/u.test(path)) return false;
+  return isRealpathedWithinBoundary(resolve(root, path), root)
+    && isAllowedPassiveReadTarget(path, { rootDir: root, recursive: true });
+}
+
 /**
  * Validate the small, bounded search-pipeline family.  A second rg consumes
  * only the first rg's stdout and is still a closed, read-only diagnostic.  It
@@ -420,8 +448,12 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
   const rgName = basename(parsed.segments[0].executable).toLowerCase();
   const expectedRg = windows ? "rg.exe" : "rg";
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
-  if (rgName !== expectedRg) return false;
-  if (sinkName === expectedRg) {
+  // Git-show lane (isContainedGitShowObject above; backlog item pipeline.claude-windows-guard-refuses-every-in-repo-read, K3): such a source takes the `head` sink only;
+  // the rg-to-rg, sort and tail branches below never apply to it.
+  const gitShowObject = rgName === (windows ? "git.exe" : "git")
+    && isContainedGitShowObject(parsed.segments[0].argv, root);
+  if (rgName !== expectedRg && !gitShowObject) return false;
+  if (!gitShowObject && sinkName === expectedRg) {
     return parsed.redirects.length === 0
       && validateRg(parsed.segments[0].argv, root, windows, additionalRoots)
       && validateRg(parsed.segments[1].argv, root, windows, additionalRoots);
@@ -431,7 +463,7 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
   // sort permission: no sort flags, operands, redirects, or extra pipeline
   // stages are accepted, so `sort -o <file>` cannot gain a write route.
   const expectedSort = windows ? "sort.exe" : "sort";
-  if (sinkName === expectedSort) {
+  if (!gitShowObject && sinkName === expectedSort) {
     return parsed.redirects.length === 0
       && parsed.segments[1].argv.length === 0
       && validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
@@ -442,6 +474,7 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
   const expectedHead = windows ? "head.exe" : "head";
   const expectedTail = windows ? "tail.exe" : "tail";
   if (sinkName !== expectedHead && sinkName !== expectedTail) return false;
+  if (gitShowObject && sinkName !== expectedHead) return false;
   if (parsed.redirects.length === 1) {
     const redirect = parsed.redirects[0];
     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
@@ -456,5 +489,5 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
   const sinkOk = (sinkArgs.length === 2 && sinkArgs[0] === "-n" && lineCount.test(sinkArgs[1]))
     || (sinkArgs.length === 1 && sinkArgs[0].startsWith("-") && lineCount.test(sinkArgs[0].slice(1)));
   if (!sinkOk) return false;
-  return validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
+  return gitShowObject || validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
 }
