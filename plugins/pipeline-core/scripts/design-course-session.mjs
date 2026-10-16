@@ -294,6 +294,18 @@ export async function inspectDesignCourseSubmission({ root, runner, pluginRoot }
   }
 }
 
+const PRODUCER_STDERR_MAX_BYTES = 4096;
+const PRODUCER_STDERR_MARKER = "...[truncated]";
+/** Bounded (<= 4096 bytes, marker-terminated when cut), path-sanitized stderr text for a failed producer. */
+function boundedProducerStderr(raw) {
+  const text = String(raw ?? "")
+    .replace(/[A-Za-z]:[\\/][^\s"'`<>|:*?]*/gu, "<path>")
+    .replace(/(?:\/home|\/Users|\/root)(?:\/[^\s"'`<>|:*?]*)?/gu, "<path>");
+  if (Buffer.byteLength(text) <= PRODUCER_STDERR_MAX_BYTES) return text;
+  const room = PRODUCER_STDERR_MAX_BYTES - Buffer.byteLength(PRODUCER_STDERR_MARKER);
+  return `${Buffer.from(text).subarray(0, room).toString("utf8").replace(/�+$/u, "")}${PRODUCER_STDERR_MARKER}`;
+}
+
 export function executeDesignCourseProducer(action, dependencies = {}) {
   const keys = ["schema", "runner", "stage", "pluginRoot", "producer", "executable", "argv", "cwd", "shell",
     "mutation", "requiresConfirmation", "expectedCandidate", "expected", "implementationAuthority"];
@@ -324,7 +336,7 @@ export function executeDesignCourseProducer(action, dependencies = {}) {
   catch { return { schema: "pipeline.design-course-producer-result.v1", runner: action.runner, stage: action.stage,
     status: "producer-output-invalid", exitCode: child.status ?? null, signal: child.signal ?? null,
     errorCode: child.error?.code ?? null, outputBytes: Buffer.byteLength(String(child.stdout ?? "")),
-    stderrBytes: Buffer.byteLength(String(child.stderr ?? "")),
+    stderrBytes: Buffer.byteLength(String(child.stderr ?? "")), stderr: boundedProducerStderr(child.stderr),
     candidate: after, implementationAuthority: false }; }
   let outcome = "producer-failed";
   if (action.stage === "advisor" && child.status === 0 && !child.error && child.signal == null
@@ -354,7 +366,7 @@ export function executeDesignCourseProducer(action, dependencies = {}) {
   return { schema: "pipeline.design-course-producer-result.v1", runner: action.runner, stage: action.stage,
     status: expectedOutcomes.includes(outcome) ? outcome : "producer-failed",
     exitCode: child.status ?? null, signal: child.signal ?? null, errorCode: child.error?.code ?? null,
-    producerResult, stderrBytes: Buffer.byteLength(String(child.stderr ?? "")), candidate: after,
+    producerResult, stderrBytes: Buffer.byteLength(String(child.stderr ?? "")), stderr: boundedProducerStderr(child.stderr), candidate: after,
     implementationAuthority: false };
 }
 
