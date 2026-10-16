@@ -37,7 +37,8 @@ const { checkStagedObservationDocumentation } = await import(
 const { checkObservationDocumentation } = await import(
   pathToFileURL(join(PLUGIN_ROOT, "lib", "observation-doc-classification.mjs")).href
 );
-const { renderImpl } = await import(pathToFileURL(join(PLUGIN_ROOT, "scripts", "pre-commit-hook-install.mjs")).href);
+const { createGovernanceScopeController } = await import(pathToFileURL(join(PLUGIN_ROOT, "lib", "governance-scope.mjs")).href);
+const { renderImpl, applyInstall } = await import(pathToFileURL(join(PLUGIN_ROOT, "scripts", "pre-commit-hook-install.mjs")).href);
 
 // The real repository policy is the template, so the exact-keys contract is the real one.
 const REAL_POLICY = JSON.parse(readFileSync(join(REPO_ROOT, POLICY), "utf8"));
@@ -229,4 +230,60 @@ test("P2: the rendered hook does not raise the governance refusal once the doc i
   git(dir, "add", "docs/h.md", POLICY);
   const run = spawnSync(process.execPath, [hookFile], { cwd: dir, encoding: "utf8", timeout: 60000, env: GIT_ENV });
   assert.doesNotMatch(run.stderr, /staged observation\/document governance/, `stderr: ${run.stderr}`);
+});
+
+// ---- ALF-C-P1-11B: the installed hook at a real `git commit`, and the clone-without-hooks gap ------
+//
+// Findings recorded here (read-only inspection of production code):
+//  * Implemented, not a stub: scripts/pre-commit-hook-install.mjs (rendered impl, ~lines 955-962) imports
+//    staged-observation-doc-classification.mjs and refuses with "staged observation/document governance refused:".
+//  * There is no code "handover writer" that writes a docs/*.md handover: pipeline-state.mjs only syncs the
+//    state.md next-action and handover projections. A handover document is authored by the session, so the
+//    commit-time hook is the only code path that can classify it; the case below commits a handover-shaped
+//    docs file through the real installed hook.
+//  * Verify (harness/scripts/verify.mjs) only runs the checker's own test suite, not the checker against the
+//    repository; the only later line is the session-start bootstrap (observation-governance-bootstrap.mjs).
+
+const HOOK_COMMIT_TIMEOUT_MS = 300000;
+const HOOK_ENV = { ...GIT_ENV, GIT_CEILING_DIRECTORIES: SCRATCH };
+function hookGit(dir, ...args) {
+  return spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 240000, env: HOOK_ENV });
+}
+const HANDOVER_TEXT = "# Recovery handover\n\nNext action: continue the block.\n";
+
+test("handover doc through the real installed pre-commit hook: unclassified is refused, classified in the same commit is admitted", { timeout: HOOK_COMMIT_TIMEOUT_MS * 2 }, () => {
+  const dir = repo("installed");
+  // The installed hook only governs an enrolled project (same fixture shape as pre-commit-hook-install.test.mjs).
+  const governance = createGovernanceScopeController({ hostStateRoot: join(dir, "unused-host") });
+  const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "fixture-operator" });
+  assert.equal(governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
+  const install = applyInstall({ rootDir: dir, ...PLUGIN_DIRS });
+  assert.equal(install.status, "installed", `precondition: install must succeed (${JSON.stringify(install)})`);
+  const head = hookGit(dir, "rev-parse", "HEAD").stdout.trim();
+  put(dir, "docs/0.7-recovery-handover.md", HANDOVER_TEXT);
+  assert.equal(hookGit(dir, "add", "docs/0.7-recovery-handover.md").status, 0);
+  const refused = hookGit(dir, "commit", "-q", "-m", "docs(state): record handover");
+  assert.notEqual(refused.status, 0, `unclassified handover must not commit (stderr: ${refused.stderr})`);
+  assert.match(refused.stderr, /staged observation\/document governance refused: OG-DOC-UNCLASSIFIED/);
+  assert.equal(hookGit(dir, "rev-parse", "HEAD").stdout.trim(), head, "HEAD unchanged after refusal");
+  // Classify in the same staged commit: the governance refusal must be gone.
+  put(dir, POLICY, policyWith(["docs/a.md", "docs/0.7-recovery-handover.md"]));
+  assert.equal(hookGit(dir, "add", POLICY).status, 0);
+  const admitted = hookGit(dir, "commit", "-q", "-m", "docs(state): record handover");
+  assert.doesNotMatch(admitted.stderr, /staged observation\/document governance/, `stderr: ${admitted.stderr}`);
+});
+
+test("clone without hooks: no commit-time check exists, the unclassified handover commits; the only later line is a post-hoc classifier run, not Verify", { timeout: HOOK_COMMIT_TIMEOUT_MS }, () => {
+  const dir = repo("nohook");
+  put(dir, "docs/0.7-recovery-handover.md", HANDOVER_TEXT);
+  assert.equal(hookGit(dir, "add", "docs/0.7-recovery-handover.md").status, 0);
+  const committed = hookGit(dir, "commit", "-q", "-m", "docs(state): record handover");
+  assert.equal(committed.status, 0, `no hook installed: the commit is admitted (stderr: ${committed.stderr})`);
+  // The omission is only detectable afterwards by running the shared validator over the committed tree
+  // (what the session-start bootstrap does); this documents that the omission is real without hooks.
+  const tracked = hookGit(dir, "ls-files", "docs").stdout.split("\n").filter(Boolean);
+  const policy = JSON.parse(hookGit(dir, "show", `HEAD:${POLICY}`).stdout);
+  const later = checkObservationDocumentation(policy, tracked);
+  assert.equal(later.ok, false);
+  assert.deepEqual(later.findings, ["OG-DOC-UNCLASSIFIED docs/0.7-recovery-handover.md"]);
 });
