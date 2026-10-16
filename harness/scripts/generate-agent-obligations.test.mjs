@@ -224,6 +224,36 @@ test("AC-106 (contract): the recommended commit spelling is admitted by every gu
   );
 });
 
+// AC-106 / ALF-C-I08B: guard-lifecycle-ready, driven in-process. The subprocess route is
+// session-state dependent (a non-ready lifecycle denies everything), so the evaluator is
+// imported and given the documented onboarding-observation seam instead of reading this
+// repository's live lifecycle. The hook is only imported, never edited.
+test("AC-106 (contract): guard-lifecycle-ready admits the recommended commit spelling and refuses a composed near-miss", async () => {
+  const document = readFileSync(OBLIGATIONS_PATH, "utf8");
+  const recommended = /commit with `(git commit -F <msgfile> -- <paths>)`/u.exec(document);
+  assert.ok(recommended, "§1 must recommend `git commit -F <msgfile> -- <paths>` as the provenance-bearing commit");
+  const concrete = recommended[1].replace("<msgfile>", "scratch/commit-msg-ac106/msg.txt").replace("<paths>", "a.md");
+
+  const guard = await import("../../plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs");
+  const evaluate = (command) => guard.evaluateLifecycleReadyGuard(
+    { tool_name: "Bash", tool_input: { command } },
+    {
+      projectDir: REPO_ROOT,
+      runner: "claude",
+      inspectProjectOnboardingV3Fn() { throw new Error("fixture: no onboarding observation"); },
+    },
+  );
+
+  const admitted = evaluate(concrete);
+  assert.equal(admitted.exitCode, 0, `guard-lifecycle-ready refuses the recommended spelling (${concrete}): ${String(admitted.stderr).trim().slice(0, 300)}`);
+
+  // Near-miss in the same harness: the same commit composed with a second command is outside
+  // the closed grammar. Without it the admission above could not be told from fail-open.
+  const refused = evaluate(`${concrete} && echo done`);
+  assert.equal(refused.exitCode, 2, "a composed commit must be refused, otherwise the admission above proves nothing");
+  assert.match(String(refused.stderr), /GUARD-PARSE-UNSUPPORTED/u, "the near-miss must be refused by the closed shell grammar");
+});
+
 test("AC-7: the document carries no absolute or machine-specific path", () => {
   const document = readFileSync(OBLIGATIONS_PATH, "utf8");
   assert.doesNotMatch(document, /\/home\//u);
