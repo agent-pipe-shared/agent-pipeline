@@ -8991,7 +8991,10 @@ function readDesignApprovalInputs(dir, submission, paths) {
     const prd = physicalRebindFile(dir, submission.planPath), spec = physicalRebindFile(dir, submission.specPath);
     if (!prd || !spec) return { ok: false, code: "DCC-PATH-UNSAFE" };
     const candidate = designWorkflowGitCandidate(dir);
-    const inventory = new Map(git("ls-tree", "-r", "--name-only", "HEAD").stdout.trim().split("\n").map(path => [path, { readable: git("ls-tree", "HEAD", "--", path).stdout.startsWith("100") }]));
+    // One ls-tree for the whole HEAD tree instead of one spawn per path (Windows: minutes).
+    const tree = spawnSync("git", ["ls-tree", "-r", "--full-tree", "HEAD"], { cwd: dir, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+    if (tree.status !== 0) throw Error("git observation unavailable");
+    const inventory = new Map(tree.stdout.split("\n").filter(Boolean).map(line => { const tab = line.indexOf("\t"); return [line.slice(tab + 1), { readable: line.startsWith("100") }]; }));
     let traceabilityResult;
     try { traceabilityResult = evaluateRequirementTraceability({ specPath: submission.specPath, candidate, candidateFiles: inventory,
       readCandidateFile: path => { const out = spawnSync("git", ["show", `HEAD:${path}`], { cwd: dir }); if (out.status !== 0) throw Error("candidate read unavailable"); return out.stdout; } }); }
@@ -9106,11 +9109,11 @@ function persistAcceptedContractEnvelope({dir,path,sha256,envelope}) {
     if (!existsSync(target)) {
       fd = openSync(target,"wx",0o444); created = true;
       writeFileSync(fd,bytes); fsyncSync(fd); closeSync(fd); fd = undefined;
-      const directory = openSync(dirname(target),"r"); try { fsyncSync(directory); } finally { closeSync(directory); }
+      if (process.platform !== "win32") { const directory = openSync(dirname(target),"r"); try { fsyncSync(directory); } finally { closeSync(directory); } }
     }
     if (!acceptedContractFile(dir,path).equals(bytes)) throw Error("capture readback mismatch");
     return {ok:true,path,sha256,externalMutation:created};
-  } catch { return {ok:false,code:"CAC-CAPTURE-READBACK",externalMutation:created}; }
+  } catch (error) { if (process.env.PIPELINE_DEBUG_CAPTURE === "1") console.error("capture failure:", error); return {ok:false,code:"CAC-CAPTURE-READBACK",externalMutation:created}; }
   finally { if (fd !== undefined) closeSync(fd); }
 }
 function acceptedContractPolicyBinding(dir,request,mode) {
