@@ -35,6 +35,11 @@ after(() => { rmSync(WORK, { recursive: true, force: true, maxRetries: 3 }); });
 // The installer snapshots the plugin root; a frozen copy keeps parallel writers from causing GHS-SOURCE-DRIFT.
 const FROZEN = join(WORK, "plugin");
 cpSync(LIVE_PLUGIN_ROOT, FROZEN, { recursive: true });
+// RED-demonstration seam: PIN_PREFLIGHT_MIRROR names a scratch copy (e.g. `git show HEAD:<path>`) of
+// pipeline-start-preflight.mjs that replaces the frozen copy's, so the pin can be run against old code.
+if (process.env.PIN_PREFLIGHT_MIRROR) {
+  cpSync(resolve(process.env.PIN_PREFLIGHT_MIRROR), join(FROZEN, "scripts", "pipeline-start-preflight.mjs"));
+}
 const PLUGIN_LIB_DIR = join(FROZEN, "lib");
 const INSTALLER = join(FROZEN, "scripts", "pre-push-hook-install.mjs");
 const installerMod = await import(pathToFileURL(INSTALLER).href);
@@ -184,9 +189,10 @@ test("C2 preflight installCommand: absolute script path and explicit absolute co
   assert.deepEqual(installCommand.argv.slice(1), ["--install"]);
   assert.equal(isAbsolute(installCommand.cwd), true);
   assert.equal(installCommand.cwd, resolve(repo.dir));
-  // Observed (not asserted as a requirement): executable is the bare "node" resolved via PATH, as the adjacent
-  // preflight test pins; the onboarding offer (C1) carries the absolute interpreter.
-  assert.equal(installCommand.executable, "node");
+  // Like the onboarding offer (C1) and the other host actions, the executable is the absolute interpreter,
+  // never a bare "node" resolved via PATH.
+  assert.equal(isAbsolute(installCommand.executable), true, `executable must be absolute, got ${installCommand.executable}`);
+  assert.equal(installCommand.executable, process.execPath);
   const run = spawnSync(process.execPath, installCommand.argv, { cwd: installCommand.cwd, encoding: "utf8", timeout: 90000 });
   assert.equal(run.status, 0, run.stderr || run.stdout);
   assert.equal(existsSync(repo.hookPath), true);

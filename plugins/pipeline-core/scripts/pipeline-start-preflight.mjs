@@ -603,7 +603,7 @@ const PRE_PUSH_HOOK_PLUGIN_LIB_DIR = fileURLToPath(new URL("../lib", import.meta
 function prePushHookInstallCommand(rootDir) {
   return {
     kind: "command",
-    executable: "node",
+    executable: process.execPath,
     argv: [PRE_PUSH_HOOK_INSTALLER_SCRIPT_PATH, "--install"],
     cwd: resolve(rootDir),
     mutation: true,
