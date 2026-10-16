@@ -11,7 +11,7 @@
  * (humanOverrideRoute dependencies) are used. Fixtures live under scratch/.
  */
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -108,4 +108,60 @@ test("mandatory start skill is concise and defers runner detail to lazy referenc
   }
   assert.doesNotMatch(core, /host-session-id/u, "Antigravity-only detail leaked into the common path");
   assert.match(core, /approval/iu, "PO boundary must stay in the common path");
+});
+
+// AC-192 follow-up (ALF-C-P17-01C): runner-specific bootstrap detail is pinned to the lazy references.
+// Static file reads only. Bounds derive from sizes measured 2026-10-16: the largest
+// reference (workflow-dispatch.md) is 20715 B -> 32 KiB general ceiling (~1.5x headroom);
+// the two model-role references are 803 B and 657 B -> 2 KiB ceiling each (~2.5x headroom).
+const REF_MAX_BYTES = 32 * 1024;
+const MODEL_ROLE_REF_MAX_BYTES = 2 * 1024;
+const skillDirForRefs = join(pluginRoot, "skills", "pipeline-start");
+const readSkillCore = () => readFileSync(join(skillDirForRefs, "SKILL.md"), "utf8");
+const readRef = (name) => readFileSync(join(skillDirForRefs, "references", name), "utf8");
+
+test("every reference named in the start skill exists", () => {
+  const core = readSkillCore();
+  const names = [...new Set([...core.matchAll(/references\/([A-Za-z0-9._-]+\.md)/gu)].map((m) => m[1]))];
+  assert.ok(names.length >= 10, `expected many lazy references named, got ${names.length}`);
+  for (const name of names) {
+    assert.ok(existsSync(join(skillDirForRefs, "references", name)), `${name} named in SKILL.md but missing`);
+  }
+});
+
+test("runner-specific model-role detail lives in its runner reference, not in the common skill", () => {
+  const core = readSkillCore();
+  const cc = readRef("model-role-codex-claude.md");
+  const ag = readRef("model-role-antigravity.md");
+  // The executable invocation is runner detail: only the references carry it.
+  assert.doesNotMatch(core, /model-role-bootstrap\.mjs/u, "bootstrap script invocation duplicated in SKILL.md");
+  // (SKILL.md legitimately mentions `--runner` for onboarding-init, so pin the model-role-specific forms.)
+  assert.doesNotMatch(core, /--runner antigravity|--runner <current-runner>|--repo-root <absolute-repo>/u, "runner flag detail duplicated in SKILL.md");
+  assert.match(cc, /model-role-bootstrap\.mjs/u);
+  assert.match(cc, /--runner <current-runner>/u);
+  assert.match(ag, /model-role-bootstrap\.mjs/u);
+  assert.match(ag, /--runner antigravity/u);
+  assert.match(ag, /--host-session-id/u);
+  // Neither reference leaks the other runner's specific detail.
+  assert.doesNotMatch(cc, /host-session-id|--runner antigravity/u, "Antigravity detail inside the Codex/Claude reference");
+  assert.doesNotMatch(ag, /<current-runner>/u, "Codex/Claude detail inside the Antigravity reference");
+  // No verbatim duplication of reference prose in the common skill.
+  const flat = (s) => s.replace(/\s+/gu, " ");
+  const coreFlat = flat(core);
+  for (const [name, text] of [["codex-claude", cc], ["antigravity", ag]]) {
+    for (const line of text.split(/\r?\n/u).map((l) => flat(l).trim()).filter((l) => l.length >= 40)) {
+      assert.ok(!coreFlat.includes(line), `${name} reference line duplicated verbatim in SKILL.md: ${line.slice(0, 60)}`);
+    }
+  }
+});
+
+test("each lazy reference stays under its per-file byte bound", () => {
+  const dir = join(skillDirForRefs, "references");
+  const files = readdirSync(dir).filter((f) => f.endsWith(".md"));
+  assert.ok(files.length >= 20, `expected the reference set, got ${files.length}`);
+  for (const f of files) {
+    const bytes = statSync(join(dir, f)).size;
+    const bound = f.startsWith("model-role-") ? MODEL_ROLE_REF_MAX_BYTES : REF_MAX_BYTES;
+    assert.ok(bytes <= bound, `${f}: ${bytes} B over ${bound} B bound`);
+  }
 });
