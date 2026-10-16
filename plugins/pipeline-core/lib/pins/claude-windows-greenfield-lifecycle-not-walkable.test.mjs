@@ -10,6 +10,10 @@
 //         dispatch to the briefing INLINE in the Agent/Task prompt it actually received. A route record
 //         (evidence/dispatch-route-<sliceId>.json) carries the digest; the guard recomputes it over the
 //         canonical inline text and refuses a mismatch typed; no record = behaviour unchanged.
+//   V-10  producer (ALF-C-P19-05D): lib/dispatch-briefing-route-record.mjs writes that record, built with the
+//         guard's own buildBriefingRoute/briefingSha256, exactly where the guard reads it; a recorded route
+//         makes the binding fire through the real hook (matching digest admitted, mismatching refused typed).
+//         Remaining: no product flow CALLS the producer yet (the caller wiring is outside ALF-C-P19-05D's scope).
 //   two-approval happy path (reaches implementation and push) -- native: pending. It needs a live
 //         interactive Claude/Windows session. A native run exercises
 //         plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeGenerate and the
@@ -22,7 +26,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, test, before, after } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -275,6 +279,95 @@ describe("V-10 route digest is bound to the inline briefing actually sent", () =
     assert.throws(() => checkV10(unbound));
     const digestOfStaleFile = { bind: () => {}, send: (prompt) => ({ code: prompt === V10_BRIEFING ? 0 : 2, stderr: "DISPATCH-BRIEFING-DIGEST-MISMATCH" }) };
     assert.throws(() => checkV10(digestOfStaleFile)); // names no expected/observed digest -> not a typed, evidenced refusal
+  });
+});
+
+// V-10 PRODUCER (ALF-C-P19-05D). ALF-C-P19-05C bound the digest guard-side only: no product flow wrote the
+// record, so nothing ever put one where the guard looks and the binding never fired. The producer module builds
+// the record with the guard's own exports and writes it at evidence/dispatch-route-<sliceId>.json. Like the guard,
+// it is exercised through a child process, so a regression of an import-time side effect fails loudly here.
+const PRODUCER = fileURLToPath(new URL("../dispatch-briefing-route-record.mjs", import.meta.url));
+
+function producerExport(name, argument, runnerDir) {
+  const runner = join(runnerDir, "producer-runner.mjs");
+  writeFileSync(runner, "const m = await import(process.argv[2]); process.stdout.write(JSON.stringify(await m[process.argv[3]](JSON.parse(process.argv[4]))));\n");
+  const res = spawnSync(process.execPath, [runner, pathToFileURL(PRODUCER).href, name, JSON.stringify(argument)],
+    { input: "", encoding: "utf8", timeout: 20000 });
+  assert.equal(res.status, 0, `producer export ${name} failed: ${(res.stderr ?? "").slice(0, 300)}`);
+  return JSON.parse(res.stdout);
+}
+
+describe("V-10 a recorded route makes the binding fire: the producer writes what the guard reads", () => {
+  let root = null;
+  let sequence = 0;
+  let priorCeiling;
+  const send = (prompt) => {
+    sequence += 1;
+    const res = spawnSync(process.execPath, [GUARD], {
+      input: JSON.stringify({ tool_use_id: `v10-producer-pin-${process.pid}-${sequence}`, tool_name: "Task",
+        tool_input: { subagent_type: "pipeline-core:critic", prompt } }),
+      encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    return { code: res.status, stderr: res.stderr ?? "" };
+  };
+  const produce = (sliceId, briefing) => {
+    const result = producerExport("recordDispatchBriefingRoute", { root, prompt: briefing }, root);
+    assert.ok(["recorded", "replaced", "unchanged"].includes(result.status), `the producer must record the route: ${JSON.stringify(result)}`);
+    assert.equal(result.sliceId, sliceId);
+    return result;
+  };
+  const routeFile = (sliceId) => join(root, "evidence", `dispatch-route-${sliceId}.json`);
+
+  before(() => {
+    root = scratchDir("alf-c-p19-05d-v10-producer");
+    priorCeiling = process.env.GIT_CEILING_DIRECTORIES;
+    process.env.GIT_CEILING_DIRECTORIES = dirname(root); // fixture containment: no git call may climb out of scratch/
+    execFileSync("git", ["init", "-q"], { cwd: root, env: process.env });
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    recordConsentGiven({ rootDir: root });
+    assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true, "the fixture must be an enrolled governed root");
+  });
+  after(() => {
+    if (priorCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = priorCeiling;
+    if (root !== null) rmSync(root, { recursive: true, force: true });
+  });
+
+  test("V-10 the producer's record binds the sent text through the real hook: matching digest admitted, mismatching refused typed", () => {
+    checkV10({ bind: (sliceId, briefing) => { produce(sliceId, briefing); }, send });
+  });
+
+  test("V-10 the record sits at the route path the guard reads and carries the independently computed digest; a CRLF copy is admitted", () => {
+    produce(V10_SLICE, V10_BRIEFING);
+    const raw = readFileSync(routeFile(V10_SLICE), "utf8");
+    assert.deepEqual(JSON.parse(raw), { schema: "pipeline.dispatch-briefing-route.v1", sliceId: V10_SLICE, briefingSha256: sha256Of(V10_BRIEFING) });
+    assert.ok(raw.endsWith("\n"));
+    assert.equal(send(V10_BRIEFING.replace(/\n/g, "\r\n")).code, 0);
+  });
+
+  test("V-10 issuing a route for a new briefing replaces the binding: the new text is admitted, the old one refused typed", () => {
+    const next = V10_BRIEFING.replace("risk class high", "risk class medium");
+    produce(V10_SLICE, V10_BRIEFING);
+    produce(V10_SLICE, next);
+    assert.equal(send(next).code, 0);
+    const stale = send(V10_BRIEFING);
+    assert.equal(stale.code, 2);
+    assert.ok(stale.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"), stale.stderr.slice(0, 300));
+    assert.ok(stale.stderr.includes(sha256Of(next)) && stale.stderr.includes(sha256Of(V10_BRIEFING)), "the refusal names both digests");
+  });
+
+  test("V-10 RED proof: with no producer call (the state before this slice) the one-byte-changed briefing is admitted and the same check fails", () => {
+    rmSync(join(root, "evidence"), { recursive: true, force: true });
+    assert.throws(() => checkV10({ bind: () => {}, send }));
+    assert.equal(send(V10_BRIEFING.replace("risk class high", "risk class hugh")).code, 0, "no record, no binding: the unrouted briefing goes through");
+  });
+
+  test("V-10 RED proof: a producer that binds a briefing FILE name instead of the text actually sent fails the same check", () => {
+    const fileDigest = (sliceId) => {
+      mkdirSync(join(root, "evidence"), { recursive: true });
+      const record = { schema: "pipeline.dispatch-briefing-route.v1", sliceId, briefingSha256: sha256Of("scratch/briefing.md") };
+      writeFileSync(routeFile(sliceId), `${JSON.stringify(record)}\n`);
+    };
+    assert.throws(() => checkV10({ bind: fileDigest, send }));
   });
 });
 
