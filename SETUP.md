@@ -354,6 +354,74 @@ change. Do not paste a pipeline source's `pipeline.user.yaml` into an
 application repository or make a legacy authority look current by copying
 generated runtime files.
 
+### Uninstalling from a repository
+
+A repository that once opted in can be released again. The plugin ships a
+journaled, resumable uninstall controller that removes the Pipeline's own
+mechanics and keeps everything you wrote. Replace `<absolute-plugin-root>` with
+the installed Pipeline plugin directory and `<repo>` with the repository root.
+
+1. **Plan** (read-only; changes no byte). It prints one JSON document that
+   includes `planSha256` and the list of `conflicts`:
+
+   ```sh
+   node "<absolute-plugin-root>/scripts/project-uninstall.mjs" plan --root "<repo>"
+   ```
+
+   Resolve every entry in `conflicts` before you continue. A plan with
+   conflicts is refused by `apply` and nothing is changed.
+
+2. **Apply** the exact plan you reviewed by passing its digest back:
+
+   ```sh
+   node "<absolute-plugin-root>/scripts/project-uninstall.mjs" apply --root "<repo>" --plan-sha256 "<planSha256>" --activate
+   ```
+
+3. **Resume** after an interruption with the same flags. Each stage is journaled,
+   so the run continues from the last completed stage to the same end state:
+
+   ```sh
+   node "<absolute-plugin-root>/scripts/project-uninstall.mjs" resume --root "<repo>" --plan-sha256 "<planSha256>" --activate
+   ```
+
+The controller accepts only `--root`, `--plan-sha256` and `--activate`; there
+are no archive or retention flags. A refusal is a JSON document with the schema
+`pipeline.project-uninstall-error.v1`, a `code`, and exit status 1. Common codes:
+
+- `PU-FOREIGN-HOOK-CONFLICT`: a `pre-commit`, `commit-msg` or `pre-push` hook is
+  present that the Pipeline did not install. It is never touched; remove or
+  relocate it, then plan again.
+- `PU-SHARED-ACTIVE-WORKTREE`: another worktree of the same repository is still
+  governed. Release or decline that worktree first.
+- `PU-OWNERSHIP-CONFLICT`: a file the Pipeline owns was changed by someone
+  else, so the plan carries conflicts and `apply` changes nothing.
+- `PU-PLAN`: the digest or `--activate` flag does not match a current plan.
+- `PU-CLI`: an unknown verb or flag, a missing `--root`, or a malformed digest.
+
+What `apply` does, in order:
+
+- removes the owned `pre-commit`, `commit-msg` and `pre-push` shims first, so no
+  commit or push can reach a hook whose private state is being retired;
+- strips only the Pipeline-owned keys from projection files such as
+  `.claude/pipeline.json` and `.claude/pipeline.yaml`; unowned bytes stay
+  exactly as they were;
+- moves retained metadata, including the private hook state, under
+  `<git-common-dir>/pipeline-uninstall/<scopeKey>/<planSha256>/retained/`
+  instead of deleting it;
+- removes the owned Antigravity entries from `.agents/plugins.json`,
+  `.agents/hooks.json` and `.agents/external-hooks.json`;
+- writes the durable declined scope marker, so the repository is reported as
+  declined and not as an unevaluated candidate.
+
+What it keeps: `AGENTS.md`, `CLAUDE.md`, `architecture/`, `docs/`, `specs/`,
+`backlog/`, the whole Git history, user-scope stores, and `pipeline.user.yaml`.
+Ordinary `git commit` and `git push` keep working throughout.
+
+Re-onboarding later is an ordinary enrollment of the same repository; the
+retained records stay intact. Removing the plugin from a runner globally
+(Claude Code, Codex or Antigravity) is a separate step in that runner's own
+plugin manager. This controller releases one repository only.
+
 ### Missing prerequisite guidance in a consumer project
 
 The installed plugin's read-only toolchain preflight reports each configured

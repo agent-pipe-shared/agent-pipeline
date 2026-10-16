@@ -14,7 +14,8 @@ import {applyInstall as installPreCommit} from '../scripts/pre-commit-hook-insta
 import {applyInstall as installCommitMsg} from '../scripts/commit-msg-hook-install.mjs';
 import {applyInstall as installPrePush} from '../scripts/pre-push-hook-install.mjs';
 import {main as uninstallCli} from '../scripts/project-uninstall.mjs';
-export function git(root,args){const r=spawnSync('git',args,{cwd:root,encoding:'utf8',timeout:15000});assert.equal(r.status,0,JSON.stringify({args,stderr:r.stderr,error:r.error?.code}));return r.stdout.trim();}
+// GIT_CEILING_DIRECTORIES keeps repository discovery from climbing out of a fixture into the enclosing project checkout.
+export function git(root,args){const r=spawnSync('git',args,{cwd:root,encoding:'utf8',timeout:15000,env:{...process.env,GIT_CEILING_DIRECTORIES:dirname(root)}});assert.equal(r.status,0,JSON.stringify({args,stderr:r.stderr,error:r.error?.code}));return r.stdout.trim();}
 function yaml(v,level=0){const indent=' '.repeat(level);if(Array.isArray(v))return v.map(x=>typeof x==='object'?indent+'-\n'+yaml(x,level+2):indent+'- '+JSON.stringify(x)+'\n').join('');return Object.entries(v).map(([k,x])=>typeof x==='object'&&x!==null?indent+k+':\n'+yaml(x,level+2):indent+k+': '+JSON.stringify(x)+'\n').join('');}
 export function fixture(t,{hooks=true,keys=true,runners=['claude','codex']}={}){
  const base=mkdtempSync(join(tmpdir(),'uninstall-transaction-')),root=join(base,'repo');mkdirSync(root);t.after(()=>rmSync(base,{recursive:true,force:true}));git(root,['init','--initial-branch=main','-q']);git(root,['config','user.name','Fixture']);git(root,['config','user.email','fixture@example.invalid']);

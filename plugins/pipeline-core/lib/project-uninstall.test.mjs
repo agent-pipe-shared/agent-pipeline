@@ -8,7 +8,7 @@ function test(name, run) {
 }
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {cpSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync,existsSync,readdirSync,statSync} from 'node:fs';
+import {cpSync,linkSync,mkdirSync,mkdtempSync,readFileSync,rmSync,symlinkSync,writeFileSync,existsSync,readdirSync,statSync} from 'node:fs';
 import {tmpdir, devNull} from 'node:os';
 import {join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -131,8 +131,73 @@ test('AC34-T3: CLI apply prints the typed refusal with instructions',t=>{
  assert.equal(out.instructions?.hook,'.git/hooks/pre-commit');assert.equal(out.instructions?.removed,false);assert.equal(typeof out.instructions?.attendedStep,'string');assert(out.instructions.attendedStep.length>0);
 });
 
+// ALF-C-AC216-B4. An active pre-push hook appends its own log.jsonl to its private state directory (recordLog in
+// scripts/pre-push-hook-install.mjs), so a repository that ever pushed with the hook active must still plan clean and
+// uninstall: the log is the hook's own private state and is archived with the rest. Anything else stays foreign.
+const LOG_SCHEMA='pipeline.pre-push-hook-log.v1',LOG_AT='2026-10-17T08:15:30.123Z',LOG_COMMIT='a'.repeat(40);
+const logRecord=extra=>({schema:LOG_SCHEMA,at:LOG_AT,verdict:'allowed',commit:LOG_COMMIT,localRef:'refs/heads/main',remoteRef:'refs/heads/main',reasons:[],...extra});
+const logLine=record=>JSON.stringify(record)+'\n',goodLog=logLine(logRecord());
+// Every record shape recordLog can emit: allowed, allowed-with-warnings, blocked (with and without a commit), and the notes.
+const realisticLog=[logRecord(),logRecord({note:'push gate not configured or off',reasons:undefined}),logRecord({verdict:'allowed-with-warnings',reasons:['a warning']}),logRecord({verdict:'blocked',reasons:['evaluation fault']}),{schema:LOG_SCHEMA,at:LOG_AT,verdict:'blocked',note:'ref deletion',localRef:'(delete)',remoteRef:'refs/heads/gone'}].map(logLine).join('');
+const hookState=(f,name)=>observeGitHookFootprint({rootDir:f.root}).hooks.find(h=>h.name===name).state;
+function privateFootprint(f){return {statuses:observeGitHookFootprint({rootDir:f.root}).hooks.map(h=>h.status),config:readFileSync(join(f.root,'.git/config')),content:f.digests(),scope:f.scope.observe({rootDir:f.root}).state};}
+test('AC216-B4: a pre-push private directory holding the hook\'s own valid log.jsonl plans without a conflict, is archived with the rest, and the uninstall completes',t=>{
+ const f=fixture(t),state=hookState(f,'pre-push'),log=join(state,'log.jsonl');writeFileSync(log,realisticLog);
+ const before=f.digests(),plan=f.controller.plan({rootDir:f.root});
+ assert.deepEqual(plan.conflicts,[],'a repository that pushed with the hook active must plan clean');
+ const archive=plan.privateArchives.find(a=>a.path===state);assert(archive,'the pre-push private directory is planned for archiving');assert(archive.names.includes('log.jsonl'),'the log is part of the archived names');
+ const result=f.controller.apply(plan,options(plan));assert.equal(result.status,'uninstalled');completed(f,plan);
+ assert(!existsSync(state),'the live private directory left with the hook');
+ const retained=join(result.retainedMetadataPath,'private-'+plan.privateArchives.indexOf(archive));
+ assert.deepEqual(readFileSync(join(retained,'log.jsonl')),Buffer.from(realisticLog),'the log is archived byte for byte, not deleted');assert.deepEqual(f.digests(),before);
+ // The same holds for an empty log and for a repository whose hook never logged at all.
+ const empty=fixture(t);writeFileSync(join(hookState(empty,'pre-push'),'log.jsonl'),'');const emptyPlan=empty.controller.plan({rootDir:empty.root});assert.deepEqual(emptyPlan.conflicts,[]);
+ empty.controller.apply(emptyPlan,options(emptyPlan));completed(empty,emptyPlan);
+});
+test('AC216-B4: a log.jsonl whose content is not exactly the pre-push hook\'s own record schema is foreign private state (PU-PRIVATE-FOREIGN) and nothing changes',t=>{
+ const f=fixture(t),state=hookState(f,'pre-push'),log=join(state,'log.jsonl'),shims=f.controller.plan({rootDir:f.root}).git.hooks.map(h=>h.hookPath);
+ const invalid=[
+  ['a malformed line after a valid record',goodLog+'{"schema":"'+LOG_SCHEMA+'",\n'],
+  ['a torn final line',goodLog+JSON.stringify(logRecord()).slice(0,40)],
+  ['a blank line between records',goodLog+'\n'+goodLog],
+  ['a record that is an array','[]\n'],['a record that is null','null\n'],['a record that is a string','"text"\n'],
+  ['another schema version',logLine(logRecord({schema:'pipeline.pre-push-hook-log.v2'}))],['no schema',logLine(logRecord({schema:undefined}))],
+  ['a timestamp that is not an ISO instant',logLine(logRecord({at:'yesterday'}))],['a timestamp that is not a string',logLine(logRecord({at:1760689000000}))],['no timestamp',logLine(logRecord({at:undefined}))],
+  ['a verdict the hook never writes',logLine(logRecord({verdict:'approved'}))],['no verdict',logLine(logRecord({verdict:undefined}))],
+  ['a key the hook never writes',logLine(logRecord({exfil:'x'}))],['a prototype key',goodLog.replace('{','{"__proto__":{"x":1},')],
+  ['a commit that is not a string',logLine(logRecord({commit:7}))],['reasons that are not an array',logLine(logRecord({reasons:'text'}))],['a reason that is not a string',logLine(logRecord({reasons:['ok',{nested:true}]}))],
+  ['bytes that are not UTF-8',Buffer.concat([Buffer.from(goodLog),Buffer.from([0xff,0xfe,0x0a])])],['foreign text','user notes\n'],
+ ];
+ const baseline=privateFootprint(f);
+ for(const [name,bytes] of invalid){
+  writeFileSync(log,bytes);const plan=f.controller.plan({rootDir:f.root});
+  assert.deepEqual(plan.conflicts.map(c=>[c.code,c.path]),[['PU-PRIVATE-FOREIGN',state]],name);
+  assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-OWNERSHIP-CONFLICT',name);assert(!existsSync(plan.controls),name+': no controls were created');
+  assert.deepEqual(readFileSync(log),Buffer.from(bytes),name+': the log itself is untouched');assert(shims.every(path=>existsSync(path)),name+': the shims stay');assert.deepEqual(privateFootprint(f),baseline,name);
+ }
+ // Control: the valid record next to which each of the above was written is itself admitted.
+ writeFileSync(log,goodLog);assert.deepEqual(f.controller.plan({rootDir:f.root}).conflicts,[]);
+});
+test('AC216-B4: log.jsonl is admitted only as the pre-push hook\'s own regular file in a directory holding nothing else foreign',t=>{
+ const f=fixture(t),state=hookState(f,'pre-push'),other=hookState(f,'pre-commit'),log=join(state,'log.jsonl'),outside=join(f.base,'outside.jsonl'),shims=f.controller.plan({rootDir:f.root}).git.hooks.map(h=>h.hookPath),baseline=privateFootprint(f);
+ const refused=(name,at,code)=>{const plan=f.controller.plan({rootDir:f.root});assert.deepEqual(plan.conflicts.map(c=>[c.code,c.path]),[[code,at]],name);assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-OWNERSHIP-CONFLICT',name);assert(!existsSync(plan.controls),name);assert(shims.every(path=>existsSync(path)),name);};
+ // A valid log next to a foreign extra file.
+ writeFileSync(log,goodLog);writeFileSync(join(state,'notes.txt'),'foreign\n');refused('a foreign extra file beside a valid log',state,'PU-PRIVATE-FOREIGN');rmSync(join(state,'notes.txt'));
+ // Only pre-push writes this file: the same valid record in another hook's private directory is foreign there.
+ rmSync(log);writeFileSync(join(other,'log.jsonl'),goodLog);refused('a log.jsonl in the pre-commit private directory',other,'PU-PRIVATE-FOREIGN');rmSync(join(other,'log.jsonl'));
+ // Same rigour as the decline marker: a regular file with one link and no symlink anywhere on the path.
+ mkdirSync(log);refused('a directory named log.jsonl',state,'PU-FILE');rmSync(log,{recursive:true});
+ writeFileSync(outside,goodLog);linkSync(outside,log);refused('a hard-linked log.jsonl',state,'PU-FILE');rmSync(log);
+ let symlinked=true;try{symlinkSync(outside,log);}catch(e){if(!['EPERM','EACCES','ENOSYS','UNKNOWN'].includes(e.code))throw e;symlinked=false;}
+ if(symlinked){refused('a symlinked log.jsonl',state,'PU-ALIAS');rmSync(log);}
+ // Control: with the foreign shapes removed the directory plans clean again, and the host's symlink capability is the only variable above.
+ writeFileSync(log,goodLog);assert.deepEqual(f.controller.plan({rootDir:f.root}).conflicts,[]);
+ assert.deepEqual(readFileSync(outside,'utf8'),goodLog,'the file outside the private directory was never touched'+(symlinked?'':' (symlink creation unavailable on this host)'));
+ assert.deepEqual(privateFootprint(f),baseline);
+});
+
 // Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 12) throw new Error("Required completion declared case count drift");
+if (completionCases.length !== 15) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
