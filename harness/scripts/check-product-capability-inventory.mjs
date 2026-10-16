@@ -246,9 +246,11 @@ function checkoutSource(root) {
 }
 
 /** Read only regular tracked blobs from one already-verified baseline commit. */
-function committedSource(root, commit) {
+const COMMITTED_SOURCE_MAX_BUFFER = 256 * 1024 * 1024;
+
+export function committedSource(root, commit) {
   const listing = execFileSync("git", ["ls-tree", "-r", "-z", commit], {
-    cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+    cwd: root, encoding: "utf8", maxBuffer: COMMITTED_SOURCE_MAX_BUFFER, stdio: ["ignore", "pipe", "ignore"],
   });
   const files = new Set();
   for (const row of listing.split("\0")) {
@@ -260,7 +262,7 @@ function committedSource(root, commit) {
     exists(path) { return files.has(path) || [...files].some((file) => file.startsWith(`${path}/`)); },
     read(path) {
       if (!files.has(path)) throw new Error(`baseline source path is unavailable: ${path}`);
-      return execFileSync("git", ["show", `${commit}:${path}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      return execFileSync("git", ["show", `${commit}:${path}`], { cwd: root, encoding: "utf8", maxBuffer: COMMITTED_SOURCE_MAX_BUFFER, stdio: ["ignore", "pipe", "ignore"] });
     },
     walk(start, accept) { return [...files].filter((path) => path.startsWith(`${start}/`) && accept(path)).sort(utf8Compare); },
   };
