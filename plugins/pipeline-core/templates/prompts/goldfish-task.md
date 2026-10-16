@@ -518,6 +518,14 @@ and targeted GREEN in one context. Preserve the batch's original review budget
 and exact candidate lineage. Existing acceptance examiner changes remain
 bounded and independently scrutinized under QG-04.
 
+Preserve the original criterion, RED-before-fix evidence and test assertions.
+The owner MUST NOT weaken, skip or delete existing acceptance examiners. A
+necessary change to an existing examiner requires a bounded written justification tied to the original criterion, preserves the original failing/acceptance evidence, and receives independent scrutiny under QG-04.
+Do not rewrite the repro assertions merely to make the fix GREEN; any necessary
+correction must preserve the reported behavior and retain the original RED and
+assertions for independent review. A conflicting examiner is a stop condition
+until the allowed correction is established.
+
 ---
 
 ## Final report (mandatory format, target ≤ 1,000 tokens, hard max 40 lines)
