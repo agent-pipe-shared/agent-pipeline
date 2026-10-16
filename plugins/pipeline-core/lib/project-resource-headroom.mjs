@@ -116,3 +116,75 @@ export function reportProjectResourceHeadroom(input) {
     }),
   };
 }
+
+/*
+ * Run-time budget headroom (ALF-C-P5-04B, AC-233; PO decisions 2026-10-16 #26/#29).
+ *
+ * The budget is a RUN-TIME budget per run: an optional calibration field
+ *   "resourceBudget": { "quickSeconds": <seconds>, "verifySeconds": <seconds> }
+ * compared with the measured wall-clock seconds of that Quick or Verify run.
+ * No (valid) budget -> "unknown". INFORMATION ONLY: nothing here returns or
+ * accepts an exit code, and runHeadroomInfoLine() never throws, so wiring it
+ * after a run cannot block, fail or change that run's result.
+ */
+export const RUN_TIME_BUDGET_KEYS = Object.freeze({ quick: 'quickSeconds', verify: 'verifySeconds' });
+const RUN_PREFIX = 'Resource headroom (run time): ';
+const INFO_ONLY = 'information only';
+const positiveSeconds = (value) => typeof value === 'number' && Number.isFinite(value) && value > 0;
+const measuredOk = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const seconds = (value) => String(Number(value.toFixed(3)));
+const budgetKey = (kind) => (typeof kind === 'string' && Object.hasOwn(RUN_TIME_BUDGET_KEYS, kind) ? RUN_TIME_BUDGET_KEYS[kind] : null);
+
+/** Pure: budget minus measured seconds; "unknown" whenever either side is absent or invalid. */
+export function headroomForRun(input) {
+  const given = input !== null && typeof input === 'object' ? input : {};
+  const budget = given.budgetSeconds;
+  const measured = given.measuredSeconds;
+  if (!positiveSeconds(budget) || !measuredOk(measured)) {
+    return {
+      status: 'unknown',
+      budgetSeconds: positiveSeconds(budget) ? budget : null,
+      measuredSeconds: measuredOk(measured) ? measured : null,
+      headroomSeconds: null,
+    };
+  }
+  const headroomSeconds = budget - measured;
+  return { status: headroomSeconds >= 0 ? 'within' : 'exceeded', budgetSeconds: budget, measuredSeconds: measured, headroomSeconds };
+}
+
+/** Pure: read the declared run-time budget for `kind` from a parsed calibration; undefined when none. */
+export function readRunBudgetSeconds(calibration, kind) {
+  const key = budgetKey(kind);
+  if (key === null || calibration === null || typeof calibration !== 'object' || !Object.hasOwn(calibration, 'resourceBudget')) return undefined;
+  const budget = calibration.resourceBudget;
+  if (budget === null || typeof budget !== 'object' || !Object.hasOwn(budget, key)) return undefined;
+  return budget[key];
+}
+
+/** Pure: one single-line, information-only rendering of a headroomForRun() result. */
+export function formatRunHeadroomLine(result, kind) {
+  if (result !== null && typeof result === 'object'
+    && [result.budgetSeconds, result.measuredSeconds, result.headroomSeconds].every(Number.isFinite)) {
+    const { budgetSeconds: b, measuredSeconds: m, headroomSeconds: h } = result;
+    if (result.status === 'within' && h >= 0) return `${RUN_PREFIX}within - budget ${seconds(b)} s, measured ${seconds(m)} s, headroom ${seconds(h)} s (${INFO_ONLY})`;
+    if (result.status === 'exceeded' && h < 0) return `${RUN_PREFIX}exceeded - budget ${seconds(b)} s, measured ${seconds(m)} s, over by ${seconds(-h)} s (${INFO_ONLY}; result and exit code unchanged)`;
+  }
+  const key = budgetKey(kind);
+  return key === null
+    ? `${RUN_PREFIX}unknown - run kind not recognised (${INFO_ONLY})`
+    : `${RUN_PREFIX}unknown - no valid run-time budget declared (resourceBudget.${key}) or no valid measurement (${INFO_ONLY})`;
+}
+
+/**
+ * The one call a Quick or Verify summary makes after its result. Never throws:
+ * any error (including a throwing injected `headroom` reporter) prints "unknown".
+ */
+export function runHeadroomInfoLine(options) {
+  try {
+    const { kind, measuredSeconds, calibration, headroom = headroomForRun } = options ?? {};
+    const result = headroom({ budgetSeconds: readRunBudgetSeconds(calibration, kind), measuredSeconds });
+    return formatRunHeadroomLine(result, kind);
+  } catch {
+    return `${RUN_PREFIX}unknown - headroom could not be computed (${INFO_ONLY})`;
+  }
+}

@@ -248,3 +248,157 @@ test('A3 CLI refuses a hard-linked input (nlink != 1)', async () => {
   assert.equal(r.code, 2);
   assert.equal(r.out, '');
 });
+
+// ---------------------------------------------------------------------------
+// A5-A7 (ALF-C-P5-04B; PO decisions 2026-10-16 #26/#29): the headroom is surfaced
+// where work happens. The budget is a RUN-TIME budget per run, an optional
+// calibration field resourceBudget.{quickSeconds,verifySeconds}, compared with the
+// measured run time; no valid budget -> unknown; INFORMATION ONLY - it never blocks,
+// fails or changes an exit code.
+//   A5 within    A6 exceeded (still exit 0, same result)    A7 unknown (no budget /
+//   bad input / a throwing reporter), never an invented figure or a changed exit.
+// A8 pins the protected harness/scripts/verify.mjs wiring once its signature-bound
+// patch is applied (HEADROOM_PIN_VERIFY points the case at a patched scratch mirror).
+// ---------------------------------------------------------------------------
+const runtimeLib = await import(libUrl);
+const { headroomForRun, runHeadroomInfoLine } = runtimeLib;
+const needFunctions = () => {
+  assert.equal(typeof headroomForRun, 'function', 'headroomForRun is not exported (run-time headroom not implemented)');
+  assert.equal(typeof runHeadroomInfoLine, 'function', 'runHeadroomInfoLine is not exported (run-time headroom not implemented)');
+};
+const PREFIX = 'Resource headroom (run time): ';
+const BUDGET = { resourceBudget: { quickSeconds: 120, verifySeconds: 1800 } };
+const unknownLine = (key) => `${PREFIX}unknown - no valid run-time budget declared (resourceBudget.${key}) or no valid measurement (information only)`;
+const calibrated = (calibration) => {
+  const root = fixture();
+  mkdirSync(join(root, 'project'));
+  if (calibration !== undefined) {
+    writeFileSync(join(root, 'project', 'pipeline.json'), typeof calibration === 'string' ? calibration : JSON.stringify(calibration), { flag: 'wx' });
+  }
+  return root;
+};
+const runtimeArgs = (kind, value) => ['--run-time', kind, '--measured-seconds', String(value)];
+const subprocessRun = (root, argv) => spawnSync(process.execPath, [scriptPath, ...argv], { cwd: root, encoding: 'utf8' });
+
+test('A5 within: the run-time budget minus the measured run time is reported as headroom', () => {
+  needFunctions();
+  assert.deepEqual(headroomForRun({ budgetSeconds: 120, measuredSeconds: 30 }),
+    { status: 'within', budgetSeconds: 120, measuredSeconds: 30, headroomSeconds: 90 });
+  assert.deepEqual(headroomForRun({ budgetSeconds: 120, measuredSeconds: 120 }),
+    { status: 'within', budgetSeconds: 120, measuredSeconds: 120, headroomSeconds: 0 });
+  const quick = runHeadroomInfoLine({ kind: 'quick', measuredSeconds: 30, calibration: BUDGET });
+  assert.equal(quick, `${PREFIX}within - budget 120 s, measured 30 s, headroom 90 s (information only)`);
+  const verify = runHeadroomInfoLine({ kind: 'verify', measuredSeconds: 600.5, calibration: BUDGET });
+  assert.equal(verify, `${PREFIX}within - budget 1800 s, measured 600.5 s, headroom 1199.5 s (information only)`);
+  assert.equal(`${quick}${verify}`.includes('\n'), false);
+});
+
+test('A5 Quick surface: the CLI run-time mode reads the calibration budget and prints the within line, exit 0', () => {
+  const root = calibrated(BUDGET);
+  const quick = subprocessRun(root, runtimeArgs('quick', 30));
+  assert.equal(quick.status, 0, quick.stderr);
+  assert.equal(quick.stderr, '');
+  assert.equal(quick.stdout, `${PREFIX}within - budget 120 s, measured 30 s, headroom 90 s (information only)\n`);
+  const verify = subprocessRun(root, runtimeArgs('verify', 30));
+  assert.equal(verify.status, 0, verify.stderr);
+  assert.equal(verify.stdout, `${PREFIX}within - budget 1800 s, measured 30 s, headroom 1770 s (information only)\n`);
+});
+
+test('A6 exceeded: negative headroom is reported as exceeded, still exit 0 and the same result', async () => {
+  needFunctions();
+  assert.deepEqual(headroomForRun({ budgetSeconds: 120, measuredSeconds: 150.25 }),
+    { status: 'exceeded', budgetSeconds: 120, measuredSeconds: 150.25, headroomSeconds: -30.25 });
+  const line = runHeadroomInfoLine({ kind: 'quick', measuredSeconds: 150.25, calibration: BUDGET });
+  assert.equal(line, `${PREFIX}exceeded - budget 120 s, measured 150.25 s, over by 30.25 s (information only; result and exit code unchanged)`);
+  const root = calibrated(BUDGET);
+  const over = subprocessRun(root, runtimeArgs('quick', 150.25));
+  const within = subprocessRun(root, runtimeArgs('quick', 30));
+  assert.equal(over.status, 0, over.stderr);
+  assert.equal(over.stderr, '');
+  assert.equal(over.stdout, `${line}\n`);
+  assert.equal(over.status, within.status, 'exceeding the budget must not change the exit code');
+  const inProcess = await runMain(root, runtimeArgs('verify', 99999));
+  assert.equal(inProcess.code, 0);
+  assert.equal(inProcess.err, '');
+  assert.match(inProcess.out, /^Resource headroom \(run time\): exceeded - budget 1800 s, measured 99999 s, over by 98199 s /u);
+});
+
+test('A7 unknown when no valid budget or measurement exists - never an invented figure', async () => {
+  needFunctions();
+  for (const budgetSeconds of [undefined, null, 0, -5, Number.NaN, Infinity, '120', true, {}, []]) {
+    assert.deepEqual(headroomForRun({ budgetSeconds, measuredSeconds: 30 }),
+      { status: 'unknown', budgetSeconds: null, measuredSeconds: 30, headroomSeconds: null }, String(budgetSeconds));
+  }
+  for (const measuredSeconds of [undefined, null, -1, Number.NaN, Infinity, '30']) {
+    assert.deepEqual(headroomForRun({ budgetSeconds: 120, measuredSeconds }),
+      { status: 'unknown', budgetSeconds: 120, measuredSeconds: null, headroomSeconds: null }, String(measuredSeconds));
+  }
+  for (const input of [undefined, null, 'x', 5]) assert.equal(headroomForRun(input).status, 'unknown');
+  for (const calibration of [undefined, null, {}, [], 'text', { resourceBudget: null }, { resourceBudget: {} },
+    { resourceBudget: { quickSeconds: 'soon' } }, { resourceBudget: { quickSeconds: 0 } }, { resourceBudget: { verifySeconds: 1800 } }]) {
+    assert.equal(runHeadroomInfoLine({ kind: 'quick', measuredSeconds: 30, calibration }), unknownLine('quickSeconds'), JSON.stringify(calibration));
+  }
+  assert.equal(runHeadroomInfoLine({ kind: 'quick', measuredSeconds: undefined, calibration: BUDGET }), unknownLine('quickSeconds'));
+  assert.equal(runHeadroomInfoLine({ kind: 'bogus', measuredSeconds: 30, calibration: BUDGET }), `${PREFIX}unknown - run kind not recognised (information only)`);
+  // The CLI: no calibration file, none of the key, malformed JSON, a non-object, an invalid budget - all unknown, all exit 0.
+  for (const calibration of [undefined, {}, '{not json', '[]', 'null', JSON.stringify({ resourceBudget: { quickSeconds: -1 } })]) {
+    const run = subprocessRun(calibrated(calibration), runtimeArgs('quick', 30));
+    assert.equal(run.status, 0, String(calibration));
+    assert.equal(run.stderr, '', String(calibration));
+    assert.equal(run.stdout, `${unknownLine('quickSeconds')}\n`, String(calibration));
+  }
+  // Bad run-time arguments still print one unknown line and never fail.
+  for (const argv of [['--run-time'], ['--run-time', 'quick'], ['--run-time', 'bogus', '--measured-seconds', '1'],
+    ['--run-time', 'quick', '--measured-seconds', '-1'], ['--run-time', 'quick', '--measured-seconds', '1e3'],
+    ['--run-time', 'quick', '--measured-seconds', 'NaN'], ['--run-time', 'quick', '--measured-seconds', '1', 'x']]) {
+    const r = await runMain(calibrated(BUDGET), argv);
+    assert.equal(r.code, 0, JSON.stringify(argv));
+    assert.equal(r.err, '', JSON.stringify(argv));
+    assert.match(r.out, /^Resource headroom \(run time\): unknown - [^\n]*\n$/u, JSON.stringify(argv));
+  }
+});
+
+test('A7 a throwing reporter prints unknown and never throws or changes the exit code', async () => {
+  needFunctions();
+  const boom = () => { throw new Error('reporter exploded SECRET-MARKER-5521'); };
+  const line = runHeadroomInfoLine({ kind: 'verify', measuredSeconds: 5, calibration: BUDGET, headroom: boom });
+  assert.equal(line, `${PREFIX}unknown - headroom could not be computed (information only)`);
+  assert.equal(line.includes('SECRET'), false);
+  assert.match(runHeadroomInfoLine(null), /^Resource headroom \(run time\): unknown - /u);
+  assert.equal(runHeadroomInfoLine({ kind: 'verify', measuredSeconds: 5, calibration: BUDGET, headroom: () => ({ status: 'within', budgetSeconds: 'x' }) }),
+    unknownLine('verifySeconds'));
+  assert.equal(runHeadroomInfoLine({ kind: 'verify', measuredSeconds: 5, calibration: BUDGET, headroom: () => ({ status: 'within', budgetSeconds: 10, measuredSeconds: 5, headroomSeconds: -5 }) }),
+    unknownLine('verifySeconds'));
+  const out = [];
+  const err = [];
+  const code = await cli.main({ argv: runtimeArgs('verify', 5), stdout: { write: s => { out.push(s); } }, stderr: { write: s => { err.push(s); } },
+    cwd: calibrated(BUDGET), headroom: boom });
+  assert.equal(code, 0);
+  assert.deepEqual(err, []);
+  assert.equal(out.join(''), `${PREFIX}unknown - headroom could not be computed (information only)\n`);
+  const unreadable = await cli.main({ argv: runtimeArgs('quick', 5), stdout: { write: s => { out.push(s); } }, stderr: { write: s => { err.push(s); } },
+    cwd: calibrated(BUDGET), readCalibration: async () => { throw new Error('unreadable'); } });
+  assert.equal(unreadable, 0);
+  assert.equal(out.at(-1), `${unknownLine('quickSeconds')}\n`);
+  const closed = await cli.main({ argv: runtimeArgs('quick', 5), stdout: { write: () => { throw new Error('EPIPE'); } }, stderr: { write: () => {} }, cwd: calibrated(BUDGET) });
+  assert.equal(closed, 0);
+});
+
+const verifyTarget = process.env.HEADROOM_PIN_VERIFY ?? join(repository, 'harness', 'scripts', 'verify.mjs');
+const verifySource = readFileSync(verifyTarget, 'utf8');
+const WIRING_PENDING = 'signature-bound patch: harness/scripts/verify.mjs is TP-3 protected; the Verify wiring ships as '
+  + 'scratch/patches/ALF-C-P5-04B.patch and this case activates once it is applied (or HEADROOM_PIN_VERIFY points at a patched mirror)';
+test('A8 Verify prints the run-time headroom line after the result, guarded, without touching the exit code',
+  { skip: verifySource.includes('runHeadroomInfoLine') ? false : WIRING_PENDING }, () => {
+    const overall = verifySource.indexOf('console.log(`Overall:');
+    const call = verifySource.indexOf('runHeadroomInfoLine');
+    const exit = verifySource.indexOf('process.exit(finalExitCode)');
+    assert.ok(overall >= 0 && overall < call && call < exit, 'the headroom call must sit between the Overall line and the final exit');
+    const wired = verifySource.slice(overall, exit);
+    assert.match(wired, /try \{[\s\S]*runHeadroomInfoLine[\s\S]*\} catch \{[\s\S]*Resource headroom \(run time\): unknown/u);
+    assert.match(wired, /kind: "verify"/u);
+    // The block ends where the ORIGINAL `const finalExitCode = ...` begins; nothing in between may touch an exit code.
+    const finalDeclaration = verifySource.indexOf('const finalExitCode');
+    assert.ok(call < finalDeclaration && finalDeclaration < exit, 'finalExitCode must still be computed after the headroom block');
+    assert.equal(/process\.exit|[eE]xitCode\s*=/u.test(verifySource.slice(call, finalDeclaration)), false, 'the headroom block must not touch the exit code');
+  });

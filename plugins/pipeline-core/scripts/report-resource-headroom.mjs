@@ -5,14 +5,24 @@
  * Or pass a bounded observation JSON document on stdin. Read-only diagnostic;
  * exit 0 means the report was emitted, never that a project check passed.
  * Source and artifact references are declared data and are never opened here.
+ *
+ * Run-time mode (the Quick surface; Verify prints the same line in-process):
+ *   node report-resource-headroom.mjs --run-time <quick|verify> --measured-seconds <seconds>
+ * prints ONE information line comparing the measured run time with the optional
+ * calibration field resourceBudget.quickSeconds / resourceBudget.verifySeconds.
+ * Information only: it always exits 0, and any problem (no budget, unreadable
+ * calibration, bad arguments, a throwing reporter) prints "unknown".
  */
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { TextDecoder } from 'node:util';
 import { isDirectInvocation } from '../lib/entrypoint.mjs';
-import { ResourceHeadroomError, reportProjectResourceHeadroom } from '../lib/project-resource-headroom.mjs';
+import {
+  RUN_TIME_BUDGET_KEYS, ResourceHeadroomError, reportProjectResourceHeadroom, runHeadroomInfoLine,
+} from '../lib/project-resource-headroom.mjs';
 
 const MAX_INPUT_BYTES = 65536;
+const MAX_CALIBRATION_BYTES = 262144;
 const PRIVATE_ROOTS = new Set(['.git', '.ssh', '.aws', '.codex', '.agents', '.claude', '.pipeline']);
 const fail = (message) => { throw new ResourceHeadroomError(message); };
 
@@ -26,6 +36,26 @@ export function parseResourceHeadroomArgs(argv) {
     || /[\\:\x00-\x1f\x7f]/u.test(input) || parts.some(part => part === '' || part === '.' || part === '..')
     || PRIVATE_ROOTS.has(parts[0])) fail('Input must be a public repository-relative JSON path.');
   return { input };
+}
+
+/** Run-time mode grammar: exactly --run-time <quick|verify> --measured-seconds <decimal>. */
+export function parseRunTimeArgs(argv) {
+  if (!Array.isArray(argv) || argv.length !== 4 || argv[0] !== '--run-time' || argv[2] !== '--measured-seconds'
+    || typeof argv[1] !== 'string' || typeof argv[3] !== 'string') fail('Expected only --run-time <quick|verify> --measured-seconds <seconds>.');
+  if (!Object.hasOwn(RUN_TIME_BUDGET_KEYS, argv[1])) fail('Run kind must be quick or verify.');
+  if (argv[3].length > 24 || !/^(?:0|[1-9]\d*)(?:\.\d+)?$/u.test(argv[3])) fail('Measured seconds must be a nonnegative decimal number.');
+  return { kind: argv[1], measuredSeconds: Number(argv[3]) };
+}
+
+/** Read the project calibration (resolved authority tier) read-only; null on any problem. */
+export async function readRunTimeCalibration(cwd) {
+  try {
+    const { resolveAuthorityArtifactPath } = await import('../lib/project-authority.mjs');
+    const { path } = resolveAuthorityArtifactPath('calibration', { rootDir: cwd });
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.size > MAX_CALIBRATION_BYTES) return null;
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch { return null; }
 }
 
 function sameFile(left, right) {
@@ -80,8 +110,23 @@ async function readStdin(stdin) {
   return Buffer.concat(chunks);
 }
 
+/** Run-time mode: one information line, always exit 0, never throws. */
+async function runTimeHeadroomMain({ argv, stdout, cwd, readCalibration, headroom }) {
+  let parsed = null;
+  try { parsed = parseRunTimeArgs(argv); } catch { parsed = null; }
+  let calibration = null;
+  if (parsed !== null) {
+    try { calibration = await readCalibration(cwd); } catch { calibration = null; }
+  }
+  const line = runHeadroomInfoLine({ kind: parsed?.kind ?? null, measuredSeconds: parsed?.measuredSeconds ?? null, calibration, headroom });
+  try { stdout.write(`${line}\n`); } catch { /* information only: a closed stdout must not change the exit code */ }
+  return 0;
+}
+
 export async function main({ argv = process.argv.slice(2), stdin = process.stdin,
-  stdout = process.stdout, stderr = process.stderr, cwd = process.cwd() } = {}) {
+  stdout = process.stdout, stderr = process.stderr, cwd = process.cwd(),
+  readCalibration = readRunTimeCalibration, headroom } = {}) {
+  if (Array.isArray(argv) && argv[0] === '--run-time') return runTimeHeadroomMain({ argv, stdout, cwd, readCalibration, headroom });
   try {
     const args = parseResourceHeadroomArgs(argv);
     const bytes = args.input === null ? await readStdin(stdin) : readInputFile(cwd, args.input);
