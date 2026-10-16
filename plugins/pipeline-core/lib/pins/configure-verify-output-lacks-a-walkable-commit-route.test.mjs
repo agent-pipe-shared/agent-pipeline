@@ -308,17 +308,14 @@ test("refusal: a different staged set (an extra file beside the twins), private 
   assert.equal(existsSync(join(ctx.root, "extra.txt")), true);
 });
 
-// Typed todo, original assertion kept unchanged (not weakened, not deleted). Measured RED live on win32 (ALF-C-R1H
-// run 1: "extra staged file: the hook must refuse", actual 0): with the legacy TRACKED State, the hook's late-recovery
-// sanction (sanctionedLateVerifyRecoveryPaths) judges only the protected delta -- both twins baseline-only -> one
-// identical command over an established implementing HEAD State -- and an unprotected extra file in the same index is
-// not part of that judgement, so the commit lands. The exact-set check (CVCT-STAGED-SET) guards only the untracked-State
-// route above. Blocker (D, decision): whether the legacy tracked route must also refuse an unprotected extra file is a
-// product decision on scripts/pre-commit-hook-install.mjs, outside this pin's write scope. The body runs; if the hook
-// is ever tightened, this todo turns green and the todo marker is then to be removed.
-test("refusal: a different staged set (an extra file beside the twins)", {
-  todo: "D-decision: the tracked-State late-recovery route (sanctionedLateVerifyRecoveryPaths) admits an unprotected extra staged file; CVCT-STAGED-SET covers only the untracked-State route",
-}, () => {
+// The same refusal for the legacy TRACKED State. Measured RED live on win32 before the hook was tightened (ALF-C-R1H
+// run 1: "extra staged file: the hook must refuse", actual 0): the late-recovery sanction
+// (sanctionedLateVerifyRecoveryPaths) judged only the protected delta -- both twins baseline-only -> one identical
+// command over an established implementing HEAD State -- so an unprotected extra file in the same index was not part of
+// that judgement and the commit landed. The tracked route now applies the same exact-set rule as the untracked-State
+// route above (every staged path is a calibration twin, else the twins stay protected), so this case is a real green
+// case; its assertions are the original ones, unchanged.
+test("refusal: a different staged set (an extra file beside the twins)", () => {
   const ctx = { ...fixture({ stateTracked: true }) };
   ctx.before = ctx.head();
   const route = printedRoute(configure(ctx.root, ctx.env));

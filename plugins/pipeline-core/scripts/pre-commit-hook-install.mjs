@@ -620,9 +620,16 @@ function sanctionedVerifyTransitionPaths(projectRoot, paths) {
  * implementing lifecycle. Any malformed/missing twin, calibration drift,
  * staged state rewrite or extra protected rewrite stays on the ordinary
  * capability path and is refused there.
+ *
+ * The WHOLE staged set is judged, not only its protected delta: the same
+ * exact-set rule the untracked-State route enforces (CVCT-STAGED-SET, every
+ * staged path is a calibration twin). A file that no protection rule names,
+ * staged beside the twins, would otherwise ride along in a commit whose twins
+ * were exempted for a twins-only recovery, so it withholds the exemption.
  */
 function sanctionedLateVerifyRecoveryPaths(projectRoot, paths) {
   if (paths.includes(VERIFY_TRANSITION_STATE_PATH)) return new Set();
+  if (!paths.every((path) => VERIFY_CALIBRATION_PATHS.includes(path))) return new Set();
   const stagedCalibrations = paths.filter((path) => VERIFY_CALIBRATION_PATHS.includes(path));
   if (stagedCalibrations.length !== VERIFY_CALIBRATION_PATHS.length
     || !VERIFY_CALIBRATION_PATHS.every((path) => stagedCalibrations.includes(path))) return new Set();

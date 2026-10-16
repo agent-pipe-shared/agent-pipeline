@@ -550,6 +550,31 @@ test("installed hook: admits only the two calibration twins for the sanctioned l
   assert.equal(code, 0, stderr);
 });
 
+// AC-140 (pipeline.configure-verify-output-lacks-a-walkable-commit-route): the legacy TRACKED-State late recovery
+// must judge the whole staged set, exactly as the untracked-State route does (CVCT-STAGED-SET: every staged path is a
+// calibration twin), not only the protected delta. Without that, an unprotected file staged beside the two twins rides
+// along in a commit whose twins were exempted for a twins-only recovery.
+test("installed hook: refuses the sanctioned late verify recovery when an unprotected extra file is staged beside the two twins", { timeout: commitTestTimeout(1) }, () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-late-verify-extra-file");
+  writeEstablishedLateVerifyFixture(dir);
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and established implementation");
+  installHook(dir);
+  const before = git("rev-parse", "HEAD").stdout.trim();
+
+  writeEstablishedLateVerifyFixture(dir, { command: "node --test test.mjs" });
+  writeFileSync(join(dir, "extra.txt"), "extra\n");
+  assert.equal(git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json", "extra.txt").status, 0);
+  assert.deepEqual(git("diff", "--cached", "--name-only", "HEAD").stdout.trim().split(/\r?\n/u).sort(), [".claude/pipeline.json", "extra.txt", "project/pipeline.json"], "precondition: exactly the two twins plus the extra file are staged");
+  const { code, stderr } = commit(dir, "attempt late verify recovery with an extra staged file");
+  assert.notEqual(code, 0, "the twins are no longer exempt once the staged set is wider than the twins");
+  assert.match(stderr, /BLOCKED \(agent-pipeline pre-commit hook\)/);
+  assert.match(stderr, /GS-10 project\/pipeline\.json/);
+  assert.match(stderr, /GS-11 \.claude\/pipeline\.json/);
+  assert.equal(git("rev-parse", "HEAD").stdout.trim(), before, "no new commit");
+  assert.equal(existsSync(join(dir, "extra.txt")), true, "the extra file is left in the working tree");
+});
+
 test("installed hook: refuses a late verify rewrite when it also stages lifecycle state", { timeout: commitTestTimeout(1) }, () => {
   const { dir, git } = freshRepo("e2e-sanctioned-late-verify-state-rewrite");
   writeEstablishedLateVerifyFixture(dir, { updatedAt: "2026-09-13T12:00:00.000Z" });
