@@ -269,6 +269,79 @@ test("P5 a fresh lock from a different build yields the distinct lock-version-mi
   assert.equal(r.observed, true);
 });
 
+// ALF-C-P19-01C: every observer verdict (registered only / imported snapshot only / both with shadowing snapshot / neither)
+// pinned through the real observers and the host's prepare(), with the typed reason codes the host actually emits.
+// Finding (D): the host and the topology observer emit ATR-* / AT-* codes only; the IPA-AGY-* family lives solely in
+// install-agy.mjs (IPA-AGY-SOURCE-UNAVAILABLE) and is outside this item's write scope, so no IPA-AGY code is asserted here.
+const kinds = (plan) => plan.actions.map((a) => (a.kind === "cli" ? a.argv[1] : a.kind));
+const registerOnly = (f) => { rmSync(f.old, { recursive: true }); put(f.imports, { imports: [{ name: "foreign-plugin", source: "claude" }] }); };
+const loadedOf = (f, root) => observeAntigravityLoadedTopology({ loadedPluginRoot: root, configRoot: f.configRoot, workspaceRoot: f.workspaceRoot });
+
+test("P6 verdict registered-only: current loaded topology, host plans install without uninstall", () => {
+  const f = incident(); registerOnly(f);
+  const o = topo(f);
+  assert.equal(o.managed.candidates.length, 0); assert.equal(o.importState.entries.length, 0);
+  assert.equal(o.registries.global.entries.filter((e) => e.status === "observed").length, 1);
+  const loaded = loadedOf(f, f.approvedSourceRoot);
+  assert.equal(loaded.status, "current"); assert.equal(loaded.loadedKind, "direct"); assert.equal(loaded.managedContentMismatch, false);
+  const plan = createAntigravityRefreshHost(f.args).prepare();
+  assert.equal(plan.status, "prepared", JSON.stringify(plan));
+  assert.deepEqual(kinds(plan), ["validate", "install"]);
+});
+
+test("P6 verdict imported-snapshot-only: no registered plugin, loaded topology unverifiable, host plans uninstall/install and registry rebind", () => {
+  const f = incident();
+  put(f.global, { entries: [{ path: f.foreign, enabled: false }] });
+  const o = topo(f);
+  assert.equal(o.managed.candidates.length, 1); assert.equal(o.importState.entries.length, 1);
+  assert.equal(o.registries.global.entries.filter((e) => e.status === "observed").length, 0);
+  const loaded = loadedOf(f, f.old);
+  assert.equal(loaded.status, "unavailable"); assert.equal(loaded.reason, "AT-TOPOLOGY-UNVERIFIABLE", "snapshot with no registered plugin has no unambiguous source");
+  const plan = createAntigravityRefreshHost(f.args).prepare();
+  assert.equal(plan.status, "prepared", JSON.stringify(plan));
+  assert.deepEqual(kinds(plan), ["uninstall", "validate", "install", "owned-registry-rebind"]);
+  const noApproval = createAntigravityRefreshHost({ ...f.args, globalChangeApproved: false }).prepare();
+  assert.equal(noApproval.status, "refused"); assert.equal(noApproval.reason, "ATR-GLOBAL-SCOPE");
+});
+
+test("P6 verdict both, snapshot shadows registered plugin: refresh-required and the host plans lifecycle without a registry rebind", () => {
+  const f = incident();
+  const loaded = loadedOf(f, f.approvedSourceRoot);
+  assert.equal(loaded.status, "refresh-required"); assert.equal(loaded.managedContentMismatch, true);
+  const plan = createAntigravityRefreshHost(f.args).prepare();
+  assert.equal(plan.status, "prepared", JSON.stringify(plan));
+  assert.deepEqual(kinds(plan), ["uninstall", "validate", "install"]);
+  const noApproval = createAntigravityRefreshHost({ ...f.args, globalChangeApproved: false }).prepare();
+  assert.equal(noApproval.status, "refused"); assert.equal(noApproval.reason, "ATR-GLOBAL-SCOPE", "stale shadow never retired without explicit approval");
+});
+
+test("P6 verdict neither: loaded topology unverifiable, host plans install plus registry rebind", () => {
+  const f = incident(); registerOnly(f); put(f.global, { entries: [{ path: f.foreign, enabled: false }] });
+  const o = topo(f);
+  assert.equal(o.managed.candidates.length, 0); assert.equal(o.importState.entries.length, 0);
+  assert.equal(o.registries.global.entries.filter((e) => e.status === "observed").length, 0);
+  const loaded = loadedOf(f, f.approvedSourceRoot);
+  assert.equal(loaded.status, "unavailable"); assert.equal(loaded.reason, "AT-TOPOLOGY-UNVERIFIABLE");
+  const plan = createAntigravityRefreshHost(f.args).prepare();
+  assert.equal(plan.status, "prepared", JSON.stringify(plan));
+  assert.deepEqual(kinds(plan), ["validate", "install", "owned-registry-rebind"]);
+});
+
+test("P6 every refused verdict carries a typed ATR-* reason, never the untyped fallback and never an IPA-AGY code", () => {
+  const ambiguous = incident(); rmSync(ambiguous.old, { recursive: true });
+  put(ambiguous.imports, { imports: [{ name: "agent-pipeline-core", source: "antigravity" }] });
+  const unverifiable = incident(); writeFileSync(unverifiable.imports, "not json");
+  const oldCli = incident("1.2.11");
+  const conflict = incident(); const second = pluginTree(join(conflict.base, "second-copy"));
+  put(conflict.global, { entries: [{ path: second }] }); put(conflict.local, { entries: [{ path: conflict.approvedSourceRoot }] });
+  const expected = [[ambiguous, "ATR-MANAGED-IMPORT-AMBIGUOUS"], [unverifiable, "ATR-TOPOLOGY-UNVERIFIABLE"], [oldCli, "ATR-CLI-CAPABILITY"], [conflict, "ATR-OTHER-SCOPE-CONFLICT"]];
+  for (const [f, reason] of expected) {
+    const plan = createAntigravityRefreshHost({ ...f.args, ...(f === conflict ? { scope: "workspace", globalChangeApproved: false } : {}) }).prepare();
+    assert.equal(plan.status, "refused", reason); assert.equal(plan.reason, reason);
+    assert.doesNotMatch(plan.reason, /IPA-AGY|ATR-UNAVAILABLE/);
+  }
+});
+
 test("HOST-LIMITATION skip: directory-mode/symlink aliasing cases (owner Coordinator, due 2026-10-19, Linux/WSL run, PO decision K7)", { skip: process.platform === "win32" ? "host-limitation: directory symlinks unavailable on native Windows; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)" : false }, () => {
   const f = incident();
   const alias = join(f.workspaceRoot, "plugins", "pipeline-core");
