@@ -11,6 +11,8 @@ import { isSafeTaskId, normalizeDispatchRecordPath } from "./dispatch-record.mjs
 export const GOLDFISH_COMMIT_COMMAND_FLOW_SCHEMA = "pipeline.goldfish-commit-command-flow.v1";
 const TYPES = new Set(["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"]);
 const SCOPE = /^[a-z][a-z0-9-]{0,39}$/u;
+/** AC-185 clause C: machine-readable index.lock contract carried by each rendered step (render-only; never executed here). */
+const ON_INDEX_LOCK = Object.freeze({ retries: 1, then: "stop-and-report" });
 const fail = (code) => ({ ok: false, code, steps: [] });
 
 function oneLine(value, maxBytes) {
@@ -53,6 +55,7 @@ export function createGoldfishCommitCommandFlow({ taskId, type, scope, summary,
   return { ok: true, schema: GOLDFISH_COMMIT_COMMAND_FLOW_SCHEMA,
     code: "GF-COMMAND-PREVIEW-ONLY", taskId, paths: normalized,
     message, messagePath,
-    steps: [{ kind: "stage-exact-paths", ...stage }, { kind: "commit-exact-paths", ...commit }],
-    disclaimer: "Write `message` to `messagePath` with the Write tool first (this preview never writes it), then use each step's POSIX or PowerShell copyCommand for that shell, separately from the same repository root after reviewing the exact paths. The command field is POSIX only. This preview does not attest dispatch identity, stage files, commit, bypass hooks, or publish a dispatch record." };
+    steps: [{ kind: "stage-exact-paths", ...stage, onIndexLock: { ...ON_INDEX_LOCK } },
+      { kind: "commit-exact-paths", ...commit, onIndexLock: { ...ON_INDEX_LOCK } }],
+    disclaimer: "Write `message` to `messagePath` with the Write tool first (this preview never writes it), then use each step's POSIX or PowerShell copyCommand for that shell, separately from the same repository root after reviewing the exact paths. The command field is POSIX only. This preview does not attest dispatch identity, stage files, commit, bypass hooks, or publish a dispatch record. A step refused because .git/index.lock exists gets exactly one retry with the identical step; if it persists, stop and report, and never delete the lock file yourself." };
 }

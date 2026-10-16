@@ -48,6 +48,16 @@ test("legacy Goldfish command flow renders separate exact-path argv without shel
   assert.match(result.disclaimer, /does not attest dispatch identity/u);
 });
 
+test("AC-185: each rendered step carries the single index.lock retry contract and the disclaimer states it", () => {
+  const result = createGoldfishCommitCommandFlow(input);
+  assert.equal(result.ok, true);
+  for (const step of result.steps) assert.deepEqual(step.onIndexLock, { retries: 1, then: "stop-and-report" }, step.kind);
+  assert.match(result.disclaimer, /index\.lock exists gets exactly one retry with the identical step/u);
+  assert.match(result.disclaimer, /never delete the lock file yourself/u);
+  assert.deepEqual(runGoldfishCommitCommandFlow(PRODUCER_T_CLI_ARGS).steps.map((step) => step.onIndexLock),
+    [{ retries: 1, then: "stop-and-report" }, { retries: 1, then: "stop-and-report" }]);
+});
+
 test("legacy command flow refuses malformed paths, duplicate paths and unsafe message metadata", () => {
   assert.equal(createGoldfishCommitCommandFlow({ ...input, paths: ["src/regular.js", "src/regular.js"] }).code,
     "GF-COMMAND-PATH-ORDER");
