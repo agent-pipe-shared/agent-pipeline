@@ -25,6 +25,8 @@ import {
 import { main as sessionCleanupMain } from "../../scripts/session-cleanup.mjs";
 import { foreignDescriptorResidueWarning } from "../project-onboarding-v3.mjs";
 import { classifyActiveSessionDescriptors } from "../worktree-lifecycle.mjs";
+import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+import { clearRuntimeBarrier, completeKickoff, dispose, fakeDeps, initializeRestartRequiredRoot, root as onboardingRoot } from "../project-onboarding-v3.test.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 
@@ -136,6 +138,49 @@ test("AC-203 point 4: a foreign unavailable-owner descriptor leaves readiness re
     const own = loadSessionDescriptor(root, d.sessionId);
     assert.equal(foreignDescriptorResidueWarning({ root, deps: { requesterOwnerNonce: own.ownerNonce } }), null);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// Point 4 (real readiness): the full session-readiness evaluation, not only the warning decision.
+function realReadiness(path, deps = {}) {
+  return inspectProjectOnboardingV3({
+    runner: "codex", rootDir: path, intent: "session",
+    deps: {
+      ...fakeDeps,
+      requesterOwnerNonce: "",
+      planSessionCleanupRecovery() {
+        return { schema: "pipeline.session-cleanup-recovery-plan.v1", status: "cleanup-required" };
+      },
+      ...deps,
+    },
+  });
+}
+
+test("AC-203 point 4 (real readiness): the real readiness evaluation over a foreign unavailable-owner descriptor stays ready with the warning, descriptor bytes untouched", () => {
+  const previousNonce = process.env.PIPELINE_SESSION_OWNER_NONCE;
+  delete process.env.PIPELINE_SESSION_OWNER_NONCE;
+  const path = onboardingRoot();
+  try {
+    clearRuntimeBarrier(path, initializeRestartRequiredRoot(path));
+    completeKickoff(path);
+    const d = orphan(path, "hcv-ready");
+    const observed = realReadiness(path);
+    assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
+    const warnings = observed.diagnostics.filter((x) => x.code === "cleanup_residue_foreign");
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0].severity, "warning");
+    assert.equal(warnings[0].nextAction.argv[1], "plan-archive-orphan");
+    assert.deepEqual(readFileSync(d.path), d.bytes, "readiness must not touch the descriptor");
+    assert.equal(listActiveSessionDescriptors(path).length, 1);
+    // Contrast: the same descriptor seen as the requester's OWN keeps the non-ready result.
+    process.env.PIPELINE_SESSION_OWNER_NONCE = loadSessionDescriptor(path, d.sessionId).ownerNonce;
+    const own = realReadiness(path, { requesterOwnerNonce: undefined });
+    assert.notEqual(own.status, "ready", "the requester's own descriptor must still block readiness");
+    assert.deepEqual(readFileSync(d.path), d.bytes);
+  } finally {
+    if (previousNonce === undefined) delete process.env.PIPELINE_SESSION_OWNER_NONCE;
+    else process.env.PIPELINE_SESSION_OWNER_NONCE = previousNonce;
+    dispose(path);
+  }
 });
 
 test("AC-203 RED proof (point 1): an archive verb mirror with the removal branch deleted fails the point-1 assertions", () => {
