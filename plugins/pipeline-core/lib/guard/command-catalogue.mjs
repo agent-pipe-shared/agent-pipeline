@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
-import { APP_SERVER_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { exactRoot, simpleWords } from "./shell-grammar.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
 import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
@@ -149,6 +149,12 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
   if (script === PRE_PUSH_HOOK_INSTALL_SCRIPT) return args[0] === "--install" && args.length === 1;
+  // ALF-C-P8-02B (AC-167): a freshly reset clone in `draft` must be able to run the two mandatory-hook
+  // actions the preflight itself publishes, and nothing else. Each is ONE exact argv shape: the physical
+  // plugin script, `--root <this root>` and -- provisioning only -- a final `--apply`. No other flag, no
+  // other root, and no `--apply`-less or extra-argument variant is admitted.
+  if (script === CLONE_HOOK_READINESS_SCRIPT) return exactRoot(args, root, 0) && args[2] === "--apply" && args.length === 3;
+  if (script === REFRESH_MANDATORY_HOOKS_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   // F6 is an obligatory read-only diagnosis after governance bootstrap reports failure.
   if (script === resolve(root, "harness/scripts/check-observation-governance.mjs")) return args.length === 0;

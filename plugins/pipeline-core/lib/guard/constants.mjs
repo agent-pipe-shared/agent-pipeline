@@ -152,6 +152,12 @@ export const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../../scripts/pipel
 // A stale pipeline-owned hook must be able to invoke only its own exact updater.
 export const PRE_PUSH_HOOK_INSTALL_SCRIPT = fileURLToPath(new URL("../../scripts/pre-push-hook-install.mjs", import.meta.url));
 
+// ALF-C-P8-02B (AC-167): the two mandatory-hook actions pipeline-start-preflight.mjs publishes as its
+// `nextAction` (status hook-provisioning-required / hook-refresh-required). Identity only; the admitted
+// argv shape lives in command-catalogue.mjs.
+export const CLONE_HOOK_READINESS_SCRIPT = fileURLToPath(new URL("../../scripts/clone-hook-readiness.mjs", import.meta.url));
+export const REFRESH_MANDATORY_HOOKS_SCRIPT = fileURLToPath(new URL("../../scripts/refresh-mandatory-hooks.mjs", import.meta.url));
+
 export const OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../../scripts/observation-governance-bootstrap.mjs", import.meta.url));
 
 // The sole pre-bootstrap route that may inspect a runner's private transcript

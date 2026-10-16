@@ -670,7 +670,34 @@ export function resolveSanctionedScriptInvocation(command, root, options = {}) {
   // matched by physical identity, so forward-slash, backslash, MSYS (/d/...) and
   // repository-relative spellings of the SAME file resolve to the canonical spelling
   // (case-folded on win32). A different file, or any spelling with a "." / ".." segment, stays lexical.
-  return { script: canonicalSanctionedScript(script, root, platform) ?? script, args };
+  return { script: literalPluginRootPreflight(script, platform, options) ?? canonicalSanctionedScript(script, root, platform) ?? script, args };
+}
+
+/**
+ * ALF-C-P8-02B (AC-167): `pipeline-start/SKILL.md` prescribes the preflight with the placeholder spelling
+ * `${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs`. The guard sees that text, not the expansion,
+ * so it used to classify it as an unknown opaque script. Exactly this one word resolves to the physical
+ * START_PREFLIGHT_SCRIPT (so every argv/extra-argument rule that already governs that script still applies);
+ * on win32 the comparison is case-folded, the same physical-identity rule the canonical constants use. A
+ * different variable, script, separator or trailing text stays lexical and therefore refused. When the guard
+ * process itself can see a non-empty PIPELINE_PLUGIN_ROOT it must designate THIS plugin's preflight, so the
+ * placeholder can never name a foreign script; an unset variable expands to nothing and cannot name one.
+ */
+function literalPluginRootPreflight(script, platform, options) {
+  const literal = "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs";
+  if (typeof script !== "string") return null;
+  const win = platform === "win32";
+  if (win ? script.toLowerCase() !== literal.toLowerCase() : script !== literal) return null;
+  const declared = (options.env ?? process.env).PIPELINE_PLUGIN_ROOT;
+  if (declared === undefined || declared === "") return START_PREFLIGHT_SCRIPT;
+  if (typeof declared !== "string" || /[\x00-\x1f\x7f]/u.test(declared)) return null;
+  const physical = (value) => {
+    let real;
+    try { real = realpathSync(value); } catch { return null; }
+    return win ? real.replace(/\\/gu, "/").toLowerCase() : real;
+  };
+  const target = physical(resolve(declared, "scripts/pipeline-start-preflight.mjs"));
+  return target !== null && target === physical(START_PREFLIGHT_SCRIPT) ? START_PREFLIGHT_SCRIPT : null;
 }
 
 function canonicalSanctionedScript(script, root, platform) {
