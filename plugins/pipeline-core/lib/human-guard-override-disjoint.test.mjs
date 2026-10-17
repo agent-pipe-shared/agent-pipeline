@@ -38,7 +38,9 @@ import {
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import test from "node:test";
+import { availableParallelism } from "node:os";
+import nodeTest from "node:test";
+import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 
 import {
   authorizeHumanGuardOverride,
@@ -172,6 +174,57 @@ function assertDriftRefusal(root, result, label, driftedChecks, requestSha256 = 
   assert.equal(result.status, "replan", `${label}: ${JSON.stringify(result)}`);
   assert.equal(result.code, "HGO-DRIFT", label);
   assert.deepEqual(lastRejection(root, requestSha256).driftedChecks, driftedChecks, label);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Execution model (ALF-C-HGO-FAST2). Every case below owns a private fixture root and arming one
+// action costs tens of seconds on native Windows (record, plan and authorize each write private
+// files behind PowerShell DACL probes, all synchronous). The cases are independent, so each body
+// runs unchanged inside its own worker thread (this same file, re-entered with workerData) while
+// the main thread only registers one node:test case per body and awaits that body's result. Every
+// assertion still executes, in the same code, against the same real module; a failure in a worker
+// is rethrown in the matching case with its message and stack. HGO_DISJOINT_WORKERS bounds the pool.
+// ---------------------------------------------------------------------------------------------
+
+const CASES = new Map();
+const WORKERS = Math.max(1, Number(process.env.HGO_DISJOINT_WORKERS) || Math.min(8, Math.max(2, availableParallelism())));
+const jobs = new Map();
+const waiting = [];
+let running = 0;
+
+function pump() {
+  while (running < WORKERS && waiting.length > 0) {
+    const { name, resolve } = waiting.shift();
+    running += 1;
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      running -= 1;
+      resolve(result);
+      pump();
+    };
+    const worker = new Worker(fileURLToPath(import.meta.url), { workerData: { hgoCase: name } });
+    worker.once("message", finish);
+    worker.once("error", (error) => finish({ ok: false, message: String(error?.stack ?? error) }));
+    worker.once("exit", (code) => finish({ ok: false, message: `worker for "${name}" exited (${code}) without a result` }));
+  }
+}
+
+function runCase(name) {
+  if (!jobs.has(name)) jobs.set(name, new Promise((resolve) => { waiting.push({ name, resolve }); pump(); }));
+  return jobs.get(name);
+}
+
+function test(name, body) {
+  assert.ok(!CASES.has(name), `duplicate case name: ${name}`);
+  CASES.set(name, body);
+  if (!isMainThread) return;
+  nodeTest(name, async (t) => {
+    const result = await runCase(name);
+    if (!result.ok) throw new Error(result.message);
+    if (result.skipped) t.skip(result.skipped);
+  });
 }
 
 for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInput]]) {
@@ -495,10 +548,13 @@ function withClosedCodexRegistry(fn) {
   const dir = mkdtempSync(join(scratchBase(), "hgo-codex-"));
   if (process.platform === "win32") copyFileSync(process.execPath, join(dir, "codex.exe"));
   else { writeFileSync(join(dir, "codex"), "#!/bin/sh\nexit 1\n"); chmodSync(join(dir, "codex"), 0o755); }
-  const original = process.env.PATH;
-  process.env.PATH = `${dir}${delimiter}${original ?? ""}`;
+  // A worker thread gets a plain-object copy of the environment, which is case-sensitive even on win32
+  // ("Path"), so the existing spelling of the variable is reused rather than adding a second "PATH".
+  const key = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+  const original = process.env[key];
+  process.env[key] = `${dir}${delimiter}${original ?? ""}`;
   try { return fn(); }
-  finally { process.env.PATH = original; rmSync(dir, { recursive: true, force: true }); }
+  finally { process.env[key] = original; rmSync(dir, { recursive: true, force: true }); }
 }
 
 test("plugin installation: binding follows the attested install source, planned on the legacy v3 contract, never target-bound", () => {
@@ -583,3 +639,27 @@ test("AC-160 serial-dependence disclosure: status-bound Bash signing preparation
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------------------
+// Worker entry and eager scheduling (see the execution model above). Registration is complete here.
+// ---------------------------------------------------------------------------------------------
+
+if (!isMainThread) {
+  const body = CASES.get(workerData?.hgoCase);
+  let message;
+  if (typeof body !== "function") {
+    message = { ok: false, message: `unknown case: ${workerData?.hgoCase}` };
+  } else {
+    let skipped = null;
+    try {
+      body({ skip: (reason) => { skipped = String(reason ?? "skipped"); } });
+      message = { ok: true, skipped };
+    } catch (error) {
+      message = { ok: false, message: String(error?.stack ?? error) };
+    }
+  }
+  parentPort.postMessage(message);
+} else if (!process.execArgv.some((arg) => arg.startsWith("--test-name-pattern") || arg.startsWith("--test-skip-pattern"))) {
+  // Start every body now so the pool overlaps them; with a name filter only the selected cases start (lazily).
+  for (const name of CASES.keys()) void runCase(name);
+}
