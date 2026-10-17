@@ -24,7 +24,7 @@ no Critic batch and no PO acceptance. Nothing is "done".
    - the Windows product changes, whose DIFF moved here from the Windows session:
      `bf9040f27` (model-role-host-store), `915ef21c2` (ancestor callers bounded at the
      repository root), `8869464c2` (plugin-root boundary and registry ENOENT parity),
-     and the verify-evidence-producer boundary commit if it lands (see below).
+     and `0b06f4092` (verify-evidence-producer boundary, unverified; see below).
 3. Fix every blocker and major finding, scoped. Rerun only the affected suites.
 4. Rerun `specs/sprint-alfred-epic/tools/delivery-remeasure.mjs` and commit the new
    snapshot.
@@ -58,9 +58,15 @@ rediscover them.
 - **verify-evidence-producer (Windows).** It was 7/33 because `registerRun` never
   registers the git common dir, so the ancestor walk is strict up to the drive root.
   `D:\` grants Authenticated Users Modify by default, which makes this a failure on
-  practically every Windows host. Dispatch ALF-C-VEP-BOUNDARY exports and calls
-  `verifyWindowsRegisterCommon`; its result is recorded in the commit that carries it,
-  or below if it did not land.
+  practically every Windows host. Commit `0b06f4092` (ALF-C-VEP-BOUNDARY) exports and
+  calls `verifyWindowsRegisterCommon` before `registerVerifyRunRecord`, and adds one
+  structural test. It is committed UNVERIFIED: the PO stopped its Windows test run, and
+  verification moves here.
+  - To do under WSL: run `verify-evidence-producer.test.mjs` (34 tests). The call is a
+    no-op on POSIX, so the Linux results must stay unchanged, and the new structural
+    case must be green.
+  - A native Windows rerun (expected about 31/34, with two symlink EPERM host-class reds)
+    belongs to the lean Windows pin set, not to this session.
 - **Interruption-receipts adapter tripwire.** Backlog item
   `backlog/items/2026-10-17-interruption-receipts-adapter-tripwire-reaches-a-json-schema.md`.
 
