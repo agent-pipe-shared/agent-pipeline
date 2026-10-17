@@ -261,8 +261,8 @@ async function bindRouteOwner(fx) {
   const windows = await loadLib("windows-private-state.mjs");
   const repository = lifecycle.inspectSignedDescriptorCustodyRepository(fx.dir);
   // No CallerJSON native-positive fallback. An unavailable native producer is a real
-  // prerequisite failure, except the typed HOST-LIMITATION (WIN-AUTH-ANCESTOR-OWNER/-ACL/-MUTATION on
-  // win32: a human-controlled ancestor, outside the threat model, PO decision 2026-10-17), handled by
+  // prerequisite failure, except the typed HOST-LIMITATION (WIN-AUTH-ANCESTOR-OWNER only, on
+  // win32: a human-controlled ancestor owner, outside the threat model, PO decision 2026-10-17), handled by
   // runRoute() via hostLimitationOf(); every other error still propagates and fails.
   const runtime = bridge.createControlledMethodRuntimeFixture({ repository,
     fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/design-approval-route"),
@@ -534,16 +534,18 @@ async function buildSubmittedFeature(prefix) {
  * "Decision tiles answered (PO, 2026-10-17 ...)"). Only those exact reasons on win32 qualify; every other
  * error still fails the case. Owner Coordinator; the AC-155 assertions run on any host whose ancestors pass.
  */
-const HOST_LIMITATION_REASONS = new Set(["WIN-AUTH-ANCESTOR-OWNER", "WIN-AUTH-ANCESTOR-ACL", "WIN-AUTH-ANCESTOR-MUTATION"]);
+// Narrowed (QG-04/QG-06, Critic C6h H-F1): only the one reason the PO decision justified is admitted;
+// WIN-AUTH-ANCESTOR-ACL, -MUTATION and any other WIN-AUTH-* code propagate and fail the case.
+const HOST_LIMITATION_REASONS = new Set(["WIN-AUTH-ANCESTOR-OWNER"]);
 function hostLimitationOf(error) {
   if (process.platform !== "win32" || error?.code !== "SDC-AUTHORITY-UNAVAILABLE"
     || !HOST_LIMITATION_REASONS.has(error?.reason)) return null;
-  return { type: "host-limitation", reason: error.reason, owner: "Coordinator", due: "standing PO decision 2026-10-17, no expiry", host: "native Windows with a human-controlled drive-root ancestor owner/ACL (win32)" };
+  return { type: "host-limitation", reason: error.reason, owner: "Coordinator", due: "2026-10-31", runsOn: "WSL/Linux", host: "native Windows with a human-controlled drive-root ancestor owner (win32)" };
 }
 function skipForHostLimitation(t, run) {
   if (!run.hostLimitation) return false;
   const h = run.hostLimitation;
-  t.skip(`HOST-LIMITATION ${h.reason}: owner ${h.owner}, ${h.due}, host ${h.host}; run on a host whose repository ancestors pass the native owned-authority backend`);
+  t.skip(`HOST-LIMITATION ${h.reason}: owner ${h.owner}, due ${h.due}, skipped on ${h.host}; runs instead on ${h.runsOn}`);
   return true;
 }
 
