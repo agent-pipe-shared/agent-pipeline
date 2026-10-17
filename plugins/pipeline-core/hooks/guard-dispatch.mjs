@@ -65,7 +65,7 @@
  * sides cannot drift. Canonical form: CRLF normalised to LF, nothing else stripped or altered.
  */
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
 import {
@@ -74,6 +74,9 @@ import {
 } from "../lib/advisor-prohibition-binding.mjs";
 import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
+// Circular by design: the producer imports this module's route exports, and this module calls the producer only at hook
+// run time (recordAdmittedBriefingRoutes), never while either module is evaluating. Function declarations are hoisted.
+import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-record.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
@@ -171,13 +174,23 @@ export function briefingRoutePath(root, sliceId) {
 }
 
 /**
- * The route record a producer writes for a dispatch: it binds `sliceId` to the digest of the briefing
- * text that will actually be sent inline. Throws on an unusable slice id or an empty briefing.
+ * Provenance of a record the guard itself wrote when it admitted a Goldfish briefing (V-10, PO decision
+ * 2026-10-17: latest admission wins). A record written by a route producer (role-dispatch-preflight) carries
+ * no `origin` and stays authoritative: only a record with this origin may be superseded by a later admission.
  */
-export function buildBriefingRoute({ sliceId, briefing } = {}) {
+export const BRIEFING_ROUTE_ORIGIN_ADMISSION = "admission";
+
+/**
+ * The route record a producer writes for a dispatch: it binds `sliceId` to the digest of the briefing
+ * text that will actually be sent inline. Throws on an unusable slice id or an empty briefing. The default
+ * record has exactly three keys; the guard's own admission record adds one more, `origin: "admission"`.
+ */
+export function buildBriefingRoute({ sliceId, briefing, origin } = {}) {
   if (typeof sliceId !== "string" || !BRIEFING_ROUTE_ID.test(sliceId)) throw new TypeError("buildBriefingRoute: sliceId must be a safe slice id");
   if (typeof briefing !== "string" || briefing === "") throw new TypeError("buildBriefingRoute: briefing must be the non-empty text actually sent");
-  return { schema: BRIEFING_ROUTE_SCHEMA, sliceId, briefingSha256: briefingSha256(briefing) };
+  if (origin !== undefined && origin !== BRIEFING_ROUTE_ORIGIN_ADMISSION) throw new TypeError("buildBriefingRoute: origin, when given, must be \"admission\"");
+  const record = { schema: BRIEFING_ROUTE_SCHEMA, sliceId, briefingSha256: briefingSha256(briefing) };
+  return origin === undefined ? record : { ...record, origin };
 }
 
 /**
@@ -209,16 +222,19 @@ export function evaluateBriefingRoute({ prompt, root } = {}) {
     } catch {
       return invalid("the route record is not readable JSON");
     }
-    const exact = record !== null && typeof record === "object" && !Array.isArray(record)
-      && Object.keys(record).sort().join(",") === "briefingSha256,schema,sliceId";
+    const keys = record !== null && typeof record === "object" && !Array.isArray(record) ? Object.keys(record).sort().join(",") : null;
+    const admission = keys === "briefingSha256,origin,schema,sliceId"; // the one optional extra key
+    const exact = keys === "briefingSha256,schema,sliceId" || admission;
     if (!exact || record.schema !== BRIEFING_ROUTE_SCHEMA || record.sliceId !== sliceId
+      || (admission && record.origin !== BRIEFING_ROUTE_ORIGIN_ADMISSION)
       || typeof record.briefingSha256 !== "string" || !BRIEFING_ROUTE_DIGEST.test(record.briefingSha256)) {
       return invalid(`the route record is not an exact ${BRIEFING_ROUTE_SCHEMA} record of this slice`);
     }
     const observed = briefingSha256(prompt);
+    const provenance = admission ? { origin: BRIEFING_ROUTE_ORIGIN_ADMISSION } : {};
     return observed === record.briefingSha256
-      ? { status: "match", sliceId, digest: observed }
-      : { status: "mismatch", sliceId, path: shown, expected: record.briefingSha256, observed };
+      ? { status: "match", sliceId, digest: observed, ...provenance }
+      : { status: "mismatch", sliceId, path: shown, expected: record.briefingSha256, observed, ...provenance };
   } catch {
     return { status: "invalid", sliceId: null, path: "evidence/dispatch-route-*.json", reason: "the route check itself faulted" };
   }
@@ -239,6 +255,81 @@ function briefingRouteRefusal(route) {
         "A route record that exists but cannot be verified is not treated as \"no route\". Repair or remove it, then dispatch again.",
         "",
       ].join("\n");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Admission recording (ALF-C-V10-WIRE3, AC-127; PO decision 2026-10-17: latest admission wins). The guard is the one
+// admission point every transport passes through, so it records the route digest of each Goldfish briefing it admits,
+// with `origin: "admission"`. Rules:
+//   - a record WITHOUT origin was written by a route producer (role-dispatch-preflight); it stays authoritative, so a
+//     tampered briefing after a preflight record is refused DISPATCH-BRIEFING-DIGEST-MISMATCH;
+//   - a record WITH origin "admission" is superseded by a later admitted Goldfish briefing of the same slice (the
+//     latest admission wins); only a dispatch that is itself recorded may supersede it;
+//   - two different briefings of one slice in ONE call are refused DISPATCH-BRIEFING-DIGEST-MISMATCH;
+//   - a refused briefing writes no record: the plan runs in the early route check, the writes happen last.
+const shownRoutePath = (sliceId) => `evidence/dispatch-route-${sliceId}.json`;
+
+/** The per-slice digest plan of ONE call: a second, different digest for the same slice is a typed mismatch. Never writes. */
+export function planAdmittedBriefingRoutes({ dispatches } = {}) {
+  try {
+    const bySlice = new Map();
+    for (const dispatch of Array.isArray(dispatches) ? dispatches : []) {
+      const prompt = dispatch?.prompt;
+      if (typeof prompt !== "string") continue;
+      const sliceId = parseDispatchSlice(prompt).sliceId;
+      if (typeof sliceId !== "string" || !BRIEFING_ROUTE_ID.test(sliceId)) continue; // names no single, safe slice: nothing is bound
+      const digest = briefingSha256(prompt);
+      const seen = bySlice.get(sliceId);
+      if (seen === undefined) bySlice.set(sliceId, { sliceId, digest, prompt });
+      else if (seen.digest !== digest) {
+        return { ok: false, route: { status: "mismatch", sliceId, path: shownRoutePath(sliceId), expected: seen.digest, observed: digest } };
+      }
+    }
+    return { ok: true, plan: [...bySlice.values()] };
+  } catch {
+    return { ok: false, route: { status: "invalid", sliceId: null, path: "evidence/dispatch-route-*.json", reason: "the route plan itself faulted" } };
+  }
+}
+
+/**
+ * Records the route of each distinct slice the call admits, with origin "admission". Every slice is judged first
+ * (nothing is written for a call any slice of which is refused); the writes then snapshot the prior bytes and restore
+ * them if a later slice cannot be written. `{ ok: true, recorded }` or `{ ok: false, route }` (a typed
+ * mismatch/invalid result, ready for briefingRouteRefusal). A slice already bound to exactly this text is left untouched.
+ */
+export function recordAdmittedBriefingRoutes({ dispatches, root } = {}) {
+  const planned = planAdmittedBriefingRoutes({ dispatches });
+  if (!planned.ok) return planned;
+  const writes = [];
+  for (const entry of planned.plan) {
+    const existing = evaluateBriefingRoute({ prompt: entry.prompt, root });
+    if (existing.status === "invalid" || (existing.status === "mismatch" && existing.origin !== BRIEFING_ROUTE_ORIGIN_ADMISSION)) return { ok: false, route: existing };
+    if (existing.status !== "match") writes.push(entry);
+  }
+  const done = [];
+  const undo = () => {
+    for (const { target, previous } of done.reverse()) {
+      try {
+        if (previous === null) rmSync(target, { force: true });
+        else writeFileSync(target, previous);
+      } catch { /* best effort: the refusal below is the signal */ }
+    }
+  };
+  for (const entry of writes) {
+    const target = briefingRoutePath(root, entry.sliceId);
+    let previous = null;
+    try {
+      const info = lstatSync(target);
+      if (info.isFile() && info.size <= BRIEFING_ROUTE_MAX_BYTES) previous = readFileSync(target);
+    } catch { /* no record yet */ }
+    done.push({ target, previous });
+    const recorded = recordDispatchBriefingRoute({ root, prompt: entry.prompt, origin: BRIEFING_ROUTE_ORIGIN_ADMISSION });
+    if (recorded.status === "refused") {
+      undo();
+      return { ok: false, route: { status: "invalid", sliceId: entry.sliceId, path: shownRoutePath(entry.sliceId), reason: `the route record could not be written (${recorded.code})` } };
+    }
+  }
+  return { ok: true, recorded: writes.map((entry) => entry.sliceId) };
 }
 
 // FANOUT slice S7: the dispatch-time slice-scope check (design:
@@ -550,17 +641,30 @@ if (isDirectInvocation(import.meta.url)) {
     budget: dispatchBudgetBinding(dispatch),
   }));
   const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
+  const routeRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
   if (blocked.length === 0) {
     // V-10: bind the route digest to the briefing actually received. It runs before any admission
     // effect (item reservation, budget/prohibition binding, fan-out launch), so a refused briefing
     // leaves nothing behind. No route record for the named slice: nothing changes.
-    const routeRoot = process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd());
-    for (const { dispatch } of evaluated) {
+    for (const { dispatch, policy } of evaluated) {
       const route = evaluateBriefingRoute({ prompt: dispatch.prompt, root: routeRoot });
-      if (route.status === "mismatch" || route.status === "invalid") {
+      // A mismatch against the guard's own admission record is not a refusal for a Goldfish briefing: it is the
+      // latest admission and supersedes the record at the end of this hook. A producer record (no origin) and
+      // every dispatch that is not itself recorded keep the typed refusal.
+      const supersedes = route.status === "mismatch" && route.origin === BRIEFING_ROUTE_ORIGIN_ADMISSION
+        && requiresGovernedItemAdmission(policy);
+      if ((route.status === "mismatch" && !supersedes) || route.status === "invalid") {
         process.stderr.write(briefingRouteRefusal(route));
         process.exit(2);
       }
+    }
+    // Two different briefings of one slice in one call: refused here, before any effect.
+    const conflict = planAdmittedBriefingRoutes({
+      dispatches: evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy)).map(({ dispatch }) => ({ prompt: dispatch.prompt })),
+    });
+    if (!conflict.ok) {
+      process.stderr.write(briefingRouteRefusal(conflict.route));
+      process.exit(2);
     }
   }
   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
@@ -680,6 +784,17 @@ if (isDirectInvocation(import.meta.url)) {
           process.stderr.write(`WARNING (guard-dispatch): native host-commit preparation failed (${prepared.code}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.\n`);
         }
       }
+    }
+    // V-10, last step before admitting: record the route digest of every Goldfish briefing this call admits
+    // (origin "admission"; the latest admission of a slice wins). Every earlier refusal of this hook has already
+    // exited, so a refused briefing writes no record; a conflict inside the call was refused in the route check.
+    const admitted = recordAdmittedBriefingRoutes({
+      dispatches: evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy)).map(({ dispatch }) => ({ prompt: dispatch.prompt })),
+      root: routeRoot,
+    });
+    if (!admitted.ok) {
+      process.stderr.write(briefingRouteRefusal(admitted.route));
+      process.exit(2);
     }
     process.exit(0);
   }

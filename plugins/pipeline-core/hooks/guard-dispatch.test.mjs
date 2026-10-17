@@ -695,6 +695,28 @@ manualCheck("GD26 block  the existing contamination finding still wins over the 
   assert.ok(stderr.includes("DISPATCH-CONTAMINATION-CLAIMS-LIST") && !stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"), stderr.slice(0, 300));
 });
 
+// GD28 -- ALF-C-V10-WIRE3: the guard's own admission record carries ONE optional extra key, origin "admission". It is
+// accepted by the route check and read back with its provenance; any other origin value stays unverifiable (GD25 keeps
+// every other extra key invalid). A dispatch that is not itself recorded (a Critic) cannot supersede such a record: its
+// mismatch is refused typed, exactly as against a producer record.
+manualCheck("GD28 allow/block  an origin-admission route record binds a non-recorded dispatch; another origin value is unverifiable", () => {
+  const prompt = routePrompt("GD-ROUTE-ADMISSION");
+  const admission = { ...routeRecord("GD-ROUTE-ADMISSION", prompt), origin: "admission" };
+  writeRoute("GD-ROUTE-ADMISSION", admission);
+  const matched = run(routeDispatch("gd28a", prompt));
+  assert.equal(matched.code, ALLOW, matched.stderr.slice(0, 300));
+  const changed = prompt.replace("risk class high", "risk class hugh");
+  const refused = run(routeDispatch("gd28b", changed));
+  assert.equal(refused.code, BLOCK, refused.stderr.slice(0, 300));
+  for (const needle of ["DISPATCH-BRIEFING-DIGEST-MISMATCH", routeSha(prompt), routeSha(changed)]) {
+    assert.ok(refused.stderr.includes(needle), `stderr missing "${needle}"`);
+  }
+  writeRoute("GD-ROUTE-ADMISSION", { ...admission, origin: "preflight" });
+  const other = run(routeDispatch("gd28c", prompt));
+  assert.equal(other.code, BLOCK, other.stderr.slice(0, 300));
+  assert.ok(other.stderr.includes("DISPATCH-BRIEFING-ROUTE-INVALID"), other.stderr.slice(0, 300));
+});
+
 // GD27 -- the digest definition is exported ONCE and reused: subprocess-only, same hardening as GD16/GD20.
 manualCheck("GD27 briefingSha256 / buildBriefingRoute are importable, share one canonical form, and refuse unusable input", () => {
   const successMarker = "GD27-IMPORT-OK";
@@ -847,7 +869,7 @@ manualCheck("GD60 allow  a marked Claude dispatch that is NOT item-governed is u
   }
 });
 
-assert.equal(cases.length, 60, "the complete dispatch guard corpus must register before execution");
+assert.equal(cases.length, 61, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

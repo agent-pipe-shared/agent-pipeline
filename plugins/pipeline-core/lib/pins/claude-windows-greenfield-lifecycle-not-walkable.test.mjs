@@ -16,14 +16,24 @@
 //   V-10  wiring, exact state (ALF-C-V10-DISP-B; the C6g5 F1 claim "no caller" is stale and is retracted):
 //         delivered: the record type (pipeline.dispatch-briefing-route.v1), the guard check
 //         (hooks/guard-dispatch.mjs evaluateBriefingRoute, refusing DISPATCH-BRIEFING-DIGEST-MISMATCH /
-//         DISPATCH-BRIEFING-ROUTE-INVALID), the producer (lib/dispatch-briefing-route-record.mjs), and the ONE
-//         caller: lib/role-dispatch-preflight.mjs calls recordDispatchBriefingRoute, and only when
-//         current.packet.transport === "direct" (commit a2d61489c).
-//         The guard itself never writes a record: with no record for the named slice it passes ("none").
-//         A native Claude Agent/Task dispatch that does not go through role-dispatch-preflight writes no record,
-//         so for it the binding does not fire (the guard admits unchanged).
-//         V-10 native Agent/Task dispatch wiring: open, owner Coordinator, due 2026-10-31
-//         V-10 non-direct transport (role-dispatch-preflight, transport !== "direct") wiring: open, owner Coordinator, due 2026-10-31
+//         DISPATCH-BRIEFING-ROUTE-INVALID), the producer (lib/dispatch-briefing-route-record.mjs), and the TWO
+//         callers of recordDispatchBriefingRoute: (1) lib/role-dispatch-preflight.mjs, only when
+//         current.packet.transport === "direct" (commit a2d61489c); (2) hooks/guard-dispatch.mjs
+//         recordAdmittedBriefingRoutes (ALF-C-V10-WIRE3), the admission point of EVERY transport the guard reads: the
+//         native Claude Agent/Task call, Codex spawn_agent, the Antigravity Subagents array and a statically resolvable
+//         Workflow agent() call. It is the LAST step before the hook admits (after the policy, route check, item
+//         admission, fan-out, Advisor/budget binding and the native host state), so a refused briefing writes no record.
+//         Semantics (PO decision 2026-10-17): latest admission wins. The guard's records carry one extra key,
+//         origin: "admission"; an amended re-dispatch of an admitted slice is admitted and replaces that record. A record
+//         without origin is a producer record (role-dispatch-preflight) and stays authoritative: a tampered briefing after
+//         it is refused DISPATCH-BRIEFING-DIGEST-MISMATCH, as are two different briefings of one slice in one call.
+//         Only a dispatch that is itself recorded (a Goldfish briefing) can supersede an admission record.
+//         Typed gaps (no fake record is written for any of them):
+//         V-10 Critic and unrelated-role dispatches are not recorded (critic-review.md carries no Slice line): open, owner Coordinator, due 2026-10-31
+//         V-10 a dynamically built Workflow script (not statically resolvable, fail-open in the guard) has no admission point: open, owner Coordinator, due 2026-10-31
+//         V-10 Codex/Antigravity runner registration of guard-dispatch (outside this repository scope: hooks.json matches Task|Agent|Workflow only): open, owner Coordinator, due 2026-10-31
+//         V-10 role-dispatch-preflight records the direct transport only; the other transports are recorded by the guard,
+//         because a Workflow digest is taken over the script literal the guard extracts, not over packet.prompt: by design
 //         The caller set below is pinned by a source scan; when a caller is added or removed this header must be
 //         updated with it.
 //   two-approval happy path (reaches implementation and push) -- native: pending. It needs a live
@@ -407,7 +417,7 @@ function callersOf(name, definingRel, pluginRoot) {
 
 function checkV10Callers(pluginRoot) {
   const expected = [
-    ["recordDispatchBriefingRoute", "lib/dispatch-briefing-route-record.mjs", ["lib/role-dispatch-preflight.mjs"]],
+    ["recordDispatchBriefingRoute", "lib/dispatch-briefing-route-record.mjs", ["hooks/guard-dispatch.mjs", "lib/role-dispatch-preflight.mjs"]],
     ["buildBriefingRoute", "hooks/guard-dispatch.mjs", ["lib/dispatch-briefing-route-record.mjs"]],
   ];
   for (const [name, defining, callers] of expected) {
@@ -419,7 +429,7 @@ function checkV10Callers(pluginRoot) {
 }
 
 describe("V-10 caller set of the route producer is pinned", () => {
-  test("recordDispatchBriefingRoute is called only by role-dispatch-preflight (direct transport) and buildBriefingRoute only by the producer", () => {
+  test("recordDispatchBriefingRoute is called only by role-dispatch-preflight (direct transport) and the guard's admission step, and buildBriefingRoute only by the producer", () => {
     checkV10Callers(PLUGIN_ROOT);
     const source = readFileSync(join(PLUGIN_ROOT, "lib", "role-dispatch-preflight.mjs"), "utf8");
     assert.match(source, /transport === "direct"\)\s*\{\s*const route = recordDispatchBriefingRoute\(/u,
@@ -431,7 +441,7 @@ describe("V-10 caller set of the route producer is pinned", () => {
     try {
       const put = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), text); };
       const real = () => {
-        put("hooks/guard-dispatch.mjs", "export function buildBriefingRoute() {}\n");
+        put("hooks/guard-dispatch.mjs", "import { recordDispatchBriefingRoute } from \"../lib/dispatch-briefing-route-record.mjs\"; export function buildBriefingRoute() {} recordDispatchBriefingRoute();\n");
         put("lib/dispatch-briefing-route-record.mjs", "import { buildBriefingRoute } from \"../hooks/guard-dispatch.mjs\"; export function recordDispatchBriefingRoute() { buildBriefingRoute(); }\n");
         put("lib/role-dispatch-preflight.mjs", "import { recordDispatchBriefingRoute } from \"./dispatch-briefing-route-record.mjs\"; recordDispatchBriefingRoute();\n");
       };
@@ -443,6 +453,255 @@ describe("V-10 caller set of the route producer is pinned", () => {
       put("lib/role-dispatch-preflight.mjs", "// recordDispatchBriefingRoute mentioned only in a comment\n");
       assert.throws(() => checkV10Callers(dir), /Update the V-10 wiring header/u);
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+// V-10 ADMISSION WIRING (ALF-C-V10-WIRE, AC-127). The guard records the route digest of every governed (Goldfish) briefing it
+// admits, at the one admission point every transport passes through, so the binding no longer depends on a caller that
+// only the direct preflight had. Every case drives the real hook as a child process; nothing is mocked.
+const V10W_ROLE = "pipeline-core:goldfish-implementor";
+const V10W_ROUTE_SCHEMA = "pipeline.dispatch-briefing-route.v1";
+
+function v10wBriefing(sliceId, { withSlice = true } = {}) {
+  return [
+    "### 1. Goal", "", "V-10 admission wiring pin: nothing in this briefing is executed.", "",
+    "### 2. Context files", "", "- backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md", "",
+    "### 3. DoD checks", "", "- the pin passes", "",
+    "### 4. Forbidden", "", "- any file outside the write scope", "",
+    "### 5. Stop conditions", "", "- more than 2 failed attempts at the same problem", "",
+    "### 6. Dispatch metadata", "",
+    "- Model/effort for this run: claude-sonnet-5-5 / medium.",
+    "- **Tool budget (hard cap, first-class field):** ≤24 tool uses.",
+    ...(withSlice ? [`- **Slice:** ${sliceId}`, "- Write scope: none"] : []),
+  ].join("\n");
+}
+
+// One packet per transport the guard reads. The Workflow packet carries the briefing as a template literal, so the text
+// the guard extracts (and hashes) is exactly the text sent.
+const V10W_PACKET = {
+  native: (prompt, id) => ({ tool_use_id: id, tool_name: "Agent", tool_input: { subagent_type: V10W_ROLE, prompt } }),
+  codex: (prompt, id) => ({ tool_use_id: id, tool_name: "spawn_agent", tool_input: { agent_type: V10W_ROLE, message: prompt } }),
+  antigravity: (prompt, id) => ({ tool_use_id: id, tool_name: "invoke_subagent", tool_input: { Subagents: [{ TypeName: V10W_ROLE, Prompt: prompt }] } }),
+  workflow: (prompt, id) => ({ tool_use_id: id, tool_name: "Workflow", tool_input: { script: `await agent({ agentType: '${V10W_ROLE}', prompt: \`${prompt}\` });` } }),
+  critic: (prompt, id) => ({ tool_use_id: id, tool_name: "Task", tool_input: { subagent_type: "pipeline-core:critic", prompt } }),
+};
+
+const V10W_ORIGIN = "admission";
+
+/**
+ * The wiring clause as one reusable check (PO decision 2026-10-17, latest admission wins):
+ *   admit -> the record carries the digest of what was admitted, with origin "admission"
+ *   amended re-dispatch of the admitted slice -> admitted, and it REPLACES the record
+ *   a producer (preflight) record is written for that text -> a tampered copy is refused typed and moves nothing.
+ */
+function checkV10Wiring({ send, read, produce, prompt, sliceId }) {
+  assert.equal(read(), null, "the slice must start unrouted");
+  const admitted = send(prompt);
+  assert.equal(admitted.code, 0, `the briefing must be admitted: ${admitted.stderr.slice(0, 300)}`);
+  assert.deepEqual(read(), { schema: V10W_ROUTE_SCHEMA, sliceId, briefingSha256: sha256Of(prompt), origin: V10W_ORIGIN },
+    "admission must record the route digest of the briefing it admitted, with its provenance");
+  const amended = prompt.replace("admission wiring pin", "amended wiring pin");
+  assert.notEqual(amended, prompt);
+  const redispatched = send(amended);
+  assert.equal(redispatched.code, 0, `an amended re-dispatch of an admitted slice must be admitted: ${redispatched.stderr.slice(0, 300)}`);
+  assert.deepEqual(read(), { schema: V10W_ROUTE_SCHEMA, sliceId, briefingSha256: sha256Of(amended), origin: V10W_ORIGIN },
+    "the latest admission must replace the record");
+  produce(amended); // the preflight producer binds the amended text: no origin key, authoritative
+  const preflight = { schema: V10W_ROUTE_SCHEMA, sliceId, briefingSha256: sha256Of(amended) };
+  assert.deepEqual(read(), preflight, "a producer record carries exactly the three keys");
+  const tampered = amended.replace("amended wiring pin", "amended wirinG pin");
+  assert.notEqual(tampered, amended);
+  assert.equal(tampered.length, amended.length);
+  const refused = send(tampered);
+  assert.equal(refused.code, 2, `a tampered briefing after a preflight record must be refused: ${refused.stderr.slice(0, 300)}`);
+  assert.ok(refused.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH"), refused.stderr.slice(0, 300));
+  assert.ok(refused.stderr.includes(sha256Of(amended)) && refused.stderr.includes(sha256Of(tampered)), "the refusal names the expected and the observed digest");
+  assert.deepEqual(read(), preflight, "a refused briefing must not move the record");
+  assert.equal(send(amended).code, 0, "the briefing the preflight record names is still admitted");
+  assert.deepEqual(read(), preflight, "re-admitting the routed text leaves a producer record untouched");
+}
+
+describe("V-10 admission wiring: the guard records the route digest of the briefing it admits (ALF-C-V10-WIRE)", () => {
+  let root = null;
+  let sequence = 0;
+  let priorCeiling;
+  const runHook = (payload) => {
+    const res = spawnSync(process.execPath, [GUARD], {
+      input: JSON.stringify(payload), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    return { code: res.status, stderr: res.stderr ?? "" };
+  };
+  const send = (kind, prompt, { toolUseId } = {}) => {
+    sequence += 1;
+    const payload = V10W_PACKET[kind](prompt, toolUseId === undefined ? `v10w-${kind}-${process.pid}-${sequence}` : toolUseId);
+    if (toolUseId === null) delete payload.tool_use_id;
+    return runHook(payload);
+  };
+  // The route record a producer (role-dispatch-preflight's direct transport) writes: three keys, no origin.
+  const produce = (prompt) => {
+    const result = producerExport("recordDispatchBriefingRoute", { root, prompt }, root);
+    assert.ok(["recorded", "replaced", "unchanged"].includes(result.status), `the producer must record the route: ${JSON.stringify(result)}`);
+  };
+  const readRoute = (sliceId) => {
+    try { return JSON.parse(readFileSync(join(root, "evidence", `dispatch-route-${sliceId}.json`), "utf8")); } catch { return null; }
+  };
+  const routeNames = () => {
+    try { return readdirSync(join(root, "evidence")).sort(); } catch { return []; }
+  };
+
+  before(() => {
+    root = scratchDir("alf-c-v10-wire");
+    priorCeiling = process.env.GIT_CEILING_DIRECTORIES;
+    process.env.GIT_CEILING_DIRECTORIES = dirname(root); // fixture containment: no git call may climb out of scratch/
+    execFileSync("git", ["init", "-q"], { cwd: root, env: process.env });
+    // Fixture blocker of the earlier attempts: a governed root WITHOUT project authority fails closed in the hook
+    // (resolveGovernedItemQueue -> SQ-AUTHORITY-UNAVAILABLE) before any route logic runs. This repository is enrolled
+    // and carries valid project authority (a manifest and a lifecycle State) but NO approved course (no activeFeature),
+    // so resolveGovernedItemQueue answers not-applicable and the route logic is what the cases exercise.
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "# V-10 admission wiring fixture: authority marker only\n");
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" })}\n`);
+    recordConsentGiven({ rootDir: root });
+    assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true, "the fixture must be an enrolled governed root");
+  });
+  after(() => {
+    if (priorCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = priorCeiling;
+    if (root !== null) rmSync(root, { recursive: true, force: true });
+  });
+
+  test("V-10 a native Agent dispatch is admitted and records its route with origin admission: an amended re-dispatch replaces it, a tampered briefing after a preflight record is refused typed", () => {
+    const slice = "ALF-V10-WIRE-NATIVE";
+    checkV10Wiring({ send: (text) => send("native", text), read: () => readRoute(slice), produce, prompt: v10wBriefing(slice), sliceId: slice });
+  });
+
+  test("V-10 the admission record reads back through the guard's own check; a resend and a CRLF copy are admitted and leave it untouched", () => {
+    const slice = "ALF-V10-WIRE-READBACK";
+    const prompt = v10wBriefing(slice);
+    assert.equal(send("native", prompt).code, 0);
+    assert.deepEqual(guardExport("evaluateBriefingRoute", { prompt, root }, root), { status: "match", sliceId: slice, digest: sha256Of(prompt), origin: V10W_ORIGIN });
+    const recorded = readFileSync(join(root, "evidence", `dispatch-route-${slice}.json`), "utf8");
+    assert.equal(send("native", prompt).code, 0);
+    assert.equal(send("native", prompt.replace(/\n/gu, "\r\n")).code, 0);
+    assert.equal(readFileSync(join(root, "evidence", `dispatch-route-${slice}.json`), "utf8"), recorded, "re-admitting the routed text leaves the record untouched");
+    // origin is the ONE optional extra key: any other key, and any other origin value, stays an unverifiable record
+    const file = join(root, "evidence", `dispatch-route-${slice}.json`);
+    for (const record of [{ ...JSON.parse(recorded), note: "x" }, { ...JSON.parse(recorded), origin: "preflight" }]) {
+      writeFileSync(file, `${JSON.stringify(record)}\n`);
+      assert.equal(guardExport("evaluateBriefingRoute", { prompt, root }, root).status, "invalid");
+    }
+    writeFileSync(file, recorded);
+  });
+
+  test("V-10 latest admission wins: a slice re-dispatched with other bytes is admitted each time and the record follows the last admission", () => {
+    const slice = "ALF-V10-WIRE-LATEST";
+    const first = v10wBriefing(slice);
+    const second = first.replace("nothing in this briefing", "nothing in that briefing");
+    for (const prompt of [first, second, first]) {
+      assert.equal(send("native", prompt).code, 0);
+      assert.deepEqual(readRoute(slice), { schema: V10W_ROUTE_SCHEMA, sliceId: slice, briefingSha256: sha256Of(prompt), origin: V10W_ORIGIN });
+    }
+  });
+
+  test("V-10 only a recorded dispatch can supersede an admission record: a Critic briefing naming the slice with other bytes is refused typed and moves nothing", () => {
+    const slice = "ALF-V10-WIRE-CRITIC-SLICE";
+    const prompt = v10wBriefing(slice);
+    assert.equal(send("native", prompt).code, 0);
+    const critic = V10_BRIEFING.replace(V10_SLICE, slice);
+    const refused = send("critic", critic);
+    assert.equal(refused.code, 2, refused.stderr.slice(0, 300));
+    assert.ok(refused.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH") && refused.stderr.includes(sha256Of(prompt)) && refused.stderr.includes(sha256Of(critic)), refused.stderr.slice(0, 300));
+    assert.deepEqual(readRoute(slice), { schema: V10W_ROUTE_SCHEMA, sliceId: slice, briefingSha256: sha256Of(prompt), origin: V10W_ORIGIN });
+  });
+
+  for (const kind of ["codex", "antigravity", "workflow"]) {
+    test(`V-10 the ${kind} transport records the briefing it admits at the guard's admission point: latest admission wins, a tampered copy after a preflight record is refused typed`, () => {
+      const slice = `ALF-V10-WIRE-${kind.toUpperCase()}`;
+      checkV10Wiring({ send: (text) => send(kind, text), read: () => readRoute(slice), produce, prompt: v10wBriefing(slice), sliceId: slice });
+    });
+  }
+
+  test("V-10 a refused briefing leaves no record: a policy refusal and a later admission refusal both leave the slice unrouted, and nothing blocks the retry", () => {
+    const slice = "ALF-V10-WIRE-REFUSED";
+    const prompt = v10wBriefing(slice);
+    const incomplete = prompt.split("\n").filter((line) => !/Stop conditions|more than 2 failed/u.test(line)).join("\n");
+    const policy = send("native", incomplete);
+    assert.equal(policy.code, 2, policy.stderr.slice(0, 300));
+    assert.ok(policy.stderr.includes("DISPATCH-INCOMPLETE-BRIEFING"), policy.stderr.slice(0, 300));
+    assert.equal(readRoute(slice), null, "a policy refusal records nothing");
+    const late = send("native", prompt, { toolUseId: null }); // a budget-bearing dispatch without the host tool-use id is refused after the route check
+    assert.equal(late.code, 2, late.stderr.slice(0, 300));
+    assert.ok(late.stderr.includes("DBB-PARENT-TOOL-USE-ID-MISSING"), late.stderr.slice(0, 300));
+    assert.equal(readRoute(slice), null, "a later admission refusal records nothing");
+    const retry = prompt.replace("nothing in this briefing", "nothing in that briefing"); // nothing bound the slice, so other bytes are admitted and become the route
+    assert.equal(send("native", retry).code, 0);
+    assert.deepEqual(readRoute(slice), { schema: V10W_ROUTE_SCHEMA, sliceId: slice, briefingSha256: sha256Of(retry), origin: V10W_ORIGIN });
+  });
+
+  test("V-10 two different briefings of one slice in a single call are refused DISPATCH-BRIEFING-DIGEST-MISMATCH before anything is written", () => {
+    const slice = "ALF-V10-WIRE-CALL";
+    const first = v10wBriefing(slice);
+    const second = first.replace("nothing in this briefing", "nothing in that briefing");
+    const result = guardExport("recordAdmittedBriefingRoutes", { dispatches: [{ prompt: first }, { prompt: second }], root }, root);
+    assert.equal(result.ok, false);
+    assert.deepEqual([result.route.status, result.route.sliceId, result.route.path, result.route.expected, result.route.observed],
+      ["mismatch", slice, `evidence/dispatch-route-${slice}.json`, sha256Of(first), sha256Of(second)]);
+    assert.equal(readRoute(slice), null);
+    // the same conflict through the real hook (a Workflow script carrying two agent() calls): refused typed, no effect
+    const call = (prompt) => `await agent({ agentType: '${V10W_ROLE}', prompt: \`${prompt}\` });`;
+    const refused = runHook({ tool_use_id: `v10w-call-${process.pid}`, tool_name: "Workflow", tool_input: { script: `${call(first)}\n${call(second)}` } });
+    assert.equal(refused.code, 2, refused.stderr.slice(0, 300));
+    assert.ok(refused.stderr.includes("DISPATCH-BRIEFING-DIGEST-MISMATCH") && refused.stderr.includes(sha256Of(first)) && refused.stderr.includes(sha256Of(second)), refused.stderr.slice(0, 300));
+    assert.equal(readRoute(slice), null, "a refused call records nothing");
+    // two identical briefings of one slice in one call are one admission
+    const same = runHook({ tool_use_id: `v10w-same-${process.pid}`, tool_name: "Workflow", tool_input: { script: `${call(first)}\n${call(first)}` } });
+    assert.equal(same.code, 0, same.stderr.slice(0, 300));
+    assert.deepEqual(readRoute(slice), { schema: V10W_ROUTE_SCHEMA, sliceId: slice, briefingSha256: sha256Of(first), origin: V10W_ORIGIN });
+  });
+
+  test("V-10 a call with one unverifiable slice records nothing for its other slices", () => {
+    const [a, b] = ["ALF-V10-WIRE-MULTI-A", "ALF-V10-WIRE-MULTI-B"];
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, "evidence", `dispatch-route-${b}.json`), "{ not json\n");
+    const result = guardExport("recordAdmittedBriefingRoutes", { dispatches: [{ prompt: v10wBriefing(a) }, { prompt: v10wBriefing(b) }], root }, root);
+    assert.equal(result.ok, false);
+    assert.equal(result.route.status, "invalid");
+    assert.equal(result.route.sliceId, b);
+    assert.equal(readRoute(a), null, "the verifiable slice must not be recorded when another slice of the call is refused");
+    rmSync(join(root, "evidence", `dispatch-route-${b}.json`), { force: true });
+  });
+
+  test("V-10 what is deliberately not recorded: a Critic dispatch and a Goldfish briefing without a Slice line stay unbound and are admitted", () => {
+    const critic = V10_BRIEFING.replace(V10_SLICE, "ALF-V10-WIRE-CRITIC");
+    assert.equal(send("critic", critic).code, 0);
+    assert.equal(readRoute("ALF-V10-WIRE-CRITIC"), null);
+    assert.equal(send("critic", critic.replace("risk class high", "risk class hugh")).code, 0);
+    const prior = routeNames();
+    assert.equal(send("native", v10wBriefing("unused", { withSlice: false })).code, 0);
+    assert.deepEqual(routeNames(), prior, "no Slice line, nothing recorded");
+  });
+
+  test("V-10 admission wiring RED proof: a guard that records nothing, one that never lets a later admission win, and one that admits a tampered briefing after a preflight record, fail the same check", () => {
+    const sliceId = "ALF-V10-WIRE-RED";
+    const prompt = v10wBriefing(sliceId);
+    const ok = { code: 0, stderr: "" };
+    assert.throws(() => checkV10Wiring({ send: () => ok, read: () => null, produce: () => {}, prompt, sliceId })); // the state before this slice
+    const record = (text, origin) => ({ schema: V10W_ROUTE_SCHEMA, sliceId, briefingSha256: sha256Of(text), ...(origin === undefined ? {} : { origin }) });
+    // first admission binds (the semantics this slice replaces): the amended re-dispatch is refused
+    let bound = null;
+    const firstBinds = (text) => {
+      if (bound === null) { bound = record(text, V10W_ORIGIN); return ok; }
+      return text === prompt ? ok : { code: 2, stderr: "DISPATCH-BRIEFING-DIGEST-MISMATCH" };
+    };
+    assert.throws(() => checkV10Wiring({ send: firstBinds, read: () => bound, produce: (text) => { bound = record(text); }, prompt, sliceId }), /amended re-dispatch/u);
+    // records every admission but cannot tell a producer record from its own: a tampered text after a preflight record goes through
+    let stored = null;
+    assert.throws(() => checkV10Wiring({
+      send: (text) => { stored = record(text, V10W_ORIGIN); return ok; },
+      read: () => stored, produce: (text) => { stored = record(text); }, prompt, sliceId,
+    }), /tampered briefing after a preflight record/u);
+    // records without provenance: the admission record is not distinguishable from a producer record
+    let bare = null;
+    assert.throws(() => checkV10Wiring({ send: (text) => { bare = record(text); return ok; }, read: () => bare, produce: () => {}, prompt, sliceId }));
   });
 });
 

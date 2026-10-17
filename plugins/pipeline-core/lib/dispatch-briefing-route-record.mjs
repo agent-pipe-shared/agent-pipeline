@@ -60,10 +60,13 @@ function digestOfExistingRecord(path, size) {
 
 /**
  * Write the route record that binds the briefing about to be sent to its slice.
- * @param {{ root: string, prompt: string }} input `root` is the absolute project root the guard resolves
- *   (CLAUDE_PROJECT_DIR, else the hook payload cwd); `prompt` is the exact inline briefing text.
+ * @param {{ root: string, prompt: string, origin?: "admission" }} input `root` is the absolute project root the guard
+ *   resolves (CLAUDE_PROJECT_DIR, else the hook payload cwd); `prompt` is the exact inline briefing text. `origin`
+ *   is optional: absent, the record keeps its three keys (the producer record of role-dispatch-preflight, which stays
+ *   authoritative against a tampered briefing); "admission" is the guard's own provenance mark, the one extra key of
+ *   a record a later admission of the same slice may supersede (V-10, latest admission wins).
  */
-export function recordDispatchBriefingRoute({ root, prompt } = {}) {
+export function recordDispatchBriefingRoute({ root, prompt, origin } = {}) {
   if (typeof prompt !== "string" || prompt.trim() === "") return outcome("refused", "DBRR-PROMPT");
   if (typeof root !== "string" || root === "" || !isAbsolute(root)) return outcome("refused", "DBRR-ROOT");
   const absoluteRoot = resolve(root);
@@ -78,7 +81,7 @@ export function recordDispatchBriefingRoute({ root, prompt } = {}) {
   const shown = `evidence/dispatch-route-${sliceId}.json`;
   let record;
   try {
-    record = buildBriefingRoute({ sliceId, briefing: prompt });
+    record = buildBriefingRoute({ sliceId, briefing: prompt, origin });
   } catch {
     return outcome("refused", "DBRR-BUILD", { sliceId, path: shown });
   }
@@ -120,7 +123,7 @@ export function recordDispatchBriefingRoute({ root, prompt } = {}) {
 
   // Read the record back through the guard's own reader: what the guard will see is what is proven here.
   const read = evaluateBriefingRoute({ prompt, root: absoluteRoot });
-  if (read.status !== "match" || read.digest !== record.briefingSha256) {
+  if (read.status !== "match" || read.digest !== record.briefingSha256 || (read.origin ?? null) !== (record.origin ?? null)) {
     return outcome("refused", "DBRR-READBACK", { ...bound, detail: String(read.status) });
   }
   return outcome(status, status === "unchanged" ? "DBRR-UNCHANGED" : status === "replaced" ? "DBRR-REPLACED" : "DBRR-RECORDED", {
