@@ -351,6 +351,7 @@ export function isBoundedGitPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE
   if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
   if (!areGitObjectSpecOperandsContained(subcommand, subargs, root)) return false;
   if (!areGitPipelineOperandsContained(subargs, root, extraRoots)) return false;
+  if (!areGitReadOperandsInsideRoot(subcommand, subargs, root)) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   if (sinkName !== (windows ? "head.exe" : "head")) return false;
   if (parsed.redirects.length === 1) {
@@ -1186,7 +1187,53 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
   }
   const subcommand = args[index];
   const subargs = args.slice(index + 1);
-  return isReadOnlyGitSubcommand(subcommand, subargs);
+  return isReadOnlyGitSubcommand(subcommand, subargs)
+    && areGitReadOperandsInsideRoot(subcommand, subargs, root);
+}
+
+// C6g1 F3 (ALF-C-C6G1-CORR-A, refined by ALF-C-C6G1-CORR-A2 under the PO decision of 2026-10-17): the output/execution denylist
+// refuses every prefix of a denied name together with the glued `=value` forms, because git parses an unambiguous abbreviation of
+// a long option as the option itself in several subcommands and versions (an ambiguous prefix is a git error, which is no reason
+// to admit it); `-o` keeps its original spelling check. An EXACT, complete option name always wins over an abbreviation, so an
+// exact harmless option that is itself a prefix of a denied name is admitted through the closed list below, and only without a
+// glued `=value`. The list is measured, not guessed: it is every long option of an admitted subcommand
+// (`git <subcommand> --git-completion-helper`) that is a strict prefix of a denied name; `--text` (`-a`, treat all files as text)
+// is the one collision, with `--textconv`.
+const GIT_DENIED_LONG_OPTIONS = Object.freeze(["--output", "--ext-diff", "--textconv", "--no-index"]);
+const GIT_EXACT_HARMLESS_LONG_OPTIONS = Object.freeze(["--text"]);
+function isDeniedGitReadOption(arg) {
+  if (/^-o(?:$|[^-])/u.test(arg)) return true;
+  if (!arg.startsWith("--")) return false;
+  const equals = arg.indexOf("=");
+  const name = equals < 0 ? arg : arg.slice(0, equals);
+  if (equals < 0 && GIT_EXACT_HARMLESS_LONG_OPTIONS.includes(name)) return false;
+  return name.length > 2 && GIT_DENIED_LONG_OPTIONS.some((denied) => denied.startsWith(name));
+}
+
+// C6g1 F3: `git diff <path> <path>` behaves as `git diff --no-index` when a path lies outside the repository, so a
+// diff/log/show operand that is not a revision must resolve inside the project root (lexically AND physically); an
+// operand that cannot be resolved is refused. A project-relative ref or pathspec resolves inside and stays admitted.
+function areGitReadOperandsInsideRoot(subcommand, subargs, root) {
+  if (!["diff", "log", "show"].includes(subcommand)) return true;
+  let afterDashDash = false;
+  for (let i = 0; i < subargs.length; i += 1) {
+    const arg = subargs[i];
+    if (!afterDashDash && arg === "--") { afterDashDash = true; continue; }
+    if (!afterDashDash && arg.startsWith("-")) {
+      if (GIT_VALUE_FLAGS.has(arg) && /^[0-9]+$/u.test(subargs[i + 1] ?? "")) i += 1;
+      continue;
+    }
+    if (!afterDashDash && isGitRevisionOperand(arg, root, [])) continue;
+    if (!isGitPathOperandInsideRoot(arg, root)) return false;
+  }
+  return true;
+}
+
+function isGitPathOperandInsideRoot(arg, root) {
+  if (typeof arg !== "string" || arg === "" || /[\0`$]/u.test(arg)) return false;
+  if (process.platform === "win32" && /^[A-Za-z]:(?![\\/])/u.test(arg)) return false;
+  const candidate = arg.startsWith("-") ? `${root}${sep}${arg}` : rawReadCandidatePath(arg, root);
+  return candidate !== null && isRealpathedWithinBoundary(candidate, root);
 }
 
 // NVA-CF-GITPIPEALLOWLIST: factored out of isReadOnlySimpleWords' git branch (pure extraction,
@@ -1196,8 +1243,7 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
 // function nor isBoundedGitPipeline support it, keeping both callers free of the
 // cross-repository-reaching `-C` shape.
 function isReadOnlyGitSubcommand(subcommand, subargs) {
-  if (subargs.some((arg) =>
-    /^(?:--output(?:=|$)|--ext-diff$|--textconv$|--no-index$|-o(?:$|[^-]))/u.test(arg))) return false;
+  if (subargs.some(isDeniedGitReadOption)) return false;
   if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref", "describe"].includes(subcommand)) {
     return true;
   }

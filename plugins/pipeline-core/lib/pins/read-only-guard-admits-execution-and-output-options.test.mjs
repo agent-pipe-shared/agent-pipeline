@@ -13,9 +13,9 @@
 //   A3 direct/aliased signing keys and declared credential roots denied in every read lane
 //      (`~`, `..`, Windows drive spelling, directory scans; directory symlinks are host-limited)
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, rmSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -139,6 +139,121 @@ test("A1 git config: other write/edit/file flags refused; pure reads admitted (c
   }
 });
 
+// ---- ALF-C-C6G1-CORR-A (Critic C6g1 F3/F4): git accepts any unambiguous abbreviation of a long option, and `git diff <path> <path>`
+// behaves as `git diff --no-index` when a path lies outside the repository. Cases titled with NEEDS_PATCH are RED on a tree without
+// the protected-file patch scratch/patches/ALF-C-C6G1-CORR-A.patch (lib/guard/shell-grammar.mjs) and GREEN with it.
+const NEEDS_PATCH = "needs protected patch ALF-C-C6G1-CORR-A";
+
+/** Create a directory alias (symlink; a junction where the host denies unprivileged symlinks) or report null: the host capability probe. */
+function removeDirectoryAlias(link) {
+  try { unlinkSync(link); } catch { try { rmdirSync(link); } catch { /* already gone */ } }
+}
+function makeDirectoryAlias(target, link) {
+  for (const kind of process.platform === "win32" ? ["dir", "junction"] : ["dir"]) {
+    try {
+      symlinkSync(target, link, kind);
+      if (lstatSync(link).isSymbolicLink()) return kind;
+    } catch { /* this alias kind is unavailable on this host; try the next */ }
+    removeDirectoryAlias(link);
+  }
+  return null;
+}
+
+for (const command of [
+  "git diff --out=x.txt", "git diff --outp x.txt", "git log --outpu=x.txt", "git show --ou=x.txt HEAD", "git diff --o x.txt",
+  "git diff --ext", "git diff --ext-d", "git log -p --ext-diff=x", "git diff --textc", "git show --textco HEAD",
+  "git diff --no-ind a b", "git diff --no-i a b", "git diff --no-index=x a b",
+]) {
+  test(`A1 git: abbreviated long option denied (${NEEDS_PATCH}): ${command}`, () => {
+    assert.equal(guard(command), false);
+  });
+}
+test(`A1 git: an abbreviated output/execution option stays denied inside a pipeline and a chain (${NEEDS_PATCH})`, () => {
+  for (const command of ["git diff --out=x.txt | head -5", "git log --no-ind a b | head -5", "git log -p --ext | head -5",
+    "rg -n needle README.md && git diff --out=x.txt"]) assert.equal(guard(command), false, command);
+});
+test("A1 git: unrelated long options are not caught by the prefix rule (control)", () => {
+  for (const command of ["git diff --stat", "git diff --name-only", "git log --oneline", "git log --no-merges",
+    "git diff --exit-code", "git log --format=%H"]) assert.equal(guard(command), true, command);
+});
+
+// ---- ALF-C-C6G1-CORR-A2 (PO decision 2026-10-17): the prefix rule refines to "an exact harmless option is admitted, an abbreviation
+// of a denied name stays refused". An exact, complete option name wins over an abbreviation, so `--text` (diff -a: treat all files as
+// text) is a complete harmless option even though it is also a prefix of `--textconv`. Measured with
+// `git <subcommand> --git-completion-helper` over every admitted subcommand, `--text` is the only exact option that is a strict prefix
+// of a denied name (--output, --ext-diff, --textconv, --no-index). Cases titled with REFINED_BY_A2 are RED on a tree carrying only the
+// original patch ALF-C-C6G1-CORR-A (it refuses every prefix) and GREEN with scratch/patches/ALF-C-C6G1-CORR-A2.patch, which replaces
+// it; the NEEDS_PATCH cases above are satisfied by the A2 patch as well.
+const REFINED_BY_A2 = "refined by protected patch ALF-C-C6G1-CORR-A2";
+test(`A1 git: the exact harmless option --text is admitted although it is a prefix of --textconv (${REFINED_BY_A2})`, () => {
+  for (const command of ["git diff --text", "git diff --text --stat", "git diff --text HEAD~1 HEAD", "git diff --text -- README.md",
+    "git log -p --text", "git show --text HEAD"]) assert.equal(guard(command), true, command);
+});
+test(`A1 git: the exact harmless option --text stays admitted inside a pipeline and a chain (${REFINED_BY_A2})`, () => {
+  for (const command of ["git diff --text | head -5", "git log -p --text | head -5", "rg -n needle README.md && git diff --text"]) {
+    assert.equal(guard(command), true, command);
+  }
+});
+test("A1 git: -a and the negated harmless options are admitted (control)", () => {
+  for (const command of ["git diff -a", "git diff --no-ext-diff", "git diff --no-textconv", "git diff --exit-code"]) {
+    assert.equal(guard(command), true, command);
+  }
+});
+test("A1 git: an abbreviation of a denied option stays denied beside the admitted exact --text", () => {
+  for (const command of ["git diff --tex", "git diff --te", "git diff --t", "git diff --textc", "git diff --textco", "git diff --text --textc",
+    "git diff --ext", "git diff --text --ext", "git diff --text --ext-d", "git diff --text --out=x.txt", "git diff --text --no-ind a b"]) {
+    assert.equal(guard(command), false, command);
+  }
+});
+test("A1 git: the glued =value form of --text and of every denied name stays denied", () => {
+  for (const command of ["git diff --text=x", "git diff --text=1", "git log -p --text=x", "git diff --textconv=cat", "git diff --ext-diff=x",
+    "git diff --output=x.txt", "git diff --no-index=x a b", "git diff --text --textconv"]) assert.equal(guard(command), false, command);
+});
+test("A1 git: an abbreviation or a glued value stays denied inside a pipeline and a chain beside --text", () => {
+  for (const command of ["git diff --tex | head -5", "git diff --text=x | head -5", "git log -p --text --ext | head -5",
+    "rg -n needle README.md && git diff --text=x", "rg -n needle README.md && git diff --tex"]) assert.equal(guard(command), false, command);
+});
+
+for (const command of [
+  "git diff /outside-root-c6g1/a /outside-root-c6g1/b", "git diff -- /outside-root-c6g1/a /outside-root-c6g1/b",
+  "git diff ../outside-a ../outside-b", "git diff README.md ../outside-b", "git log -p -- ../outside-a",
+  "git show HEAD -- /outside-root-c6g1/a", "git diff ~/outside-a ~/outside-b", "git diff -- ~/outside-a README.md",
+]) {
+  test(`A1 git: a path operand outside the project root is not a passive read (${NEEDS_PATCH}): ${command}`, () => {
+    assert.equal(guard(command), false);
+  });
+}
+if (process.platform === "win32") {
+  test(`A1 git: a drive-relative path operand cannot be resolved and is refused (${NEEDS_PATCH})`, () => {
+    assert.equal(guard("git diff C:foo C:bar"), false);
+    assert.equal(guard("git diff -- C:foo"), false);
+  });
+}
+test(`A1 git: an operand that resolves outside the project through a directory alias is refused (${NEEDS_PATCH})`, (t) => {
+  const alias = join(fixture, "outside-alias");
+  if (makeDirectoryAlias(dirname(repoRoot), alias) === null) { t.skip(HOST_LIMIT("directory symlinks")); return; }
+  try {
+    const rel = relative(repoRoot, alias).replaceAll("\\", "/");
+    assert.equal(guard(`git diff ${rel}/a ${rel}/b`), false);
+    assert.equal(guard(`git diff -- ${rel}/a`), false);
+  } finally { removeDirectoryAlias(alias); }
+});
+test("A1 git: project-relative revisions and pathspecs stay admitted (control)", () => {
+  for (const command of ["git diff README.md", "git diff HEAD~1 HEAD", "git diff HEAD -- README.md", "git log --oneline -n 5 -- plugins",
+    "git log main..HEAD", "git show HEAD"]) assert.equal(guard(command), true, command);
+});
+test("A1 git -C: a symlinked directory is rejected even when it resolves inside the project; a real one is admitted", (t) => {
+  const real = join(fixture, "gitc-real");
+  const link = join(fixture, "gitc-link");
+  mkdirSync(real, { recursive: true });
+  if (makeDirectoryAlias(real, link) === null) { t.skip(HOST_LIMIT("directory symlinks")); return; }
+  try {
+    const rel = (path) => relative(repoRoot, path).replaceAll("\\", "/");
+    assert.equal(guard(`git -C ${rel(real)} status`), true, "control: a real directory inside the project");
+    assert.equal(guard(`git -C ${rel(link)} status`), false);
+  } finally { removeDirectoryAlias(link); }
+});
+
 // ------------------------------------------- A2: PowerShell and native forms
 // The PowerShell fixed-read dialect is parsed by guard-command-grammar but is not itself a
 // read-only admission in isReadOnlyDiagnosticCommand (its admission lives in the hook layer,
@@ -236,8 +351,46 @@ test("A3 credential roots denied through the shell lanes (single, chain, pipelin
   }
 });
 
-test("A3 directory symlink alias to a credential root", { skip: HOST_LIMIT("directory symlinks") }, () => {});
-test("A3 directory mode-bit variants of a credential root", { skip: HOST_LIMIT("directory mode bits") }, () => {});
+// ALF-C-C6G1-CORR-A (F4): real bodies. Each probes the host capability inside the test and skips only when the host genuinely lacks it.
+test("A3 directory symlink alias to a credential root", (t) => {
+  const { home, project, opts } = credentialFixture();
+  const sshAlias = join(project, "ssh-alias");
+  const homeAlias = join(project, "home-alias");
+  const srcAlias = join(project, "src-alias");
+  const made = [];
+  try {
+    for (const [target, link] of [[join(home, ".ssh"), sshAlias], [home, homeAlias], [join(project, "src"), srcAlias]]) {
+      if (makeDirectoryAlias(target, link) === null) { t.skip(HOST_LIMIT("directory symlinks")); return; }
+      made.push(link);
+    }
+    for (const target of [sshAlias, join(sshAlias, "id_rsa"), join(sshAlias, "id_ed25519"), join(homeAlias, ".ssh", "id_rsa"),
+      join(homeAlias, ".aws", "credentials")]) assert.equal(isAllowedPassiveReadTarget(target, opts), false, target);
+    for (const alias of [sshAlias, homeAlias]) {
+      assert.equal(isAllowedPassiveReadTarget(alias, { ...opts, recursive: true }), false, `${alias} recursive`);
+      assert.equal(isAllowedPassiveReadTarget(alias, { ...opts, directoryListing: true }), false, `${alias} listing`);
+    }
+    assert.equal(isAllowedPassiveReadTarget(join(srcAlias, "a.txt"), opts), true, "control: an alias to a harmless project directory stays readable");
+  } finally { for (const link of made) removeDirectoryAlias(link); }
+});
+test("A3 directory mode-bit variants of a credential root", (t) => {
+  const { home, opts } = credentialFixture();
+  const sshDir = join(home, ".ssh");
+  const modeOf = () => statSync(sshDir).mode & 0o777;
+  try {
+    chmodSync(sshDir, 0o755);
+    const honoured755 = modeOf() === 0o755;
+    chmodSync(sshDir, 0o711);
+    if (!honoured755 || modeOf() !== 0o711) { t.skip(HOST_LIMIT("directory mode bits")); return; }
+    for (const mode of [0o700, 0o755, 0o777, 0o711, 0o500, 0o555, 0o000]) {
+      chmodSync(sshDir, mode);
+      for (const target of [sshDir, join(sshDir, "id_rsa"), join(sshDir, "id_ed25519")]) {
+        assert.equal(isAllowedPassiveReadTarget(target, opts), false, `${target} (mode ${mode.toString(8)})`);
+      }
+      assert.equal(isAllowedPassiveReadTarget(sshDir, { ...opts, recursive: true }), false, `recursive (mode ${mode.toString(8)})`);
+      assert.equal(isAllowedPassiveReadTarget(home, { ...opts, recursive: true }), false, `home scan (mode ${mode.toString(8)})`);
+    }
+  } finally { chmodSync(sshDir, 0o700); }
+});
 
 // ------------------- mutation proof: the rg option check is what makes the cases meaningful
 test("meaningful: weakening the rg option check in a scratch mirror admits --pre (RED mirror)", async () => {

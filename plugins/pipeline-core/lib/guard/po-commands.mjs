@@ -118,6 +118,86 @@ function sedInPlaceFileOperands(args) {
   return files;
 }
 
+// C6g1 F1 (ALF-C-C6G1-CORR-A): closed option tables for the cp/mv/install write-target judgement. An option that is
+// not listed could consume or name a path operand, so the whole command fails closed instead of being guessed at.
+const COPY_MOVE_INSTALL_OPTIONS = Object.freeze({
+  cp: Object.freeze({
+    shortFlags: "abdfHilLnPpRrsTuvxZ",
+    shortValues: "St",
+    longFlags: ["archive", "attributes-only", "backup", "copy-contents", "debug", "dereference", "force", "interactive", "link",
+      "no-clobber", "no-dereference", "no-target-directory", "one-file-system", "parents", "preserve", "recursive", "reflink",
+      "remove-destination", "sparse", "strip-trailing-slashes", "symbolic-link", "update", "verbose", "context", "help", "version"],
+    longValues: ["no-preserve", "suffix", "target-directory"],
+  }),
+  mv: Object.freeze({
+    shortFlags: "bfinTuvZ",
+    shortValues: "St",
+    longFlags: ["backup", "debug", "exchange", "force", "interactive", "no-clobber", "no-copy", "no-target-directory",
+      "strip-trailing-slashes", "update", "verbose", "context", "help", "version"],
+    longValues: ["suffix", "target-directory"],
+  }),
+  install: Object.freeze({
+    shortFlags: "bcCdDpsTvZ",
+    shortValues: "gmoSt",
+    longFlags: ["backup", "compare", "debug", "directory", "no-target-directory", "preserve-timestamps", "preserve-context",
+      "strip", "verbose", "context", "help", "version"],
+    longValues: ["group", "mode", "owner", "strip-program", "suffix", "target-directory"],
+  }),
+});
+
+/**
+ * Every operand a cp/mv/install command writes, creates or removes, or null when an option cannot be placed.
+ * cp and install write the destination (the -t/--target-directory value, else the last operand) and only read their
+ * sources; mv also REMOVES every source; install -d creates every operand. `-t` is recognised glued, inside a short-option
+ * cluster (-rtDIR, -vt DIR) and as any unambiguous prefix of --target-directory, as the underlying getopt does.
+ */
+function copyMoveInstallWrittenOperands(executable, args) {
+  const spec = COPY_MOVE_INSTALL_OPTIONS[executable];
+  const operands = [];
+  let targetDirectory = null;
+  let targetCount = 0;
+  let createsDirectories = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--") { operands.push(...args.slice(index + 1)); break; }
+    if (arg === "-" || !arg.startsWith("-")) { operands.push(arg); continue; }
+    if (arg.startsWith("--")) {
+      const equals = arg.indexOf("=");
+      const name = arg.slice(2, equals < 0 ? undefined : equals);
+      const known = [...spec.longFlags, ...spec.longValues];
+      const matches = known.includes(name) ? [name] : known.filter((candidate) => name !== "" && candidate.startsWith(name));
+      if (matches.length !== 1) return null;
+      const option = matches[0];
+      if (spec.longValues.includes(option)) {
+        const value = equals >= 0 ? arg.slice(equals + 1) : args[++index];
+        if (value === undefined) return null;
+        if (option === "target-directory") { targetCount += 1; targetDirectory = value; }
+      }
+      if (executable === "install" && option === "directory") createsDirectories = true;
+      continue;
+    }
+    for (let at = 1; at < arg.length; at += 1) {
+      const letter = arg[at];
+      if (spec.shortValues.includes(letter)) {
+        const glued = arg.slice(at + 1);
+        const value = glued !== "" ? glued : args[++index];
+        if (value === undefined) return null;
+        if (letter === "t") { targetCount += 1; targetDirectory = value; }
+        break;
+      }
+      if (!spec.shortFlags.includes(letter)) return null;
+      if (executable === "install" && letter === "d") createsDirectories = true;
+    }
+  }
+  if (targetCount > 1) return null;
+  const written = [];
+  if (executable === "install" && createsDirectories) written.push(...operands);
+  else if (targetDirectory === null && operands.length > 0) written.push(operands[operands.length - 1]);
+  if (targetDirectory !== null) written.push(targetDirectory);
+  if (executable === "mv") written.push(...(targetDirectory === null ? operands.slice(0, -1) : operands));
+  return written;
+}
+
 /**
  * Identify the concrete cross-repository mutation patterns involved in local
  * plugin development. Read-only commands remain handled by the diagnostic
@@ -191,14 +271,14 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   if (mutatingTargets.has(executable)) {
     let written = args;
     if (["cp", "mv", "install"].includes(executable)) {
-      // Only the destination is written: the -t/--target-directory value, else the last operand.
-      // Sources are reads; `-t` may also be glued (-tDIR / --target-directory=DIR).
-      const targetOption = args.findIndex((arg) => arg === "-t" || arg === "--target-directory");
-      const glued = args.find((arg) => /^--target-directory=/u.test(arg) || /^-t.+/u.test(arg));
-      const operands = args.filter((arg) => arg === "-" || !arg.startsWith("-"));
-      if (targetOption >= 0 && args[targetOption + 1] !== undefined) written = [args[targetOption + 1]];
-      else if (glued) written = [glued.replace(/^--target-directory=|^-t/u, "")];
-      else if (operands.length > 0) written = [operands[operands.length - 1]];
+      // C6g1 F1: judge EVERY operand written, created or removed (destination or -t value, every mv source, every install -d
+      // operand); an outside READ source of cp/install stays allowed, and an option the closed tables cannot place fails closed.
+      written = copyMoveInstallWrittenOperands(executable, args);
+      if (written === null) return true;
+      return written.some((arg) => {
+        const target = commandPath(arg, root);
+        return target !== null && !pathInside(root, target);
+      });
     }
     return written.some((arg) => {
       const target = commandPath(arg, root);

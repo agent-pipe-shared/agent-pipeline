@@ -3,7 +3,8 @@
 // Acceptance points of the original item:
 //   P1 a hook snapshot is bound to the plugin identity (content-addressed) and a changed plugin is detected as stale;
 //   P2 a typed HOOK-SNAPSHOT-STALE diagnostic is reported in preflight AND in the commit refusal, naming one refresh command;
-//   P3 only the destination operand of cp/mv/install is the write target (a source outside the root is a read);
+//   P3 only the destination operand of cp/install is the write target (a source outside the root is a read); mv also REMOVES
+//      its sources, so an outside mv source is refused (ALF-C-C6G1-CORR-A, Critic C6g1 F1; protected-file patch);
 //   P4 fixtures run on win32 and POSIX (directory mode bits / directory symlinks are a typed host limitation).
 // Fixtures live under the repository scratch/ (gitignored) and are removed before a test ends.
 import assert from "node:assert/strict";
@@ -13,7 +14,9 @@ import { join, relative, resolve } from "node:path";
 import test from "node:test";
 
 import { createGovernanceScopeController } from "../governance-scope.mjs";
-import { publishGitHookRuntimeSnapshot } from "../git-hook-runtime-snapshot.mjs";
+import { inspectGitHookSourceSnapshot, publishGitHookRuntimeSnapshot } from "../git-hook-runtime-snapshot.mjs";
+import { checkCloneProvisioning } from "../../scripts/check-clone-provisioning.mjs";
+import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { HOOK_SNAPSHOT_STALE_CODE, assessHookCurrentness } from "../hook-currentness.mjs";
 import { applyInstall as applyCommitMsg, planInstall as planCommitMsg, renderImpl } from "../../scripts/commit-msg-hook-install.mjs";
 import { applyInstall as applyPreCommit, planInstall as planPreCommit } from "../../scripts/pre-commit-hook-install.mjs";
@@ -70,22 +73,78 @@ test("P2 (commit refusal): the rendered commit-msg implementation checks snapsho
   assert.match(rendered, /HOOK-SNAPSHOT-STALE/u);
 });
 
-test("P2 (preflight): the typed stale diagnostic is the literal HOOK-SNAPSHOT-STALE code", () => {
-  // Preflight reports status hook-refresh-required / state installed-but-stale with a refresh nextAction, but not the
-  // item's typed code. Pinned against the preflight source text; this holds on the current source.
-  const source = readFileSync(join(PLUGIN, "scripts", "pipeline-start-preflight.mjs"), "utf8");
-  assert.match(source, /HOOK-SNAPSHOT-STALE/u);
-});
+// P2 (preflight) is now a behavioural case at the end of this file (ALF-C-C6G4-F2): the former source-text grep for the literal
+// passed on the pre-push observation alone and could not fail for a stale commit-msg or pre-commit snapshot.
 
-test("P3: cp/mv/install classify only the destination operand; an outside source is a read", (t) => {
+test("P3: cp/install classify only the destination operand (an outside source is a read); mv removes its source (needs protected patch ALF-C-C6G1-CORR-A)", (t) => {
   const base = scratch(t), inside = join(base, "project"), outside = join(base, "installed-plugin").replaceAll("\\", "/");
   mkdirSync(inside, { recursive: true });
   const dest = join(inside, "x.mjs").replaceAll("\\", "/");
   for (const verb of ["cp", "mv", "install"]) {
-    assert.equal(isForbiddenCrossRepositoryMutation(`${verb} /outside-root/src/x.mjs ${dest}`, inside), false, `${verb} outside source, inside destination`);
+    // The ONE inverted expectation (ALF-C-C6G1-CORR-A, Critic C6g1 F1): `mv` REMOVES its source, so an outside source is a
+    // cross-repository mutation (it used to read "allowed" for all three verbs); cp and install only read theirs.
+    assert.equal(isForbiddenCrossRepositoryMutation(`${verb} /outside-root/src/x.mjs ${dest}`, inside), verb === "mv", `${verb} outside source, inside destination`);
   }
   assert.equal(isForbiddenCrossRepositoryMutation(`cp ${dest} /tmp/elsewhere/x.mjs`, inside), true, "outside destination stays refused");
   assert.equal(typeof outside, "string");
+});
+
+// ---- ALF-C-C6G1-CORR-A (Critic C6g1 F1): cp/mv/install are judged by EVERY operand they write, create or remove ------------
+// Cases titled with NEEDS_PATCH are RED on a tree without the protected-file patch scratch/patches/ALF-C-C6G1-CORR-A.patch
+// (lib/guard/po-commands.mjs, isForbiddenCrossRepositoryMutation) and GREEN with it. The path logic is purely lexical, so the
+// project root below is never created on disk.
+const NEEDS_PATCH = "needs protected patch ALF-C-C6G1-CORR-A";
+const W = (() => {
+  const inside = join(REPO, "scratch", "c6g1-project").replaceAll("\\", "/");
+  return { inside, outside: "/outside-root-c6g1", src: `${inside}/src/a.mjs`, dest: `${inside}/dest/a.mjs`, dir: `${inside}/dest` };
+})();
+const c6g1Forbidden = (command) => isForbiddenCrossRepositoryMutation(command, W.inside);
+const c6g1Title = (command) => command.replaceAll(W.inside, "<project>").replaceAll(W.outside, "<outside>");
+
+// An operand written, created or removed outside the project (a target directory hidden in a short-option cluster or behind a
+// long-option abbreviation, an mv source, an install -d operand) or an option the closed tables cannot place: refused.
+for (const command of [
+  `cp -rt ${W.outside}/dest ${W.src}`, `cp -vt ${W.outside}/dest ${W.src}`, `cp -rt${W.outside}/dest ${W.src}`,
+  `mv -vt ${W.outside}/dest ${W.src}`, `install -Dt ${W.outside}/dest ${W.src}`,
+  `cp --target ${W.outside}/dest ${W.src}`, `cp --target=${W.outside}/dest ${W.src}`, `cp --t=${W.outside}/dest ${W.src}`,
+  `mv --targ ${W.outside}/dest ${W.src}`, `install --target-dir ${W.outside}/dest ${W.src}`,
+  `mv -t ${W.dir} ${W.outside}/src/x.mjs`, `mv -vt ${W.dir} ${W.src} ${W.outside}/a.mjs`,
+  `install -d ${W.outside}/created ${W.dir}`, `install --directory ${W.outside}/created ${W.dir}`, `install --dir ${W.outside}/created ${W.dir}`,
+  `cp --bogus-option ${W.src} ${W.dest}`, `cp -Q ${W.src} ${W.dest}`, `mv --no ${W.src} ${W.dest}`, `cp ${W.src} -t`,
+  `cp -t ${W.dir} -t ${W.dir}2 ${W.src}`,
+]) {
+  test(`P3 (F1): a write, creation or removal outside the project is refused (${NEEDS_PATCH}): ${c6g1Title(command)}`, () => {
+    assert.equal(c6g1Forbidden(command), true);
+  });
+}
+test(`P3 (F1): an outside mv source is refused, matching the inverted P3 expectation (${NEEDS_PATCH})`, () => {
+  assert.equal(c6g1Forbidden(`mv ${W.outside}/src/x.mjs ${W.dest}`), true);
+});
+
+// Controls: hold on the original source AND with the patch.
+test("P3 (F1 control): an outside READ source of cp/install stays allowed", () => {
+  for (const command of [
+    `cp -a ${W.outside}/src ${W.dest}`, `cp --target-directory=${W.dir} ${W.outside}/src/x.mjs`,
+    `install -m 0644 ${W.outside}/src/x.mjs ${W.dest}`,
+  ]) assert.equal(c6g1Forbidden(command), false, c6g1Title(command));
+});
+// The same outside READ source behind a cluster or an abbreviated -t used to be misjudged as the written operand: it is a read.
+test(`P3 (F1): an outside READ source stays allowed when the target directory is spelled -t in a cluster or as an abbreviation (${NEEDS_PATCH})`, () => {
+  for (const command of [
+    `cp -rt ${W.dir} ${W.outside}/src/x.mjs`, `install -Dt ${W.dir} ${W.outside}/src/x.mjs`, `cp --target ${W.dir} ${W.outside}/src/x.mjs`,
+  ]) assert.equal(c6g1Forbidden(command), false, c6g1Title(command));
+});
+test("P3 (F1 control): commands whose every written operand is inside the project stay allowed", () => {
+  for (const command of [
+    `cp -r ${W.src} ${W.dest}`, `cp -vt ${W.dir} ${W.src}`, `cp -- ${W.src} ${W.dest}`, `cp -pr --preserve=mode ${W.src} ${W.dest}`,
+    `mv ${W.src} ${W.dest}`, `mv -vt ${W.dir} ${W.src} ${W.inside}/b.mjs`, `install -d ${W.dir} ${W.inside}/d2`,
+    `install --owner=root --mode=0644 ${W.src} ${W.dest}`,
+  ]) assert.equal(c6g1Forbidden(command), false, c6g1Title(command));
+});
+test("P3 (F1 control): an outside destination stays refused for every verb", () => {
+  for (const command of [`cp ${W.src} ${W.outside}/x`, `mv ${W.src} ${W.outside}/x`, `install ${W.src} ${W.outside}/x`, `install -d ${W.outside}/x`]) {
+    assert.equal(c6g1Forbidden(command), true, c6g1Title(command));
+  }
 });
 
 test("P4: directory-mode and directory-symlink variants are a typed host limitation on win32", (t) => {
@@ -225,4 +284,31 @@ test("AC-179 (inert outside governance scope): a stale installed pre-commit hook
   const committed = world.commit();
   assert.equal(committed.status, 0, `an unenrolled repository stays inert even with a stale hook (stderr: ${committed.stderr})`);
   assert.doesNotMatch(committed.stderr, new RegExp(HOOK_SNAPSHOT_STALE_CODE, "u"), committed.stderr);
+});
+
+test("AC-179 (inert outside governance scope): a stale installed commit-msg hook in a repository that is NOT enrolled does not refuse the commit", { timeout: INSTALLED_HOOK_TEST_TIMEOUT_MS }, (t) => {
+  const world = installedHookWorld(t, { consumer: false, enroll: false });
+  const hook = HOOKS["commit-msg"];
+  assert.equal(hook.apply(world.project, world.pluginRoot).status, "installed");
+  world.updatePlugin();
+  assert.equal(hook.plan(world.project, world.pluginRoot).updateRequired, true, "the snapshot is stale");
+  const committed = world.commit();
+  assert.equal(committed.status, 0, `an unenrolled repository stays inert even with a stale commit-msg hook (stderr: ${committed.stderr})`);
+  assert.doesNotMatch(committed.stderr, new RegExp(HOOK_SNAPSHOT_STALE_CODE, "u"), committed.stderr);
+});
+
+// ---- ALF-C-C6G4-F2 (Critic C6g4 F2): preflight carries the typed code for EVERY stale mandatory hook ------------------------
+test("P2 (preflight, behavioural): a stale commit-msg and a stale pre-commit snapshot each carry the typed HOOK-SNAPSHOT-STALE code naming the hook", { timeout: INSTALLED_HOOK_TEST_TIMEOUT_MS }, (t) => {
+  const world = installedHookWorld(t, { consumer: false });
+  for (const hook of Object.values(HOOKS)) assert.equal(hook.apply(world.project, world.pluginRoot).status, "installed");
+  // The loaded plugin tree is the fixture's own copy, so "current" and "stale" are decided by its content digest.
+  const inspectSource = () => inspectGitHookSourceSnapshot({ pluginLibDir: join(world.pluginRoot, "lib") });
+  const observe = () => observePipelineStartPreflight({ cwd: world.project, env: world.env, checkCloneProvisioningFn: (cwd) => checkCloneProvisioning(cwd, { inspectSource }) });
+  assert.equal(observe().staleHookSnapshots, undefined, "a current pair carries no stale code");
+  world.updatePlugin();
+  const stale = observe().staleHookSnapshots;
+  assert.ok(Array.isArray(stale), `a stale pair carries typed codes (got ${JSON.stringify(stale)})`);
+  const byHook = Object.fromEntries(stale.map((entry) => [entry.hook, entry.code]));
+  assert.equal(byHook["commit-msg"], HOOK_SNAPSHOT_STALE_CODE, "stale commit-msg snapshot");
+  assert.equal(byHook["pre-commit"], HOOK_SNAPSHOT_STALE_CODE, "stale pre-commit snapshot");
 });
