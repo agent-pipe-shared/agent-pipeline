@@ -168,6 +168,17 @@ export function sanctionedTranscriptRecoveryArgs(args, root) {
       requiredValue: { ...base.requiredValue, "--session-id": sessionId },
     });
   }
+  // ALF-C-N1-02C: `export` takes the read flag set but admits all three runners, because the Claude and
+  // Antigravity usage is part of the export (their storage adapters are the script's own business).
+  if (args[0] === "export") {
+    return matchFlagSpec(args.slice(1), {
+      requiredValue: {
+        ...base.requiredValue,
+        "--runner": (value) => ["codex", "claude", "antigravity"].includes(value),
+        "--session-id": sessionId,
+      },
+    });
+  }
   return matchFlagSpec(args, base);
 }
 
