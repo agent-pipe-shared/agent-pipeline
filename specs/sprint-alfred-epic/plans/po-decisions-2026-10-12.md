@@ -161,3 +161,12 @@ Answers to structured questions; tile text in
   - Decision (PO, same principle as AC-155): ancestors strictly above the repository root are human-controlled and outside the threat model. Their owner and ACL are still observed and bound into the native facts, so drift stays detectable, but a foreign owner or foreign write grant there no longer refuses. Ancestors at or below the repository root, and the private state itself, keep the existing strict checks.
   - Rejected: changing the ACLs of `D:\` / `D:\Dev`, and moving Full Verify to WSL only.
 - **Order after the candidate (PO, 2026-10-17):** first finish the candidate, then install it, then push. Only after that comes the gap analysis of the items at stage 50.
+
+## Decision tiles answered (PO, 2026-10-17 evening, Claude session)
+
+- **Commit-bound signature for Pipeline source paths (AC-258 gap):** backlog, fix after 0.7.0. The signed quality package stays the route. Item: `backlog/items/2026-10-17-commit-bound-signature-refuses-pipeline-source-paths.md`.
+- **C6h H-F1, design-approval e2e host-limitation skip:** narrow the admitted reason set to the justified `WIN-AUTH-ANCESTOR-OWNER`, and name the host that runs the cases (WSL/Linux) and a due date (2026-10-31), per QG-04/QG-06. Implement for 0.7.0.
+- **C6g1 C-A (stamp is provenance, not a MAC) and C-B (rethrow without a consumer pin):** backlog. Items: `backlog/items/2026-10-17-signing-stamp-is-provenance-not-authentication.md`, `backlog/items/2026-10-17-po-human-approval-rethrow-has-no-consumer-pin.md`.
+- **`specs/sprint-alfred-epic/slice-queue.json`:** machine-local dispatch state; add it to `.gitignore`.
+- **Session-cleanup recovery offers the running session's descriptor as an orphan:** fix now, in 0.7.0. Measured 2026-10-17: `session-cleanup.mjs plan-human-recovery` lists `archive-orphan-descriptor` for the live session's own descriptor. Archiving the running session must never be offered.
+- **Quoted redirect target bypasses the protected-path write check (G24-LIVE):** fix now, in 0.7.0, as a signed quality package (package 5) together with the push signature. Under the threat model (the agent must not break out) this is in scope.
