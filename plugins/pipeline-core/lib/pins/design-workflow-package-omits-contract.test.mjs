@@ -334,7 +334,8 @@ test("AC6 behavioral: a Spec/PRD whose E1 freeze order contradicts the readiness
   }
   // an incidental negation elsewhere in the sentence must not suppress the refusal
   for (const sentence of ["E1 is not optional and is a prerequisite for implementation authority.",
-    "E1 never slips and is required before implementation authority."]) {
+    "E1 never slips and is required before implementation authority.",
+    "E1 must precede implementation authority."]) {
     const positive = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC, prd: `${sentence}\n` } }));
     assert.equal(positive.code, "DWP-E1-FREEZE-ORDER", sentence);
   }
