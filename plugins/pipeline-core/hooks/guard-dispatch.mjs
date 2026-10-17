@@ -668,7 +668,11 @@ if (isDirectInvocation(import.meta.url)) {
         if (!prepared.ok) {
           // Claude runtimes without a run_in_background parameter cannot launch in the foreground;
           // item admission and the budget binding already ran, so fall back to an uncommitted child.
-          const claudeBackgroundOnly = nativeRunner === "claude" && prepared.code === "NGHS-CLAUDE-FOREGROUND-REQUIRED";
+          // That fallback is for a runtime that carries NO such key at all: NGHS-CLAUDE-FOREGROUND-REQUIRED
+          // also fires for an explicit run_in_background: true, a runtime that does have the parameter and
+          // chose to launch in the background, and that stays BLOCKED for an item-governed dispatch.
+          const claudeBackgroundOnly = nativeRunner === "claude" && prepared.code === "NGHS-CLAUDE-FOREGROUND-REQUIRED"
+            && !Object.hasOwn(toolInput, "run_in_background");
           if (markedV2.length > 0 || (itemGovernanceRequired && !claudeBackgroundOnly)) {
             process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.\n`);
             process.exit(2);

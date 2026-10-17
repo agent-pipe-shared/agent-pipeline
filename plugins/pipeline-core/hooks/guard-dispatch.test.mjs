@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -33,6 +33,8 @@ import { evaluateAdvisorProhibitionGuard } from "./guard-advisor-prohibition.mjs
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+import { NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 
 // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
 // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
@@ -726,7 +728,126 @@ manualCheck("GD27 briefingSha256 / buildBriefingRoute are importable, share one 
   }
 });
 
-assert.equal(cases.length, 56, "the complete dispatch guard corpus must register before execution");
+// GD57-GD60 -- ALF-C-C6G2-CORR-A / Critic C6g2 finding F1: the background-only fallback of an item-governed
+// marked Claude dispatch is for a runtime that carries NO `run_in_background` key at all. The host-state code
+// NGHS-CLAUDE-FOREGROUND-REQUIRED fires for ANY value that is not exactly `false` (absent OR true), so the code alone
+// cannot tell "this runtime has no such parameter" from "the caller explicitly asked for a background launch".
+// The item-governed fixture is its own scratch repository (the shared bindingRepo above must stay un-governed);
+// every git call it makes sets GIT_CEILING_DIRECTORIES to the fixture parent and the repo owns its own `git init`.
+const ITEM_BACKGROUND_SLICE = "GD-ITEM-BG";
+const ITEM_BACKGROUND_CANDIDATE = "a".repeat(40);
+const FOREGROUND_CODE = "NGHS-CLAUDE-FOREGROUND-REQUIRED";
+const backgroundFixtures = new Map();
+// `itemGoverned: true` is an enrolled project with an approved course and a v2 delivery queue (the guard resolves it as
+// a required item queue); `false` is the same enrolled project with no active feature (no approved course, no queue).
+function itemBackgroundRepo(itemGoverned = true) {
+  if (backgroundFixtures.has(itemGoverned)) return backgroundFixtures.get(itemGoverned);
+  const parent = join(repoRoot, "scratch");
+  mkdirSync(parent, { recursive: true });
+  const root = realpathSync(mkdtempSync(join(parent, "guard-dispatch-item-")));
+  process.once("exit", () => rmSync(root, { recursive: true, force: true }));
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: parent };
+  execFileSync("git", ["init", "-q"], { cwd: root, env });
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  recordConsentGiven({ rootDir: root });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify(itemGoverned ? {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "unit", planPath: "specs/unit/plan.md", phase: "implementation" },
+    planApproved: true,
+  } : { schema: "pipeline.state.v0" }));
+  if (itemGoverned) {
+    mkdirSync(join(root, "specs", "unit"), { recursive: true });
+    writeFileSync(join(root, "specs", "unit", "slice-queue.json"), JSON.stringify({
+      schema: "pipeline.slice-queue.v2", feature: "unit",
+      slices: [{ id: ITEM_BACKGROUND_SLICE, title: ITEM_BACKGROUND_SLICE, state: "ready", dependsOn: [], writeScope: ["src/change.mjs"],
+        tier: "implementor", commitMode: "diff-only", loadClass: "light",
+        delivery: { itemId: "AC-1", criteria: ["CR-1"], baseCommit: ITEM_BACKGROUND_CANDIDATE } }],
+    }));
+  }
+  // The fixture must really be (or not be) item-governed, or the cases below would prove nothing about the branch.
+  assert.equal(resolveGovernedItemQueue({ root }).status, itemGoverned ? "required" : "not-applicable",
+    `the ${itemGoverned ? "item-governed" : "non-item-governed"} fixture must resolve accordingly`);
+  const fixture = { root, parent };
+  backgroundFixtures.set(itemGoverned, fixture);
+  return fixture;
+}
+function markedGoldfishPrompt() {
+  const binding = { schema: "pipeline.native-goldfish-host-briefing.v1", dispatchId: ITEM_BACKGROUND_SLICE,
+    candidateCommit: ITEM_BACKGROUND_CANDIDATE, candidateTree: "b".repeat(40), runner: "claude",
+    role: "pipeline-core:goldfish-implementor", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+    rulesetSha: "c".repeat(64), allowedPaths: ["src/change.mjs"],
+    criticDecision: { schema: "pipeline.critic-required-decision.v1",
+      trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false,
+        diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T4" } };
+  // The filled goldfish-task body already carries the exact directive once; the parser demands exactly one.
+  const body = filledTemplateBody("templates/prompts/goldfish-task.md");
+  const prompt = [
+    `<!-- pipeline-native-goldfish-host-commit:v1\n${JSON.stringify(binding)}\n-->`,
+    body.includes(NATIVE_GOLDFISH_HOST_DIRECTIVE) ? body : `${NATIVE_GOLDFISH_HOST_DIRECTIVE}\n${body}`,
+    `Slice: ${ITEM_BACKGROUND_SLICE}`,
+    "Write scope: src/change.mjs",
+    "",
+  ].join("\n");
+  assert.equal(parseNativeGoldfishBriefing(prompt).ok, true, "the marked briefing must parse, or the cases never reach the background branch");
+  return prompt;
+}
+// `background` is spread into tool_input: `{}` carries no run_in_background key at all.
+function markedGoldfishDispatch(root, toolUseId, background) {
+  return { cwd: root, session_id: "gd-item-session", tool_name: "Agent", tool_use_id: toolUseId,
+    tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: markedGoldfishPrompt(), ...background } };
+}
+function runAt(payload, root, env = {}) {
+  const res = spawnSync(process.execPath, [GUARD], {
+    input: JSON.stringify(payload), encoding: "utf8", env: { ...process.env, ...env, CLAUDE_PROJECT_DIR: root },
+  });
+  return { code: res.status, stderr: res.stderr ?? "" };
+}
+function pendingNativeStates(root) {
+  const directory = join(root, ".git", "agent-pipeline", "run", "native-goldfish-host-commit");
+  return existsSync(directory) ? readdirSync(directory).filter((name) => name.startsWith("pending-")) : [];
+}
+const FOREGROUND_WARNING = `WARNING (guard-dispatch): native host-commit preparation failed (${FOREGROUND_CODE}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.`;
+
+manualCheck("GD57 allow  an item-governed marked Claude dispatch with NO run_in_background key continues with the WARNING and claims no authorship", () => {
+  const { root, parent } = itemBackgroundRepo();
+  const { code, stderr } = runAt(markedGoldfishDispatch(root, "gd57", {}), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.equal(code, ALLOW, stderr.trim().slice(0, 300));
+  assert.ok(stderr.includes(FOREGROUND_WARNING), `stderr missing the background-only WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.ok(!stderr.includes("BLOCKED"), stderr.slice(0, 300));
+  assert.deepEqual(pendingNativeStates(root), [], "a continued background-only dispatch must leave no native host pending state (no authorship claim)");
+});
+
+manualCheck("GD58 block  an item-governed marked Claude dispatch with an EXPLICIT run_in_background: true stays blocked (typed, no WARNING fallback)", () => {
+  const { root, parent } = itemBackgroundRepo();
+  const { code, stderr } = runAt(markedGoldfishDispatch(root, "gd58", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
+  assert.ok(stderr.includes(`BLOCKED (guard-dispatch): ${FOREGROUND_CODE}`), `stderr missing the typed BLOCKED code -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.ok(!stderr.includes("WARNING (guard-dispatch): native host-commit preparation failed"), stderr.slice(0, 300));
+  assert.deepEqual(pendingNativeStates(root), []);
+});
+
+manualCheck("GD59 an item-governed marked Claude dispatch with an explicit run_in_background: false does not fail with NGHS-CLAUDE-FOREGROUND-REQUIRED", () => {
+  const { root, parent } = itemBackgroundRepo();
+  const { code, stderr } = runAt(markedGoldfishDispatch(root, "gd59", { run_in_background: false }), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.ok(!stderr.includes(FOREGROUND_CODE), `the foreground launch must not be refused as background -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  // The fixture repository has no commit, so preparation proceeds past the foreground gate and the whole item-queue
+  // admission and stops at the candidate check: that proves the explicit-false dispatch reached the next preparation step.
+  assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
+  assert.ok(stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+});
+
+manualCheck("GD60 allow  a marked Claude dispatch that is NOT item-governed is unchanged: key absent and explicit true both continue with the WARNING", () => {
+  const { root, parent } = itemBackgroundRepo(false);
+  for (const [label, background] of [["key absent", {}], ["explicit true", { run_in_background: true }]]) {
+    const { code, stderr } = runAt(markedGoldfishDispatch(root, `gd60-${label.replace(/\W+/gu, "-")}`, background), root, { GIT_CEILING_DIRECTORIES: parent });
+    assert.equal(code, ALLOW, `${label}: ${stderr.trim().slice(0, 300)}`);
+    assert.ok(stderr.includes(FOREGROUND_WARNING), `${label}: stderr missing the WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+    assert.ok(!stderr.includes("BLOCKED"), `${label}: ${stderr.slice(0, 300)}`);
+  }
+});
+
+assert.equal(cases.length, 60, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
