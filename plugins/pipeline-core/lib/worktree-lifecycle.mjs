@@ -2081,16 +2081,44 @@ export function inspectSignedDescriptorCustodyInputs(startPath, sessionId, { arc
   const manifestLock = existsSync(lockPath)
     ? { status: "held", path: `.git/${relative(repo.commonDir, lockPath).split(sep).join("/")}`, sha256: null }
     : { status: "absent", path: `.git/${relative(repo.commonDir, lockPath).split(sep).join("/")}` };
-  return { repository: { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir,
-    candidate: { commit: gitText(repo.primaryRoot, ["rev-parse", "HEAD"]), tree: gitText(repo.primaryRoot, ["rev-parse", "HEAD^{tree}"]) } },
+  return { repository: { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir, candidate: custodyCandidate(repo) },
     sessionId, ownerNonce: value.ownerNonce, descriptor: descriptor.target, bytes: descriptor.raw, manifest, manifestLock,
     activePath: path, activePresent: existsSync(path), ownerRuntime: value.ownerRuntime ?? null };
 }
 
+// A repository with no first commit (unborn HEAD) is the normal state of a greenfield project at kickoff, but
+// `git rev-parse HEAD` / `HEAD^{tree}` fail on it exactly as on a broken repository. Custody therefore reports
+// it as a typed unborn candidate in the representation human-guard-override.mjs already owns
+// (HGO_SIGNATURE_UNBORN_COMMIT_SENTINEL / UNBORN_TREE_OID): the all-zero commit id no real commit can carry plus
+// git's empty-tree object id. Both ids are SHA-1 values, so any other object format keeps failing closed with
+// the original git error. The sentinel is an observation only and is never a revision to hand to git. A born
+// repository takes the unchanged pair of rev-parse calls, so its candidate is byte-identical to before.
+const CUSTODY_UNBORN_COMMIT = "0".repeat(40);
+const CUSTODY_UNBORN_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+// Same exit-code-only signal as human-guard-override.mjs: HEAD is attached to a branch (`symbolic-ref -q HEAD`
+// succeeds) that resolves to no object yet. A detached or missing HEAD fails symbolic-ref and stays an error.
+function custodyHeadIsUnborn(repo) {
+  try {
+    if (repo.objectFormat !== "sha1") return false;
+    const attached = runGit(repo.primaryRoot, ["symbolic-ref", "-q", "HEAD"], { allowNonzero: true });
+    if (attached.status !== 0) return false;
+    return runGit(repo.primaryRoot, ["rev-parse", "--verify", "-q", "HEAD"], { allowNonzero: true }).status !== 0;
+  } catch { return false; }
+}
+
+function custodyCandidate(repo) {
+  let commit;
+  try { commit = gitText(repo.primaryRoot, ["rev-parse", "HEAD"]); } catch (error) {
+    if (error?.code === "WT-GIT-FAILED" && custodyHeadIsUnborn(repo)) return { commit: CUSTODY_UNBORN_COMMIT, tree: CUSTODY_UNBORN_TREE };
+    throw error;
+  }
+  return { commit, tree: gitText(repo.primaryRoot, ["rev-parse", "HEAD^{tree}"]) };
+}
+
 export function inspectSignedDescriptorCustodyRepository(startPath) {
   const repo = discoverRepository(startPath);
-  return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir,
-    candidate: { commit: gitText(repo.primaryRoot, ["rev-parse", "HEAD"]), tree: gitText(repo.primaryRoot, ["rev-parse", "HEAD^{tree}"]) } };
+  return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir, candidate: custodyCandidate(repo) };
 }
 
 /** The exact registration lock namespace, with preexisting locks never reclaimed. */
