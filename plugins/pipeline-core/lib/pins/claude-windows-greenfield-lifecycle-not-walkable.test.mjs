@@ -13,7 +13,19 @@
 //   V-10  producer (ALF-C-P19-05D): lib/dispatch-briefing-route-record.mjs writes that record, built with the
 //         guard's own buildBriefingRoute/briefingSha256, exactly where the guard reads it; a recorded route
 //         makes the binding fire through the real hook (matching digest admitted, mismatching refused typed).
-//         Remaining: no product flow CALLS the producer yet (the caller wiring is outside ALF-C-P19-05D's scope).
+//   V-10  wiring, exact state (ALF-C-V10-DISP-B; the C6g5 F1 claim "no caller" is stale and is retracted):
+//         delivered: the record type (pipeline.dispatch-briefing-route.v1), the guard check
+//         (hooks/guard-dispatch.mjs evaluateBriefingRoute, refusing DISPATCH-BRIEFING-DIGEST-MISMATCH /
+//         DISPATCH-BRIEFING-ROUTE-INVALID), the producer (lib/dispatch-briefing-route-record.mjs), and the ONE
+//         caller: lib/role-dispatch-preflight.mjs calls recordDispatchBriefingRoute, and only when
+//         current.packet.transport === "direct" (commit a2d61489c).
+//         The guard itself never writes a record: with no record for the named slice it passes ("none").
+//         A native Claude Agent/Task dispatch that does not go through role-dispatch-preflight writes no record,
+//         so for it the binding does not fire (the guard admits unchanged).
+//         V-10 native Agent/Task dispatch wiring: open, owner Coordinator, due 2026-10-31
+//         V-10 non-direct transport (role-dispatch-preflight, transport !== "direct") wiring: open, owner Coordinator, due 2026-10-31
+//         The caller set below is pinned by a source scan; when a caller is added or removed this header must be
+//         updated with it.
 //   two-approval happy path (reaches implementation and push) -- native: pending. It needs a live
 //         interactive Claude/Windows session. A native run exercises
 //         plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeGenerate and the
@@ -25,8 +37,8 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { describe, test, before, after } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -368,6 +380,69 @@ describe("V-10 a recorded route makes the binding fire: the producer writes what
       writeFileSync(routeFile(sliceId), `${JSON.stringify(record)}\n`);
     };
     assert.throws(() => checkV10({ bind: fileDigest, send }));
+  });
+});
+
+// V-10 CALLER SET (ALF-C-V10-DISP-B). Pins which non-test source files call the producer and the route builder, so
+// the header's wiring statement cannot silently go stale in either direction.
+const PLUGIN_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//gu, "").replace(/(^|[^:"'`\\])\/\/.*$/gmu, "$1");
+
+function callersOf(name, definingRel, pluginRoot) {
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name === ".git") continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) { walk(full); continue; }
+      if (!/\.(mjs|js|cjs)$/u.test(entry.name) || entry.name.endsWith(".test.mjs")) continue;
+      const rel = relative(pluginRoot, full).split("\\").join("/");
+      if (rel === definingRel) continue;
+      if (new RegExp(`\\b${name}\\b`, "u").test(stripComments(readFileSync(full, "utf8")))) found.push(rel);
+    }
+  };
+  walk(pluginRoot);
+  return found.sort();
+}
+
+function checkV10Callers(pluginRoot) {
+  const expected = [
+    ["recordDispatchBriefingRoute", "lib/dispatch-briefing-route-record.mjs", ["lib/role-dispatch-preflight.mjs"]],
+    ["buildBriefingRoute", "hooks/guard-dispatch.mjs", ["lib/dispatch-briefing-route-record.mjs"]],
+  ];
+  for (const [name, defining, callers] of expected) {
+    const actual = callersOf(name, defining, pluginRoot);
+    assert.deepEqual(actual, callers,
+      `V-10 caller set of ${name} changed (now: ${JSON.stringify(actual)}). Update the V-10 wiring header of this pin ` +
+      "(delivered / open routes) and this expected set together.");
+  }
+}
+
+describe("V-10 caller set of the route producer is pinned", () => {
+  test("recordDispatchBriefingRoute is called only by role-dispatch-preflight (direct transport) and buildBriefingRoute only by the producer", () => {
+    checkV10Callers(PLUGIN_ROOT);
+    const source = readFileSync(join(PLUGIN_ROOT, "lib", "role-dispatch-preflight.mjs"), "utf8");
+    assert.match(source, /transport === "direct"\)\s*\{\s*const route = recordDispatchBriefingRoute\(/u,
+      "the producer call must stay guarded by the direct transport; update the V-10 header if that changes");
+  });
+
+  test("V-10 caller set RED proof: a mirror tree with an added caller, and one with the real caller removed, fail the same check", () => {
+    const dir = scratchDir("alf-c-v10-disp-b-callers");
+    try {
+      const put = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), text); };
+      const real = () => {
+        put("hooks/guard-dispatch.mjs", "export function buildBriefingRoute() {}\n");
+        put("lib/dispatch-briefing-route-record.mjs", "import { buildBriefingRoute } from \"../hooks/guard-dispatch.mjs\"; export function recordDispatchBriefingRoute() { buildBriefingRoute(); }\n");
+        put("lib/role-dispatch-preflight.mjs", "import { recordDispatchBriefingRoute } from \"./dispatch-briefing-route-record.mjs\"; recordDispatchBriefingRoute();\n");
+      };
+      real();
+      checkV10Callers(dir); // the faithful mirror passes
+      put("lib/fake-caller.mjs", "import { recordDispatchBriefingRoute } from \"./dispatch-briefing-route-record.mjs\"; recordDispatchBriefingRoute();\n");
+      assert.throws(() => checkV10Callers(dir), /Update the V-10 wiring header/u);
+      rmSync(join(dir, "lib", "fake-caller.mjs"));
+      put("lib/role-dispatch-preflight.mjs", "// recordDispatchBriefingRoute mentioned only in a comment\n");
+      assert.throws(() => checkV10Callers(dir), /Update the V-10 wiring header/u);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
 
