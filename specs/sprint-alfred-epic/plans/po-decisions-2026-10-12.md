@@ -183,3 +183,9 @@ Answers to structured questions; tile text in
   - This is a residual risk of `d4b31c304`. For 0.7.0 it is covered by EL-18 (one Elephant per repository) and by the PO confirming every archive.
   - A later fix would add a liveness signal per session.
 - **Recurring untracked `pkey` at the repository root:** move it unread into `scratch/` once no tests run, and record the producing test as a backlog item. No agent reads its content.
+- **`session-cleanup.mjs start` binds without an owning controller (39 red cases in `session-cleanup-binding.test.mjs`):** `start` binds only under an owning controller.
+  - Background: since `d02409a8a`, `bindOnboardingSessionCleanup` requires a source-owned authority context. Today only the Verify controller establishes one. The CLI `start` verb binds directly, so it is refused with `SDC-AUTHORITY-UNAVAILABLE`. No skill or hook calls it; only the suite does.
+  - The authority check stays. A standalone `start` refuses typed, and one case proves that refusal.
+  - The positive binding cases run inside a genuine controller context through the existing test API (`createControlledMethodRuntimeFixture`), never through a mock that bypasses `checkRequester`.
+  - If `start` cannot bind even under a controller, the course returns to the PO before any product change.
+  - Rejected: letting `start` establish its own context, because that would let any caller self-grant the binding.
