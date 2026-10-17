@@ -5,6 +5,41 @@
 // The authenticated Antigravity role carrier is NOT available; the role source
 // is the same one the Claude route uses (an open dispatch record), never a
 // prompt-asserted role.
+//
+// WHAT THIS PIN COVERS, AND WHAT IT DOES NOT (AC-109 is reported PARTIAL).
+// Covered: parity only. The Antigravity Edit/Write route runs the same EL-01
+// tripwire as the Claude route and refuses a write when the tripwire's own
+// conditions hold and no dispatch record is open (cases below).
+// NOT delivered, and deliberately NOT claimed by any case in this file: the
+// carrier, worker-scope and fail-closed clauses of AC-109 as reconstructed in
+// specs/sprint-alfred-epic/plans/acceptance-reconstruction/R2.md line 11 --
+// authorization only from authenticated per-call carrier evidence that the
+// caller is an admitted, owned worker AND that the target path lies inside that
+// worker's scope, refused (fail closed) when that evidence is missing or
+// unauthenticated. guard-el01-tripwire.mjs has no carrier input and no
+// worker-scope input, so none of those three clauses can be exercised here.
+// OPEN PO DECISION (R2.md line 14): whether the criterion is accepted on a
+// documented carrier-unavailable disposition or held until native carrier
+// evidence exists. Owner: Coordinator. Due: 2026-10-31. Until that decision
+// lands, whether the Antigravity adapter must fail closed without an
+// authenticated role carrier is undecided and no production behaviour is
+// pinned for it.
+//
+// FAIL-OPEN CONDITIONS of hooks/guard-el01-tripwire.mjs (the tripwire exits 0
+// and therefore allows the write; none of these is pinned as a refusal):
+//   1. the repository is not governed (requiresEnforcement is false; line 158);
+//   2. there is no pipeline state file at all (line 296), and an unparsable
+//      state file only warns (line 302-307);
+//   3. there is no active feature (line 311);
+//   4. the spec path cannot be resolved (line 316) or the spec cannot be read
+//      (line 322);
+//   5. the spec's risk class is anything but "high" (line 325);
+//   6. ANY open dispatch-record exists anywhere under the project (lines
+//      328-329), whoever the writer is: the record is not bound to the calling
+//      session, to a role, or to a target path.
+// The third case below touches only condition 6, and only to show that the
+// tripwire itself stops refusing: it is not evidence that the caller is an
+// authorized worker.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

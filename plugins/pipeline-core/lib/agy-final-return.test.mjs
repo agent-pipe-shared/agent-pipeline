@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -476,21 +476,87 @@ test("AFR17 the built authored record carries a non-empty truthful log and valid
 
 test("AFR18 a store write without a sealed root is a typed refusal and a foreign top level is still refused", () => {
   assert.equal(persistAgyHostObservedReceipt({ commonDir: "x", receipt: {}, record: {}, recordBytes: Buffer.alloc(0) }).ok, false);
-  const root = mkdtempSync(join(tmpdir(), "agy-toplevel-"));
+  // Missing root: refused by the ROOT gate and by nothing else. The receipt, record and record bytes are valid in every
+  // other respect, so a refusal for any other reason (binding, authority) would carry a different code.
+  const draftInput = authoredDraftInput();
+  const record = draftAgyAuthoredRecordAfterCommit(draftInput).record;
+  const recordBytes = agyAuthoredRecordBytes(record);
+  const receipt = draftAgyHostObservedReceipt({ modelWitness: draftInput.modelWitness,
+    commitReadback: draftInput.commitReadback, record }).receipt;
+  assert.equal(validateAgyHostObservedReceiptShape(receipt, { record, recordBytes }), true);
+  const absentCommonDir = "agy-afr18-commondir-never-created";
+  for (const root of [undefined, null, "", 42, {}]) {
+    assert.deepEqual(persistAgyHostObservedReceipt({ root, commonDir: absentCommonDir, receipt, record, recordBytes }),
+      { ok: false, code: "AGY-HOST-STORE-ROOT" }, `root ${JSON.stringify(root)}`);
+  }
+  assert.deepEqual(persistAgyHostObservedReceipt({ commonDir: absentCommonDir, receipt, record, recordBytes }),
+    { ok: false, code: "AGY-HOST-STORE-ROOT" }, "root omitted");
+  // The fixture is a real, BORN repository under the repository scratch/. Every git call runs with
+  // GIT_CEILING_DIRECTORIES set to the fixture's parent, so discovery can never climb into the project checkout.
+  const scratchDir = fileURLToPath(new URL("../../../scratch/", import.meta.url));
+  mkdirSync(scratchDir, { recursive: true });
+  const parent = realpathSync(mkdtempSync(join(scratchDir, "agy-toplevel-")));
   try {
-    const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-    git(root, "init", "-q"); git(root, "config", "user.email", "t@example.invalid"); git(root, "config", "user.name", "T");
+    const root = join(parent, "repo");
+    mkdirSync(root);
+    const env = { ...process.env, GIT_CEILING_DIRECTORIES: parent };
+    const git = (cwd, ...args) => execFileSync("git", args, { cwd, env, encoding: "utf8" }).trim();
+    const initialize = (cwd) => {
+      git(cwd, "init", "-q"); git(cwd, "config", "user.email", "t@example.invalid"); git(cwd, "config", "user.name", "T");
+      git(cwd, "config", "commit.gpgsign", "false"); git(cwd, "config", "core.autocrlf", "false");
+    };
+    initialize(root);
     writeFileSync(join(root, "a.txt"), "a\n"); git(root, "add", "a.txt"); git(root, "commit", "-q", "-m", "base");
     const commit = git(root, "rev-parse", "HEAD");
-    const ok = captureAgyHostCommitBaseline({ root, candidateCommit: commit, resultPath: "results/r.json" });
+    const resultPath = "results/r.json";
+    const ok = captureAgyHostCommitBaseline({ root, candidateCommit: commit, resultPath });
     assert.equal(ok.ok, true, JSON.stringify(ok));
-    mkdirSync(join(root, "nested"));
-    git(join(root, "nested"), "init", "-q");
-    const nested = captureAgyHostCommitBaseline({ root: join(root, "nested"), candidateCommit: commit, resultPath: "results/r.json" });
-    assert.equal(nested.ok, false);
-    const observed = observeAgyHostHead({ baseline: { ...ok.baseline, root: join(root, "nested") } });
-    assert.equal(observed.ok, false);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+    assert.equal(ok.code, "AGY-HOST-BASELINE-CAPTURED");
+    // Control for the ROOT gate: given this repository's root and its own common directory, the same valid receipt gets
+    // past the missing-root gate and is stopped by a LATER gate (no bound requester context exists for this fixture),
+    // with a different typed code. (AGY-HOST-STORE-ROOT is also what the sealed-root authority raises for a commonDir
+    // that does not belong to the root, so the control must pass the matching commonDir.)
+    const withRoot = persistAgyHostObservedReceipt({ root, commonDir: join(root, ".git"), receipt, record, recordBytes });
+    assert.deepEqual(withRoot, { ok: false, code: "AGY-HOST-STORE-REQUESTER-UNAVAILABLE" });
+    // Foreign top level, in a BORN repository: the pinned root is a subdirectory, so HEAD equals the candidate, nothing
+    // is staged or dirty, and the only difference from the accepted capture above is that git's top level is the
+    // enclosing directory. Each refusal below is therefore the top-level comparison (sameTopLevel) and nothing else.
+    mkdirSync(join(root, "sub"));
+    const sub = realpathSync(join(root, "sub"));
+    assert.equal(git(sub, "rev-parse", "HEAD"), commit);
+    assert.equal(git(sub, "rev-parse", "--show-prefix"), "sub/");
+    assert.equal(git(root, "rev-parse", "--show-prefix"), "");
+    assert.deepEqual(captureAgyHostCommitBaseline({ root: sub, candidateCommit: commit, resultPath }),
+      { ok: false, code: "AGY-HOST-BASELINE-DIRTY" });
+    assert.deepEqual(observeAgyHostHead({ baseline: ok.baseline }), { ok: true, code: "AGY-HOST-HEAD-UNCHANGED" });
+    assert.deepEqual(observeAgyHostHead({ baseline: { ...ok.baseline, root: sub } }),
+      { ok: false, code: "AGY-HOST-HEAD-DRIFT" });
+    writeFileSync(join(root, "a.txt"), "a changed\n");
+    const claim = { final: { changedPaths: ["a.txt"] }, allowedPaths: ["a.txt"] };
+    const admitted = assessAgyHostCommit({ baseline: ok.baseline, ...claim });
+    assert.equal(admitted.ok, true, JSON.stringify(admitted));
+    assert.equal(admitted.code, "AGY-HOST-COMMIT-ADMITTED");
+    assert.deepEqual(assessAgyHostCommit({ baseline: { ...ok.baseline, root: sub }, ...claim }),
+      { ok: false, code: "AGY-HOST-COMMIT-DRIFT" });
+    // A nested repository that has no commit yet returns earlier (before any top-level comparison).
+    const nestedRoot = join(root, "nested");
+    mkdirSync(nestedRoot);
+    initialize(nestedRoot);
+    assert.deepEqual(captureAgyHostCommitBaseline({ root: nestedRoot, candidateCommit: commit, resultPath }),
+      { ok: false, code: "AGY-HOST-BASELINE-GIT" });
+    assert.deepEqual(observeAgyHostHead({ baseline: { ...ok.baseline, root: nestedRoot } }),
+      { ok: false, code: "AGY-HOST-HEAD-UNAVAILABLE" });
+    // Once it has a commit it is its own top level: pinned there, it is admitted, and bound to the OUTER candidate it is
+    // refused by the HEAD binding (which is not what the subdirectory case above pins).
+    writeFileSync(join(nestedRoot, "n.txt"), "n\n"); git(nestedRoot, "add", "n.txt"); git(nestedRoot, "commit", "-q", "-m", "nested base");
+    const nestedCommit = git(nestedRoot, "rev-parse", "HEAD");
+    const own = captureAgyHostCommitBaseline({ root: nestedRoot, candidateCommit: nestedCommit, resultPath });
+    assert.equal(own.ok, true, JSON.stringify(own));
+    assert.deepEqual(captureAgyHostCommitBaseline({ root: nestedRoot, candidateCommit: commit, resultPath }),
+      { ok: false, code: "AGY-HOST-BASELINE-DIRTY" });
+    assert.deepEqual(observeAgyHostHead({ baseline: { ...own.baseline, candidateCommit: commit } }),
+      { ok: false, code: "AGY-HOST-HEAD-DRIFT" });
+  } finally { rmSync(parent, { recursive: true, force: true }); }
 });
 
 assert.equal(cases.length, 18,"the complete Agy Final Return corpus must be registered before execution begins");
