@@ -102,7 +102,7 @@ export function actualGuard(action, root, { ready = false, tty = false } = {}) {
     requireProjectOnboardingReadyFn: () => {
       readinessCalls += 1;
       if (ready) return { schema: 'pipeline.project-onboarding-ready-gate.v1', status: 'ready', intent: 'session' };
-      throw new ProjectOnboardingReadyError('PORG-NOT-READY', 'Design-course recovery fixture is not ready.', { intent: 'session', lifecycleStatus: 'partial' });
+      throw new ProjectOnboardingReadyError('PORG-NOT-READY', 'Design-course recovery fixture is not ready.', { intent: 'session', lifecycleStatus: 'not-initialized' });
     },
     writeErrorFn: value => { stderr += value; },
     recordHumanGuardDenialFn: () => ({ status: 'ineligible' }),
