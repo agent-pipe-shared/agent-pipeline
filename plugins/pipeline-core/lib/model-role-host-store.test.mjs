@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, chmodSync, openSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, chmodSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 import { prepareModelRoleHostBootstrap, admitModelRoleHostBootstrap,
   bindStoredModelRoleDispatch } from "./model-role-host-session.mjs";
-import { createModelRoleHostStore } from "./model-role-host-store.mjs";
+import { createModelRoleHostStore, isAbsoluteStoreRoot, hasPrivateStoreMode } from "./model-role-host-store.mjs";
 import { createModelRolePolicyApprovalIntent, verifyModelRoleApprovedPolicy } from "./model-role-approved-policy.mjs";
 import { deriveV3BaselinePolicies } from "./model-role-v3-baseline.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
@@ -163,7 +163,74 @@ test("the production reader admits only an unchanged exact V3 baseline", () => {
   } finally { rmSync(commonDir, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 5);
+// AC-203 (host-crash-during-verify item): the session receipt store must hold on every supported
+// platform. On win32 the POSIX mode bits are deliberately not evaluated (PO decision 2026-10-17:
+// the host is protected by login; the pipeline only guards against the agent breaking out).
+test("the store root and file-mode checks are platform-explicit and POSIX behaviour is unchanged", () => {
+  for (const [value, expected] of [["/var/run/x", true], ["/", true], ["relative/dir", false], ["", false],
+    ["C:\\Users\\x", false], ["\\x", false], [null, false], [undefined, false], [42, false]]) {
+    for (const platform of ["linux", "darwin"]) {
+      assert.equal(isAbsoluteStoreRoot(value, platform), expected, `${platform} root ${String(value)}`);
+    }
+  }
+  for (const [value, expected] of [["C:\\Users\\x", true], ["c:/users/x", true], ["D:\\", true],
+    ["\\\\host\\share\\x", true], ["/x", false], ["\\x", false], ["C:x", false], ["relative\\dir", false],
+    ["", false], [null, false], [42, false]]) {
+    assert.equal(isAbsoluteStoreRoot(value, "win32"), expected, `win32 root ${String(value)}`);
+  }
+  for (const mode of [0o100600, 0o100400]) assert.equal(hasPrivateStoreMode(mode, "linux"), true, `posix ${mode.toString(8)}`);
+  for (const mode of [0o100644, 0o100640, 0o100604, 0o100660, 0o100666]) {
+    assert.equal(hasPrivateStoreMode(mode, "linux"), false, `posix ${mode.toString(8)}`);
+  }
+  for (const mode of [0o100666, 0o100444]) assert.equal(hasPrivateStoreMode(mode, "win32"), true, `win32 ${mode.toString(8)}`);
+});
+
+test("a store root spelled differently from its on-disk form resolves to the same private store", () => {
+  const commonDir = mkdtempSync(join(tmpdir(), "model-role-store-Spelling-"));
+  try {
+    const store = createModelRoleHostStore(commonDir, { verifyAuthority });
+    assert.equal(admitModelRoleHostBootstrap({ proposal, acknowledgement, store, authority }).ok, true);
+    const spellings = [`${commonDir}${sep}.`, `${commonDir}${sep}`];
+    if (process.platform === "win32") {
+      spellings.push(commonDir.replaceAll("\\", "/"), commonDir.toUpperCase(), commonDir.toLowerCase());
+    }
+    for (const spelling of spellings) {
+      const other = createModelRoleHostStore(spelling, { verifyAuthority });
+      assert.equal(other.read(sessionId).ok, true, `read via ${spelling}`);
+      assert.equal(other.inspect(sessionId).status, "present", `inspect via ${spelling}`);
+      assert.equal(other.latest().sessionId, sessionId, `latest via ${spelling}`);
+    }
+  } finally { rmSync(commonDir, { recursive: true, force: true }); }
+});
+
+test("an unsafe store root or parent chain fails closed and a rejected latest() exposes no receipts", () => {
+  const relative = createModelRoleHostStore("relative-store-root", { verifyAuthority });
+  for (const result of [relative.latest(), relative.inspect(sessionId), relative.read(sessionId)]) {
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "MODEL-ROLE-STORE-UNAVAILABLE");
+    assert.equal("receipts" in result, false, "a rejected result must not look like an empty mapping");
+  }
+  const control = mkdtempSync(join(tmpdir(), "model-role-store-control-"));
+  const commonDir = mkdtempSync(join(tmpdir(), "model-role-store-linked-"));
+  const outside = mkdtempSync(join(tmpdir(), "model-role-store-outside-"));
+  try {
+    // Positive control: the same admission publishes into an unlinked root, so the refusal below is the link.
+    assert.equal(admitModelRoleHostBootstrap({ proposal, acknowledgement,
+      store: createModelRoleHostStore(control, { verifyAuthority }), authority }).ok, true);
+    symlinkSync(outside, join(commonDir, "agent-pipeline"), "junction");
+    const store = createModelRoleHostStore(commonDir, { verifyAuthority });
+    for (const result of [store.latest(), store.inspect(sessionId), store.read(sessionId)]) {
+      assert.equal(result.ok, false);
+      assert.equal("receipts" in result, false);
+    }
+    assert.notEqual(admitModelRoleHostBootstrap({ proposal, acknowledgement, store, authority }).ok, true);
+    assert.deepEqual(readdirSync(outside), [], "nothing is written through a linked parent");
+  } finally {
+    for (const dir of [control, commonDir, outside]) rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+assert.equal(cases.length, 8);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

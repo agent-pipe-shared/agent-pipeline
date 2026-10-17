@@ -3,7 +3,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstatSync,
   mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, win32 } from "node:path";
 import { parseStrictJson } from "./governance-event.mjs";
 import { admitModelRoleBootstrap } from "./model-role-session.mjs";
 import { canonical } from "./po-approval-proof.mjs";
@@ -17,8 +17,28 @@ const PARTS = ["agent-pipeline", "run", "model-role-sessions"];
 function rejected(code) { return { ok: false, code }; }
 const digest = (value) => createHash("sha256").update(canonical(value)).digest("hex");
 
+/**
+ * Store roots must be absolute. POSIX keeps its exact "/" requirement; win32 needs a
+ * drive or UNC root, because a root-relative "\x" or "/x" depends on the current drive.
+ */
+export function isAbsoluteStoreRoot(value, platform = process.platform) {
+  if (typeof value !== "string") return false;
+  if (platform !== "win32") return value.startsWith("/");
+  return win32.isAbsolute(value) && /^(?:[A-Za-z]:|[\\/]{2})/u.test(value);
+}
+
+/**
+ * Owner-only mode check for a stored file. win32 reports synthetic mode bits (0o666 or
+ * 0o444), so the POSIX privacy bits are deliberately not evaluated there: the host is
+ * protected by login and no ACL evaluator exists (PO threat-model decision 2026-10-17).
+ * The symlink, type, size and identity checks stay in force on every platform.
+ */
+export function hasPrivateStoreMode(mode, platform = process.platform) {
+  return platform === "win32" || (mode & 0o077) === 0;
+}
+
 function parent(commonDir, create) {
-  if (typeof commonDir !== "string" || !commonDir.startsWith("/")) throw new Error("MODEL-ROLE-STORE-ROOT");
+  if (!isAbsoluteStoreRoot(commonDir)) throw new Error("MODEL-ROLE-STORE-ROOT");
   let path = resolve(commonDir);
   for (const part of [null, ...PARTS]) {
     if (part !== null) {
@@ -82,7 +102,7 @@ export function createModelRoleHostStore(commonDir, { rootDir, verifyAuthority =
     if (authority?.mode === "v3-baseline") {
       return verifyV3BaselineAuthority({ authority, runner });
     }
-    if (typeof rootDir !== "string" || !rootDir.startsWith("/")) return rejected("MODEL-ROLE-STORE-ROOT");
+    if (!isAbsoluteStoreRoot(rootDir)) return rejected("MODEL-ROLE-STORE-ROOT");
     const trust = readCriticalHumanProofPolicy(rootDir);
     const trustAnchors = trust?.trustAnchors ?? (trust?.trustAnchor ? [trust.trustAnchor] : []);
     if (!trust?.ok || trustAnchors.length === 0) return rejected("MODEL-ROLE-STORE-TRUST");
@@ -174,7 +194,7 @@ export function createModelRoleHostStore(commonDir, { rootDir, verifyAuthority =
         const target = join(parent(commonDir, false), exactFileName(sessionId));
         const before = lstatSync(target);
         if (!before.isFile() || before.isSymbolicLink() || before.size < 1
-          || before.size > MAX_BYTES || (before.mode & 0o077) !== 0) return rejected("MODEL-ROLE-STORE-TARGET");
+          || before.size > MAX_BYTES || !hasPrivateStoreMode(before.mode)) return rejected("MODEL-ROLE-STORE-TARGET");
         const fd = openSync(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
         try {
           const pinned = fstatSync(fd);
