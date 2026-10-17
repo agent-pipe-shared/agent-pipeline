@@ -1,0 +1,1932 @@
+{
+ "schema": "alfred.wsl-verify-red-suites.v1",
+ "candidate": {
+  "commit": "76a2c02b56a432b5988b292301c7373a1d2e6717",
+  "tree": "88177f0d7e87399ebd91538d6352608d49bd3642"
+ },
+ "runId": "verify-1792267703818-71b4075cb922aa0d",
+ "suites": 1042,
+ "red": 192,
+ "rows": [
+  {
+   "suite": "afk-activation-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 13,
+   "pass": 12,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "afk-claude-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 9,
+   "pass": 8,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "afk-transaction-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 2,
+   "pass": 0,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "code: 'SDC-AUTHORITY-UNAVAILABLE',"
+  },
+  {
+   "suite": "agy-final-return-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 18,
+   "pass": 16,
+   "fail": 0,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "agy-session-authority-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 4,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: AGY-CONSENT-ADMISSION-UNAVAILABLE"
+  },
+  {
+   "suite": "agy-session-dispatch-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 7,
+   "pass": 4,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: MODEL-FAMILY-AUTHORITY-UNAVAILABLE"
+  },
+  {
+   "suite": "antigravity-pretool-guard-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/. Input:"
+  },
+  {
+   "suite": "antigravity-topology-refresh-host-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 15,
+   "pass": 15,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "architecture-baseline-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 21,
+   "pass": 20,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "architecture-decision-continuity-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 4,
+   "pass": 3,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "architecture-design-test-fixture-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 1,
+   "pass": 0,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.architecture-entry-readiness.v1\",\"status\":\"blocked\",\"root\":\"<tmp>\",\"code\":\"ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED\",\"message"
+  },
+  {
+   "suite": "architecture-effective-decisions-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 12,
+   "pass": 5,
+   "fail": 7,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "architecture-entry-required-source-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 2,
+   "pass": 0,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.architecture-effective-decisions.v1\",\"status\":\"advisory\",\"area\":\"pipeline-core\",\"decisions\":[],\"activeExceptions\":[],\"findings\":"
+  },
+  {
+   "suite": "auth-gate-inventory-drift-check",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "auth-gate-inventory-drift-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 35,
+   "pass": 27,
+   "fail": 8,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "suite": "backlog-ledger-reconciliation-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL RBL01 this repository needs no reconciliation: unexpected drift: pipeline.correction-critic-reuses-the-full-review-context, pipeline.architecture-deferral-records-no-net-new-b"
+  },
+  {
+   "suite": "backlog-sprint-assignment-check",
+   "verifyExit": 1,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "backlog-state-check",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL backlog state: backlog/items/2026-10-12-correction-critic-reuses-the-full-review-context.md: type is not in the canonical item taxonomy"
+  },
+  {
+   "suite": "check-adr-consistency-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: expected exit 0, got 2; stderr: INDEX-DISAGREEMENT docs/adr/README.md:13 -- 0086-canonical-dab-windows-course-and-separate-legacy-api-checks.md has "
+  },
+  {
+   "suite": "check-backlog-sprint-assignment-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 12,
+   "pass": 11,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: expected the real backlog to carry no out-of-set sprint value; findings: [\"backlog/items/2026-10-12-correction-critic-reuses-the-full-review-context"
+  },
+  {
+   "suite": "check-backlog-state-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL CBS16 the real event 403 format and closure drift are explicitly accepted while all current drift is dispositioned: backlog/items/2026-10-12-correction-critic-reuses-the-full-"
+  },
+  {
+   "suite": "check-critic-skip-coverage-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 32,
+   "pass": 27,
+   "fail": 5,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: evidence/dispatch-record-UNDELIVERED.json: invalid v4 dispatch record (terminal dispatch record requires at least one log entry)"
+  },
+  {
+   "suite": "close-coordinator-audit-lifecycle-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 8,
+   "pass": 0,
+   "fail": 8,
+   "skipped": 0,
+   "signature": "SessionCriticFinalizerError: Session Critic finalization is invalid."
+  },
+  {
+   "suite": "codex-advisor-execution-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 7,
+   "pass": 2,
+   "fail": 5,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: SDC-AUTHORITY-UNAVAILABLE"
+  },
+  {
+   "suite": "codex-critic-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 137,
+   "pass": 133,
+   "fail": 4,
+   "skipped": 0,
+   "signature": "Error: review economy admission rejected: RE-DELTA-UNKNOWN-PATH"
+  },
+  {
+   "suite": "codex-critic-packet-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "CriticPacketError: Critic review admission is blocked: evidence/dispatch-record-batman-codex.json: invalid v3 dispatch record (terminal dispatch record requires at least one log en"
+  },
+  {
+   "suite": "codex-critic-session-route-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 5,
+   "pass": 4,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "code: 'SDC-AUTHORITY-UNAVAILABLE',"
+  },
+  {
+   "suite": "codex-design-advisor-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 1,
+   "pass": 0,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "code: 'SDC-AUTHORITY-UNAVAILABLE',"
+  },
+  {
+   "suite": "codex-design-readiness-bootstrap-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 0,
+   "fail": 6,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "codex-design-readiness-host-store-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 1,
+   "fail": 5,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"status\":\"unavailable\",\"code\":\"CTFR-HOST-UNAVAILABLE\",\"report\":null,\"receiptId\":\"drh_a7465165d761f34a64aad4c1d808eca4\",\"transportCode\":\"host-proces"
+  },
+  {
+   "suite": "codex-design-readiness-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 10,
+   "pass": 9,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "WorktreeLifecycleError: git rev-parse failed (128): fatal: not a git repository (or any parent up to mount point /)"
+  },
+  {
+   "suite": "codex-host-output-custody-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 12,
+   "pass": 3,
+   "fail": 9,
+   "skipped": 0,
+   "signature": "Error: ENOENT: no such file or directory, open '<tmp>'"
+  },
+  {
+   "suite": "codex-host-process-journal-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 0,
+   "fail": 6,
+   "skipped": 0,
+   "signature": "SyntaxError: Unexpected token 'export'"
+  },
+  {
+   "suite": "codex-isolated-critic-protected-preimage-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "suite": "codex-pretool-guard-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.project-onboarding.v4\",\"status\":\"bootstrap-binding-required\",\"root\":\"<tmp>\",\"runner\":\"codex\",\"intent\":\"onboarding\",\"repository\":"
+  },
+  {
+   "suite": "codex-readiness-finalization-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 9,
+   "pass": 2,
+   "fail": 7,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"status\":\"unavailable\",\"code\":\"CTFR-HOST-UNAVAILABLE\",\"report\":null,\"receiptId\":\"drh_716e665d0332bba351816eceb41fdd54\",\"transportCode\":\"host-proces"
+  },
+  {
+   "suite": "codex-readiness-shared-parent-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 5,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "codex-session-start-hint-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 9,
+   "pass": 8,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "codex-tool-free-design-readiness-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 7,
+   "pass": 2,
+   "fail": 5,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"status\":\"unavailable\",\"code\":\"CTFR-HOST-UNAVAILABLE\",\"report\":null,\"receiptId\":\"drh_d1eb15d5e79fae04e72b7fe309262aa6\",\"transportCode\":\"host-proces"
+  },
+  {
+   "suite": "commit-msg-hook-install-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 23,
+   "pass": 23,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "commit-msg-hook-signed-integration-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 9,
+   "pass": 2,
+   "fail": 7,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "consumer-safe-paths-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 9,
+   "pass": 8,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: ["
+  },
+  {
+   "suite": "continuity-result-bootstrap-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 1,
+   "fail": 5,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Error: State authority route unavailable (WT-GIT-FAILED); no success is reported."
+  },
+  {
+   "suite": "continuity-result-case-migration-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 3,
+   "pass": 0,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Error: State authority route unavailable (WT-GIT-FAILED); no success is reported."
+  },
+  {
+   "suite": "continuity-result-close-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 2,
+   "fail": 4,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Error: State authority route unavailable (WT-GIT-FAILED); no success is reported."
+  },
+  {
+   "suite": "continuity-result-rebind-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 2,
+   "pass": 0,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Error: State authority route unavailable (WT-GIT-FAILED); no success is reported."
+  },
+  {
+   "suite": "critic-dispatch-preflight-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 46,
+   "pass": 45,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "✔ CDPF039 a successful Git exit remains admissible when a contained host adds an EPERM diagnostic (93.066083ms)"
+  },
+  {
+   "suite": "critic-generic-batch-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 11,
+   "pass": 3,
+   "fail": 8,
+   "skipped": 0,
+   "signature": "GenericCriticBatchError: Generic Critic batch is unavailable or refused."
+  },
+  {
+   "suite": "critic-skip-coverage-check",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "CRITIC-SKIP-COVERAGE evidence/abandoned-v3-dispatch-recovery-index.json: invalid or unauthorized abandoned-v3 recovery index (evidence/abandoned-v3-dispatch-recovery-index.json: en"
+  },
+  {
+   "suite": "critical-action-approval-request-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "suite": "critical-human-proof-gate-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "Error: State authority route unavailable (WT-GIT-FAILED); no success is reported."
+  },
+  {
+   "suite": "deferred-backlog-check",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "design-advisory-admission-cli-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 2,
+   "pass": 0,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "design-advisory-coordinator-v2-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 3,
+   "pass": 1,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"status\":\"recovery-required\",\"code\":\"SDC-AUTHORITY-UNAVAILABLE\",\"courseBinding\":{\"courseId\":\"dac_<hex>\",\"initialContextSha256\":\"<hex>\",\""
+  },
+  {
+   "suite": "design-approval-command-admission-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 13,
+   "pass": 12,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: imported parser/catalogue policy for [\"approve-plan\",\"--design-approval-request\",\"scratch/design-approval-request-<hex>.json\"]"
+  },
+  {
+   "suite": "design-course-coordinator-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 1,
+   "pass": 0,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "TypeError: Cannot read properties of undefined (reading 'status')"
+  },
+  {
+   "suite": "design-course-session-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 9,
+   "pass": 3,
+   "fail": 6,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "design-package-parent-metadata-false-drift-pin",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 21,
+   "pass": 20,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "Error: EACCES, Permission denied: <repo>/scratch/dwp-parent-pin-pcC795 '<repo>/scratch/dwp-parent-pin-pcC795'"
+  },
+  {
+   "suite": "design-workflow-package-builder-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 3,
+   "pass": 0,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"status\":\"recovery-required\",\"code\":\"SDC-AUTHORITY-UNAVAILABLE\",\"courseBinding\":{\"courseId\":\"dac_<hex>\",\"initialContextSha256\":\"<hex>\",\""
+  },
+  {
+   "suite": "design-workflow-package-route-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: refusal wording must not change"
+  },
+  {
+   "suite": "design-workflow-package-v2-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 2,
+   "pass": 0,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"status\":\"recovery-required\",\"code\":\"SDC-AUTHORITY-UNAVAILABLE\",\"courseBinding\":{\"courseId\":\"dac_<hex>\",\"initialContextSha256\":\"<hex>\",\""
+  },
+  {
+   "suite": "dispatch-authorship-verify-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 64,
+   "pass": 57,
+   "fail": 7,
+   "skipped": 0,
+   "signature": "✔ (b) trailer present, no record file -> FAIL record-missing (0.539315ms)"
+  },
+  {
+   "suite": "dispatch-policy-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 46,
+   "pass": 46,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "dispatch-record-strip-for-critic-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 12,
+   "pass": 12,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "doc-contract-check",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "doc-contract-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 76,
+   "pass": 73,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "suite": "gate-strength-guard-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL GST21 a chat-armed capability admits the exact bound edit to a GS-1..GS-5/GS-7 path: override activation refused (CHAT-GATE-NOT-ATTENDED); a human must confirm this activation"
+  },
+  {
+   "suite": "gitleaks-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 23,
+   "pass": 22,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /stale/i. Input:"
+  },
+  {
+   "suite": "goldfish-antigravity-live-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 5,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.agy-session-dispatch-receipt.v1\",\"status\":\"rejected\",\"code\":\"AGY-SESSION-NATIVE-CARRIER-UNAVAILABLE\",\"field\":\"authorityLifetime\""
+  },
+  {
+   "suite": "governance-action-artifact-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 9,
+   "pass": 9,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "governance-scope-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 26,
+   "pass": 25,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "ℹ chmod(000) actual EACCES: true"
+  },
+  {
+   "suite": "guard-apply-patch-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:"
+  },
+  {
+   "suite": "guard-devplan-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "Error: [guard-devplan] implementation requires a valid design approval (DAA-PUBLIC-UNAVAILABLE)."
+  },
+  {
+   "suite": "guard-dispatch-budget-checkpoint-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: admitted ABS:scratch/dispatch/critic-review-1/critic-notes.md"
+  },
+  {
+   "suite": "guard-dispatch-native-worker-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 4,
+   "pass": 2,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: complete v2 briefing should prepare before launch: BLOCKED (guard-dispatch): SQ-AUTHORITY-UNAVAILABLE: Restore the approved feature's valid v2 slice"
+  },
+  {
+   "suite": "guard-dispatch-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 61,
+   "pass": 58,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: stderr missing \"DISPATCH-INCOMPLETE-BRIEFING\""
+  },
+  {
+   "suite": "guard-gate-strength-ledger-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 2,
+   "pass": 0,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "guard-git-signed-integration-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 5,
+   "pass": 0,
+   "fail": 5,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "guard-human-override-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 28,
+   "pass": 24,
+   "fail": 4,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "guard-lifecycle-ready-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 391,
+   "pass": 362,
+   "fail": 26,
+   "skipped": 3,
+   "signature": "✔ NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: only ENOENT permits first creation; scratch inspection faults fail closed (98.329743ms)"
+  },
+  {
+   "suite": "guard-maintenance-window-kernel-closure-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports: AssertionError [ERR_ASSERTION]: NEVER_LIFTABLE_KERNEL_PATHS is not transitively "
+  },
+  {
+   "suite": "guard-push-architecture-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 1,
+   "pass": 0,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination."
+  },
+  {
+   "suite": "guard-push-decision-reference-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  GPDR01 allow  signed push, no decisionReference on the record at all -- exit 1 (expected 0) -- stderr: [guard-push] WARN (report-only): scratch custody has 4 typed finding(s)"
+  },
+  {
+   "suite": "guard-push-external-ledger-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  PGXL01 allow  signed push, no gates.push_external_ledger configured at all -- exit 1 (expected 0) -- stderr: [guard-push] WARN (report-only): scratch custody has 4 typed find"
+  },
+  {
+   "suite": "guard-push-promotion-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 4,
+   "pass": 3,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected allow (exit 0), got 1: [guard-push] WARN (report-only): scratch custody has 4 typed finding(s) for pushed source <hex>."
+  },
+  {
+   "suite": "guard-push-scratch-advisory-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  PGSA01 allow  signed push, no scratch descriptors at all -- no advisory -- exit 1 (expected 0) -- stderr: [guard-push] WARN (report-only): scratch custody has 4 typed finding"
+  },
+  {
+   "suite": "guard-push-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  PG09 allow  security evidence skipped when gates.security mode=off -- exit 1 (expected 0) -- stderr: [guard-push] WARN (report-only): scratch custody has 4 typed finding(s) f"
+  },
+  {
+   "suite": "guard-push-v2-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  PGV2-01 allow  fresh+bound+non-blocking v2 pair is a no-op alongside all-green v1 -- exit 1 (expected 0) -- stderr: [guard-push] WARN (report-only): scratch custody has 4 typ"
+  },
+  {
+   "suite": "guard-split-contract-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 5,
+   "pass": 4,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: export names"
+  },
+  {
+   "suite": "guard-testpath-override-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL OT10 an armed capability admits exactly the edit it was bound to: override activation refused (CHAT-GATE-NOT-ATTENDED); a human must confirm this activation directly, in their"
+  },
+  {
+   "suite": "guard-testpath-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 21,
+   "pass": 21,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "hook-governance-scope-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 9,
+   "pass": 8,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: unadmitted runner wiring: claude-task-output-scope-posttool.mjs"
+  },
+  {
+   "suite": "human-guard-override-capability-scan-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 3,
+   "pass": 0,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "HumanGuardOverrideError: override activation refused (CHAT-GATE-NOT-ATTENDED); a human must confirm this activation directly, in their own attended terminal -- an agent's own tool "
+  },
+  {
+   "suite": "human-guard-override-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 172,
+   "pass": 129,
+   "fail": 42,
+   "skipped": 1,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "install-agy-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 17,
+   "pass": 15,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "suite": "interruption-receipts-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 107,
+   "pass": 106,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: file://<repo>/plugins/pipeline-core/schemas/pipeline.design-workflow-package.v2.json:2"
+  },
+  {
+   "suite": "language-canon-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 4,
+   "pass": 3,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /When the delivery contract explicitly requires actual\\nindependent PASS/. Input:"
+  },
+  {
+   "suite": "license-contract-check",
+   "verifyExit": 1,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "lifecycle-denial-loop-guard-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 5,
+   "pass": 4,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: matcher and telemetry share one inspection per guard call"
+  },
+  {
+   "suite": "local-worker-supervisor-cli-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 10,
+   "pass": 1,
+   "fail": 9,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"schema\":\"pipeline.local-worker-supervisor-cli.v1\",\"ok\":false,\"code\":\"LWS-UNAVAILABLE\"}"
+  },
+  {
+   "suite": "measure-tofu-push-e2e-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 9,
+   "pass": 8,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {"
+  },
+  {
+   "suite": "model-family-approval-request-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 10,
+   "pass": 9,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: family requests must receive their own exact disclosure and fail closed before generic HGO/GMW fallback"
+  },
+  {
+   "suite": "model-family-execution-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 19,
+   "pass": 18,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "Error: S4 activation failed: MODEL-FAMILY-AUTHORITY-UNAVAILABLE"
+  },
+  {
+   "suite": "model-family-host-store-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 28,
+   "pass": 1,
+   "fail": 27,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: MODEL-FAMILY-AUTHORITY-UNAVAILABLE"
+  },
+  {
+   "suite": "model-family-invocation-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 14,
+   "pass": 8,
+   "fail": 6,
+   "skipped": 0,
+   "signature": "WorktreeLifecycleError: git rev-parse failed (128): fatal: not a git repository (or any parent up to mount point /)"
+  },
+  {
+   "suite": "model-family-main-prelaunch-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 3,
+   "pass": 2,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "WorktreeLifecycleError: git rev-parse failed (128): fatal: not a git repository (or any parent up to mount point /)"
+  },
+  {
+   "suite": "model-family-runtime-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 5,
+   "pass": 4,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: MODEL-FAMILY-STATE-UNCERTAIN"
+  },
+  {
+   "suite": "model-role-host-store-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 8,
+   "pass": 8,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "module-inventory-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 27,
+   "pass": 26,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "native-goldfish-host-state-regression-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 3,
+   "pass": 0,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: WT-GIT-FAILED"
+  },
+  {
+   "suite": "native-goldfish-host-state-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 20,
+   "pass": 20,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "no-autoupdate-key-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  SCAN  .claude/settings.json binds pipeline-core@agent-pipeline to the public marketplace -- enabled=false; marketplace=null"
+  },
+  {
+   "suite": "notebook-write-coverage-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL NB07 no write guard reads tool_input.file_path directly any more: guard-lifecycle-ready.mjs does not use the shared write-target reader"
+  },
+  {
+   "suite": "nova-critic-lineage-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /CRL-INVALIDATION/u. Input:"
+  },
+  {
+   "suite": "nova-verify-journal-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 91,
+   "pass": 88,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "✔ WSL EPERM after a zero suite exit remains successful; other error shapes stay closed (354.953161ms)"
+  },
+  {
+   "suite": "onboarding-continuity-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 301,
+   "pass": 262,
+   "fail": 39,
+   "skipped": 0,
+   "signature": "KickoffError: continuity current invocation required before binding"
+  },
+  {
+   "suite": "onboarding-init-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 55,
+   "pass": 54,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "✔ driveOnboardingInit: accepts a completed WSL child when EPERM accompanies its zero exit status (0.519066ms)"
+  },
+  {
+   "suite": "passive-read-credential-follow-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: owned fixture and Git ceiling required"
+  },
+  {
+   "suite": "phase3-sdlc-coherence-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: schema-lite does not execute the published schema's $ref/oneOf nested event contract"
+  },
+  {
+   "suite": "pin-advisor-demand-reuse-has-no-design-course-bound-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 13,
+   "pass": 12,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "pin-advisor-question-contract-and-final-source-binding-conflict-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 12,
+   "pass": 11,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: design-workflow-package-v2.test.mjs"
+  },
+  {
+   "suite": "pin-agy-managed-copy-first-start-lacks-attestation-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 12,
+   "pass": 10,
+   "fail": 1,
+   "skipped": 1,
+   "signature": "Error: ENOENT: no such file or directory, scandir '<repo>/scratch/agy-p18-02-first-start-NyqPln/home/.gemini/agent-pipeline/installed-plugin-attestations'"
+  },
+  {
+   "suite": "pin-approval-bound-design-package-lives-in-an-ignored-directory-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 11,
+   "pass": 7,
+   "fail": 4,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"code\":\"PO-PROFILE-RECEIPT-INVALID\",\"reason\":\"The common PO profile receipt is missing, unsafe, noncanonical or malformed.\",\"repair\":\"Ru"
+  },
+  {
+   "suite": "pin-claude-session-start-emits-codex-transcript-recovery-hint-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 12,
+   "pass": 11,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: the drive-letter path detector used in A3 recognises the embedded host path"
+  },
+  {
+   "suite": "pin-codex-advisor-evidence-fails-after-host-update-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 7,
+   "pass": 4,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: SDC-AUTHORITY-UNAVAILABLE"
+  },
+  {
+   "suite": "pin-codex-readiness-private-receipt-omits-output-custody-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 8,
+   "pass": 7,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"status\":\"unavailable\",\"code\":\"CTFR-HOST-UNAVAILABLE\",\"report\":null,\"receiptId\":\"drh_d0b0f7704bf4e574e3077bee3bf1e053\",\"transportCode\":\"host-proces"
+  },
+  {
+   "suite": "pin-declared-system-skill-read-requires-human-override-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 10,
+   "pass": 4,
+   "fail": 1,
+   "skipped": 5,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "pin-design-approval-validator-rejects-json-key-reordering-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 4,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /current, complete package/. Input:"
+  },
+  {
+   "suite": "pin-draft-phase-guard-blocks-mandatory-bootstrap-preflight-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 11,
+   "pass": 9,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: case variant on a case-sensitive host must stay refused (control)"
+  },
+  {
+   "suite": "pin-lifecycle-read-scope-blocks-host-declared-system-skill-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 14,
+   "pass": 6,
+   "fail": 1,
+   "skipped": 7,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "pin-model-role-bootstrap-is-always-unavailable-on-native-windows-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 14,
+   "pass": 11,
+   "fail": 1,
+   "skipped": 2,
+   "signature": "AssertionError [ERR_ASSERTION]: MODEL-FAMILY-STATE-UNCERTAIN"
+  },
+  {
+   "suite": "pin-no-uninstall-path-for-a-repository-that-once-opted-in-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 29,
+   "pass": 28,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Missing expected exception."
+  },
+  {
+   "suite": "pin-node-v24-on-windows-creates-a-real-nul-file-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 13,
+   "pass": 12,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "suite": "pin-revised-native-design-cannot-reach-a-new-advisor-course-tests",
+   "verifyExit": 1,
+   "alone": "timeout-alone",
+   "tests": 7,
+   "pass": 6,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: {\"ok\":false,\"status\":\"recovery-required\",\"code\":\"SDC-AUTHORITY-UNAVAILABLE\",\"courseBinding\":{\"courseId\":\"dac_<hex>\",\"initialContextSha256\":\"<hex>\",\""
+  },
+  {
+   "suite": "pin-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 8,
+   "pass": 6,
+   "fail": 1,
+   "skipped": 1,
+   "signature": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE/u. Input:"
+  },
+  {
+   "suite": "pin-windows-greenfield-scratch-write-denied-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 12,
+   "pass": 9,
+   "fail": 2,
+   "skipped": 1,
+   "signature": "AssertionError [ERR_ASSERTION]: alias project dir, alias-spelled target"
+  },
+  {
+   "suite": "pin-windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 13,
+   "pass": 4,
+   "fail": 1,
+   "skipped": 8,
+   "signature": "AssertionError [ERR_ASSERTION]: child must exit 0 (status=1): file://<repo>/[eval1]:19"
+  },
+  {
+   "suite": "pipeline-start-preflight-pre-push-observation-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 28,
+   "pass": 27,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "pipeline-state-discard-feature-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 11,
+   "pass": 7,
+   "fail": 4,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "pipeline-state-external-push-ledger-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL PSXL05 approve-push refuses with PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED when discoverRepository cannot resolve the repository, and the success line is not reached: Assertion"
+  },
+  {
+   "suite": "pipeline-state-inspection-contract-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: close-feature: expected classification \"valid\", got \"damaged\""
+  },
+  {
+   "suite": "pipeline-state-late-verify-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 2,
+   "pass": 1,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "TypeError: Cannot read properties of undefined (reading 'map')"
+  },
+  {
+   "suite": "pipeline-state-lifecycle-event-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "Error: State authority route unavailable (WT-GIT-FAILED); no success is reported."
+  },
+  {
+   "suite": "pipeline-state-observer-conformance-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 14,
+   "pass": 10,
+   "fail": 4,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: close-feature (design): classifyOnboardingContinuity expected status \"valid\", got \"damaged\""
+  },
+  {
+   "suite": "pipeline-state-push-anchor-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 5,
+   "pass": 2,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: the complete bundle must get past the anchor stage and be approved"
+  },
+  {
+   "suite": "pipeline-state-rebind-runner-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 18,
+   "pass": 4,
+   "fail": 14,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Error: State authority route unavailable (WT-GIT-FAILED); no success is reported."
+  },
+  {
+   "suite": "pipeline-state-reopen-design-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 2,
+   "pass": 1,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "pipeline-state-revocation-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 2,
+   "pass": 1,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "pipeline-state-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  PS06a-1 continuity-init exit 0 -- got 2"
+  },
+  {
+   "suite": "po-human-approval-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 185,
+   "pass": 170,
+   "fail": 15,
+   "skipped": 0,
+   "signature": "✔ 2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-error: a writeMachinePlane() failure produces a visible warning and still does not throw (4.046836ms)"
+  },
+  {
+   "suite": "portable-agy-authorship-export-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 5,
+   "pass": 4,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "Error: terminal dispatch record requires at least one log entry"
+  },
+  {
+   "suite": "product-capability-inventory-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 30,
+   "pass": 26,
+   "fail": 4,
+   "skipped": 0,
+   "signature": "✔ PCI01 HAW-A00 accepts only a status-zero Git EPERM false positive with observed output (2.494968ms)"
+  },
+  {
+   "suite": "project-onboarding-e2e-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 4,
+   "fail": 1,
+   "skipped": 1,
+   "signature": "AssertionError [ERR_ASSERTION]: DWP-PRESENT-RETIRED: use present-plan --review-receipt"
+  },
+  {
+   "suite": "project-onboarding-v3-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  V4 authority drift reopens the historical approval instead of rebinding it -- Expected values to be strictly equal:"
+  },
+  {
+   "suite": "project-uninstall-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 17,
+   "pass": 17,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "push-init-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 32,
+   "pass": 31,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "✔ drivePushInit: reconciliation accepts WSL EPERM only after status zero, while non-zero and status-less results stop fail-closed (1677.804899ms)"
+  },
+  {
+   "suite": "push-release-flow-docs-contract-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 11,
+   "pass": 8,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: reader-review lost required source-bound procedure: /If any covered document\\s+changes,[\\s\\S]*restart both phases with a new round/u"
+  },
+  {
+   "suite": "r7-3-bound-paths-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 13,
+   "pass": 12,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: unclassified live State fields: rigorHistory.body.planPath, planPresentation.designApprovalRequestPath"
+  },
+  {
+   "suite": "repair-map-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 7,
+   "pass": 6,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: a code was added to or removed from eligibility() without updating this test's accepted-gap list"
+  },
+  {
+   "suite": "rigor-floor-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 16,
+   "pass": 11,
+   "fail": 5,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "runner-contracts.schema-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL  committed registry is complete and exact -- mechanic.claude exact tuple"
+  },
+  {
+   "suite": "runner-design-readiness-bootstrap-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 8,
+   "pass": 5,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: claude"
+  },
+  {
+   "suite": "runner-profile-migration-v3-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 60,
+   "pass": 60,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "scoped-verify-registration-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL SVR28 Verify writes only the failed scoped-registration evidence when its registered target is absent"
+  },
+  {
+   "suite": "scratch-package-staging-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "Error: SPC controls require genuine Root-inherited FD3"
+  },
+  {
+   "suite": "scripts-pipeline-state-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: present-plan must succeed for a normal submitted plan: DWP-PRESENT-RETIRED: use present-plan --review-receipt"
+  },
+  {
+   "suite": "security-scan",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "security-scan-snapshot-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 4,
+   "pass": 2,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+  },
+  {
+   "suite": "session-cleanup-binding-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 64,
+   "pass": 25,
+   "fail": 39,
+   "skipped": 0,
+   "signature": "KickoffError: continuity current invocation required before binding"
+  },
+  {
+   "suite": "session-cleanup-power-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL descriptor-bound cleanup accepts unavailable power as nonblocking and retires the session -- domain-ancestor-unsafe"
+  },
+  {
+   "suite": "session-cleanup-recovery-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 38,
+   "pass": 32,
+   "fail": 6,
+   "skipped": 0,
+   "signature": "KickoffError: continuity current invocation required before binding"
+  },
+  {
+   "suite": "session-critic-finalizer-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 18,
+   "pass": 2,
+   "fail": 16,
+   "skipped": 0,
+   "signature": "SessionCriticFinalizerError: Session Critic finalization is invalid."
+  },
+  {
+   "suite": "session-power-controller-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "SessionPowerError: controller runtime dependency overrides are unavailable"
+  },
+  {
+   "suite": "signed-quality-package-single-link-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 6,
+   "pass": 0,
+   "fail": 6,
+   "skipped": 0,
+   "signature": "Error: ENOENT: no such file or directory, lstat '<repo>/undefined'"
+  },
+  {
+   "suite": "signed-quality-package-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 43,
+   "pass": 25,
+   "fail": 18,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "signing-disclosure-sweep-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 19,
+   "pass": 18,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: actual anchor failure precedes scratch request/describer"
+  },
+  {
+   "suite": "slice-queue-cli-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 14,
+   "pass": 13,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: [\"validate\"]"
+  },
+  {
+   "suite": "spec-readiness-host-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 3,
+   "pass": 0,
+   "fail": 3,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+  },
+  {
+   "suite": "spec-retention-check",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "FAIL spec retention: sprint-sentinel-epic.handoverPath must link specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md"
+  },
+  {
+   "suite": "stop-fanout-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 24,
+   "pass": 24,
+   "fail": 0,
+   "skipped": 0,
+   "signature": ""
+  },
+  {
+   "suite": "threat-model-approval-request-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "WorktreeLifecycleError: git rev-parse failed (128): fatal: not a git repository (or any parent up to mount point /)"
+  },
+  {
+   "suite": "toolchain-preflight-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 44,
+   "pass": 44,
+   "fail": 0,
+   "skipped": 0,
+   "signature": "PASS TCP13 Git accepts only the documented status-zero EPERM false-positive, while ordinary probes retain EPERM failure"
+  },
+  {
+   "suite": "verify-case-completion-check",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "verify-case-completion-registry-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 32,
+   "pass": 31,
+   "fail": 1,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: REQUIRED-VERIFY-POLICY agy-item-delivery-tests has no Verify caseCompletion policy"
+  },
+  {
+   "suite": "verify-evidence-producer-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 34,
+   "pass": 29,
+   "fail": 5,
+   "skipped": 0,
+   "signature": "SessionCriticFinalizerError: Session Critic finalization is invalid."
+  },
+  {
+   "suite": "verify-suite-append-history-check",
+   "verifyExit": 1,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "verify-suite-registration-check",
+   "verifyExit": 2,
+   "alone": "check-not-rerun",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": ""
+  },
+  {
+   "suite": "verify-suite-registration-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "AssertionError [ERR_ASSERTION]: UNCATEGORIZED-VERIFY-SURFACE \"administrative-commit-policy-tests\": add \"verify-phase:harness/scripts/verify.mjs:administrative-commit-policy-tests\" "
+  },
+  {
+   "suite": "windows-private-state-tests",
+   "verifyExit": 1,
+   "alone": "pass-alone",
+   "tests": 16,
+   "pass": 12,
+   "fail": 0,
+   "skipped": 4,
+   "signature": "✔ WPS008 accepts only the documented completed WSL EPERM shape (0.459733ms)"
+  },
+  {
+   "suite": "wire-dispatch-budget-hook-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 17,
+   "pass": 10,
+   "fail": 7,
+   "skipped": 0,
+   "signature": "Error: anchor not found (test): the file does not contain the expected text. Nothing was written."
+  },
+  {
+   "suite": "worktree-lifecycle-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": null,
+   "pass": null,
+   "fail": null,
+   "skipped": null,
+   "signature": "PASS D0-WSPAWN runGit accepts WSL EPERM only after status zero and keeps non-zero or missing status closed"
+  },
+  {
+   "suite": "worktree-target-binding-tests",
+   "verifyExit": 1,
+   "alone": "fail-alone",
+   "tests": 5,
+   "pass": 3,
+   "fail": 2,
+   "skipped": 0,
+   "signature": "AssertionError [ERR_ASSERTION]: target CWD must use target evidence"
+  }
+ ]
+}
