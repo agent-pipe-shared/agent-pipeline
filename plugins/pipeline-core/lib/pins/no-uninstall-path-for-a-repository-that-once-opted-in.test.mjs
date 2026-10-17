@@ -7,12 +7,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {cpSync,existsSync,mkdirSync,readdirSync,readFileSync,rmSync,statSync,writeFileSync} from 'node:fs';
+import {appendFileSync,cpSync,existsSync,mkdirSync,readdirSync,readFileSync,rmSync,statSync,writeFileSync} from 'node:fs';
 import {basename,dirname,join,relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createProjectUninstallController,PROJECT_UNINSTALL_FAULT_STAGES} from '../project-uninstall.mjs';
 import {createGovernanceScopeController} from '../governance-scope.mjs';
-import {observeGitHookFootprint} from '../git-hook-footprint.mjs';
+import {observeGitHookFootprint,removeManagedGitHook} from '../git-hook-footprint.mjs';
 import {fixture,git} from '../project-uninstall.fixture.mjs';
 import {applyInstall as installPreCommit} from '../../scripts/pre-commit-hook-install.mjs';
 import {applyInstall as installCommitMsg} from '../../scripts/commit-msg-hook-install.mjs';
@@ -151,7 +151,8 @@ test('RED: a declined sibling that becomes governed again between plan and apply
  const plan=f.controller.plan({rootDir:f.root}),before=f.digests(),statuses=hookStatuses(f);
  const enroll=f.scope.planDecision({rootDir:sibling,decision:'enroll',by:'Fixture Owner'});f.scope.applyDecision(enroll,options(enroll));
  assert.equal(f.scope.observe({rootDir:sibling}).state,'active');
- assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-SHARED-SCOPE-DRIFT'||e.code==='PU-SHARED-ACTIVE-WORKTREE'||e.code==='PU-HOOK-SHARED');
+ // apply() re-derives the footprint first, and derive() refuses any sibling that is not declined: this layer's own code, not the later per-unlink or journal layers (those are pinned below).
+ assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-SHARED-ACTIVE-WORKTREE');
  assert.deepEqual(hookStatuses(f),statuses);assert.deepEqual(f.digests(),before);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
 });
 
@@ -160,8 +161,96 @@ test('RED: a worktree added after the plan is a still-governed sibling: apply re
  git(f.root,['worktree','add','-q','--detach',sibling]);declineSibling(f,sibling);
  const plan=f.controller.plan({rootDir:f.root}),statuses=hookStatuses(f);
  git(f.root,['worktree','add','-q','--detach',late]);
- assert.throws(()=>f.controller.apply(plan,options(plan)),e=>['PU-SHARED-ACTIVE-WORKTREE','PU-SHARED-SCOPE-DRIFT','PU-HOOK-SHARED'].includes(e.code));
+ // A worktree nobody has declined is governed, so apply()'s own re-derivation refuses it first (derive(), as in the case above).
+ assert.notEqual(f.scope.observe({rootDir:late}).state,'declined');
+ assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-SHARED-ACTIVE-WORKTREE');
  assert.deepEqual(hookStatuses(f),statuses);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
+});
+
+// The cases above are all refused by the controller's own re-derivation. Two layers sit behind it and a change that lands later than
+// derive() must still be stopped there: the per-unlink binding of removeManagedGitHook, which re-observes before every file it removes
+// (deps.afterShim fires right after the shim is unlinked, so it is the seam for "changed while we were removing"), and the journal a
+// fresh controller resumes (crashAt:'journal' leaves a written journal and nothing else). Each case drives the real module and real
+// Git and asserts the code that layer really raises.
+function unlinkBinding(f,name='pre-commit'){
+ // The observed footprint is both the repository binding and the source of the entry, exactly what the controller journals as plan.git.
+ const repository=observeGitHookFootprint({rootDir:f.root}),entry=repository.hooks.find(h=>h.name===name);
+ return {repository,entry,args:{rootDir:f.root,name,expectedEntry:entry,expectedRepository:repository,observeSiblingScope:rootDir=>f.scope.observe({rootDir}),deps:{}}};
+}
+// The shim is retired first; the implementation and marker pair stays physical, so a refusal leaves a state a later resume can finish.
+function assertShimRetiredPairKept(f,entry){assert(!existsSync(entry.hookPath),'the shim is unlinked before the interference');assert(existsSync(entry.implPath),'impl kept');assert(existsSync(entry.markerPath),'marker kept');}
+const assertSameRepository=(now,plan)=>{assert.equal(now.root,plan.root);assert.equal(now.commonDir,plan.commonDir);assert.deepEqual(now.rootIdentity,plan.rootIdentity);assert.deepEqual(now.commonIdentity,plan.commonIdentity);assert.deepEqual(now.worktrees,plan.worktrees);};
+
+test('per-unlink control: the durable binding removes shim, implementation and marker when nothing changes underneath it',t=>{
+ const f=fixture(t),{entry,args}=unlinkBinding(f);
+ assert.equal(entry.status,'owned');
+ assert.equal(removeManagedGitHook(args).status,'removed');
+ for(const path of [entry.hookPath,entry.implPath,entry.markerPath])assert(!existsSync(path),path);
+ assert.deepEqual(hookStatuses(f),['absent','owned','owned']);
+});
+
+test('RED: a worktree added right after the shim is unlinked stops the per-unlink layer before the implementation and marker go (PU-HOOK-SHARED)',t=>{
+ const f=fixture(t),late=join(f.base,'late'),{repository,entry,args}=unlinkBinding(f);
+ assert.equal(repository.worktrees.length,1);
+ args.deps.afterShim=()=>git(f.root,['worktree','add','-q','--detach',late]);
+ assert.throws(()=>removeManagedGitHook(args),e=>e.code==='PU-HOOK-SHARED');
+ assert.equal(observeGitHookFootprint({rootDir:f.root}).worktrees.length,2,'the worktree really was added mid-removal');
+ assertShimRetiredPairKept(f,entry);
+ assert.deepEqual(hookStatuses(f),['owned-partial','owned','owned']);
+});
+
+test('RED: a declined sibling re-enrolled right after the shim is unlinked stops the per-unlink layer through its sibling-state clause alone (PU-HOOK-SHARED)',t=>{
+ const f=fixture(t),sibling=join(f.base,'sibling');
+ git(f.root,['worktree','add','-q','--detach',sibling]);declineSibling(f,sibling);
+ const {repository,entry,args}=unlinkBinding(f);let mid=null;
+ assert.equal(repository.worktrees.length,2);
+ args.deps.afterShim=()=>{const enroll=f.scope.planDecision({rootDir:sibling,decision:'enroll',by:'Fixture Owner'});f.scope.applyDecision(enroll,options(enroll));mid=observeGitHookFootprint({rootDir:f.root});};
+ assert.throws(()=>removeManagedGitHook(args),e=>e.code==='PU-HOOK-SHARED');
+ assert.equal(f.scope.observe({rootDir:sibling}).state,'active');
+ // Observed at the moment of interference: root, common dir, both identities and the worktree set all equal the binding, so the
+ // repository-identity clause cannot be what refused; only the sibling no longer being declined remains.
+ assert.notEqual(mid,null);assertSameRepository(mid,repository);
+ assertShimRetiredPairKept(f,entry);
+ assert.deepEqual(hookStatuses(f),['owned-partial','owned','owned']);
+});
+
+test('RED: foreign bytes appended to the implementation after the shim is unlinked stop the per-unlink layer and survive untouched (PU-HOOK-DRIFT)',t=>{
+ const f=fixture(t),{entry,args}=unlinkBinding(f),original=readFileSync(entry.implPath),foreign='// foreign edit after the shim went\n';
+ args.deps.afterShim=()=>appendFileSync(entry.implPath,foreign);
+ assert.throws(()=>removeManagedGitHook(args),e=>e.code==='PU-HOOK-DRIFT');
+ assertShimRetiredPairKept(f,entry);
+ assert.deepEqual(readFileSync(entry.implPath),Buffer.concat([original,Buffer.from(foreign)]),'the foreign bytes were not deleted');
+ // The marker no longer matches the implementation, so the hook reads as a conflict and the uninstall refuses it instead of deleting it.
+ assert.deepEqual(hookStatuses(f),['conflict','owned','owned']);
+});
+
+test('RED: a worktree added after the journal was written makes a fresh controller refuse to resume before any mutation (PU-SHARED-SCOPE-DRIFT)',t=>{
+ const f=fixture(t),before=f.digests(),plan=f.controller.plan({rootDir:f.root}),statuses=hookStatuses(f),late=join(f.base,'late');
+ assert.throws(()=>f.controller.apply(plan,{...options(plan),crashAt:'journal'}),e=>e.code==='PU-SIMULATED-FAULT');
+ const controls=join(plan.controls,plan.planSha256),journalPath=join(controls,'journal.json');
+ assert.deepEqual(JSON.parse(readFileSync(journalPath)).completed,[]);
+ git(f.root,['worktree','add','-q','--detach',late]);
+ assert.equal(observeGitHookFootprint({rootDir:f.root}).worktrees.length,plan.git.worktrees.length+1,'the worktree set no longer matches the journal');
+ const fresh=createProjectUninstallController({hostStateRoot:join(f.base,'host-state')});
+ assert.throws(()=>fresh.resume({rootDir:f.root,...options(plan)}),e=>e.code==='PU-SHARED-SCOPE-DRIFT');
+ assert.deepEqual(JSON.parse(readFileSync(journalPath)).completed,[]);assert(!existsSync(join(controls,'retained')));
+ assert.deepEqual(hookStatuses(f),statuses);assert.deepEqual(f.digests(),before);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
+});
+
+test('RED: a declined sibling re-enrolled after the journal was written makes a fresh controller refuse to resume through the sibling-state clause alone (PU-SHARED-SCOPE-DRIFT)',t=>{
+ const f=fixture(t),sibling=join(f.base,'sibling');
+ git(f.root,['worktree','add','-q','--detach',sibling]);declineSibling(f,sibling);
+ const before=f.digests(),plan=f.controller.plan({rootDir:f.root}),statuses=hookStatuses(f);
+ assert.throws(()=>f.controller.apply(plan,{...options(plan),crashAt:'journal'}),e=>e.code==='PU-SIMULATED-FAULT');
+ const controls=join(plan.controls,plan.planSha256),journalPath=join(controls,'journal.json');
+ const enroll=f.scope.planDecision({rootDir:sibling,decision:'enroll',by:'Fixture Owner'});f.scope.applyDecision(enroll,options(enroll));
+ assert.equal(f.scope.observe({rootDir:sibling}).state,'active');
+ // Common dir, its identity and the worktree set all still equal the journaled plan, so the clause on those cannot be what refuses.
+ const now=observeGitHookFootprint({rootDir:f.root});assert.equal(now.commonDir,plan.git.commonDir);assert.deepEqual(now.commonIdentity,plan.git.commonIdentity);assert.deepEqual(now.worktrees,plan.git.worktrees);
+ const fresh=createProjectUninstallController({hostStateRoot:join(f.base,'host-state')});
+ assert.throws(()=>fresh.resume({rootDir:f.root,...options(plan)}),e=>e.code==='PU-SHARED-SCOPE-DRIFT');
+ assert.deepEqual(JSON.parse(readFileSync(journalPath)).completed,[]);assert(!existsSync(join(controls,'retained')));
+ assert.deepEqual(hookStatuses(f),statuses);assert.deepEqual(f.digests(),before);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
 });
 
 for(const runners of [['claude'],['codex'],['antigravity']])test('per-runner fixture ('+runners[0]+' only): uninstall keeps AGENTS.md/CLAUDE.md, strips owned keys only, and archives private hook state',t=>{
