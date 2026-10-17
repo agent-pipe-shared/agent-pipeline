@@ -320,6 +320,35 @@ const POWERSHELL_WRITE_VERBS = Object.freeze(new Set([
 /** Maximal runs of characters a filename or path can be made of. */
 const PATH_TOKEN = /[A-Za-z0-9_.\-/\\~]+/gu;
 
+/**
+ * Remove every shell quote delimiter from command text, so that the path the shell would build
+ * is visible to the rule match: single and double quotes, and the dollar sign of an ANSI-C or
+ * locale quoted word. The shell removes quoting before it opens a redirect target, so a target
+ * spelled with quotes names the same file as its unquoted spelling, and a quote must never hide
+ * a protected path (PO decision 2026-10-17, G24-LIVE).
+ *
+ * This is a deliberate fail-closed OVER-approximation, not a shell parser: it ignores quote
+ * nesting and escapes, so it may also join fragments a real shell would keep apart. A surplus
+ * candidate costs a refused command at worst; a missing candidate is a protected write. The
+ * parsed redirect lane tests the stripped target; the unparsed fallback appends the stripped
+ * tokens after the raw ones, so every raw candidate is still tested.
+ */
+function stripShellQuoteDelimiters(text) {
+  return text.replace(/[$](?=['"])/gu, "").replace(/['"]/gu, "");
+}
+
+/**
+ * Remove POSIX backslash escapes from command text: outside quotes, a backslash followed by any
+ * character yields that character, so `gu\ard` opens the same file as `guard`. A lone trailing
+ * backslash yields nothing. Like the quote strip above this is a fail-closed OVER-approximation,
+ * not a shell parser (it also unescapes inside single quotes, where a real shell keeps the
+ * backslash): the escaped spelling always stays a candidate of its own and the unescaped
+ * spelling is an ADDITIONAL one, so no raw candidate is ever dropped (PO decision 2026-10-17).
+ */
+function stripShellBackslashEscapes(text) {
+  return text.replace(/\\([\s\S]?)/gu, "$1");
+}
+
 function normalizedExecutable(word) {
   if (typeof word !== "string" || word === "") return "";
   return basename(word.replace(/\\/gu, "/")).toLowerCase().replace(/\.exe$/u, "");
@@ -536,6 +565,37 @@ function gitShellPayloads(verb, postVerbArgv) {
 }
 
 /**
+ * Redirect targets in PowerShell command text: `>`, `>>`, `n>`, `n>>`, `*>` and `*>>` write the
+ * named file with no cmdlet at all (`'x' > path`). Each target word is tested quote-stripped
+ * (PowerShell treats the typographic quotes like the ASCII ones) and again with its backtick
+ * escapes removed, because a backtick is PowerShell's escape character, the analogue of the POSIX
+ * backslash: guar`d names the file guard. A stream merge (`2>&1`) names no file and yields nothing.
+ *
+ * Fail-closed and deliberately simple: the scan does not track string literals, so a `>` inside a
+ * quoted string is tested like any other. A surplus candidate costs a refused command only when it
+ * also names a protected path; a missing candidate is a protected write. NOT reached: a target that
+ * is computed at run time (`> (Join-Path $dir 'x')`, a variable), the same residual the other lanes
+ * of this module already state.
+ */
+function powershellRedirectTargets(command) {
+  const targets = [];
+  const seen = new Set();
+  const add = (candidate) => {
+    if (candidate === "" || seen.has(candidate)) return;
+    seen.add(candidate);
+    targets.push({ candidate, lane: "powershell-redirect" });
+  };
+  for (const match of command.matchAll(/>{1,2}\s*([^\s;|&(){}<>,]+)/gu)) {
+    const unquoted = match[1].replace(/['"\u2018\u2019\u201A\u201B\u201C\u201D\u201E]/gu, "");
+    const unescaped = unquoted.replace(/`([\s\S]?)/gu, "$1");
+    add(unquoted);
+    add(unescaped);
+    for (const token of unescaped.match(PATH_TOKEN) ?? []) add(token);
+  }
+  return targets;
+}
+
+/**
  * PowerShell candidates: the raw write-cmdlet operand, plus any path-shaped sub-tokens
  * embedded inside it (an operand can carry characters PATH_TOKEN would otherwise split on,
  * e.g. a quoted argument with an inner separator) — the same coverage
@@ -544,10 +604,9 @@ function gitShellPayloads(verb, postVerbArgv) {
  */
 function powershellWriteTargets(command) {
   const words = command.trim().split(/\s+/u);
-  if (words.length < 2) return [];
-  if (!POWERSHELL_WRITE_VERBS.has(normalizedExecutable(words[0]))) return [];
   const targets = [];
-  for (const word of words.slice(1)) {
+  const cmdletOperands = words.length >= 2 && POWERSHELL_WRITE_VERBS.has(normalizedExecutable(words[0])) ? words.slice(1) : [];
+  for (const word of cmdletOperands) {
     const stripped = word.replace(/^["']|["']$/gu, "");
     targets.push({ candidate: stripped, lane: "powershell-write-cmdlet" });
     for (const token of stripped.match(PATH_TOKEN) ?? []) {
@@ -555,7 +614,8 @@ function powershellWriteTargets(command) {
       targets.push({ candidate: token, lane: "powershell-write-cmdlet" });
     }
   }
-  return targets;
+  // The cmdlet candidates keep their order and lane; redirect candidates follow them.
+  return [...targets, ...powershellRedirectTargets(command)];
 }
 
 /**
@@ -840,7 +900,13 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
   if (parsed.parseStatus === "accepted") {
     for (const redirect of parsed.redirects) {
       if (redirect.direction !== ">") continue;
-      targets.push({ candidate: redirect.target, lane: "redirect" });
+      // The shell strips quoting before it opens the target: test the name it would open.
+      const unquoted = stripShellQuoteDelimiters(redirect.target) || redirect.target;
+      targets.push({ candidate: unquoted, lane: "redirect" });
+      // ... and removes backslash escapes, so the unescaped name is a second candidate; the
+      // escaped text above stays a candidate too (a backslash is a path separator on Windows).
+      const unescaped = stripShellBackslashEscapes(unquoted);
+      if (unescaped !== unquoted && unescaped !== "") targets.push({ candidate: unescaped, lane: "redirect" });
     }
     for (const segment of parsed.segments) {
       const executable = normalizedExecutable(segment.executable);
@@ -938,7 +1004,24 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
     || inPlaceNamed
     || opaqueCodeNamed;
   if (!writerNamed) return [];
-  for (const token of command.match(PATH_TOKEN) ?? []) {
+  const rawTokens = command.match(PATH_TOKEN) ?? [];
+  for (const token of rawTokens) {
+    targets.push({ candidate: token, lane: "unparsed-command", classification: "conservative-possible-write" });
+  }
+  // PATH_TOKEN splits at a quote character, so a partly quoted word such as plugins/"pipeline-core"/x
+  // never appears whole above. Append the tokens of the quote-stripped text that the raw scan did
+  // not already produce: unquoted commands add nothing, and the raw candidates stay a prefix.
+  const seenTokens = new Set(rawTokens);
+  for (const token of stripShellQuoteDelimiters(command).match(PATH_TOKEN) ?? []) {
+    if (seenTokens.has(token)) continue;
+    seenTokens.add(token);
+    targets.push({ candidate: token, lane: "unparsed-command", classification: "conservative-possible-write" });
+  }
+  // The same for backslash escapes: `gu\ard` is `guard` to the shell. Appended after the raw and
+  // quote-stripped tokens, so the earlier candidates keep their order and an unescaped command adds nothing.
+  for (const token of stripShellBackslashEscapes(stripShellQuoteDelimiters(command)).match(PATH_TOKEN) ?? []) {
+    if (seenTokens.has(token)) continue;
+    seenTokens.add(token);
     targets.push({ candidate: token, lane: "unparsed-command", classification: "conservative-possible-write" });
   }
   return targets;

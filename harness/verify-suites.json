@@ -3448,6 +3448,42 @@
       "file": "plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs"
+    },
+    {
+      "name": "pin-escaped-and-powershell-redirects-to-a-protected-path-are-writes-tests",
+      "file": "plugins/pipeline-core/lib/pins/escaped-and-powershell-redirects-to-a-protected-path-are-writes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/escaped-and-powershell-redirects-to-a-protected-path-are-writes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/escaped-and-powershell-redirects-to-a-protected-path-are-writes.test.mjs"
+    },
+    {
+      "name": "pin-orphan-descriptor-recovery-never-offers-the-running-session-tests",
+      "file": "plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs"
+    },
+    {
+      "name": "pin-quoted-redirect-target-to-a-protected-path-is-a-write-tests",
+      "file": "plugins/pipeline-core/lib/pins/quoted-redirect-target-to-a-protected-path-is-a-write.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/quoted-redirect-target-to-a-protected-path-is-a-write.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/quoted-redirect-target-to-a-protected-path-is-a-write.test.mjs"
+    },
+    {
+      "name": "pin-signed-descriptor-custody-handles-an-unborn-repository-tests",
+      "file": "plugins/pipeline-core/lib/pins/signed-descriptor-custody-handles-an-unborn-repository.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/signed-descriptor-custody-handles-an-unborn-repository.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/signed-descriptor-custody-handles-an-unborn-repository.test.mjs"
+    },
+    {
+      "name": "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
+      "file": "plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs"
+    },
+    {
+      "name": "pin-windows-requester-ancestors-above-repository-are-human-controlled-tests",
+      "file": "plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs"
     }
   ]
 }
