@@ -232,3 +232,12 @@ Answers to structured questions; tile text in
   - Ordering, PO the same night: the stamp comes before any Critic. The pending Critic DIFF on the Windows product changes (model-role-host-store `bf9040f27`, ancestor callers `915ef21c2` and the plugin-root boundary) moves to the WSL session, into the one Critic batch above.
   - Clarified by the PO the same night: a blocker or major finding from a test run (WSL Full Verify or a targeted suite) or from the Critic batch is always fixed before acceptance. The fix is scoped to that finding. Minor findings and Windows host-class reds are recorded instead, as a backlog item or a typed host skip.
 - **One work list:** `specs/sprint-alfred-epic/evidence/delivery-status-current.{json,md}`, written by `specs/sprint-alfred-epic/tools/delivery-remeasure.mjs`. An item is touched only if its open list has an `agent` entry released for work.
+
+## Scope of the final 0.7.0 candidate (PO, 2026-10-17, WSL session)
+
+- **Goal set by the PO:** finish the 0.7.0 Alfred candidate content-wise, close all items, and push a new final candidate for local testing. Work autonomously; collect PO tasks and decisions in parallel; keep the delivery matrix current.
+- **Answer to the scope tile (the cut versus "close all items"):** implement everything that belongs to 0.7.0 Alfred and that the PO has not explicitly moved to after 0.7.0. Majors and blockers must be fixed; 0.7.0 is meant to be a functional release.
+  - This supersedes the "no new fixes" part of the cut above. Every `agent` entry of an in-scope item is released for work.
+  - Still excluded: items the PO already moved to after 0.7.0 (for example `declared-system-skill-read-requires-human-override`, scheduled with AC-209) and the excluded epics (Nightwing, Batman, explicitly deferred work).
+  - Unchanged: Critic batch budget (one FULL plus at most three DIFF reviews per declared batch), the signature routes, and PO acceptance.
+- **First WSL Full Verify (same session):** 192 of 1042 suites red, 157 of them red alone on Linux; see `specs/sprint-alfred-epic/evidence/wsl-verify-20261017/README.md`. Those reds are fixed under this scope before the final candidate.
