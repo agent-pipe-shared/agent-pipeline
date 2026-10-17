@@ -157,7 +157,7 @@ test("OWN-7 the production claim reader (no readFileSyncFn seam) admits the owne
 
 // The landed (v2) creation needs POSIX directory mode bits, O_DIRECTORY and directory fsync (secureDirectory / syncCreationDirectory), which native
 // Windows does not provide; there it is a typed host limitation, not a pass. On POSIX the cases run for real.
-const HOST_LIMIT = process.platform === "win32" ? "host-limitation: landed creation requires POSIX directory mode bits and O_DIRECTORY; unavailable on native Windows" : false;
+const HOST_LIMIT = process.platform === "win32" ? "HOST-LIMITATION: win32: landed creation requires POSIX directory mode bits and O_DIRECTORY; unavailable on native Windows. Owner Coordinator, due 2026-10-19 (needs a Linux or WSL-native run)" : false;
 
 async function landedCreation(fault, id) {
   const fx = twoLinkedWorktrees();

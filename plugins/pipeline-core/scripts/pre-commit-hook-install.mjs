@@ -139,10 +139,11 @@
  * UNAVAILABLE (any fault: fail closed, the original findings are still printed). The HGO module
  * and CLI load from the SOURCE plugin root (`SOURCE_PLUGIN_LIB_DIR/..`, fallback
  * `PLUGIN_LIB_DIR/..`) because the runtime snapshot carries no plugin manifest. The commit
- * message is deliberately NOT bound. DISCLOSED: consumption happens in pre-commit, so a later
+ * message is deliberately NOT bound. DISCLOSED (each gap: owner Coordinator, due 2026-10-31):
+ * (1) consumption happens in pre-commit, so a later
  * commit-msg failure burns the capability (the next attempt reports ALREADY-CONSUMED and
- * seeds fresh); the chat approval mode is not special-cased; a first commit (unborn HEAD) has
- * no override path; and Layer 1 `check-protected-path-integrity` still flags a commit-scoped
+ * seeds fresh); (2) the chat approval mode is not special-cased; (3) a first commit (unborn HEAD) has
+ * no override path; and (4) Layer 1 `check-protected-path-integrity` still flags a commit-scoped
  * capability (its `eligiblePaths` is []) until that baseline is re-recorded.
  *
  * NOT installed into this repository's own `.git/hooks/pre-commit` by this dispatch — that is
