@@ -11,7 +11,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
 import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
-import { inspectArchitectureDesign, parseArchitectureDesign } from "./architecture-design.mjs";
+import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
+// Behavioural seam for the criterion-bound AC-174 pin: the handover decision is exercised through the
+// real function with the module's existing `fs.inspectArchitectureDesign` injection, not by reading source text.
+export { designToImplementationHandoverAction };
 import {
   accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
   linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
@@ -3250,6 +3253,18 @@ function designToImplementationHandoverAction(root, fs) {
       };
     }
     if (["approved", "implementing"].includes(authority.lifecycleStatus)) {
+      // AC-174: reopen-design is offered ONLY for a typed, verified content drift/invalid-content code
+      // (architecture-design.mjs ARCHITECTURE_DESIGN_REOPEN_CODES). Any other invalid result -- an
+      // unexpected exception, a setup/availability/lock/symlink condition -- gets the same typed
+      // diagnosis shape as the environment condition above, never a design reopen.
+      if (!isArchitectureDesignReopenCode(architecture.code)) {
+        return {
+          kind: "architecture-design-required",
+          prdPath: authority.planPath,
+          code: architecture.code ?? "ARCHITECTURE-DESIGN-INSPECTION-FAILED",
+          guidance: "The approved design is not shown to have drifted: architecture inspection failed with a code that is not a verified content drift (an unexpected exception or a setup/availability condition). Do not reopen design. Resolve the diagnosed condition named by this code, then inspect again.",
+        };
+      }
       const action = reopenDesignAction();
       action.guidance = `The approved PRD is immutable and its architecture evidence is invalid (${architecture.code ?? "ARCHITECTURE-DESIGN-INVALID"}). Collect the recovery actor, then execute the exact reopen-design action; edit the PRD only after it is a draft and submit/present one complete package for one final approval.`;
       return action;

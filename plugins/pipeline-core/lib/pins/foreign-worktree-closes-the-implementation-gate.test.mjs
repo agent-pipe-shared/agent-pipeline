@@ -55,14 +55,93 @@ test('AC2 reader: the typed environment condition keeps its own code and a close
   assert.equal(r.diagnostic.cause,'git-unavailable');
 });
 
-test('AC4 reopen-design (RED today): onboarding offers reopen-design only for a verified content-drift code, not for any !architecture.ok',()=>{
-  const text=src('project-onboarding-v3.mjs');
-  const at=text.indexOf('its architecture evidence is invalid');
-  assert.ok(at>0,'guidance anchor present');
-  const before=text.slice(Math.max(0,at-900),at);
-  assert.match(text.slice(Math.max(0,at-2200),at),/code === "DWP2-ENVIRONMENT-UNAVAILABLE"[\s\S]*?kind: "architecture-design-required"/u);
-  assert.match(before,/DRIFT|STALE|environment/iu,
-    'branch `if (!architecture.ok)` in designToImplementationHandoverAction (lib/project-onboarding-v3.mjs) offers reopen-design for every failure code');
+// AC4 behavioural fixture (ALF-C-C6G3-CORR F1): a real approved-PRD state file observed by the real
+// persistedPoAuthority, driven through the real designToImplementationHandoverAction. Only the
+// architecture inspection result is injected through the module's existing `fs.inspectArchitectureDesign` seam.
+const sha64=c=>c.repeat(64);
+const REOPEN='"reopen-design"';
+async function approvedHandover(inspect){
+  const nodeFs=(await import('node:fs')).default;
+  const {designToImplementationHandoverAction}=await import('../project-onboarding-v3.mjs');
+  const dir=join(repoRoot,'scratch','foreign-worktree-pin-ac4-'+process.pid+'-'+Math.random().toString(36).slice(2,8));
+  mkdirSync(dir,{recursive:true});
+  const root=nodeFs.realpathSync(dir);
+  const authority={schema:'pipeline.po-gate-authority.v2',humanFacing:'en',sourceSha256:sha64('a'),runtimeSha256:sha64('b'),
+    receiptSha256:sha64('c'),repositoryFingerprint:sha64('d'),planPath:'prd.md',planSha256:sha64('e'),specPath:'spec.md',specSha256:sha64('f')};
+  const state={schema:'pipeline.state.v0',activeFeature:{id:'f1',planPath:'prd.md',phase:'design'},planApproved:true,
+    planApproval:{schema:'pipeline.plan-approval.v2',approvedBy:'po',approvedAt:'2026-01-01T00:00:00.000Z',
+      specBoundBy:'po',specBoundAt:'2026-01-01T00:00:00.000Z',poGateAuthority:authority},
+    continuity:{authority:{prd:{path:'prd.md',sha256:authority.planSha256},spec:{path:'spec.md',sha256:authority.specSha256}}}};
+  writeFileSync(join(root,'state.json'),JSON.stringify(state));
+  try{
+    const fs={...nodeFs,resolveProjectAuthorityPaths:()=>({status:'ready',state:'state.json'}),inspectArchitectureDesign:inspect};
+    return designToImplementationHandoverAction(root,fs);
+  }finally{rmSync(dir,{recursive:true,force:true});}
+}
+const isDiagnosis=a=>a?.kind==='architecture-design-required'&&a.applyAction===undefined&&!JSON.stringify(a).includes(REOPEN);
+
+test('AC4 reopen-design (F1): an unexpected inspection exception yields a typed diagnosis, never a reopen-design action',async()=>{
+  const {inspectArchitectureDesign}=await import('../architecture-design.mjs');
+  // A root no filesystem call accepts: the real inspection raises a non-typed (system) exception.
+  const badRoot=join(repoRoot,'scratch','foreign-worktree-pin-nul\0root');
+  const direct=inspectArchitectureDesign(badRoot,null,{});
+  assert.equal(direct.ok,false);
+  assert.match(String(direct.code),/^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u,'the code field must be a typed code, never exception text');
+  const action=await approvedHandover((_r,scope,deps)=>inspectArchitectureDesign(badRoot,scope,deps));
+  assert.ok(isDiagnosis(action),'no reopen-design for an unexplained exception: '+JSON.stringify(action));
+  assert.match(String(action.code),/^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u);
+});
+
+test('AC4 architecture-design (F1): failure codes are closed and typed; exception text never reaches the code field',async()=>{
+  const m=await import('../architecture-design.mjs');
+  assert.equal(m.ARCHITECTURE_DESIGN_INSPECTION_FAILED,'ARCHITECTURE-DESIGN-INSPECTION-FAILED');
+  const msg="ENOENT: no such file or directory, open 'C:\\some\\private\\prd.md'";
+  assert.equal(m.architectureDesignFailureCode(new Error(msg)),'ARCHITECTURE-DESIGN-INSPECTION-FAILED');
+  assert.equal(m.architectureDesignFailureCode(new TypeError('x'.repeat(200))),'ARCHITECTURE-DESIGN-INSPECTION-FAILED');
+  assert.equal(m.architectureDesignFailureCode(null),'ARCHITECTURE-DESIGN-INSPECTION-FAILED');
+  for(const code of m.ARCHITECTURE_DESIGN_REOPEN_CODES)assert.equal(m.architectureDesignFailureCode(new Error(code)),code);
+  assert.equal(m.architectureDesignFailureCode(new Error('DAA-PUBLIC-UNAVAILABLE')),'DAA-PUBLIC-UNAVAILABLE');
+});
+
+test('AC4 reopen-design (F1): a typed content-drift code still offers the exact reopen-design action',async()=>{
+  const action=await approvedHandover(()=>({ok:false,status:'design-required',code:'ARCHITECTURE-DESIGN-APPROVAL-STALE'}));
+  assert.equal(action?.kind,'collect-input');
+  assert.ok(JSON.stringify(action).includes(REOPEN),'reopen-design applyAction present for verified drift');
+});
+
+test('AC4 reopen-design (F1): a typed non-drift code (setup/availability) gets a diagnosis, not reopen-design',async()=>{
+  for(const code of ['DAA-PUBLIC-UNAVAILABLE','DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP','ARCHITECTURE-DESIGN-LOCK-REQUIRED','ARCHITECTURE-DESIGN-INSPECTION-FAILED']){
+    const action=await approvedHandover(()=>({ok:false,status:'design-required',code}));
+    assert.ok(isDiagnosis(action),code+': '+JSON.stringify(action));
+    assert.equal(action.code,code);
+  }
+});
+
+test('AC4 reopen-design (F1): environment-unavailable is unchanged (typed environment diagnosis, no reopen-design)',async()=>{
+  const action=await approvedHandover(()=>({ok:false,status:'environment-unavailable',code:'DWP2-ENVIRONMENT-UNAVAILABLE',cause:'foreign-worktree'}));
+  assert.ok(isDiagnosis(action));
+  assert.equal(action.code,'DWP2-ENVIRONMENT-UNAVAILABLE');
+  assert.match(action.guidance,/not content drift/u);
+});
+
+// F4 (ALF-C-C6G3-CORR): only a registered NON-primary worktree failure is foreign-worktree.
+const topologyGit=(primaryRoot,foreignRoot)=>args=>{
+  const a=args.join(' ');
+  if(a==='rev-parse --show-toplevel')return repoRoot+'\n';
+  if(a.includes('--git-common-dir'))return join(repoRoot,'.git')+'\n';
+  const h='a'.repeat(40);
+  return `worktree ${primaryRoot}\0HEAD ${h}\0branch refs/heads/main\0\0worktree ${foreignRoot}\0HEAD ${h}\0branch refs/heads/other\0\0`;
+};
+test('AC2 primary root (F4): a failure resolving the PRIMARY worktree is its own typed error, not foreign-worktree, with the original error kept',()=>{
+  const gone=join(repoRoot,'scratch','foreign-worktree-pin-primary-gone');
+  const git=topologyGit(gone,repoRoot);
+  assert.throws(()=>resolvePoGateRepositoryTopology(repoRoot,{spawn:(_c,args)=>({status:0,stdout:git(args)})}),
+    e=>e.code==='PO-GATE-PRIMARY-ROOT-UNAVAILABLE'&&e.cause!=='foreign-worktree'&&e.underlyingError instanceof Error);
+});
+test('AC2 foreign root (F4): a non-primary registered worktree failure keeps the original error alongside the closed foreign-worktree cause',()=>{
+  const git=topologyGit(repoRoot,join(repoRoot,'scratch','foreign-worktree-pin-gone-2'));
+  assert.throws(()=>resolvePoGateRepositoryTopology(repoRoot,{spawn:(_c,args)=>({status:0,stdout:git(args)})}),
+    e=>e.code==='DWP2-ENVIRONMENT-UNAVAILABLE'&&e.cause==='foreign-worktree'&&e.underlyingError instanceof Error);
 });
 
 test('AC3 named diagnosis: the closed-gate denial names only admitted recovery commands, never the retired inspect script',async()=>{

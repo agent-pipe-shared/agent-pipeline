@@ -178,10 +178,11 @@ export function inspectArchitectureDesignDraft({ rootDir, planPath, expectedPlan
     try {
       return { ok: true, required: true, design: parseArchitectureDesign(prdBytes.toString("utf8")), prdPath: planPath };
     } catch (error) {
-      return { ok: false, required: true, code: error.message, prdPath: planPath };
+      return { ok: false, required: true, code: architectureDesignFailureCode(error), prdPath: planPath };
     }
   } catch (error) {
-    return { ok: false, code: error?.message ?? "ARCHITECTURE-DESIGN-PRD-UNAVAILABLE", prdPath: planPath };
+    // Same closed code contract as inspectArchitectureDesign (AC-174): no exception text in `code`.
+    return { ok: false, code: error ? architectureDesignFailureCode(error) : "ARCHITECTURE-DESIGN-PRD-UNAVAILABLE", prdPath: planPath };
   }
 }
 
@@ -283,11 +284,45 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
     if (error?.code === "DWP2-ENVIRONMENT-UNAVAILABLE" || error?.message === "DWP2-ENVIRONMENT-UNAVAILABLE") {
       return { ok: false, status: "environment-unavailable", code: "DWP2-ENVIRONMENT-UNAVAILABLE", cause: "foreign-worktree" };
     }
-    return { ok: false, status: "design-required", code: error.message,
-      ...(error.message === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && prdPath ? { prdPath } : {}),
-      ...(error.field ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };
+    // AC-174: the `code` field is a closed, typed identifier. Exception text
+    // (a system message, a path, a stack fragment) never reaches it.
+    const code = architectureDesignFailureCode(error);
+    return { ok: false, status: "design-required", code,
+      ...(code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && prdPath ? { prdPath } : {}),
+      ...(error?.field && code === error.message ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };
   }
 }
+
+/** The one code an unexpected (non-typed) exception inspection failure maps to. */
+export const ARCHITECTURE_DESIGN_INSPECTION_FAILED = "ARCHITECTURE-DESIGN-INSPECTION-FAILED";
+const TYPED_FAILURE_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u;
+
+/** Typed identifiers (ARCHITECTURE-DESIGN-*, DAA-*, DWP-*, ...) pass through unchanged; anything else
+ * (exception text, system messages, null) becomes ARCHITECTURE_DESIGN_INSPECTION_FAILED. */
+export function architectureDesignFailureCode(error) {
+  const message = error?.message;
+  if (typeof message === "string" && message.length <= 96 && TYPED_FAILURE_CODE.test(message)) return message;
+  // A required file is absent (e.g. a partial greenfield scaffold fails closed): one typed class, never the OS text.
+  if (error?.code === "ENOENT") return "ARCHITECTURE-DESIGN-ENOENT";
+  return ARCHITECTURE_DESIGN_INSPECTION_FAILED;
+}
+
+/** The only typed codes for which reopen-design is the repair: the approved bytes or design evidence are
+ * VERIFIED to be stale/drifted, or the approved design block deterministically fails its own contract.
+ * Environment, setup/availability, lock, symlink, brownfield-state and unexpected-exception failures are
+ * deliberately absent: they never justify discarding a possibly valid approval. */
+export const ARCHITECTURE_DESIGN_REOPEN_CODES = Object.freeze([
+  // verified stale / drifted approval, source or materialized evidence
+  "ARCHITECTURE-DESIGN-APPROVAL-STALE", "ARCHITECTURE-DESIGN-CONTINUITY-STALE", "ARCHITECTURE-DESIGN-RECEIPT-STALE",
+  "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", "ARCHITECTURE-DESIGN-DECISION-SUBSET-STALE", "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE",
+  "DAA-DESIGN-APPROVAL-BINDING-DRIFT", "DAA-DESIGN-SOURCE-DRIFT",
+  // the approved PRD's design block is missing or invalid (deterministic content findings)
+  "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE", "ARCHITECTURE-DESIGN-PACKAGE-INVALID",
+  "ARCHITECTURE-DESIGN-DISPOSITION-INVALID", "ARCHITECTURE-DESIGN-MODULES-REQUIRED", "ARCHITECTURE-DESIGN-MODULE-INVALID",
+  "ARCHITECTURE-DESIGN-DEPENDENCY-INVALID", "ARCHITECTURE-DESIGN-SURFACE-INVALID", "ARCHITECTURE-DESIGN-FITNESS-MISMATCH",
+  "ARCHITECTURE-DESIGN-GREENFIELD-DEBT-INVALID", "ARCHITECTURE-DESIGN-SCOPE-MISMATCH",
+]);
+export function isArchitectureDesignReopenCode(code) { return ARCHITECTURE_DESIGN_REOPEN_CODES.includes(code); }
 
 // Stored final approval is portable: reread its exact package and sources, then
 // verify the recorded signature against current policy trust anchors. The legacy

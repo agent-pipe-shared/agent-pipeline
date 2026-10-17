@@ -597,19 +597,30 @@ export function resolvePoGateRepositoryTopology(repoRoot, deps = {}) {
   // A registered, non-prunable worktree this host cannot resolve (for example a
   // WSL `/mnt` registration seen from native Windows) is an ENVIRONMENT condition,
   // not content drift: surface it as a typed, bounded error, never free text.
-  let registeredWorktreeRoots;
-  let primaryRoot;
-  try {
-    registeredWorktreeRoots = worktrees
-      .filter((entry) => !entry.prunable)
-      .map(({ root }) => assertPhysicalDirectory(realpathSync(root)));
-    primaryRoot = assertPhysicalDirectory(realpathSync(primary.root));
-  } catch {
-    throw Object.assign(new Error(PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE), {
-      code: PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE,
-      cause: "foreign-worktree",
-    });
-  }
+  // Only a failure of a registered NON-primary worktree is the foreign-worktree environment condition
+  // (`cause` stays the closed enum existing readers assert). A failure of the PRIMARY root is a different
+  // condition and propagates as its own typed error. Both keep the original error as `underlyingError`.
+  const resolveRegisteredRoot = (root, isPrimary) => {
+    try {
+      return assertPhysicalDirectory(realpathSync(root));
+    } catch (underlyingError) {
+      if (isPrimary) {
+        throw Object.assign(new Error("PO-GATE-PRIMARY-ROOT-UNAVAILABLE"), {
+          code: "PO-GATE-PRIMARY-ROOT-UNAVAILABLE",
+          underlyingError,
+        });
+      }
+      throw Object.assign(new Error(PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE), {
+        code: PO_GATE_ENVIRONMENT_UNAVAILABLE_CODE,
+        cause: "foreign-worktree",
+        underlyingError,
+      });
+    }
+  };
+  const registeredWorktreeRoots = worktrees
+    .filter((entry) => !entry.prunable)
+    .map(({ root }) => resolveRegisteredRoot(root, root === primary.root));
+  const primaryRoot = resolveRegisteredRoot(primary.root, true);
   return {
     repoRoot: observedRoot,
     gitCommonDir,
