@@ -183,7 +183,7 @@ test("the guard feeds the fitness evaluator the same touchedContracts as the lib
 });
 
 // ---- (c) model gap: an established project under a PO deferral must not admit a net-new implementation path unratcheted ----
-test("a deferred established project is admitted for a net-new target path (fix site: lib/architecture-entry-readiness.mjs inspectArchitectureEntryReadiness, `disposition.disposition === \"deferred\"` branch)", () => {
+test("a deferred established project is NOT admitted, not ready, for a net-new target path (fix site: lib/architecture-entry-readiness.mjs inspectArchitectureEntryReadiness, `disposition.disposition === \"deferred\"` branch)", () => {
   const result = inspectArchitectureEntryReadiness({ rootDir: repoRoot, planningSurface: { planPath: PLAN, paths: ["src/brand-new.mjs"] }, deps: {
     inspectArchitectureDesign: () => ({ ok: true, status: "not-required", required: false, scope: null }),
     readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }),

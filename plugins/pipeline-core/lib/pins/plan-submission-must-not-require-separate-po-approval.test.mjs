@@ -373,6 +373,7 @@ test("AC3: the Advisor step precedes presentation - an Advisor receipt authored 
   noDisposition.packageBytes = fserialized(noDisposition.workflowPackage);
   const refused = validateDesignWorkflowPackage(noDisposition);
   assert.equal(refused.ok, false, "an answered Advisor without a disposition cannot reach the final presentation");
+  assert.equal(refused.code, "DWP-ADVISOR-DISPOSITION");
 });
 
 test("AC5: an unavailable Advisor is a proposed exception inside the same package and still requires independent readiness", () => {
@@ -405,7 +406,7 @@ test("AC3/AC5: the real present-plan writer refuses an epic/feature presentation
   writeFileSync(statePathFile, `${JSON.stringify(state, null, 2)}\n`);
   const noReceipt = capture(["present-plan", "--by", "coordinator"], f.deps);
   assert.equal(noReceipt.status, 2, `${noReceipt.out} ${noReceipt.err}`);
-  assert.match(noReceipt.err, /DCC-REVIEW-RECEIPT-MISSING|DCC-INPUT|refused/);
+  assert.match(noReceipt.err, /DCC-REVIEW-RECEIPT-MISSING/);
   assert.equal(readState(f.root).planPresentation, undefined, "no presentation without readiness evidence");
   const retired = capture(["present-plan", "--by", "coordinator", "--design-workflow-package", "specs/x/design-workflow-package.json"], f.deps);
   assert.equal(retired.status, 2);

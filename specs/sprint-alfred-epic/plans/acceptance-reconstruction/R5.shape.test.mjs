@@ -33,6 +33,7 @@ test('header says RELEASED by PO decision K6', () => {
   const header = headings.length ? text.slice(0, headings[0].index) : text;
   assert.ok(header.includes('Status: RELEASED - PO decision 2026-10-16 (K6)'));
   assert.ok(!header.includes('DRAFT'));
+  assert.ok(!header.includes('until the PO releases'));
 });
 
 test('no absolute host path', () => {
