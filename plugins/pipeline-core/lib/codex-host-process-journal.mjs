@@ -698,7 +698,7 @@ function verificationSameProcess(a,b){return process.platform==='win32'?a?.platf
 function verificationStartDigest(p){return nativeManagedDigest(p.platform==='win32'?{start:p.start,bootIdentity:p.bootIdentity}:{start:p.start,bootSha256:p.bootSha256});}
 function verificationWindowsRecord(repository,ref){
   originRef(ref);const path=join(repository.commonDir,ref.path.slice(5));
-  const native=verificationWindowsRead(path,524288);
+  const native=verificationWindowsRead(path,524288,repository);
   if(native.bytes.length!==ref.size||hostDigest(native.bytes)!==ref.sha256)verificationOriginFault();
   return {ref:structuredClone(ref),value:parseStrictJson(native.bytes),nativeFactsSha256:native.nativeFactsSha256};
 }
@@ -772,17 +772,26 @@ function verificationWindowsTaskProof(repository,sourceRef,controller,bindingSha
   return {intent,member,custody,directory};
 }
 function verificationWindowsCatalogueRef(repository){
-  const native=verificationWindowsRead(join(repository.commonDir,'agent-pipeline','session-authority','catalogue.json'),524288);
+  const native=verificationWindowsRead(join(repository.commonDir,'agent-pipeline','session-authority','catalogue.json'),524288,repository);
   return {sha256:hostDigest(native.bytes),size:native.bytes.length};
 }
-function verificationWindowsRead(path,maxBytes){
-  const ancestry=()=>{const rows=[];let cursor=dirname(path);while(true){const facts=observeWindowsAuthorityAncestor({path:cursor});rows.push({path:cursor,nativeFacts:facts.nativeFacts,nativeFactsSha256:facts.nativeFactsSha256,helperSha256:facts.helperSha256});const parent=dirname(cursor);if(parent===cursor)break;cursor=parent;}return rows;};
+// Directories strictly above the repository root are human-controlled (PO decision 2026-10-17): observed and hashed into the
+// facts, never refused. Only a caller that carries its repository gets that boundary, and only for a path lexically inside
+// repository.primaryRoot; every other caller and path keeps every strict check.
+function verificationWindowsBoundary(path,repository){
+  const root=repository?.primaryRoot;if(typeof root!=='string'||typeof path!=='string')return null;
+  const base=root.replace(/\\+$/u,'');
+  return path.length>base.length&&path.toLowerCase().startsWith(base.toLowerCase()+'\\')?root:null;
+}
+function verificationWindowsRead(path,maxBytes,repository=null){
+  const boundaryRoot=verificationWindowsBoundary(path,repository);
+  const ancestry=()=>{const rows=[];let cursor=dirname(path);while(true){const facts=observeWindowsAuthorityAncestor(boundaryRoot?{path:cursor,boundaryRoot}:{path:cursor});rows.push({path:cursor,nativeFacts:facts.nativeFacts,nativeFactsSha256:facts.nativeFactsSha256,helperSha256:facts.helperSha256});const parent=dirname(cursor);if(parent===cursor)break;cursor=parent;}return rows;};
   const before=ancestry(),result=readWindowsOwnedAuthorityFile({path,maxBytes});if(!originEqual(before,ancestry()))verificationOriginFault();return result;
 }
 
 function managedWindowsRegistryRecord(repository,path){
   if(typeof path!=='string'||!path.startsWith('agent-pipeline/session-authority/')||path.includes('\\')||path.split('/').some(p=>!p||p==='.'||p==='..'))throw hostFault('managed-origin-registry-path');
-  const bytes=verificationWindowsRead(join(repository.commonDir,path),524288).bytes,value=parseStrictJson(bytes);
+  const bytes=verificationWindowsRead(join(repository.commonDir,path),524288,repository).bytes,value=parseStrictJson(bytes);
   if(canonicalJson(value)!==bytes.toString('utf8'))throw hostFault('managed-origin-registry-noncanonical');
   return {value,ref:{path:'.git/'+path,sha256:hostDigest(bytes),size:bytes.length}};
 }

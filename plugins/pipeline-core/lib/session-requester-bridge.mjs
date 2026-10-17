@@ -1436,9 +1436,12 @@ function osvWindowsPrivate(r,ref){
   // Existing managed task sources are outside the requester adapter's fixed
   // namespace. Read them through the same native private-file backend rather
   // than widening adapter publication/removal routes or fabricating a ref.
+  // The repository root bounds the human-controlled ancestors above it (PO decision 2026-10-17); only a private file that
+  // lexically lies inside r.primaryRoot gets that boundary, every other path keeps every strict check.
+  const file=join(r.commonDir,ref.path.slice(5));
   const result=ref.path.startsWith('.git/agent-pipeline/run/session-requesters/')
     ?windowsRequesterRuntime.readWindowsRequesterPrivateRef({storage:osvWindowsStorage(r),ref})
-    :osvWindowsRead(join(r.commonDir,ref.path.slice(5)),MAX,true);
+    :osvWindowsRead(file,MAX,true,osvWindowsBoundary(file,r.primaryRoot));
   if(result.bytes.length!==ref.size||hash(result.bytes)!==ref.sha256)osvFail('OSV-INPUT-DRIFT');
   osvWindowsRemember(r,ref,result.nativeFactsSha256);return result;
 }
@@ -1453,16 +1456,23 @@ function osvSameProcess(a,b){
   return a?.platform==='win32'&&b?.platform==='win32'
     &&sameNativeWindowsProcess({...a,cwd:null},{...b,cwd:null});
 }
-function osvWindowsAncestors(path){
-  const rows=[];let cursor=dirname(path);while(true){const native=observeWindowsAuthorityAncestor({path:cursor});
+// Directories strictly above the repository root are human-controlled: observed and hashed, never refused. Returns root
+// only when path lexically lies strictly inside it (case-insensitive, backslash-delimited); otherwise null keeps strict.
+function osvWindowsBoundary(path,root){
+  if(typeof path!=='string'||typeof root!=='string')return null;
+  const base=root.replace(/\\+$/u,'');
+  return path.length>base.length&&path.toLowerCase().startsWith(base.toLowerCase()+'\\')?root:null;
+}
+function osvWindowsAncestors(path,boundaryRoot=null){
+  const rows=[];let cursor=dirname(path);while(true){const native=observeWindowsAuthorityAncestor(boundaryRoot?{path:cursor,boundaryRoot}:{path:cursor});
     rows.push({path:cursor,nativeFacts:native.nativeFacts,nativeFactsSha256:native.nativeFactsSha256,helperSha256:native.helperSha256});
     const parent=dirname(cursor);if(parent===cursor)break;cursor=parent;}return rows;
 }
-function osvWindowsRead(path,maxBytes,privateFile=false){
+function osvWindowsRead(path,maxBytes,privateFile=false,boundaryRoot=null){
   if(typeof path!=='string'||!isAbsolute(path)||resolve(path)!==path||path.startsWith('\\\\'))osvFail('OSV-INPUT-DRIFT');
-  const before=osvWindowsAncestors(path);
+  const before=osvWindowsAncestors(path,boundaryRoot);
   const result=privateFile?readWindowsOwnedAuthorityFile({path,maxBytes:Math.min(maxBytes,1048576)}):readWindowsAuthoritySourceModule({path,maxBytes:Math.min(maxBytes,1048576)});
-  osvSame(before,osvWindowsAncestors(path));return result;
+  osvSame(before,osvWindowsAncestors(path,boundaryRoot));return result;
 }
 function osvWindowsPhysicalRef(path){
   if(path===realpathSync(process.execPath)){

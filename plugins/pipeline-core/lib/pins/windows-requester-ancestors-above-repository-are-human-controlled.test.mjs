@@ -15,7 +15,7 @@
 // repository below a base directory that deliberately grants a foreign principal write (the human-controlled ancestor).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdirSync, mkdtempSync, realpathSync, rmSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -147,4 +147,112 @@ winTest('control: a foreign write grant below the repository root (the common di
   const repository = custody(fixture.belowBad);
   assert.throws(() => runtime.ensureWindowsRequesterNamespace(runtime.createWindowsRequesterStorage({repository})), refusal);
   assert.throws(() => bridge.createControlledMethodRuntimeFixture({repository, fixtureRoot: fixtureRootFor(fixture.belowBad, 'fx-ancestor-pin'), sessionId}), refusal);
+});
+
+// ---- ALF-C-ANCESTOR-CALLERS4: the remaining repository-path walkers (domain owner, OSV bridge, host-process journal) ------------
+// Decided design: each walker derives or receives the repository root and passes it as boundaryRoot to
+// observeWindowsAuthorityAncestor, which relaxes only paths lexically STRICTLY ABOVE it. Case A drives the real domain-owner
+// namespace read on the real fixture. Cases B and C are structural: the bridge and journal readers need a full signed
+// session-authority catalogue and a live Codex task origin that no cheap fixture reproduces, so the call graph is pinned instead.
+const NAMESPACE_ID = 'domain-ancestor-pin';
+const NAMESPACE_RECORD = {schema: 'ancestor-pin-record'};
+const ownerModule = () => import(pathToFileURL(join(pluginRoot, 'lib', 'session-authority-domain-owner.mjs')).href);
+const readNamespace = (owner, rootPath) => owner.readAuthorityNamespace({namespaceId: NAMESPACE_ID, rootPath, classifyEntry: ({value}) => value});
+function seedNamespace(repository) {
+  const {backend} = loaded;
+  const state = join(repository.dotGit, 'agent-pipeline'), namespace = join(state, NAMESPACE_ID);
+  if (!existsSync(state)) backend.createWindowsOwnedAuthorityDirectory({path: state});
+  backend.createWindowsOwnedAuthorityDirectory({path: namespace});
+  backend.createWindowsOwnedAuthorityExclusiveFile({path: join(namespace, 'record.json'), bytes: Buffer.from(JSON.stringify(NAMESPACE_RECORD))});
+  return namespace;
+}
+
+winTest('case A: readAuthorityNamespace is not refused by a foreign-writable ancestor strictly above the repository root', async () => {
+  const owner = await ownerModule();
+  const namespace = seedNamespace(fixture.clean);
+  const read = readNamespace(owner, namespace);
+  assert.equal(read.membership.entryCount, 1);
+  assert.deepEqual(read.entries.map((entry) => ({...entry.value})), [NAMESPACE_RECORD]); // parseStrictJson returns null-prototype objects
+});
+
+winTest('case A control: readAuthorityNamespace still refuses at and below the repository root and outside any .git/agent-pipeline', async () => {
+  const owner = await ownerModule();
+  // A foreign write grant on the common directory (below the root), on the root itself, and a directory directly under the
+  // foreign-writable base that is not inside any <repository>/.git/agent-pipeline (no boundary is derived, so it stays strict).
+  assert.throws(() => readNamespace(owner, join(fixture.belowBad.dotGit, 'agent-pipeline', NAMESPACE_ID)), refusal);
+  assert.throws(() => readNamespace(owner, join(fixture.rootBad.dotGit, 'agent-pipeline', NAMESPACE_ID)), refusal);
+  const outside = join(fixture.base, 'outside-any-agent-pipeline');
+  mkdirSync(outside);
+  assert.throws(() => readNamespace(owner, outside), refusal);
+});
+
+const libSource = (name) => readFileSync(join(pluginRoot, 'lib', name), 'utf8');
+function splitArguments(text) {
+  const args = [];
+  let depth = 0, quote = null, current = '';
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quote) { current += ch; if (ch === '\\') current += text[++i] ?? ''; else if (ch === quote) quote = null; continue; }
+    if (ch === "'" || ch === '"' || ch === '`') { quote = ch; current += ch; continue; }
+    if ('([{'.includes(ch)) depth += 1;
+    else if (')]}'.includes(ch)) depth -= 1;
+    if (ch === ',' && depth === 0) { args.push(current.trim()); current = ''; continue; }
+    current += ch;
+  }
+  if (current.trim()) args.push(current.trim());
+  return args;
+}
+// Every call of a top-level function with its top-level enclosing function and its top-level arguments (declaration excluded).
+function callsOf(source, name) {
+  const headers = [...source.matchAll(/^(?:export )?(?:async )?function (\w+)/gmu)].map((match) => ({name: match[1], index: match.index}));
+  const calls = [];
+  for (const match of source.matchAll(new RegExp(`(?<![\\w.])${name}\\(`, 'gu'))) {
+    if (source.slice(Math.max(0, match.index - 9), match.index) === 'function ') continue;
+    const open = match.index + name.length;
+    let depth = 0, quote = null, end = -1;
+    for (let i = open; i < source.length && end < 0; i += 1) {
+      const ch = source[i];
+      if (quote) { if (ch === '\\') i += 1; else if (ch === quote) quote = null; continue; }
+      if (ch === "'" || ch === '"' || ch === '`') quote = ch;
+      else if (ch === '(') depth += 1;
+      else if (ch === ')' && --depth === 0) end = i;
+    }
+    assert.ok(end > open, `unterminated call of ${name}`);
+    calls.push({caller: headers.filter((header) => header.index < match.index).at(-1)?.name ?? null, args: splitArguments(source.slice(open + 1, end))});
+  }
+  return calls;
+}
+
+test('case B (structural): the OSV bridge bounds only osvWindowsPrivate with the repository root, after a lexical containment check', () => {
+  const source = libSource('session-requester-bridge.mjs');
+  assert.match(source, /function osvWindowsBoundary\(path,root\)\{/u); // lexical, case-insensitive containment inside the root, else null (strict)
+  assert.match(source, /function osvWindowsAncestors\(path,boundaryRoot=null\)\{/u);
+  assert.match(source, /function osvWindowsRead\(path,maxBytes,privateFile=false,boundaryRoot=null\)\{/u);
+  // osvWindowsRead forwards the identical boundary to the before and the after ancestor read, so its CAS stays deterministic.
+  assert.deepEqual(callsOf(source, 'osvWindowsAncestors').map(({caller, args}) => [caller, args.join('|')]), [['osvWindowsRead', 'path|boundaryRoot'], ['osvWindowsRead', 'path|boundaryRoot']]);
+  const reads = callsOf(source, 'osvWindowsRead');
+  const bounded = reads.filter(({args}) => args.length > 3);
+  assert.equal(bounded.length, 1, 'exactly one osvWindowsRead caller passes a boundary');
+  assert.equal(bounded[0].caller, 'osvWindowsPrivate');
+  assert.equal(bounded[0].args[3], 'osvWindowsBoundary(file,r.primaryRoot)');
+  assert.deepEqual(reads.filter((call) => call !== bounded[0]).map(({caller}) => caller).sort(), ['osvWindowsEvidence', 'osvWindowsPhysical', 'osvWindowsPhysicalRef']);
+});
+
+test('case C (structural): the host-process journal bounds only the three repository-bearing verification readers', () => {
+  const source = libSource('codex-host-process-journal.mjs');
+  assert.match(source, /function verificationWindowsBoundary\(path,repository\)\{/u); // contained in repository.primaryRoot, else null (strict)
+  assert.match(source, /function verificationWindowsRead\(path,maxBytes,repository=null\)\{/u);
+  assert.equal(callsOf(source, 'verificationWindowsBoundary').length, 1);
+  // The boundary is computed once per read and reused by the before and the after ancestry, so the CAS stays deterministic.
+  // rootIdentity keeps the strict single-path ancestor check; only verificationWindowsRead can pass a boundary.
+  assert.deepEqual(callsOf(source, 'observeWindowsAuthorityAncestor').map(({caller, args}) => [caller, args.join('|')]), [['rootIdentity', '{path}'], ['verificationWindowsRead', 'boundaryRoot?{path:cursor,boundaryRoot}:{path:cursor}']]);
+  const reads = callsOf(source, 'verificationWindowsRead').map(({caller, args}) => [caller, args.length === 3 ? args[2] : args.length === 2 ? 'strict' : `${args.length} arguments`]);
+  assert.deepEqual(reads.sort((a, b) => a[0].localeCompare(b[0])), [
+    ['managedWindowsRegistryRecord', 'repository'],
+    ['readHostJournal', 'strict'],
+    ['verificationReadTask', 'strict'],
+    ['verificationWindowsCatalogueRef', 'repository'],
+    ['verificationWindowsRecord', 'repository'],
+    ['writeHostJournal', 'strict'],
+  ]);
 });
