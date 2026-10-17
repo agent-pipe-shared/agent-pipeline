@@ -670,6 +670,15 @@ function invocationSource({ count = 2, disposition = sourceDisposition(), invoca
   assert.equal(validateInvocationChain(request, attempts).ok, true);
   return { request, attempts, sandboxDisposition: disposition };
 }
+function deltaReviewAttempt(round, correctionCommits, packet) {
+  const pathInvariantMap = { [packet.diffPaths[0]]: ["INV-01", "INV-02"] };
+  return { round, correctionCommits, requestedMode: "delta",
+    base: packet.candidate.base, head: packet.candidate.commit, tree: packet.candidate.tree,
+    changedPaths: [...packet.diffPaths], changedBehaviorClaims: ["acceptance-delta"],
+    priorReceipt: { id: "review-receipt", sha256: A }, pathInvariantMap,
+    pathInvariantMapSha256: sha256Canonical(pathInvariantMap),
+    coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false };
+}
 function reviewSource(firstId = "z-review", count = 2) {
   const history = [];
   for (let index = 0; index < count; index++) {
@@ -686,9 +695,10 @@ function reviewSource(firstId = "z-review", count = 2) {
       lane: { laneId: `private-lane-${index}`, contextSha256: index ? B : A, evidenceSha256: C },
       verdict: { status: "pending", schemaValid: false, resultSha256: null, failure: null }, findings: [],
       correction: parent ? { commit: candidate.commit, deltaSha256: A, impactSha256: sha256Canonical(["fixture-edge"]) } : null,
-      invalidation: parent ? { kind: "full-review-required", reason: "explicit-broad-review", evidenceSha256: D }
-        : { kind: "none", reason: null, evidenceSha256: null },
-      reviewAttempt: { round: index + 1, correctionCommits: index, requestedMode: "full" },
+      // A follow-up is admitted only as a delta (RE-FOLLOWUP-DELTA-REQUIRED); a delta requires invalidation none.
+      invalidation: { kind: "none", reason: null, evidenceSha256: null },
+      reviewAttempt: parent ? deltaReviewAttempt(index + 1, index, packet)
+        : { round: 1, correctionCommits: 0, requestedMode: "full" },
     }));
   }
   assert.equal(validateCriticReviewHistory(history).ok, true);
