@@ -215,7 +215,7 @@ test("DWP nested digest transport reaches the unchanged default complete-package
   const dirs = fixtureDirs();try {
     keyFixture(dirs.directory);mkdirSync(join(dirs.repoRoot,"scratch"));const request=nestedDwpSigningRequest();assert.equal(Object.keys(request).length,4);assert.equal(Object.hasOwn(request,"intentSha256"),false);
     writeFileSync(join(dirs.repoRoot,"scratch","dwp-request-fixture.json"),JSON.stringify(request));let confirmations=0,signs=0,fallbacks=0;
-    assert.throws(()=>runHumanApproval(["sign-intent","--repo-root",dirs.repoRoot,"--directory",dirs.directory,"--request","scratch/dwp-request-fixture.json"],{readConfirmation:()=>{confirmations++;return "approve";},spawn:()=>{signs++;throw Error("unexpected signing");},describeIntentRecord:()=>{fallbacks++;throw Error("unexpected generic fallback");}}),/design-workflow approval request does not bind a current, complete package/);
+    assert.throws(()=>runHumanApproval(["sign-intent","--repo-root",dirs.repoRoot,"--directory",dirs.directory,"--request","scratch/dwp-request-fixture.json"],{readConfirmation:()=>{confirmations++;return "approve";},spawn:()=>{signs++;throw Error("unexpected signing");},describeIntentRecord:()=>{fallbacks++;throw Error("unexpected generic fallback");}}),/PO-HUMAN-REQUEST-RETIRED/);/* d02409a8a retired the design-workflow request; the refusal is PO-HUMAN-REQUEST-RETIRED */
     assert.equal(confirmations,0);assert.equal(signs,0);assert.equal(fallbacks,0);assert.equal(existsSync(join(dirs.repoRoot,"scratch","dwp-proof-fixture.json")),false);
   }finally{cleanup(dirs);}
 });
@@ -231,7 +231,7 @@ test("DWP nested transport cannot bypass closed request or changed intent valida
   const dirs=fixtureDirs();try {
     keyFixture(dirs.directory);mkdirSync(join(dirs.repoRoot,"scratch"));for(const mutate of [r=>{r.intentSha256=r.approvalIntent.sha256;},r=>{r.approvalIntent.sha256="e".repeat(64);},r=>{r.packageSha256="f".repeat(64);},r=>{r.approvalIntent.value.decision="reject";}]){
       const request=nestedDwpSigningRequest();mutate(request);writeFileSync(join(dirs.repoRoot,"scratch","dwp-request-changed.json"),JSON.stringify(request));let confirmations=0,signs=0;
-      assert.throws(()=>runHumanApproval(["sign-intent","--repo-root",dirs.repoRoot,"--directory",dirs.directory,"--request","scratch/dwp-request-changed.json"],{readConfirmation:()=>{confirmations++;return "approve";},spawn:()=>{signs++;throw Error("unexpected signing");}}),/design-workflow approval request does not bind a current, complete package/);assert.equal(confirmations,0);assert.equal(signs,0);assert.equal(existsSync(join(dirs.repoRoot,"scratch","dwp-proof-changed.json")),false);
+      assert.throws(()=>runHumanApproval(["sign-intent","--repo-root",dirs.repoRoot,"--directory",dirs.directory,"--request","scratch/dwp-request-changed.json"],{readConfirmation:()=>{confirmations++;return "approve";},spawn:()=>{signs++;throw Error("unexpected signing");}}),/PO-HUMAN-REQUEST-RETIRED/);/* d02409a8a retired the design-workflow request */assert.equal(confirmations,0);assert.equal(signs,0);assert.equal(existsSync(join(dirs.repoRoot,"scratch","dwp-proof-changed.json")),false);
     }
   }finally{cleanup(dirs);}
 });
@@ -5209,6 +5209,50 @@ test("R7-6b(i), real lookup: with a PATH holding no openssl at all the same type
     r76AssertTyped(outcome, { cls: "openssl-not-on-path", findingId: "signing-toolchain", status: "attended" });
     assert.equal(r76Prompts(env), 0);
   } finally { rmSync(emptyPath, { recursive: true, force: true }); r76Release(env); }
+});
+
+/**
+ * ALF-C-SIGN-ORDER2 (AC-258, item pipeline.signature-ceremony-requires-operator-work-and-breaks): the order of the
+ * two refusals on `sign-intent --request`. A request is judged for what it is (malformed, non-binding, unsupported)
+ * BEFORE the openssl toolchain is probed, so the operator is told the request-specific reason rather than a
+ * toolchain symptom, and the failing request starts no process at all. A request that DOES bind still meets the
+ * full readiness guarantee (fc56a4d5f) before any confirmation, publication or process holding a key path.
+ */
+test("ALF-C-SIGN-ORDER2-1: a non-binding --request with a failing toolchain stub gets its own request-specific refusal and starts no process", () => {
+  const forged = adoptSignForged(adoptSignGenuineRequest(), (r) => { r.note = "extra"; }, {});
+  const { dirs, scratchDir, seen, dependencies, argv } = adoptSignSession("order2-1", forged);
+  const toolchain = r76Spy("not-on-path");
+  try {
+    const outcome = r76Outcome(() => runHumanApproval(argv, { ...dependencies, spawn: (executable, args) => { seen.spawns += 1; return toolchain.spawn(executable, args); } }));
+    assert.equal(outcome.threw, true, `the request must be refused; observed ${r76Describe(outcome)}`);
+    assert.match(outcome.error.message, ADOPT_NOT_BOUND, `the refusal must be the adoption-specific sentence, not a toolchain symptom; observed ${r76Describe(outcome)}`);
+    assert.notEqual(outcome.error.code, "SIGN-READINESS-FAILED", "a non-binding request must not be reported as a toolchain failure");
+    assert.equal(seen.spawns, 0, "a non-binding request must not even reach the openssl toolchain probe");
+    assert.equal(toolchain.calls.length, 0);
+    assert.equal(seen.confirmations, 0);
+    assert.equal(existsSync(join(scratchDir, "adoption-proof-order2-1.json")), false);
+    assert.equal(existsSync(join(scratchDir, "adoption-signer-order2-1.json")), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("ALF-C-SIGN-ORDER2-2: a genuine --request with openssl not on PATH ends in SIGN-READINESS-FAILED (openssl-not-on-path) before any confirmation, publication or key-path process", () => {
+  const { dirs, scratchDir, seen, dependencies, argv } = adoptSignSession("order2-2", adoptSignGenuineRequest());
+  const toolchain = r76Spy("not-on-path");
+  try {
+    const outcome = r76Outcome(() => runHumanApproval(argv, { ...dependencies, spawn: (executable, args) => { seen.spawns += 1; return toolchain.spawn(executable, args); } }));
+    assert.equal(outcome.threw, true, `the toolchain failure must end the command; observed ${r76Describe(outcome)}`);
+    assert.equal(outcome.error.code, "SIGN-READINESS-FAILED");
+    r76AssertTyped(outcome, { cls: "openssl-not-on-path", findingId: "signing-toolchain", status: "attended" });
+    assert.ok(toolchain.calls.length > 0, "the readiness guarantee is kept: a request that binds still meets the toolchain probe");
+    assert.deepEqual(r76KeyPathSpawns(toolchain), [], "no process may be started with a key path");
+    assert.equal(seen.confirmations, 0, "the typed result ends the command before any confirmation");
+    assert.equal(existsSync(join(scratchDir, "adoption-proof-order2-2.json")), false);
+    assert.equal(existsSync(join(scratchDir, "adoption-signer-order2-2.json")), false);
+  } finally {
+    cleanup(dirs);
+  }
 });
 
 test("R7-6b(iii): an openssl that fails the Ed25519 round trip (non-zero exit on sign, a signature that fails verification, no raw-sign support) yields the typed openssl-no-ed25519 result before any prompt", () => {

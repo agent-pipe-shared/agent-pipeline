@@ -2514,7 +2514,10 @@ function executeHumanApprovalCore(args, dependencies = {}) {
     // value comes from and, further below, adds a second write target for the result.
     const progress = dependencies.stderrWriteFn ?? (value => process.stderr.write(value));
     progress("Preparing signing request...\n");
-    assertSigningReadyBeforePrompt({ repository, inspection: keyInspection, legacy: args.legacy === true, keys: paths, dependencies });
+    // ALF-C-SIGN-ORDER2 (AC-258): request checks come first; with --request, readiness is deferred but still
+    // precedes publication, disclosure, confirmation, passphrase and key-using spawns.
+    const assertReady = () => assertSigningReadyBeforePrompt({ repository, inspection: keyInspection, legacy: args.legacy === true, keys: paths, dependencies });
+    if (!text(args.request)) assertReady();
     let scratchProofPath = null; let scratchSignerPath = null; let scratchRequestRecord = null; let scratchRequestSha256 = null;
     let portableRequestPath = null; let designSigningObservation = null;
     if (text(args.request)) {
@@ -2594,8 +2597,8 @@ function executeHumanApprovalCore(args, dependencies = {}) {
     // never-fabricate contract, so trying a second one after the first fails closed
     // only WIDENS what can be disclosed, never what gets signed; when both fail closed
     // the honest fallback below is unchanged.
-    // Validate the actual signing prerequisites before any disclosure resolver work.
-    // Request validation and the attended-terminal precondition remain unchanged.
+    // Readiness (assertReady) already ran above without --request; with --request it follows the request
+    // checks and precedes publication.
     const describeGmw = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
     const describeHgo = dependencies.describeHgoIntentRecord ?? describeHumanGuardOverrideSelection;
     let record = null, portableAgyAuthorship = null, portableCriticExport = null;
@@ -2659,6 +2662,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
         fail("the portable Critic export request is not bound to a current consumed private Critic review");
       }
     }
+    if (scratchRequestRecord !== null) assertReady();
     const materialArtifact = scratchRequestRecord !== null && record.resolved === true
       ? publishSigningReviewMaterial(repository, portableRequestPath, scratchRequestSha256, intentSha256, record)
       : record.materialArtifact ?? null;

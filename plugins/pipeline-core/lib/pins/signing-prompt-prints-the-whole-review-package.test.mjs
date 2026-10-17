@@ -210,7 +210,10 @@ test("P8: push/critical-action approve and the generic signing command share com
   const approve = src.slice(src.indexOf('if (args.command === "approve" || args.command === "approve-critical")'));
   assert.ok(approve.slice(0, 1500).includes("compactSigningDisclosure({ intentSha256"), "approve/approve-critical route its summary through the compact disclosure");
   const hgo = src.slice(src.indexOf('case "pipeline.human-guard-override-signature-digest.v1"'));
-  assert.ok(hgo.slice(0, 6000).includes("compactSigningDisclosure({ intentSha256, record, materialArtifact })"), "the human-guard-override signing request is rendered by sign-intent through the same compact disclosure");
+  // The bound is the passphrase/confirmation step, not a fixed character count, so the HGO request must reach the shared compact disclosure before any signing step (ALF-C-SIGN-ORDER5).
+  const signOnce = hgo.indexOf("NVA-SIGNONCE-1");
+  assert.ok(signOnce > 0, "the passphrase/confirmation step follows the HGO case");
+  assert.ok(hgo.slice(0, signOnce).includes("compactSigningDisclosure({ intentSha256, record, materialArtifact })"),"the human-guard-override signing request is rendered by sign-intent through the same compact disclosure");
 });
 
 test("P6 (host limitation): directory-mode / symlink custody cases of the review file", { skip: "host-limitation: Windows has no directory mode bits or directory symlinks; owner Coordinator, due 2026-10-19, Linux/WSL run (PO decision K7)" }, () => {});
