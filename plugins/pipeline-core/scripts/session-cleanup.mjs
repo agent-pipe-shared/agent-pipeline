@@ -63,6 +63,8 @@ import {
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { claudeHookDescriptorSessionId } from "../lib/claude-hook-session-owner.mjs";
+import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
 
 const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
@@ -198,6 +200,7 @@ function planHumanRecovery(repo, dependencies = {}) {
       rootDir: repo,
       scriptPath: SESSION_CLEANUP_SCRIPT,
       requesterOwnerNonce: dependencies.requesterOwnerNonce ?? null,
+      requesterSessionId: dependencies.requesterSessionId ?? null,
       deps: dependencies,
     });
     for (const candidate of offer.candidates) {
@@ -307,6 +310,18 @@ function requesterOwnerNonce(flags, env, io = {}) {
   return typeof env.PIPELINE_SESSION_OWNER_NONCE === "string" && env.PIPELINE_SESSION_OWNER_NONCE !== ""
     ? env.PIPELINE_SESSION_OWNER_NONCE
     : null;
+}
+
+/**
+ * The running Claude session's OWN descriptor id (`claude-<CLAUDE_CODE_SESSION_ID>`, the id the
+ * session hook gives the descriptor it creates), or null when the env names no usable session.
+ * That descriptor has a null owner runtime, so its owner status is `unavailable` and it is
+ * otherwise indistinguishable from a crashed orphan; it is only used to REFUSE offering or
+ * archiving the requester's own descriptor, so absence is not an error.
+ */
+function requesterSessionId(env) {
+  const identity = resolveModelRoleHostSessionIdentity({ runner: "claude", env });
+  return identity.ok ? claudeHookDescriptorSessionId(identity.sessionId) : null;
 }
 
 function parseArchiveArgs(argv) {
@@ -553,6 +568,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       rootDir: repo,
       scriptPath: SESSION_CLEANUP_SCRIPT,
       requesterOwnerNonce: requesterOwnerNonce(flags, env, { platform: dependencies.platform, assessWindowsPrivate: dependencies.assessWindowsPrivate }),
+      requesterSessionId: requesterSessionId(env),
       deps: dependencies,
     });
   } else if (command === "archive-orphan") {
@@ -569,15 +585,16 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       by: required(flags, "by"),
       reason: required(flags, "reason"),
       requesterOwnerNonce: requesterOwnerNonce(flags, env, { platform: dependencies.platform, assessWindowsPrivate: dependencies.assessWindowsPrivate }),
+      requesterSessionId: requesterSessionId(env),
       deps: dependencies,
     });
   } else if (command === "plan-recovery") {
     const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });
     output = promotionRecovery.status === "not-applicable"
-      ? planSessionCleanupRecovery({ rootDir: repo, requesterOwnerNonce: requesterOwnerNonce({}, env) })
+      ? planSessionCleanupRecovery({ rootDir: repo, requesterOwnerNonce: requesterOwnerNonce({}, env), requesterSessionId: requesterSessionId(env) })
       : promotionRecovery;
   } else if (command === "plan-human-recovery") {
-    output = planHumanRecovery(repo, { ...dependencies, requesterOwnerNonce: requesterOwnerNonce({}, env) });
+    output = planHumanRecovery(repo, { ...dependencies, requesterOwnerNonce: requesterOwnerNonce({}, env), requesterSessionId: requesterSessionId(env) });
   } else if (command === "apply-recovery") {
     const planSha256 = required(flags, "plan-sha256");
     const planPromotionRecovery = dependencies.planOnboardingKickoffPromotionCleanupRecoveryFn

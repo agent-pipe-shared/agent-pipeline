@@ -949,6 +949,7 @@ export function planSessionCleanupRecovery({
   rootDir,
   scriptPath = DEFAULT_SCRIPT,
   requesterOwnerNonce = null,
+  requesterSessionId = null,
   deps = {},
 } = {}) {
   // Latency: each active-descriptor listing spawns one private-path probe per
@@ -990,6 +991,7 @@ export function planSessionCleanupRecovery({
       rootDir,
       scriptPath,
       requesterOwnerNonce,
+      requesterSessionId,
       deps: effectiveDeps,
     });
   } catch {
@@ -1086,6 +1088,7 @@ export function planOrphanDescriptorArchive({
   rootDir,
   scriptPath = DEFAULT_SCRIPT,
   requesterOwnerNonce = null,
+  requesterSessionId = null,
   deps = {},
 } = {}) {
   const listDescriptors = deps.listActiveSessionDescriptorsFn ?? listActiveSessionDescriptors;
@@ -1113,6 +1116,7 @@ export function planOrphanDescriptorArchive({
       verdict = inspectEligibility(rootDir, descriptor.sessionId, {
         expectedDescriptorSha256: descriptor.descriptorSha256,
         requesterOwnerNonce,
+        requesterSessionId,
       });
     } catch (error) {
       refusals.push({
@@ -1171,6 +1175,7 @@ export function applyOrphanDescriptorArchive({
   by,
   reason,
   requesterOwnerNonce = null,
+  requesterSessionId = null,
   deps = {},
 } = {}) {
   const readBinding = deps.readOnboardingSessionCleanupBindingFn ?? readOnboardingSessionCleanupBinding;
@@ -1184,6 +1189,7 @@ export function applyOrphanDescriptorArchive({
     by,
     reason,
     requesterOwnerNonce,
+    requesterSessionId,
   });
   const binding = readBinding({ rootDir });
   let bindingReleased = false;
