@@ -92,7 +92,7 @@ test('B1 the real readinessFixture surfaces CRHS-INPUT on a Windows host (reprod
 
 test('B2 the existing suite skips (does not fail) the readiness case on win32, with a reason naming the linux gate and the WSL route', { skip: !win && 'win32-specific behavior' }, () => {
   const source = readFileSync(existingTestPath, 'utf8');
-  assert.match(source, /if\(process\.platform==='win32'\)\{t\.skip\('win32: readinessFixture needs the linux-only codex-design-readiness-host-store \(CRHS-INPUT\); run via WSL: wsl\.exe -e bash/);
+  assert.match(source, /if\(process\.platform==='win32'\)\{t\.skip\('HOST-LIMITATION: win32: readinessFixture needs the linux-only codex-design-readiness-host-store \(CRHS-INPUT\)\. Owner Coordinator, due 2026-10-19 .*run via WSL: wsl\.exe -e bash/);
   const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
   let out;
   try {
