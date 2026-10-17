@@ -1318,7 +1318,7 @@ function verifyWindowsFault(){throw new Error('VERIFY-JOURNAL-WINDOWS-ASSURANCE'
 // root are human-controlled: still observed and bound into the facts, never refused for a foreign owner or write grant. The root
 // and everything below it, and any path outside a registered common directory, keep the strict walk.
 const verifyWindowsCommonDirs=new Set();
-function verifyWindowsRegisterCommon(common){if(process.platform==='win32'&&typeof common==='string'&&isAbsolute(common)&&resolve(common)===common)verifyWindowsCommonDirs.add(common);}
+export function verifyWindowsRegisterCommon(common){if(process.platform==='win32'&&typeof common==='string'&&isAbsolute(common)&&resolve(common)===common)verifyWindowsCommonDirs.add(common);}
 function verifyWindowsBoundary(path){const lower=path.toLowerCase();let best=null;for(const common of verifyWindowsCommonDirs){const c=common.toLowerCase();if((lower===c||lower.startsWith(c.endsWith('\\')?c:c+'\\'))&&(best===null||common.length>best.length))best=common;}return best===null?null:dirname(best);}
 function verifyWindowsAncestors(path){const boundaryRoot=verifyWindowsBoundary(path),rows=[];let cursor=dirname(path);while(true){const row=observeWindowsAuthorityAncestor(boundaryRoot===null?{path:cursor}:{path:cursor,boundaryRoot});rows.push({path:cursor,...row});const parent=dirname(cursor);if(parent===cursor)break;cursor=parent;}return rows;}
 function verifyWindowsSame(a,b){return JSON.stringify(a)===JSON.stringify(b);}

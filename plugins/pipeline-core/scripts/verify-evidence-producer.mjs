@@ -68,7 +68,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt,
   readCriticVerifyLifecycle, recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
-import { ensureVerifyRunRecordsDirectory, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
+import { ensureVerifyRunRecordsDirectory, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName, verifyWindowsRegisterCommon } from "./verify-journal.mjs";
 import { defaultProcessStartIdentity, registerVerifyRunRecord, settleVerifyRunRecord } from "../lib/verify-run-record.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
@@ -385,6 +385,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
         // runPath is <git-common-dir>/agent-pipeline/verify/runs/<runId>
         const gitCommonDir = dirname(dirname(dirname(dirname(runPath))));
         const resourceId = `consumer-${attempt}`;
+        verifyWindowsRegisterCommon(gitCommonDir);
         const written = registerVerifyRunRecord({ gitCommonDir, runId, runPath, processStartId: defaultProcessStartIdentity(process.pid), ensureDirectory: ensureVerifyRunRecordsDirectory });
         registration = { gitCommonDir, runId };
         return sealVerifyCleanupRegistration({ status: "registered", runId, runPath, sessionId: `verify-run-${runId.slice(0, 40)}`, descriptorSha256: written.recordSha256, resourceId, registeredAt: new Date().toISOString() });

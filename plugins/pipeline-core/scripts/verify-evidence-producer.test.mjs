@@ -682,3 +682,12 @@ test("an interrupted new attempt clears stale canonical success", async () => {
     assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
   });
 });
+
+test("the producer registers the git common dir as a Windows boundary before registering the run record", () => {
+  const source = readFileSync(fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url)), "utf8");
+  const boundary = source.indexOf("verifyWindowsRegisterCommon(gitCommonDir)");
+  const register = source.indexOf("registerVerifyRunRecord({ gitCommonDir, runId, runPath");
+  assert.ok(register > 0, "registerVerifyRunRecord call present");
+  assert.ok(boundary > 0, "verifyWindowsRegisterCommon(gitCommonDir) call present");
+  assert.ok(boundary < register, "boundary registered before the run record");
+});
