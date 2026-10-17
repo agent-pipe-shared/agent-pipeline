@@ -1194,7 +1194,7 @@ ok("parseArgv: advisor export configuration is explicit and standalone", parseAr
   );
   ok(
     "renderPipelineYaml: goldfish_mechanic mirrors direct mechanic duty",
-    /goldfish_mechanic:\s*\n\s*model: sonnet-5\s*\n\s*effort: low/.test(yaml),
+    /goldfish_mechanic:\s*\n\s*model: haiku\s*\n\s*effort: medium/.test(yaml),
     yaml,
   );
   ok(
