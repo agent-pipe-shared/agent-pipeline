@@ -170,3 +170,16 @@ Answers to structured questions; tile text in
 - **`specs/sprint-alfred-epic/slice-queue.json`:** machine-local dispatch state; add it to `.gitignore`.
 - **Session-cleanup recovery offers the running session's descriptor as an orphan:** fix now, in 0.7.0. Measured 2026-10-17: `session-cleanup.mjs plan-human-recovery` lists `archive-orphan-descriptor` for the live session's own descriptor. Archiving the running session must never be offered.
 - **Quoted redirect target bypasses the protected-path write check (G24-LIVE):** fix now, in 0.7.0, as a signed quality package (package 5) together with the push signature. Under the threat model (the agent must not break out) this is in scope.
+
+## Decision tiles answered (PO, 2026-10-17 late evening, Claude session)
+
+- **Two DWP cases in `po-human-approval.test.mjs` assert a retired message:** re-point both assertions to `PO-HUMAN-REQUEST-RETIRED`.
+  - Background: commit `d02409a8a` retired the design-workflow request, so such a request is now refused earlier, before the validator whose message the cases expected.
+  - The refusal itself is unchanged. The cases keep proving it at the current refusal point.
+- **Two further gaps in the protected-path write check, same class as the quoted redirect:** fix both now, in 0.7.0, inside package 5 under the one shared signature. Each needs a measured RED case before its patch.
+  1. A backslash escape inside a redirect target path. The shell resolves it to the protected path, but the matcher compares the escaped text.
+  2. The PowerShell lane does not classify `>` redirects as writes.
+- **A foreign concurrent session's descriptor looks like an orphan:** backlog, after 0.7.0.
+  - This is a residual risk of `d4b31c304`. For 0.7.0 it is covered by EL-18 (one Elephant per repository) and by the PO confirming every archive.
+  - A later fix would add a liveness signal per session.
+- **Recurring untracked `pkey` at the repository root:** move it unread into `scratch/` once no tests run, and record the producing test as a backlog item. No agent reads its content.
