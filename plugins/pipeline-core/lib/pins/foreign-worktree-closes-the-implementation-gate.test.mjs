@@ -110,7 +110,7 @@ test('AC4 reopen-design (F1): a typed content-drift code still offers the exact 
 });
 
 test('AC4 reopen-design (C6g3 F1): approved-package content-drift codes route to reopen-design, same as guard-devplan-policy',async()=>{
-  for(const code of ['DWP-APPROVAL-SOURCE-DRIFT','DWP-APPROVAL-DIGEST-DRIFT','DWP-APPROVAL-PLAN-SPEC-MISMATCH']){
+  for(const code of ['DWP-APPROVAL-SOURCE-DRIFT','DWP-APPROVAL-PLAN-SPEC-MISMATCH']){
     const action=await approvedHandover(()=>({ok:false,status:'design-required',code}));
     assert.equal(action?.kind,'collect-input',code+': '+JSON.stringify(action));
     assert.ok(JSON.stringify(action).includes(REOPEN),code+': reopen-design applyAction present');
@@ -119,6 +119,14 @@ test('AC4 reopen-design (C6g3 F1): approved-package content-drift codes route to
   assert.equal(m.isArchitectureDesignReopenCode('DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING'),false);
   const action=await approvedHandover(()=>({ok:false,status:'design-required',code:'DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING'}));
   assert.ok(isDiagnosis(action),JSON.stringify(action));
+});
+
+test('AC4 reopen-design (C6g3 D1): every DWP-APPROVAL-* reopen code has the reopen-design remediation on the guard side',async()=>{
+  const m=await import('../architecture-design.mjs');
+  const {designAdvisoryRemediation}=await import('../guard-devplan-policy.mjs');
+  const codes=m.ARCHITECTURE_DESIGN_REOPEN_CODES.filter(c=>c.startsWith('DWP-APPROVAL-'));
+  assert.ok(codes.length>=2,'parity subject must be non-empty');
+  for(const code of codes)assert.match(designAdvisoryRemediation(code),/Run reopen-design --by/u,code+': guard remediation is not reopen-design');
 });
 
 test('AC4 reopen-design (F1): a typed non-drift code (setup/availability) gets a diagnosis, not reopen-design',async()=>{

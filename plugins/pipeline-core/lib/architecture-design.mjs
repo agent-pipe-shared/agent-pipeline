@@ -316,8 +316,10 @@ export const ARCHITECTURE_DESIGN_REOPEN_CODES = Object.freeze([
   "ARCHITECTURE-DESIGN-APPROVAL-STALE", "ARCHITECTURE-DESIGN-CONTINUITY-STALE", "ARCHITECTURE-DESIGN-RECEIPT-STALE",
   "ARCHITECTURE-DESIGN-ARTIFACT-DRIFT", "ARCHITECTURE-DESIGN-DECISION-SUBSET-STALE", "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE",
   "DAA-DESIGN-APPROVAL-BINDING-DRIFT", "DAA-DESIGN-SOURCE-DRIFT",
-  // approved design-workflow package re-read: package digest or PRD/spec source bytes drifted from the approval
-  "DWP-APPROVAL-SOURCE-DRIFT", "DWP-APPROVAL-DIGEST-DRIFT", "DWP-APPROVAL-PLAN-SPEC-MISMATCH",
+  // approved design-workflow package re-read: PRD/spec source bytes drifted from the approval. Parity with the
+  // guard's contentDrift list (guard-devplan-policy.mjs designAdvisoryRemediation); DWP-APPROVAL-DIGEST-DRIFT is
+  // deliberately absent because the guard does not route it to reopen-design.
+  "DWP-APPROVAL-SOURCE-DRIFT", "DWP-APPROVAL-PLAN-SPEC-MISMATCH",
   // the approved PRD's design block is missing or invalid (deterministic content findings)
   "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE", "ARCHITECTURE-DESIGN-PACKAGE-INVALID",
   "ARCHITECTURE-DESIGN-DISPOSITION-INVALID", "ARCHITECTURE-DESIGN-MODULES-REQUIRED", "ARCHITECTURE-DESIGN-MODULE-INVALID",
