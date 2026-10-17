@@ -19,6 +19,11 @@ Read these three files first, in this order, before any other work:
    the closing steps in order, the Critic scope, and the open Windows findings with their
    measurements, so they are built on and not rediscovered.
 
+**WSL session, 2026-10-17:** the WSL clone was synced to the stamp commit `902f029c3`
+with a local fetch from the Windows checkout (fast-forward, no own commits lost). The
+installed plugin matches that source (`d6f4d76`). The branch is checkpoint-pushed so a
+second PC can run greenfield tests. Closing step 1 (WSL Full Verify) is still open.
+
 After each closing step, rerun `specs/sprint-alfred-epic/tools/delivery-remeasure.mjs` and
 commit the new snapshot; it replaces `delivery-status-current` and keeps history in dated
 directories. The sections below are background from 2026-10-12.
