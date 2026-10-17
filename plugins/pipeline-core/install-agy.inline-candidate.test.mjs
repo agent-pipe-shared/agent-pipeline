@@ -46,6 +46,11 @@ function fixture(t) {
     git(repo, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture"]);
   };
   git(main, ["init", "--initial-branch", "main"]);
+  // Pin line endings in the fixture's own repository (the candidate worktree
+  // shares this config) so a host-level core.autocrlf cannot rewrite committed
+  // LF bytes as CRLF and make the candidate differ from Main.
+  git(main, ["config", "core.autocrlf", "false"]);
+  git(main, ["config", "core.eol", "lf"]);
   git(main, ["remote", "add", "origin", "https://example.invalid/synthetic-pipeline.git"]);
   commit(main);
   git(main, ["worktree", "add", "-b", "installer-candidate", candidate]);
