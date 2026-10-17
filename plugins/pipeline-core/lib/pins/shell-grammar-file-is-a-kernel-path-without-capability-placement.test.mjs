@@ -11,6 +11,10 @@
  *   P4. harness/verify-suites.json registers suite shell-grammar-capability-placement-tests exactly once
  *       with caseIds RGCP001-RGCP004.
  *
+ * Not covered (F6): AC-255 also names a historical "fixture issue" of the shell grammar file. The backlog
+ * item says the file "has a fixture issue" but never names which fixture or what defect, so this pin cannot
+ * assert it; it is a disclosed gap, not a pass. Owner: Coordinator, due 2026-10-31.
+ *
  * Plain node test, no git fixtures. RED cases mutate in-memory copies of the real inputs, so the pin is
  * shown able to fail; production files are never edited.
  */
@@ -38,9 +42,12 @@ const live = () => ({
   map: readText("architecture/map/pipeline-core.md"),
 });
 
-function checkKernel() {
-  assert.ok(NEVER_LIFTABLE_KERNEL_PATHS.includes(GRAMMAR), "grammar path in NEVER_LIFTABLE_KERNEL_PATHS");
-  assert.equal(isNeverLiftableKernelPath(join(ROOT, GRAMMAR), { rootDir: ROOT }), true, "grammar path is never-liftable");
+// Both halves read their input: `paths` is the declared list, `target` the path under test. The predicate
+// (guard-maintenance-window.mjs isNeverLiftableKernelPath) is the real one and is not injectable, so a RED
+// case varies the list and the target, never the predicate.
+function checkKernel({ paths = NEVER_LIFTABLE_KERNEL_PATHS, target = GRAMMAR } = {}) {
+  assert.ok(paths.includes(target), `${target} in NEVER_LIFTABLE_KERNEL_PATHS`);
+  assert.equal(isNeverLiftableKernelPath(join(ROOT, target), { rootDir: ROOT }), true, `${target} is never-liftable`);
 }
 function checkInventory(v) {
   const owners = v.inventory.capabilities.filter((c) => (c.productionEvidence ?? []).includes(GRAMMAR));
@@ -102,6 +109,15 @@ test("RED P4 missing, duplicated or mismatched suite registration is detected", 
   wrong.registry.suites.push({ name: SUITE, file: "harness/scripts/foreign.test.mjs", caseCompletion: { caseIds: CASE_IDS } });
   assert.throws(() => checkRegistry(wrong));
 });
+// QG-04: the previous RED P1 body filtered the grammar out of the list and then asserted the filtered list
+// no longer included it; it never called checkKernel and could not fail. Replaced by two cases that drive
+// checkKernel itself with mutated input.
 test("RED P1 a path list without the grammar is detected", () => {
-  assert.equal(NEVER_LIFTABLE_KERNEL_PATHS.filter((p) => p !== GRAMMAR).includes(GRAMMAR), false);
+  // (a) the declared list lacks the grammar: the membership half throws
+  assert.throws(() => checkKernel({ paths: NEVER_LIFTABLE_KERNEL_PATHS.filter((p) => p !== GRAMMAR) }), /NEVER_LIFTABLE_KERNEL_PATHS/);
+  // (b) a target outside the kernel set passes membership once listed, but the real predicate refuses it
+  const nonKernel = "plugins/pipeline-core/lib/not-a-kernel-path.mjs";
+  assert.equal(NEVER_LIFTABLE_KERNEL_PATHS.includes(nonKernel), false, "precondition: the probe path is not declared a kernel path");
+  assert.equal(isNeverLiftableKernelPath(join(ROOT, nonKernel), { rootDir: ROOT }), false, "precondition: the real predicate rejects the probe path");
+  assert.throws(() => checkKernel({ paths: [...NEVER_LIFTABLE_KERNEL_PATHS, nonKernel], target: nonKernel }), /is never-liftable/);
 });

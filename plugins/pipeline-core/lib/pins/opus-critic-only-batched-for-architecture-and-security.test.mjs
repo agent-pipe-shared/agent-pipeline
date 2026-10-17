@@ -1,5 +1,12 @@
 // Pin for pipeline.opus-critic-only-batched-for-architecture-and-security (AC-222).
 // Reads the real canon/route files and calls the real dispatch-policy module; no mocks.
+//
+// Known limit (F4, MP-29): the Opus-rationale check reads briefing prose only, because the tool-layer
+// model selector is not visible to the guard on this runtime; a tool-layer Opus override without a matching
+// label line is therefore not caught by this check. Owner: Coordinator, due 2026-10-31.
+// Known limits of the re-critic beyond-delta check (F3): it is line-oriented (a range on a continuation line
+// of a search-surface field is not scanned), and it matches only `<sha>..<sha>` / `<sha>...<sha>` ranges, so a
+// `sha^..sha` form is not matched.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -90,6 +97,29 @@ test("rule 3 (mechanical): a re-critic naming more than the delta is flagged; or
   const fifth = "- Re-critic (MP-07): delta aaaaaaa..bbbbbbb\n- Batch scope (MP-07): S1\n- Review ordinal: 5";
   assert.ok(rc(fifth).includes("DISPATCH-RECRITIC-ORDINAL"));
   assert.ok(!rc(fifth.replace("5", "4")).includes("DISPATCH-RECRITIC-ORDINAL"));
+});
+
+// F3: bind the beyond-delta check to the label the REAL critic template uses for the search-surface field.
+const TEMPLATE_DIFF_LINE = () => {
+  const line = read("templates/prompts/critic-review.md").split(/\r?\n/).find((l) => l.startsWith("- Diff (the object under review):"));
+  assert.ok(line, "templates/prompts/critic-review.md carries the `- Diff (the object under review):` field line");
+  return line;
+};
+const RECRITIC_HEAD = "- Re-critic (MP-07): aaaaaaa..bbbbbbb\n- Batch scope (MP-07): S1";
+
+test("rule 3 (mechanical, F3): a wider range on the real template's `Diff (the object under review)` line is flagged", () => {
+  const line = TEMPLATE_DIFF_LINE();
+  assert.ok(rc(`${RECRITIC_HEAD}\n${line} 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  // the label is matched case-insensitively like every other search-surface label
+  assert.ok(rc(`${RECRITIC_HEAD}\n${line.toUpperCase()} 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  // the bold-label form a filled template may carry
+  assert.ok(rc(`${RECRITIC_HEAD}\n- **Diff (the object under review):** 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+});
+
+test("rule 3 (mechanical, F3): the same template line naming exactly the delta does NOT raise the beyond-delta finding", () => {
+  const line = TEMPLATE_DIFF_LINE();
+  assert.ok(!rc(`${RECRITIC_HEAD}\n${line} aaaaaaa..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  assert.deepEqual(rc(`${RECRITIC_HEAD}\n${line} aaaaaaa..bbbbbbb`).filter((c) => c.startsWith("DISPATCH-RECRITIC")), []);
 });
 
 test("rule 3 (mechanical): a non-declared full Critic prompt is not judged as a re-critic", () => {

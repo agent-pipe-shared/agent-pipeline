@@ -179,7 +179,12 @@ const NAMES_RULESET =/\bruleset[- ]?sha\s*[:=]\s*\S/i;
 // ordinary full-Critic prompt (and every existing fixture) is unaffected.
 const RECRITIC_LINE = /^\s*(?:[-*]\s*)?\**\s*re-critic\b[^:\n]*:\**\s*(.*)$/i;
 const RANGE = /\b[0-9a-f]{7,40}\.{2,3}[0-9a-f]{7,40}\b/gi;
-const SEARCH_SURFACE_LINE = /^\s*(?:[-*]\s*)?\**\s*(?:diff range|candidate diff|search surface)\b[^:\n]*:/i;
+// The search-surface labels, including the one the real critic template uses
+// (templates/prompts/critic-review.md: `- Diff (the object under review): ...`). Each WORD alternative
+// keeps its own `\b`; the parenthesised label ends in `)`, where a `\b` would never match, so it carries none.
+// Known limits: line-oriented (a range on a continuation line is not scanned) and only `<sha>..<sha>` /
+// `<sha>...<sha>` ranges are read, so a `sha^..sha` form is not matched.
+const SEARCH_SURFACE_LINE = /^\s*(?:[-*]\s*)?\**\s*(?:(?:diff range|candidate diff|search surface)\b|diff\s*\(the object under review\))[^:\n]*:/i;
 const REVIEW_ORDINAL_LINE = /^\s*(?:[-*]\s*)?\**\s*review ordinal\b[^:\n]*:\**\s*(\d+)/im;
 function recriticFindings(text) {
   const lines = text.split(/\r?\n/);
