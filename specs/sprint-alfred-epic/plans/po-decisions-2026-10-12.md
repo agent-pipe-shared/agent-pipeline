@@ -189,3 +189,18 @@ Answers to structured questions; tile text in
   - The positive binding cases run inside a genuine controller context through the existing test API (`createControlledMethodRuntimeFixture`), never through a mock that bypasses `checkRequester`.
   - If `start` cannot bind even under a controller, the course returns to the PO before any product change.
   - Rejected: letting `start` establish its own context, because that would let any caller self-grant the binding.
+
+## Decision tiles answered (PO, 2026-10-17 night, Claude session)
+
+- **Where the 39 `session-cleanup-binding` cases run:** the binding logic runs under WSL/Linux. On Windows the cases are a typed host-limitation skip with reason, owner, due date and the host WSL/Linux, plus one or two real Windows controller cases as a smoke test.
+  - Measured on this host: a controller costs about 73 s to build and about 44 s per bound operation. With one controller per case the suite alone would take 1.5 to 2.5 h on Windows.
+  - Whether 0.7.0 waits for the `start`-under-controller change is decided after a WSL measurement.
+- **Full Verify on native Windows:** no further Windows Full Verify before the stamp. The stopped run of 2026-10-17 on `ab5fefbbc` is the last Windows overview.
+  - Measured: about 52 s per suite, about 15 h extrapolated, 49 of 1036 suites finished, 22 of them red.
+  - Changes after `ab5fefbbc` are checked with their targeted suites only.
+  - The Full Verify on the exact stamp commit follows under WSL.
+  - The candidate is never described as a Full Verify PASS.
+- **Candidate with the Windows Verify picture:** finish the local candidate now, and document the red sample honestly in the stamp and the handover.
+  - The candidate contains package 5 and the three remaining ancestor callers.
+  - In parallel, a fanout clarifies the seven possibly genuine red suites: setup, control-placement, interruption-receipts, model-role-host-store, codex-native-critic-host, claude-critic-host, repository-freshness.
+  - Backlog: `backlog/items/2026-10-17-full-verify-on-windows-takes-hours.md`.
