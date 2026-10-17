@@ -105,10 +105,13 @@ test("AC-A4: no non-test source, generator or printed template emits or requires
   assert.deepEqual(offenders, []);
 });
 
-test("AC-A5: the printed agent obligations document the single stage-0 form and no separate design form", () => {
+test("AC-A5: the printed agent obligations document the stage-0 form and the design (elephant) form with its bounds", () => {
   const text = readFileSync(join(ROOT, "templates/prompts/agent-obligations.md"), "utf8");
   assert.ok(text.includes("Dispatch: stage-0 (elephant)"));
-  assert.ok(text.includes("There is no separate design-phase trailer form."));
+  assert.ok(text.includes(`Dispatch: ${REJECTED_FORM}`));
+  assert.ok(!text.includes("There is no separate design-phase trailer form"), "the retired no-design-form sentence must be gone");
+  assert.match(text, /at most 10 paths/u, "the design form's path bound is documented");
+  assert.match(text, /grants no production\s+implementation authority/u, "the design form's no-implementation-authority bound is documented");
 });
 
 test("AC-B1: the done_when `contains` predicate is the merge-survival needle check and fails when a needle disappears", () => {

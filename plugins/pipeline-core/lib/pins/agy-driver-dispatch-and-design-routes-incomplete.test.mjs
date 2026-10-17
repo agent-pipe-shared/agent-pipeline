@@ -167,12 +167,15 @@ test("F4: the Antigravity design-readiness bootstrap is retired with a typed ref
   assert.equal(result.implementationAuthority, false);
 });
 
-test("F7: every Dispatch trailer example in the agent obligations is an admitted work-package binding", async () => {
+test("F7: every Dispatch trailer example in the agent obligations is admitted and the design (elephant) form is documented", async () => {
   const { finishedCommitMessageFindings } = await import(
     pathToFileURL(join(REPO, "plugins/pipeline-core/lib/commit-message-policy.mjs")).href);
   const text = readFileSync(join(REPO, "templates/prompts/agent-obligations.md"), "utf8");
-  assert.equal(text.includes("Dispatch: design (elephant)"), false, "the retired design-trailer example must not be documented");
+  assert.equal(text.includes("Dispatch: design (elephant)"), true, "the admitted design-trailer form (AC-205, PO decision 2026-10-16 #12) must be documented");
   const examples = [...text.matchAll(/`Dispatch:[ \t]+([^`\n]+)`/gu)]
+    // Evidence-bound bindings (administrative, generated, signed integration) are admitted only with their own
+    // independent evidence; they are not unconditional work-package examples and are pinned elsewhere.
+    .filter((match) => !/administrative \(elephant\)$|\(elephant-generated\)$|\(integration\)$/u.test(match[1].trim()))
     .map((match) => match[1].trim().replace(/<[A-Za-z_]+>/gu, "ALF-C-P20-12E"));
   assert.ok(examples.length >= 3, `expected the documented Dispatch examples, found ${JSON.stringify(examples)}`);
   assert.ok(examples.includes("stage-0 (elephant)"));

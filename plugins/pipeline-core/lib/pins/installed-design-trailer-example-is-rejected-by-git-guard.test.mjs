@@ -60,15 +60,25 @@ const printedDispatchExamples = () => {
   const values = [...OBLIGATIONS.matchAll(/`Dispatch:\s*([^`]+)`/gu)].map((match) => match[1].trim());
   return values
     .filter((value) => /\((?:goldfish|critic|elephant)\)$/u.test(value))
+    // `administrative (elephant)` is admitted only with independent evidence (not an unconditional example).
+    .filter((value) => value !== "administrative (elephant)")
     .map((value) => value.replace(/<(?:TASK_ID|ID)>/gu, "ALF-C-P1-13"));
 };
 
-test("the installed obligations print the stage-0 form and never the removed design form", () => {
+test("the installed obligations and generator print both the stage-0 and the admitted design (elephant) form", () => {
   assert.match(OBLIGATIONS, /`Dispatch: stage-0 \(elephant\)`/u);
-  assert.doesNotMatch(OBLIGATIONS, /Dispatch:\s*design \(elephant\)/u);
+  assert.match(OBLIGATIONS, /Dispatch:\s*design \(elephant\)/u);
   assert.match(GENERATOR, /Dispatch: stage-0 \(elephant\)/u);
-  assert.doesNotMatch(GENERATOR, /Dispatch:\s*design \(elephant\)/u);
-  assert.match(OBLIGATIONS, /There is no separate design-phase trailer form/u);
+  assert.match(GENERATOR, /Dispatch:\s*design \(elephant\)/u);
+  assert.doesNotMatch(OBLIGATIONS, /There is no separate design-phase trailer form/u);
+  assert.doesNotMatch(GENERATOR, /There is no separate design-phase trailer form/u);
+});
+
+test("AC1: the printed administrative (elephant) example is refused without independent evidence", () => {
+  assert.match(OBLIGATIONS, /`Dispatch: administrative \(elephant\)`/u);
+  const message = messageWith("administrative (elephant)");
+  assert.ok(codes(guardLane(message)).includes("GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED"));
+  assert.ok(codes(backstopLane(message)).includes("GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED"));
 });
 
 test("AC1: every concrete printed Dispatch example is accepted by the command guard and the backstop", () => {
