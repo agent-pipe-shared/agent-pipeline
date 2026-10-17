@@ -200,6 +200,7 @@ function resolveRunsRoot(gitCommonDir) {
   const common = realpathSync(gitCommonDir);
   if (common !== resolve(gitCommonDir)) throw new Error("VERIFY-JOURNAL-GIT-COMMON");
   assertPhysicalDirectory(common);
+  verifyWindowsRegisterCommon(common);
   const pipeline = join(common, "agent-pipeline");
   const verify = join(pipeline, "verify");
   const runs = join(verify, "runs");
@@ -245,6 +246,7 @@ export const VERIFY_PRIVATE_DIRECTORY_HINT = "HINT: this filesystem reports perm
 // The outer code stays VERIFY-CLEANUP-REGISTRATION-REQUIRED (callers match on it); the original
 // failure is preserved as `cause` and named in the message, with a typed hint for the not-private case.
 export function registerRunRecordOwner({ gitCommonDir, runId, runPath, registerRecord = registerVerifyRunRecord }) {
+  verifyWindowsRegisterCommon(gitCommonDir);
   let written;
   try {
     written = registerRecord({
@@ -368,6 +370,7 @@ export function createVerifyRun({ gitCommonDir, runId, candidate, policySha256, 
   if (!SAFE_ID.test(runId) || !SHA256.test(policySha256) || !Array.isArray(suites) || suites.length === 0) throw new TypeError("VERIFY-JOURNAL-INPUT");
   planVerifyResume({ runId, candidate, suites, policySha256 });
   const common = assertPhysicalDirectory(realpathSync(gitCommonDir));
+  verifyWindowsRegisterCommon(common);
   const runDir = join(common, "agent-pipeline", "verify", "runs", runId);
   if (!validateCleanupRegistration(cleanupRegistration, { runId, runPath: runDir })) throw new Error("VERIFY-CLEANUP-REGISTRATION-REQUIRED");
   const runsRoot = resolveRunsRoot(gitCommonDir);
@@ -1311,7 +1314,13 @@ export function deriveVerifyExecutionMetrics({ steps, startedAt, completedAt, co
 // Native private journal custody; these facts do not issue authority or a cleanup proof.
 const verifyWindowsFiles=new Map(),verifyWindowsFlushedDirectories=new Set();
 function verifyWindowsFault(){throw new Error('VERIFY-JOURNAL-WINDOWS-ASSURANCE');}
-function verifyWindowsAncestors(path){const rows=[];let cursor=dirname(path);while(true){const row=observeWindowsAuthorityAncestor({path:cursor});rows.push({path:cursor,...row});const parent=dirname(cursor);if(parent===cursor)break;cursor=parent;}return rows;}
+// A git common directory a caller supplied is registered once; its parent is the repository root. Ancestors strictly above that
+// root are human-controlled: still observed and bound into the facts, never refused for a foreign owner or write grant. The root
+// and everything below it, and any path outside a registered common directory, keep the strict walk.
+const verifyWindowsCommonDirs=new Set();
+function verifyWindowsRegisterCommon(common){if(process.platform==='win32'&&typeof common==='string'&&isAbsolute(common)&&resolve(common)===common)verifyWindowsCommonDirs.add(common);}
+function verifyWindowsBoundary(path){const lower=path.toLowerCase();let best=null;for(const common of verifyWindowsCommonDirs){const c=common.toLowerCase();if((lower===c||lower.startsWith(c.endsWith('\\')?c:c+'\\'))&&(best===null||common.length>best.length))best=common;}return best===null?null:dirname(best);}
+function verifyWindowsAncestors(path){const boundaryRoot=verifyWindowsBoundary(path),rows=[];let cursor=dirname(path);while(true){const row=observeWindowsAuthorityAncestor(boundaryRoot===null?{path:cursor}:{path:cursor,boundaryRoot});rows.push({path:cursor,...row});const parent=dirname(cursor);if(parent===cursor)break;cursor=parent;}return rows;}
 function verifyWindowsSame(a,b){return JSON.stringify(a)===JSON.stringify(b);}
 function verifyWindowsDirectory(path,exclusive){
   const absolute=resolve(path),before=verifyWindowsAncestors(absolute);let exists=true;

@@ -140,13 +140,15 @@ public static class PipelineOwnedAuthorityNative {
  // Compatible WRITE sharing is restricted to this parent; DELETE sharing remains refused.
  // Private-file and temp handles retain their original exclusive sharing/custody checks.
  static SafeFileHandle OpenPublicationParent(string p) { Canonical(p);var h=CreateFileW(p,0xC0020000u,3,IntPtr.Zero,3,0x02200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}try{Verify(h,p,true,true);return h;}catch{h.Dispose();throw;} }
- public static string Verify(SafeFileHandle h,string p,bool directory,bool privateOnly,bool sourceImage=false) {
+ // humanControlled is the closed relaxation for a directory strictly above a caller-proven repository root: owner and ACL facts are still hashed into the returned facts, but a foreign owner, ACE shape or write grant no longer refuses. It is never combined with private custody or source images.
+ public static string Verify(SafeFileHandle h,string p,bool directory,bool privateOnly,bool sourceImage=false,bool humanControlled=false) {
   if(sourceImage&&(directory||privateOnly))throw Refuse("WIN-AUTH-INPUT");
+  if(humanControlled&&(privateOnly||sourceImage||!directory))throw Refuse("WIN-AUTH-INPUT");
   Info i;if(!GetFileInformationByHandle(h,out i))throw Refuse("WIN-AUTH-FILE-ID");
   if((i.Attributes&0x400)!=0||((i.Attributes&0x10)!=0)!=directory||(!directory&&(sourceImage?i.Links<1:i.Links!=1))||!String.Equals(Final(h),Canonical(p),StringComparison.OrdinalIgnoreCase))throw Refuse("WIN-AUTH-ALIAS");
   IntPtr owner,group,dacl,sacl,sd;uint rc=GetSecurityInfo(h,1,5,out owner,out group,out dacl,out sacl,out sd);if(rc!=0||sd==IntPtr.Zero)throw Refuse("WIN-AUTH-SECURITY");
   try{uint length=GetSecurityDescriptorLength(sd);if(length==0||length>65536)throw Refuse("WIN-AUTH-SECURITY");byte[] raw=new byte[length];Marshal.Copy(sd,raw,0,(int)length);var security=new RawSecurityDescriptor(raw,0);if(security.Owner==null||security.DiscretionaryAcl==null||security.DiscretionaryAcl.Count==0)throw Refuse("WIN-AUTH-DACL");if(privateOnly){if(security.Owner.Value!=CurrentSid)throw Refuse("WIN-AUTH-OWNER");if((security.ControlFlags&ControlFlags.DiscretionaryAclProtected)==0)throw Refuse("WIN-AUTH-DACL");foreach(GenericAce ace in security.DiscretionaryAcl){var known=ace as CommonAce;if(known==null||known.IsCallback||known.SecurityIdentifier.Value!=CurrentSid)throw Refuse("WIN-AUTH-DACL");}}
-   if(!privateOnly){string sid=security.Owner.Value;if(sid!=CurrentSid&&sid!="S-1-5-18"&&sid!="S-1-5-32-544")throw Refuse("WIN-AUTH-ANCESTOR-OWNER");foreach(GenericAce ace in security.DiscretionaryAcl){var common=ace as CommonAce;if(common==null||common.IsCallback)throw Refuse("WIN-AUTH-ANCESTOR-ACL");string principal=common.SecurityIdentifier.Value;if(common.AceQualifier==AceQualifier.AccessAllowed&&(common.AccessMask&unchecked((int)0x500D0156))!=0&&principal!=CurrentSid&&principal!="S-1-5-18"&&principal!="S-1-5-32-544")throw Refuse("WIN-AUTH-ANCESTOR-MUTATION");}}
+   if(!privateOnly&&!humanControlled){string sid=security.Owner.Value;if(sid!=CurrentSid&&sid!="S-1-5-18"&&sid!="S-1-5-32-544")throw Refuse("WIN-AUTH-ANCESTOR-OWNER");foreach(GenericAce ace in security.DiscretionaryAcl){var common=ace as CommonAce;if(common==null||common.IsCallback)throw Refuse("WIN-AUTH-ANCESTOR-ACL");string principal=common.SecurityIdentifier.Value;if(common.AceQualifier==AceQualifier.AccessAllowed&&(common.AccessMask&unchecked((int)0x500D0156))!=0&&principal!=CurrentSid&&principal!="S-1-5-18"&&principal!="S-1-5-32-544")throw Refuse("WIN-AUTH-ANCESTOR-MUTATION");}}
    return i.Volume+":"+i.IndexHigh+":"+i.IndexLow+":"+i.Links+":"+i.Attributes+":"+(directory?"directory":i.SizeHigh+":"+i.SizeLow)+":"+unchecked((uint)i.Creation.dwHighDateTime)+":"+unchecked((uint)i.Creation.dwLowDateTime)+":"+(directory?"directory":unchecked((uint)i.Write.dwHighDateTime)+":"+unchecked((uint)i.Write.dwLowDateTime))+":"+Hash(raw);
   }finally{LocalFree(sd);}
  }
@@ -178,6 +180,14 @@ public static class PipelineOwnedAuthorityNative {
  public static string CreateDirectory(string p) { using(var parent=Open(Path.GetDirectoryName(p),true,true,false)){if(!FlushFileBuffers(parent))throw Refuse("WIN-AUTH-DIRECTORY-FLUSH-UNAVAILABLE");IntPtr sd;SA sa=PrivateAttributes(out sd);try{if(!CreateDirectoryW(p,ref sa))throw Refuse("WIN-AUTH-EXCLUSIVE-CREATE");Published=true;}finally{LocalFree(sd);}if(!FlushFileBuffers(parent))throw Refuse("WIN-AUTH-DIRECTORY-FLUSH-UNAVAILABLE");using(var h=Open(p,true))return Verify(h,p,true,true);} }
  public static string Inspect(string p,bool directory) { using(var h=Open(p,directory))return Verify(h,p,directory,true); }
  public static string Ancestor(string p) { using(var h=Open(p,true,false,false))return Verify(h,p,true,false); }
+ // The native helper re-proves the lexical relation itself: only a canonical path strictly above the canonical boundary root is human-controlled. Reparse points, non-directories, alias and final-path checks stay refused.
+ static bool StrictlyAbove(string p,string boundary) { string a=Canonical(p),b=Canonical(boundary);return b.Length>a.Length&&b.StartsWith(a+@"\",StringComparison.OrdinalIgnoreCase); }
+ public static string AncestorAboveRoot(string p,string boundary) {
+  if(!StrictlyAbove(p,boundary))throw Refuse("WIN-AUTH-INPUT");
+  var h=CreateFileW(p,0x80000000u|0x00020000u,1,IntPtr.Zero,3,0x00200000u|0x02000000u,IntPtr.Zero);
+  if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}
+  using(h)return Verify(h,p,true,false,false,true);
+ }
  public static bool Published=false;
  public static string Remove(string p,string expected,string expectedFacts) {
   using(var parent=Open(Path.GetDirectoryName(p),true,true)){
@@ -233,6 +243,7 @@ try {
   switch ($request.operation) {
     'inspect' { $facts = [PipelineOwnedAuthorityNative]::Inspect([string]$request.path,[bool]$request.directory) }
     'ancestor' { $facts = [PipelineOwnedAuthorityNative]::Ancestor([string]$request.path) }
+    'ancestor-above-root' { $facts = [PipelineOwnedAuthorityNative]::AncestorAboveRoot([string]$request.path,[string]$request.boundaryRoot) }
     'read' { $bytes = [PipelineOwnedAuthorityNative]::Read([string]$request.path,[int]$request.maxBytes,[ref]$facts) }
     'inspect-source-image' { $imageSha256=[PipelineOwnedAuthorityNative]::InspectSourceImage([string]$request.path,[ref]$facts,[ref]$imageSize) }
     'read-source' { $bytes = [PipelineOwnedAuthorityNative]::Read([string]$request.path,[int]$request.maxBytes,[ref]$facts,$false) }

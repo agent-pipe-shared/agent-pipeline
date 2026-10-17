@@ -8,7 +8,7 @@ import {isAbsolute,resolve} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 
-const HELPER_SHA256='bdbb511bf89b91cbbc438d1d71927b14a90ec51111dac3db72d4bb4150083560';
+const HELPER_SHA256='09cc5f5eee1991704b0824688d8f87284a904f86c0029056cd15118abd33dd9b';
 const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -32,7 +32,13 @@ function invoke(request){
 }
 function observation(result){return Object.freeze({nativeFacts:result.facts,nativeFactsSha256:digest(result.facts),helperSha256:HELPER_SHA256,committed:result.committed});}
 export function inspectWindowsOwnedAuthorityPath(input){if(!exact(input,['path','directory'])||typeof input.directory!=='boolean')fail('WIN-AUTH-INPUT');return observation(invoke({operation:'inspect',path:path(input.path),directory:input.directory}));}
-export function observeWindowsAuthorityAncestor(input){if(!exact(input,['path']))fail('WIN-AUTH-INPUT');return observation(invoke({operation:'ancestor',path:path(input.path)}));}
+// A directory strictly above a caller-proven repository root is human-controlled. The optional closed input {path,boundaryRoot}
+// selects that relaxation only when path is lexically a strict ancestor of boundaryRoot (re-proved natively); a path at or below
+// the root, or unrelated to it, keeps every strict check. Owner/ACL facts are still hashed into the returned facts either way.
+function strictlyAboveRoot(ancestor,root){const a=ancestor.replace(/\\+$/u,''),b=root.replace(/\\+$/u,'');return b.length>a.length&&b.toLowerCase().startsWith(a.toLowerCase()+'\\');}
+export function observeWindowsAuthorityAncestor(input){
+ if(exact(input,['path','boundaryRoot'])){const ancestor=path(input.path),root=path(input.boundaryRoot);return observation(invoke(strictlyAboveRoot(ancestor,root)?{operation:'ancestor-above-root',path:ancestor,boundaryRoot:root}:{operation:'ancestor',path:ancestor}));}
+ if(!exact(input,['path']))fail('WIN-AUTH-INPUT');return observation(invoke({operation:'ancestor',path:path(input.path)}));}
 function read(input,operation){if(!exact(input,['path','maxBytes'])||!Number.isSafeInteger(input.maxBytes)||input.maxBytes<0||input.maxBytes>1048576)fail('WIN-AUTH-INPUT');const result=invoke({operation,path:path(input.path),maxBytes:input.maxBytes});if(typeof result.bytes!=='string'||! /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(result.bytes))fail('WIN-AUTH-NATIVE-OUTPUT');const bytes=Buffer.from(result.bytes,'base64');if(bytes.length>input.maxBytes)fail('WIN-AUTH-SIZE');return Object.freeze({...observation(result),bytes});}
 export function readWindowsOwnedAuthorityFile(input){return read(input,'read');}
 export function readWindowsAuthoritySourceModule(input){return read(input,'read-source');}
