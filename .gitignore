@@ -111,3 +111,7 @@ project/resume-hint.json
 # overwrites this on every run (nova-a8-benchmark-runner.mjs); regenerated,
 # never a deliverable.
 plugins/pipeline-core/scripts/fixtures/nova-benchmark/workloads/*/result.txt
+
+# Machine-local dispatch queue state (PO decision 2026-10-17): live runtime
+# state, never a deliverable.
+specs/*/slice-queue.json
