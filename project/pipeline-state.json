@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-10-12T16:04:00.133Z",
+  "updatedAt": "2026-10-17T20:07:31.220Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -63,23 +63,23 @@
   ],
   "pushApproval": {
     "lastApproved": {
-      "approvedBy": "Andre",
-      "approvedAt": "2026-10-09T08:19:06.521Z",
-      "forCommit": "692fa703f4a349168a270c186b78e4a6004025ee",
+      "approvedBy": "PO",
+      "approvedAt": "2026-10-17T20:07:31.220Z",
+      "forCommit": "a715527aabd047a0df2728f15269eda40d22005f",
       "criticalProof": {
-        "proofSha256": "517c37f3e54b1061b1e1d92d11205dba15753bed3b1cc4459b9b5497a52e6cfe",
-        "intentSha256": "2406757350151c11da61dd974b53a52dbffc0fc08f64fb3f19c06c59ca5df28d",
+        "proofSha256": "c55e8554aa796b956153a83d759146cbf0369cb1b880ffb359455086ccd86834",
+        "intentSha256": "992868bd6189cdc1214217cc248e629c28193e3e39c3a25770aea2c9b50ee56d",
         "action": {
           "kind": "push",
-          "subjectSha256": "76dec26cec37bb8c03fff715dc5eb3300b57c52ab5db560d06a49a11c672b825",
-          "expiresAt": "2026-10-09T09:17:39.123Z"
+          "subjectSha256": "0eb314ea87fde7166adde8a155517555e3e29f512dcfc4c48ed4675699101dc5",
+          "expiresAt": "2026-10-17T21:06:22.316Z"
         },
         "proof": {
           "schema": "pipeline.po-approval-proof.v1",
-          "intentSha256": "2406757350151c11da61dd974b53a52dbffc0fc08f64fb3f19c06c59ca5df28d",
+          "intentSha256": "992868bd6189cdc1214217cc248e629c28193e3e39c3a25770aea2c9b50ee56d",
           "keyReference": "local-po-key",
           "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
-          "signatureBase64": "RceVtFgVyojZBimAPt4Qt9nakvqXuMaQa1K1UwNQfDMbkC7zsNRlkyP00pErh1Mtw6zj7VX2rKNDZWsWvOy0DQ=="
+          "signatureBase64": "EqhcS7HuIs9gA/wiom7hXkGBq3Luu+VZFKadAMwK/lXJtQDf7k8KYKwzpctnYkhKJh10I6yNADHP+gllmFxTCQ=="
         }
       },
       "remote": "origin",
@@ -88,7 +88,7 @@
         "path": "project/push-threat-model.md",
         "sha256": "6a13ff03dfd15f93f15fe845c86edca35445a49a8979275ad35e42a93252a1ae"
       },
-      "pendingAuditWrite": false
+      "pendingAuditWrite": true
     }
   },
   "criticalProofConsumption": [
@@ -191,6 +191,11 @@
       "proofSha256": "517c37f3e54b1061b1e1d92d11205dba15753bed3b1cc4459b9b5497a52e6cfe",
       "kind": "push",
       "consumedAt": "2026-10-09T08:19:06.521Z"
+    },
+    {
+      "proofSha256": "c55e8554aa796b956153a83d759146cbf0369cb1b880ffb359455086ccd86834",
+      "kind": "push",
+      "consumedAt": "2026-10-17T20:07:31.220Z"
     }
   ],
   "phoenixEpicHistory": {
