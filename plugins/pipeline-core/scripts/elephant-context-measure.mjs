@@ -16,7 +16,8 @@ export const ADMIN_CATEGORIES = ["wakeUp", "guardRefusal", "authoring"];
 export const ADMIN_TARGET_SHARE = 0.1;
 // One key per cause in the item's Description. Causes are attribution views over the
 // category totals, not a partition: their shares overlap and are never summed.
-// `guardRefusals` counts every guard refusal. The transcript cannot tell a false positive from
+// `guardRefusals` counts every guard refusal except Explore/Plan recon dispatch refusals, which
+// are counted under `exploreOrPlanRefused`. The transcript cannot tell a false positive from
 // a true one (a true refusal is also followed by an admitted respelling), so the cause is named
 // for what it counts and `retriedAdmitted*` is the false-positive CANDIDATE subset, not a verdict.
 export const CAUSES = ["wakeUpLoops", "delegationCost", "exploreOrPlanRefused", "guardRefusals", "handWrittenBriefings"];
