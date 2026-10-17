@@ -2,7 +2,9 @@
 // Guard module "po-commands" (layer 4), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
 import { existsSync } from "node:fs";
-import { basename, isAbsolute, resolve } from "node:path";
+import { homedir } from "node:os";
+import { basename, isAbsolute, join, resolve } from "node:path";
+import { PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
 import { HUMAN_PO_SIGNING_COMMANDS } from "../../scripts/po-human-approval.mjs";
 import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, PO_APPROVAL_GATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT } from "./constants.mjs";
@@ -151,7 +153,7 @@ const COPY_MOVE_INSTALL_OPTIONS = Object.freeze({
  * sources; mv also REMOVES every source; install -d creates every operand. `-t` is recognised glued, inside a short-option
  * cluster (-rtDIR, -vt DIR) and as any unambiguous prefix of --target-directory, as the underlying getopt does.
  */
-function copyMoveInstallWrittenOperands(executable, args) {
+function copyMoveInstallWrittenOperands(executable, args, readSources = null) {
   const spec = COPY_MOVE_INSTALL_OPTIONS[executable];
   const operands = [];
   let targetDirectory = null;
@@ -190,12 +192,43 @@ function copyMoveInstallWrittenOperands(executable, args) {
     }
   }
   if (targetCount > 1) return null;
+  // C6g1 G1-D3-F1: a cp/install source is only READ; hand it back so the caller can apply the passive read policy to it.
+  if (readSources !== null && executable !== "mv" && !createsDirectories) {
+    readSources.push(...(targetDirectory === null ? operands.slice(0, -1) : operands));
+  }
   const written = [];
   if (executable === "install" && createsDirectories) written.push(...operands);
   else if (targetDirectory === null && operands.length > 0) written.push(operands[operands.length - 1]);
   if (targetDirectory !== null) written.push(targetDirectory);
   if (executable === "mv") written.push(...(targetDirectory === null ? operands.slice(0, -1) : operands));
   return written;
+}
+
+const CREDENTIAL_SECRET_BASENAME = new RegExp(
+  PASSIVE_READ_CREDENTIAL_ROOTS.secretBasenameRegex.source, PASSIVE_READ_CREDENTIAL_ROOTS.secretBasenameRegex.flags,
+);
+
+/**
+ * C6g1 G1-D3-F1 (AC-179): an OUTSIDE cp/install source is a read "subject to the read policy". Lexical judgement against the
+ * passive-read-policy credential declaration only (home-relative credential roots, absolute credential paths, secret basenames);
+ * every other outside source, and every in-project source, keeps its previous behaviour. An unexpandable `~user` fails closed.
+ */
+function isCredentialCopySource(arg, root) {
+  if (typeof arg !== "string" || arg === "" || arg.startsWith("-")) return false;
+  const home = homedir();
+  let raw = arg;
+  if (arg === "~") raw = home;
+  else if (arg.startsWith("~/") || arg.startsWith("~\\")) raw = join(home, arg.slice(2));
+  else if (arg.startsWith("~")) return true;
+  const target = resolve(root, raw);
+  if (pathInside(root, target)) return false;
+  const fold = (path) => (process.platform === "win32" ? path.toLowerCase() : path);
+  const roots = [
+    ...PASSIVE_READ_CREDENTIAL_ROOTS.homeRelativePaths.map((path) => resolve(home, path)),
+    ...PASSIVE_READ_CREDENTIAL_ROOTS.posixAbsolutePaths,
+  ];
+  return roots.some((credentialRoot) => pathInside(fold(credentialRoot), fold(target)))
+    || CREDENTIAL_SECRET_BASENAME.test(basename(target));
 }
 
 /**
@@ -273,8 +306,10 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
     if (["cp", "mv", "install"].includes(executable)) {
       // C6g1 F1: judge EVERY operand written, created or removed (destination or -t value, every mv source, every install -d
       // operand); an outside READ source of cp/install stays allowed, and an option the closed tables cannot place fails closed.
-      written = copyMoveInstallWrittenOperands(executable, args);
+      const readSources = [];
+      written = copyMoveInstallWrittenOperands(executable, args, readSources);
       if (written === null) return true;
+      if (readSources.some((arg) => isCredentialCopySource(arg, root))) return true;
       return written.some((arg) => {
         const target = commandPath(arg, root);
         return target !== null && !pathInside(root, target);

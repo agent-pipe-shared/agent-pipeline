@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import test from "node:test";
 
@@ -157,6 +158,27 @@ test(`P3 (D2-F1 control): a separated '--sparse always' with an in-project desti
 test("P3 (F1 control): an outside destination stays refused for every verb", () => {
   for (const command of [`cp ${W.src} ${W.outside}/x`, `mv ${W.src} ${W.outside}/x`, `install ${W.src} ${W.outside}/x`, `install -d ${W.outside}/x`]) {
     assert.equal(c6g1Forbidden(command), true, c6g1Title(command));
+  }
+});
+
+// ALF-C-C6G1-CORR-A4 (Critic G1-D3-F1, AC-179): an outside cp/install SOURCE is a read "subject to the read policy", so a source
+// under a protected credential root (passive-read-policy) is refused. Synthetic path strings only: nothing is read or copied.
+// RED on a tree without scratch/patches/ALF-C-C6G1-CORR-A4.patch (lib/guard/po-commands.mjs); GREEN with it.
+const NEEDS_PATCH_A4 = "needs protected patch ALF-C-C6G1-CORR-A4";
+const CREDENTIAL_SOURCES = [
+  join(homedir(), ".ssh", "c6g1-synthetic-key").replaceAll("\\", "/"),
+  join(homedir(), ".aws", "c6g1-synthetic-credentials").replaceAll("\\", "/"),
+];
+test(`P3 (G1-D3-F1): a cp/install source under a protected credential root is refused (${NEEDS_PATCH_A4})`, () => {
+  for (const source of CREDENTIAL_SOURCES) {
+    for (const command of [
+      `cp ${source} ${W.dest}`, `install -m 0600 ${source} ${W.dest}`, `cp -t ${W.dir} ${source}`, `cp -a ${W.src} ${source} ${W.dir}`,
+    ]) assert.equal(c6g1Forbidden(command), true, command.replaceAll(W.inside, "<project>"));
+  }
+});
+test("P3 (G1-D3-F1 control): an ordinary in-project source copied to an in-project destination stays allowed", () => {
+  for (const command of [`cp ${W.src} ${W.dest}`, `install -m 0644 ${W.src} ${W.dest}`, `cp -t ${W.dir} ${W.src}`]) {
+    assert.equal(c6g1Forbidden(command), false, c6g1Title(command));
   }
 });
 

@@ -3376,6 +3376,78 @@
       "file": "plugins/pipeline-core/scripts/po-human-approval-openssl-path.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/po-human-approval-openssl-path.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/po-human-approval-openssl-path.test.mjs"
+    },
+    {
+      "name": "install-agy-inline-candidate-tests",
+      "file": "plugins/pipeline-core/install-agy.inline-candidate.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/install-agy.inline-candidate.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/install-agy.inline-candidate.test.mjs"
+    },
+    {
+      "name": "human-guard-override-disjoint-tests",
+      "file": "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs"
+    },
+    {
+      "name": "pin-advertised-git-to-head-pipeline-is-refused-tests",
+      "file": "plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs"
+    },
+    {
+      "name": "pin-agy-driver-dispatch-and-design-routes-incomplete-tests",
+      "file": "plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs"
+    },
+    {
+      "name": "pin-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes-tests",
+      "file": "plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs"
+    },
+    {
+      "name": "pin-catalogue-admit-prescribed-lifecycle-verbs-tests",
+      "file": "plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs"
+    },
+    {
+      "name": "pin-declared-product-criteria-need-matching-acceptance-evidence-tests",
+      "file": "plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/declared-product-criteria-need-matching-acceptance-evidence.test.mjs"
+    },
+    {
+      "name": "pin-design-trailer-verifier-lost-after-closure-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs"
+    },
+    {
+      "name": "pin-design-workflow-package-v2-readiness-fixture-fails-on-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-workflow-package-v2-readiness-fixture-fails-on-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-workflow-package-v2-readiness-fixture-fails-on-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-workflow-package-v2-readiness-fixture-fails-on-windows.test.mjs"
+    },
+    {
+      "name": "pin-hgo-stale-capability-shadows-current-authorization-tests",
+      "file": "plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs"
+    },
+    {
+      "name": "pin-installed-design-trailer-example-is-rejected-by-git-guard-tests",
+      "file": "plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs"
+    },
+    {
+      "name": "signed-spec-descriptor-tests",
+      "file": "plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs"
     }
   ]
 }
