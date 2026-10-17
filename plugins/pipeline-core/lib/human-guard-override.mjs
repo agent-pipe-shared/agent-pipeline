@@ -1127,6 +1127,16 @@ function hardBoundaryPath(path) {
     || /(^|\/)(?:secrets?|credentials?|tokens?|id_rsa|id_ed25519)(?:[./_-]|$)/u.test(normalized);
 }
 
+/**
+ * PO decision 2026-10-17 (item pipeline.signature-ceremony-requires-operator-work-and-breaks,
+ * AC-258): a PO-signed override of pipeline.user.yaml is refused up front. The edited routing
+ * is not a durable layer -- the lifecycle later classes it as a stale projection and the
+ * prescribed migration rewrites it back, which spends the human's signature for nothing.
+ */
+function userConfigOverridePath(path) {
+  return path.toLowerCase() === "pipeline.user.yaml";
+}
+
 function pipelineSourcePath(path) {
   const normalized = path.toLowerCase();
   return normalized === "plugins/pipeline-core" || normalized.startsWith("plugins/pipeline-core/");
@@ -1767,6 +1777,23 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
         },
       };
   }
+  if (code === "HGO-NONOVERRIDABLE-USER-CONFIG") {
+    // PO decision 2026-10-17 (AC-258): refused up front, with the real alternative named.
+    return {
+      status: "narrower-recovery-required",
+      code: "HGO-NARROWER-USER-CONFIG-REFUSED",
+      nextAction: {
+        kind: "typed-recovery",
+        action: {
+          toolName,
+          toolInputSha256: sha(toolInput),
+          requiredChange: "make the pipeline.user.yaml change as a human edit committed to the repository; no signed override is offered for it",
+          repositoryRoot: root,
+        },
+        limitation: "an agent write authorized by a signed override is not a durable layer: the lifecycle classes the edited routing as a stale projection and the prescribed migration rewrites it back, spending the signature for nothing",
+      },
+    };
+  }
   const deniedPushCommand = commandIsGitPush(command);
   if (code === "HGO-PUBLICATION-REQUIRED" || deniedPushCommand) {
     // Classify ONLY when the denied command is itself a push. A publication-authority
@@ -1894,6 +1921,7 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
     if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
     const path = classified.path;
     if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
+    if (userConfigOverridePath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-USER-CONFIG", paths: [path.relative] };
     paths.push(path.relative);
     if (protectedPath(path.relative)) return {
       eligible: true,
@@ -1950,6 +1978,7 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
       }
       return crossBoundaryEligible(crossBoundaryPaths.slice(1), crossBoundaryPaths[0]);
     }
+    if (paths.some(userConfigOverridePath)) return { eligible: false, code: "HGO-NONOVERRIDABLE-USER-CONFIG", paths: [...new Set(paths)].sort() };
     if (paths.some(protectedPath)) return {
       eligible: true,
       mode: "standard",
