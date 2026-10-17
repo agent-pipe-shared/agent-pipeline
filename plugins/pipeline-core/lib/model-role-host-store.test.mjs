@@ -73,10 +73,20 @@ test("private exclusive store readback binds the admitted session and dispatch",
     const original = readFileSync(path);
     writeFileSync(path, original.subarray(0, original.length - 4));
     assert.equal(store.read(sessionId).ok, false);
-    chmodSync(path, 0o644);
-    assert.equal(store.read(sessionId).code, "MODEL-ROLE-STORE-TARGET");
+    if (process.platform === "win32") {
+      // chmod has no mode effect on win32 and hasPrivateStoreMode does not check mode bits there.
+      assert.equal(store.read(sessionId).ok, false);
+    } else {
+      chmodSync(path, 0o644);
+      assert.equal(store.read(sessionId).code, "MODEL-ROLE-STORE-TARGET");
+    }
     unlinkSync(path);
-    symlinkSync("missing-private-receipt.json", path);
+    if (process.platform === "win32") {
+      // a file symlink needs a privilege on win32; a junction to a missing directory does not.
+      symlinkSync(join(commonDir, "missing-private-receipt-dir"), path, "junction");
+    } else {
+      symlinkSync("missing-private-receipt.json", path);
+    }
     assert.equal(store.inspect(sessionId).status, "present");
     assert.equal(store.read(sessionId).ok, false);
   } finally { rmSync(commonDir, { recursive: true, force: true }); }
