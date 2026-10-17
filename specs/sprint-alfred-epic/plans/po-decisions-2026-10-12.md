@@ -139,3 +139,14 @@ Answers to structured questions; tile text in
 - **K12 (C5 budget):** the two budget-truncated partial reviews together are
   the one FULL round; the next round is one DIFF over the P1-10 correction and
   P1-24C, then self-verification.
+
+## Decision tiles answered (PO, 2026-10-17, Claude session)
+
+- **AC-155, design-approval-route.e2e on this host: accepted as intended.**
+  - Situation: the native Windows authority check refuses the drive-root ancestor (`WIN-AUTH-ANCESTOR-OWNER`). D:\ and D:\Dev are human-configured.
+  - Principle (PO): the Pipeline protects against the agent, never against the human, who can reach everything anyway. A human-controlled host property is therefore outside the threat model.
+  - Consequence: the typed host-limitation skips are adopted. The file's header is reworded so that it documents them as intended for a human-controlled ancestor, instead of saying "no skip is a passing course".
+  - Remaining evidence gap: the AC-155 assertions still run only on a host whose ancestors pass.
+- **Orphan draft ADR** (`plugins/pipeline-core/docs/adr/draft-item-owned-egm-retained-quality-gates.{json,md}`): classify it in the vendored-canon manifest; do not remove it.
+- **C6G1-CORR-A option prefixes:** refine before the 0.7.0 candidate. Exact harmless options such as `git diff --text` are admitted. Abbreviated prefixes of denied option names stay refused. The refinement replaces the pending protected patch.
+- **V-10 route wiring:** before the 0.7.0 candidate. The native Agent/Task route and the non-direct transports write a route record.

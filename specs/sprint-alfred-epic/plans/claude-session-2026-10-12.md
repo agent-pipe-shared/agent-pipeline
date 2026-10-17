@@ -709,3 +709,42 @@ All commits are by the orchestrator through `scratch/alfred-claude-20261012/comm
 
 - **Observed transient:** dispatched Goldfish and the Elephant both saw `GUARD-LIFECYCLE-NOT-READY repository-mount-read-only` for one call while a commit batch was running; the next call passed. Briefings now tell the Goldfish to retry once.
 - **Stale lock:** `registry.lock` (about 5 minutes, no owner) blocked two dispatches with `SDC-LOCK-HELD`; removed by the Elephant.
+
+## Night 3, 2026-10-16/17 (C6 corrections, DIFF Critics, Route B)
+
+Implementation complete for the items below. Independent Critic review is complete only where it says PASS. Full Verify, the stamp and PO acceptance are pending.
+
+| Work | Commit | Note |
+|---|---|---|
+| ALF-C-C6G3-CORR, -CORR-B | `ec3b97599`, `a5d7b63bc` | Typed reopen-design codes, po-gate catch, E1 negation, comments. |
+| ALF-C-C6G4-CORR, -CORR-B, -F2 | `b8eac766a`, `000bbafe1`, `5360819d9` | AGY header, AFR18, preflight `staleHookSnapshots` field. |
+| ALF-C-C6G5-PINS, -CANON, -CORR2, -F1W | `7d18fc766`, `57f51ffc1`, `e29da0cc4`, `32725e521` | Opus and shell-grammar pins; obligations section 6 regenerated from the generator; re-critic field scan covers continuation lines and caret ranges; every GIT-03 binding named. |
+| ALF-C-V10-DISP-B, ALF-C-VCANON-SYNC | `a370201fa`, `869b62f09` | Direct-transport route record; vendored critic-review.md resynced after a session-caused drift. |
+| ALF-C-C6G2-MIN, C6D-MIN, C6G4-MIN | `cb2255013`, `ea978bd0b`, `4b03f6d21` | DACL nativeFacts assertion can fail; guardRefusals wording; AGY fail-open inventory (Coordinator, due 2026-10-19). |
+| ALF-C-W1-05B | `a9aeb9d63` | Disjoint signed-override suite covers every drift and replay case; 35 tests, 33 pass, 0 fail. |
+| ALF-C-C6G3-D1, -D2 | `ec9ea2d4f`, `8926f1286` | C6g3 review 2 minors: DIGEST-DRIFT out of the reopen allowlist again, with a parity pin that calls the guard's real remediation (RED 16/1 → GREEN 17/0/1); refused "must precede" case. DIFF review 3 of 3: PASS. |
+| ALF-C-DABR-RED (AC-155) | held as patches, file restored to HEAD | `design-approval-route.e2e.test.mjs` is red at HEAD (5/14, measured on an unchanged copy). Root cause: the native Windows authority check refuses this host's drive-root ancestor (`WIN-AUTH-ANCESTOR-OWNER`), failing closed correctly. The proposed typed host skips contradict the file's own "no skip is a passing course" contract, so they are held for a PO decision; the six AC-155 assertions are unverifiable on this host until then. |
+| ALF-C-C6G3-F1, -F2 | `0462d3f4c`, `14cfd349b` | Three verified approval drift codes route to reopen-design (RED executed); E1 negation bound to the negated phrase (RED by analysis only). |
+
+DIFF Critic results (all Sonnet, under `specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/`):
+
+- `C6g1-diff-result.md`: no findings. Two candidates remain as PO topics: the stamp is not a MAC, and the rethrow has no consumer-level pin.
+- `C6de-diff-result.md`, `C6g24-diff-result.md`: minors only. All are fixed by the MIN commits above, or close with Route B.
+- `C6g5-diff-result.md` → `C6g5-diff2-result.md`: **PASS** in review 2. Its one minor was fixed by `32725e521`, self-verified.
+- `C6g3-diff-result.md`: partial (budget). Two minors, both fixed by `0462d3f4c` and `14cfd349b`.
+- `C6g3-diff2-result.md`: FAIL, two minors (D1, D2). Both are fixed by `ec9ea2d4f` and `8926f1286`. D1's false parity premise came from the Elephant's own F1 briefing.
+- `C6g3-diff3-result.md`: **PASS** in review 3 of 3, no findings. The C6g3 budget is closed.
+
+Route B: `scratch/route-b-2026-10-17.ps1`.
+
+- It applies seven protected patches, each committed with its paired pin: AC121-REG, AC169-B, AC258-REF, C6G1-CORR-A, C6G2-CORR-B, N1-02C and PARWORK-M3.
+- It then makes one human docs commit.
+- All seven patches applied cleanly in order to a scratch index built from HEAD `ec9ea2d4f`. The held AC-155 e2e changes are saved as `scratch/held-patches/dabr-ac155-only.patch` and `dabr-red-full.patch` (verified byte-identical), and the file is restored to HEAD so the tree is clean after Route B.
+
+Process lessons:
+
+- **Misleading admission error:** a native-binding dispatch prompt must carry the `NATIVE HOST-COMMIT RULE:` line after the binding block. Without it the parser returns `NGHR-BRIEFING-DIRECTIVE`, and the dispatch guard reports `SQ-NATIVE-ITEM-ADMISSION-REQUIRED` instead.
+- **Item-check path:** the item-check path must be a `.test.mjs` file.
+- **Critic dispatch:** a Critic dispatch must carry the full filled template text, or the guard refuses it with `DISPATCH-NO-RULESET-SHA`.
+- **Critic budget:** a DIFF Critic cap of 30 was too small; use 45.
+- **Host commit:** it stayed unavailable (`NGHF-PENDING-UNAVAILABLE`), so the Elephant commits returns behind their tests with `Commit-Act: orchestrator`.
