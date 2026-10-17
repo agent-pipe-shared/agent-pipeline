@@ -17,7 +17,7 @@ import {createGovernanceScopeController} from './governance-scope.mjs';
 import {NEUTRAL_MANIFEST,NEUTRAL_STATE} from './project-authority.mjs';
 import {derivePlanLifecycle} from './plan-spec-state-v2.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
-import {createWindowsOwnedAuthorityDirectory} from './windows-owned-authority-backend.mjs';
+import {createWindowsOwnedAuthorityDirectory,inspectWindowsOwnedAuthorityPath} from './windows-owned-authority-backend.mjs';
 
 export const AT='2026-10-10T10:00:00.000Z';
 export const TWINS=['project/pipeline.json','.claude/pipeline.json'];
@@ -59,7 +59,7 @@ export const rawState=f=>readFileSync(statePath(f.dir));
 export const stateRelative=f=>statePath(f.dir).slice(f.dir.length+1);
 export function assertPrivateState(f,expected){
   assert.deepEqual(rawState(f),expected,'private lifecycle State bytes remain unchanged');
-  const info=lstatSync(statePath(f.dir));assert(info.isFile()&&!info.isSymbolicLink()&&info.nlink===1);assert.equal(info.mode&0o077,0,'actual private State mode');
+  const info=lstatSync(statePath(f.dir));assert(info.isFile()&&!info.isSymbolicLink()&&info.nlink===1);if(process.platform==='win32'){const root=inspectWindowsOwnedAuthorityPath({path:join(f.dir,'.git','agent-pipeline'),directory:true});assert(/^[a-f0-9]{64}$/u.test(root.nativeFactsSha256),'actual private State root owned-DACL observation');}else assert.equal(info.mode&0o077,0,'actual private State mode');
   const path=stateRelative(f);
   assert.equal(gitResult(f,['check-ignore','--quiet','--',path]).status,0,'State is actually ignored');
   assert.equal(git(f,'ls-files','--',path),'','State remains untracked');
