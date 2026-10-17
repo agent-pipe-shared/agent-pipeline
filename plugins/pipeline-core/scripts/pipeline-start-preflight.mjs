@@ -51,7 +51,7 @@ import {
   listActiveSessionDescriptors,
 } from "../lib/worktree-lifecycle.mjs";
 import { planInstall } from "./pre-push-hook-install.mjs";
-import { applyMandatoryHookGate, assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
+import { MANDATORY_HOOK_IDS, applyMandatoryHookGate, assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
 import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 import {
   DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
@@ -1726,6 +1726,7 @@ export function observePipelineStartPreflight({
   });
   const resultStatus = hookRefresh.status;
   const refreshAction = hookRefresh.action;
+  const staleHookSnapshots = staleMandatoryHookSnapshots(cloneProvisioning);
   const result = {
     schema: SCHEMA,
     status: resultStatus,
@@ -1746,6 +1747,7 @@ export function observePipelineStartPreflight({
     effectiveDecisions,
     ...(continuityAuthorityDrift !== null ? { continuityAuthorityDrift } : {}),
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
+    ...(staleHookSnapshots.length > 0 ? { staleHookSnapshots } : {}),
     ...(sessionReadiness ? { sessionReadiness } : {}),
     nextAction: resultStatus === "hook-provisioning-required"
       ? {
@@ -1866,6 +1868,17 @@ export function observePipelineStartPreflight({
   // to before, which keeps every synchronous caller and the pinned key set unchanged.
   if (typeof runModelRoleBootstrapFn !== "function") return envelope;
   return attachModelRoleBootstrap(envelope, runModelRoleBootstrapFn, { rootDir: resolve(cwd), runner, env, readOnly: true });
+}
+
+/**
+ * ALF-C-C6G4-F2 (AC-179): the typed HOOK-SNAPSHOT-STALE code for EVERY stale mandatory hook (pre-commit, commit-msg),
+ * naming the hook, exactly as the pre-push observation does. Detection only: it never changes `status` or `nextAction`.
+ */
+function staleMandatoryHookSnapshots(cloneProvisioning) {
+  const checks = Array.isArray(cloneProvisioning?.checks) ? cloneProvisioning.checks : [];
+  return MANDATORY_HOOK_IDS
+    .filter((id) => checks.some((entry) => entry?.id === id && entry.status === "refresh"))
+    .map((id) => ({ code: "HOOK-SNAPSHOT-STALE", id, hook: id.replace(/-hook$/u, "") }));
 }
 
 /**
