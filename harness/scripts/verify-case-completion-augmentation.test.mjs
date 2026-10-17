@@ -7,7 +7,7 @@ import {join,dirname} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {registerTestCaseCompletion} from '../../plugins/pipeline-core/lib/test-case-completion.mjs';
 import {parseVerifyCaseCompletion,verifyCaseCompletionPolicySha256} from '../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs';
-import {AUGMENTATION_SCHEMA,AUGMENTATION_PATH,validateVerifyCaseCompletionAugmentations,applyVerifyCaseCompletionAugmentations,loadAndApplyVerifyCaseCompletionAugmentations} from './verify-case-completion-augmentation.mjs';
+import {AUGMENTATION_SCHEMA,AUGMENTATION_PATH,validateVerifyCaseCompletionAugmentations,applyVerifyCaseCompletionAugmentations,loadAndApplyVerifyCaseCompletionAugmentations,loadAndApplyVerifyCaseCompletionAugmentationsToSources} from './verify-case-completion-augmentation.mjs';
 const policy=()=>({schema:'pipeline.verify-case-completion-policy.v1',caseIds:['actual-one','actual-two'],maxBytes:4096});
 const policySha256=value=>verifyCaseCompletionPolicySha256(value);
 const suites=()=>[{name:'existing',file:'plugins/pipeline-core/lib/existing.test.mjs',invariantPinned:'original invariant',nonOverlapNote:'original coverage',durationMs:123},{name:'unaffected',file:'plugins/pipeline-core/lib/unaffected.test.mjs'}];
@@ -108,6 +108,21 @@ check('VAC017','ordered superset may interleave new IDs while retaining every ol
   const rows=suites();rows[0].caseCompletion=previous;const data=table(next);data.augmentations[0].previousPolicySha256=policySha256(previous);
   assert.equal(applyVerifyCaseCompletionAugmentations(rows,data).ok,true);
 });
-assert.equal(cases.length,17);
+check('VAC018','an augmentation targeting a hard-coded absolute-path suite is applied on the normalised repo-relative form',t=>{
+  const root=fixture(t),previous={schema:'pipeline.verify-case-completion-policy.v1',caseIds:['old-one'],maxBytes:4096},next={...previous,caseIds:['old-one','old-two']};
+  const hard=[{name:'existing',file:join(root,'plugins','pipeline-core','lib','existing.test.mjs'),caseCompletion:previous},{name:'other',file:join(root,'plugins','pipeline-core','lib','other.test.mjs')}];
+  const data=table(next);data.augmentations[0].previousPolicySha256=policySha256(previous);write(root,AUGMENTATION_PATH,JSON.stringify(data));
+  const result=loadAndApplyVerifyCaseCompletionAugmentationsToSources({rootDir:root,hardCodedSuites:hard,suites:[]});
+  assert.equal(result.ok,true);assert.deepEqual(result.hardCodedSuites[0].caseCompletion,next);assert.equal(result.hardCodedSuites[0].file,hard[0].file);assert.equal(result.hardCodedSuites[1],hard[1]);assert.deepEqual(hard[0].caseCompletion,previous);
+});
+check('VAC019','a hard-coded suite whose previous-policy digest does not match, or an unbound shadow, is still refused',t=>{
+  const root=fixture(t),previous={schema:'pipeline.verify-case-completion-policy.v1',caseIds:['old-one'],maxBytes:4096},next={...previous,caseIds:['old-one','old-two']};
+  const hard=[{name:'existing',file:join(root,'plugins','pipeline-core','lib','existing.test.mjs'),caseCompletion:previous}];
+  const data=table(next);data.augmentations[0].previousPolicySha256=policySha256(policy());write(root,AUGMENTATION_PATH,JSON.stringify(data));
+  assert.equal(loadAndApplyVerifyCaseCompletionAugmentationsToSources({rootDir:root,hardCodedSuites:hard,suites:[]}).code,'AUG-PREIMAGE');
+  write(root,AUGMENTATION_PATH,JSON.stringify(table(next)));
+  assert.equal(loadAndApplyVerifyCaseCompletionAugmentationsToSources({rootDir:root,hardCodedSuites:hard,suites:[]}).code,'AUG-CONFLICT');
+});
+assert.equal(cases.length,19);
 const fd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined?openSync(devNull,'w'):Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({cases,fd,maxBytes:Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES??'65536')});

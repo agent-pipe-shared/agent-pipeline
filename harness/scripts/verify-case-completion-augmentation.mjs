@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import {spawnSync} from 'node:child_process';
 import {lstatSync,readFileSync,realpathSync,statSync} from 'node:fs';
-import {join,posix,resolve,sep} from 'node:path';
+import {join,posix,relative,resolve,sep} from 'node:path';
 import {parseStrictJson} from '../../plugins/pipeline-core/lib/governance-event.mjs';
 import {validateVerifyCaseCompletionPolicy,verifyCaseCompletionPolicySha256} from '../../plugins/pipeline-core/lib/verify-case-completion-receipt.mjs';
 
@@ -74,6 +74,22 @@ function readOptional(rootDir,candidate){
   if(!physical.startsWith(physicalRoot+sep)||!statSync(physical).isFile())throw Error('augmentation must be a physical regular file inside the repository');
   return readFileSync(physical);
 }
+
+// Registration sources may be hard-coded Verify entries (absolute file paths) next to declarative ones (repo-relative
+// forward-slash paths). Compare on the normalised repo-relative form; the returned hard-coded entries keep their own file.
+export function loadAndApplyVerifyCaseCompletionAugmentationsToSources({rootDir,hardCodedSuites,suites,candidate=null}={}){
+  if(!Array.isArray(hardCodedSuites)||!Array.isArray(suites))return failure('AUG-SUITES','registration sources must be arrays');
+  const root=resolve(rootDir),normalised=[];
+  for(const [i,s]of hardCodedSuites.entries()){
+    if(!object(s)||typeof s.file!=='string')return failure('AUG-SUITES',`hard-coded registration source ${i} requires a file`);
+    normalised.push({...s,file:relativeForm(root,s.file)});
+  }
+  const result=loadAndApplyVerifyCaseCompletionAugmentations({rootDir,suites:[...normalised,...suites],candidate});
+  if(!result.ok)return result;
+  const count=hardCodedSuites.length;
+  return {...result,hardCodedSuites:hardCodedSuites.map((s,i)=>Object.hasOwn(result.suites[i],'caseCompletion')?{...s,caseCompletion:result.suites[i].caseCompletion}:s),suites:result.suites.slice(count)};
+}
+const relativeForm=(root,file)=>relative(root,resolve(root,file)).split(sep).join('/');
 
 export function loadAndApplyVerifyCaseCompletionAugmentations({rootDir,suites,candidate=null}={}){
   try{
