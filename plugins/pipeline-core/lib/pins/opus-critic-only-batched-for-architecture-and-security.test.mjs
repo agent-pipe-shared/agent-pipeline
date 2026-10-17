@@ -4,9 +4,13 @@
 // Known limit (F4, MP-29): the Opus-rationale check reads briefing prose only, because the tool-layer
 // model selector is not visible to the guard on this runtime; a tool-layer Opus override without a matching
 // label line is therefore not caught by this check. Owner: Coordinator, due 2026-10-31.
-// Known limits of the re-critic beyond-delta check (F3): it is line-oriented (a range on a continuation line
-// of a search-surface field is not scanned), and it matches only `<sha>..<sha>` / `<sha>...<sha>` ranges, so a
-// `sha^..sha` form is not matched.
+// The re-critic beyond-delta check reads a search-surface FIELD (label line plus its more-indented continuation
+// lines, up to the next field or a blank line) and the `<sha>..<sha>`, `<sha>...<sha>` and `<sha>^..<sha>`
+// spellings. Known limits that remain (each: owner Coordinator, due 2026-10-31): (1) a flush-left wrapped
+// continuation or a range after a blank line is not scanned; (2) ref-name ranges (`main..topic`, `HEAD~2..HEAD`) are
+// not read, only hex SHAs; (3) SHAs compare as text (an abbreviated and a full spelling of one commit differ), and a
+// caret range `X^..Y` is judged only by its tip and by a start AT the previous candidate, because X's parent cannot
+// be resolved without git, so a caret range starting further back than the previous candidate passes.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -99,27 +103,79 @@ test("rule 3 (mechanical): a re-critic naming more than the delta is flagged; or
   assert.ok(!rc(fifth.replace("5", "4")).includes("DISPATCH-RECRITIC-ORDINAL"));
 });
 
-// F3: bind the beyond-delta check to the label the REAL critic template uses for the search-surface field.
-const TEMPLATE_DIFF_LINE = () => {
-  const line = read("templates/prompts/critic-review.md").split(/\r?\n/).find((l) => l.startsWith("- Diff (the object under review):"));
-  assert.ok(line, "templates/prompts/critic-review.md carries the `- Diff (the object under review):` field line");
-  return line;
+// AC-222 correction (Critic C6g5 D2): the beyond-delta check must read the Diff field the REAL critic template
+// PRODUCES. That field spreads over ~12 lines (label, enumerated SHAs, an example `git diff {{FIRST_SHA}}^..{{LAST_SHA}}`
+// on a continuation line), so the cases below take the template's own field block (label line through its last
+// continuation line), FILL its placeholders with real 7-hex values, and judge it against a declared delta.
+// QG-04 reason for replacing the two earlier F3 cases: they appended a bare range to the template's LABEL line,
+// a shape the template never produces, and so could not see a range on a continuation line or the caret spelling.
+// Their coverage is kept inside the cases below (label line, upper-case label, bold label, exact-delta label line).
+const templateDiffBlock = () => {
+  const lines = read("templates/prompts/critic-review.md").split(/\r?\n/);
+  const start = lines.findIndex((l) => l.startsWith("- Diff (the object under review):"));
+  assert.ok(start >= 0, "templates/prompts/critic-review.md carries the `- Diff (the object under review):` field line");
+  let end = start + 1;
+  while (end < lines.length && lines[end].trim() !== "" && /^\s/.test(lines[end])) end += 1;
+  return lines.slice(start, end).join("\n");
+};
+const PLACEHOLDER = /\{\{([A-Z_]+)[^}]*\}\}/g;
+const fillDiffBlock = ({ shas, first, last }) => {
+  const block = templateDiffBlock();
+  const names = [...block.matchAll(PLACEHOLDER)].map((m) => m[1]);
+  for (const need of ["COMMIT_SHAS", "FIRST_SHA", "LAST_SHA"]) {
+    assert.ok(names.includes(need), `the template's Diff field names the ${need} placeholder (found: ${names.join(", ")})`);
+  }
+  const values = { COMMIT_SHAS: shas, FIRST_SHA: first, LAST_SHA: last };
+  // any other placeholder the template carries (read from it, not assumed) gets a neutral, hex-free value
+  const filled = block.replace(PLACEHOLDER, (_all, name) => values[name] ?? "not-applicable");
+  assert.ok(!filled.includes("{{"), "every placeholder of the Diff field is filled");
+  assert.ok(filled.split("\n").length > 3, "the filled field spans continuation lines, as the real template does");
+  return filled;
 };
 const RECRITIC_HEAD = "- Re-critic (MP-07): aaaaaaa..bbbbbbb\n- Batch scope (MP-07): S1";
+const rcFindings = (extra) => dispatchFindings({ subagentType: "pipeline-core:critic", prompt: `${RC_BASE}\n${RECRITIC_HEAD}\n${extra}` }).findings;
+const recriticCodes = (extra) => rcFindings(extra).map((f) => f.code).filter((c) => c.startsWith("DISPATCH-RECRITIC"));
+// delta aaaaaaa..bbbbbbb = (aaaaaaa, bbbbbbb]; ccccccc is its first commit, so `ccccccc^..bbbbbbb` covers exactly it.
+const EQUAL_FILL = { shas: "ccccccc, bbbbbbb", first: "ccccccc", last: "bbbbbbb" };
 
-test("rule 3 (mechanical, F3): a wider range on the real template's `Diff (the object under review)` line is flagged", () => {
-  const line = TEMPLATE_DIFF_LINE();
-  assert.ok(rc(`${RECRITIC_HEAD}\n${line} 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+test("rule 3 (mechanical, D2): the real template's Diff field filled with exactly the delta does NOT raise a re-critic finding", () => {
+  const filled = fillDiffBlock(EQUAL_FILL);
+  assert.ok(filled.includes("ccccccc^..bbbbbbb"), "the template's own caret example is filled into the continuation line");
+  assert.deepEqual(recriticCodes(filled), []);
   // the label is matched case-insensitively like every other search-surface label
-  assert.ok(rc(`${RECRITIC_HEAD}\n${line.toUpperCase()} 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  assert.deepEqual(recriticCodes(filled.toUpperCase()), []);
   // the bold-label form a filled template may carry
-  assert.ok(rc(`${RECRITIC_HEAD}\n- **Diff (the object under review):** 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  assert.deepEqual(recriticCodes(filled.replace("- Diff (the object under review):", "- **Diff (the object under review):**")), []);
+  // the label line itself naming exactly the delta (the shape the earlier F3 case used)
+  assert.deepEqual(recriticCodes(`${filled.split("\n")[0]} aaaaaaa..bbbbbbb`), []);
 });
 
-test("rule 3 (mechanical, F3): the same template line naming exactly the delta does NOT raise the beyond-delta finding", () => {
-  const line = TEMPLATE_DIFF_LINE();
-  assert.ok(!rc(`${RECRITIC_HEAD}\n${line} aaaaaaa..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
-  assert.deepEqual(rc(`${RECRITIC_HEAD}\n${line} aaaaaaa..bbbbbbb`).filter((c) => c.startsWith("DISPATCH-RECRITIC")), []);
+test("rule 3 (mechanical, D2): the real template's Diff field filled WIDER than the delta is flagged", () => {
+  // tip beyond the delta: the range sits only on a continuation line, in the caret spelling
+  const beyondTip = fillDiffBlock({ shas: "ccccccc, ddddddd", first: "ccccccc", last: "ddddddd" });
+  const f = rcFindings(beyondTip).find((x) => x.code === "DISPATCH-RECRITIC-BEYOND-DELTA");
+  assert.ok(f, "a caret range on a continuation line whose tip is beyond the delta is flagged");
+  assert.ok(f.why.includes("ccccccc^..ddddddd"), f.why);
+  // start AT the previous reviewed candidate: `aaaaaaa^..bbbbbbb` re-includes an already reviewed commit
+  assert.ok(recriticCodes(fillDiffBlock({ shas: "aaaaaaa, bbbbbbb", first: "aaaaaaa", last: "bbbbbbb" })).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  // a bare `..` / `...` range on a continuation line of the filled field
+  assert.ok(recriticCodes(`${fillDiffBlock(EQUAL_FILL)}\n  also 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  assert.ok(recriticCodes(`${fillDiffBlock(EQUAL_FILL)}\n  also 1234567...bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  // the label-line shapes the earlier F3 case covered: plain, upper-case and bold label with a wider range
+  const label = fillDiffBlock(EQUAL_FILL).split("\n")[0];
+  assert.ok(recriticCodes(`${label} 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  assert.ok(recriticCodes(`${label.toUpperCase()} 1234567..bbbbbbb`).includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+  assert.ok(recriticCodes("- **Diff (the object under review):** 1234567..bbbbbbb").includes("DISPATCH-RECRITIC-BEYOND-DELTA"));
+});
+
+test("rule 3 (mechanical, D2): the search-surface field ends at the next field or a blank line", () => {
+  const filled = fillDiffBlock(EQUAL_FILL);
+  // the next top-level field of the real template follows the Diff field: a range there is not a search surface
+  assert.deepEqual(recriticCodes(`${filled}\n- Correction input bindings: 1234567..eeeeeee`), []);
+  // a blank line closes the field, even before an indented line
+  assert.deepEqual(recriticCodes(`${filled}\n\n  1234567..eeeeeee`), []);
+  // a flush-left line closes it too (known limit 1: a flush-left wrapped continuation is not scanned)
+  assert.deepEqual(recriticCodes(`${filled}\n1234567..eeeeeee`), []);
 });
 
 test("rule 3 (mechanical): a non-declared full Critic prompt is not judged as a re-critic", () => {

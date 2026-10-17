@@ -178,14 +178,40 @@ const NAMES_RULESET =/\bruleset[- ]?sha\s*[:=]\s*\S/i;
 // `Re-critic (MP-07): <delta range>` line; only a declared re-critic is judged here, so an
 // ordinary full-Critic prompt (and every existing fixture) is unaffected.
 const RECRITIC_LINE = /^\s*(?:[-*]\s*)?\**\s*re-critic\b[^:\n]*:\**\s*(.*)$/i;
+// The DELTA is exactly what the template's re-critic line defines: `<previous-reviewed-sha>..<new-candidate-sha>`.
 const RANGE = /\b[0-9a-f]{7,40}\.{2,3}[0-9a-f]{7,40}\b/gi;
+const DELTA_PARTS = /^([0-9a-f]+)(\.{2,3})([0-9a-f]+)$/i;
+// A SEARCH-SURFACE range additionally reads the caret spelling the real template's own example uses
+// (`git diff {{FIRST_SHA}}^..{{LAST_SHA}}`). Groups: start, optional caret, dots, tip.
+const SURFACE_RANGE = /\b([0-9a-f]{7,40})(\^?)(\.{2,3})([0-9a-f]{7,40})\b/gi;
 // The search-surface labels, including the one the real critic template uses
 // (templates/prompts/critic-review.md: `- Diff (the object under review): ...`). Each WORD alternative
 // keeps its own `\b`; the parenthesised label ends in `)`, where a `\b` would never match, so it carries none.
-// Known limits: line-oriented (a range on a continuation line is not scanned) and only `<sha>..<sha>` /
-// `<sha>...<sha>` ranges are read, so a `sha^..sha` form is not matched.
+// A search-surface FIELD is its label line plus its continuation lines: the lines indented deeper than the
+// label, up to the next field (a line at the label's own indent or shallower) or a blank line. The real template
+// spreads the Diff field over ~12 such lines, with its example range on a continuation line.
+// Known limits (each: owner Coordinator, due 2026-10-31):
+//  (1) a flush-left wrapped continuation, or a range after a blank line, is not part of the field and is not scanned;
+//  (2) only hex-SHA ranges (`<sha>..<sha>`, `<sha>...<sha>`, `<sha>^..<sha>`) are read, never ref-name ranges
+//      such as `main..topic` or `HEAD~2..HEAD`;
+//  (3) SHAs compare as text, so an abbreviated and a full spelling of one commit differ (a false BEYOND-DELTA),
+//      and `X^..Y` includes X whose parent cannot be resolved without git: only its tip and a start AT the
+//      previous candidate (which would re-include an already reviewed commit) are judged, so a caret range
+//      starting further back than the previous candidate passes.
 const SEARCH_SURFACE_LINE = /^\s*(?:[-*]\s*)?\**\s*(?:(?:diff range|candidate diff|search surface)\b|diff\s*\(the object under review\))[^:\n]*:/i;
 const REVIEW_ORDINAL_LINE = /^\s*(?:[-*]\s*)?\**\s*review ordinal\b[^:\n]*:\**\s*(\d+)/im;
+const indentOf = (line) => /^[ \t]*/.exec(line)[0].length;
+function searchSurfaceFields(lines) {
+  const fields = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!SEARCH_SURFACE_LINE.test(lines[i])) continue;
+    const indent = indentOf(lines[i]);
+    let end = i + 1;
+    while (end < lines.length && lines[end].trim() !== "" && indentOf(lines[end]) > indent) end += 1;
+    fields.push(lines.slice(i, end).join("\n"));
+  }
+  return fields;
+}
 function recriticFindings(text) {
   const lines = text.split(/\r?\n/);
   const declared = lines.map((l) => RECRITIC_LINE.exec(l)).find((m) => m !== null);
@@ -198,7 +224,16 @@ function recriticFindings(text) {
   if (delta.length !== 1) {
     out.push({ code: "DISPATCH-RECRITIC-NO-DELTA-RANGE", why: "a re-critic names exactly one delta range (previous reviewed candidate..new candidate) as its only search surface (MP-07)" });
   } else {
-    const wider = lines.filter((l) => SEARCH_SURFACE_LINE.test(l)).flatMap((l) => l.match(RANGE) ?? []).filter((r) => r.toLowerCase() !== delta[0].toLowerCase());
+    const [dStart, dDots, dTip] = DELTA_PARTS.exec(delta[0]).slice(1).map((s) => s.toLowerCase());
+    const wider = searchSurfaceFields(lines)
+      .flatMap((field) => [...field.matchAll(SURFACE_RANGE)])
+      .filter((m) => {
+        const start = m[1].toLowerCase();
+        if (m[3] !== dDots || m[4].toLowerCase() !== dTip) return true;
+        // `X^..Y` includes X: the only knowable widening at its start is X being the previous candidate itself.
+        return m[2] === "^" ? start === dStart : start !== dStart;
+      })
+      .map((m) => m[0]);
     if (wider.length > 0) {
       out.push({ code: "DISPATCH-RECRITIC-BEYOND-DELTA", why: `a re-critic is restricted to the delta ${delta[0]}; it also names ${wider.join(", ")} as a search surface (MP-07)` });
     }
