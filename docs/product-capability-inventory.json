@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "a6aa8705dad4db36ed6313ddf3805515aa4e5530",
-    "tree": "d03576f98dfa7a546fd708c13220ba3f3d0098b9"
+    "commit": "9d50be193096bd4da528269d6441576163dd1e24",
+    "tree": "1d11989a62617510a668666ba5c45da641ea3758"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -51,6 +51,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SubagentStart::node \"${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start-receipt.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:UserPromptSubmit::node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-intake-prompt-capture.mjs\"",
         "verify-phase:harness/scripts/verify.mjs:claude-native-capture-entry-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-task-output-read-scope-tests",
@@ -399,6 +400,7 @@
         "verify-phase:harness/scripts/verify.mjs:design-approval-route-e2e-tests",
         "verify-phase:harness/scripts/verify.mjs:design-approval-route-tests",
         "verify-phase:harness/scripts/verify.mjs:design-course-command-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-package-parent-metadata-false-drift-pin",
         "verify-phase:harness/scripts/verify.mjs:design-workflow-candidate-binding-codex-tests",
         "verify-phase:harness/scripts/verify.mjs:design-workflow-candidate-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:design-workflow-evidence-descendant-tests",
@@ -834,6 +836,7 @@
         "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
         "verify-phase:harness/scripts/verify.mjs:stop-fanout-tests",
         "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
+        "verify-phase:harness/scripts/verify.mjs:subagent-start-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
         "verify-phase:harness/scripts/verify.mjs:test-case-completion-tests",
