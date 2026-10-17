@@ -4,7 +4,7 @@
 > Previous state text is preserved as a public projection in the archive below.
 
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
-Read these two files first, in this order, before any other work:
+Read these three files first, in this order, before any other work:
 
 1. [Current item status](../specs/sprint-alfred-epic/evidence/delivery-status-current.md):
    the only work list. Per item it gives the stage and what is still open, each entry with
@@ -14,6 +14,10 @@ Read these two files first, in this order, before any other work:
    "Cut for the 0.7.0 candidate": only closing steps remain, in this order: one WSL Full
    Verify, one Critic batch, PO acceptance lists in blocks. New implementation only for what
    those steps show as genuinely red. Touch an item only for an `agent` entry released for work.
+
+3. [Handover to the WSL session](../specs/sprint-alfred-epic/plans/HANDOVER-2026-10-17-wsl.md):
+   the closing steps in order, the Critic scope, and the open Windows findings with their
+   measurements, so they are built on and not rediscovered.
 
 After each closing step, rerun `specs/sprint-alfred-epic/tools/delivery-remeasure.mjs` and
 commit the new snapshot; it replaces `delivery-status-current` and keeps history in dated
