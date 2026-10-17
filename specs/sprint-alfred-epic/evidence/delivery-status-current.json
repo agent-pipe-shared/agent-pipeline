@@ -1,0 +1,15 @@
+{
+  "schema": "pipeline.alfred-delivery-status-pointer.v1",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-17/snapshot.json",
+  "sha256": "0a45af93989c0018f3d267c0a76469976738a4f597c356622523d20b248ada6e",
+  "measuredAt": "2026-10-17",
+  "head": "76fe529b3",
+  "counts": {
+    "25": 7,
+    "50": 151,
+    "75": 15,
+    "100": 0,
+    "UNKNOWN": 1
+  },
+  "index": 50.86
+}

@@ -214,5 +214,19 @@ Answers to structured questions; tile text in
 - **C6g1 findings C-A and C-B:** accepted as residual risk. They get no backlog item; the candidate status names them.
 - **Test fixtures under the host temp directory must be green:** stated by the PO in chat. On this host `%TEMP%` grants the Codex sandbox group Modify, and every fixture created there inherits that grant. The strict product check correctly refuses such a repository root, because that principal is the agent sandbox.
   - The product check is not relaxed.
-  - The test environment is fixed so that temp-based fixtures do not inherit the sandbox grant.
+  - The course is to fix the test environment so that temp-based fixtures do not inherit the sandbox grant. Not done yet; status of 2026-10-17:
+    - Measured: with TEMP/TMP redirected to a clean checkout-scratch directory, two suites moved past the TEMP refusal to two further, separate Windows defects. Those defects are dispatched as product fixes. A third suite was not affected by TEMP at all.
+    - The existing helper `mkdtempTestScratch` (`lib/test-tmpdir.mjs`) already places fixtures under `scratch/test-tmp/`. Moving every `os.tmpdir()` fixture onto it, or having the Verify runner set TEMP/TMP for child suites, is still open. The runner route touches the protected `harness/scripts/verify.mjs` and would need a signature.
   - A repository root that the agent sandbox can write stays refused in real use.
+
+## Cut for the 0.7.0 candidate (PO, 2026-10-17 late night, Claude session)
+
+- **No new fixes from now on.** Background: items were touched again and again without closing, because Full Verify, a Critic batch and PO acceptance never took place, and each Windows fix uncovered the next red Windows case.
+  - The two Windows fixes still in flight (verify-evidence-producer walker boundary, registry absent-file parity) are taken only if their own logs are green. Otherwise they stop and are recorded as Windows host class.
+- **Then:** final delivery remeasure, stamp, and the PO local test.
+- **After that, only closing steps, in this order:**
+  1. one WSL Full Verify,
+  2. one Critic batch,
+  3. PO acceptance lists in blocks.
+  - New implementation happens only for what those steps show as genuinely red.
+- **One work list:** `specs/sprint-alfred-epic/evidence/delivery-status-current.{json,md}`, written by `specs/sprint-alfred-epic/tools/delivery-remeasure.mjs`. An item is touched only if its open list has an `agent` entry released for work.

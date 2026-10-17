@@ -1,0 +1,464 @@
+{
+ "base": "20e3055c6",
+ "unmappedCommits": [
+  {
+   "sha": "011642c6f",
+   "subject": "docs(sprint-alfred-epic): record the 2026-10-16 engineering-stage remeasure",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1309c8ddf",
+   "subject": "docs(backlog): record the zero-price licensing outlook and the Verify checker gap",
+   "dispatch": []
+  },
+  {
+   "sha": "f9d35bb13",
+   "subject": "chore(pipeline-core): stamp the performance hotfix build for bab86d4",
+   "dispatch": []
+  },
+  {
+   "sha": "64ba2056e",
+   "subject": "docs(backlog): update triage of four guard items after the C6 round",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "9d50be193",
+   "subject": "docs(sprint-alfred): record the C6 Critic round and the 2026-10-17 night",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "616815dcb",
+   "subject": "docs(sprint-alfred): record the C6 correction rounds and the V-10 decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5b12fbe1d",
+   "subject": "docs(sprint-alfred): record the C6g1 DIFF 2, C6g24 DIFF 3 and C6i FULL results",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c3d0e2d81",
+   "subject": "docs(sprint-alfred): add the C6g1 DIFF 3 and C6i DIFF 1 Critic briefings",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "36710f4eb",
+   "subject": "docs(sprint-alfred): record the C6g1 DIFF 3 and C6i DIFF 1 results",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f220e5069",
+   "subject": "docs(sprint-alfred): record the Windows attestation threat-model decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "89b70faf2",
+   "subject": "docs(sprint-alfred): add the C6j FULL Critic briefing",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2cfae6c98",
+   "subject": "docs(sprint-alfred): record the C6j FULL result",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a35506ef0",
+   "subject": "fix(pipeline-core): refuse credential-sourced copies and register the green suites",
+   "dispatch": [
+    "quality-package-f366275ec7f6e79ee8166e7026548dd9c9390266f75cd2d8b3557e49064cc3de"
+   ]
+  },
+  {
+   "sha": "d461bbb79",
+   "subject": "docs(sprint-alfred): record the Windows authority ancestor decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6ff0b71df",
+   "subject": "docs(sprint-alfred): record the evening PO decisions and backlog items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7cbf74ff1",
+   "subject": "chore: ignore the machine-local slice queue",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0739fbd60",
+   "subject": "docs(sprint-alfred): add the C6k FULL Critic briefing",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "425ed6e29",
+   "subject": "docs(sprint-alfred): record the C6k FULL result",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "39f157171",
+   "subject": "docs(sprint-alfred): record the late-evening PO decision tiles",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "aa0580fe6",
+   "subject": "docs(sprint-alfred): record the start-under-controller PO decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "38911a34a",
+   "subject": "docs(sprint-alfred): record the night decisions and the Windows Verify cost",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "809a798b4",
+   "subject": "fix(pipeline-core): treat quoted, escaped and PowerShell redirects to a protected path as writes",
+   "dispatch": [
+    "quality-package-a1a67570d9fcdc22c560c27bdad0cae328b720175061451b2b4d7b08c202e266"
+   ]
+  },
+  {
+   "sha": "d160c04ee",
+   "subject": "docs(sprint-alfred): add the WSL candidate sync and Verify runbook",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ee386564e",
+   "subject": "docs(sprint-alfred): record the Windows Verify sample classification and triage",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1c7038c67",
+   "subject": "docs(sprint-alfred): record the late-night PO tile decisions and the tripwire item",
+   "dispatch": [
+    "stage-0"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "itemId": "pipeline.desktop-app-support-is-unverified",
+   "stage20261016": "50",
+   "reason20261016": "Doc-contract clauses green; all four live points typed skips.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+   "stage20261016": "25",
+   "reason20261016": "Code repair committed but no counted GREEN evidence or pin.",
+   "mappedCommits": [
+    {
+     "sha": "a9aeb9d63",
+     "subject": "test(pipeline-core): cover every drift and replay case of disjoint signed overrides"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+   "stage20261016": "50",
+   "reason20261016": "Windows lock acquisition pinned; macOS held, no RED mirror.",
+   "mappedCommits": [
+    {
+     "sha": "7b0712f39",
+     "subject": "test(pipeline-core): pin the bounded counter-lock wait and a RED mirror"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+   "stage20261016": "50",
+   "reason20261016": "All three clauses appear pinned with RED mirrors; no green counts stated.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "stage20261016": "50",
+   "reason20261016": "Mechanical empty-log refusal implemented and pinned; measurement and fold-in parts and todos remain.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+   "stage20261016": "25",
+   "reason20261016": "Retained patch only, pin untracked, and the patch maps to a different defect.",
+   "mappedCommits": [
+    {
+     "sha": "418dd753a",
+     "subject": "fix(pipeline-core): accept the owner's own dispatch-record claim on Windows"
+    },
+    {
+     "sha": "9e075f96d",
+     "subject": "fix(pipeline-core): read the owner's claim DACL fresh on Windows"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+   "stage20261016": "75",
+   "reason20261016": "Both proposal clauses covered by 15 green cases with RED mirrors.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+   "stage20261016": "50",
+   "reason20261016": "same PO decision #21 maps AC-166 to the committed 9/9 pin 7eebbe101bc5; real gitleaks reproduction stays held, so 50",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "stage20261016": "50",
+   "reason20261016": "No Claude commits; pin untracked, baseline stage retained. Backlog file not read (budget); requirement inferred from baseline text.",
+   "mappedCommits": [
+    {
+     "sha": "417ed9a30",
+     "subject": "docs(pipeline-core): name the hook provisioning statuses in the start skill"
+    },
+    {
+     "sha": "ea8fc5a0a",
+     "subject": "fix(pipeline-core): admit the bootstrap preflight and hook actions in draft"
+    },
+    {
+     "sha": "beb9142d2",
+     "subject": "test(pipeline-core): drop stale RED tags from ten passing pin titles"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+   "stage20261016": "25",
+   "reason20261016": "Commit adds measurement script; message states no tests and leaves real-data measurements open. Mapped to AC-168 requirement text, no GREEN evidence; backlog not read.",
+   "mappedCommits": [
+    {
+     "sha": "b8a020ec3",
+     "subject": "feat(pipeline-core): measure the Elephant's main-context spend per administration cause"
+    },
+    {
+     "sha": "ea978bd0b",
+     "subject": "docs(pipeline-core): say exactly which refusals the guardRefusals cause counts"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+   "stage20261016": "50",
+   "reason20261016": "Template fix committed with pin 7 pass, but message keeps the fresh-dispatch first-write proof open. Backlog not read.",
+   "mappedCommits": [
+    {
+     "sha": "30da379bb",
+     "subject": "feat(pipeline-core): add a SubagentStart hook that records the dispatch receipt"
+    },
+    {
+     "sha": "68af587b5",
+     "subject": "feat(pipeline-core): register the SubagentStart receipt hook"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.evidence-artifacts-carry-no-commit-identity",
+   "stage20261016": "50",
+   "reason20261016": "Pin now committed but message gives no counts; no explicit GREEN lineage for 75. Backlog not read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+   "stage20261016": "50",
+   "reason20261016": "Key-pair mismatch fix committed with targeted cases passing; security review and consumer verification open. Backlog not read.",
+   "mappedCommits": [
+    {
+     "sha": "bd92916c6",
+     "subject": "test(pipeline-core): show the encrypted-key passphrase route in key pairing"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.feature-branch-push-admitted-without-signature-approval",
+   "stage20261016": "50",
+   "reason20261016": "Checkpoint-push pin committed with RED mirror, but baseline's broader clauses remain and counts absent. Backlog not read.",
+   "mappedCommits": [
+    {
+     "sha": "629edbc77",
+     "subject": "test(pipeline-core): keep the approval-only push lane out of main and other branches"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.first-enrollment-enters-retirement-before-consent",
+   "stage20261016": "50",
+   "reason20261016": "Pin committed and passing, but one clause covered only by a typed skip, so not qualified for 75. Backlog not read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.foreign-worktree-closes-the-implementation-gate",
+   "stage20261016": "UNKNOWN",
+   "reason20261016": "No commits and untracked pin; baseline stage retained. Backlog not read.",
+   "mappedCommits": [
+    {
+     "sha": "d412a84b2",
+     "subject": "fix(pipeline-core): close the implementation gate for a foreign worktree with a typed cause"
+    },
+    {
+     "sha": "4076e2900",
+     "subject": "fix(pipeline-core): treat an unreachable registered worktree as an environment condition"
+    },
+    {
+     "sha": "3b1c2e269",
+     "subject": "test(pipeline-core): pin the closed-gate diagnosis on admitted recovery verbs"
+    },
+    {
+     "sha": "ec3b97599",
+     "subject": "fix(pipeline-core): offer reopen-design only for typed design drift"
+    },
+    {
+     "sha": "a5d7b63bc",
+     "subject": "fix(pipeline-core): accept negated E1 sentences in the PRD freeze-order check"
+    },
+    {
+     "sha": "0462d3f4c",
+     "subject": "fix(pipeline-core): route the verified approval drift codes to reopen-design"
+    },
+    {
+     "sha": "ec9ea2d4f",
+     "subject": "fix(pipeline-core): keep the reopen-design allowlist in parity with the devplan guard"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+   "stage20261016": "25",
+   "reason20261016": "Commit adds generator but states no test results; stays at 25. Backlog not read.",
+   "mappedCommits": [
+    {
+     "sha": "17067dca4",
+     "subject": "feat(pipeline-core): advise on continuity drift at start and export runner transcripts"
+    },
+    {
+     "sha": "0824e528e",
+     "subject": "feat(pipeline-core): admit the runner transcript export to governed agents"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.gh-delivery-classifier-is-not-wired",
+   "stage20261016": "75",
+   "reason20261016": "Sole acceptance clause is gh pr merge guard-refused; committed pin covers it and more (API merge, release upload, Codex/Antigravity routing, hooks.json); baseline retained. Backlog read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+   "stage20261016": "50",
+   "reason20261016": "Commit fixes the last two win32 NUL sites with GREEN source-scan test, but real-git spawn regression and host checks held. Backlog read.",
+   "mappedCommits": [
+    {
+     "sha": "a6e161526",
+     "subject": "test(pipeline-core): run real git with the null-device constant and add a git seam"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+   "stage20261016": "50",
+   "reason20261016": "New cases committed but one clause only typed-skip covered and no counts. Backlog not read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+   "stage20261016": "50",
+   "reason20261016": "Staleness reporting committed with pin 5 pass/1 skip; code and targeted evidence exist but stale-admission clause unqualified. Backlog not read.",
+   "mappedCommits": [
+    {
+     "sha": "03ef96053",
+     "subject": "fix(pipeline-core): keep a stale pre-commit hook inert outside governance scope"
+    },
+    {
+     "sha": "5360819d9",
+     "subject": "fix(pipeline-core): report a typed stale-snapshot code for every mandatory hook"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+   "stage20261016": "50",
+   "reason20261016": "Pin committed with mirror check but no pass counts; 75 not supported. Backlog not read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.git-stash-list-classified-as-working-tree-write",
+   "stage20261016": "50",
+   "reason20261016": "Pin covers Proposal (list/show read-only, mutating verbs stay write) but no counts or integration evidence. Backlog read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+   "stage20261016": "50",
+   "reason20261016": "Pin committed but no counts or native evidence. Backlog not read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+   "stage20261016": "50",
+   "reason20261016": "Pin committed but baseline's real-scanner and batch clauses open; no counts. Backlog not read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+   "stage20261016": "50",
+   "reason20261016": "CLI child-process pin committed but pass counts and native Windows run not evidenced. Backlog read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+   "stage20261016": "50",
+   "reason20261016": "Fix and pin committed with RED-to-GREEN producer case; consumer verification open. Backlog not read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+   "stage20261016": "50",
+   "reason20261016": "Prepared postimage now applied and committed with GREEN pin, but no counts and baseline review/sync clauses unverified. Backlog not read.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+   "stage20261016": "50",
+   "reason20261016": "Template pin 7 pass, commit labels AC-187 (partial), consumer coverage open. Backlog file does not exist; used AC-187 excerpt and matrix.",
+   "mappedCommits": []
+  }
+ ]
+}

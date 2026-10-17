@@ -3,7 +3,23 @@
 > Current public repository state. Durable decisions remain in the ADR register.
 > Previous state text is preserved as a public projection in the archive below.
 
-**Current task: portable Alfred WIP checkpoint, 2026-10-12.**
+**Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
+Read these two files first, in this order, before any other work:
+
+1. [Current item status](../specs/sprint-alfred-epic/evidence/delivery-status-current.md):
+   the only work list. Per item it gives the stage and what is still open, each entry with
+   an owner (agent, critic, verify-wsl, native-host, po-decision, po-signature, po-acceptance).
+   Do not re-derive status from older matrices, ledgers or chat.
+2. [The cut decision](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md), section
+   "Cut for the 0.7.0 candidate": only closing steps remain, in this order: one WSL Full
+   Verify, one Critic batch, PO acceptance lists in blocks. New implementation only for what
+   those steps show as genuinely red. Touch an item only for an `agent` entry released for work.
+
+After each closing step, rerun `specs/sprint-alfred-epic/tools/delivery-remeasure.mjs` and
+commit the new snapshot; it replaces `delivery-status-current` and keeps history in dated
+directories. The sections below are background from 2026-10-12.
+
+**Earlier task: portable Alfred WIP checkpoint, 2026-10-12.**
 Start at [the Claude handover](../specs/sprint-alfred-epic/plans/HANDOVER-2026-10-12.md).
 The PO requests all important work and public evidence committed for another PC.
 The checkpoint was pushed: `origin/feat/sprint-alfred` = `6447fcc1a` (observed
@@ -16,7 +32,11 @@ Claude continuation ledger (batches, collected patches, PO topics):
 
 The delivery scope remains 174 original backlog items, 37 ACs and four incident
 criteria. Nightwing, Batman and explicitly deferred work stay excluded.
-[Current matrix](../specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.md):
+Current status (2026-10-17, HEAD `76fe529b3`): 7 at 25%, 151 at 50%, 15 at 75%, one
+unknown, zero accepted; index 50.86% — see
+[delivery-status-current](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
+Every 75 still needs Critic confirmation. The figures below are the superseded 2026-10-11 matrix.
+[2026-10-11 matrix](../specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.md):
 55 at 25%, 75 at 50%, nine at 75%, 35 unknown, zero accepted; 66 assessments.
 JSON SHA256: `bb2ad93f93de1db19a6506908a8a572ac2ea57e8044d1fc48a3178358c4eb03c`.
 The conservative weighted index is 33.33%, versus 32.76% at the frozen baseline;

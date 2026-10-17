@@ -1,0 +1,510 @@
+{
+ "base": "20e3055c6",
+ "unmappedCommits": [
+  {
+   "sha": "011642c6f",
+   "subject": "docs(sprint-alfred-epic): record the 2026-10-16 engineering-stage remeasure",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1309c8ddf",
+   "subject": "docs(backlog): record the zero-price licensing outlook and the Verify checker gap",
+   "dispatch": []
+  },
+  {
+   "sha": "f9d35bb13",
+   "subject": "chore(pipeline-core): stamp the performance hotfix build for bab86d4",
+   "dispatch": []
+  },
+  {
+   "sha": "64ba2056e",
+   "subject": "docs(backlog): update triage of four guard items after the C6 round",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "9d50be193",
+   "subject": "docs(sprint-alfred): record the C6 Critic round and the 2026-10-17 night",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "616815dcb",
+   "subject": "docs(sprint-alfred): record the C6 correction rounds and the V-10 decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5b12fbe1d",
+   "subject": "docs(sprint-alfred): record the C6g1 DIFF 2, C6g24 DIFF 3 and C6i FULL results",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c3d0e2d81",
+   "subject": "docs(sprint-alfred): add the C6g1 DIFF 3 and C6i DIFF 1 Critic briefings",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "36710f4eb",
+   "subject": "docs(sprint-alfred): record the C6g1 DIFF 3 and C6i DIFF 1 results",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f220e5069",
+   "subject": "docs(sprint-alfred): record the Windows attestation threat-model decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "89b70faf2",
+   "subject": "docs(sprint-alfred): add the C6j FULL Critic briefing",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2cfae6c98",
+   "subject": "docs(sprint-alfred): record the C6j FULL result",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a35506ef0",
+   "subject": "fix(pipeline-core): refuse credential-sourced copies and register the green suites",
+   "dispatch": [
+    "quality-package-f366275ec7f6e79ee8166e7026548dd9c9390266f75cd2d8b3557e49064cc3de"
+   ]
+  },
+  {
+   "sha": "d461bbb79",
+   "subject": "docs(sprint-alfred): record the Windows authority ancestor decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6ff0b71df",
+   "subject": "docs(sprint-alfred): record the evening PO decisions and backlog items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7cbf74ff1",
+   "subject": "chore: ignore the machine-local slice queue",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0739fbd60",
+   "subject": "docs(sprint-alfred): add the C6k FULL Critic briefing",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "425ed6e29",
+   "subject": "docs(sprint-alfred): record the C6k FULL result",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "39f157171",
+   "subject": "docs(sprint-alfred): record the late-evening PO decision tiles",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "aa0580fe6",
+   "subject": "docs(sprint-alfred): record the start-under-controller PO decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "38911a34a",
+   "subject": "docs(sprint-alfred): record the night decisions and the Windows Verify cost",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "809a798b4",
+   "subject": "fix(pipeline-core): treat quoted, escaped and PowerShell redirects to a protected path as writes",
+   "dispatch": [
+    "quality-package-a1a67570d9fcdc22c560c27bdad0cae328b720175061451b2b4d7b08c202e266"
+   ]
+  },
+  {
+   "sha": "d160c04ee",
+   "subject": "docs(sprint-alfred): add the WSL candidate sync and Verify runbook",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ee386564e",
+   "subject": "docs(sprint-alfred): record the Windows Verify sample classification and triage",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1c7038c67",
+   "subject": "docs(sprint-alfred): record the late-night PO tile decisions and the tripwire item",
+   "dispatch": [
+    "stage-0"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "itemId": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+   "stage20261016": "75",
+   "reason20261016": "Commit pins every proposal clause: env/printenv/set/export -p/env: drive/GetEnvironmentVariables/proc environ/whole process.env refused with GUARD-ENV-DUMP, main+subagent, no override route, plus Goldfish and Critic data-only sentences. No counts in message, so GREEN is inferred from the committed pin + mutants; confirm run at batch review. Wrapper forms (sudo env, bash -c env, xargs) documented out of reach, not an original clause.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+   "stage20261016": "50",
+   "reason20261016": "Fix committed with GREEN pin (42 pass) covering git show HEAD:path | head -n N and advertised-example pairing; unexplained adjacent guard suite failures and host skips keep it at 50. Raised from UNKNOWN on this commit.",
+   "mappedCommits": [
+    {
+     "sha": "56015a99e",
+     "subject": "test(pipeline-core): give two RED-mirror pins mutants that still discriminate"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+   "stage20261016": "50",
+   "reason20261016": "Pin covers one-cycle-per-course, immutable initial record, reuse across dispatches, new course only with terminal parent + fresh decision, restart/tamper, 32-course cap; but the export-consent clause is skip-only and PO decision plus installed-host work remain, so baseline 50 holds.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+   "stage20261016": "50",
+   "reason20261016": "Two committed pins now exercise the narrowed dev/ino/mode predicate with deterministic swap cases (code + targeted evidence), but the cause-field clause and the policy gate are uncovered, so it stays below 75.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+   "stage20261016": "50",
+   "reason20261016": "Shared question contract, unchanged sources, revision after advice, wrong question, unrelated candidate, forged chain and no-child masking are GREEN (10 pass), but the item's central end-to-end clause is only a typed skip, so 75 is not allowed.",
+   "mappedCommits": [
+    {
+     "sha": "5065ba1f6",
+     "subject": "test(pipeline-core): prove signature-mode approval verification succeeds"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+   "stage20261016": "50",
+   "reason20261016": "Commit adds a contract case extracting the generated recommendation and running it through guard-push expecting admission (targeted green evidence for the main clause); missing path/counts and guard-union scope keep it at 50.",
+   "mappedCommits": [
+    {
+     "sha": "80c5a9922",
+     "subject": "test(harness): run the recommended commit spelling through guard-git too"
+    },
+    {
+     "sha": "a34415842",
+     "subject": "test(pipeline-core): drive the recommended commit spelling through guard-lifecycle-ready"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+   "stage20261016": "75",
+   "reason20261016": "Pin covers the item's required agreement: canonical and vendored obligations text equal the guard's six-segment bound and generated file matches fresh generation (source fix 7b1b4083b per Triage); optional 'export grammar from guard' improvement not a required clause. No counts in message — confirm run at batch review; host checklist is manual acceptance only.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+   "stage20261016": "UNKNOWN",
+   "reason20261016": "No commits and no pin file exist; baseline retained. Backlog item not read (no commits).",
+   "mappedCommits": [
+    {
+     "sha": "addbe38fe",
+     "subject": "test(pipeline-core): pin Antigravity bootstrap lock stale-only renewal"
+    },
+    {
+     "sha": "45e7f19d2",
+     "subject": "fix(pipeline-core): name the admitted bootstrap read in the Antigravity barrier denial"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.agy-el01-write-authorization-gap",
+   "stage20261016": "25",
+   "reason20261016": "Only commit is a documentation draft with no test evidence, so stage stays at 25. Original text unresolved in portable record (no backlog file exists).",
+   "mappedCommits": [
+    {
+     "sha": "e21474fe3",
+     "subject": "fix(pipeline-core): run the EL-01 tripwire on Antigravity Edit and Write"
+    },
+    {
+     "sha": "1040a34ea",
+     "subject": "test(pipeline-core): pin the EL-01 write tripwire on the Antigravity route"
+    },
+    {
+     "sha": "4b03f6d21",
+     "subject": "test(pipeline-core): list every fail-open path of the AGY write tripwire found by reading"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+   "stage20261016": "50",
+   "reason20261016": "A Windows wiring-ownership repair is committed with a RED-to-GREEN case (code + targeted green evidence), but the commit fixes one defect while the backlog item's acceptance (spikes, topology observer, remediation, docs, version-correct run) is largely uncovered.",
+   "mappedCommits": [
+    {
+     "sha": "797829c69",
+     "subject": "test(pipeline-core): pin Antigravity topology verdicts and refusal codes"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+   "stage20261016": "50",
+   "reason20261016": "Receipt creation, byte-for-byte copy match, partial failure, global-scope refusal and manual recovery for a gitless source are GREEN, but the acceptance requires a native fresh-runner observation and there are 2 typed skips, so 75 is not allowed.",
+   "mappedCommits": [
+    {
+     "sha": "101d1162d",
+     "subject": "test(pipeline-core): give the AC19 parity fixture an approved design aggregate"
+    },
+    {
+     "sha": "f14cab0ef",
+     "subject": "test(pipeline-core): pin LF line endings in the Agy inline-candidate fixture"
+    },
+    {
+     "sha": "7f1396152",
+     "subject": "fix(pipeline-core): attest installed plugins on native Windows"
+    },
+    {
+     "sha": "7814ab3b3",
+     "subject": "test(pipeline-core): normalise separators in the IPH09 manifest stub"
+    },
+    {
+     "sha": "d7cb34060",
+     "subject": "test(pipeline-core): state the decided Windows posture in AGYIC011"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+   "stage20261016": "50",
+   "reason20261016": "Version gate now admits every strict-semver release from 1.2.12 on per PO decision with a green case, but the actual installed-host run is explicitly required and open, so the stage stays 50.",
+   "mappedCommits": [
+    {
+     "sha": "6238d9567",
+     "subject": "test(pipeline-core): pin the Antigravity 1.2.13 stale managed copy refresh"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+   "stage20261016": "50",
+   "reason20261016": "ADR-0063 amendment and the close-block bound-path report (proposal points 3-4) are committed with a green pin, but points 1-2 (fail-closed refusal, tracked relocation) are not implemented, so stage stays 50.",
+   "mappedCommits": [
+    {
+     "sha": "288bfd279",
+     "subject": "test(pipeline-core): pin that present-plan refuses an ignored bound path"
+    },
+    {
+     "sha": "56fd7ed36",
+     "subject": "test(pipeline-core): prove the approval-bound design package lands in a tracked path"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+   "stage20261016": "50",
+   "reason20261016": "Flag-forwarding and mirror cases are committed (repair with targeted evidence), but the core candidate-binding suites are typed skips on Windows, which blocks 75. Raised from UNKNOWN on this commit.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+   "stage20261016": "75",
+   "reason20261016": "All three proposal clauses GREEN: valid observation in approved and implementing, PORG-INVALID-OBSERVATION recovery admitted in four states, backlog/docs/scratch writes admitted in every state with src/ refused. The single skip is an extra link-escape security case, not an original clause; 'consider removing approved state' is an optional input, not acceptance. Run on native Windows — confirm at batch review.",
+   "mappedCommits": [
+    {
+     "sha": "384e73527",
+     "subject": "test(pipeline-core): bind the reopen-code helper in the approved-lifecycle pin"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+   "stage20261016": "75",
+   "reason20261016": "Clone provisioning path now installs a missing pre-push (current untouched, foreign preserved, failure non-gating) with 6/6 + 18/18 GREEN, and the plugin install path already did, so the whole 'provision during install or clone' proposal is covered. Pin written post-fix, RED-to-GREEN not shown (left to batch Critic) — a review risk for batch review, not a held clause.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+   "stage20261016": "50",
+   "reason20261016": "Stale-hook non-ready with one refresh action, Goldfish/Critic unaffected and refresh limited to stale managed hooks are GREEN (14 pass), but the actual refresh/install route is only skip-covered and the confirmation-line gate is unevidenced, so 50.",
+   "mappedCommits": [
+    {
+     "sha": "4e92f1430",
+     "subject": "docs(pipeline-core): require the start skill to consume modelRoleBootstrap"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.bounded-reader-terminal-binding",
+   "stage20261016": "50",
+   "reason20261016": "The acceptance fixture clause (four rounds + terminal correction passes; unresolved finding, fifth round, mismatched commit/digest, changed document fail) is GREEN 11/11 on contained real-Git fixtures, but the real-course binding clause is not covered, so 75 is not allowed.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+   "stage20261016": "UNKNOWN",
+   "reason20261016": "No commits land, so the baseline is retained; the only artifact is an untracked pin on disk, which is not committed evidence. Backlog item not read (no commits).",
+   "mappedCommits": [
+    {
+     "sha": "a6641cce4",
+     "subject": "fix(pipeline-core): enforce architecture fitness for net-new paths under a deferred adoption"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+   "stage20261016": "75",
+   "reason20261016": "Triage narrowed the item to documentation (state which source wins); the pin covers min(briefed, maxTurns-15), ceil(0.8 x cap) checkpoint for caps 1..200, the 45->35 case, and that the Goldfish template states the clamp rule. No counts in message — confirm run at batch review.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.capability-inventory-checker-is-red-at-head",
+   "stage20261016": "50",
+   "reason20261016": "Inventory re-baselined, reader and sort defects fixed, and the pin asserts no other finding class remains, but the item's goal (checker not red) is still held as todo. Raised from UNKNOWN to 50 on this commit.",
+   "mappedCommits": [
+    {
+     "sha": "5cc6b7006",
+     "subject": "test(pipeline-core): register the unregistered test suites in verify-suites.json"
+    },
+    {
+     "sha": "71a2c0304",
+     "subject": "fix(docs): re-bind the capability inventory to the registered suites"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+   "stage20261016": "50",
+   "reason20261016": "PATHEXT fix and RED-to-GREEN pin are committed (code + green targeted evidence), but baseline 75 is lowered because the original acceptance cannot be mapped from a public original and the baseline itself lists native Windows qualification as open, which the 75 definition does not allow.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+   "stage20261016": "50",
+   "reason20261016": "Raised from 25 on f7c7e9240ca0 with green admission cases for most prescribed verbs; not 75 because continuity writes are not shown admitted and one case is skipped.",
+   "mappedCommits": [
+    {
+     "sha": "078128431",
+     "subject": "test(pipeline-core): pin the prescribed present-plan verb from a mini inspect"
+    },
+    {
+     "sha": "6ecad410c",
+     "subject": "test(pipeline-core): keep one enforcing readiness read in the command-admission helper"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+   "stage20261016": "50",
+   "reason20261016": "Raised from 25 on 7fa1b4332448: K5-10, K3-17, K5-12 green, but the R4-9/R4-10 typed sub-reason clause is explicitly not present.",
+   "mappedCommits": [
+    {
+     "sha": "13a0dbc1e",
+     "subject": "test(pipeline-core): pin the documented POSIX install roots for the Claude binary"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+   "stage20261016": "50",
+   "reason20261016": "Acceptance now maps to a green plan-level pin, so UNKNOWN becomes 50; plan-only fakes leave platform matrix and real apply uncovered.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+   "stage20261016": "50",
+   "reason20261016": "Hook wiring and runner-neutral output are green with a positive control; the staleness-ref check is only weakly guarded, so not 75.",
+   "mappedCommits": [
+    {
+     "sha": "da2958311",
+     "subject": "feat(pipeline-core): make the staleness ref configurable per channel"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+   "stage20261016": "50",
+   "reason20261016": "V-9, V-12, V-13 green with RED proofs; V-10 todo and happy-path skip keep it below 75.",
+   "mappedCommits": [
+    {
+     "sha": "9fb514786",
+     "subject": "fix(pipeline-core): bind the dispatch guard to the briefing actually sent"
+    },
+    {
+     "sha": "1db508959",
+     "subject": "feat(pipeline-core): record the dispatch briefing route the V-10 guard binds to"
+    },
+    {
+     "sha": "a2d61489c",
+     "subject": "feat(pipeline-core): record the briefing route before a direct role dispatch launches"
+    },
+    {
+     "sha": "a370201fa",
+     "subject": "test(pipeline-core): state the V-10 briefing route wiring per dispatch route"
+    },
+    {
+     "sha": "04db66267",
+     "subject": "feat(pipeline-core): record the briefing route digest at native dispatch admission"
+    },
+    {
+     "sha": "3ed911a79",
+     "subject": "fix(pipeline-core): refuse unwritable briefing route targets before admission effects"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+   "stage20261016": "50",
+   "reason20261016": "New commits are latency work and retained patch documents; pin untracked and read-guard repair not applied, so 50 holds.",
+   "mappedCommits": [
+    {
+     "sha": "8d4b3613e",
+     "subject": "fix(pipeline-core): admit bounded in-repo reads in the Windows guard grammar"
+    },
+    {
+     "sha": "1f1991be3",
+     "subject": "fix(pipeline-core): contain the object path of a piped git show"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+   "stage20261016": "50",
+   "reason20261016": "Bounded first-failing-subcheck diagnostic has 4 green cases and four failing mutants; three skips and installed replay keep it below 75.",
+   "mappedCommits": []
+  }
+ ]
+}

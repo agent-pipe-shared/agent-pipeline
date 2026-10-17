@@ -1,0 +1,458 @@
+{
+ "base": "20e3055c6",
+ "unmappedCommits": [
+  {
+   "sha": "011642c6f",
+   "subject": "docs(sprint-alfred-epic): record the 2026-10-16 engineering-stage remeasure",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1309c8ddf",
+   "subject": "docs(backlog): record the zero-price licensing outlook and the Verify checker gap",
+   "dispatch": []
+  },
+  {
+   "sha": "f9d35bb13",
+   "subject": "chore(pipeline-core): stamp the performance hotfix build for bab86d4",
+   "dispatch": []
+  },
+  {
+   "sha": "64ba2056e",
+   "subject": "docs(backlog): update triage of four guard items after the C6 round",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "9d50be193",
+   "subject": "docs(sprint-alfred): record the C6 Critic round and the 2026-10-17 night",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "616815dcb",
+   "subject": "docs(sprint-alfred): record the C6 correction rounds and the V-10 decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5b12fbe1d",
+   "subject": "docs(sprint-alfred): record the C6g1 DIFF 2, C6g24 DIFF 3 and C6i FULL results",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c3d0e2d81",
+   "subject": "docs(sprint-alfred): add the C6g1 DIFF 3 and C6i DIFF 1 Critic briefings",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "36710f4eb",
+   "subject": "docs(sprint-alfred): record the C6g1 DIFF 3 and C6i DIFF 1 results",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f220e5069",
+   "subject": "docs(sprint-alfred): record the Windows attestation threat-model decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "89b70faf2",
+   "subject": "docs(sprint-alfred): add the C6j FULL Critic briefing",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2cfae6c98",
+   "subject": "docs(sprint-alfred): record the C6j FULL result",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a35506ef0",
+   "subject": "fix(pipeline-core): refuse credential-sourced copies and register the green suites",
+   "dispatch": [
+    "quality-package-f366275ec7f6e79ee8166e7026548dd9c9390266f75cd2d8b3557e49064cc3de"
+   ]
+  },
+  {
+   "sha": "d461bbb79",
+   "subject": "docs(sprint-alfred): record the Windows authority ancestor decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6ff0b71df",
+   "subject": "docs(sprint-alfred): record the evening PO decisions and backlog items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7cbf74ff1",
+   "subject": "chore: ignore the machine-local slice queue",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0739fbd60",
+   "subject": "docs(sprint-alfred): add the C6k FULL Critic briefing",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "425ed6e29",
+   "subject": "docs(sprint-alfred): record the C6k FULL result",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "39f157171",
+   "subject": "docs(sprint-alfred): record the late-evening PO decision tiles",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "aa0580fe6",
+   "subject": "docs(sprint-alfred): record the start-under-controller PO decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "38911a34a",
+   "subject": "docs(sprint-alfred): record the night decisions and the Windows Verify cost",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "809a798b4",
+   "subject": "fix(pipeline-core): treat quoted, escaped and PowerShell redirects to a protected path as writes",
+   "dispatch": [
+    "quality-package-a1a67570d9fcdc22c560c27bdad0cae328b720175061451b2b4d7b08c202e266"
+   ]
+  },
+  {
+   "sha": "d160c04ee",
+   "subject": "docs(sprint-alfred): add the WSL candidate sync and Verify runbook",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ee386564e",
+   "subject": "docs(sprint-alfred): record the Windows Verify sample classification and triage",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1c7038c67",
+   "subject": "docs(sprint-alfred): record the late-night PO tile decisions and the tripwire item",
+   "dispatch": [
+    "stage-0"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+   "stage20261016": "50",
+   "reason20261016": "Both clauses covered with no skip; held only for the missing pass count.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+   "stage20261016": "50",
+   "reason20261016": "Structural observe call pinned; controller-level clauses uncovered.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+   "stage20261016": "50",
+   "reason20261016": "Clauses 1-2 and part of 3 green; explicit override retention not shown.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+   "stage20261016": "50",
+   "reason20261016": "19 cells, cell-selective failure and real cell run pinned; wall-time skip.",
+   "mappedCommits": [
+    {
+     "sha": "bab86d46d",
+     "subject": "perf(pipeline-core): compile the Windows PowerShell C# helpers once"
+    },
+    {
+     "sha": "ab717ef31",
+     "subject": "fix(pipeline-core): bind cached native assemblies to their source and surface the signing git refusal"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+   "stage20261016": "50",
+   "reason20261016": "Criteria 1-3 pinned; criterion 4 deferred.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+   "stage20261016": "50",
+   "reason20261016": "Opus-rationale refusal committed and green; rules 2-3 and triage items open.",
+   "mappedCommits": [
+    {
+     "sha": "363a96005",
+     "subject": "feat(pipeline-core): flag re-critic dispatches that exceed their delta"
+    },
+    {
+     "sha": "0b404a591",
+     "subject": "test(pipeline-core): pin the mechanic tier on Haiku at effort medium"
+    },
+    {
+     "sha": "1cff4a1db",
+     "subject": "docs(backlog): record the 2026-10-16 deferrals and the re-critic marker"
+    },
+    {
+     "sha": "eac46002b",
+     "subject": "fix(templates): keep the re-critic line out of a filled full-review briefing"
+    },
+    {
+     "sha": "7d18fc766",
+     "subject": "fix(pipeline-core): read the real critic template diff label as a re-critic search surface"
+    },
+    {
+     "sha": "57f51ffc1",
+     "subject": "docs(pipeline): name the design trailer form in the canon and close the MP-07 slice note"
+    },
+    {
+     "sha": "869b62f09",
+     "subject": "fix(pipeline-core): resync the vendored critic review template with its canon"
+    },
+    {
+     "sha": "e29da0cc4",
+     "subject": "fix(pipeline-core): scan the whole re-critic diff field and regenerate section 6"
+    },
+    {
+     "sha": "32725e521",
+     "subject": "docs(pipeline-core): name every GIT-03 Dispatch binding in obligations section 6"
+    },
+    {
+     "sha": "dd96f9047",
+     "subject": "fix(harness): classify the vendored draft ADR on retained quality gates"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+   "stage20261016": "75",
+   "reason20261016": "Both options in all forms with negatives and RED mirror; baseline already recorded criterion qualified; raise rests on clause coverage, not a count.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+   "stage20261016": "50",
+   "reason20261016": "Code and 8 green cases for counter lock and batch-critic slice; coverage partial.",
+   "mappedCommits": [
+    {
+     "sha": "428a64f19",
+     "subject": "test(pipeline-core): pin the counter-lock and record-collision modes of parallel work"
+    },
+    {
+     "sha": "704b12cd7",
+     "subject": "fix(pipeline-core): re-read a transient partial readiness once before refusing"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+   "stage20261016": "50",
+   "reason20261016": "The first acceptance clause names /etc/shadow and is only a typed skip here; baseline 75 contradicted.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+   "stage20261016": "50",
+   "reason20261016": "Real hook entrypoints and scope predicate pinned for git fixtures; non-git skip.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+   "stage20261016": "50",
+   "reason20261016": "Central acceptance and negatives pinned; no counts and two clauses unmentioned.",
+   "mappedCommits": [
+    {
+     "sha": "ae262e962",
+     "subject": "test(pipeline-core): pin plan-submission bullets 3 and 5 through the real package validator"
+    },
+    {
+     "sha": "3628fb3c9",
+     "subject": "test(pipeline-core): close the Critic C6e findings on released acceptances and pins"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+   "stage20261016": "50",
+   "reason20261016": "Maps to all four bullets; native and installed open, no counts.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+   "stage20261016": "50",
+   "reason20261016": "No clause can be shown qualified; baseline kept.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+   "stage20261016": "50",
+   "reason20261016": "Slash spellings record receipts end to end; skip and case discrepancy keep 50.",
+   "mappedCommits": [
+    {
+     "sha": "29984e731",
+     "subject": "test(pipeline-core): admit case-variant plugin paths in the preflight receipt pin"
+    },
+    {
+     "sha": "31bd8c354",
+     "subject": "test(pipeline-core): turn the path-spelling equivalence todos into real cases"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+   "stage20261016": "50",
+   "reason20261016": "Seam committed and NOT_SECURE refusal pinned; skip and missing counts.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+   "stage20261016": "UNKNOWN",
+   "reason20261016": "Pin that would support baseline 75 is absent on HEAD; baseline contradicted.",
+   "mappedCommits": [
+    {
+     "sha": "179240f81",
+     "subject": "test(pipeline-core): pin project calibration identity and reconstruct AC-232"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+   "stage20261016": "50",
+   "reason20261016": "Reporter pinned; no counts, a skip and the surface question held.",
+   "mappedCommits": [
+    {
+     "sha": "9a5012289",
+     "subject": "feat(pipeline-core): report run-time budget headroom as information only"
+    },
+    {
+     "sha": "d27cd2b84",
+     "subject": "feat(harness): print run-time budget headroom after Verify"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+   "stage20261016": "50",
+   "reason20261016": "Repair exists only as an unapplied patch and pin uncommitted.",
+   "mappedCommits": [
+    {
+     "sha": "105ed7b74",
+     "subject": "test(pipeline-core): pin protected baseline fail-closed handling of idle state"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+   "stage20261016": "50",
+   "reason20261016": "Marker-based inversion pinned; no counts and gates open.",
+   "mappedCommits": [
+    {
+     "sha": "5c8fb499d",
+     "subject": "test(pipeline-core): re-base quoted-substitution push cases to the Q12 decision"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+   "stage20261016": "75",
+   "reason20261016": "19/19 GREEN pin committed with the fix covers backtick escape and executed here-strings; rated 75 with lineage caveat.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+   "stage20261016": "50",
+   "reason20261016": "Shapes pinned; no counts.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+   "stage20261016": "50",
+   "reason20261016": "Detection well covered; accepted-false-positive clause contradicted by 13 red sibling cases.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+   "stage20261016": "50",
+   "reason20261016": "Exact-file Grep globs admitted with 11/11 and 3/3; most original clauses still held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+   "stage20261016": "50",
+   "reason20261016": "fetch, git -C, git config escapes closed with 40 green; skips and lanes remain.",
+   "mappedCommits": [
+    {
+     "sha": "b58dda23c",
+     "subject": "fix(pipeline-core): close the cp/mv/install target and git option gaps in the guard grammar"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+   "stage20261016": "50",
+   "reason20261016": "6 green; 3 clauses typed skips.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+   "stage20261016": "50",
+   "reason20261016": "Output classes pinned; native clause held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+   "stage20261016": "50",
+   "reason20261016": "Only typed-unsafe clause pinned.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+   "stage20261016": "50",
+   "reason20261016": "Route retired; surviving observer 5 green; 2 skips.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+   "stage20261016": "50",
+   "reason20261016": "Per-runner preflight and fallback pinned 9/9; point 2b held.",
+   "mappedCommits": []
+  }
+ ]
+}

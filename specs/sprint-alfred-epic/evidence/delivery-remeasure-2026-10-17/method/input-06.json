@@ -1,0 +1,472 @@
+{
+ "base": "20e3055c6",
+ "unmappedCommits": [
+  {
+   "sha": "011642c6f",
+   "subject": "docs(sprint-alfred-epic): record the 2026-10-16 engineering-stage remeasure",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1309c8ddf",
+   "subject": "docs(backlog): record the zero-price licensing outlook and the Verify checker gap",
+   "dispatch": []
+  },
+  {
+   "sha": "f9d35bb13",
+   "subject": "chore(pipeline-core): stamp the performance hotfix build for bab86d4",
+   "dispatch": []
+  },
+  {
+   "sha": "64ba2056e",
+   "subject": "docs(backlog): update triage of four guard items after the C6 round",
+   "dispatch": [
+    "administrative"
+   ]
+  },
+  {
+   "sha": "9d50be193",
+   "subject": "docs(sprint-alfred): record the C6 Critic round and the 2026-10-17 night",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "616815dcb",
+   "subject": "docs(sprint-alfred): record the C6 correction rounds and the V-10 decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5b12fbe1d",
+   "subject": "docs(sprint-alfred): record the C6g1 DIFF 2, C6g24 DIFF 3 and C6i FULL results",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "c3d0e2d81",
+   "subject": "docs(sprint-alfred): add the C6g1 DIFF 3 and C6i DIFF 1 Critic briefings",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "36710f4eb",
+   "subject": "docs(sprint-alfred): record the C6g1 DIFF 3 and C6i DIFF 1 results",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f220e5069",
+   "subject": "docs(sprint-alfred): record the Windows attestation threat-model decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "89b70faf2",
+   "subject": "docs(sprint-alfred): add the C6j FULL Critic briefing",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2cfae6c98",
+   "subject": "docs(sprint-alfred): record the C6j FULL result",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a35506ef0",
+   "subject": "fix(pipeline-core): refuse credential-sourced copies and register the green suites",
+   "dispatch": [
+    "quality-package-f366275ec7f6e79ee8166e7026548dd9c9390266f75cd2d8b3557e49064cc3de"
+   ]
+  },
+  {
+   "sha": "d461bbb79",
+   "subject": "docs(sprint-alfred): record the Windows authority ancestor decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6ff0b71df",
+   "subject": "docs(sprint-alfred): record the evening PO decisions and backlog items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "7cbf74ff1",
+   "subject": "chore: ignore the machine-local slice queue",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0739fbd60",
+   "subject": "docs(sprint-alfred): add the C6k FULL Critic briefing",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "425ed6e29",
+   "subject": "docs(sprint-alfred): record the C6k FULL result",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "39f157171",
+   "subject": "docs(sprint-alfred): record the late-evening PO decision tiles",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "aa0580fe6",
+   "subject": "docs(sprint-alfred): record the start-under-controller PO decision",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "38911a34a",
+   "subject": "docs(sprint-alfred): record the night decisions and the Windows Verify cost",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "809a798b4",
+   "subject": "fix(pipeline-core): treat quoted, escaped and PowerShell redirects to a protected path as writes",
+   "dispatch": [
+    "quality-package-a1a67570d9fcdc22c560c27bdad0cae328b720175061451b2b4d7b08c202e266"
+   ]
+  },
+  {
+   "sha": "d160c04ee",
+   "subject": "docs(sprint-alfred): add the WSL candidate sync and Verify runbook",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ee386564e",
+   "subject": "docs(sprint-alfred): record the Windows Verify sample classification and triage",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1c7038c67",
+   "subject": "docs(sprint-alfred): record the late-night PO tile decisions and the tripwire item",
+   "dispatch": [
+    "stage-0"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "itemId": "pipeline.scratch-has-no-retention-and-no-durability-check",
+   "stage20261016": "50",
+   "reason20261016": "Sweep, staging, WARN-only durability 12 green; skip and matrix held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+   "stage20261016": "50",
+   "reason20261016": "All-state scratch matrix pinned; skips, counts and native sweeps hold 50.",
+   "mappedCommits": [
+    {
+     "sha": "968a77e75",
+     "subject": "test(pipeline-core): pin the shell redirect boundary for scratch captures"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+   "stage20261016": "50",
+   "reason20261016": "Codemod and redirect shapes pinned; no counts.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.security-scanner-failure-provenance",
+   "stage20261016": "50",
+   "reason20261016": "Four outcomes pinned; sidecar skip and native open.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+   "stage20261016": "50",
+   "reason20261016": "Proposal maps fully; without counts not 75.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.semgrep-offline-default-version-check",
+   "stage20261016": "50",
+   "reason20261016": "Seam and cleanup pinned; no counts and host failures.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+   "stage20261016": "50",
+   "reason20261016": "Distinction pinned; no counts and Windows skips held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+   "stage20261016": "50",
+   "reason20261016": "Routing and concurrency pinned; typed-reason and root-cause clauses uncovered.",
+   "mappedCommits": [
+    {
+     "sha": "a81cae62f",
+     "subject": "test(pipeline-core): mark the missing typed partial-readiness reason"
+    },
+    {
+     "sha": "0963e8087",
+     "subject": "fix(pipeline-core): give a partial session readiness a typed reason"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+   "stage20261016": "50",
+   "reason20261016": "Both clauses covered; no counts.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+   "stage20261016": "50",
+   "reason20261016": "Placement suite registered and pinned; fixture clause and counts missing.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+   "stage20261016": "50",
+   "reason20261016": "Absolute-path resolver committed; only baseline portable controls are green evidence.",
+   "mappedCommits": [
+    {
+     "sha": "411b83a86",
+     "subject": "fix(pipeline-core): spawn git by its trusted absolute path while signing"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+   "stage20261016": "50",
+   "reason20261016": "Green but partial and structural; AC-257 marked partial.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+   "stage20261016": "25",
+   "reason20261016": "No commits; baseline kept.",
+   "mappedCommits": [
+    {
+     "sha": "58f6ae820",
+     "subject": "feat(pipeline-core): seed a commit-scoped override request at the pre-commit refusal"
+    },
+    {
+     "sha": "56e1fbbbc",
+     "subject": "test(pipeline-core): measure slow installed-hook commits instead of killing them"
+    },
+    {
+     "sha": "1931e07b0",
+     "subject": "docs(pipeline-core): give the C6g2 disclosed gaps and host skips an owner and due date"
+    },
+    {
+     "sha": "07095b411",
+     "subject": "fix(pipeline-core): keep an explicit background flag on an item-governed dispatch blocked"
+    },
+    {
+     "sha": "0ee5b8d69",
+     "subject": "fix(pipeline-core): refuse a signed override of pipeline.user.yaml up front"
+    },
+    {
+     "sha": "667f1a99b",
+     "subject": "fix(pipeline-core): normalise single backslashes in protected-baseline paths"
+    },
+    {
+     "sha": "29df88cad",
+     "subject": "fix(pipeline-core): sign unborn-HEAD overrides and collapse doubled path separators"
+    },
+    {
+     "sha": "ab5fefbbc",
+     "subject": "fix(pipeline-core): validate a signing request before probing the toolchain"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+   "stage20261016": "50",
+   "reason20261016": "Six points pinned green; skip and native route absent.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+   "stage20261016": "50",
+   "reason20261016": "Three of five cases todo.",
+   "mappedCommits": [
+    {
+     "sha": "087529609",
+     "subject": "test(pipeline-core): re-base the signing-default cases onto the design approval request"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.signing-prompt-prints-the-whole-review-package",
+   "stage20261016": "50",
+   "reason20261016": "Compact disclosure pinned with uncapped mirror failing; route and latency held.",
+   "mappedCommits": [
+    {
+     "sha": "979e5dc70",
+     "subject": "fix(pipeline-core): use the compact signing disclosure for plan approval"
+    },
+    {
+     "sha": "ff4007a49",
+     "subject": "fix(pipeline-core): name the missing request in the compact signing fallback"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.signing-toolchain-readiness",
+   "stage20261016": "50",
+   "reason20261016": "input-builder defect: the reader saw originalStage 25 as baseline; the 2026-10-12 matrix currentEngineering stage is 50 and no commit since contradicts it, so the keep-baseline rule yields 50",
+   "mappedCommits": [
+    {
+     "sha": "fc56a4d5f",
+     "subject": "fix(pipeline-core): pin signing toolchain readiness and name Git's ucrt64 OpenSSL"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+   "stage20261016": "25",
+   "reason20261016": "No commits; baseline kept.",
+   "mappedCommits": [
+    {
+     "sha": "3ec87cfc1",
+     "subject": "test(pipeline-core): pin that a changed source agent definition cannot lock its installed agent"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
+   "stage20261016": "25",
+   "reason20261016": "No commits; baseline kept.",
+   "mappedCommits": [
+    {
+     "sha": "fefb4fa0f",
+     "subject": "test(pipeline-core): pin the happy path to exactly two per-feature PO approvals"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.transfer-redaction-alters-digest-bound-files",
+   "stage20261016": "50",
+   "reason20261016": "Byte-exact carry pinned; no counts and CLI runs only as refusal.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+   "stage20261016": "50",
+   "reason20261016": "Declined seed, first-round question, binding and refusal pinned; guard-admission clause missing.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+   "stage20261016": "50",
+   "reason20261016": "Most cases typed skips on this host.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+   "stage20261016": "50",
+   "reason20261016": "Pin matches proposal; no counts; reader's pin-file read refused by guard.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+   "stage20261016": "50",
+   "reason20261016": "Guard fix and pins map the acceptance; cross-platform and fresh intake held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+   "stage20261016": "50",
+   "reason20261016": "Assurance refusal and private root pinned; suite-wide effect unproven.",
+   "mappedCommits": [
+    {
+     "sha": "4776fcfd4",
+     "subject": "fix(pipeline-core): create the fixture private root with an owned DACL on Windows"
+    },
+    {
+     "sha": "74b2c01c5",
+     "subject": "test(pipeline-core): restore the replaced AC-270 pin cases"
+    },
+    {
+     "sha": "3a97d3cbd",
+     "subject": "fix(pipeline-core): stop the retention-parent check from refusing every Windows directory"
+    },
+    {
+     "sha": "abace877f",
+     "subject": "test(pipeline-core): realign the PO gate authority suite with the current routes"
+    },
+    {
+     "sha": "cb2255013",
+     "subject": "test(pipeline-core): make the DACL pin's native-facts assertion able to fail"
+    },
+    {
+     "sha": "fd6e0d65b",
+     "subject": "test(pipeline-core): assert private state with the owned DACL on Windows"
+    },
+    {
+     "sha": "b554c495c",
+     "subject": "fix(pipeline-core): treat Windows ancestors above the repository as human-controlled"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+   "stage20261016": "50",
+   "reason20261016": "First two clauses mapped; driver, onboarding and installed observation held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+   "stage20261016": "50",
+   "reason20261016": "Durable write, absolute argv, marker, real push block green; skip and smoke runs block 75.",
+   "mappedCommits": [
+    {
+     "sha": "04bc678d1",
+     "subject": "fix(pipeline-core): give the pre-push installer action an absolute executable"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+   "stage20261016": "50",
+   "reason20261016": "Parser pinned; real-process clauses skips.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+   "stage20261016": "50",
+   "reason20261016": "One of five clauses gets targeted evidence on code the baseline marked present.",
+   "mappedCommits": [
+    {
+     "sha": "128d7bd36",
+     "subject": "test(pipeline-core): pin root-bound onboarding state across two worktrees"
+    }
+   ]
+  }
+ ]
+}
