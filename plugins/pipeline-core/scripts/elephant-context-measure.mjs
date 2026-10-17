@@ -4,8 +4,8 @@
 // wake-up replies, inline reads, guard refusals, authoring and other, with shares,
 // then attribute the same events to the five structural causes the backlog item
 // pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads names
-// (wake-up loops, delegation cost, refused Explore/Plan dispatch, guard false
-// positives, hand-written briefings) and compare two measurements per cause.
+// (wake-up loops, delegation cost, refused Explore/Plan dispatch, guard refusals,
+// hand-written briefings) and compare two measurements per cause.
 // Metric is a utf8-byte upper bound (not exact model tokens). Claude transcripts only.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -16,7 +16,10 @@ export const ADMIN_CATEGORIES = ["wakeUp", "guardRefusal", "authoring"];
 export const ADMIN_TARGET_SHARE = 0.1;
 // One key per cause in the item's Description. Causes are attribution views over the
 // category totals, not a partition: their shares overlap and are never summed.
-export const CAUSES = ["wakeUpLoops", "delegationCost", "exploreOrPlanRefused", "guardFalsePositives", "handWrittenBriefings"];
+// `guardRefusals` counts every guard refusal. The transcript cannot tell a false positive from
+// a true one (a true refusal is also followed by an admitted respelling), so the cause is named
+// for what it counts and `retriedAdmitted*` is the false-positive CANDIDATE subset, not a verdict.
+export const CAUSES = ["wakeUpLoops", "delegationCost", "exploreOrPlanRefused", "guardRefusals", "handWrittenBriefings"];
 
 const READ_TOOLS = new Set(["Read", "Grep", "Glob", "NotebookRead", "WebFetch", "WebSearch"]);
 const AUTHORING_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit", "Agent", "Task"]);
@@ -26,7 +29,7 @@ const GIT_READ = /^\s*git\s+(status|log|diff|show|branch|rev-parse|ls-files|work
 const WAKE_MARKERS = [/<task-notification>/, /Stop hook feedback/i, /<goal[\s>]/i, /\[goal\]/i];
 // The six field headings of templates/prompts/goldfish-task.md. A dispatch prompt that
 // carries all six is template-shaped; the rest is an UPPER BOUND on hand-written
-// briefings (it also contains Critic and other non-Goldfish prompts).
+// briefings (it can still contain other non-Goldfish prompts that carry no template).
 const TEMPLATE_FIELD_MARKERS = [
   /\b1\.\s*Goal\b/i,
   /\b2\.\s*Context files\b/i,
@@ -34,6 +37,15 @@ const TEMPLATE_FIELD_MARKERS = [
   /\b4\.\s*(?:Forbidden|Prohibitions)\b/i,
   /\b5\.\s*Stop conditions\b/i,
   /\b6\.\s*Dispatch metadata\b/i,
+];
+// The fixed headings of templates/prompts/critic-review.md. A Critic prompt never carries the six
+// Goldfish fields, so a correctly filled Critic briefing is recognised by its own template: the
+// fail-closed reference boundary plus both review phases. One heading quoted in a freehand
+// prompt is not the template.
+const CRITIC_TEMPLATE_MARKERS = [
+  /^#{1,6}\s*Fail-closed reference boundary \(MUST\)/im,
+  /^#{1,6}\s*Phase A\b[^\n]*Adversarial hunt/im,
+  /^#{1,6}\s*Phase B\b[^\n]*Evidence gate/im,
 ];
 
 const bytes = (value) => Buffer.byteLength(typeof value === "string" ? value : JSON.stringify(value ?? ""), "utf8");
@@ -75,9 +87,10 @@ export function classifyTranscript(jsonlText) {
   const inlineActions = { count: 0 };
   const delegation = tally();
   const recon = tally();
-  const falsePositive = tally();
+  const refusals = tally();
   const retried = tally();
   const briefings = { all: tally(), templateShaped: tally(), notTemplateShaped: tally() };
+  let criticTemplateEvents = 0;
   const add = (category, size) => { totals[category] += size; counts[category] += 1; };
 
   for (const line of jsonlText.split(/\r?\n/)) {
@@ -98,10 +111,10 @@ export function classifyTranscript(jsonlText) {
           add(refused ? "guardRefusal" : meta?.category ?? "other", size);
           if (meta?.delegated) delegation.units += size;
           if (refused) {
-            const target = meta?.delegated && RECON_AGENT_TYPES.has(meta.subagentType) ? recon : falsePositive;
+            const target = meta?.delegated && RECON_AGENT_TYPES.has(meta.subagentType) ? recon : refusals;
             target.events += 1;
             target.units += size;
-            if (target === falsePositive) pendingRefusals.set(meta?.name ?? "", size);
+            if (target === refusals) pendingRefusals.set(meta?.name ?? "", size);
           } else if (block.is_error !== true && retryRefusalBytes.has(block.tool_use_id)) {
             retried.events += 1;
             retried.units += retryRefusalBytes.get(block.tool_use_id);
@@ -141,7 +154,9 @@ export function classifyTranscript(jsonlText) {
             delegation.events += 1;
             delegation.units += size;
             const prompt = typeof block.input?.prompt === "string" ? block.input.prompt : "";
-            const shaped = TEMPLATE_FIELD_MARKERS.every((re) => re.test(prompt));
+            const criticShaped = CRITIC_TEMPLATE_MARKERS.every((re) => re.test(prompt));
+            const shaped = criticShaped || TEMPLATE_FIELD_MARKERS.every((re) => re.test(prompt));
+            if (criticShaped) criticTemplateEvents += 1;
             for (const bucket of [briefings.all, shaped ? briefings.templateShaped : briefings.notTemplateShaped]) {
               bucket.events += 1;
               bucket.units += size;
@@ -166,8 +181,8 @@ export function classifyTranscript(jsonlText) {
     wakeUpLoops: { events: counts.wakeUp, units: totals.wakeUp, share: shares.wakeUp, replyEvents: wake.replyEvents, replyUnits: wake.replyUnits, longestRun: wake.longestRun },
     delegationCost: { events: delegation.events, units: delegation.units, share: shareOf(delegation.units), perDelegationUnits: perDelegation, perInlineActionUnits: perInline, costRatio, costlierThanInline: costRatio !== null && costRatio > 1 },
     exploreOrPlanRefused: { events: recon.events, units: recon.units, share: shareOf(recon.units) },
-    guardFalsePositives: { events: falsePositive.events, units: falsePositive.units, share: shareOf(falsePositive.units), retriedAdmittedEvents: retried.events, retriedAdmittedUnits: retried.units },
-    handWrittenBriefings: { events: briefings.notTemplateShaped.events, units: briefings.notTemplateShaped.units, share: shareOf(briefings.notTemplateShaped.units), briefingEvents: briefings.all.events, templateShapedEvents: briefings.templateShaped.events },
+    guardRefusals: { events: refusals.events, units: refusals.units, share: shareOf(refusals.units), retriedAdmittedEvents: retried.events, retriedAdmittedUnits: retried.units },
+    handWrittenBriefings: { events: briefings.notTemplateShaped.events, units: briefings.notTemplateShaped.units, share: shareOf(briefings.notTemplateShaped.units), briefingEvents: briefings.all.events, templateShapedEvents: briefings.templateShaped.events, criticTemplateEvents },
   };
   return {
     schema: "pipeline.elephant-context-measurement.v1",
@@ -188,15 +203,20 @@ export function classifyTranscript(jsonlText) {
 
 /**
  * Per-cause before/after over two measurements produced by classifyTranscript().
- * `improved` is a strict fall of that cause's own share of main-thread units; a cause
- * absent in `before` (no events) cannot be improved and is reported `improved: false`.
+ * A cause's share is relative: it falls whenever the REST of the transcript grows, at an
+ * unchanged absolute cost. The share change is therefore reported on its own (`deltaShare`,
+ * `shareFell`) and `improved` additionally requires the absolute cost to fall (`unitsFell`, the
+ * utf8-byte metric). `eventsFell` is reported alongside. A cause absent in `before` (no events)
+ * cannot be improved and is reported `improved: false`.
  */
 export function compareMeasurements(before, after) {
   const view = (m, key) => ({ events: m?.causes?.[key]?.events ?? 0, units: m?.causes?.[key]?.units ?? 0, share: m?.causes?.[key]?.share ?? 0 });
   const causes = Object.fromEntries(CAUSES.map((key) => {
     const b = view(before, key);
     const a = view(after, key);
-    return [key, { before: b, after: a, deltaUnits: a.units - b.units, deltaShare: a.share - b.share, improved: b.events > 0 && a.share < b.share }];
+    const shareFell = a.share < b.share;
+    const unitsFell = a.units < b.units;
+    return [key, { before: b, after: a, deltaUnits: a.units - b.units, deltaShare: a.share - b.share, shareFell, unitsFell, eventsFell: a.events < b.events, improved: b.events > 0 && shareFell && unitsFell }];
   }));
   return {
     schema: "pipeline.elephant-context-comparison.v1",

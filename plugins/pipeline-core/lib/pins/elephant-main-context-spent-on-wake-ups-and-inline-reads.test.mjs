@@ -58,7 +58,7 @@ const PAIRS = {
     before: [asst([toolUse("e1", "Agent", { subagent_type: "Explore", prompt: "look around" })]), user([toolResult("e1", "BLOCKED: GUARD-DISPATCH Explore refused", true)]), ...read1("r1")],
     after: [...read1("r1")],
   },
-  guardFalsePositives: {
+  guardRefusals: {
     before: [asst([toolUse("b1", "Bash", { command: "rg -rn x f" })]), user([toolResult("b1", "BLOCKED: GUARD-READ-COMMAND-UNSUPPORTED", true)]), asst([toolUse("b2", "Bash", { command: "rg -n x f" })]), user([toolResult("b2", "match ".repeat(300))])],
     after: [asst([toolUse("b2", "Bash", { command: "rg -n x f" })]), user([toolResult("b2", "match ".repeat(300))])],
   },

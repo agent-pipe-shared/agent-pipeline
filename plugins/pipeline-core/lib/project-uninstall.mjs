@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 // Source target: plugins/pipeline-core/lib/project-uninstall.mjs
-import {closeSync,fsyncSync,mkdirSync,openSync,readdirSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
+import {closeSync,constants,fstatSync,fsyncSync,mkdirSync,openSync,readSync,readdirSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
 import {dirname,join,relative,resolve,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {randomBytes} from 'node:crypto';
@@ -35,7 +35,35 @@ function replace(path,bytes,{beforeSha256,mode=0o600,absent=false}={}){const bef
 // It is owned private state and is archived with the rest; any other shape stays foreign.
 const PRE_PUSH_LOG_SCHEMA='pipeline.pre-push-hook-log.v1',PRE_PUSH_LOG_KEYS=['schema','at','verdict','commit','localRef','remoteRef','note','reasons'],PRE_PUSH_LOG_VERDICTS=['allowed','allowed-with-warnings','blocked'];
 function prePushLogRecord(line){let v;try{v=JSON.parse(line);}catch{return false;}if(v===null||typeof v!=='object'||Array.isArray(v)||Object.keys(v).some(k=>!PRE_PUSH_LOG_KEYS.includes(k))||v.schema!==PRE_PUSH_LOG_SCHEMA||typeof v.at!=='string'||!PRE_PUSH_LOG_VERDICTS.includes(v.verdict)||Number.isNaN(Date.parse(v.at))||new Date(v.at).toISOString()!==v.at)return false;if(['commit','localRef','remoteRef','note'].some(k=>k in v&&typeof v[k]!=='string'))return false;return !('reasons' in v)||(Array.isArray(v.reasons)&&v.reasons.every(r=>typeof r==='string'));}
-function privateHookArchive(entry){const current=physicalFootprintPath(entry.state,{missing:true,directory:true});if(!current)return null;const names=readdirSync(entry.state).sort();for(const name of names){if(['impl.mjs','install-marker.json'].includes(name))continue;if(name==='log.jsonl'&&entry.name==='pre-push'){const raw=readPhysicalFootprint(join(entry.state,name),{max:4194304});let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(raw.bytes);}catch{footprintFail('PU-PRIVATE-FOREIGN');}const lines=text.split('\n');if(lines.at(-1)==='')lines.pop();if(!lines.every(prePushLogRecord))footprintFail('PU-PRIVATE-FOREIGN');continue;}if(name==='decline-marker.json'){const raw=readPhysicalFootprint(join(entry.state,name),{max:65536});let v;try{v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw.bytes));}catch{footprintFail('PU-PRIVATE-FOREIGN');}if(v.schema!=='pipeline.'+entry.name+'-hook-decline.v1'||typeof v.declinedAt!=='string')footprintFail('PU-PRIVATE-FOREIGN');continue;}if(!/^runtime-[a-f0-9]{64}$/.test(name))footprintFail('PU-PRIVATE-FOREIGN');verifyGitHookRuntimeSnapshot({snapshotRoot:join(entry.state,name),manifestSha256:name.slice(8)});}return {path:entry.state,identity:footprintIdentity(current),names};}
+// recordLog appends without rotation, so the log has no size bound a reader may rely on: readPhysicalFootprint's byte cap would
+// make a valid but long-lived log fail PU-SIZE and leave the repository unremovable. Validity is a property of the records, so the
+// file is validated record by record from a bounded chunked read, never held whole. Only the longest single record is bounded
+// (PRE_PUSH_LOG_MAX_LINE, the former whole-file cap: nothing the old reader admitted is refused now); a longer line is not a record
+// the hook can have written and is foreign. The physical-file rigour of readPhysicalFootprint is kept: no symlink on the path, a
+// regular file with one link (PU-FILE), the same inode across open, and no drift in size or timestamps over the whole read (PU-DRIFT).
+const PRE_PUSH_LOG_CHUNK=65536,PRE_PUSH_LOG_MAX_LINE=4194304;
+function scanPrePushLog(path){
+ const pre=physicalFootprintPath(path,{missing:true});if(!pre)footprintFail('PU-DRIFT');
+ if(!pre.isFile()||pre.nlink!==1)footprintFail('PU-FILE');
+ const fd=openSync(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0));
+ try{
+  const before=fstatSync(fd);if(before.ino!==pre.ino||before.dev!==pre.dev||before.nlink!==1||!before.isFile())footprintFail('PU-FD');
+  const decoder=new TextDecoder('utf-8',{fatal:true}),chunk=Buffer.allocUnsafe(PRE_PUSH_LOG_CHUNK),foreign=()=>footprintFail('PU-PRIVATE-FOREIGN');
+  let count=0,carry='';
+  for(;;){
+   const n=readSync(fd,chunk,0,chunk.length,null);if(n===0)break;count+=n;if(count>before.size)footprintFail('PU-DRIFT');
+   let text;try{text=decoder.decode(chunk.subarray(0,n),{stream:true});}catch{foreign();}
+   const parts=(carry+text).split('\n');carry=parts.pop();
+   for(const part of parts)if(part.length>PRE_PUSH_LOG_MAX_LINE||!prePushLogRecord(part))foreign();
+   if(carry.length>PRE_PUSH_LOG_MAX_LINE)foreign();
+  }
+  try{carry+=decoder.decode();}catch{foreign();}
+  if(carry!==''&&(carry.length>PRE_PUSH_LOG_MAX_LINE||!prePushLogRecord(carry)))foreign();
+  const after=fstatSync(fd),now=physicalFootprintPath(path);
+  if(after.ino!==now.ino||after.dev!==now.dev||after.size!==count||now.size!==count||after.mtimeMs!==before.mtimeMs||after.ctimeMs!==before.ctimeMs||now.mtimeMs!==after.mtimeMs||now.ctimeMs!==after.ctimeMs||now.nlink!==1)footprintFail('PU-DRIFT');
+ }finally{closeSync(fd);}
+}
+function privateHookArchive(entry){const current=physicalFootprintPath(entry.state,{missing:true,directory:true});if(!current)return null;const names=readdirSync(entry.state).sort();for(const name of names){if(['impl.mjs','install-marker.json'].includes(name))continue;if(name==='log.jsonl'&&entry.name==='pre-push'){scanPrePushLog(join(entry.state,name));continue;}if(name==='decline-marker.json'){const raw=readPhysicalFootprint(join(entry.state,name),{max:65536});let v;try{v=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw.bytes));}catch{footprintFail('PU-PRIVATE-FOREIGN');}if(v.schema!=='pipeline.'+entry.name+'-hook-decline.v1'||typeof v.declinedAt!=='string')footprintFail('PU-PRIVATE-FOREIGN');continue;}if(!/^runtime-[a-f0-9]{64}$/.test(name))footprintFail('PU-PRIVATE-FOREIGN');verifyGitHookRuntimeSnapshot({snapshotRoot:join(entry.state,name),manifestSha256:name.slice(8)});}return {path:entry.state,identity:footprintIdentity(current),names};}
 export function createProjectUninstallController({hostStateRoot=join(homedir(),'.local','state','agent-pipeline','activation')}={}){
  const scope=createGovernanceScopeController({hostStateRoot}),plans=new WeakMap();
  function derive(rootDir){const observed=scope.observe({rootDir});if(observed.root===null||observed.repositoryKind==='unavailable')footprintFail('PU-ROOT-UNAVAILABLE');const root=observed.root,rootIdentity=footprintIdentity(physicalFootprintPath(root,{directory:true})),git=observed.repositoryKind==='git'?observeGitHookFootprint({rootDir:root}):null;

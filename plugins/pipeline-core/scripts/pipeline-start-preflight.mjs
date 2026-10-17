@@ -858,7 +858,7 @@ function observeContinuitySourceSha256(rootDir, relativePath) {
 }
 
 /**
- * ALF-C-N1-02B (item pipeline.forensics-and-audit-evidence-not-reconstructable, Acceptance
+ * ALF-C-N1-02C (item pipeline.forensics-and-audit-evidence-not-reconstructable, Acceptance
  * "Bootstrap ... compare continuity source digests with the checkout and surface drift"): the
  * recorded continuity PRD/Spec digests are compared with the bytes now in the checkout, reusing the
  * projection the State `inspect` verb already emits (`continuityAuthorityDrift`). The result is a
@@ -1708,7 +1708,7 @@ export function observePipelineStartPreflight({
       taskScopeResolved: false,
     };
   }
-  // Advisory only (ALF-C-N1-02B): never read by `status`, `nextAction` or the exit code below.
+  // Advisory only (ALF-C-N1-02C): never read by `status`, `nextAction` or the exit code below.
   let continuityAuthorityDrift = null;
   try { continuityAuthorityDrift = observeContinuityAuthorityDriftFn({ rootDir: resolve(cwd) }) ?? null; }
   catch { continuityAuthorityDrift = null; }

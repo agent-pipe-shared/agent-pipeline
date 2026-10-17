@@ -196,8 +196,52 @@ test('AC216-B4: log.jsonl is admitted only as the pre-push hook\'s own regular f
  assert.deepEqual(privateFootprint(f),baseline);
 });
 
-// Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 15) throw new Error("Required completion declared case count drift");
+// ALF-C-C6D-CORR (Critic C6d F4). recordLog appends to log.jsonl without rotation, so a long-lived repository can carry a log
+// larger than the 4 MiB readPhysicalFootprint cap. Whether a log is the hook's own is a property of its records, not of its
+// size: a valid log of any size must stay uninstallable, and every byte of a large one must still be validated.
+const OLD_READ_CAP=4194304,CHUNK=65536;
+function bigLog(){
+ const lines=[];let bytes=0;
+ for(let i=0;bytes<OLD_READ_CAP+262144;i++){const line=logLine(logRecord({commit:i.toString(16).padStart(40,'0'),reasons:['reason ß €'+'x'.repeat(i%17)],note:'€'.repeat(30)}));lines.push(line);bytes+=Buffer.byteLength(line);}
+ return Buffer.from(lines.join(''));
+}
+// A 3-byte character that begins before a 64 KiB boundary and ends after it proves the multi-byte straddle is really exercised.
+const straddlesChunk=buffer=>{for(let at=CHUNK;at<buffer.length;at+=CHUNK)if((buffer[at]&0xc0)===0x80)return true;return false;};
+test('AC216-B4: a valid log.jsonl larger than the 4 MiB footprint read cap still plans clean, is archived byte for byte, and the uninstall completes',t=>{
+ const f=fixture(t),state=hookState(f,'pre-push'),log=join(state,'log.jsonl'),big=bigLog();
+ assert(big.length>OLD_READ_CAP,'the fixture log must exceed the old read cap');assert(straddlesChunk(big),'the fixture must put a multi-byte character across a 64 KiB read boundary');
+ writeFileSync(log,big);const before=f.digests(),plan=f.controller.plan({rootDir:f.root});
+ assert.deepEqual(plan.conflicts,[],'a valid log must not make the repository unremovable because it grew');
+ const archive=plan.privateArchives.find(a=>a.path===state);assert(archive,'the pre-push private directory is planned for archiving');assert(archive.names.includes('log.jsonl'));
+ const result=f.controller.apply(plan,options(plan));assert.equal(result.status,'uninstalled');completed(f,plan);
+ assert(!existsSync(state),'the live private directory left with the hook');
+ const retained=join(result.retainedMetadataPath,'private-'+plan.privateArchives.indexOf(archive),'log.jsonl');
+ assert(readFileSync(retained).equals(big),'the oversized log is archived byte for byte, not truncated or deleted');assert.deepEqual(f.digests(),before);
+});
+test('AC216-B4: an oversized log.jsonl is validated to its last byte: a bad record, bad UTF-8 or an over-long line past the old cap is still PU-PRIVATE-FOREIGN and nothing changes',t=>{
+ const f=fixture(t),state=hookState(f,'pre-push'),log=join(state,'log.jsonl'),big=bigLog(),shims=f.controller.plan({rootDir:f.root}).git.hooks.map(h=>h.hookPath),baseline=privateFootprint(f);
+ const invalid=[
+  ['a malformed record after more than 4 MiB of valid ones',Buffer.concat([big,Buffer.from('{"schema":"'+LOG_SCHEMA+'",\n')])],
+  ['a torn final record after more than 4 MiB of valid ones',Buffer.concat([big,Buffer.from(JSON.stringify(logRecord()).slice(0,40))])],
+  ['a blank line after more than 4 MiB of valid ones',Buffer.concat([big,Buffer.from('\n')])],
+  ['a foreign key after more than 4 MiB of valid ones',Buffer.concat([big,Buffer.from(logLine(logRecord({exfil:'x'})))])],
+  ['bytes that are not UTF-8 after more than 4 MiB of valid ones',Buffer.concat([big,Buffer.from([0xff,0xfe,0x0a])])],
+  ['a multi-byte character cut off at the end of the file',Buffer.concat([big,Buffer.from([0xe2,0x82])])],
+  ['a single line longer than any record the hook can write',Buffer.concat([Buffer.from(goodLog),Buffer.from('a'.repeat(OLD_READ_CAP+1)+'\n')])],
+ ];
+ for(const [name,bytes] of invalid){
+  writeFileSync(log,bytes);const plan=f.controller.plan({rootDir:f.root});
+  assert.deepEqual(plan.conflicts.map(c=>[c.code,c.path]),[['PU-PRIVATE-FOREIGN',state]],name);
+  assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-OWNERSHIP-CONFLICT',name);assert(!existsSync(plan.controls),name+': no controls were created');
+  assert(readFileSync(log).equals(bytes),name+': the log itself is untouched');assert(shims.every(path=>existsSync(path)),name+': the shims stay');assert.deepEqual(privateFootprint(f),baseline,name);
+ }
+ // Control: the same oversized log without the bad tail is admitted.
+ writeFileSync(log,big);assert.deepEqual(f.controller.plan({rootDir:f.root}).conflicts,[]);
+});
+
+// Each original sibling callback is registered individually; no envelope case. The count is the fifteen originals plus the
+// two oversized-log cases above (UC02C016, UC02C017); the originals keep their ids because new cases are appended.
+if (completionCases.length !== 17) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -89,9 +89,9 @@ test("attributes events to the five causes of the item", () => {
   assert.equal(causes.wakeUpLoops.replyEvents, 3);
   assert.equal(causes.exploreOrPlanRefused.events, 1);
   assert.ok(causes.exploreOrPlanRefused.units > 0);
-  // The Explore refusal is its own cause: it is neither a false positive nor a retried respelling.
-  assert.equal(causes.guardFalsePositives.events, 1);
-  assert.equal(causes.guardFalsePositives.retriedAdmittedEvents, 1);
+  // The Explore refusal is its own cause: it is neither a guard refusal of the ordinary kind nor a retried respelling.
+  assert.equal(causes.guardRefusals.events, 1);
+  assert.equal(causes.guardRefusals.retriedAdmittedEvents, 1);
   assert.equal(causes.delegationCost.events, 2);
   assert.equal(typeof causes.delegationCost.costRatio, "number");
   assert.equal(causes.delegationCost.costlierThanInline, causes.delegationCost.costRatio > 1);
@@ -119,4 +119,76 @@ test("a cause with no events before cannot be reported improved", () => {
   const none = compareMeasurements(classifyTranscript(""), classifyTranscript(""));
   for (const key of CAUSES) assert.equal(none.causes[key].improved, false, key);
   assert.equal(none.withinAdminTarget, false);
+});
+
+// ALF-C-C6D-CORR (Critic C6d F5). Three per-cause measures were imprecise.
+// F5(a): the six-field Goldfish markers never match a Critic prompt, so every correctly filled
+// Critic briefing was counted as hand-written. The Critic template has its own fixed headings.
+const CRITIC_PROMPT = [
+  "Review the fixed candidate range.",
+  "## Fail-closed reference boundary (MUST)", "name paths only",
+  "## Phase A — Adversarial hunt (be harsh; report nothing yet)", "hunt",
+  "## Phase B — Evidence gate (be honest; report only what survives)", "gate",
+  "## Report format (mandatory)", "findings table",
+].join("\n");
+
+test("F5(a): a correctly filled Critic briefing is template-shaped, a freehand Critic prompt is still hand-written", () => {
+  const dispatch = (id, prompt) => [asst([toolUse(id, "Agent", { subagent_type: "pipeline-core:critic", prompt })]), user([toolResult(id, "findings")])];
+  const filled = classifyTranscript(dispatch("c1", CRITIC_PROMPT).join("\n")).causes.handWrittenBriefings;
+  assert.equal(filled.briefingEvents, 1);
+  assert.equal(filled.templateShapedEvents, 1);
+  assert.equal(filled.events, 0);
+  assert.equal(filled.units, 0);
+  const freehand = classifyTranscript(dispatch("c2", "Please review commit abc123 and tell me what is wrong with it.").join("\n")).causes.handWrittenBriefings;
+  assert.equal(freehand.briefingEvents, 1);
+  assert.equal(freehand.templateShapedEvents, 0);
+  assert.equal(freehand.events, 1);
+  // One Critic heading quoted inside a freehand prompt is not the template.
+  const quoted = classifyTranscript(dispatch("c3", "Follow the Fail-closed reference boundary (MUST) section, whatever it says.").join("\n")).causes.handWrittenBriefings;
+  assert.equal(quoted.events, 1);
+});
+
+// F5(b): the transcript cannot tell a false-positive refusal from a true one (a true refusal is
+// also followed by an admitted respelling), so the cause counts guard REFUSALS and says so.
+test("F5(b): the guard cause is named for what it counts: refusals, with the retried-and-admitted subset", () => {
+  assert.ok(CAUSES.includes("guardRefusals"));
+  assert.ok(!CAUSES.includes("guardFalsePositives"));
+  const session = [
+    asst([toolUse("g1", "Bash", { command: "rg -rn x f" })]),
+    user([toolResult("g1", "BLOCKED: GUARD-READ-COMMAND-UNSUPPORTED", true)]),
+    asst([toolUse("g2", "Bash", { command: "rg -n x f" })]),
+    user([toolResult("g2", "match")]),
+    asst([toolUse("g3", "Edit", { file_path: "p.md", old_string: "a", new_string: "b" })]),
+    user([toolResult("g3", "BLOCKED: GUARD-WRITE refused", true)]),
+    asst([{ type: "text", text: "stopping" }]),
+  ].join("\n");
+  const { causes } = classifyTranscript(session);
+  assert.equal(causes.guardFalsePositives, undefined);
+  assert.equal(causes.guardRefusals.events, 2);
+  assert.equal(causes.guardRefusals.retriedAdmittedEvents, 1);
+  assert.ok(causes.guardRefusals.units > causes.guardRefusals.retriedAdmittedUnits);
+  assert.ok(Object.keys(compareMeasurements(classifyTranscript(session), classifyTranscript("")).causes).includes("guardRefusals"));
+});
+
+// F5(c): a cause's share can fall only because the rest of the transcript grew. That is not an improvement.
+test("F5(c): a falling share at unchanged absolute cost is not improved; the share change is reported separately", () => {
+  const exchange = [user("go"), wake(), reply()];
+  const small = [asst([toolUse("r1", "Read", { file_path: "a.md" })]), user([toolResult("r1", "y".repeat(100))])];
+  const large = [asst([toolUse("r1", "Read", { file_path: "a.md" })]), user([toolResult("r1", "y".repeat(20000))])];
+  const before = classifyTranscript([...exchange, ...small].join("\n"));
+  const after = classifyTranscript([...exchange, ...large].join("\n"));
+  assert.equal(after.causes.wakeUpLoops.events, before.causes.wakeUpLoops.events);
+  assert.equal(after.causes.wakeUpLoops.units, before.causes.wakeUpLoops.units);
+  const cmp = compareMeasurements(before, after).causes.wakeUpLoops;
+  assert.ok(cmp.deltaShare < 0);
+  assert.equal(cmp.shareFell, true);
+  assert.equal(cmp.unitsFell, false);
+  assert.equal(cmp.deltaUnits, 0);
+  assert.equal(cmp.improved, false);
+  // Control: the same share fall with a real fall in absolute cost is an improvement.
+  const gone = compareMeasurements(before, classifyTranscript([user("go"), ...large].join("\n"))).causes.wakeUpLoops;
+  assert.equal(gone.shareFell, true);
+  assert.equal(gone.unitsFell, true);
+  assert.equal(gone.eventsFell, true);
+  assert.equal(gone.improved, true);
 });
