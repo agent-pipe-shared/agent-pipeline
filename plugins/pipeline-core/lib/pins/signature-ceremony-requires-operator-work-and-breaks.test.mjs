@@ -225,6 +225,217 @@ test("mirror proof: the staged protected patch ALF-C-AC258-REF yields the up-fro
 });
 
 // ---------------------------------------------------------------------------------------------
+// UNBORN-HEAD SIGNATURE CEREMONY ON A PATCHED MIRROR (acceptance clause "Signing works in an
+// unborn-HEAD repository"; ALF-C-AC258-UNBORN2). The live case "RED: signature preparation works
+// in an unborn-HEAD repository" above stays RED until the signature-bound protected patch
+// scratch/patches/ALF-C-AC258-UNBORN.patch (plugins/pipeline-core/lib/human-guard-override.mjs)
+// lands. Root cause it fixes: createPoApprovalIntent() rejects a null commit, so the unborn
+// observation (`head: null`, tree === the empty-tree oid) is bound into the signed intent as the
+// all-zero commit sentinel with a separate "-unborn" policy revision, and the same mapping is
+// compared at arm time. The cases below prove the patch on a scratch COPY of the plugin (the
+// AC258-REF mirror pattern) and pin the ceremony around the first commit:
+//   (U1)  unborn prepare-for-signature returns status 0 and "prepared"       [RED without the patch]
+//   (U1b) a born repository still prepares on the same mirror                 [control]
+//   (U2)  an intent prepared and signed while unborn is refused, typed, after the first commit
+//   (U3a) arming while still unborn works and consuming while still unborn is admitted [control]
+//   (U3b) arm unborn, first commit, consume -> replan HGO-DRIFT, capability never spent
+// Every fixture git call carries GIT_CEILING_DIRECTORIES (the fixtures' parent) and every fixture
+// runs its own `git init` first. The signing key is an in-memory ephemeral Ed25519 pair whose
+// public digest is the fixture's committed-style trust anchor, exactly as in the course cases below.
+// ---------------------------------------------------------------------------------------------
+const AC258_UNBORN_PATCH = join(REPO_ROOT, "scratch", "patches", "ALF-C-AC258-UNBORN.patch");
+const UNBORN_CASE_TIMEOUT_MS = 600_000; // own constant: the shared CASE_TIMEOUT_MS below is still in its TDZ when these cases register
+const UNBORN_KEY_REFERENCE = "ac258-unborn-fixture-key";
+const UNBORN_DRIFT_CODES = ["HGO-CANDIDATE-DRIFT", "HGO-DRIFT"];
+const UNBORN_DENIALS = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+const UNBORN_TOOL_INPUT = { file_path: "notes.md", content: "ac258\n" };
+const unbornCourse = { cleanup: [] };
+
+function ubGit(dir, args) {
+  return spawnSync("git", ["-c", "commit.gpgsign=false", ...args], {
+    cwd: dir, encoding: "utf8", shell: false, timeout: 240_000,
+    env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURES },
+  });
+}
+
+function ubIsUnborn(root) {
+  return ubGit(root, ["rev-parse", "--verify", "-q", "HEAD"]).status !== 0;
+}
+
+/** Own `git init` under scratch/, an UNBORN branch, a signature-mode yaml and the ephemeral key's anchor. */
+function ubFixture() {
+  mkdirSync(FIXTURES, { recursive: true });
+  const root = mkdtempSync(join(FIXTURES, "unborn-sign-"));
+  unbornCourse.cleanup.push(root);
+  fxMust(ubGit(root, ["init", "-q", "-b", "main"]), "git init");
+  fxMust(ubGit(root, ["config", "user.name", "Fixture"]), "git config user.name");
+  fxMust(ubGit(root, ["config", "user.email", "fixture@example.invalid"]), "git config user.email");
+  const normalise = (p) => realpathSync(p).replace(/\\/gu, "/").toLowerCase();
+  assert.equal(normalise(fxMust(ubGit(root, ["rev-parse", "--show-toplevel"]), "show-toplevel")), normalise(root), "containment: the fixture must be its own repository root");
+  assert.ok(ubIsUnborn(root), "the fixture starts with an unborn HEAD");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push"],
+    trustAnchor: { keyReference: UNBORN_KEY_REFERENCE, publicKeySha256: createHash("sha256").update(unbornCourse.publicKeyPem).digest("hex") },
+  }));
+  return root;
+}
+
+/** The first commit: one unrelated file, so the staged anchor/yaml bytes stay exactly as prepared. */
+function ubFirstCommit(root) {
+  writeFileSync(join(root, "README.md"), "first commit\n");
+  fxMust(ubGit(root, ["add", "--", "README.md"]), "stage README.md");
+  fxMust(ubGit(root, ["commit", "-q", "-m", "first commit"]), "first commit");
+  assert.ok(!ubIsUnborn(root), "the first commit was made: HEAD is born");
+}
+
+function ubPrepare(root) {
+  const recorded = unbornCourse.hgo.recordHumanGuardDenial({
+    rootDir: root, pluginRoot: unbornCourse.pluginCopy, toolName: "Write", toolInput: UNBORN_TOOL_INPUT, denials: UNBORN_DENIALS,
+  });
+  assert.equal(recorded.status, "planned", JSON.stringify(recorded).slice(0, 400));
+  const out = io();
+  const status = unbornCourse.cli.main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], out);
+  return { status, out };
+}
+
+function ubPrepared(root) {
+  const { status, out } = ubPrepare(root);
+  assert.equal(status, 0, `prepare-for-signature: ${out.stderr}`);
+  const prepared = JSON.parse(out.stdout);
+  assert.equal(prepared.status, "prepared");
+  return prepared;
+}
+
+function ubArm(root, prepared) {
+  const proof = {
+    schema: unbornCourse.proofSchema,
+    intentSha256: prepared.intentSha256,
+    keyReference: UNBORN_KEY_REFERENCE,
+    publicKey: unbornCourse.publicKeyPem,
+    signatureBase64: sign(null, Buffer.from(prepared.intentSha256, "utf8"), unbornCourse.keyPair.privateKey).toString("base64"),
+  };
+  return unbornCourse.hgo.authorizeHumanGuardOverrideBySignature({
+    rootDir: root,
+    pluginRoot: unbornCourse.pluginCopy,
+    requestSha256: prepared.requestSha256,
+    planSha256: prepared.planSha256,
+    proof,
+    scriptPath: join(unbornCourse.pluginCopy, "scripts", "guard-human-override.mjs"),
+  });
+}
+
+function ubConsume(root) {
+  return unbornCourse.hgo.consumeHumanGuardOverride({
+    rootDir: root, pluginRoot: unbornCourse.pluginCopy, toolName: "Write", toolInput: UNBORN_TOOL_INPUT, denials: UNBORN_DENIALS,
+  });
+}
+
+function ubStore(root) {
+  const commonDir = fxMust(ubGit(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]), "git-common-dir");
+  const base = join(commonDir, "agent-pipeline", "human-guard-overrides");
+  return { capabilities: join(base, "capabilities"), audit: join(base, "audit.jsonl") };
+}
+
+function ubAuditEvents(root) {
+  try { return readFileSync(ubStore(root).audit, "utf8").split(/\r?\n/u).filter(Boolean).map((line) => JSON.parse(line).event); } catch { return []; }
+}
+
+describe("unborn-HEAD signature ceremony on a scratch mirror carrying the staged protected patch ALF-C-AC258-UNBORN (AC-258)", {
+  skip: existsSync(AC258_UNBORN_PATCH) ? false : "the protected patch is not staged under scratch/patches (nothing to prove)",
+}, () => {
+  before(async () => {
+    unbornCourse.previousCeiling = process.env.GIT_CEILING_DIRECTORIES;
+    process.env.GIT_CEILING_DIRECTORIES = FIXTURES; // the library spawns git with the inherited environment
+    mkdirSync(FIXTURES, { recursive: true });
+    const mirror = mkdtempSync(join(FIXTURES, "unborn-mirror-"));
+    unbornCourse.cleanup.push(mirror);
+    unbornCourse.pluginCopy = join(mirror, "plugins", "pipeline-core");
+    cpSync(PLUGIN_ROOT, unbornCourse.pluginCopy, { recursive: true });
+    const apply = (args) => spawnSync("git", ["apply", ...args, AC258_UNBORN_PATCH], {
+      cwd: mirror, encoding: "utf8", shell: false, env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURES },
+    });
+    const applied = apply([]);
+    if (applied.status !== 0) {
+      // Once the patch has landed in the live tree it no longer applies forward; then it must apply in reverse.
+      const reverse = apply(["--reverse", "--check"]);
+      assert.equal(reverse.status, 0, `patch neither applies nor is already present: ${applied.stderr} | ${reverse.stderr}`);
+    }
+    assert.match(readFileSync(join(unbornCourse.pluginCopy, "lib", "human-guard-override.mjs"), "utf8"), /HGO_SIGNATURE_INTENT_POLICY_REVISION_UNBORN/u, "the mirror carries the unborn mapping");
+    const load = (relative) => import(pathToFileURL(join(unbornCourse.pluginCopy, relative)).href);
+    unbornCourse.hgo = await load("lib/human-guard-override.mjs");
+    unbornCourse.cli = await load("scripts/guard-human-override.mjs");
+    unbornCourse.proofSchema = (await load("lib/po-approval-proof.mjs")).PO_APPROVAL_PROOF_SCHEMA;
+    unbornCourse.keyPair = generateKeyPairSync("ed25519");
+    unbornCourse.publicKeyPem = unbornCourse.keyPair.publicKey.export({ type: "spki", format: "pem" });
+  }, { timeout: UNBORN_CASE_TIMEOUT_MS });
+
+  after(() => {
+    if (unbornCourse.previousCeiling === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+    else process.env.GIT_CEILING_DIRECTORIES = unbornCourse.previousCeiling;
+    for (const target of unbornCourse.cleanup) rmSync(target, { recursive: true, force: true, maxRetries: 3 });
+  }, { timeout: UNBORN_CASE_TIMEOUT_MS });
+
+  test("(U1) unborn prepare-for-signature returns status 0 and 'prepared' with a signable intent on the patched mirror", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
+    const root = ubFixture();
+    const prepared = ubPrepared(root);
+    assert.match(prepared.intentSha256, /^[a-f0-9]{64}$/u);
+    assert.ok(prepared.signIntentCommand.argv.includes(prepared.intentSha256), "the human is handed the digest the agent computed");
+    assert.equal(prepared.signIntentCommand.executionBoundary, "attended-external-terminal");
+    assert.equal(prepared.authorizeBySignatureCommand.executionBoundary, "local-process");
+    assert.ok(ubIsUnborn(root), "preparing must not create a commit");
+  });
+
+  test("(U1b) control: a born repository still prepares on the same patched mirror", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
+    const root = ubFixture();
+    ubFirstCommit(root);
+    const prepared = ubPrepared(root);
+    assert.match(prepared.intentSha256, /^[a-f0-9]{64}$/u);
+  });
+
+  test("(U2) an intent prepared and signed while unborn is refused with a typed drift code after the first commit", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
+    const root = ubFixture();
+    const prepared = ubPrepared(root);
+    ubFirstCommit(root);
+    let refusal = null;
+    try { ubArm(root, prepared); } catch (error) { refusal = error; }
+    assert.ok(refusal, "authorize-by-signature must refuse once the first commit landed after signing");
+    assert.ok(UNBORN_DRIFT_CODES.includes(refusal.code), `typed drift refusal expected, got ${refusal.code}: ${refusal.message}`);
+    assert.deepEqual(jsonFiles(ubStore(root).capabilities), [], "nothing was armed");
+  });
+
+  test("(U3a) control: arming while still unborn works and consuming while still unborn is admitted", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
+    const root = ubFixture();
+    const prepared = ubPrepared(root);
+    const armed = ubArm(root, prepared);
+    assert.equal(armed.status, "armed", JSON.stringify(armed).slice(0, 400));
+    assert.ok(ubIsUnborn(root), "arming must not create a commit");
+    const verdict = ubConsume(root);
+    assert.equal(verdict.status, "consumed", JSON.stringify(verdict).slice(0, 400));
+  });
+
+  test("(U3b) arm while unborn, make the first commit, then consume returns replan HGO-DRIFT and the capability is never spent", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
+    const root = ubFixture();
+    const prepared = ubPrepared(root);
+    const armed = ubArm(root, prepared);
+    assert.equal(armed.status, "armed", JSON.stringify(armed).slice(0, 400));
+    ubFirstCommit(root);
+    const verdict = ubConsume(root);
+    assert.deepEqual({ status: verdict.status, code: verdict.code }, { status: "replan", code: "HGO-DRIFT" }, JSON.stringify(verdict).slice(0, 400));
+    const rejected = ubAuditEvents(root).filter((event) => event?.type === "rejected");
+    assert.equal(rejected.length, 1, `exactly one authenticated rejection is audited: ${JSON.stringify(rejected).slice(0, 400)}`);
+    assert.equal(rejected[0].code, "HGO-DRIFT");
+    assert.ok(rejected[0].driftedChecks.includes("repository"), `the drift is the repository observation: ${JSON.stringify(rejected[0].driftedChecks)}`);
+    const store = ubStore(root);
+    const files = jsonFiles(store.capabilities);
+    assert.equal(files.length, 1, "one capability exists");
+    assert.equal(readJson(join(store.capabilities, files[0])).status, "armed", "the drifted capability was refused, not consumed");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
 // COMMIT-SCOPED OVERRIDE COURSE (ALF-C-P19-12F pins what ALF-C-P19-12E implemented in the
 // generated hook of plugins/pipeline-core/scripts/pre-commit-hook-install.mjs).
 //

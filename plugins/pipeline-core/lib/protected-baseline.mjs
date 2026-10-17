@@ -27,7 +27,7 @@ function canonicalJson(value) {
   return JSON.stringify(value);
 }
 function sha256(value) { return createHash("sha256").update(canonicalJson(value)).digest("hex"); }
-function normal(value) { return String(value ?? "").replace(/\\/gu, "/").replace(/^\.\//u, ""); }
+function normal(value) { return String(value ?? "").replace(/\\/gu, "/").replace(/\/{2,}/gu, "/").replace(/^\.\//u, ""); }
 function asDiagnostic(code, message, extra = {}) { return Object.freeze({ code, message, ...extra }); }
 function compiled(entry) { try { return new RegExp(entry.pathPattern, "i"); } catch { return null; } }
 function matches(entry, filePath) { return compiled(entry)?.test(normal(filePath)) ?? false; }

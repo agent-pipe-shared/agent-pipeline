@@ -133,6 +133,10 @@ export const HGO_SIGNATURE_REASON = "authorized via a detached PO Ed25519 signat
 const HGO_SIGNATURE_INTENT_KIND = "guard-override";
 const HGO_SIGNATURE_INTENT_FEATURE_ID = "human-guard-override";
 const HGO_SIGNATURE_INTENT_POLICY_REVISION = "human-guard-override-signature-v1";
+// AC-258 (unborn HEAD): the typed policy revision and the commit sentinel an intent over an
+// unborn repository carries (see signatureIntentCandidate() below).
+const HGO_SIGNATURE_INTENT_POLICY_REVISION_UNBORN = "human-guard-override-signature-v1-unborn";
+const HGO_SIGNATURE_UNBORN_COMMIT_SENTINEL = "0".repeat(40);
 const HGO_SIGNATURE_INTENT_DECISION = "authorize";
 
 export class HumanGuardOverrideError extends Error {
@@ -989,6 +993,24 @@ function repositoryObservation(root, spawn = spawnSync) {
     statusSha256: sha(filterGovernanceEventsStatus(rawStatus)),
     state: stateObservation(root),
   };
+}
+
+// AC-258 (unborn HEAD): createPoApprovalIntent() demands a 40-64 hex commit id, so the unborn
+// observation (`head: null` with tree === UNBORN_TREE_OID, see repositoryObservation()) is
+// bound into the signed intent as an explicit, typed candidate -- never skipped, never an
+// opaque rejection: the commit is git's all-zero null object id (no real commit can carry
+// it) and the policy revision carries an `-unborn` suffix. A born observation maps to the
+// unchanged historical candidate and revision, so every born digest is byte-identical.
+// A null head WITHOUT the unborn tree (the global-plugin-install observation) is deliberately
+// not mapped and keeps failing intent construction exactly as before.
+function isUnbornObservation(repository) {
+  return repository?.head === null && repository?.tree === UNBORN_TREE_OID;
+}
+function signatureIntentCandidate(repository) {
+  return { commit: isUnbornObservation(repository) ? HGO_SIGNATURE_UNBORN_COMMIT_SENTINEL : repository.head, tree: repository.tree };
+}
+function signatureIntentPolicyRevision(repository) {
+  return isUnbornObservation(repository) ? HGO_SIGNATURE_INTENT_POLICY_REVISION_UNBORN : HGO_SIGNATURE_INTENT_POLICY_REVISION;
 }
 
 // NVA-HGOFIX-1 (sibling fix ba562481 for po-human-approval.mjs's outside()): rewriting
@@ -4219,8 +4241,8 @@ export function prepareHumanGuardOverrideForSignature({
       featureId: HGO_SIGNATURE_INTENT_FEATURE_ID,
       planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
       specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
-      candidate: { commit: planned.repository.head, tree: planned.repository.tree },
-      policyRevision: HGO_SIGNATURE_INTENT_POLICY_REVISION,
+      candidate: signatureIntentCandidate(planned.repository),
+      policyRevision: signatureIntentPolicyRevision(planned.repository),
       subjectSha256: prepared.selectionSha256,
       decision: HGO_SIGNATURE_INTENT_DECISION,
     });
@@ -4515,8 +4537,8 @@ export function buildHumanGuardOverrideSignatureIntent({ prepared, planned }) {
       featureId: HGO_SIGNATURE_INTENT_FEATURE_ID,
       planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
       specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
-      candidate: { commit: planned.repository.head, tree: planned.repository.tree },
-      policyRevision: HGO_SIGNATURE_INTENT_POLICY_REVISION,
+      candidate: signatureIntentCandidate(planned.repository),
+      policyRevision: signatureIntentPolicyRevision(planned.repository),
       subjectSha256: prepared.selectionSha256,
       decision: HGO_SIGNATURE_INTENT_DECISION,
     });
@@ -4681,7 +4703,7 @@ export function authorizeHumanGuardOverrideBySignature({
   // signature covers -- plan-persisted, byte-identical to what was signed, never
   // re-derived. Step 5's check: the fresh 3a observation's head/tree must still
   // match it, or a commit landed on HEAD after signing but before this arm call.
-  const signedCandidate = { commit: planned.repository.head, tree: planned.repository.tree };
+  const signedCandidate = signatureIntentCandidate(planned.repository);
   // NVA-CF-HGOCANDIDATEDRIFT (backlog/items/2026-08-30-hgo-candidate-drift-invalidates-
   // ceremony-on-any-concurrent-commit.md): this compares the WHOLE-repository root tree
   // (`git rev-parse HEAD^{tree}`, see repositoryObservation()), not just the target
@@ -4704,7 +4726,8 @@ export function authorizeHumanGuardOverrideBySignature({
   // identical binding applies to guard-human-override.mjs's general override ceremony")
   // for the operator-facing mitigation and the `plan` command's own advisory output
   // (concurrentWorktreeAdvisory() below) for the partial, best-effort in-flight signal.
-  if (freshRepository.head !== signedCandidate.commit || freshRepository.tree !== signedCandidate.tree) {
+  const freshCandidate = signatureIntentCandidate(freshRepository);
+  if (freshCandidate.commit !== signedCandidate.commit || freshCandidate.tree !== signedCandidate.tree) {
     fail(
       "HGO-CANDIDATE-DRIFT",
       "a commit landed on HEAD after the PO's signature was computed but before this arm call; "

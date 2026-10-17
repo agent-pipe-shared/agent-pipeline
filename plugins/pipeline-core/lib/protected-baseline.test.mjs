@@ -111,6 +111,51 @@ test("A3 plugin-only install retains the shipped baseline without a parent schem
   assert.ok(installed.protectedBaselineRuleFor(baseline.entries, "plugins/pipeline-core/lib/protected-baseline.mjs"));
 });
 
+// G24-F1: path spelling is normalised before matching (spec A3 alias rules). A
+// native Windows spelling must resolve to the same rule as the forward-slash one.
+const BACKSLASH_TARGETS = [
+  ["plugins/pipeline-core/lib/protected-baseline.mjs", "PB-CONFIG"],
+  ["plugins/pipeline-core/hooks/guard-git.mjs", null],
+  ["plugins/pipeline-core/lib/guard/anything.mjs", null],
+];
+
+test("A3 resolves native single-backslash spellings to the same rule as forward slashes", () => {
+  const baseline = resolveProtectedBaseline({ rootDir: fixture() });
+  for (const [forward] of BACKSLASH_TARGETS) {
+    const expected = protectedBaselineRuleFor(baseline.entries, forward);
+    assert.ok(expected, `forward spelling must be protected: ${forward}`);
+    const native = forward.split("/").join("\\");
+    assert.equal(protectedBaselineRuleFor(baseline.entries, native)?.id, expected.id, `native spelling: ${native}`);
+    assert.equal(protectedBaselineRuleFor(baseline.entries, `.\\${native}`)?.id, expected.id, `dot-relative native spelling: ${native}`);
+  }
+  assert.equal(protectedBaselineRuleFor(baseline.entries, "plugins\\pipeline-core\\scripts\\unprotected-neighbour.mjs"), null);
+  assert.equal(canonicalProjectPath(fixture(), "a\\b\\c.txt"), "a/b/c.txt");
+});
+
+test("A3 resolves mixed-separator spellings to the same rule as forward slashes", () => {
+  const baseline = resolveProtectedBaseline({ rootDir: fixture() });
+  const expected = protectedBaselineRuleFor(baseline.entries, "plugins/pipeline-core/hooks/guard-git.mjs");
+  assert.ok(expected);
+  for (const mixed of ["plugins\\pipeline-core/hooks\\guard-git.mjs", "plugins/pipeline-core\\hooks/guard-git.mjs", ".\\plugins/pipeline-core\\hooks\\guard-git.mjs"]) {
+    assert.equal(protectedBaselineRuleFor(baseline.entries, mixed)?.id, expected.id, mixed);
+  }
+  assert.equal(canonicalProjectPath(fixture(), "a/b\\c/d.txt"), "a/b/c/d.txt");
+});
+
+// A doubled backslash is the same Windows path as a single one (path aliasing,
+// spec A3), so it must not slip past a forward-slash pattern. Without collapsing
+// repeated separators it would yield "//", which evades every "dir/dir/file"
+// pattern (Critic C6g24 G24-F1; fixed in the protected lib/protected-baseline.mjs).
+test("A3 collapses doubled-backslash spellings to the same rule as forward slashes", () => {
+  const baseline = resolveProtectedBaseline({ rootDir: fixture() });
+  const expected = protectedBaselineRuleFor(baseline.entries, "plugins/pipeline-core/hooks/guard-git.mjs");
+  assert.ok(expected);
+  for (const doubled of ["plugins\\\\pipeline-core\\\\hooks\\\\guard-git.mjs", "plugins\\\\pipeline-core/hooks\\\\guard-git.mjs", "plugins//pipeline-core//hooks//guard-git.mjs"]) {
+    assert.equal(protectedBaselineRuleFor(baseline.entries, doubled)?.id, expected.id, doubled);
+  }
+  assert.equal(canonicalProjectPath(fixture(), "a\\\\b\\\\c.txt"), "a/b/c.txt");
+});
+
 test("A3 refuses all writes when the shipped baseline cannot be loaded", () => {
   const root = fixture();
   const rules = loadProtectedTestPathRules({ rootDir: root, readFileSyncFn: () => { throw new Error("schema unavailable"); } });
