@@ -292,12 +292,48 @@ export function planAdmittedBriefingRoutes({ dispatches } = {}) {
 }
 
 /**
+ * Write-ability precheck of the evidence target of every slice the call would record. It runs in the early route
+ * check, before any admission effect, so a structurally unwritable target (the `evidence` entry is not a real
+ * directory, or the record entry is not a regular file) refuses with nothing left behind. Never writes.
+ * `{ ok: true }` or `{ ok: false, fault: { code, sliceId, path } }`.
+ */
+export function precheckAdmittedBriefingRouteTargets({ dispatches, root } = {}) {
+  const planned = planAdmittedBriefingRoutes({ dispatches });
+  if (!planned.ok) return { ok: true }; // a conflict is reported by the plan itself
+  const lstatOrNull = (path) => {
+    try { return lstatSync(path); } catch (error) { if (error?.code === "ENOENT") return null; throw error; }
+  };
+  for (const entry of planned.plan) {
+    const path = shownRoutePath(entry.sliceId);
+    try {
+      const dir = lstatOrNull(join(root, "evidence"));
+      if (dir !== null && !dir.isDirectory()) return { ok: false, fault: { code: "DBRR-EVIDENCE-DIR", sliceId: entry.sliceId, path: "evidence" } };
+      const target = lstatOrNull(briefingRoutePath(root, entry.sliceId));
+      if (target !== null && !target.isFile()) return { ok: false, fault: { code: "DBRR-TARGET", sliceId: entry.sliceId, path } };
+    } catch {
+      return { ok: false, fault: { code: "DBRR-WRITE", sliceId: entry.sliceId, path } };
+    }
+  }
+  return { ok: true };
+}
+
+function briefingRouteWriteFault(fault, { admitted }) {
+  const head = `(guard-dispatch, plugin pipeline-core): DISPATCH-BRIEFING-ROUTE-UNWRITABLE: ${fault.code}: the admission record of slice ${fault.sliceId} cannot be written at ${fault.path}.`;
+  return admitted
+    ? `WARNING ${head} The dispatch is admitted without a route record; the slice stays unbound until the evidence path is fixed.\n`
+    : `BLOCKED ${head} Make \`evidence\` a real directory and the record entry a regular file (or remove what blocks it), then dispatch again; nothing was admitted or persisted.\n`;
+}
+
+/**
  * Records the route of each distinct slice the call admits, with origin "admission". Every slice is judged first
  * (nothing is written for a call any slice of which is refused); the writes then snapshot the prior bytes and restore
  * them if a later slice cannot be written. `{ ok: true, recorded }` or `{ ok: false, route }` (a typed
  * mismatch/invalid result, ready for briefingRouteRefusal). A slice already bound to exactly this text is left untouched.
  */
-export function recordAdmittedBriefingRoutes({ dispatches, root } = {}) {
+export function recordAdmittedBriefingRoutes({ dispatches, root, record = recordDispatchBriefingRoute } = {}) {
+  // `record` is the per-slice writer. It defaults to the production writer; it is a parameter only so the multi-slice
+  // rollback below (a LATER slice failing after an earlier one was written) can be driven by a test: no filesystem
+  // state lets a slice pass the judgement above and then fail its write portably.
   const planned = planAdmittedBriefingRoutes({ dispatches });
   if (!planned.ok) return planned;
   const writes = [];
@@ -323,10 +359,12 @@ export function recordAdmittedBriefingRoutes({ dispatches, root } = {}) {
       if (info.isFile() && info.size <= BRIEFING_ROUTE_MAX_BYTES) previous = readFileSync(target);
     } catch { /* no record yet */ }
     done.push({ target, previous });
-    const recorded = recordDispatchBriefingRoute({ root, prompt: entry.prompt, origin: BRIEFING_ROUTE_ORIGIN_ADMISSION });
+    const recorded = record({ root, prompt: entry.prompt, origin: BRIEFING_ROUTE_ORIGIN_ADMISSION });
     if (recorded.status === "refused") {
       undo();
-      return { ok: false, route: { status: "invalid", sliceId: entry.sliceId, path: shownRoutePath(entry.sliceId), reason: `the route record could not be written (${recorded.code})` } };
+      // `fault` marks a record-WRITE fault (not an unverifiable existing record): the caller words it as such.
+      return { ok: false, fault: { code: recorded.code, sliceId: entry.sliceId, path: shownRoutePath(entry.sliceId) },
+        route: { status: "invalid", sliceId: entry.sliceId, path: shownRoutePath(entry.sliceId), reason: `the route record could not be written (${recorded.code})` } };
     }
   }
   return { ok: true, recorded: writes.map((entry) => entry.sliceId) };
@@ -666,6 +704,15 @@ if (isDirectInvocation(import.meta.url)) {
       process.stderr.write(briefingRouteRefusal(conflict.route));
       process.exit(2);
     }
+    // The record is written last, so a structurally unwritable evidence target is refused HERE, before any effect.
+    const writable = precheckAdmittedBriefingRouteTargets({
+      dispatches: evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy)).map(({ dispatch }) => ({ prompt: dispatch.prompt })),
+      root: routeRoot,
+    });
+    if (!writable.ok) {
+      process.stderr.write(briefingRouteWriteFault(writable.fault, { admitted: false }));
+      process.exit(2);
+    }
   }
   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
   let itemGovernanceRequired = false;
@@ -792,7 +839,11 @@ if (isDirectInvocation(import.meta.url)) {
       dispatches: evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy)).map(({ dispatch }) => ({ prompt: dispatch.prompt })),
       root: routeRoot,
     });
-    if (!admitted.ok) {
+    if (!admitted.ok && admitted.fault) {
+      // A record-write fault the precheck could not see (a transient write/readback error) arrives after the admission
+      // effects persisted: refusing now would leave them behind, so the dispatch is admitted with a typed warning.
+      process.stderr.write(briefingRouteWriteFault(admitted.fault, { admitted: true }));
+    } else if (!admitted.ok) {
       process.stderr.write(briefingRouteRefusal(admitted.route));
       process.exit(2);
     }

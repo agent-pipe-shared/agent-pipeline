@@ -670,6 +670,71 @@ describe("V-10 admission wiring: the guard records the route digest of the brief
     rmSync(join(root, "evidence", `dispatch-route-${b}.json`), { force: true });
   });
 
+  test("V-10 multi-slice rollback: when a later slice's record write fails, the earlier slice's prior record bytes are restored and a slice with no prior record stays absent", () => {
+    const [a, b, c] = ["ALF-V10-WIRE-RB-A", "ALF-V10-WIRE-RB-B", "ALF-V10-WIRE-RB-C"];
+    const prior = v10wBriefing(a, {}).replace("nothing in this briefing", "nothing in the earlier briefing");
+    const priorRecord = `${JSON.stringify({ schema: V10W_ROUTE_SCHEMA, sliceId: a, briefingSha256: sha256Of(prior), origin: V10W_ORIGIN })}\n`;
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    const fileA = join(root, "evidence", `dispatch-route-${a}.json`);
+    writeFileSync(fileA, priorRecord);
+    // The writer is injected (the one documented seam of recordAdmittedBriefingRoutes): the real writer for A and B, a
+    // write fault for C. A is a superseding admission (its prior bytes must come back), B has no prior record (it must
+    // be removed again), C fails after both were written.
+    const runner = join(root, "rollback-runner.mjs");
+    writeFileSync(runner, [
+      "const guard = await import(process.argv[2]);",
+      "const lib = await import(process.argv[3]);",
+      "const { prompts, root, failing } = JSON.parse(process.argv[4]);",
+      "const record = (input) => input.prompt.includes(failing) ? { status: 'refused', code: 'DBRR-WRITE' } : lib.recordDispatchBriefingRoute(input);",
+      "process.stdout.write(JSON.stringify(guard.recordAdmittedBriefingRoutes({ dispatches: prompts.map((prompt) => ({ prompt })), root, record })));",
+    ].join("\n"));
+    const prompts = [v10wBriefing(a), v10wBriefing(b), v10wBriefing(c)];
+    assert.notEqual(sha256Of(prompts[0]), sha256Of(prior));
+    const res = spawnSync(process.execPath, [runner, pathToFileURL(GUARD).href,
+      pathToFileURL(fileURLToPath(new URL("../dispatch-briefing-route-record.mjs", import.meta.url))).href,
+      JSON.stringify({ prompts, root, failing: c })], { input: "", encoding: "utf8", timeout: 15000 });
+    assert.equal(res.status, 0, (res.stderr ?? "").slice(0, 300));
+    const result = JSON.parse(res.stdout);
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.fault, { code: "DBRR-WRITE", sliceId: c, path: `evidence/dispatch-route-${c}.json` });
+    assert.equal(readFileSync(fileA, "utf8"), priorRecord, "the earlier slice's prior record bytes must be restored");
+    assert.equal(readRoute(b), null, "a slice with no prior record must be left absent");
+    assert.equal(readRoute(c), null);
+    rmSync(fileA, { force: true });
+  });
+
+  test("V-10 a record-write fault is refused before any admission effect, names the evidence path and the code, and leaves nothing persisted", () => {
+    const slice = "ALF-V10-WIRE-FAULT";
+    const pending = () => {
+      const out = [];
+      const walk = (dir) => {
+        let entries = [];
+        try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+        for (const entry of entries) {
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) walk(full); else out.push(relative(root, full));
+        }
+      };
+      walk(join(root, ".git", "agent-pipeline"));
+      return out.sort();
+    };
+    const before = pending();
+    const evidence = join(root, "evidence");
+    rmSync(evidence, { recursive: true, force: true });
+    writeFileSync(evidence, "not a directory\n"); // the evidence target cannot hold a record
+    try {
+      const refused = send("native", v10wBriefing(slice));
+      assert.equal(refused.code, 2, refused.stderr.slice(0, 300));
+      assert.ok(refused.stderr.includes("DBRR-EVIDENCE-DIR") && refused.stderr.includes("evidence"), refused.stderr.slice(0, 300));
+      assert.ok(!/repair or remove it/iu.test(refused.stderr), "a write fault must not be worded as an unverifiable existing record");
+      assert.deepEqual(pending(), before, "a refused briefing must leave no persisted admission effect behind");
+    } finally {
+      rmSync(evidence, { force: true });
+    }
+    assert.equal(send("native", v10wBriefing(slice)).code, 0, "once the evidence path is fixed the same briefing is admitted");
+    assert.equal(readRoute(slice)?.briefingSha256, sha256Of(v10wBriefing(slice)));
+  });
+
   test("V-10 what is deliberately not recorded: a Critic dispatch and a Goldfish briefing without a Slice line stay unbound and are admitted", () => {
     const critic = V10_BRIEFING.replace(V10_SLICE, "ALF-V10-WIRE-CRITIC");
     assert.equal(send("critic", critic).code, 0);
