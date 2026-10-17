@@ -6,7 +6,11 @@
  * accepted envelope and publishes the closed v9 State reference. This test
  * supplies genuine owner capabilities; platform support is never fabricated.
  * Native Windows execution requires the Source-owned requester/Registry/domain
- * backend and the coherent selected State writer; no skip is a passing course.
+ * backend and the coherent selected State writer. The only admitted skip is the typed
+ * HOST-LIMITATION for SDC-AUTHORITY-UNAVAILABLE with reason WIN-AUTH-ANCESTOR-OWNER/-ACL/-MUTATION
+ * on win32: a human-controlled ancestor, intentionally outside the agent-facing threat model
+ * (PO decision 2026-10-17, specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md). Every
+ * other error fails; on a host whose ancestors pass, every assertion including AC-155 runs.
  *
  * Run: node --test plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
  *
@@ -256,8 +260,10 @@ async function bindRouteOwner(fx) {
   const continuity = await loadLib("onboarding-continuity.mjs");
   const windows = await loadLib("windows-private-state.mjs");
   const repository = lifecycle.inspectSignedDescriptorCustodyRepository(fx.dir);
-  // No platform skip or CallerJSON native-positive fallback. An unavailable
-  // native producer remains a real prerequisite failure before presentation.
+  // No CallerJSON native-positive fallback. An unavailable native producer is a real
+  // prerequisite failure, except the typed HOST-LIMITATION (WIN-AUTH-ANCESTOR-OWNER/-ACL/-MUTATION on
+  // win32: a human-controlled ancestor, outside the threat model, PO decision 2026-10-17), handled by
+  // runRoute() via hostLimitationOf(); every other error still propagates and fails.
   const runtime = bridge.createControlledMethodRuntimeFixture({ repository,
     fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/design-approval-route"),
     sessionId: "design-approval-route-fixture" });
@@ -519,6 +525,28 @@ async function buildSubmittedFeature(prefix) {
   return fx;
 }
 
+/**
+ * Typed host limitation (intended, not a product defect): on a Windows host whose repository ancestors carry
+ * a human-controlled owner/ACL (e.g. the stock non-system-drive DACL on the drive root / parent directory),
+ * the native owned-authority backend fails closed with WIN-AUTH-ANCESTOR-*. The product refusal is correct;
+ * the route cannot run on that host. The Pipeline protects against the agent, never against the human, so a
+ * human-controlled ancestor is outside the threat model (PO decision 2026-10-17, specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md,
+ * "Decision tiles answered (PO, 2026-10-17 ...)"). Only those exact reasons on win32 qualify; every other
+ * error still fails the case. Owner Coordinator; the AC-155 assertions run on any host whose ancestors pass.
+ */
+const HOST_LIMITATION_REASONS = new Set(["WIN-AUTH-ANCESTOR-OWNER", "WIN-AUTH-ANCESTOR-ACL", "WIN-AUTH-ANCESTOR-MUTATION"]);
+function hostLimitationOf(error) {
+  if (process.platform !== "win32" || error?.code !== "SDC-AUTHORITY-UNAVAILABLE"
+    || !HOST_LIMITATION_REASONS.has(error?.reason)) return null;
+  return { type: "host-limitation", reason: error.reason, owner: "Coordinator", due: "standing PO decision 2026-10-17, no expiry", host: "native Windows with a human-controlled drive-root ancestor owner/ACL (win32)" };
+}
+function skipForHostLimitation(t, run) {
+  if (!run.hostLimitation) return false;
+  const h = run.hostLimitation;
+  t.skip(`HOST-LIMITATION ${h.reason}: owner ${h.owner}, ${h.due}, host ${h.host}; run on a host whose repository ancestors pass the native owned-authority backend`);
+  return true;
+}
+
 /** The whole route, run once and shared by route cases 1-4. Never throws: each step records its outcome. */
 let routePromise;
 function routeRun() { routePromise ??= runRoute(); return routePromise; }
@@ -526,7 +554,14 @@ async function runRoute() {
   const out = { steps: [] };
   out.fx = await buildSubmittedFeature("route");
   const { fx } = out;
-  await bindRouteOwner(fx);
+  try {
+    await bindRouteOwner(fx);
+  } catch (error) {
+    const limitation = hostLimitationOf(error);
+    if (limitation === null) throw error;
+    out.hostLimitation = limitation;
+    return out;
+  }
   out.dispatchBefore = readState(fx.dir).continuity?.queueHead?.dispatch ?? null;
   out.present = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
   if (out.present.status !== 0) return out;
@@ -554,6 +589,7 @@ async function runRoute() {
 
 test("route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command", async (t) => {
   const run = await routeRun();
+  if (skipForHostLimitation(t, run)) return;
   t.diagnostic(`present-plan exit ${run.present.status}; stderr: ${run.present.stderr.trim()}`);
   assert.equal(run.present.status, 0, `present-plan --review-receipt must exit 0; stderr: ${run.present.stderr}`);
   assert.equal(run.signLines.length, 1, `exactly one line names sign-intent; stdout: ${run.present.stdout}`);
@@ -573,6 +609,7 @@ test("route 1: present-plan --review-receipt accepts finished sources and hands 
 
 test("route 2: one design proof, approve-plan, and the closed v9 accepted-contract record", async (t) => {
   const run = await routeRun();
+  if (skipForHostLimitation(t, run)) return;
   t.diagnostic(`present-plan exit ${run.present.status}; stderr: ${run.present.stderr.trim()}`);
   assert.equal(run.present.status, 0, `present-plan --review-receipt must exit 0 first; stderr: ${run.present.stderr}`);
   assert.ok(run.approve, "approve-plan was reached (request file named and found)");
@@ -605,10 +642,17 @@ test("route 2: one design proof, approve-plan, and the closed v9 accepted-contra
   assert.equal(run.accepted.intentSha256, run.request.approvalIntent.sha256);
   assert.deepEqual(run.accepted.candidate, run.request.approvalIntent.value.candidate);
   assert.deepEqual(run.acceptedEnvelope.request, run.request);
+  // AC-155: the real present-plan --review-receipt route needs ONE signature and runs no Advisor or readiness stage.
+  assert.equal(run.signLines.length, 1, "exactly one signature command is handed over");
+  const forbidden = /advisor|readiness|design-course/iu;
+  assert.equal(forbidden.test(run.present.stdout), false, "present-plan stdout names no Advisor/readiness/course stage");
+  assert.equal(forbidden.test(JSON.stringify(run.request)), false, "the signed request carries no Advisor/readiness/course content");
+  assert.equal(forbidden.test(JSON.stringify(record.designApprovalBinding)), false, "the approved binding carries no Advisor/readiness/course content");
 });
 
 test("route 3: the boundary library admits the current approved v9 accepted-contract record", async (t) => {
   const run = await routeRun();
+  if (skipForHostLimitation(t, run)) return;
   assert.equal(run.present.status, 0, `present-plan --review-receipt must exit 0 first; stderr: ${run.present.stderr}`);
   assert.equal(run.approve?.status, 0, `approve-plan must exit 0 first; stderr: ${run.approve?.stderr}`);
   const state = run.stateAfter;
@@ -625,8 +669,9 @@ test("route 3: the boundary library admits the current approved v9 accepted-cont
   assert.equal(admitted?.ok, true, `the boundary must admit the v8 record: ${JSON.stringify(admitted)}`);
 });
 
-test("route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve", async () => {
+test("route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve", async (t) => {
   const run = await routeRun();
+  if (skipForHostLimitation(t, run)) return;
   assert.equal(run.present.status, 0, `present-plan --review-receipt must exit 0; stderr: ${run.present.stderr}`);
   assert.equal(run.approve?.status, 0, `approve-plan must exit 0 (else the check below would pass vacuously); stderr: ${run.approve?.stderr}`);
   assert.equal(run.dispatchBefore, null, "no dispatch is registered after submit-plan");
@@ -634,8 +679,9 @@ test("route 4: zero continuity-cas -- queueHead.dispatch stays unregistered acro
   assert.equal(run.fx.ledger.includes("continuity-cas"), false, "the route never needs the continuity-cas verb");
 });
 
-test("compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State", async () => {
+test("compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State", async (t) => {
   const run = await routeRun();
+  if (skipForHostLimitation(t, run)) return;
   assert.equal(run.approve?.status, 0);
   const { validCurrentPlanApproval } = await loadLib("plan-spec-state-v2.mjs");
   const { createAcceptedDeliveryContractEnvelope } = await loadLib("critic-accepted-contract.mjs");
