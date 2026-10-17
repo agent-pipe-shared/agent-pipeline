@@ -46,7 +46,7 @@ write lane. Add positive and negative tests.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** deferred past the 0.7.0 candidate (PO decision, 2026-10-16). The item stays open.
+- **Rationale:** the PO chose to ship the 0.7.0 local test candidate without this guard classification change, not to drop it.
+- **Assignment (if accepted):** next sprint after 0.7.0; AC-181 is not counted against the 0.7.0 candidate.
+- **Date:** 2026-10-17

@@ -40,3 +40,7 @@ was read, and no exceptional authorization was consumed.
   0.7 guard liveness and host-boundary correction review.
 - **Assignment:** Lifecycle read-scope admission, with security review.
 - **Date:** 2026-09-28.
+- **Deferral (2026-10-17):** deferred past the 0.7.0 candidate together with
+  `declared-system-skill-read-requires-human-override` (AC-147) by PO decision
+  of 2026-10-16. The item stays open; AC-209 is not counted against the 0.7.0
+  local test candidate.

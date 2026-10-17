@@ -48,7 +48,8 @@ done_when: manual
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** deferred past the 0.7.0 candidate (PO decision, 2026-10-16). The item stays open.
+- **Rationale:** the forensics and audit-chain work here, including its Verify contract, is a larger product change than the 0.7.0 local test candidate needs. The PO chose to ship the candidate without it, not to drop it.
+- **Assignment (if accepted):** next sprint after 0.7.0; AC-175 is not counted against the 0.7.0 candidate.
+- **Date:** 2026-10-17
+- **Partial groundwork already committed:** 17067dca4 (ALF-C-N1-02C) adds a runner transcript export for Claude and Codex. Antigravity is typed unavailable, and child sessions and turn boundaries are not reported. Admitting the export to governed agents needs a held guard patch. Critic C6d F3 records these gaps; they stay with this deferred item.

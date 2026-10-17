@@ -52,3 +52,8 @@ routine skill loading into an unplanned PO signature ceremony.
 ## Triage
 
 The installed denial is reproduced. No repair or release acceptance is claimed.
+
+2026-10-17: deferred past the 0.7.0 candidate together with
+`lifecycle-read-scope-blocks-host-declared-system-skill` (AC-209) by PO
+decision of 2026-10-16. The item stays open; AC-147 is not counted against the
+0.7.0 local test candidate.
