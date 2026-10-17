@@ -15,6 +15,7 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "../../hooks/guard-lifecycle-ready.mjs";
+import { ARCHITECTURE_DESIGN_REOPEN_CODES, isArchitectureDesignReopenCode } from "../architecture-design.mjs";
 import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
 import {
   expectedPipelineScriptsRunnerAllowlistEntries,
@@ -59,10 +60,12 @@ const state = { verifyOk: true };
 const producer = new Function(
   "persistedPoAuthority", "inspectArchitectureDesign", "checkVerifyContractConfigured", "detectVerifyCommandCandidate",
   "PO_AUTHORITY_REBIND_WRITER", "SCHEMA", "PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER", "VERIFY_COMMAND_MAX_BYTES",
+  "isArchitectureDesignReopenCode",
   `${NAMES.map(extractFunction).join("\n")}\nreturn designToImplementationHandoverAction;`,
 )(
   (_root, fs) => fs.authority, () => { throw new Error("overridden via fs"); }, () => ({ ok: state.verifyOk }), () => null,
   PIPELINE_STATE_SCRIPT, "pipeline.project-onboarding.v4", PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER, 512,
+  isArchitectureDesignReopenCode,
 );
 
 function observation(root, nextAction) {
@@ -90,7 +93,7 @@ const SCENARIOS = [
   ["approved: ready for set-phase", "approved", { ok: true, status: "current" }, true, "set-phase"],
   ["approved: verify command unconfigured", "approved", { ok: true, status: "current" }, false, "collect-input"],
   ["implementing: materialization required", "implementing", { ok: true, status: "materialization-required" }, true, "materialize-architecture"],
-  ["implementing: architecture evidence invalid", "implementing", { ok: false, code: "X" }, true, "reopen-design"],
+  ["implementing: architecture evidence invalid", "implementing", { ok: false, code: ARCHITECTURE_DESIGN_REOPEN_CODES[0] }, true, "reopen-design"],
   ["implementing: nothing to do", "implementing", { ok: true, status: "current" }, true, null],
 ];
 
