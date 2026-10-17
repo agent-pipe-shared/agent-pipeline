@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, watch, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { WINDOWS_POWERSHELL_PATHS, assessWindowsPrivatePath, hardenWindowsPrivateDirectory, sanitizeChildEnvironment } from './windows-private-state.mjs';
@@ -201,5 +201,102 @@ test('two parallel first calls both succeed and leave only verified entries and 
     const entries = entriesOf(root);
     assert.ok(entries.length >= 1 && entries.length === names.length, 'every file left behind is a published, named entry');
     for (const entry of entries) assert.equal(entry.split('.')[1], sha256(readFileSync(path.join(cacheDirOf(root), entry))));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// ALF-C-C6G1-CORR-B (F2): a cached assembly is bound to the exact helper source it was compiled from, not only to its own bytes.
+test('the loader demands the source stamp before it loads anything and never turns a mismatch into a persistent denial', () => {
+  for (const [tag, helper] of Object.entries(HELPERS)) {
+    const block = loaderBlock(read(helper.file));
+    assert.doesNotMatch(block, /PIPELINE-NATIVE-TYPE-MISSING/u, `${tag}: an entry without the expected type is skipped, never thrown as a denial`);
+    const stamp = block.indexOf('Test-PipelineSourceStamp $bytes $sourceSha');
+    const load = block.indexOf('[System.Reflection.Assembly]::Load($bytes)');
+    assert.ok(stamp > 0 && load > stamp, `${tag}: the source stamp is checked on the verified bytes before the one executing load`);
+    assert.match(block, /\$sourceSha=Get-PipelineSha256 \(\[System\.Text\.Encoding\]::UTF8\.GetBytes\(\$source\)\)/u, `${tag}: the stamp digest is the sha256 of the exact source text`);
+    assert.match(block, /GetBytes\(\$runtime\+\[string\]\[char\]10\+\$sourceSha\)/u, `${tag}: the cache key derives from that source digest`);
+  }
+});
+
+test('both backends pin the exact digest of the helper they execute', () => {
+  const backends = { 'owned-authority': 'windows-owned-authority-backend.mjs', 'process-observer': 'windows-native-process-observer.mjs' };
+  for (const [tag, file] of Object.entries(backends)) {
+    const pinned = /HELPER_SHA256='([0-9a-f]{64})'/u.exec(read(path.join(lib, file)));
+    assert.ok(pinned, `${tag}: HELPER_SHA256 is declared`);
+    assert.equal(pinned[1], sha256(readFileSync(HELPERS[tag].file)), `${tag}: HELPER_SHA256 matches the helper bytes on disk`);
+  }
+});
+
+const liveStamp = { skip: powershell === undefined ? 'host-limitation: fixed Windows PowerShell is unavailable on this host; owner Coordinator, due 2026-10-19; a native Windows host runs this case' : false };
+const stampSource = (digest) => `public static class PipelineNativeSourceStamp { public const string Sha256 = "${digest}"; }`;
+const sourceDigest = (csharp) => sha256(Buffer.from(csharp, 'utf8'));
+
+async function buildAssembly(root, csharp, name) {
+  const out = path.join(root, name);
+  const build = await run(`$ErrorActionPreference='Stop'\nAdd-Type -TypeDefinition @'\n${csharp}\n'@ -OutputAssembly $env:PIPELINE_TEST_OUT\n`, root, { PIPELINE_TEST_OUT: out });
+  assert.equal(build.code, 0, `build ${name} exited 0 (stderr: ${build.stderr.slice(0, 300)})`);
+  const bytes = readFileSync(out);
+  assert.ok(bytes.length >= 1024, `${name}: a plausible assembly`);
+  return bytes;
+}
+
+// Overwrites the genuine entry in place (it keeps its private ACL and owner) and renames it so its name still carries the sha256 of its
+// new bytes: the self-hash and the key are both valid, so only a binding to the helper source stands between this payload and the load.
+function plantEntry(root, entry, payload) {
+  const from = path.join(cacheDirOf(root), entry);
+  writeFileSync(from, payload);
+  const planted = `${entry.split('.')[0]}.${sha256(payload)}.dll`;
+  renameSync(from, path.join(cacheDirOf(root), planted));
+  return planted;
+}
+
+async function plantAndProbe(root, csharp) {
+  await probe(root);
+  const [entry] = entriesOf(root);
+  const payload = await buildAssembly(root, csharp, 'planted.dll');
+  const planted = plantEntry(root, entry, payload);
+  assert.deepEqual(entriesOf(root), [planted], 'precondition: the planted entry is the only one and carries a valid self-hash under the right key');
+  return { payload, planted, after: await probe(root) };
+}
+
+function assertFellBack(root, { payload, planted, after }) {
+  assert.equal(after.result, 'pong', 'the planted assembly was never loaded');
+  assert.deepEqual({ loaded: after.loaded, addTypeCalls: after.addTypeCalls }, { loaded: true, addTypeCalls: 1 }, 'fell back to a fresh compile');
+  assert.deepEqual(readFileSync(path.join(cacheDirOf(root), planted)), payload, 'the refused file is left as found');
+  const healthy = entriesOf(root).filter((name) => name !== planted);
+  assert.equal(healthy.length, 1, 'a new verified entry was published next to it');
+  assert.equal(healthy[0].split('.')[1], sha256(readFileSync(path.join(cacheDirOf(root), healthy[0]))));
+}
+
+test('a freshly published entry carries the sha256 of the exact source it was compiled from', liveStamp, async () => {
+  const root = freshRoot();
+  try {
+    await probe(root);
+    const [entry] = entriesOf(root);
+    const bytes = readFileSync(path.join(cacheDirOf(root), entry));
+    const digest = sourceDigest(probeSource('pong'));
+    assert.ok(bytes.includes(Buffer.from(digest, 'utf16le')) || bytes.includes(Buffer.from(digest, 'utf8')), 'the compiled assembly carries the source digest it must later be checked against');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a planted entry with a valid self-hash and key but a different source digest is not loaded; the call falls back', liveStamp, async () => {
+  const root = freshRoot();
+  try {
+    const csharp = `${probeSource('tampered')}\n${stampSource(sourceDigest(probeSource('some other helper source')))}`;
+    assertFellBack(root, await plantAndProbe(root, csharp));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a planted entry with a valid self-hash and key but no source stamp at all is not loaded; the call falls back', liveStamp, async () => {
+  const root = freshRoot();
+  try {
+    assertFellBack(root, await plantAndProbe(root, probeSource('tampered')));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a planted valid-hash entry that lacks the expected type falls back instead of failing persistently', liveStamp, async () => {
+  const root = freshRoot();
+  try {
+    const csharp = `using System;\npublic static class PipelineCacheOther { public static string Ping() { return "other"; } }\n${stampSource(sourceDigest(probeSource('pong')))}`;
+    assertFellBack(root, await plantAndProbe(root, csharp));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

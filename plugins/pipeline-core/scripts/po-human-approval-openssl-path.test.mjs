@@ -9,6 +9,8 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { resolveOpensslExecutable, spawnOpenssl, spawnTrustedGit } from "./po-human-approval.mjs";
+import * as approval from "./po-human-approval.mjs";
+import { trustedToolRepairHint } from "../lib/trusted-tool-resolution.mjs";
 
 const WIN = process.platform === "win32";
 const NAME = WIN ? "openssl.exe" : "openssl";
@@ -158,4 +160,36 @@ test("the git spawn fails closed with a typed code when git does not resolve, an
   assert.equal(unavailable.error.code, "PO-SIGN-GIT-UNAVAILABLE");
   const viaNode = spawnTrustedGit(["-e", "process.stdout.write('abs')"], { stdio: "pipe", encoding: "utf8" }, { resolve: () => ({ ok: true, path: process.execPath }) });
   assert.equal(viaNode.stdout, "abs");
+});
+
+// ALF-C-C6G1-CORR-B (F5): an unresolved git must reach the operator as the typed code PLUS the repair hint, never as a generic refusal.
+const unresolvedGit = (status) => ({ resolve: () => ({ ok: false, status }) });
+const resolvedButFailingGit = { resolve: () => ({ ok: true, path: process.execPath }) };
+const assertTypedGitRefusal = (error) => {
+  assert.equal(error.code, "PO-SIGN-GIT-UNAVAILABLE", "the typed code must survive");
+  assert.ok(error.message.includes("PO-SIGN-GIT-UNAVAILABLE"), "the typed code is part of the message the operator reads");
+  assert.ok(error.message.includes(trustedToolRepairHint("git")), "the repair hint text is part of the message the operator reads");
+  return true;
+};
+
+test("an unresolved git carries the typed code and the exact repair hint in its not-started error", () => {
+  for (const status of ["binary_missing", "untrusted_path"]) {
+    const result = spawnTrustedGit(["--version"], { stdio: "pipe" }, unresolvedGit(status));
+    assert.equal(result.status, null);
+    assertTypedGitRefusal(result.error);
+  }
+});
+
+test("the design-signing git read rethrows the typed refusal with its hint, and keeps a generic git failure generic", () => {
+  assert.throws(() => approval.designSigningGit(process.cwd(), ["rev-parse", "HEAD"], unresolvedGit("binary_missing")), assertTypedGitRefusal);
+  assert.throws(() => approval.designSigningGit(process.cwd(), ["rev-parse", "HEAD"], resolvedButFailingGit), (error) => {
+    assert.equal(error.message, "DAB-SIGN-GIT-UNAVAILABLE", "a git that started and failed is not the unresolved-git refusal");
+    assert.equal(error.code, undefined);
+    return true;
+  });
+});
+
+test("the current git candidate surfaces the typed refusal for an unresolved git, and stays null for a git that started and failed", () => {
+  assert.throws(() => approval.currentGitCandidate(process.cwd(), unresolvedGit("binary_missing")), assertTypedGitRefusal);
+  assert.equal(approval.currentGitCandidate(process.cwd(), resolvedButFailingGit), null);
 });

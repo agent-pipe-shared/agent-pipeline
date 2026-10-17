@@ -55,7 +55,7 @@ import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-
 import { ORGANIZATION_ARCHITECTURE_CONFIG_PATH, organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA, describeModelFamilyApprovalRequest } from "./model-family-approval-request.mjs";
 import { canonical as canonicalProofJson } from "../lib/po-approval-proof.mjs";
-import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
+import { resolveTrustedSystemExecutable, trustedToolRepairHint } from "../lib/trusted-tool-resolution.mjs";
 
 // NVA-SIGENTRY-1: the same resolved-plugin-root derivation guard-human-override.mjs
 // already uses (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`) -- needed
@@ -258,18 +258,31 @@ function describeAdoptionApprovalRequest(record, intentSha256) {
  * as a not-started result when git does not resolve. `dependencies.resolve` is a test seam only. */
 export function spawnTrustedGit(args, options = {}, dependencies = {}) {
   const resolved = (dependencies.resolve ?? resolveTrustedSystemExecutable)("git");
-  if (!resolved?.ok) return { status: null, signal: null, stdout: "", stderr: "", error: Object.assign(new Error("PO-SIGN-GIT-UNAVAILABLE: git did not resolve to a trusted executable"), { code: "PO-SIGN-GIT-UNAVAILABLE" }) };
+  if (!resolved?.ok) {
+    // ALF-C-C6G1-CORR-B (F5): the refusal the operator reads carries the typed code AND the repair hint. The shared resolver owns the
+    // per-machine trusted-roots file, so the hint text comes from it (a resolver result's own hint wins) and is never restated here.
+    const repairable = resolved?.status === "binary_missing" || resolved?.status === "untrusted_path";
+    const hint = repairable ? ` ${typeof resolved.hint === "string" ? resolved.hint : trustedToolRepairHint("git")}` : "";
+    const status = typeof resolved?.status === "string" ? ` (${resolved.status})` : "";
+    return { status: null, signal: null, stdout: "", stderr: "", error: Object.assign(new Error(`PO-SIGN-GIT-UNAVAILABLE: git did not resolve to a trusted executable${status}.${hint}`), { code: "PO-SIGN-GIT-UNAVAILABLE" }) };
+  }
   return spawnSync(resolved.path, args, { ...options, shell: false });
 }
 
-function currentGitCandidate(repository) {
+// A git that never started (unresolved) is a repairable host defect and keeps its typed refusal; a git that started and failed stays generic.
+function unresolvedGitError(result) { return result?.error?.code === "PO-SIGN-GIT-UNAVAILABLE" ? result.error : null; }
+
+/** `dependencies.resolve` is the same test seam as spawnTrustedGit's; read-only git, no authority. */
+export function currentGitCandidate(repository, dependencies = {}) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
   const commit = spawnTrustedGit(["-C", repository, "rev-parse", "HEAD"], {
     encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
-  });
+  }, dependencies);
   const tree = spawnTrustedGit(["-C", repository, "rev-parse", "HEAD^{tree}"], {
     encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
-  });
+  }, dependencies);
+  const unresolved = unresolvedGitError(commit) ?? unresolvedGitError(tree);
+  if (unresolved !== null) throw unresolved;
   const commitId = String(commit.stdout ?? "").trim();
   const treeId = String(tree.stdout ?? "").trim();
   return commit.status === 0 && tree.status === 0 && /^[a-f0-9]{40,64}$/u.test(commitId)
@@ -341,9 +354,12 @@ function readDesignSigningFile(repository, path, { optional = false, request = f
     return { bytes, sha256: designSigningHash(bytes) };
   } finally { closeSync(fd); }
 }
-function designSigningGit(repository, argv) {
+/** `dependencies.resolve` is the same test seam as spawnTrustedGit's; read-only git, no authority. */
+export function designSigningGit(repository, argv, dependencies = {}) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
-  const result = spawnTrustedGit(["-C", repository, ...argv], { env, shell: false, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000, maxBuffer: DESIGN_SIGNING_MAX_BYTES });
+  const result = spawnTrustedGit(["-C", repository, ...argv], { env, shell: false, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000, maxBuffer: DESIGN_SIGNING_MAX_BYTES }, dependencies);
+  const unresolved = unresolvedGitError(result);
+  if (unresolved !== null) throw unresolved;
   if (result.error || result.signal || result.status !== 0) throw Error("DAB-SIGN-GIT-UNAVAILABLE");
   return result.stdout;
 }
@@ -408,7 +424,12 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
       JSON.stringify(physicalRequest.binding, null, 2),
       "this signs only the exact design decision digest; approve-plan must independently consume it. It is not push, release, publication or a guard override.",
     ] } };
-  } catch { return null; }
+  } catch (error) {
+    // An unresolved git is a repairable host defect, not evidence that the request is invalid: keep its typed code and repair hint
+    // instead of collapsing into the generic DAB-SIGN-REQUEST-INVALID refusal.
+    if (error?.code === "PO-SIGN-GIT-UNAVAILABLE") throw error;
+    return null;
+  }
 }
 /** Read-only, source-proven purpose; no configured observer/authorization seam. */
 export function describeDesignApprovalSigningRequest(record, intentSha256, repository) {

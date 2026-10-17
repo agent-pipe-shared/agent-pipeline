@@ -18,7 +18,18 @@ function Get-PipelineSha256([byte[]]$bytes) {
  $hash=[System.Security.Cryptography.SHA256]::Create()
  try{return [System.BitConverter]::ToString($hash.ComputeHash($bytes)).Replace('-','').ToLowerInvariant()}finally{$hash.Dispose()}
 }
-function Import-PipelineVerifiedAssembly([string]$dir,[string]$prefix,[string]$sid,[string]$typeName) {
+function Test-PipelineSourceStamp([byte[]]$bytes,[string]$sourceSha) {
+ # Inspects the already hash-verified bytes through a reflection-only load, so no code of the entry runs before this check passes.
+ try{
+  $inspected=[System.Reflection.Assembly]::ReflectionOnlyLoad($bytes)
+  $stamp=$inspected.GetType('PipelineNativeSourceStamp',$false)
+  if($null -eq $stamp){return $false}
+  $field=$stamp.GetField('Sha256')
+  if($null -eq $field){return $false}
+  return ([string]$field.GetRawConstantValue() -ceq $sourceSha)
+ }catch{return $false}
+}
+function Import-PipelineVerifiedAssembly([string]$dir,[string]$prefix,[string]$sid,[string]$typeName,[string]$sourceSha) {
  $names=@();try{$names=@([System.IO.Directory]::GetFiles($dir,$prefix+'.*.dll'))}catch{return}
  [System.Array]::Sort($names)
  $tried=0
@@ -39,9 +50,11 @@ function Import-PipelineVerifiedAssembly([string]$dir,[string]$prefix,[string]$s
    if($at -eq $buffer.Length -and (Get-PipelineSha256 $buffer) -eq $expected.Groups[1].Value){$bytes=$buffer}
   }catch{$bytes=$null}finally{if($null -ne $stream){$stream.Dispose()}}
   if($null -eq $bytes){continue}
+  if(-not (Test-PipelineSourceStamp $bytes $sourceSha)){continue}
   $assembly=$null
   try{$assembly=[System.Reflection.Assembly]::Load($bytes)}catch{continue}
-  if($null -eq $assembly.GetType($typeName,$false)){throw 'PIPELINE-NATIVE-TYPE-MISSING'}
+  $found=$null;try{$found=$assembly.GetType($typeName,$false)}catch{$found=$null}
+  if($null -eq $found){continue}
   $script:PipelineNativeTypeLoaded=$true
   return
  }
@@ -56,11 +69,13 @@ function Test-PipelinePrivateDirectory([string]$dir,[string]$sid) {
 }
 function Import-PipelineNativeType([string]$source,[string]$tag,[string]$typeName,[string]$cacheRoot='') {
  $script:PipelineNativeTypeLoaded=$false
- $dir=$null;$prefix=$null;$sid=$null
+ $dir=$null;$prefix=$null;$sid=$null;$sourceSha=$null
  try{
   $sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-  $runtime=[string]::Join('|',@('v1',$tag,$PSVersionTable.PSVersion.ToString(),$PSVersionTable.CLRVersion.ToString(),[System.Diagnostics.FileVersionInfo]::GetVersionInfo([object].Assembly.Location).FileVersion,[Environment]::Is64BitProcess.ToString(),[Environment]::Is64BitOperatingSystem.ToString(),[string]$env:PROCESSOR_ARCHITECTURE))
-  $prefix=$tag+'-'+(Get-PipelineSha256 ([System.Text.Encoding]::UTF8.GetBytes($runtime+[string][char]10+$source))).Substring(0,32)
+  # An entry is bound to the exact helper source: its key derives from the sha256 of that source text, and the assembly built from it carries the same digest, which the loader requires before it loads anything.
+  $sourceSha=Get-PipelineSha256 ([System.Text.Encoding]::UTF8.GetBytes($source))
+  $runtime=[string]::Join('|',@('v2',$tag,$PSVersionTable.PSVersion.ToString(),$PSVersionTable.CLRVersion.ToString(),[System.Diagnostics.FileVersionInfo]::GetVersionInfo([object].Assembly.Location).FileVersion,[Environment]::Is64BitProcess.ToString(),[Environment]::Is64BitOperatingSystem.ToString(),[string]$env:PROCESSOR_ARCHITECTURE))
+  $prefix=$tag+'-'+(Get-PipelineSha256 ([System.Text.Encoding]::UTF8.GetBytes($runtime+[string][char]10+$sourceSha))).Substring(0,32)
   $root=$cacheRoot
   if([string]::IsNullOrEmpty($root)){$root=[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)}
   if([string]::IsNullOrEmpty($root)){throw 'PIPELINE-NATIVE-CACHE-ROOT'}
@@ -76,15 +91,16 @@ function Import-PipelineNativeType([string]$source,[string]$tag,[string]$typeNam
   if(-not (Test-PipelinePrivateDirectory $dir $sid)){$dir=$null}
  }catch{$dir=$null}
  if($null -ne $dir){
-  Import-PipelineVerifiedAssembly $dir $prefix $sid $typeName
+  Import-PipelineVerifiedAssembly $dir $prefix $sid $typeName $sourceSha
   if(-not $script:PipelineNativeTypeLoaded){
    $build=[System.IO.Path]::Combine($dir,'b'+[Guid]::NewGuid().ToString('N')+'.dll')
+   $stamp='public static class PipelineNativeSourceStamp { public const string Sha256 = "'+$sourceSha+'"; }'
    try{
-    Add-Type -TypeDefinition $source -OutputAssembly $build
+    Add-Type -TypeDefinition ($source+[string][char]10+$stamp) -OutputAssembly $build
     $built=[System.IO.File]::ReadAllBytes($build)
     [System.IO.File]::Move($build,[System.IO.Path]::Combine($dir,$prefix+'.'+(Get-PipelineSha256 $built)+'.dll'))
    }catch{}finally{try{[System.IO.File]::Delete($build)}catch{}}
-   Import-PipelineVerifiedAssembly $dir $prefix $sid $typeName
+   Import-PipelineVerifiedAssembly $dir $prefix $sid $typeName $sourceSha
   }
  }
  if(-not $script:PipelineNativeTypeLoaded){Add-Type -TypeDefinition $source}
