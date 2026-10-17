@@ -318,6 +318,12 @@ test("AC6 behavioral: a Spec/PRD whose E1 freeze order contradicts the readiness
   const prd = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC,
     prd: "The E1 freeze is a prerequisite for implementation authority.\n" } }));
   assert.equal(prd.code, "DWP-E1-FREEZE-ORDER");
+  // negated PRD sentences state the correct order and must be accepted
+  for (const sentence of ["E1 is not a prerequisite for implementation authority.",
+    "E1 freeze is not required before implementation authorization."]) {
+    const negated = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC, prd: `${sentence}\n` } }));
+    assert.notEqual(negated.code, "DWP-E1-FREEZE-ORDER", sentence);
+  }
 });
 
 test("AC5 behavioral: the owning modules refuse invalid input rather than only existing", async () => {

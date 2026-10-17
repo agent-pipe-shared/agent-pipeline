@@ -139,7 +139,8 @@ function e1FreezeOrderContradiction(sourceBytes) {
   const ready = /\*\*Work-package implementation-ready:\*\*(.*?)(?=\*\*Wave-complete:\*\*|$)/u.exec(spec);
   if (ready !== null && !/\bfreeze\b/u.test(ready[1])) return true;
   const prd = text("prd");
-  return /\bE1\b[^.]{0,120}\b(?:is |are )?(?:a )?(?:prerequisite (?:to|for) |required (?:for|before) |precedes |before )(?:the )?implementation[- ]authori(?:[sz]|ty)/iu.test(prd);
+  // A negated sentence ("E1 is not a prerequisite for ...") states the correct order.
+  return /\bE1\b(?:(?!\b(?:not|never|no longer)\b|n't)[^.]){0,120}\b(?:is |are )?(?:a )?(?:prerequisite (?:to|for) |required (?:for|before) |precedes |before )(?:the )?implementation[- ]authori(?:[sz]|ty)/iu.test(prd);
 }
 function sourceBytesMatch(sources, sourceBytes) {
   if (!exact(sourceBytes, SOURCE_NAMES)) return false;

@@ -437,7 +437,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   // fitness result and keeps every outcome visible for the later adoption.
   // Net-new ratchet (PO decision 2026-10-16 #5): the deferral covers only paths
   // that already existed; a net-new implementation path gets the full check.
-  // KNOWN LIMITATION: "existed" is judged by on-disk existence at entry time. The
+  // KNOWN LIMITATION (owner: Coordinator, due 2026-10-31): "existed" is judged by on-disk existence at entry time. The
   // deferral record (architecture-adoption.mjs: schema/state/scope/decidedAt/
   // expiresAt/reviewDate/decisionRef/...) carries neither a commit nor a captured
   // path list, so a path created by an earlier implementation entry reads as
