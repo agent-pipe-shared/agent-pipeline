@@ -435,7 +435,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   git(agyRepo.antigravityWorkspaceRoot, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture"]);
   installMandatoryHooks(agyRepo.antigravityWorkspaceRoot);
   const agyManifestRead = (path) => {
-    const value = String(path);
+    const value = String(path).replaceAll("\\", "/");
     if (value.endsWith("/plugin.json") && !value.includes("/.codex-plugin/")) {
       return JSON.stringify({ version: "1.2.3-test.1" });
     }
