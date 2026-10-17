@@ -218,6 +218,18 @@
           }
         ]
       }
+    ],
+    "SubagentStart": [
+      {
+        "$comment": "Dispatch receipt at SubagentStart (ALF-C-AC169-B; backlog item pipeline.every-dispatch-pays-a-bootstrap-receipt-detour; PO decision 2026-10-17). Hands the native SubagentStart identity (agent_id, agent_type) to the guard's own bootstrap-receipt writer, so a fresh subagent's first Edit/Write/NotebookEdit is admitted without the refusal-then-retry detour. No matcher: every subagent start. Never blocks and prints nothing (stdout would be injected into the subagent's context). The goldfish-task template's step 0 (the plain pipeline-start-preflight.mjs route) stays as the fallback and as the agent's own obligation. See hooks/subagent-start-receipt.mjs.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start-receipt.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }

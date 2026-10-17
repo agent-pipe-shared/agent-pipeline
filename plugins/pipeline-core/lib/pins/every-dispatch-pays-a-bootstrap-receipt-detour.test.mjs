@@ -15,9 +15,18 @@
 //   C5 A1 (template alternative) executability: the step 0 route must be runnable with the tools the shipped
 //      Goldfish role actually has. KNOWN GAP, see the todo case: template step 0 names the Skill
 //      `pipeline-core:pipeline-start`, while goldfish-implementor's tool list has no Skill tool.
-//   C6 the SubagentStart alternative is not wired (documents that A1 rests on the template alternative only).
+//   C6 A1 (SubagentStart alternative, PO decision 2026-10-17): hooks/subagent-start-receipt.mjs exists and
+//      hooks/hooks.json registers it under SubagentStart. hooks.json is a PROTECTED path (TP-4): the registration
+//      lands only through the signature-bound patch scratch/patches/ALF-C-AC169-B.patch, so until then this case
+//      is RED and carries "[needs protected patch ALF-C-AC169-B]" in its title (the marker clears itself once the
+//      registration is present). This replaces the earlier C6, which pinned that SubagentStart was NOT wired;
+//      the template alternative below (C4/C5) stays in force as the fallback either way.
+//   C7 A1+A2 through the hook: with the SubagentStart event as the only bootstrap act, the FIRST write of every
+//      write tool is admitted and the guard never records a refusal (the hook's own unit cases live in
+//      hooks/subagent-start-receipt.test.mjs, which is green with or without the hooks.json patch).
 // RED discriminator: C1 is the unmodified-flow RED (no receipt -> refusal); a scratch mirror of the template
-// step 0 without the preflight route shows C5's assertion can fail.
+// step 0 without the preflight route shows C5's assertion can fail; C6's discriminator shows the registration
+// predicate can fail on text mirrors, and C6 itself is RED against the unpatched hooks.json.
 
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -26,6 +35,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
+import { recordSubagentStartReceipt } from "../../hooks/subagent-start-receipt.mjs";
 import { START_PREFLIGHT_SCRIPT } from "../guard/constants.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -164,6 +174,55 @@ test("C5 discriminator: the executability predicate can pass and can fail (scrat
   assert.equal(step0Executable(bare, "tools: Read, Edit, Write, Grep, Glob, Bash"), false);
 });
 
-test("C6: the SubagentStart alternative is not wired, so A1 rests on the template alternative", () => {
-  assert.doesNotMatch(readFileSync(HOOKS_JSON, "utf8"), /SubagentStart/u);
+const HOOK_SCRIPT = join(REPO, "plugins", "pipeline-core", "hooks", "subagent-start-receipt.mjs");
+const C6_PATCH_MARKER = "[needs protected patch ALF-C-AC169-B]";
+function subagentStartRegistered(hooksJsonText, hookScriptExists) {
+  const entries = JSON.parse(hooksJsonText)?.hooks?.SubagentStart;
+  if (!hookScriptExists || !Array.isArray(entries)) return false;
+  return entries.some((entry) => Array.isArray(entry?.hooks) && entry.hooks.some((handler) => handler?.type === "command"
+    && typeof handler.command === "string"
+    && /\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/subagent-start-receipt\.mjs/u.test(handler.command)
+    && Number.isFinite(handler.timeout) && handler.timeout > 0));
+}
+const c6Registered = subagentStartRegistered(readFileSync(HOOKS_JSON, "utf8"), existsSync(HOOK_SCRIPT));
+test(`C6/A1: the SubagentStart receipt hook exists and is registered in hooks.json${c6Registered ? "" : ` ${C6_PATCH_MARKER}`}`, () => {
+  assert.equal(existsSync(HOOK_SCRIPT), true, "hooks/subagent-start-receipt.mjs must exist");
+  assert.equal(subagentStartRegistered(readFileSync(HOOKS_JSON, "utf8"), true), true,
+    "hooks/hooks.json must register hooks/subagent-start-receipt.mjs under SubagentStart with a finite timeout (protected path: apply scratch/patches/ALF-C-AC169-B.patch)");
+});
+
+test("C6 discriminator: the registration predicate can pass and can fail (text mirrors, production untouched)", () => {
+  const good = 'node "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start-receipt.mjs"';
+  const wired = (command, extra = {}) => JSON.stringify({ hooks: { SubagentStart: [{ hooks: [{ type: "command", command, ...extra }] }] } });
+  assert.equal(subagentStartRegistered(wired(good, { timeout: 15 }), true), true);
+  assert.equal(subagentStartRegistered(JSON.stringify({ hooks: { SessionStart: [] } }), true), false, "event not wired");
+  assert.equal(subagentStartRegistered(wired('node "${CLAUDE_PLUGIN_ROOT}/hooks/other-hook.mjs"', { timeout: 15 }), true), false, "another script");
+  assert.equal(subagentStartRegistered(wired(good), true), false, "no timeout");
+  assert.equal(subagentStartRegistered(wired(good, { timeout: 15 }), false), false, "script missing on disk");
+});
+
+test("C7/A1+A2: with the SubagentStart hook as the only bootstrap act, the first write of every write tool is admitted with zero refusals", () => {
+  const f = fixture();
+  try {
+    const id = "fresh-subagent-start";
+    const result = recordSubagentStartReceipt({
+      hook_event_name: "SubagentStart",
+      session_id: "session-c7",
+      transcript_path: join(f.base, "session.jsonl"),
+      cwd: f.project,
+      agent_id: id,
+      agent_type: AGENT_TYPE,
+    }, f.deps);
+    assert.equal(result.status, "delegated");
+    assert.deepEqual(JSON.parse(readFileSync(f.receipt(id), "utf8")), {
+      schema: "pipeline.bootstrap-receipt.v1", agentId: id, agentType: AGENT_TYPE, observedAt: "1970-01-01T00:00:00.000Z",
+    });
+    for (const [tool, input] of f.writes(id)) {
+      const r = evaluateLifecycleReadyGuard(f.dispatched(tool, input, id), f.deps);
+      assert.equal(r.exitCode, 0, `${tool}: ${r.stderr}`);
+    }
+    const decisions = f.observations().map((o) => o.decision);
+    assert.ok(decisions.includes("allow-receipt-present"));
+    assert.equal(decisions.includes("deny-no-receipt"), false, "the detour (a refusal) must never occur on the SubagentStart path");
+  } finally { f.cleanup(); }
 });
