@@ -42,6 +42,34 @@ practice (see `2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced`).
 - The happy path for one design revision needs one PO signature (approval) and
   no further PO acts.
 
+## Observed 2026-10-17: the one design review does not check decision continuity (major for 0.7.0)
+
+Source: PO-supplied forensic analysis of the Codex WSL greenfield run, finding P1-3
+(confirmed).
+
+- The approved Spec carried nine technical decisions; the project had only
+  `docs/adr/.gitkeep`, no ADR and no decision-register entry (EL-04). The architecture map
+  and fitness model were materialized, but no fitness check ever ran against a candidate.
+
+Added acceptance (0.7.0, major), inside the one review step above, no extra gate:
+
+- The single design review assesses each foundational decision of the Spec for
+  significance and requires, before the PO approval, either an ADR/register reference or a
+  recorded non-significance reason.
+- A materialized fitness model is executed as a candidate check at the implementation
+  boundary; a model that never ran is reported, not counted as qualified.
+
+## Recorded minors from the same analysis (not 0.7.0 acceptance conditions)
+
+- P2: after plan approval `docs/state.md` of the consumer project still said design, no
+  implementation and approval pending; an older owner checkpoint still said
+  blocked/unverified after a later green run; a test artifact named `.json` was plain text.
+  Proposal: an automatically refreshed entry state with the actual next executable step,
+  superseded markers on old checkpoints, artifacts that match their file format.
+- Transparency: the PO had to ask what the agent was doing, where parallel work is visible,
+  and to continue. Proposal: visible status of active owners and autonomous continuation
+  of technical recovery.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted for the next local 0.7.0 candidate (PO 2026-10-07).

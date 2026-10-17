@@ -43,6 +43,29 @@ Advisor at all through the formal route.
   implementor review itself.
 - Failing producers surface their stderr and exit code in the session result.
 
+## Observed 2026-10-17: a Goldfish receives an Elephant-only action from preflight (major for 0.7.0)
+
+Source: PO-supplied forensic analysis of the Codex WSL greenfield run, finding P1-1
+(partially confirmed; call counts are owner self-reports).
+
+- The first kernel owner (a Goldfish) ran an onboarding step that only the Coordinator may
+  run, after a `ready` preflight handed it that action. A later correction was correctly
+  refused as an unauthenticated amendment, but no usable recovery state existed.
+- A replacement owner left twelve uncommitted files, exceeded the call cap (self-report:
+  37 work calls against 20 + 5), and twice hit `spawnSync EPERM` at the Codex default
+  sandbox edge before using the host boundary. No product commit or host dispatch record
+  resulted, although the later checks were green.
+
+Added acceptance (0.7.0, major):
+
+- The preflight result is role-dependent: for a Goldfish or Critic it never carries an
+  executable Elephant/Coordinator action (onboarding, hook refresh, attestation).
+- Admitted test commands are routed to the declared host boundary from the first call, so
+  a Goldfish does not burn attempts on a sandbox `EPERM`.
+- When an owner dispatch fails or is refused, the course offers an explicit, atomic
+  recovery state that keeps the same task identity and attempt history; neither a chat
+  message nor a renamed task can stand in for it.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**

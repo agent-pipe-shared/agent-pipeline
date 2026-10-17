@@ -26,3 +26,25 @@ or identify the current transcript through the approved route.
   supplied by the runner; use `unavailable` for absent data.
 - Reject another session's ID, foreign repository metadata, aliases and
   unbounded content. Test Codex reconnect and honest unavailable readback.
+
+## Observed 2026-10-17: forensic export not completable on a grown session store (major for 0.7.0)
+
+Source: PO-supplied forensic analysis of the Codex WSL greenfield run, finding P1-2
+(confirmed).
+
+- Direct reads of the session directory are refused (`GUARD-READ-SCOPE-OUTSIDE-ROOT`),
+  which is the intended privacy boundary.
+- The repository-bound adapter, called with correct consent, failed with
+  `scan-bound-exceeded` on the grown session store.
+- Its list/read route needs the current exclusion session id, and there is no admitted way
+  to hand that id over (shell variable and `printenv` are refused).
+- Consequence: the requested runtime and token analysis could not be done at all.
+
+Added acceptance (0.7.0, major):
+
+- One repository-bound export determines the current session itself, finds every parent
+  and child segment of this repository, reports start/end events and token deltas,
+  pseudonymizes private identifiers and states completeness and limits explicitly.
+- It works without an environment query and without a PO signature series.
+- A scaling test with many foreign sessions in the store stays within the scan bound
+  (indexed or repository-filtered scan) and reports truncation honestly.

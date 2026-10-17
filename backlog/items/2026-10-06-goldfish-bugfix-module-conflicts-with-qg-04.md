@@ -41,6 +41,29 @@ accordingly; or (b) carve out a narrow QG-04 exception for a NEW repro test writ
 the RED run as a mandatory artifact and a hard ban on changing pre-existing tests or the repro after the fix goes
 green. Until decided, the Alfred night run uses (a). Due before the 0.7.0 release candidate.
 
+## Observed 2026-10-17: implementer-owned checks legitimize wrong product behavior (major for 0.7.0)
+
+Source: PO-supplied forensic analysis of the Codex WSL greenfield run (installed
+`0.7.0+codex.20261017214948.d6f4d76`), finding P0-2 (confirmed).
+
+- The item briefing of the consumer project assigned test ownership to the implementing
+  owner; no independent test author ran, although the project configuration declares a
+  test-author route. A configured route that is never executed is not separation.
+- The owner's green checks encoded three wrong expectations against the approved Spec: a
+  secret granted on the wrong action (the test asserts the same wrong trigger), a second
+  restart that crashes because only the first restart is tested, and a hash over Unicode
+  code points where the Spec requires FNV-1a over UTF-8 bytes.
+- So the 2026-10-08 template fix (`b3cabc7f8`) does not reach the consumer delivery route.
+
+Added acceptance (0.7.0, major):
+
+- For a product item, the delivery route dispatches the criterion-bound tests from the
+  approved requirements through a separate test-author dispatch before or independent of
+  the implementing owner, and the implementing owner may not modify them (QG-04).
+- The generated item briefing never assigns test ownership to the implementer.
+- A pin proves that a consumer item course with a declared test-author route actually
+  produces two dispatches with disjoint test and implementation write scopes.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
