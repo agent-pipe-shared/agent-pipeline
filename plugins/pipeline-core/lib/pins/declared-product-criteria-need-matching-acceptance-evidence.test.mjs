@@ -263,7 +263,7 @@ describe("declared product criteria need matching acceptance evidence (AC-146)",
       assert.throws(() => assertVerifyIsNeverProductAcceptance(report(B, { specPath: SPEC_PATH, verifyPath: "evidence/verify-ok.json" }, m)), assert.AssertionError);
     });
     test("a mirror that ignores unmapped mentions loses the mention-only gap", async () => {
-      const m = await mirror("nomentions", s => s.replace("?? [])].sort();", "?? []).slice(0, 0)].sort();"));
+      const m = await mirror("nomentions", s => s.replace("?? [])].sort();", "?? [])].sort().slice(0, 0);"));
       assert.throws(() => assertCriteriaAreNotSatisfiedByName(report(B, { specPath: SPEC_PATH }, m)), assert.AssertionError);
     });
     test("the unmodified production function passes the same assertions", () => {

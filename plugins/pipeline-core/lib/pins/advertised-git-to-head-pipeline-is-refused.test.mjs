@@ -128,7 +128,11 @@ test("P4 RED: a mirror with the git-pipeline lane removed refuses the advertised
   const mutant = await mirrorWithoutGitPipeline("shell-grammar-no-git-pipeline.mjs");
   const asMutant = (command) => mutant.isReadOnlyDiagnosticCommand(command, repoRoot);
   assert.equal(asMutant("rg -n needle README.md"), true, "mirror control: unrelated lanes intact");
-  assert.equal(asMutant("git show HEAD:docs/state.md | head -n 200"), false);
+  // the dedicated git-show lane (isContainedGitShowObject, via isBoundedReadOnlyPipeline)
+  // admits "git show HEAD:<path> | head" even without the generic git-pipeline lane,
+  // so the discriminating probes use shapes only the generic lane can admit.
+  assert.equal(asMutant("git log | head -n 3"), false);
+  assert.equal(asMutant("git diff --stat | head -n 20"), false);
   assert.equal(asMutant("git log | head -5"), false);
   // and the real module still admits them: the pin above discriminates real from mirror
   assert.equal(guard("git log | head -5"), true);
