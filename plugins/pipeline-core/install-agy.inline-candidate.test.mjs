@@ -196,11 +196,11 @@ test("Agy clean byte-matching candidate with different file mode does not supply
   assert.deepEqual(hostFiles(f.configRoot), before);
 });
 
-// Receipt-store privacy is the host platform's own assurance, exercised for real
-// on both sides: POSIX keeps its mode-bit contract, native Windows (which only
-// reports synthetic mode bits) is judged by the owner/DACL/reparse-point
-// assessment of lib/windows-private-state.mjs. Nothing here is injected.
-test("Agy refresh leaves its receipt store private under the host platform's real private-state assurance", (t) => {
+// Receipt-store privacy posture, exercised with the real refresh (nothing injected):
+// on POSIX the owner-only mode bits are asserted; on native Windows mode bits are
+// not evaluated (PO decision 2026-10-17: other local OS accounts are outside the
+// threat model), and the real refresh still writes and verifies the receipt.
+test("Agy refresh writes its receipt store; POSIX asserts owner-only mode bits, native Windows does not evaluate them (PO decision 2026-10-17)", (t) => {
   const f = fixture(t);
   const resolved = resolveSelected(f);
   assert.equal(resolved.status, "attestable-source", JSON.stringify(resolved));
@@ -219,7 +219,6 @@ test("Agy refresh leaves its receipt store private under the host platform's rea
   assert.equal(result.status, "refreshed", JSON.stringify(result));
   const stored = readdirSync(f.receiptDirectory).map((name) => join(f.receiptDirectory, name));
   assert.equal(stored.length, 2, "one source locator and one receipt");
-  const paths = [f.receiptDirectory, ...stored];
   // Native Windows: POSIX mode bits are synthetic and not evaluated (PO decision 2026-10-17); `refreshed` plus the stored pair above is the check.
   if (process.platform !== "win32") {
     assert.equal(statSync(f.receiptDirectory).mode & 0o022, 0);
