@@ -126,8 +126,8 @@ const COPY_MOVE_INSTALL_OPTIONS = Object.freeze({
     shortValues: "St",
     longFlags: ["archive", "attributes-only", "backup", "copy-contents", "debug", "dereference", "force", "interactive", "link",
       "no-clobber", "no-dereference", "no-target-directory", "one-file-system", "parents", "preserve", "recursive", "reflink",
-      "remove-destination", "sparse", "strip-trailing-slashes", "symbolic-link", "update", "verbose", "context", "help", "version"],
-    longValues: ["no-preserve", "suffix", "target-directory"],
+      "remove-destination", "strip-trailing-slashes", "symbolic-link", "update", "verbose", "context", "help", "version"],
+    longValues: ["no-preserve", "sparse", "suffix", "target-directory"],
   }),
   mv: Object.freeze({
     shortFlags: "bfinTuvZ",

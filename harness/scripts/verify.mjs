@@ -52,7 +52,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadAndApplyVerifyCaseCompletionAugmentations } from "./verify-case-completion-augmentation.mjs";
+import { loadAndApplyVerifyCaseCompletionAugmentationsToSources } from "./verify-case-completion-augmentation.mjs";
 import { duplicateSuiteIds, loadDeclarativeVerifySuites } from "./check-verify-suite-registration.mjs";
 import { UNREPLACED_MANUAL_CHECK_PLACEHOLDER, computeManualVerifyStep } from "./manual-check-logic.mjs";
 import { writeVerifyEvidencePair } from "./verify-evidence-writer.mjs";
@@ -940,8 +940,9 @@ const augmentationRegistrationSources = declarativeSuitesResult.ok
   ? [...declarativeSuitesResult.suites, ...WINDOWS_ASSURANCE_VERIFY_SUITES]
   : [];
 const augmentedDeclarativeSuitesResult = declarativeSuitesResult.ok
-  ? loadAndApplyVerifyCaseCompletionAugmentations({ rootDir: repoRoot, suites: augmentationRegistrationSources })
+  ? loadAndApplyVerifyCaseCompletionAugmentationsToSources({ rootDir: repoRoot, hardCodedSuites: TEST_SUITES, suites: augmentationRegistrationSources })
   : declarativeSuitesResult;
+if (augmentedDeclarativeSuitesResult.ok && augmentedDeclarativeSuitesResult.hardCodedSuites) TEST_SUITES.splice(0, TEST_SUITES.length, ...augmentedDeclarativeSuitesResult.hardCodedSuites);
 let declarativeSuitesStep = null;
 if (!augmentedDeclarativeSuitesResult.ok) {
   console.error(`VERIFY-DECLARATIVE-SUITES: ${augmentedDeclarativeSuitesResult.error}`);

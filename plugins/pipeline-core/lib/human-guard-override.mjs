@@ -4572,6 +4572,12 @@ export function buildHumanGuardOverrideSignatureIntent({ prepared, planned }) {
  * `emit-signature-digest` CLI command, which computes the identical value through
  * `buildHumanGuardOverrideSignatureIntent()` above.
  *
+ * Unborn HEAD (AC-258): when `repository.head` is null and `repository.tree` is the empty
+ * tree (`isUnbornObservation()`), the recipe above maps to `candidate: { commit:
+ * "0000000000000000000000000000000000000000", tree: repository.tree }` and
+ * policyRevision "human-guard-override-signature-v1-unborn" (see
+ * `signatureIntentCandidate()` / `signatureIntentPolicyRevision()`); a born repository keeps the recipe above unchanged.
+ *
  * Deliberate scope narrowing (reported deviation, not required by ADR-0059's own
  * scope): the `global-plugin-install` denial class carries no commit/tree in its
  * repository observation (see `localPluginInstallSourceObservation`), so it has no

@@ -141,6 +141,19 @@ test("P3 (F1 control): commands whose every written operand is inside the projec
     `install --owner=root --mode=0644 ${W.src} ${W.dest}`,
   ]) assert.equal(c6g1Forbidden(command), false, c6g1Title(command));
 });
+// ALF-C-C6G1-CORR-A3 (Critic C6g1 D2-F1): GNU cp declares --sparse=WHEN with a MANDATORY argument, so a separated value
+// (`--sparse always`) is consumed by the option and the real destination stays the last operand. RED on a tree without
+// scratch/patches/ALF-C-C6G1-CORR-A3.patch (lib/guard/po-commands.mjs: "sparse" listed as a flag, so "always" was judged as the
+// destination and an outside write passed); GREEN with it.
+const NEEDS_PATCH_A3 = "needs protected patch ALF-C-C6G1-CORR-A3";
+test(`P3 (D2-F1): a trailing separated '--sparse always' does not hide an outside destination (${NEEDS_PATCH_A3})`, () => {
+  assert.equal(c6g1Forbidden(`cp ${W.src} ${W.outside}/dst --sparse always`), true);
+  assert.equal(c6g1Forbidden(`cp --sparse always ${W.src} ${W.outside}/dst`), true);
+});
+test(`P3 (D2-F1 control): a separated '--sparse always' with an in-project destination stays allowed (${NEEDS_PATCH_A3})`, () => {
+  assert.equal(c6g1Forbidden(`cp ${W.src} ${W.dest} --sparse always`), false);
+  assert.equal(c6g1Forbidden(`cp --sparse=always ${W.src} ${W.dest}`), false);
+});
 test("P3 (F1 control): an outside destination stays refused for every verb", () => {
   for (const command of [`cp ${W.src} ${W.outside}/x`, `mv ${W.src} ${W.outside}/x`, `install ${W.src} ${W.outside}/x`, `install -d ${W.outside}/x`]) {
     assert.equal(c6g1Forbidden(command), true, c6g1Title(command));

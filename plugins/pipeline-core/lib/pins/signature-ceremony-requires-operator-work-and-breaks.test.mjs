@@ -76,7 +76,7 @@ function prepare(root) {
   return { status, out };
 }
 
-test("RED: signature preparation works in an unborn-HEAD repository (HGO-SIGNATURE-INTENT-INVALID today)", () => {
+test("signature preparation works in an unborn-HEAD repository (AC-258; formerly HGO-SIGNATURE-INTENT-INVALID)", () => {
   const root = fixture({ born: false });
   try {
     const { status, out } = prepare(root);
@@ -225,16 +225,16 @@ test("mirror proof: the staged protected patch ALF-C-AC258-REF yields the up-fro
 });
 
 // ---------------------------------------------------------------------------------------------
-// UNBORN-HEAD SIGNATURE CEREMONY ON A PATCHED MIRROR (acceptance clause "Signing works in an
-// unborn-HEAD repository"; ALF-C-AC258-UNBORN2). The live case "RED: signature preparation works
-// in an unborn-HEAD repository" above stays RED until the signature-bound protected patch
-// scratch/patches/ALF-C-AC258-UNBORN.patch (plugins/pipeline-core/lib/human-guard-override.mjs)
-// lands. Root cause it fixes: createPoApprovalIntent() rejects a null commit, so the unborn
+// UNBORN-HEAD SIGNATURE CEREMONY ON A MIRROR OF THE LIVE PLUGIN (acceptance clause "Signing works
+// in an unborn-HEAD repository"; ALF-C-AC258-UNBORN2). The protected fix (commit 29df88cad,
+// plugins/pipeline-core/lib/human-guard-override.mjs) has landed, so these cases run
+// unconditionally: no patch file is needed or applied. Root cause it fixed: createPoApprovalIntent()
+// rejects a null commit, so the unborn
 // observation (`head: null`, tree === the empty-tree oid) is bound into the signed intent as the
 // all-zero commit sentinel with a separate "-unborn" policy revision, and the same mapping is
-// compared at arm time. The cases below prove the patch on a scratch COPY of the plugin (the
-// AC258-REF mirror pattern) and pin the ceremony around the first commit:
-//   (U1)  unborn prepare-for-signature returns status 0 and "prepared"       [RED without the patch]
+// compared at arm time. The cases below run on a scratch COPY of the live plugin (fixture
+// isolation) and pin the ceremony around the first commit:
+//   (U1)  unborn prepare-for-signature returns status 0 and "prepared"
 //   (U1b) a born repository still prepares on the same mirror                 [control]
 //   (U2)  an intent prepared and signed while unborn is refused, typed, after the first commit
 //   (U3a) arming while still unborn works and consuming while still unborn is admitted [control]
@@ -243,7 +243,6 @@ test("mirror proof: the staged protected patch ALF-C-AC258-REF yields the up-fro
 // runs its own `git init` first. The signing key is an in-memory ephemeral Ed25519 pair whose
 // public digest is the fixture's committed-style trust anchor, exactly as in the course cases below.
 // ---------------------------------------------------------------------------------------------
-const AC258_UNBORN_PATCH = join(REPO_ROOT, "scratch", "patches", "ALF-C-AC258-UNBORN.patch");
 const UNBORN_CASE_TIMEOUT_MS = 600_000; // own constant: the shared CASE_TIMEOUT_MS below is still in its TDZ when these cases register
 const UNBORN_KEY_REFERENCE = "ac258-unborn-fixture-key";
 const UNBORN_DRIFT_CODES = ["HGO-CANDIDATE-DRIFT", "HGO-DRIFT"];
@@ -343,9 +342,7 @@ function ubAuditEvents(root) {
   try { return readFileSync(ubStore(root).audit, "utf8").split(/\r?\n/u).filter(Boolean).map((line) => JSON.parse(line).event); } catch { return []; }
 }
 
-describe("unborn-HEAD signature ceremony on a scratch mirror carrying the staged protected patch ALF-C-AC258-UNBORN (AC-258)", {
-  skip: existsSync(AC258_UNBORN_PATCH) ? false : "the protected patch is not staged under scratch/patches (nothing to prove)",
-}, () => {
+describe("unborn-HEAD signature ceremony on a scratch mirror of the live plugin (AC-258, ALF-C-AC258-UNBORN landed)", () => {
   before(async () => {
     unbornCourse.previousCeiling = process.env.GIT_CEILING_DIRECTORIES;
     process.env.GIT_CEILING_DIRECTORIES = FIXTURES; // the library spawns git with the inherited environment
@@ -354,15 +351,7 @@ describe("unborn-HEAD signature ceremony on a scratch mirror carrying the staged
     unbornCourse.cleanup.push(mirror);
     unbornCourse.pluginCopy = join(mirror, "plugins", "pipeline-core");
     cpSync(PLUGIN_ROOT, unbornCourse.pluginCopy, { recursive: true });
-    const apply = (args) => spawnSync("git", ["apply", ...args, AC258_UNBORN_PATCH], {
-      cwd: mirror, encoding: "utf8", shell: false, env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURES },
-    });
-    const applied = apply([]);
-    if (applied.status !== 0) {
-      // Once the patch has landed in the live tree it no longer applies forward; then it must apply in reverse.
-      const reverse = apply(["--reverse", "--check"]);
-      assert.equal(reverse.status, 0, `patch neither applies nor is already present: ${applied.stderr} | ${reverse.stderr}`);
-    }
+    // The fix has landed in the live module: the mirror is a plain copy of the live plugin, no patch is applied.
     assert.match(readFileSync(join(unbornCourse.pluginCopy, "lib", "human-guard-override.mjs"), "utf8"), /HGO_SIGNATURE_INTENT_POLICY_REVISION_UNBORN/u, "the mirror carries the unborn mapping");
     const load = (relative) => import(pathToFileURL(join(unbornCourse.pluginCopy, relative)).href);
     unbornCourse.hgo = await load("lib/human-guard-override.mjs");
@@ -378,7 +367,7 @@ describe("unborn-HEAD signature ceremony on a scratch mirror carrying the staged
     for (const target of unbornCourse.cleanup) rmSync(target, { recursive: true, force: true, maxRetries: 3 });
   }, { timeout: UNBORN_CASE_TIMEOUT_MS });
 
-  test("(U1) unborn prepare-for-signature returns status 0 and 'prepared' with a signable intent on the patched mirror", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
+  test("(U1) unborn prepare-for-signature returns status 0 and 'prepared' with a signable intent on the live-plugin mirror", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
     const root = ubFixture();
     const prepared = ubPrepared(root);
     assert.match(prepared.intentSha256, /^[a-f0-9]{64}$/u);
@@ -388,7 +377,7 @@ describe("unborn-HEAD signature ceremony on a scratch mirror carrying the staged
     assert.ok(ubIsUnborn(root), "preparing must not create a commit");
   });
 
-  test("(U1b) control: a born repository still prepares on the same patched mirror", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
+  test("(U1b) control: a born repository still prepares on the same live-plugin mirror", { timeout: UNBORN_CASE_TIMEOUT_MS }, () => {
     const root = ubFixture();
     ubFirstCommit(root);
     const prepared = ubPrepared(root);

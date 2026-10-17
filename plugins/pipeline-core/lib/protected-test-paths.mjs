@@ -112,11 +112,20 @@ export function loadProtectedTestPathRules({ rootDir, readFileSyncFn = readFileS
   return { rules, warnings, configPath, identity: baseline.identity, dynamic: baseline.dynamic.status };
 }
 
-/** The write-lane match: backslashes folded, rules already case-insensitive. */
+/**
+ * Pure string separator normalisation shared by both live matchers; mirrors `normal()` in
+ * protected-baseline.mjs (fold backslashes, collapse runs of "/", strip a leading "./") and
+ * additionally drops interior "/./" segments. `..` is deliberately NOT resolved here.
+ */
+function normalizeSeparators(value) {
+  return value.replace(/\\/gu, "/").replace(/\/{2,}/gu, "/").replace(/^\.\//u, "").replace(/\/(?:\.\/)+/gu, "/");
+}
+
+/** The write-lane match: separators normalised, rules already case-insensitive. */
 export function protectedTestPathRuleFor(rules, filePath, { rootDir, liveRoots } = {}) {
   if (rootDir && isPhysicalScratchTarget(filePath, { rootDir, liveRoots })) return null;
   if (typeof filePath !== "string" || filePath === "") return null;
-  const normalized = filePath.replace(/\\/gu, "/");
+  const normalized = normalizeSeparators(filePath);
   return rules.find((rule) => rule.re.test(normalized)) ?? null;
 }
 
@@ -391,7 +400,7 @@ function containsWholeToken(haystack, needle) {
 function ruleForCandidate(rules, candidate, rootDir) {
   if (rootDir && isPhysicalScratchTarget(candidate, { rootDir })) return null;
   if (typeof candidate !== "string" || candidate === "") return null;
-  const normalized = candidate.replace(/\\/gu, "/");
+  const normalized = normalizeSeparators(candidate);
   return rules.find((rule) => rule.re.test(normalized)) ?? null;
 }
 

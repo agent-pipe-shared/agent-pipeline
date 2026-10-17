@@ -51,8 +51,10 @@ lifecycle); the shell write-target extraction in
   refusal, naming the one refresh command. Refresh snapshots as part of the
   sanctioned plugin install/refresh flow, so a PO plugin update never leaves
   stale hooks behind.
-- Classify only the destination operand of `cp`/`mv`/`install` as the write
+- Classify only the destination operand of `cp`/`install` as the write
   target; a source outside the root is a read (subject to the read policy).
+  `mv` also counts its sources as written, because it removes them (Critic
+  C6g1 F1): an outside `mv` source is a cross-repository mutation, not a read.
 - Fixtures on win32 and POSIX, consumer layout included.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)

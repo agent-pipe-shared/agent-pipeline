@@ -2250,12 +2250,6 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs"
     },
     {
-      "name": "shell-grammar-capability-placement-tests",
-      "file": "harness/scripts/shell-grammar-capability-placement.test.mjs",
-      "invariantPinned": "Regression and invariant coverage for harness/scripts/shell-grammar-capability-placement.test.mjs",
-      "nonOverlapNote": "Unique test suite for harness/scripts/shell-grammar-capability-placement.test.mjs"
-    },
-    {
       "name": "critic-generic-batch-tests",
       "file": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
@@ -2350,6 +2344,1038 @@
       "file": "plugins/pipeline-core/hooks/subagent-start-receipt.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/subagent-start-receipt.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/subagent-start-receipt.test.mjs"
+    },
+    {
+      "name": "administrative-commit-policy-tests",
+      "file": "plugins/pipeline-core/lib/administrative-commit-policy.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/administrative-commit-policy.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/administrative-commit-policy.test.mjs"
+    },
+    {
+      "name": "calibration-verify-commit-transition-tests",
+      "file": "plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs"
+    },
+    {
+      "name": "dispatch-briefing-route-record-tests",
+      "file": "plugins/pipeline-core/lib/dispatch-briefing-route-record.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/dispatch-briefing-route-record.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/dispatch-briefing-route-record.test.mjs"
+    },
+    {
+      "name": "git-hook-runtime-snapshot-tests",
+      "file": "plugins/pipeline-core/lib/git-hook-runtime-snapshot.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/git-hook-runtime-snapshot.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/git-hook-runtime-snapshot.test.mjs"
+    },
+    {
+      "name": "git-null-device-sites-tests",
+      "file": "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/git-null-device-sites.test.mjs"
+    },
+    {
+      "name": "onboarding-inspect-prefilter-tests",
+      "file": "plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/guard/onboarding-inspect-prefilter.test.mjs"
+    },
+    {
+      "name": "native-goldfish-host-state-fanout-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs"
+    },
+    {
+      "name": "pin-a-read-only-probe-can-dump-the-process-environment-into-a-transcript-tests",
+      "file": "plugins/pipeline-core/lib/pins/a-read-only-probe-can-dump-the-process-environment-into-a-transcript.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/a-read-only-probe-can-dump-the-process-environment-into-a-transcript.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/a-read-only-probe-can-dump-the-process-environment-into-a-transcript.test.mjs"
+    },
+    {
+      "name": "pin-advisor-demand-reuse-has-no-design-course-bound-tests",
+      "file": "plugins/pipeline-core/lib/pins/advisor-demand-reuse-has-no-design-course-bound.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/advisor-demand-reuse-has-no-design-course-bound.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/advisor-demand-reuse-has-no-design-course-bound.test.mjs"
+    },
+    {
+      "name": "pin-advisor-provenance-ancestor-check-fails-on-any-sibling-write-tests",
+      "file": "plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs"
+    },
+    {
+      "name": "pin-advisor-question-contract-and-final-source-binding-conflict-tests",
+      "file": "plugins/pipeline-core/lib/pins/advisor-question-contract-and-final-source-binding-conflict.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/advisor-question-contract-and-final-source-binding-conflict.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/advisor-question-contract-and-final-source-binding-conflict.test.mjs"
+    },
+    {
+      "name": "pin-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments-tests",
+      "file": "plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs"
+    },
+    {
+      "name": "pin-agy-el01-write-authorization-gap-tests",
+      "file": "plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs"
+    },
+    {
+      "name": "pin-agy-imported-plugin-snapshot-shadows-registered-plugin-tests",
+      "file": "plugins/pipeline-core/lib/pins/agy-imported-plugin-snapshot-shadows-registered-plugin.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/agy-imported-plugin-snapshot-shadows-registered-plugin.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/agy-imported-plugin-snapshot-shadows-registered-plugin.test.mjs"
+    },
+    {
+      "name": "pin-agy-managed-copy-first-start-lacks-attestation-tests",
+      "file": "plugins/pipeline-core/lib/pins/agy-managed-copy-first-start-lacks-attestation.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/agy-managed-copy-first-start-lacks-attestation.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/agy-managed-copy-first-start-lacks-attestation.test.mjs"
+    },
+    {
+      "name": "pin-approval-bound-design-package-lives-in-an-ignored-directory-tests",
+      "file": "plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs"
+    },
+    {
+      "name": "pin-approval-verification-demands-head-equals-candidate-tests",
+      "file": "plugins/pipeline-core/lib/pins/approval-verification-demands-head-equals-candidate.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/approval-verification-demands-head-equals-candidate.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/approval-verification-demands-head-equals-candidate.test.mjs"
+    },
+    {
+      "name": "pin-auto-install-pre-push-hook-with-the-plugin-tests",
+      "file": "plugins/pipeline-core/lib/pins/auto-install-pre-push-hook-with-the-plugin.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/auto-install-pre-push-hook-with-the-plugin.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/auto-install-pre-push-hook-with-the-plugin.test.mjs"
+    },
+    {
+      "name": "pin-bootstrap-should-refresh-hooks-when-the-plugin-updated-tests",
+      "file": "plugins/pipeline-core/lib/pins/bootstrap-should-refresh-hooks-when-the-plugin-updated.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/bootstrap-should-refresh-hooks-when-the-plugin-updated.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/bootstrap-should-refresh-hooks-when-the-plugin-updated.test.mjs"
+    },
+    {
+      "name": "pin-bounded-reader-terminal-binding-tests",
+      "file": "plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs"
+    },
+    {
+      "name": "pin-brownfield-implementation-entry-demands-a-greenfield-design-block-tests",
+      "file": "plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs"
+    },
+    {
+      "name": "pin-budget-checkpoint-fires-below-the-briefed-cap-tests",
+      "file": "plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs"
+    },
+    {
+      "name": "pin-capability-inventory-checker-is-red-at-head-tests",
+      "file": "plugins/pipeline-core/lib/pins/capability-inventory-checker-is-red-at-head.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/capability-inventory-checker-is-red-at-head.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/capability-inventory-checker-is-red-at-head.test.mjs"
+    },
+    {
+      "name": "pin-capture-evidence-does-not-normalize-windows-npm-launch-tests",
+      "file": "plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs"
+    },
+    {
+      "name": "pin-claude-design-readiness-cannot-start-on-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/claude-design-readiness-cannot-start-on-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/claude-design-readiness-cannot-start-on-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/claude-design-readiness-cannot-start-on-windows.test.mjs"
+    },
+    {
+      "name": "pin-claude-greenfield-seeds-unselected-codex-targets-tests",
+      "file": "plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs"
+    },
+    {
+      "name": "pin-claude-session-start-emits-codex-transcript-recovery-hint-tests",
+      "file": "plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/claude-session-start-emits-codex-transcript-recovery-hint.test.mjs"
+    },
+    {
+      "name": "pin-claude-windows-greenfield-lifecycle-not-walkable-tests",
+      "file": "plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs"
+    },
+    {
+      "name": "pin-claude-windows-guard-refuses-every-in-repo-read-tests",
+      "file": "plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs"
+    },
+    {
+      "name": "pin-codex-advisor-evidence-fails-after-host-update-tests",
+      "file": "plugins/pipeline-core/lib/pins/codex-advisor-evidence-fails-after-host-update.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/codex-advisor-evidence-fails-after-host-update.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/codex-advisor-evidence-fails-after-host-update.test.mjs"
+    },
+    {
+      "name": "pin-codex-advisor-shared-namespace-rejects-fresh-repository-identity-tests",
+      "file": "plugins/pipeline-core/lib/pins/codex-advisor-shared-namespace-rejects-fresh-repository-identity.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/codex-advisor-shared-namespace-rejects-fresh-repository-identity.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/codex-advisor-shared-namespace-rejects-fresh-repository-identity.test.mjs"
+    },
+    {
+      "name": "pin-codex-bootstrap-in-the-typed-next-action-tests",
+      "file": "plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs"
+    },
+    {
+      "name": "pin-codex-design-readiness-child-rejects-valid-review-tests",
+      "file": "plugins/pipeline-core/lib/pins/codex-design-readiness-child-rejects-valid-review.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/codex-design-readiness-child-rejects-valid-review.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/codex-design-readiness-child-rejects-valid-review.test.mjs"
+    },
+    {
+      "name": "pin-codex-own-session-audit-export-missing-tests",
+      "file": "plugins/pipeline-core/lib/pins/codex-own-session-audit-export-missing.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/codex-own-session-audit-export-missing.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/codex-own-session-audit-export-missing.test.mjs"
+    },
+    {
+      "name": "pin-codex-readiness-private-receipt-omits-output-custody-tests",
+      "file": "plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs"
+    },
+    {
+      "name": "pin-codex-wsl-required-advisor-has-no-completable-route-tests",
+      "file": "plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs"
+    },
+    {
+      "name": "pin-commit-grammar-hint-still-requires-scratch-message-file-tests",
+      "file": "plugins/pipeline-core/lib/pins/commit-grammar-hint-still-requires-scratch-message-file.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/commit-grammar-hint-still-requires-scratch-message-file.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/commit-grammar-hint-still-requires-scratch-message-file.test.mjs"
+    },
+    {
+      "name": "pin-completion-fd-suites-cannot-run-as-single-files-tests",
+      "file": "plugins/pipeline-core/lib/pins/completion-fd-suites-cannot-run-as-single-files.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/completion-fd-suites-cannot-run-as-single-files.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/completion-fd-suites-cannot-run-as-single-files.test.mjs"
+    },
+    {
+      "name": "pin-concurrent-session-warning-never-fires-on-native-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/concurrent-session-warning-never-fires-on-native-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/concurrent-session-warning-never-fires-on-native-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/concurrent-session-warning-never-fires-on-native-windows.test.mjs"
+    },
+    {
+      "name": "pin-configure-verify-output-lacks-a-walkable-commit-route-tests",
+      "file": "plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs"
+    },
+    {
+      "name": "pin-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard-tests",
+      "file": "plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs"
+    },
+    {
+      "name": "pin-critic-round-cap-and-delta-scope-are-not-enforced-tests",
+      "file": "plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs"
+    },
+    {
+      "name": "pin-critic-scratch-notes-write-is-refused-again-tests",
+      "file": "plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs"
+    },
+    {
+      "name": "pin-cross-runner-chat-intake-reference-needs-host-capture-tests",
+      "file": "plugins/pipeline-core/lib/pins/cross-runner-chat-intake-reference-needs-host-capture.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/cross-runner-chat-intake-reference-needs-host-capture.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/cross-runner-chat-intake-reference-needs-host-capture.test.mjs"
+    },
+    {
+      "name": "pin-declared-system-skill-read-requires-human-override-tests",
+      "file": "plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs"
+    },
+    {
+      "name": "pin-denial-names-a-diagnosis-it-refuses-tests",
+      "file": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs"
+    },
+    {
+      "name": "pin-design-approval-validator-rejects-json-key-reordering-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-approval-validator-rejects-json-key-reordering.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-approval-validator-rejects-json-key-reordering.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-approval-validator-rejects-json-key-reordering.test.mjs"
+    },
+    {
+      "name": "pin-design-bootstrap-verify-state-contradicts-deferred-contract-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs"
+    },
+    {
+      "name": "pin-design-course-run-v2-refuses-its-own-documented-routes-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs"
+    },
+    {
+      "name": "pin-design-generator-repeats-large-source-material-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs"
+    },
+    {
+      "name": "pin-design-intake-generator-omits-question-answers-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-intake-generator-omits-question-answers.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-intake-generator-omits-question-answers.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-intake-generator-omits-question-answers.test.mjs"
+    },
+    {
+      "name": "pin-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs"
+    },
+    {
+      "name": "pin-design-workflow-package-omits-contract-tests",
+      "file": "plugins/pipeline-core/lib/pins/design-workflow-package-omits-contract.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/design-workflow-package-omits-contract.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/design-workflow-package-omits-contract.test.mjs"
+    },
+    {
+      "name": "pin-desktop-app-support-is-unverified-tests",
+      "file": "plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs"
+    },
+    {
+      "name": "pin-digest-pinned-powershell-helpers-check-out-as-lf-tests",
+      "file": "plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs"
+    },
+    {
+      "name": "pin-dispatch-budget-lock-refuses-every-subagent-call-on-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs"
+    },
+    {
+      "name": "pin-dispatch-guard-rejects-built-in-capitalized-agent-types-tests",
+      "file": "plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs"
+    },
+    {
+      "name": "pin-dispatch-record-log-stays-empty-despite-mandatory-phase-entries-tests",
+      "file": "plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs"
+    },
+    {
+      "name": "pin-dispatch-record-ownership-binds-an-attempted-creation-tests",
+      "file": "plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs"
+    },
+    {
+      "name": "pin-dispatch-records-land-under-specs-evidence-tests",
+      "file": "plugins/pipeline-core/lib/pins/dispatch-records-land-under-specs-evidence.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/dispatch-records-land-under-specs-evidence.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/dispatch-records-land-under-specs-evidence.test.mjs"
+    },
+    {
+      "name": "pin-domain-scanner-findings-need-reproduction-before-remedy-tests",
+      "file": "plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs"
+    },
+    {
+      "name": "pin-draft-phase-guard-blocks-mandatory-bootstrap-preflight-tests",
+      "file": "plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs"
+    },
+    {
+      "name": "pin-elephant-main-context-spent-on-wake-ups-and-inline-reads-tests",
+      "file": "plugins/pipeline-core/lib/pins/elephant-main-context-spent-on-wake-ups-and-inline-reads.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/elephant-main-context-spent-on-wake-ups-and-inline-reads.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/elephant-main-context-spent-on-wake-ups-and-inline-reads.test.mjs"
+    },
+    {
+      "name": "pin-every-dispatch-pays-a-bootstrap-receipt-detour-tests",
+      "file": "plugins/pipeline-core/lib/pins/every-dispatch-pays-a-bootstrap-receipt-detour.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/every-dispatch-pays-a-bootstrap-receipt-detour.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/every-dispatch-pays-a-bootstrap-receipt-detour.test.mjs"
+    },
+    {
+      "name": "pin-evidence-artifacts-carry-no-commit-identity-tests",
+      "file": "plugins/pipeline-core/lib/pins/evidence-artifacts-carry-no-commit-identity.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/evidence-artifacts-carry-no-commit-identity.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/evidence-artifacts-carry-no-commit-identity.test.mjs"
+    },
+    {
+      "name": "pin-existing-signing-key-reuse-deadlocks-onboarding-tests",
+      "file": "plugins/pipeline-core/lib/pins/existing-signing-key-reuse-deadlocks-onboarding.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/existing-signing-key-reuse-deadlocks-onboarding.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/existing-signing-key-reuse-deadlocks-onboarding.test.mjs"
+    },
+    {
+      "name": "pin-feature-branch-push-admitted-without-signature-approval-tests",
+      "file": "plugins/pipeline-core/lib/pins/feature-branch-push-admitted-without-signature-approval.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/feature-branch-push-admitted-without-signature-approval.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/feature-branch-push-admitted-without-signature-approval.test.mjs"
+    },
+    {
+      "name": "pin-first-enrollment-enters-retirement-before-consent-tests",
+      "file": "plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs"
+    },
+    {
+      "name": "pin-foreign-worktree-closes-the-implementation-gate-tests",
+      "file": "plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs"
+    },
+    {
+      "name": "pin-gh-delivery-classifier-is-not-wired-tests",
+      "file": "plugins/pipeline-core/lib/pins/gh-delivery-classifier-is-not-wired.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/gh-delivery-classifier-is-not-wired.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/gh-delivery-classifier-is-not-wired.test.mjs"
+    },
+    {
+      "name": "pin-git-hook-runtime-snapshots-go-stale-after-plugin-changes-tests",
+      "file": "plugins/pipeline-core/lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs"
+    },
+    {
+      "name": "pin-git-push-classifier-misses-env-s-and-editor-bang-tests",
+      "file": "plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs"
+    },
+    {
+      "name": "pin-git-stash-list-classified-as-working-tree-write-tests",
+      "file": "plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs"
+    },
+    {
+      "name": "pin-gitleaks-content-suppression-does-not-match-on-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/gitleaks-content-suppression-does-not-match-on-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/gitleaks-content-suppression-does-not-match-on-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/gitleaks-content-suppression-does-not-match-on-windows.test.mjs"
+    },
+    {
+      "name": "pin-gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one-tests",
+      "file": "plugins/pipeline-core/lib/pins/gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.test.mjs"
+    },
+    {
+      "name": "pin-gitleaks-repair-ignore-cli-is-a-no-op-on-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs"
+    },
+    {
+      "name": "pin-goldfish-budgets-omit-the-closing-ceremony-tests",
+      "file": "plugins/pipeline-core/lib/pins/goldfish-budgets-omit-the-closing-ceremony.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/goldfish-budgets-omit-the-closing-ceremony.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/goldfish-budgets-omit-the-closing-ceremony.test.mjs"
+    },
+    {
+      "name": "pin-goldfish-bugfix-module-conflicts-with-qg-04-tests",
+      "file": "plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs"
+    },
+    {
+      "name": "pin-goldfish-test-briefs-lack-targeted-and-quick-command-routes-tests",
+      "file": "plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs"
+    },
+    {
+      "name": "pin-governance-scope-rejects-readonly-host-git-control-tests",
+      "file": "plugins/pipeline-core/lib/pins/governance-scope-rejects-readonly-host-git-control.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/governance-scope-rejects-readonly-host-git-control.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/governance-scope-rejects-readonly-host-git-control.test.mjs"
+    },
+    {
+      "name": "pin-greenfield-approval-policy-applies-after-intake-transition-tests",
+      "file": "plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs"
+    },
+    {
+      "name": "pin-greenfield-design-course-cost-and-proportionality-tests",
+      "file": "plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs"
+    },
+    {
+      "name": "pin-greenfield-machine-output-and-skill-budget-tests",
+      "file": "plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs"
+    },
+    {
+      "name": "pin-guard-override-request-digest-drifts-after-arming-tests",
+      "file": "plugins/pipeline-core/lib/pins/guard-override-request-digest-drifts-after-arming.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/guard-override-request-digest-drifts-after-arming.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/guard-override-request-digest-drifts-after-arming.test.mjs"
+    },
+    {
+      "name": "pin-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target-tests",
+      "file": "plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.test.mjs"
+    },
+    {
+      "name": "pin-guard-push-refuses-read-only-git-without-push-tests",
+      "file": "plugins/pipeline-core/lib/pins/guard-push-refuses-read-only-git-without-push.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/guard-push-refuses-read-only-git-without-push.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/guard-push-refuses-read-only-git-without-push.test.mjs"
+    },
+    {
+      "name": "pin-guard-push-treats-gitleaks-as-a-git-command-tests",
+      "file": "plugins/pipeline-core/lib/pins/guard-push-treats-gitleaks-as-a-git-command.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/guard-push-treats-gitleaks-as-a-git-command.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/guard-push-treats-gitleaks-as-a-git-command.test.mjs"
+    },
+    {
+      "name": "pin-handover-doc-committed-without-governance-classification-tests",
+      "file": "plugins/pipeline-core/lib/pins/handover-doc-committed-without-governance-classification.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/handover-doc-committed-without-governance-classification.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/handover-doc-committed-without-governance-classification.test.mjs"
+    },
+    {
+      "name": "pin-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier-tests",
+      "file": "plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs"
+    },
+    {
+      "name": "pin-hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows.test.mjs"
+    },
+    {
+      "name": "pin-hgo-patch-preflight-before-signature-tests",
+      "file": "plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs"
+    },
+    {
+      "name": "pin-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear-tests",
+      "file": "plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs"
+    },
+    {
+      "name": "pin-implementation-without-dispatch-escapes-review-coverage-tests",
+      "file": "plugins/pipeline-core/lib/pins/implementation-without-dispatch-escapes-review-coverage.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/implementation-without-dispatch-escapes-review-coverage.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/implementation-without-dispatch-escapes-review-coverage.test.mjs"
+    },
+    {
+      "name": "pin-kernel-closure-check-masks-violations-after-the-first-tests",
+      "file": "plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs"
+    },
+    {
+      "name": "pin-lifecycle-coordination-commands-refused-as-implementation-writes-tests",
+      "file": "plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs"
+    },
+    {
+      "name": "pin-lifecycle-inspect-omits-current-plan-spec-digests-tests",
+      "file": "plugins/pipeline-core/lib/pins/lifecycle-inspect-omits-current-plan-spec-digests.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/lifecycle-inspect-omits-current-plan-spec-digests.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/lifecycle-inspect-omits-current-plan-spec-digests.test.mjs"
+    },
+    {
+      "name": "pin-lifecycle-read-scope-blocks-host-declared-system-skill-tests",
+      "file": "plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs"
+    },
+    {
+      "name": "pin-mandatory-hook-readiness-returned-refusal-skips-rollback-tests",
+      "file": "plugins/pipeline-core/lib/pins/mandatory-hook-readiness-returned-refusal-skips-rollback.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/mandatory-hook-readiness-returned-refusal-skips-rollback.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/mandatory-hook-readiness-returned-refusal-skips-rollback.test.mjs"
+    },
+    {
+      "name": "pin-merge-commit-message-skips-conventional-type-check-tests",
+      "file": "plugins/pipeline-core/lib/pins/merge-commit-message-skips-conventional-type-check.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/merge-commit-message-skips-conventional-type-check.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/merge-commit-message-skips-conventional-type-check.test.mjs"
+    },
+    {
+      "name": "pin-model-family-approval-with-automatic-version-upgrades-tests",
+      "file": "plugins/pipeline-core/lib/pins/model-family-approval-with-automatic-version-upgrades.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/model-family-approval-with-automatic-version-upgrades.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/model-family-approval-with-automatic-version-upgrades.test.mjs"
+    },
+    {
+      "name": "pin-model-role-bootstrap-is-always-unavailable-on-native-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs"
+    },
+    {
+      "name": "pin-model-role-confirmation-prompt-obscures-required-digest-tests",
+      "file": "plugins/pipeline-core/lib/pins/model-role-confirmation-prompt-obscures-required-digest.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/model-role-confirmation-prompt-obscures-required-digest.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/model-role-confirmation-prompt-obscures-required-digest.test.mjs"
+    },
+    {
+      "name": "pin-native-patch-rename-drops-protected-content-markers-tests",
+      "file": "plugins/pipeline-core/lib/pins/native-patch-rename-drops-protected-content-markers.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/native-patch-rename-drops-protected-content-markers.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/native-patch-rename-drops-protected-content-markers.test.mjs"
+    },
+    {
+      "name": "pin-no-uninstall-path-for-a-repository-that-once-opted-in-tests",
+      "file": "plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs"
+    },
+    {
+      "name": "pin-node-v24-on-windows-creates-a-real-nul-file-tests",
+      "file": "plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs"
+    },
+    {
+      "name": "pin-nongit-retirement-reader-calls-inaccessible-controller-helper-tests",
+      "file": "plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs"
+    },
+    {
+      "name": "pin-onboarding-home-override-does-not-bind-machine-plane-tests",
+      "file": "plugins/pipeline-core/lib/pins/onboarding-home-override-does-not-bind-machine-plane.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/onboarding-home-override-does-not-bind-machine-plane.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/onboarding-home-override-does-not-bind-machine-plane.test.mjs"
+    },
+    {
+      "name": "pin-onboarding-init-greenfield-matrix-is-serial-and-slow-tests",
+      "file": "plugins/pipeline-core/lib/pins/onboarding-init-greenfield-matrix-is-serial-and-slow.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/onboarding-init-greenfield-matrix-is-serial-and-slow.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/onboarding-init-greenfield-matrix-is-serial-and-slow.test.mjs"
+    },
+    {
+      "name": "pin-onboarding-test-runner-reports-async-pass-before-settlement-tests",
+      "file": "plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs"
+    },
+    {
+      "name": "pin-opus-critic-only-batched-for-architecture-and-security-tests",
+      "file": "plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs"
+    },
+    {
+      "name": "pin-outside-root-read-label-skips-option-value-file-tokens-tests",
+      "file": "plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs"
+    },
+    {
+      "name": "pin-parallel-work-in-one-checkout-is-unsafe-tests",
+      "file": "plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs"
+    },
+    {
+      "name": "pin-passive-read-policy-admits-uncovered-credential-files-and-rg-follow-tests",
+      "file": "plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs"
+    },
+    {
+      "name": "pin-pipeline-hooks-act-in-repositories-that-never-opted-in-tests",
+      "file": "plugins/pipeline-core/lib/pins/pipeline-hooks-act-in-repositories-that-never-opted-in.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/pipeline-hooks-act-in-repositories-that-never-opted-in.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/pipeline-hooks-act-in-repositories-that-never-opted-in.test.mjs"
+    },
+    {
+      "name": "pin-plan-submission-must-not-require-separate-po-approval-tests",
+      "file": "plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs"
+    },
+    {
+      "name": "pin-powershell-bypasses-onboarding-read-boundary-tests",
+      "file": "plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs"
+    },
+    {
+      "name": "pin-preflight-hides-the-git-error-behind-gs-git-unavailable-tests",
+      "file": "plugins/pipeline-core/lib/pins/preflight-hides-the-git-error-behind-gs-git-unavailable.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/preflight-hides-the-git-error-behind-gs-git-unavailable.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/preflight-hides-the-git-error-behind-gs-git-unavailable.test.mjs"
+    },
+    {
+      "name": "pin-preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt-tests",
+      "file": "plugins/pipeline-core/lib/pins/preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.test.mjs"
+    },
+    {
+      "name": "pin-private-temp-root-not-secure-branch-has-no-test-seam-tests",
+      "file": "plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs"
+    },
+    {
+      "name": "pin-project-calibration-retains-new-project-placeholder-tests",
+      "file": "plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs"
+    },
+    {
+      "name": "pin-project-resource-budget-headroom-is-not-reported-tests",
+      "file": "plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs"
+    },
+    {
+      "name": "pin-protected-baseline-rejects-canonical-discarded-idle-state-tests",
+      "file": "plugins/pipeline-core/lib/pins/protected-baseline-rejects-canonical-discarded-idle-state.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/protected-baseline-rejects-canonical-discarded-idle-state.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/protected-baseline-rejects-canonical-discarded-idle-state.test.mjs"
+    },
+    {
+      "name": "pin-push-classifier-deny-list-does-not-converge-tests",
+      "file": "plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs"
+    },
+    {
+      "name": "pin-push-classifier-does-not-model-powershell-backtick-escapes-tests",
+      "file": "plugins/pipeline-core/lib/pins/push-classifier-does-not-model-powershell-backtick-escapes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/push-classifier-does-not-model-powershell-backtick-escapes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/push-classifier-does-not-model-powershell-backtick-escapes.test.mjs"
+    },
+    {
+      "name": "pin-push-classifier-misreads-backslash-escaped-quotes-tests",
+      "file": "plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs"
+    },
+    {
+      "name": "pin-push-classifier-misses-nested-quotes-and-redirect-before-push-tests",
+      "file": "plugins/pipeline-core/lib/pins/push-classifier-misses-nested-quotes-and-redirect-before-push.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/push-classifier-misses-nested-quotes-and-redirect-before-push.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/push-classifier-misses-nested-quotes-and-redirect-before-push.test.mjs"
+    },
+    {
+      "name": "pin-read-blocks-and-misleading-denial-texts-across-runners-tests",
+      "file": "plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs"
+    },
+    {
+      "name": "pin-read-only-guard-admits-execution-and-output-options-tests",
+      "file": "plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs"
+    },
+    {
+      "name": "pin-readiness-input-omits-current-advisor-observation-tests",
+      "file": "plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"
+    },
+    {
+      "name": "pin-reconnect-sandbox-empty-child-output-breaks-bootstrap-tests",
+      "file": "plugins/pipeline-core/lib/pins/reconnect-sandbox-empty-child-output-breaks-bootstrap.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/reconnect-sandbox-empty-child-output-breaks-bootstrap.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/reconnect-sandbox-empty-child-output-breaks-bootstrap.test.mjs"
+    },
+    {
+      "name": "pin-retirement-reader-masks-typed-unsafe-layout-inspection-tests",
+      "file": "plugins/pipeline-core/lib/pins/retirement-reader-masks-typed-unsafe-layout-inspection.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/retirement-reader-masks-typed-unsafe-layout-inspection.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/retirement-reader-masks-typed-unsafe-layout-inspection.test.mjs"
+    },
+    {
+      "name": "pin-revised-native-design-cannot-reach-a-new-advisor-course-tests",
+      "file": "plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs"
+    },
+    {
+      "name": "pin-role-route-preflight-with-self-dispatch-fallback-tests",
+      "file": "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs"
+    },
+    {
+      "name": "pin-scratch-has-no-retention-and-no-durability-check-tests",
+      "file": "plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs"
+    },
+    {
+      "name": "pin-scratch-must-remain-writable-across-lifecycle-states-tests",
+      "file": "plugins/pipeline-core/lib/pins/scratch-must-remain-writable-across-lifecycle-states.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/scratch-must-remain-writable-across-lifecycle-states.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/scratch-must-remain-writable-across-lifecycle-states.test.mjs"
+    },
+    {
+      "name": "pin-script-mediated-writes-bypass-protected-test-paths-tests",
+      "file": "plugins/pipeline-core/lib/pins/script-mediated-writes-bypass-protected-test-paths.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/script-mediated-writes-bypass-protected-test-paths.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/script-mediated-writes-bypass-protected-test-paths.test.mjs"
+    },
+    {
+      "name": "pin-security-scanner-failure-provenance-tests",
+      "file": "plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs"
+    },
+    {
+      "name": "pin-semgrep-console-coverage-note-has-no-test-tests",
+      "file": "plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs"
+    },
+    {
+      "name": "pin-semgrep-offline-default-version-check-tests",
+      "file": "plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs"
+    },
+    {
+      "name": "pin-semgrep-partial-parsing-warnings-fail-the-whole-scan-tests",
+      "file": "plugins/pipeline-core/lib/pins/semgrep-partial-parsing-warnings-fail-the-whole-scan.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/semgrep-partial-parsing-warnings-fail-the-whole-scan.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/semgrep-partial-parsing-warnings-fail-the-whole-scan.test.mjs"
+    },
+    {
+      "name": "pin-session-readiness-drops-to-partial-after-bootstrap-ready-tests",
+      "file": "plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs"
+    },
+    {
+      "name": "pin-shell-classifier-faults-on-heredoc-body-text-tests",
+      "file": "plugins/pipeline-core/lib/pins/shell-classifier-faults-on-heredoc-body-text.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/shell-classifier-faults-on-heredoc-body-text.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/shell-classifier-faults-on-heredoc-body-text.test.mjs"
+    },
+    {
+      "name": "pin-shell-grammar-file-is-a-kernel-path-without-capability-placement-tests",
+      "file": "plugins/pipeline-core/lib/pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs"
+    },
+    {
+      "name": "pin-sign-intent-disclosure-scan-blocks-for-minutes-tests",
+      "file": "plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs"
+    },
+    {
+      "name": "pin-signature-ceremony-requires-operator-work-and-breaks-tests",
+      "file": "plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs"
+    },
+    {
+      "name": "pin-signed-quality-package-route-is-not-agent-operable-on-windows-tests",
+      "file": "plugins/pipeline-core/lib/pins/signed-quality-package-route-is-not-agent-operable-on-windows.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/signed-quality-package-route-is-not-agent-operable-on-windows.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/signed-quality-package-route-is-not-agent-operable-on-windows.test.mjs"
+    },
+    {
+      "name": "pin-signing-default-test-fixture-root-escapes-the-repository-tests",
+      "file": "plugins/pipeline-core/lib/pins/signing-default-test-fixture-root-escapes-the-repository.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/signing-default-test-fixture-root-escapes-the-repository.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/signing-default-test-fixture-root-escapes-the-repository.test.mjs"
+    },
+    {
+      "name": "pin-signing-prompt-prints-the-whole-review-package-tests",
+      "file": "plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs"
+    },
+    {
+      "name": "pin-signing-toolchain-readiness-tests",
+      "file": "plugins/pipeline-core/lib/pins/signing-toolchain-readiness.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/signing-toolchain-readiness.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/signing-toolchain-readiness.test.mjs"
+    },
+    {
+      "name": "pin-source-agent-definition-change-locks-that-agent-until-install-tests",
+      "file": "plugins/pipeline-core/lib/pins/source-agent-definition-change-locks-that-agent-until-install.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/source-agent-definition-change-locks-that-agent-until-install.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/source-agent-definition-change-locks-that-agent-until-install.test.mjs"
+    },
+    {
+      "name": "pin-three-runner-happy-path-with-two-po-approvals-tests",
+      "file": "plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs"
+    },
+    {
+      "name": "pin-transfer-redaction-alters-digest-bound-files-tests",
+      "file": "plugins/pipeline-core/lib/pins/transfer-redaction-alters-digest-bound-files.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/transfer-redaction-alters-digest-bound-files.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/transfer-redaction-alters-digest-bound-files.test.mjs"
+    },
+    {
+      "name": "pin-unasked-advisor-export-consent-in-fresh-seed-tests",
+      "file": "plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/unasked-advisor-export-consent-in-fresh-seed.test.mjs"
+    },
+    {
+      "name": "pin-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason-tests",
+      "file": "plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs"
+    },
+    {
+      "name": "pin-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier-tests",
+      "file": "plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs"
+    },
+    {
+      "name": "pin-windows-greenfield-scratch-write-denied-tests",
+      "file": "plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs"
+    },
+    {
+      "name": "pin-windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures-tests",
+      "file": "plugins/pipeline-core/lib/pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs"
+    },
+    {
+      "name": "pin-windows-portable-seed-rolls-back-with-hidden-worktree-error-tests",
+      "file": "plugins/pipeline-core/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs"
+    },
+    {
+      "name": "pin-windows-pre-push-installer-fsync-and-relative-action-tests",
+      "file": "plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs"
+    },
+    {
+      "name": "pin-worktree-process-start-parser-misreads-spaced-comm-tests",
+      "file": "plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs"
+    },
+    {
+      "name": "pin-worktrees-share-onboarding-private-state-with-root-bound-intake-tests",
+      "file": "plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs"
+    },
+    {
+      "name": "session-cleanup-recovery-list-once-tests",
+      "file": "plugins/pipeline-core/lib/session-cleanup-recovery-list-once.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/session-cleanup-recovery-list-once.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/session-cleanup-recovery-list-once.test.mjs"
+    },
+    {
+      "name": "session-cleanup-recovery-load-once-tests",
+      "file": "plugins/pipeline-core/lib/session-cleanup-recovery-load-once.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/session-cleanup-recovery-load-once.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/session-cleanup-recovery-load-once.test.mjs"
+    },
+    {
+      "name": "windows-native-type-cache-tests",
+      "file": "plugins/pipeline-core/lib/windows-native-type-cache.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/windows-native-type-cache.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/windows-native-type-cache.test.mjs"
+    },
+    {
+      "name": "windows-private-state-observation-memo-tests",
+      "file": "plugins/pipeline-core/lib/windows-private-state-observation-memo.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/windows-private-state-observation-memo.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/windows-private-state-observation-memo.test.mjs"
+    },
+    {
+      "name": "audit-index-tests",
+      "file": "plugins/pipeline-core/scripts/audit-index.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/audit-index.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/audit-index.test.mjs"
+    },
+    {
+      "name": "bound-path-status-report-tests",
+      "file": "plugins/pipeline-core/scripts/bound-path-status-report.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/bound-path-status-report.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/bound-path-status-report.test.mjs"
+    },
+    {
+      "name": "critic-notes-write-tests",
+      "file": "plugins/pipeline-core/scripts/critic-notes-write.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/critic-notes-write.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/critic-notes-write.test.mjs"
+    },
+    {
+      "name": "elephant-context-measure-tests",
+      "file": "plugins/pipeline-core/scripts/elephant-context-measure.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/elephant-context-measure.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/elephant-context-measure.test.mjs"
+    },
+    {
+      "name": "pipeline-start-preflight-continuity-drift-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-start-preflight.continuity-drift.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-start-preflight.continuity-drift.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-start-preflight.continuity-drift.test.mjs"
+    },
+    {
+      "name": "po-human-approval-key-pairing-tests",
+      "file": "plugins/pipeline-core/scripts/po-human-approval-key-pairing.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/po-human-approval-key-pairing.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/po-human-approval-key-pairing.test.mjs"
+    },
+    {
+      "name": "po-human-approval-openssl-path-tests",
+      "file": "plugins/pipeline-core/scripts/po-human-approval-openssl-path.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/po-human-approval-openssl-path.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/po-human-approval-openssl-path.test.mjs"
     }
   ]
 }

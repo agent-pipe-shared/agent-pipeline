@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { extractShellWriteTargets } from "./protected-test-paths.mjs";
+import { extractShellWriteTargets, protectedTestPathRuleFor, protectedTestPathShellHit } from "./protected-test-paths.mjs";
 
 const TARGET = "plugins/pipeline-core/hooks/guard-push.test.mjs";
 
@@ -431,4 +431,36 @@ test("NVA-B-UNPARSED-CAVEAT-1: a dynamic opaque known-write expression remains c
       && t.lane === "opaque-interpreter-code"
       && t.classification === "conservative-possible-write"),
   );
+});
+
+// ALF-C-C6G24-LIVE (G24-D3-F1): the live matchers must normalise separators like
+// protected-baseline.mjs normal(): fold backslashes, collapse runs of "/", strip "./".
+const GUARD_FILE = "plugins/pipeline-core/hooks/guard-git.mjs";
+const GUARD_RULES = [{ id: "TP-ALIAS", re: /plugins\/pipeline-core\/hooks\/guard-git\.mjs$/iu, reason: "alias pin" }];
+const GUARD_SPELLINGS = [
+  GUARD_FILE,
+  "plugins//pipeline-core//hooks//guard-git.mjs",
+  "plugins\\\\pipeline-core\\\\hooks\\\\guard-git.mjs",
+  "plugins\\/pipeline-core//hooks\\\\guard-git.mjs",
+  "./plugins//pipeline-core/hooks/guard-git.mjs",
+  "plugins/./pipeline-core/./hooks/guard-git.mjs",
+];
+
+test("G24-D3-F1: protectedTestPathRuleFor resolves doubled/mixed separator spellings to the canonical rule", () => {
+  for (const spelling of GUARD_SPELLINGS) {
+    assert.equal(protectedTestPathRuleFor(GUARD_RULES, spelling), GUARD_RULES[0], spelling);
+  }
+  assert.equal(protectedTestPathRuleFor(GUARD_RULES, "plugins//pipeline-core//hooks//guard-git.mjs.bak"), null);
+  assert.equal(protectedTestPathRuleFor(GUARD_RULES, "plugins//pipeline-core//hooks//guard-other.mjs"), null);
+});
+
+test("G24-D3-F1: the shell/candidate path (protectedTestPathShellHit) matches doubled-separator spellings", () => {
+  for (const spelling of GUARD_SPELLINGS) {
+    const hit = protectedTestPathShellHit({ command: `printf x > ${spelling}`, rules: GUARD_RULES, root: "/repo" });
+    assert.equal(hit?.rule, GUARD_RULES[0], spelling);
+  }
+  const neighbour = protectedTestPathShellHit({
+    command: "printf x > plugins//pipeline-core//hooks//guard-other.mjs", rules: GUARD_RULES, root: "/repo",
+  });
+  assert.equal(neighbour, null);
 });
