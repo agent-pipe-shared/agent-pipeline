@@ -174,6 +174,8 @@ export const UNIVERSAL_ADRS = Object.freeze([
   { path: "docs/adr/0074-port-authorize-critical-ceremony.md", reason: "Cited by docs/push-release-flow.md (the ported `authorize-critical` single-command ceremony)." },
   { path: "docs/adr/0076-global-chat-attributed-unattested-approval-mode.md", reason: "Cited by the vendored docs/operating-model.md as the normative distinction between chat-attributed-unattested and signature approval." },
   { path: "docs/adr/0081-boundary-aware-impacted-verify.md", reason: "Defines the universal work, Critic, push, candidate, and release verification boundaries used in consuming projects." },
+  { path: "docs/adr/draft-item-owned-egm-retained-quality-gates.md", reason: "Draft ADR already shipped under the plugin subtree (d02409a8a); classified rather than removed per PO decision 2026-10-17. Vendored copy of its repo-root origin until the ADR is accepted and renumbered." },
+  { path: "docs/adr/draft-item-owned-egm-retained-quality-gates.json", reason: "Machine-readable sidecar of the draft ADR above; vendored together with it (PO decision 2026-10-17)." },
 ]);
 
 /**
