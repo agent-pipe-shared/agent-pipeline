@@ -36,7 +36,7 @@ Rule IDs: `GIT-xx`.
   AI-Assisted: true
   ```
 
-  The other admitted bindings are `Dispatch: stage-0 (elephant)`, `Dispatch: <TASK_ID> (critic)`, and a verified allowlisted generator's `Dispatch: <path> (elephant-generated)` form.
+  The other admitted bindings are `Dispatch: stage-0 (elephant)`, `Dispatch: design (elephant)`, `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, and a verified allowlisted generator's `Dispatch: <path> (elephant-generated)` form.
 
   Signed-artifact integration has one separate binding: `Dispatch: quality-package-<64 lowercase hex intent digest> (integration)` followed by exactly one `AI-Assisted: true` in the final trailer block. Precommit boundaries and postcommit provenance readers independently verify the selected signed authorization against its unique parent, complete changed-path set, and exact committed blobs and modes. A verified import is classified only as `signed-artifact-integration`; it proves import of that exact package and does not prove original authorship, model identity, review, tests, release, or installation qualification. A safely absent retained authorization is `UNVERIFIABLE`; present forged, stale, unsafe, malformed, or mismatched evidence is `FAIL`. This separate role never creates or counts as a legacy Goldfish dispatch record.
 

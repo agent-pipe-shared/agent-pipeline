@@ -164,20 +164,24 @@ deliberately carries no static copy of that; a second copy is the drift.
 - Commit messages carry **no** provider or model co-author trailers, **no**
   session URLs, **no** correlation identifiers (GIT-03; there is no override).
   Only `AI-Assisted: true`, plus exactly one `Dispatch:` trailer saying who did
-  the work. There are two legitimate forms, and they are not interchangeable:
+  the work. There are three legitimate forms, and they are not interchangeable:
   - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a
     claim about a *specific* dispatch, so it has to survive being checked against
     one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must
     be terminal rather than `in-progress`, and its `report.changedFiles` must
     cover the paths the commit touches. Never borrow an ID whose own scope
     excludes the work — that is the failure this pair exists to make visible.
-  - `Dispatch: stage-0 (elephant)` — the single direct-Elephant trailer.
-    Design-phase authoring uses this form under EL-16 and Alfred Spec §21.5;
-    it does not grant production implementation authority. Implementation
-    self-execution still requires every fast-path criterion in operating-model
-    §3.3, including at most 2 files and roughly 25 diff lines. The trailer
-    does not establish those criteria or waive path, phase, signature or
-    protected-source gates. There is no separate design-phase trailer form.
+  - `Dispatch: stage-0 (elephant)` — the direct-Elephant trailer for a bounded
+    fast-path fix. Implementation self-execution still requires every
+    fast-path criterion in operating-model §3.3, including at most 2 files and
+    roughly 25 diff lines. The trailer does not establish those criteria or
+    waive path, phase, signature or protected-source gates.
+  - `Dispatch: design (elephant)` — the direct-Elephant trailer for
+    design-phase authoring under EL-16 and Alfred Spec §21.5. No dispatch
+    record is looked up; the commit may change at most 10 paths (more is
+    `UNVERIFIABLE`, as are unreadable paths). It grants no production
+    implementation authority and waives no path, phase, signature or
+    protected-source gate.
     Use the current sanctioned source-binding and document-integration actions;
     an unavailable authorship verdict is not permission to bypass a gate.
   A commit with neither of these forms is unbound to any evidence, and the

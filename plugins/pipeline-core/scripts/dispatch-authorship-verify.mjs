@@ -51,7 +51,7 @@ import { hasAdministrativeDispatch, inspectAdministrativeCommit } from "../lib/a
  *
  *   PASS          the trailer resolves to a terminal record that does not contradict the
  *                 commit, the commit DECLARES itself Elephant-direct in the sanctioned
- *                 `stage-0 (elephant)` form AND stays inside the size bound below, or the
+ *                 `stage-0 (elephant)` or `design (elephant)` form AND stays inside the size bound below, or the
  *                 commit DECLARES `<allowlisted-script> (elephant-generated)` and re-running
  *                 that script against the parent tree reproduces the changed output exactly.
  *   FAIL          the trailer names a record that is absent, unfinished, or contradicts
@@ -87,8 +87,8 @@ import { hasAdministrativeDispatch, inspectAdministrativeCommit } from "../lib/a
  *     fresh has no `evidence/` directory and gets `record-missing` for every commit that
  *     passed here. Nothing in this script makes the verdict reproducible by a third party.
  *   - THE ELEPHANT-DIRECT CHECK IS THIN, AND ITS SIZE BOUND IS THIS SCRIPT'S OWN CONVENTION.
- *     A `stage-0 (elephant)` commit has no record to bind, so exactly two things are
- *     checked: that the id IS the sanctioned `stage-0` (any other id under role `elephant`
+ *     A `stage-0 (elephant)` or `design (elephant)` commit has no record to bind, so exactly two things are
+ *     checked: that the id IS a sanctioned one, `stage-0` or `design` (any other id under role `elephant`
  *     is UNVERIFIABLE, not a PASS), and that the diff touches at most
  *     `ELEPHANT_STAGE0_MAX_PATHS` files as a coarse stand-in for "small". The stage-0 fast
  *     path is described only qualitatively in the obligations text ("small, disclosed,
@@ -370,7 +370,7 @@ export function verifyCommit(sha, deps) {
         sha,
         VERDICT.unverifiable,
         "elephant-direct-nonstandard-id",
-        `role \`elephant\` with id \`${dispatch.id}\`; the only sanctioned Elephant form is \`${ELEPHANT_STAGE0_ID} (elephant)\`, and no record is looked up for any other id`,
+        `role \`elephant\` with id \`${dispatch.id}\`; the sanctioned Elephant forms are \`${ELEPHANT_STAGE0_ID} (elephant)\` and \`design (elephant)\`, and no record is looked up for any other id`,
         { taskId: dispatch.id },
       );
     }
