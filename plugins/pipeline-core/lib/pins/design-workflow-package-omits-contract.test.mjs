@@ -324,6 +324,20 @@ test("AC6 behavioral: a Spec/PRD whose E1 freeze order contradicts the readiness
     const negated = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC, prd: `${sentence}\n` } }));
     assert.notEqual(negated.code, "DWP-E1-FREEZE-ORDER", sentence);
   }
+  // the "cannot" and direct-negation forms are accepted too
+  for (const sentence of ["E1 cannot be a prerequisite for implementation authority.",
+    "E1 can not be a prerequisite for implementation authority.",
+    "E1 must not precede implementation authority.",
+    "E1 is no longer required before implementation authority."]) {
+    const negated = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC, prd: `${sentence}\n` } }));
+    assert.notEqual(negated.code, "DWP-E1-FREEZE-ORDER", sentence);
+  }
+  // an incidental negation elsewhere in the sentence must not suppress the refusal
+  for (const sentence of ["E1 is not optional and is a prerequisite for implementation authority.",
+    "E1 never slips and is required before implementation authority."]) {
+    const positive = validateDesignWorkflowPackage(fixture({ texts: { spec: CORRECT_SPEC, prd: `${sentence}\n` } }));
+    assert.equal(positive.code, "DWP-E1-FREEZE-ORDER", sentence);
+  }
 });
 
 test("AC5 behavioral: the owning modules refuse invalid input rather than only existing", async () => {

@@ -139,8 +139,15 @@ function e1FreezeOrderContradiction(sourceBytes) {
   const ready = /\*\*Work-package implementation-ready:\*\*(.*?)(?=\*\*Wave-complete:\*\*|$)/u.exec(spec);
   if (ready !== null && !/\bfreeze\b/u.test(ready[1])) return true;
   const prd = text("prd");
-  // A negated sentence ("E1 is not a prerequisite for ...") states the correct order.
-  return /\bE1\b(?:(?!\b(?:not|never|no longer)\b|n't)[^.]){0,120}\b(?:is |are )?(?:a )?(?:prerequisite (?:to|for) |required (?:for|before) |precedes |before )(?:the )?implementation[- ]authori(?:[sz]|ty)/iu.test(prd);
+  // A negated sentence ("E1 is not a prerequisite for ...") states the correct order,
+  // but only when the negation stands directly before the prerequisite phrase itself;
+  // an incidental negation elsewhere ("E1 is not optional and is a prerequisite ...") does not.
+  const claim = /\bE1\b([^.]{0,120}?)\b(?:is |are )?(?:a )?(?:prerequisite (?:to|for) |required (?:for|before) |precedes? |before )(?:the )?implementation[- ]authori(?:[sz]|ty)/giu;
+  const negatesClaim = /(?:\b(?:not|never|no longer|cannot|can not)|n't)(?: be| have to be)? *$/iu;
+  for (const match of prd.matchAll(claim)) {
+    if (!negatesClaim.test(match[1])) return true;
+  }
+  return false;
 }
 function sourceBytesMatch(sources, sourceBytes) {
   if (!exact(sourceBytes, SOURCE_NAMES)) return false;
