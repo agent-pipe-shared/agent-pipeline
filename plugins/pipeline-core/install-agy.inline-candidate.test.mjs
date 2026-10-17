@@ -2,7 +2,7 @@
 import { registerTestCaseCompletion } from "./lib/test-case-completion.mjs";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import * as installer from "./install-agy.mjs";
 import { observeRunnerPublicCoreIdentity } from "./lib/public-core-observation.mjs";
@@ -194,6 +194,37 @@ test("Agy clean byte-matching candidate with different file mode does not supply
   assert.equal(resolved.status, "rejected", JSON.stringify(resolved));
   assert.ok(resolved.reasonCodes.includes("ATR-SOURCE-CANDIDATE-MODE-MISMATCH"), JSON.stringify(resolved));
   assert.deepEqual(hostFiles(f.configRoot), before);
+});
+
+// Receipt-store privacy is the host platform's own assurance, exercised for real
+// on both sides: POSIX keeps its mode-bit contract, native Windows (which only
+// reports synthetic mode bits) is judged by the owner/DACL/reparse-point
+// assessment of lib/windows-private-state.mjs. Nothing here is injected.
+test("Agy refresh leaves its receipt store private under the host platform's real private-state assurance", (t) => {
+  const f = fixture(t);
+  const resolved = resolveSelected(f);
+  assert.equal(resolved.status, "attestable-source", JSON.stringify(resolved));
+  const managed = join(f.configRoot, "config", "plugins", "agent-pipeline-core");
+  const result = installer.refreshAntigravityInstallation({ configRoot: f.configRoot, workspaceRoot: f.workspaceRoot, approvedSourceRoot: f.selected, attestationSourceRoot: resolved.attestationSourceRoot, scope: "global", globalChangeApproved: true }, {
+    runCli(argv) {
+      if (argv[0] === "--version") return { status: "ok", version: "1.2.12" };
+      if (argv[1] === "install") {
+        cpSync(f.selected, managed, { recursive: true });
+        writeFileSync(join(f.configRoot, "config", "import_manifest.json"), '{"imports":[{"name":"agent-pipeline-core"}]}\n');
+      }
+      return { status: "ok" };
+    },
+    writeInstalledReceipt: (input) => writeLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: f.receiptDirectory }),
+  });
+  assert.equal(result.status, "refreshed", JSON.stringify(result));
+  const stored = readdirSync(f.receiptDirectory).map((name) => join(f.receiptDirectory, name));
+  assert.equal(stored.length, 2, "one source locator and one receipt");
+  const paths = [f.receiptDirectory, ...stored];
+  // Native Windows: POSIX mode bits are synthetic and not evaluated (PO decision 2026-10-17); `refreshed` plus the stored pair above is the check.
+  if (process.platform !== "win32") {
+    assert.equal(statSync(f.receiptDirectory).mode & 0o022, 0);
+    for (const path of stored) assert.equal(statSync(path).mode & 0o077, 0, "receipt files are owner-only");
+  }
 });
 
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 8192 });

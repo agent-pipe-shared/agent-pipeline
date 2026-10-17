@@ -52,11 +52,18 @@ function inside(root, candidate) {
   return rel === "" || rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
-function physicalDirectory(path, mode = null) {
+// Threat model (PO decision 2026-10-17): the pipeline protects against the agent, not against other local OS accounts;
+// the host is protected by the OS login. Native Windows reports synthetic POSIX mode bits (0o666 / 0o777) that carry
+// no information, so only there the mode-bit checks are skipped. Every other check (type, symlink, link count,
+// atomic readback) is unchanged, and every other platform keeps the owner-only mode gate. `platform` is a test seam
+// that lets any host drive the win32 branch; production callers never pass it.
+const modeBitsApply = (platform) => platform !== "win32";
+
+function physicalDirectory(path, mode = null, platform = process.platform) {
   if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path || path.includes("\0")) throw new Error("IPA-HOST-DIRECTORY");
   mkdirSync(path, { recursive: true, mode: mode ?? 0o700 });
   const info = lstatSync(path, { bigint: true });
-  if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o022n) !== 0n) throw new Error("IPA-HOST-DIRECTORY");
+  if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (modeBitsApply(platform) && (info.mode & 0o022n) !== 0n)) throw new Error("IPA-HOST-DIRECTORY");
   return { path, info };
 }
 
@@ -108,25 +115,25 @@ function defaultReceiptDirectory(provider = "codex") {
   return join(base, "agent-pipeline", "installed-plugin-attestations");
 }
 
-function readExistingAuthorityDirectory(directory) {
+function readExistingAuthorityDirectory(directory, platform = process.platform) {
   const path = resolve(directory);
   const info = lstatSync(path, { bigint: true });
-  if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o022n) !== 0n) throw new Error("IPA-HOST-DIRECTORY");
+  if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (modeBitsApply(platform) && (info.mode & 0o022n) !== 0n)) throw new Error("IPA-HOST-DIRECTORY");
   return path;
 }
 
-function assertExternalDirectory(directory, sourcePluginRoot, installedPluginRoot) {
+function assertExternalDirectory(directory, sourcePluginRoot, installedPluginRoot, platform = process.platform) {
   const resolved = resolve(directory);
   for (const root of [sourcePluginRoot, installedPluginRoot]) {
     const physical = realpathSync(root);
     if (inside(physical, resolved) || inside(resolved, physical)) throw new Error("IPA-HOST-RECEIPT-LOCAL");
   }
-  return physicalDirectory(resolved, 0o700);
+  return physicalDirectory(resolved, 0o700, platform);
 }
 
-function readAuthorityFile(path) {
+function readAuthorityFile(path, platform = process.platform) {
   const before = lstatSync(path, { bigint: true });
-  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n || (before.mode & 0o077n) !== 0n) throw new Error("IPA-HOST-RECEIPT-UNSAFE");
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n || (modeBitsApply(platform) && (before.mode & 0o077n) !== 0n)) throw new Error("IPA-HOST-RECEIPT-UNSAFE");
   const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     const opened = fstatSync(fd, { bigint: true });
@@ -141,7 +148,7 @@ function readAuthorityFile(path) {
   } finally { closeSync(fd); }
 }
 
-function writeAtomic(directory, name, bytes) {
+function writeAtomic(directory, name, bytes, platform = process.platform) {
   const target = join(directory, name);
   const temp = join(directory, `.${name}.${process.pid}.${Date.now()}.tmp`);
   let fd;
@@ -149,7 +156,7 @@ function writeAtomic(directory, name, bytes) {
     fd = openSync(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
     writeFileSync(fd, bytes);
     const info = fstatSync(fd, { bigint: true });
-    if (!info.isFile() || info.nlink !== 1n || info.size !== BigInt(bytes.length) || (info.mode & 0o077n) !== 0n) throw new Error("IPA-HOST-WRITE");
+    if (!info.isFile() || info.nlink !== 1n || info.size !== BigInt(bytes.length) || (modeBitsApply(platform) && (info.mode & 0o077n) !== 0n)) throw new Error("IPA-HOST-WRITE");
     closeSync(fd); fd = undefined;
     renameSync(temp, target);
     chmodSync(target, 0o600);
@@ -162,10 +169,10 @@ function writeAtomic(directory, name, bytes) {
 }
 
 /** Read-only callback for verifyInstalledPluginAttestation; the request alone selects the receipt. */
-export function readExternalInstalledPluginReceipt(request, { receiptDirectory = defaultReceiptDirectory(request?.provider) } = {}) {
+export function readExternalInstalledPluginReceipt(request, { receiptDirectory = defaultReceiptDirectory(request?.provider), platform = process.platform } = {}) {
   try {
-    const path = readExistingAuthorityDirectory(receiptDirectory);
-    return readAuthorityFile(join(path, receiptName(request)));
+    const path = readExistingAuthorityDirectory(receiptDirectory, platform);
+    return readAuthorityFile(join(path, receiptName(request)), platform);
   } catch {
     return null;
   }
@@ -178,6 +185,7 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
   receiptDirectory = defaultReceiptDirectory(input?.provider),
   verify = verifyInstalledPluginAttestation,
   observe = (value, deps) => observeRunnerPublicCoreIdentity(input?.provider, value, deps),
+  platform = process.platform,
 } = {}) {
   try {
     const protectedPaths = input?.protectedPaths ?? INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[input?.provider];
@@ -187,8 +195,8 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
       : ["provider", "plugin", "installedPluginRoot", "registrySourcePluginRoot", "protectedPaths"];
     if (!exact(normalized, expectedKeys) || !Object.hasOwn(INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER, normalized.provider)) throw new Error("IPA-HOST-INPUT");
     const binding = locatorBinding(normalized);
-    const authorityDirectory = readExistingAuthorityDirectory(receiptDirectory);
-    const locatorAuthority = readAuthorityFile(join(authorityDirectory, locatorName(binding)));
+    const authorityDirectory = readExistingAuthorityDirectory(receiptDirectory, platform);
+    const locatorAuthority = readAuthorityFile(join(authorityDirectory, locatorName(binding)), platform);
     const installedOwner = lstatSync(normalized.installedPluginRoot, { bigint: true });
     if (BigInt(locatorAuthority.receiptIdentity.uid) !== installedOwner.uid
       || BigInt(locatorAuthority.receiptIdentity.gid) !== installedOwner.gid) throw new Error("IPA-HOST-LOCATOR-OWNER");
@@ -227,7 +235,8 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
       protectedPaths,
     }, {
       observeLocal: observe,
-      readExternalReceipt: (request) => readExternalInstalledPluginReceipt(request, { receiptDirectory }),
+      readExternalReceipt: (request) => readExternalInstalledPluginReceipt(request, { receiptDirectory, platform }),
+      platform,
     });
   } catch {
     return { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-LOCATOR-UNAVAILABLE"] };
@@ -435,6 +444,7 @@ export function writeClaudeRegistryInstalledPluginReceipt(input, dependencies = 
 export function writeLocalDevelopmentInstalledPluginReceipt(input, {
   receiptDirectory = defaultReceiptDirectory(input?.provider),
   observe = (value, deps) => observeRunnerPublicCoreIdentity(input?.provider, value, deps),
+  platform = process.platform,
 } = {}) {
   const protectedPaths = input?.protectedPaths ?? INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[input?.provider];
   const normalized = { ...input, protectedPaths };
@@ -446,7 +456,7 @@ export function writeLocalDevelopmentInstalledPluginReceipt(input, {
     return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-INPUT" };
   }
   try {
-    const directory = assertExternalDirectory(receiptDirectory, normalized.sourcePluginRoot, normalized.installedPluginRoot);
+    const directory = assertExternalDirectory(receiptDirectory, normalized.sourcePluginRoot, normalized.installedPluginRoot, platform);
     const observation = observe({ sourcePluginRoot: normalized.sourcePluginRoot, installedPluginRoot: normalized.installedPluginRoot });
     if (observation?.status !== "ready" || observation.plugin.name !== normalized.plugin.name || observation.plugin.version !== normalized.plugin.version) {
       return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-READBACK" };
@@ -457,7 +467,7 @@ export function writeLocalDevelopmentInstalledPluginReceipt(input, {
       sourcePluginRoot: normalized.sourcePluginRoot,
       sourcePluginRootSha256: hash(normalized.sourcePluginRoot),
     };
-    const locatorPath = writeAtomic(directory.path, locatorName(binding), Buffer.from(`${JSON.stringify(locator)}\n`));
+    const locatorPath = writeAtomic(directory.path, locatorName(binding), Buffer.from(`${JSON.stringify(locator)}\n`), platform);
     let writtenPath = null;
     const verification = verifyInstalledPluginAttestation({
       provider: normalized.provider,
@@ -467,6 +477,7 @@ export function writeLocalDevelopmentInstalledPluginReceipt(input, {
       protectedPaths,
     }, {
       observeLocal: observe,
+      platform,
       readExternalReceipt(request) {
         const protectedFiles = protectedPaths.map((path) => {
           const snapshot = readFileSync(join(normalized.installedPluginRoot, path));
@@ -483,8 +494,8 @@ export function writeLocalDevelopmentInstalledPluginReceipt(input, {
           protected: { graphSha256: request.protectedGraphSha256, files: protectedFiles },
         };
         const receipt = { ...unsigned, receiptId: hash(canonical(unsigned)) };
-        writtenPath = writeAtomic(directory.path, receiptName(request), Buffer.from(`${JSON.stringify(receipt)}\n`));
-        return readAuthorityFile(writtenPath);
+        writtenPath = writeAtomic(directory.path, receiptName(request), Buffer.from(`${JSON.stringify(receipt)}\n`), platform);
+        return readAuthorityFile(writtenPath, platform);
       },
     });
     if (verification.status !== "verified") {

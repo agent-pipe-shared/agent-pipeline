@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, linkSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -509,7 +509,54 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   assert.match(shippedEntrypoint, new RegExp(String.raw`if \(isDirectInvocation\(import\.meta\.url\)\) \{[\s\S]*?runInteractiveInstaller\(\);`, "u"));
 });
 
-assert.equal(cases.length, 9, "the complete installed-plugin-attestation host corpus must be registered before execution begins");
+function bootstrapInput(repo) {
+  return { provider: "codex", plugin: repo.input.plugin, installedPluginRoot: repo.installedPluginRoot, registrySourcePluginRoot: repo.sourcePluginRoot, protectedPaths: repo.protectedPaths };
+}
+
+check("the real host keeps owner-only mode gates on POSIX and, on native Windows, verifies while a hard-linked receipt stays refused", (t) => {
+  const repo = fixture(); t.after(repo.cleanup);
+  const written = writeLocalDevelopmentInstalledPluginReceipt(repo.input, { receiptDirectory: repo.receiptDirectory });
+  assert.equal(written.status, "written", JSON.stringify(written));
+  const receiptPath = join(repo.receiptDirectory, readdirSync(repo.receiptDirectory).find((name) => !name.endsWith(".source.json")));
+  const verifyStore = () => verifyLocalDevelopmentInstalledPluginReceipt(bootstrapInput(repo), {
+    receiptDirectory: repo.receiptDirectory, observe: (observation) => observePublicCoreIdentity(observation),
+  });
+  assert.equal(verifyStore().status, "verified");
+  if (process.platform !== "win32") {
+    chmodSync(receiptPath, 0o666);
+    assert.notEqual(verifyStore().status, "verified", "a group/world-writable receipt is refused");
+    chmodSync(receiptPath, 0o600);
+    assert.equal(verifyStore().status, "verified");
+    chmodSync(repo.receiptDirectory, 0o777);
+    assert.notEqual(verifyStore().status, "verified", "a widened store directory is refused");
+    assert.notEqual(writeLocalDevelopmentInstalledPluginReceipt(repo.input, { receiptDirectory: repo.receiptDirectory }).status, "written");
+    chmodSync(repo.receiptDirectory, 0o700);
+  } else {
+    const again = writeLocalDevelopmentInstalledPluginReceipt(repo.input, { receiptDirectory: repo.receiptDirectory });
+    assert.equal(again.status, "written", JSON.stringify(again));
+    assert.equal(verifyStore().status, "verified");
+  }
+  const alias = join(repo.base, "receipt-alias.json");
+  linkSync(receiptPath, alias);
+  assert.notEqual(verifyStore().status, "verified", "a hard-linked receipt is refused on every platform");
+});
+
+check("the platform seam drives the win32 branch on every host: win32 writes and verifies into a widened store, linux refuses", (t) => {
+  const repo = fixture(); t.after(repo.cleanup);
+  mkdirSync(repo.receiptDirectory, { recursive: true, mode: 0o777 });
+  chmodSync(repo.receiptDirectory, 0o777);
+  const written = writeLocalDevelopmentInstalledPluginReceipt(repo.input, { receiptDirectory: repo.receiptDirectory, platform: "win32" });
+  assert.equal(written.status, "written", JSON.stringify(written));
+  const verifyAs = (platform) => verifyLocalDevelopmentInstalledPluginReceipt(bootstrapInput(repo), {
+    receiptDirectory: repo.receiptDirectory, observe: (observation) => observePublicCoreIdentity(observation), platform,
+  });
+  assert.equal(verifyAs("win32").status, "verified");
+  assert.notEqual(verifyAs("linux").status, "verified", "linux semantics refuse the widened store");
+  const refused = writeLocalDevelopmentInstalledPluginReceipt(repo.input, { receiptDirectory: repo.receiptDirectory, platform: "linux" });
+  assert.notEqual(refused.status, "written", JSON.stringify(refused));
+});
+
+assert.equal(cases.length, 11, "the complete installed-plugin-attestation host corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

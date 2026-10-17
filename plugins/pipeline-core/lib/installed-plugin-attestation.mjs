@@ -52,9 +52,14 @@ function capturedIdentity(info) {
   };
 }
 
-function identityValid(value) {
+// NTFS and ReFS file ids are 64-bit values (the sequence number sits in the high bits), so a real inode routinely
+// exceeds 2^53 and arrives here as a rounded double. It is only an opaque discriminator, so native Windows accepts any
+// non-negative integer up to 2^64; every other platform keeps the exact safe-integer rule.
+const windowsFileId = (value) => Number.isInteger(value) && value >= 0 && value <= 2 ** 64;
+
+function identityValid(value, { windows = false } = {}) {
   return exact(value, identityKeys)
-    && identityNumberKeys.every((key) => safeInteger(value[key]))
+    && identityNumberKeys.every((key) => safeInteger(value[key]) || (windows && key === "ino" && windowsFileId(value[key])))
     && identityTimeKeys.every((key) => /^(?:0|[1-9][0-9]*)$/u.test(value[key] ?? ""));
 }
 
@@ -62,8 +67,12 @@ function identitySha256(value) {
   return hash(canonical(value));
 }
 
-function restrictive(identity, { directory = false } = {}) {
-  if (!identityValid(identity) || (identity.mode & 0o022) !== 0) return false;
+// Threat model (PO decision 2026-10-17): the pipeline protects against the agent, not against other local OS accounts;
+// the host is protected by the OS login. Native Windows reports synthetic POSIX mode bits (0o666 / 0o777) that carry no
+// information, so there (`windows`) the mode-bit gate is not evaluated at all; the identity shape and the link-count
+// rule still apply. Every other platform keeps the owner-only mode gate unchanged.
+function restrictive(identity, { directory = false, windows = false } = {}) {
+  if (!identityValid(identity, { windows }) || (!windows && (identity.mode & 0o022) !== 0)) return false;
   return directory ? identity.nlink >= 1 : identity.nlink === 1;
 }
 
@@ -90,14 +99,14 @@ function validateInput(input) {
   return exact(input.source, ["class"]) && input.source.class === "signed-release";
 }
 
-function parseAuthority(value) {
+function parseAuthority(value, { windows = false } = {}) {
   if (!exact(value, ["receiptBytes", "receiptIdentity", "releaseAttestation"])
     || !(typeof value.receiptBytes === "string" || Buffer.isBuffer(value.receiptBytes))
     || !exact(value.receiptIdentity, ["physicalPath", "physicalPathSha256", ...identityKeys, "contentSha256"])
     || typeof value.receiptIdentity.physicalPath !== "string" || !isAbsolute(value.receiptIdentity.physicalPath)
     || value.receiptIdentity.physicalPathSha256 !== hash(value.receiptIdentity.physicalPath)
     || !SHA256.test(value.receiptIdentity.contentSha256 ?? "")
-    || !identityValid(Object.fromEntries(identityKeys.map((key) => [key, value.receiptIdentity[key]])))) return null;
+    || !identityValid(Object.fromEntries(identityKeys.map((key) => [key, value.receiptIdentity[key]])), { windows })) return null;
   const bytes = Buffer.from(value.receiptBytes);
   if (hash(bytes) !== value.receiptIdentity.contentSha256 || bytes.length !== value.receiptIdentity.size) return null;
   let receipt;
@@ -164,29 +173,35 @@ export function verifyInstalledPluginAttestation(input = {}, {
   trustedHostPolicy = null,
   observeLocal = observePublicCoreIdentity,
   snapshot = snapshotPhysicalPluginRoot,
+  platform = process.platform,
 } = {}) {
   try {
     if (!validateInput(input) || typeof readExternalReceipt !== "function" || typeof observeLocal !== "function" || typeof snapshot !== "function") return rejected("IPA-INPUT");
+    // `platform` is a test seam so any host can drive the win32 branch: native Windows skips only the POSIX mode bits
+    // (see `restrictive`) and accepts its 64-bit file ids (see `identityValid`).
+    const windows = platform === "win32";
     if (input.source.class === "signed-release" && trustedHostPolicy === null) return unavailable("IPA-RELEASE-POLICY-UNAVAILABLE");
     if (input.source.class === "signed-release" && !releasePolicyValid(trustedHostPolicy, input)) return rejected("IPA-RELEASE-POLICY");
     if (input.source.class === "local-development" && trustedHostPolicy !== null) return rejected("IPA-LOCAL-AUTHORITY-SHAPE");
     const installed = snapshot(input.installedPluginRoot);
     const rootIdentity = capturedIdentity(installed.rootIdentity);
     const initialPhysicalTreeIdentity = physicalTreeIdentity(installed);
+    // Native Windows compares the exact (not double-rounded) dev/ino pair: two distinct 64-bit file ids can round to one number.
+    const exactInode = (identity) => `${String(identity.dev)}\0${String(identity.ino)}`;
     const physicalEntries = [
-      ...installed.directoryIdentities.map(({ path, identity }) => ({ path: `d:${path}`, identity: capturedIdentity(identity) })),
-      ...installed.files.map(({ path, identity }) => ({ path: `f:${path}`, identity: capturedIdentity(identity) })),
+      ...installed.directoryIdentities.map(({ path, identity }) => ({ path: `d:${path}`, identity: capturedIdentity(identity), inode: exactInode(identity) })),
+      ...installed.files.map(({ path, identity }) => ({ path: `f:${path}`, identity: capturedIdentity(identity), inode: exactInode(identity) })),
     ];
     if (new Set(physicalEntries.map(({ path }) => path)).size !== physicalEntries.length
-      || new Set(physicalEntries.map(({ identity }) => `${identity.dev}\0${identity.ino}`)).size !== physicalEntries.length) return rejected("IPA-DUPLICATE-STRUCTURE");
-    if (!restrictive(rootIdentity, { directory: true })) return rejected("IPA-INSTALLED-PERMISSIONS");
+      || new Set(physicalEntries.map(({ identity, inode }) => windows ? inode : `${identity.dev}\0${identity.ino}`)).size !== physicalEntries.length) return rejected("IPA-DUPLICATE-STRUCTURE");
+    if (!restrictive(rootIdentity, { directory: true, windows })) return rejected("IPA-INSTALLED-PERMISSIONS");
     for (const directory of installed.directoryIdentities) {
       const identity = capturedIdentity(directory.identity);
-      if (!restrictive(identity, { directory: true }) || identity.uid !== rootIdentity.uid || identity.gid !== rootIdentity.gid) return rejected("IPA-INSTALLED-PERMISSIONS");
+      if (!restrictive(identity, { directory: true, windows }) || identity.uid !== rootIdentity.uid || identity.gid !== rootIdentity.gid) return rejected("IPA-INSTALLED-PERMISSIONS");
     }
     for (const file of installed.files) {
       const identity = capturedIdentity(file.identity);
-      if (!restrictive(identity) || identity.uid !== rootIdentity.uid || identity.gid !== rootIdentity.gid) return rejected("IPA-INSTALLED-PERMISSIONS");
+      if (!restrictive(identity, { windows }) || identity.uid !== rootIdentity.uid || identity.gid !== rootIdentity.gid) return rejected("IPA-INSTALLED-PERMISSIONS");
     }
     const protectedFiles = input.protectedPaths.map((path) => {
       const entry = installed.files.find((file) => file.path === path);
@@ -211,12 +226,12 @@ export function verifyInstalledPluginAttestation(input = {}, {
       installedContentSha256: installed.contentSha256,
       protectedGraphSha256,
     });
-    const authority = parseAuthority(readExternalReceipt(request));
+    const authority = parseAuthority(readExternalReceipt(request), { windows });
     if (authority === null) return rejected("IPA-AUTHORITY");
     if (!pathOutside(installed.root, authority.receiptIdentity.physicalPath)
       || (input.source.class === "local-development" && !pathOutside(input.source.sourcePluginRoot, authority.receiptIdentity.physicalPath))) return rejected("IPA-RECEIPT-LOCAL");
     const receiptFileIdentity = Object.fromEntries(identityKeys.map((key) => [key, authority.receiptIdentity[key]]));
-    if (!restrictive(receiptFileIdentity) || receiptFileIdentity.uid !== rootIdentity.uid || receiptFileIdentity.gid !== rootIdentity.gid) return rejected("IPA-RECEIPT-PERMISSIONS");
+    if (!restrictive(receiptFileIdentity, { windows }) || receiptFileIdentity.uid !== rootIdentity.uid || receiptFileIdentity.gid !== rootIdentity.gid) return rejected("IPA-RECEIPT-PERMISSIONS");
     const receipt = authority.receipt;
     if (!receiptValid(receipt, input.source.class) || receipt.receiptId !== hash(canonical(receiptPayload(receipt)))) return rejected("IPA-RECEIPT");
     if (receipt.provider !== input.provider || receipt.plugin.name !== input.plugin.name || receipt.plugin.version !== input.plugin.version) return rejected("IPA-IDENTITY-MISMATCH");

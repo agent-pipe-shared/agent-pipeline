@@ -8,6 +8,7 @@ import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { validateInstalledProtectedFiles, verifyInstalledPluginAttestation } from "./installed-plugin-attestation.mjs";
 import { createProvenanceAttestationPayload } from "./provenance-envelope.mjs";
+import { snapshotPhysicalPluginRoot } from "./public-core-observation.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -122,6 +123,7 @@ check("rejects package-local authority, permissive modes, dirty source, symlink 
     const authority = local(request); authority.receiptIdentity.physicalPath = join(repo.installedPluginRoot, "receipt.json"); authority.receiptIdentity.physicalPathSha256 = hash(authority.receiptIdentity.physicalPath); return authority;
   } });
   assert.equal(packageLocal.reasonCodes[0], "IPA-RECEIPT-LOCAL");
+  if (process.platform !== "win32") {
   const permissiveReceipt = verifyInstalledPluginAttestation(repo.input(), { readExternalReceipt(request) {
     const authority = local(request); authority.receiptIdentity.mode = 0o100666; return authority;
   } });
@@ -129,6 +131,13 @@ check("rejects package-local authority, permissive modes, dirty source, symlink 
   chmodSync(join(repo.installedPluginRoot, "entry.mjs"), 0o666);
   assert.equal(verifyInstalledPluginAttestation(repo.input(), { readExternalReceipt: local }).reasonCodes[0], "IPA-INSTALLED-PERMISSIONS");
   chmodSync(join(repo.installedPluginRoot, "entry.mjs"), 0o644);
+  } else {
+    // PO decision 2026-10-17: native Windows reports synthetic mode bits, so they are not evaluated there.
+    const widenedReceipt = verifyInstalledPluginAttestation(repo.input(), { readExternalReceipt(request) {
+      const authority = local(request); authority.receiptIdentity.mode = 0o100666; return authority;
+    } });
+    assert.equal(widenedReceipt.status, "verified", JSON.stringify(widenedReceipt));
+  }
   writeFileSync(join(repo.sourcePluginRoot, "dirty.txt"), "dirty");
   assert.equal(verifyInstalledPluginAttestation(repo.input(), { readExternalReceipt: local }).reasonCodes[0], "IPA-LOCAL-SOURCE-UNVERIFIED");
   rmSync(join(repo.sourcePluginRoot, "dirty.txt"));
@@ -300,7 +309,55 @@ check("the structural schema explicitly delegates protected-file key uniqueness 
   }
 });
 
-assert.equal(cases.length, 9, "the complete installed-plugin-attestation corpus must be registered before execution begins");
+// IPA10 drives the native-Windows branch on any host through the `platform` seam. The wrapper keeps the real snapshot and
+// rewrites only the identity fields under test (exact BigInt inodes, modes, owner, link count).
+function rewrittenSnapshot({ ino = (index) => 2n ** 60n + BigInt(index) + 1n, edit = (identity) => identity } = {}) {
+  return (pluginRoot, options) => {
+    const real = snapshotPhysicalPluginRoot(pluginRoot, options);
+    let index = 0; // index 0 is the root, then directories, then files
+    const rewrite = (entry, isFile) => ({ ...entry, identity: edit({ ...entry.identity, ino: ino(index++) }, entry.path, isFile) });
+    return { ...real, rootIdentity: edit({ ...real.rootIdentity, ino: ino(index++) }, "", false), directoryIdentities: real.directoryIdentities.map((entry) => rewrite(entry, false)), files: real.files.map((entry) => rewrite(entry, true)) };
+  };
+}
+
+check("platform win32 ignores POSIX mode bits, accepts exact 64-bit file ids and keeps owner, link-count and receipt-location rules", (t) => {
+  const repo = fixture(); t.after(repo.cleanup);
+  const local = localAuthority(repo);
+  const run = (snapshot, readExternalReceipt = local, platform = "win32") => verifyInstalledPluginAttestation(repo.input(), { readExternalReceipt, snapshot, platform });
+  const widen = (identity, path, isFile) => ({ ...identity, mode: isFile ? 0o100666 : 0o40777 });
+  const widened = run(rewrittenSnapshot({ edit: widen }));
+  assert.equal(widened.status, "verified", `mode bits are ignored on win32: ${JSON.stringify(widened)}`);
+  const widenedReceipt = run(rewrittenSnapshot(), (request) => { const authority = local(request); authority.receiptIdentity.mode = 0o100666; return authority; });
+  assert.equal(widenedReceipt.status, "verified", JSON.stringify(widenedReceipt));
+  // 2^60 + k all round to the same double yet are distinct file ids.
+  assert.equal(Number(2n ** 60n + 1n), Number(2n ** 60n + 2n));
+  const huge = run(rewrittenSnapshot());
+  assert.equal(huge.status, "verified", `exact 64-bit inodes are accepted and kept distinct: ${JSON.stringify(huge)}`);
+  const duplicate = run(rewrittenSnapshot({ ino: () => 2n ** 60n + 7n }));
+  assert.equal(duplicate.reasonCodes[0], "IPA-DUPLICATE-STRUCTURE");
+  const otherOwner = run(rewrittenSnapshot({ edit: (identity, path, isFile) => isFile && path === "entry.mjs" ? { ...identity, uid: Number(identity.uid) + 1 } : identity }));
+  assert.equal(otherOwner.reasonCodes[0], "IPA-INSTALLED-PERMISSIONS");
+  const hardLinked = run(rewrittenSnapshot({ edit: (identity, path, isFile) => isFile && path === "entry.mjs" ? { ...identity, nlink: 2 } : identity }));
+  assert.equal(hardLinked.reasonCodes[0], "IPA-INSTALLED-PERMISSIONS");
+  const tooLarge = run(rewrittenSnapshot({ ino: (index) => index === 0 ? 2n ** 65n : 2n ** 60n + BigInt(index) }));
+  assert.equal(tooLarge.reasonCodes[0], "IPA-INSTALLED-PERMISSIONS");
+  const packageLocal = run(rewrittenSnapshot(), (request) => {
+    const authority = local(request);
+    authority.receiptIdentity.physicalPath = join(repo.installedPluginRoot, "receipt.json");
+    authority.receiptIdentity.physicalPathSha256 = hash(authority.receiptIdentity.physicalPath);
+    return authority;
+  });
+  assert.equal(packageLocal.reasonCodes[0], "IPA-RECEIPT-LOCAL");
+  const owner = (identity, path, isFile) => ({ ...identity, mode: isFile ? 0o100644 : 0o40755 });
+  const linuxReceipt = run(rewrittenSnapshot({ ino: (index) => index + 10, edit: owner }),(request) => { const authority = local(request); authority.receiptIdentity.mode = 0o100666; return authority; }, "linux");
+  assert.equal(linuxReceipt.reasonCodes[0], "IPA-RECEIPT-PERMISSIONS");
+  const linuxHuge = run(rewrittenSnapshot({ ino: (index) => index === 0 ? 2n ** 60n : BigInt(index + 10), edit: owner }), local, "linux");
+  assert.equal(linuxHuge.reasonCodes[0], "IPA-INSTALLED-PERMISSIONS");
+  const linuxWidened = run(rewrittenSnapshot({ ino: (index) => index + 10, edit: widen }), local, "linux");
+  assert.equal(linuxWidened.reasonCodes[0], "IPA-INSTALLED-PERMISSIONS");
+});
+
+assert.equal(cases.length, 10, "the complete installed-plugin-attestation corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
