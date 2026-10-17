@@ -253,11 +253,23 @@ test("AC-270 P6 RED: a scratch mirror with the original POSIX-only mode term ref
 
 // ---- P5 (win32): State-authority fixtures ---------------------------------------------------------------------------
 
+/** Real shape of a backend observation: `nativeFacts` is a non-empty string and `nativeFactsSha256` its 64-hex digest. */
+function carriesNativeFacts(observed) {
+  return observed !== null && typeof observed === "object"
+    && typeof observed.nativeFacts === "string" && observed.nativeFacts.length > 0
+    && typeof observed.nativeFactsSha256 === "string" && /^[0-9a-f]{64}$/u.test(observed.nativeFactsSha256);
+}
+
 test("AC-270 P5: fixture set-feature reaches the State authority and the private root passes native DACL inspection", { skip: WIN_ONLY }, () => {
   const f = makeFixture("signature", { stage: "draft" });
   const observed = inspectWindowsOwnedAuthorityPath({ path: join(f.dir, ".git", "agent-pipeline"), directory: true });
   assert.ok(observed !== undefined && observed !== null, "native inspection must return an observation");
-  assert.match(String(observed.nativeFacts), /./u, "the observation must carry native facts");
+  assert.equal(carriesNativeFacts(observed), true, "the observation must carry native facts (non-empty string plus its sha256 digest)");
+  assert.equal(typeof observed.committed, "boolean", "the backend observation reports a boolean committed flag");
+  // Negative controls: stubs without real native facts must not satisfy the shape check.
+  assert.equal(carriesNativeFacts({}), false, "a backend returning {} must fail the native-facts check");
+  assert.equal(carriesNativeFacts({ committed: false }), false, "an observation omitting nativeFacts must fail the check");
+  assert.equal(carriesNativeFacts({ nativeFacts: "", nativeFactsSha256: observed.nativeFactsSha256 }), false, "empty native facts must fail the check");
   // The fixture ran `set-feature --id e2e`; the State authority must report exactly that feature.
   const current = state(f);
   assert.equal(current.activeFeature?.id, "e2e", "the State read back after makeFixture must name the feature set by the fixture");
