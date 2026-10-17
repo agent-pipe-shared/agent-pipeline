@@ -229,4 +229,5 @@ Answers to structured questions; tile text in
   2. one Critic batch,
   3. PO acceptance lists in blocks.
   - New implementation happens only for what those steps show as genuinely red.
+  - Clarified by the PO the same night: a blocker or major finding from a test run (WSL Full Verify or a targeted suite) or from the Critic batch is always fixed before acceptance. The fix is scoped to that finding. Minor findings and Windows host-class reds are recorded instead, as a backlog item or a typed host skip.
 - **One work list:** `specs/sprint-alfred-epic/evidence/delivery-status-current.{json,md}`, written by `specs/sprint-alfred-epic/tools/delivery-remeasure.mjs`. An item is touched only if its open list has an `agent` entry released for work.
