@@ -54,7 +54,7 @@ function repository({ references = [{ kind: "spec", path: "specs/work.md" }], di
     commits: [candidate],
     candidateCommit: candidate,
     resultSha256: "a".repeat(64),
-    log: [],
+    log: [{ phase: "complete", toolUseCount: 1 }],
     report: { text: "done", changedFiles: ["specs/work.md"] },
     criticRequired: {
       schema: "pipeline.critic-required-decision.v1",
