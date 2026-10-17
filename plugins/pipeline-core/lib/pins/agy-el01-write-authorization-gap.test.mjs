@@ -20,13 +20,20 @@
 // worker-scope input, so none of those three clauses can be exercised here.
 // OPEN PO DECISION (R2.md line 14): whether the criterion is accepted on a
 // documented carrier-unavailable disposition or held until native carrier
-// evidence exists. Owner: Coordinator. Due: 2026-10-31. Until that decision
+// evidence exists. Owner: Coordinator. Due: 2026-10-19 (specs/sprint-alfred-epic/spec.md, unresolved-originals disposition). Until that decision
 // lands, whether the Antigravity adapter must fail closed without an
 // authenticated role carrier is undecided and no production behaviour is
 // pinned for it.
 //
 // FAIL-OPEN CONDITIONS of hooks/guard-el01-tripwire.mjs (the tripwire exits 0
-// and therefore allows the write; none of these is pinned as a refusal):
+// and therefore allows the write; none of these is pinned as a refusal). This
+// list is the set of conditions found by reading the file at this commit; it is
+// NOT a proof of completeness:
+//   0a. the tool input cannot be parsed as JSON (lines 253-258), and an empty
+//       write target (line 259) both exit 0;
+//   0b. an absolute target outside the project root exits 0 (line 273), and a
+//       target whose basename matches dispatch-record*.json is exempt (line 281),
+//       as is any path under an EXEMPT_PREFIXES entry (line 282);
 //   1. the repository is not governed (requiresEnforcement is false; line 158);
 //   2. there is no pipeline state file at all (line 296), and an unparsable
 //      state file only warns (line 302-307);
@@ -36,7 +43,10 @@
 //   5. the spec's risk class is anything but "high" (line 325);
 //   6. ANY open dispatch-record exists anywhere under the project (lines
 //      328-329), whoever the writer is: the record is not bound to the calling
-//      session, to a role, or to a target path.
+//      session, to a role, or to a target path. Any valid in-progress record
+//      suffices, so the writer can create its own authorizing record (the
+//      dispatch-record*.json basename is itself write-exempt, line 281) and
+//      then write the guarded path.
 // The third case below touches only condition 6, and only to show that the
 // tripwire itself stops refusing: it is not evidence that the caller is an
 // authorized worker.
