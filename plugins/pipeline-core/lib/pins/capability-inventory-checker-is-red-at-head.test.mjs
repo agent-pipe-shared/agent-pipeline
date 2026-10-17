@@ -25,27 +25,26 @@ const live = validateInventory({ root: ROOT });
 const clone = () => structuredClone(INVENTORY);
 const matching = (result, re) => result.findings.filter((f) => re.test(f));
 
-// Group 2 (PO decision pending, ALF-C-P11-01E): inventory verify-phase references whose suite
-// is registered in neither harness/scripts/verify.mjs nor harness/verify-suites.json. Resolving
-// them means EITHER registering the suites OR removing the references (alternative patches were
-// prepared under scratch/p11-01e/, not applied). Until the PO chooses, these findings are
-// excluded from the "everything else is green" cases and asserted separately as typed TODO cases
-// (node:test `todo`: reported, failure does not fail the run) -- never silently passing.
+// Group 2 (ALF-C-P11-01E, PO decision 2026-10-17: REGISTER): inventory verify-phase references
+// whose suite is registered in neither harness/scripts/verify.mjs nor harness/verify-suites.json.
+// The 25 registrable suites are registered by the protected patch ALF-C-AC121-REG
+// (harness/verify-suites.json); the 26th (install-agy-inline-candidate-tests, no test file)
+// is dropped from the inventory. Cases tagged "[needs protected patch ALF-C-AC121-REG]" are RED
+// until that patch is committed and the inventory sourceBaseline is re-bound to it.
 const GROUP2 = /references missing surface verify-phase:harness\/scripts\/verify\.mjs:/;
 const nonGroup2 = live.findings.filter((f) => !GROUP2.test(f));
-const PO_PENDING = "PO decision pending (owner Coordinator, due 2026-10-23): register the unregistered verify suites or remove their inventory references";
 
 test("AC-121 apart from the PO-pending verify-suite references, the checker reports no findings", () => {
   assert.deepEqual(nonGroup2, [], `non-Group-2 findings: ${nonGroup2.length}`);
 });
 
-test("AC-121 the checker passes on the committed inventory at HEAD (no findings)", { todo: PO_PENDING }, () => {
+test("AC-121 the checker passes on the committed inventory at HEAD (no findings) [needs protected patch ALF-C-AC121-REG]", () => {
   assert.deepEqual(live.findings.slice(0, 5), [], `checker is red: ${live.findings.length} findings`);
   assert.equal(live.ok, true);
   assert.equal(live.findings.length, 0);
 });
 
-test("AC-121 the CLI exits 0 and prints PASS for the inventory phase", { todo: PO_PENDING }, () => {
+test("AC-121 the CLI exits 0 and prints PASS for the inventory phase [needs protected patch ALF-C-AC121-REG]", () => {
   const run = spawnSync(process.execPath, [CLI, "--root", ROOT], { encoding: "utf8" });
   assert.equal(run.status, 0, `CLI exit ${run.status}; first stderr line: ${(run.stderr || "").split("\n")[0]}`);
   assert.match(run.stdout, /^PASS: product capability inventory \(inventory\)/);
@@ -66,7 +65,7 @@ test("AC-121 no capability references a non-verify-phase surface absent from the
   assert.deepEqual(matching(live, /references missing surface/).filter((f) => !GROUP2.test(f)), []);
 });
 
-test("AC-121 no capability references a verify-phase surface absent from the committed sourceBaseline", { todo: PO_PENDING }, () => {
+test("AC-121 no capability references a verify-phase surface absent from the committed sourceBaseline [needs protected patch ALF-C-AC121-REG]", () => {
   assert.deepEqual(matching(live, GROUP2), []);
 });
 

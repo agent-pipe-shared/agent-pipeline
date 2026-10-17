@@ -2194,6 +2194,162 @@
         ],
         "maxBytes": 16384
       }
+    },
+    {
+      "name": "architecture-entry-required-source-tests",
+      "file": "harness/scripts/architecture-entry-required-source.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for harness/scripts/architecture-entry-required-source.test.mjs",
+      "nonOverlapNote": "Unique test suite for harness/scripts/architecture-entry-required-source.test.mjs"
+    },
+    {
+      "name": "doc-reader-course-budget-tests",
+      "file": "harness/scripts/doc-reader-course-budget.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for harness/scripts/doc-reader-course-budget.test.mjs",
+      "nonOverlapNote": "Unique test suite for harness/scripts/doc-reader-course-budget.test.mjs"
+    },
+    {
+      "name": "existing-public-anchor-tests",
+      "file": "plugins/pipeline-core/scripts/existing-public-anchor.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/existing-public-anchor.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/existing-public-anchor.test.mjs"
+    },
+    {
+      "name": "git-stash-readonly-tests",
+      "file": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs"
+    },
+    {
+      "name": "passive-read-credential-follow-tests",
+      "file": "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs"
+    },
+    {
+      "name": "plan-reopen-current-action-tests",
+      "file": "harness/scripts/plan-reopen-current-action.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for harness/scripts/plan-reopen-current-action.test.mjs",
+      "nonOverlapNote": "Unique test suite for harness/scripts/plan-reopen-current-action.test.mjs"
+    },
+    {
+      "name": "project-onboarding-temp-root-tests",
+      "file": "plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs"
+    },
+    {
+      "name": "read-option-operands-tests",
+      "file": "plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/guard/read-option-operands.test.mjs"
+    },
+    {
+      "name": "session-start-runner-identity-tests",
+      "file": "plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/session-start-runner-identity.test.mjs"
+    },
+    {
+      "name": "shell-grammar-capability-placement-tests",
+      "file": "harness/scripts/shell-grammar-capability-placement.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for harness/scripts/shell-grammar-capability-placement.test.mjs",
+      "nonOverlapNote": "Unique test suite for harness/scripts/shell-grammar-capability-placement.test.mjs"
+    },
+    {
+      "name": "critic-generic-batch-tests",
+      "file": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-generic-batch.test.mjs"
+    },
+    {
+      "name": "verify-case-completion-augmentation-policy-tests",
+      "file": "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
+      "nonOverlapNote": "Unique test suite for harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs"
+    },
+    {
+      "name": "darwin-native-process-observer-tests",
+      "file": "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs"
+    },
+    {
+      "name": "native-platform-process-observer-tests",
+      "file": "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/native-platform-process-observer.test.mjs"
+    },
+    {
+      "name": "darwin-requester-integration-tests",
+      "file": "plugins/pipeline-core/lib/darwin-requester-integration.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/darwin-requester-integration.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/darwin-requester-integration.test.mjs"
+    },
+    {
+      "name": "agy-item-delivery-tests",
+      "file": "plugins/pipeline-core/lib/agy-item-delivery.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/agy-item-delivery.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/agy-item-delivery.test.mjs"
+    },
+    {
+      "name": "installed-bootstrap-import-closure-tests",
+      "file": "plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs"
+    },
+    {
+      "name": "phoenix-authority-revision-installed-package-tests",
+      "file": "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs"
+    },
+    {
+      "name": "architecture-prospective-materialization-tests",
+      "file": "plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs"
+    },
+    {
+      "name": "architecture-prospective-companion-tests",
+      "file": "plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs"
+    },
+    {
+      "name": "installed-plugin-attestation-inline-action-tests",
+      "file": "plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs"
+    },
+    {
+      "name": "signed-quality-package-single-link-tests",
+      "file": "plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/signed-quality-package-single-link.test.mjs"
+    },
+    {
+      "name": "signing-disclosure-sweep-tests",
+      "file": "plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs"
+    },
+    {
+      "name": "devplan-shell-sanctioned-recovery-tests",
+      "file": "plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs"
+    },
+    {
+      "name": "scratch-package-staging-tests",
+      "file": "plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/scratch-package-staging.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/scratch-package-staging.test.mjs"
+    },
+    {
+      "name": "subagent-start-receipt-tests",
+      "file": "plugins/pipeline-core/hooks/subagent-start-receipt.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/subagent-start-receipt.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/subagent-start-receipt.test.mjs"
     }
   ]
 }

@@ -515,7 +515,6 @@
         "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
         "verify-phase:harness/scripts/verify.mjs:initial-answers-state-tests",
         "verify-phase:harness/scripts/verify.mjs:initial-answers-transaction-tests",
-        "verify-phase:harness/scripts/verify.mjs:install-agy-inline-candidate-tests",
         "verify-phase:harness/scripts/verify.mjs:installed-bootstrap-import-closure-tests",
         "verify-phase:harness/scripts/verify.mjs:intake-material-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:interruption-receipts-tests",
