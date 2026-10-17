@@ -164,7 +164,8 @@ deliberately carries no static copy of that; a second copy is the drift.
 - Commit messages carry **no** provider or model co-author trailers, **no**
   session URLs, **no** correlation identifiers (GIT-03; there is no override).
   Only `AI-Assisted: true`, plus exactly one `Dispatch:` trailer saying who did
-  the work. There are three legitimate forms, and they are not interchangeable:
+  the work. There are three forms an Elephant uses for its own commits, and they
+  are not interchangeable:
   - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a
     claim about a *specific* dispatch, so it has to survive being checked against
     one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must
@@ -184,7 +185,12 @@ deliberately carries no static copy of that; a second copy is the drift.
     protected-source gate.
     Use the current sanctioned source-binding and document-integration actions;
     an unavailable authorship verdict is not permission to bypass a gate.
-  A commit with neither of these forms is unbound to any evidence, and the
+  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:
+  `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a
+  verified generator's `Dispatch: <path> (elephant-generated)`, and the signed
+  `Dispatch: quality-package-<digest> (integration)`; each is verified by its own
+  rule in `dispatch-authorship-verify`.
+  A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the
   `dispatch-authorship-verify` tool shipped with this plugin
   (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the
   bootstrap prints — it is NOT a path relative to a consumer project root)

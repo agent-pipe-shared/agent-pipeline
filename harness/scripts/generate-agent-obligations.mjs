@@ -254,7 +254,8 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("- Commit messages carry **no** provider or model co-author trailers, **no**");
   put("  session URLs, **no** correlation identifiers (GIT-03; there is no override).");
   put("  Only `AI-Assisted: true`, plus exactly one `Dispatch:` trailer saying who did");
-  put("  the work. There are three legitimate forms, and they are not interchangeable:");
+  put("  the work. There are three forms an Elephant uses for its own commits, and they");
+  put("  are not interchangeable:");
   put("  - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a");
   put("    claim about a *specific* dispatch, so it has to survive being checked against");
   put("    one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must");
@@ -274,7 +275,12 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("    protected-source gate.");
   put("    Use the current sanctioned source-binding and document-integration actions;");
   put("    an unavailable authorship verdict is not permission to bypass a gate.");
-  put("  A commit with neither of these forms is unbound to any evidence, and the");
+  put("  GIT-03 (`guardrails/git.md`) admits further bindings these forms do not cover:");
+  put("  `Dispatch: administrative (elephant)`, `Dispatch: <TASK_ID> (critic)`, a");
+  put("  verified generator's `Dispatch: <path> (elephant-generated)`, and the signed");
+  put("  `Dispatch: quality-package-<digest> (integration)`; each is verified by its own");
+  put("  rule in `dispatch-authorship-verify`.");
+  put("  A commit carrying none of the GIT-03 bindings is unbound to any evidence, and the");
   put("  `dispatch-authorship-verify` tool shipped with this plugin");
   put("  (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the");
   put("  bootstrap prints — it is NOT a path relative to a consumer project root)");
