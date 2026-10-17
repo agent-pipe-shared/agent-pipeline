@@ -151,3 +151,9 @@ Answers to structured questions; tile text in
 - **C6G1-CORR-A option prefixes:** refine before the 0.7.0 candidate. Exact harmless options such as `git diff --text` are admitted. Abbreviated prefixes of denied option names stay refused. The refinement replaces the pending protected patch.
 - **V-10 route wiring:** before the 0.7.0 candidate. The native Agent/Task route and the non-direct transports write a route record.
 - **V-10 re-dispatch of a slice (PO tile, 2026-10-17):** a new, fully checked admission of the same slice replaces that slice's route record. Continuation and re-bound dispatches are not blocked. A briefing changed after its record was written is refused with DISPATCH-BRIEFING-DIGEST-MISMATCH. So are two different briefings for one slice in the same call. A refused briefing writes no record.
+- **Installed-plugin attestation on native Windows (AC-111, PO, 2026-10-17):** fix it in the product now.
+  - Situation: the core verifier and the host receipt writer gated on POSIX mode bits, which native Windows reports as synthetic 0o666 / 0o777. Every Antigravity attestation was refused.
+  - Two intermediate courses were considered and rejected: a new DACL write-exposure check, and trusting the current token's own accounts. Both were dropped.
+  - Decision (PO, same principle as AC-155): the system is protected by the OS login; only the agent must not break out. File-level permission checks against other local OS accounts are outside the threat model. On win32 the mode-bit checks are not evaluated. Every other check stays unchanged: structure, symlink, link count, owner equality, receipt location, digests and atomic readback. POSIX keeps the owner-only mode gate.
+  - Large NTFS file ids above 2^53 are a genuine defect and are fixed separately.
+- **Order after the candidate (PO, 2026-10-17):** first finish the candidate, then install it, then push. Only after that comes the gap analysis of the items at stage 50.
