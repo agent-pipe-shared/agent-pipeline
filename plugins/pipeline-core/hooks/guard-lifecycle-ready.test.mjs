@@ -11877,7 +11877,7 @@ test("RECCOL-6 claimDispatchRecordOwnership claims on the first opening write on
     assert.equal(claim("RECCOL-C-6", RECCOL_OWNER).status, "claimed");
     const stored = JSON.parse(readFileSync(fx.claim("RECCOL-C-6"), "utf8"));
     assert.deepEqual(stored, {
-      schema: "pipeline.dispatch-record-owner.v1", taskId: "RECCOL-C-6", agentId: RECCOL_OWNER, agentType: "pipeline-core:goldfish-deep", claimedAt: "1970-01-01T00:00:00.000Z",
+      schema: "pipeline.dispatch-record-owner.v1", bindingKind: "attempted-native-write", taskId: "RECCOL-C-6", agentId: RECCOL_OWNER, agentType: "pipeline-core:goldfish-deep", claimedAt: "1970-01-01T00:00:00.000Z",
     });
     assert.equal(claim("RECCOL-C-6", RECCOL_OTHER).status, "claim-exists");
     assert.equal(JSON.parse(readFileSync(fx.claim("RECCOL-C-6"), "utf8")).agentId, RECCOL_OWNER);

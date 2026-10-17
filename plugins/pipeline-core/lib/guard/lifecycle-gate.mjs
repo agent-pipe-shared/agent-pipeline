@@ -17,6 +17,43 @@ import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinui
 import { isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
 import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice } from "./rebase-lane.mjs";
 
+// ALF-C-PARWORK-M3 (backlog: 2026-10-04-parallel-work-in-one-checkout-is-unsafe, failure mode 3 -- transient not-ready):
+// session readiness is re-derived LIVE on every governed tool call, so a second agent's ordinary Write could be refused as
+// GUARD-LIFECYCLE-NOT-READY (`partial`) for the moment another agent's commit made a private observation transiently
+// unavailable, although the very next read reports ready. The first `partial` sample is therefore not final: wait briefly
+// (bounded, <= 2 s) and decide on ONE fresh read. Narrow by construction -- only a session-intent PORG-NOT-READY whose
+// lifecycleStatus is exactly `partial` is re-read; every other status, every other error and every invalid observation is
+// decided on the first read exactly as before; a fresh read that is still not ready is refused through the same branches
+// below (nothing is admitted on the first sample, nothing is cached, there is no second re-read).
+const PARTIAL_READINESS_REREAD_WAIT_MS = 500;
+const PARTIAL_READINESS_REREAD_WAIT_CAP_MS = 2000;
+
+function sleepSyncDefault(milliseconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+function readSessionReadiness(root, dependencies) {
+  return (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
+    rootDir: root,
+    intent: "session",
+    runner: dependencies.runner,
+  });
+}
+
+function readSessionReadinessWithBoundedReread(root, dependencies) {
+  try {
+    return readSessionReadiness(root, dependencies);
+  } catch (first) {
+    const transientCandidate = first instanceof ProjectOnboardingReadyError
+      && first.code === "PORG-NOT-READY"
+      && first.intent === "session"
+      && first.lifecycleStatus === "partial";
+    if (!transientCandidate) throw first;
+    (dependencies.sleepSyncFn ?? sleepSyncDefault)(Math.min(PARTIAL_READINESS_REREAD_WAIT_MS, PARTIAL_READINESS_REREAD_WAIT_CAP_MS));
+    return readSessionReadiness(root, dependencies);
+  }
+}
+
 export function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
   if (toolName === "Bash" && isSanctionedGovernanceScopeDiagnosticInvocation(
     input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,
@@ -57,11 +94,7 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
   ))) return verdict(2, "OSV-CONTROLLER-INVOCATION-INVALID: fixed Controller inputs changed before readiness.\n");
   let receipt;
   try {
-    receipt = (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
-      rootDir: root,
-      intent: "session",
-      runner: dependencies.runner,
-    });
+    receipt = readSessionReadinessWithBoundedReread(root, dependencies);
   } catch (error) {
     dependencies.lifecycleReturnedDenial = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY" && error.intent === "session"

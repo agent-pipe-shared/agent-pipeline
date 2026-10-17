@@ -417,3 +417,107 @@ test("PARWORK-M2c: concurrent Edits by a FOREIGN writer against the owner's inte
 // belong to a sibling dispatch of item pipeline.parallel-work-in-one-checkout-is-unsafe. It appends its cases below
 // this line; do not edit the mode 1 / mode 2 sections above to add them.
 // ===================================================================================================================
+
+// ===================================================================================================================
+// MODE 3 -- transient GUARD-LIFECYCLE-NOT-READY (session readiness `partial`) while ANOTHER agent commits
+// ===================================================================================================================
+// Original requirement (Description item 3 + Proposal bullet 3): "A second agent's Write is refused with
+// GUARD-LIFECYCLE-NOT-READY (session readiness `partial`) while another agent commits, although `inspect --intent
+// session` reports ready right afterwards." ... "never report `partial` for the duration of another agent's commit."
+//
+// Mechanism as far as it is established from code: the guard re-derives session readiness LIVE on every governed tool
+// call (lib/guard/lifecycle-gate.mjs -> requireProjectOnboardingReady -> inspectProjectOnboardingV3) and refuses on the
+// FIRST non-ready sample; it keeps no snapshot and does no re-read. Several partial-producing observations are
+// transient while a sibling session commits (a private session descriptor mid-rename, a state file being rewritten,
+// the strict cleanup-recovery observation), and the typed reason is dropped by the ready gate (only the lifecycle
+// status `partial` reaches the guard). The fix is therefore a bounded re-read at the guard: when the FIRST session
+// readiness read is `partial`, wait briefly (<= 2 s) and decide on one FRESH read. It never admits a state on the first
+// sample, never re-reads for another status, and a still-partial fresh read is refused exactly as before.
+//
+// Fixture seam: the same in-process evaluateLifecycleReadyGuard seam as mode 2 plus the guard's existing
+// `requireProjectOnboardingReadyFn` dependency. The in-flight commit is modelled by a real `index.lock` file in the
+// fixture's git common directory (the commit holds it): while it exists the injected readiness answers `partial`, once it
+// is gone it answers ready. Time is the injected `sleepSyncFn` seam of patch ALF-C-PARWORK-M3 (the commit finishes
+// during the guard's wait); there is no real race and no real wait.
+import { ProjectOnboardingReadyError } from "../project-onboarding-ready-gate.mjs";
+
+const READY_RECEIPT = (intent) => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent });
+const NOT_READY = /GUARD-LIFECYCLE-NOT-READY/u;
+const MAX_REREAD_WAIT_MS = 2000;
+
+/** A fixture whose session readiness is `statusWhileLocked` for as long as the other agent's commit holds index.lock. */
+function inFlightCommitFixture({ statusWhileLocked = "partial", commitFinishesDuringWait }) {
+  const fx = recordFixture();
+  const lock = join(fx.commonDir, "index.lock");
+  writeFileSync(lock, "");
+  mkdirSync(join(fx.path, "src"), { recursive: true });
+  const trace = { reads: [], sleeps: [] };
+  fx.deps.requireProjectOnboardingReadyFn = ({ intent }) => {
+    const locked = existsSync(lock);
+    trace.reads.push(locked ? statusWhileLocked : "ready");
+    if (locked) {
+      throw new ProjectOnboardingReadyError("PORG-NOT-READY", `Project onboarding lifecycle is not ready for intent ${intent} (status ${statusWhileLocked}).`, { intent, lifecycleStatus: statusWhileLocked });
+    }
+    return READY_RECEIPT(intent);
+  };
+  fx.deps.sleepSyncFn = (ms) => {
+    trace.sleeps.push(ms);
+    if (commitFinishesDuringWait) rmSync(lock, { force: true });
+  };
+  fx.lock = lock;
+  fx.trace = trace;
+  // An ordinary in-scope Write: not a dispatch record, not under scratch/, not a recovery lane of any non-ready status.
+  fx.ordinaryWrite = () => evaluateLifecycleReadyGuard(fx.input(OWNER, "Write", { file_path: "src/feature.mjs", content: "export const feature = 1;\n" }), fx.deps);
+  return fx;
+}
+
+test("PARWORK-M3a [needs protected patch ALF-C-PARWORK-M3 while RED on the real tree]: an ordinary in-scope Write during another agent's commit (index.lock held, readiness transiently `partial`) is not refused as GUARD-LIFECYCLE-NOT-READY -- the guard waits at most 2 s and decides on one fresh read", () => {
+  const fx = inFlightCommitFixture({ commitFinishesDuringWait: true });
+  try {
+    // Precondition: the transient is real in the fixture -- while the commit holds the lock a readiness read answers `partial`,
+    // and right after the commit it answers ready (the item's "inspect --intent session reports ready right afterwards").
+    const probe = () => { try { return fx.deps.requireProjectOnboardingReadyFn({ intent: "session" }).status; } catch (error) { return error.lifecycleStatus; } };
+    assert.equal(probe(), "partial", "fixture precondition: readiness is `partial` while the commit holds index.lock");
+    rmSync(fx.lock);
+    assert.equal(probe(), "ready", "fixture precondition: readiness is ready right after the commit");
+    writeFileSync(fx.lock, "");
+    fx.trace.reads.length = 0;
+
+    const verdict = fx.ordinaryWrite();
+    assert.equal(verdict.exitCode, 0, `the second agent's ordinary Write was refused only because another agent was committing: ${verdict.stderr}`);
+    assert.doesNotMatch(verdict.stderr ?? "", NOT_READY);
+    assert.deepEqual(fx.trace.reads, ["partial", "ready"], "exactly one fresh re-read, and the decision is taken on it");
+    assert.equal(fx.trace.sleeps.length, 1, "exactly one bounded wait between the two reads");
+    assert.ok(fx.trace.sleeps[0] > 0 && fx.trace.sleeps[0] <= MAX_REREAD_WAIT_MS, `the wait must be bounded to <= ${MAX_REREAD_WAIT_MS} ms, got ${fx.trace.sleeps[0]}`);
+    assert.equal(existsSync(fx.lock), false, "the other agent's commit finished during the wait");
+  } finally { fx.cleanup(); }
+});
+
+test("PARWORK-M3b (control): a genuinely not-ready session is still refused -- readiness that is STILL `partial` on the fresh read is refused as GUARD-LIFECYCLE-NOT-READY after at most one bounded re-read", () => {
+  const fx = inFlightCommitFixture({ commitFinishesDuringWait: false });
+  try {
+    const verdict = fx.ordinaryWrite();
+    assert.equal(verdict.exitCode, 2, `a persistently partial session must stay refused: ${verdict.stderr}`);
+    assert.match(verdict.stderr, NOT_READY);
+    assert.match(verdict.stderr, /partial/u);
+    assert.ok(fx.trace.reads.length >= 1 && fx.trace.reads.length <= 2, `at most one re-read, got ${JSON.stringify(fx.trace.reads)}`);
+    assert.ok(fx.trace.reads.every((status) => status === "partial"), "no read in this scenario was ready, so nothing may be admitted");
+    assert.ok(fx.trace.sleeps.every((ms) => ms > 0 && ms <= MAX_REREAD_WAIT_MS), `every wait is bounded to <= ${MAX_REREAD_WAIT_MS} ms: ${JSON.stringify(fx.trace.sleeps)}`);
+    assert.ok(fx.trace.sleeps.length <= 1, "never more than one wait");
+  } finally { fx.cleanup(); }
+});
+
+test("PARWORK-M3c (control): a different not-ready status is refused on the FIRST read -- only `partial` is re-read, and a state that is still locked is never admitted by waiting", () => {
+  const fx = inFlightCommitFixture({ statusWhileLocked: "restart-required", commitFinishesDuringWait: true });
+  try {
+    const verdict = fx.ordinaryWrite();
+    assert.equal(verdict.exitCode, 2, `a non-partial not-ready status must stay refused: ${verdict.stderr}`);
+    assert.match(verdict.stderr, NOT_READY);
+    assert.match(verdict.stderr, /restart-required/u);
+    assert.deepEqual(fx.trace.reads, ["restart-required"], "no re-read and no wait for a status other than `partial`");
+    assert.deepEqual(fx.trace.sleeps, []);
+  } finally { fx.cleanup(); }
+});
+
+// DEFERRED, out of scope of this item's functional delivery (PO decision item): the liveness readback for open dispatch
+// records ("Observed again 2026-10-05 (round 3b)"); no case for it is pinned here.
