@@ -15,7 +15,8 @@
 // repository below a base directory that deliberately grants a foreign principal write (the human-controlled ancestor).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -255,4 +256,86 @@ test('case C (structural): the host-process journal bounds only the three reposi
     ['verificationWindowsRecord', 'repository'],
     ['writeHostJournal', 'strict'],
   ]);
+});
+
+// ---- ALF-C-ANCESTOR-CALLERS5: the plugin-module walk of the domain owner (readModuleContext) ---------------------------------
+// readModuleContext walks the ancestors of a plugin SOURCE MODULE, not of a repository path, so the repository-root boundary of
+// cases A-C does not apply. The decided boundary is the plugin root that contains lib/, derived once from this module's own
+// location (never caller-supplied) and consumed by readModuleContext alone, and only for a module lexically inside it. The plugin
+// root and every directory below it stay strict; POSIX behaviour is unchanged. Case D pins the call graph, case D2 replays the
+// real session power record write that the host-crash recovery path needs, and its control keeps a module outside the plugin root
+// strict. Case D2 is RED on the original code on any host whose path above the plugin root grants a foreign principal write
+// (a default Windows drive root or first-level directory does); elsewhere it is a positive control.
+
+test('case D (structural): readModuleContext bounds its ancestor walk only with the plugin root derived from the module location, after a lexical containment check', () => {
+  const source = libSource('session-authority-domain-owner.mjs');
+  assert.match(source, /^const PLUGIN_ROOT=resolve\(dirname\(fileURLToPath\(import\.meta\.url\)\),'\.\.'\);$/mu); // derived from this file only
+  assert.match(source, /^function pluginRootBoundary\(filePath\)\{$/mu); // the module path is the only input
+  assert.match(source, /^function readModuleContext\(filePath\)\{$/mu); // one parameter: nothing a caller can use to widen the boundary
+  // The containment check is the only producer of the boundary and readModuleContext is its only consumer.
+  assert.deepEqual(callsOf(source, 'pluginRootBoundary').map(({caller, args}) => [caller, args.join('|')]), [['readModuleContext', 'filePath']]);
+  const body = source.match(/^function pluginRootBoundary\(filePath\)\{$[\s\S]*?^\}$/mu)?.[0] ?? '';
+  assert.match(body, /process\.platform!=='win32'\|\|typeof filePath!=='string'\)return null;/u); // POSIX never produces a boundary
+  assert.match(body, /filePath\.toLowerCase\(\)\.startsWith\(base\.toLowerCase\(\)\+sep\)\?PLUGIN_ROOT:null/u); // lexical, case-insensitive, separator-delimited, else strict
+  // The win32 module walk passes the boundary; the POSIX module walk and every other walker keep their call shape unchanged.
+  assert.deepEqual(callsOf(source, 'chain').filter(({caller}) => caller === 'readModuleContext').map(({args}) => args.join('|')), ['dirname(filePath)|pluginRootBoundary(filePath)', 'dirname(filePath)']);
+  assert.deepEqual(callsOf(source, 'chain').filter(({caller}) => caller !== 'readModuleContext').map(({caller, args}) => `${caller}:${args.join('|')}`).sort(), [
+    'publishSourceOwnedAuthorityRoot:dirname(file)',
+    'publishSourceOwnedAuthorityRoot:rootPath',
+    'readAuthorityNamespace:rootPath|boundaryRoot',
+    'readAuthoritySourceFile:dirname(filePath)|windowsAuthorityBoundary(filePath)',
+    'readPowerEndpoint:dirname(filePath)',
+  ]);
+  // Nothing else, and no export, can reach the plugin-root boundary.
+  const rest = source.replace(body, '').replace(/^const PLUGIN_ROOT=.*$/mu, '').split('\n').filter((line) => !line.trimStart().startsWith('//')).join('\n');
+  assert.doesNotMatch(rest, /PLUGIN_ROOT/u);
+});
+
+winTest('case D2: the session power record is written although a path above the plugin root grants a foreign principal write', async () => {
+  const power = await import(pathToFileURL(join(pluginRoot, 'lib', 'session-power.mjs')).href);
+  const {lifecycle} = await load();
+  // The fixture repository lives in the pin's protected fixture area, not under os.tmpdir(): a temp directory may inherit a sandbox
+  // group's Modify grant onto the repository root itself, which the strict check rightly refuses (the root is the boundary).
+  const root = realpathSync(mkdtempSync(join(fixture.base, 'power-')));
+  protect(root);
+  const ceiling = {had: Object.hasOwn(process.env, 'GIT_CEILING_DIRECTORIES'), value: process.env.GIT_CEILING_DIRECTORIES};
+  // Containment: the fixture repository initialises its own root first and every git call runs under a ceiling at its parent.
+  const gitHere = (args) => run('git', args, {cwd: root, env: {...process.env, GIT_CEILING_DIRECTORIES: dirname(root)}});
+  process.env.GIT_CEILING_DIRECTORIES = dirname(root); // the in-process git calls of the modules under test stay inside this fixture
+  try {
+    gitHere(['init', '-q']);
+    gitHere(['config', 'user.email', 'ancestor-pin@example.invalid']);
+    gitHere(['config', 'user.name', 'Ancestor Pin']);
+    gitHere(['config', 'commit.gpgsign', 'false']);
+    writeFileSync(join(root, 'README.md'), 'x\n');
+    gitHere(['add', 'README.md']);
+    gitHere(['commit', '-q', '-m', 'fixture']);
+    const session = lifecycle.startSessionDescriptor(root, {sessionId: 'session-hawkeye-01'});
+    const context = power.resolveSessionPowerContext(root, session.sessionId, session.descriptorSha256);
+    assert.equal(typeof context.repoFingerprint, 'string');
+    // The first power authority owner of the repository reads the plugin source modules: their ancestors lie above the plugin root.
+    power.writeSessionPowerRecord(context, power.createUnavailableSessionPowerRecord({repoFingerprint: context.repoFingerprint, sessionId: session.sessionId, descriptorSha256: session.descriptorSha256}, 'tool-missing', {observed: {platform: 'linux'}}));
+  } finally {
+    if (ceiling.had) process.env.GIT_CEILING_DIRECTORIES = ceiling.value;
+    else delete process.env.GIT_CEILING_DIRECTORIES;
+    rmSync(root, {recursive: true, force: true});
+  }
+});
+
+test('case D3 (structural): readRaw on win32 lstat()s the safe path before the strict native read, so an absent record is a plain ENOENT as on POSIX', () => {
+  const source = libSource('session-authority-registry.mjs');
+  const line = source.split('\n').find((candidate) => candidate.startsWith('function readRaw(repo,path){')) ?? '';
+  // The win32 branch performs the lstat on the safe path first and only then the unchanged strict native read.
+  assert.ok(line.startsWith("function readRaw(repo,path){if(process.platform==='win32'){lstatSync(safePath(repo,path));return nativePrivateRead(repo,path);}"), line.slice(0, 200));
+  // The POSIX branch keeps its own lstat-first shape.
+  assert.match(line, /const abs=safePath\(repo,path\);let fd;try\{const before=lstatSync\(abs\);/u);
+});
+
+winTest('case D2 control: a source module outside the plugin root is still refused by the strict ancestor walk', async () => {
+  const owner = await ownerModule();
+  // fixture.base grants a foreign principal write and lies outside the plugin root, so it must stay refused whatever the host above it.
+  const outside = join(fixture.base, 'outside-plugin-module.mjs');
+  writeFileSync(outside, '// ancestor pin control module\n');
+  const unreachable = () => { throw new Error('refused before any owner callback'); };
+  assert.throws(() => owner.createDomainAuthorityOwner({repository: custody(fixture.clean), producerId: 'ancestor-pin', kinds: [], namespaceIds: [NAMESPACE_ID], scan: unreachable, terminalObservation: unreachable, transitionScope: unreachable, sourceModulePaths: [outside]}), refusal);
 });

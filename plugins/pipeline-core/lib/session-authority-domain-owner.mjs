@@ -68,8 +68,19 @@ function readWindowsDomainSource(namespaceId,filePath,semantic){
   nativeFactCustody.set(sourceFact,native.nativeFactsSha256);return {value,bytes,sourceFact};
 }
 function json(bytes){try{return parseStrictJson(bytes);}catch{return null;}}
+// PO decision 2026-10-17 (the pipeline protects against the agent, not the human): directories strictly above the plugin root are
+// human-controlled host properties, observed and hashed but never refused. The boundary is DERIVED from this module's own location,
+// never supplied by a caller, and is consumed by readModuleContext alone, and only for a source module lexically inside it
+// (case-insensitive, separator-delimited); anything else is null and keeps every strict check. The plugin root itself and every
+// directory below it stay strict, and POSIX never produces a boundary.
+const PLUGIN_ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+function pluginRootBoundary(filePath){
+  if(process.platform!=='win32'||typeof filePath!=='string')return null;
+  const base=PLUGIN_ROOT.replace(/[\\/]+$/u,'');
+  return filePath.length>base.length&&filePath.toLowerCase().startsWith(base.toLowerCase()+sep)?PLUGIN_ROOT:null;
+}
 function readModuleContext(filePath){
-  if(process.platform==='win32'){if(!chain(dirname(filePath)))authorityOwnerFailure('domain-source-context-path');const native=nativeJoinedRead(filePath,false);return {pathSha256:digest(filePath),sha256:hash(native.bytes),identity:native.identity,size:native.bytes.length,nativeFactsSha256:native.nativeFactsSha256};}
+  if(process.platform==='win32'){if(!chain(dirname(filePath),pluginRootBoundary(filePath)))authorityOwnerFailure('domain-source-context-path');const native=nativeJoinedRead(filePath,false);return {pathSha256:digest(filePath),sha256:hash(native.bytes),identity:native.identity,size:native.bytes.length,nativeFactsSha256:native.nativeFactsSha256};}
   if(!chain(dirname(filePath))||realpathSync(filePath)!==filePath)authorityOwnerFailure('domain-source-context-path');
   let fd;try{const before=lstatSync(filePath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||(before.mode&0o022)!==0||before.size>LIMIT.file)authorityOwnerFailure('domain-source-context-ownership');fd=openSync(filePath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);if(!same(stability(before),stability(opened)))authorityOwnerFailure('domain-source-context-race');const buffer=Buffer.alloc(LIMIT.file+1);let size=0;while(size<buffer.length){const count=readSync(fd,buffer,size,buffer.length-size,size);if(!count)break;size+=count;}const after=lstatSync(filePath),final=fstatSync(fd);if(size>LIMIT.file||size!==final.size||!same(stability(opened),stability(final))||!same(stability(final),stability(after)))authorityOwnerFailure('domain-source-context-race');return {pathSha256:digest(filePath),sha256:hash(buffer.subarray(0,size)),identity:identity(final),size};}finally{if(fd!==undefined)closeSync(fd);}
 }
