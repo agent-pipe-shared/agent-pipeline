@@ -204,3 +204,15 @@ Answers to structured questions; tile text in
   - The candidate contains package 5 and the three remaining ancestor callers.
   - In parallel, a fanout clarifies the seven possibly genuine red suites: setup, control-placement, interruption-receipts, model-role-host-store, codex-native-critic-host, claude-critic-host, repository-freshness.
   - Backlog: `backlog/items/2026-10-17-full-verify-on-windows-takes-hours.md`.
+
+## Decision tiles answered (PO, 2026-10-17 late night, Claude session)
+
+- **Boundary for module-context ancestor reads:** the Windows ancestor walk in `readModuleContext` stops at the plugin root. Directories above the plugin root are human-controlled host properties.
+- **MRSR01 in `model-role-host-store.test.mjs`:** gets a Windows-specific expectation. On win32 the case asserts no mode-bit refusal and uses a directory junction instead of a file symlink. The POSIX expectation is unchanged.
+- **Adapter tripwire in `interruption-receipts.test.mjs`:** its import graph now reaches a JSON schema. This goes to the backlog, after 0.7.0.
+- **Host-limitation skip H-F1:** narrow it with owner, host and due date, like the other typed host skips.
+- **C6g1 findings C-A and C-B:** accepted as residual risk. They get no backlog item; the candidate status names them.
+- **Test fixtures under the host temp directory must be green:** stated by the PO in chat. On this host `%TEMP%` grants the Codex sandbox group Modify, and every fixture created there inherits that grant. The strict product check correctly refuses such a repository root, because that principal is the agent sandbox.
+  - The product check is not relaxed.
+  - The test environment is fixed so that temp-based fixtures do not inherit the sandbox grant.
+  - A repository root that the agent sandbox can write stays refused in real use.
