@@ -814,7 +814,7 @@ function fakeSetupSpawn(executable, args) {
   }
   if (executable === "openssl" && args[0] === "pkey" && args.includes("-pubout")) {
     const inPath = args[args.indexOf("-in") + 1];
-    const outPath = args[args.indexOf("-out") + 1];
+    const outIndex = args.indexOf("-out");
     // TR-S1-T3: an encrypted key is read with the `-passin` the lever appended, else LEVER_PASSPHRASE.
     const passinIndex = args.indexOf("-passin");
     const pem = readFileSync(inPath, "utf8");
@@ -822,7 +822,8 @@ function fakeSetupSpawn(executable, args) {
       ? { key: pem, format: "pem", passphrase: passinIndex >= 0 ? String(args[passinIndex + 1]).replace(/^pass:/u, "") : LEVER_PASSPHRASE }
       : pem))
       .export({ type: "spki", format: "pem" });
-    writeFileSync(outPath, publicKey);
+    if (outIndex < 0) return { status: 0, stdout: publicKey };
+    writeFileSync(args[outIndex + 1], publicKey);
     return { status: 0 };
   }
   if (executable === "openssl") return answerOpensslProbe(executable, args);
@@ -1897,7 +1898,9 @@ function tr1Spawn(passphrase = null) {
     calls.push({ executable, args: a, touchesPoKey: a.some((entry) => /po-private\.pem/u.test(entry)) });
     if (executable === "openssl" && a[0] === "pkey" && a.includes("-pubout")) {
       const key = createPrivateKey({ key: readFileSync(a[a.indexOf("-in") + 1], "utf8"), format: "pem", ...(passphrase === null ? {} : { passphrase }) });
-      writeFileSync(a[a.indexOf("-out") + 1], createPublicKey(key).export({ type: "spki", format: "pem" }));
+      const publicKey = createPublicKey(key).export({ type: "spki", format: "pem" });
+      if (!a.includes("-out")) return { status: 0, stdout: publicKey };
+      writeFileSync(a[a.indexOf("-out") + 1], publicKey);
       return { status: 0 };
     }
     return answerOpensslProbe(executable, a);

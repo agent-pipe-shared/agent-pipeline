@@ -132,10 +132,11 @@ export function fakeSetupSpawn(executable, args) {
   }
   if (executable === "openssl" && args[0] === "pkey" && args.includes("-pubout")) {
     const inPath = args[args.indexOf("-in") + 1];
-    const outPath = args[args.indexOf("-out") + 1];
+    const outIndex = args.indexOf("-out");
     const publicKey = createPublicKey(createPrivateKey(readFileSync(inPath, "utf8")))
       .export({ type: "spki", format: "pem" });
-    writeFileSync(outPath, publicKey);
+    if (outIndex < 0) return { status: 0, stdout: publicKey };
+    writeFileSync(args[outIndex + 1], publicKey);
     return { status: 0 };
   }
   const result = spawnSync(executable, args, { stdio: "pipe" });
