@@ -1,14 +1,15 @@
-import { withSourceOwnedNativeConcurrentCommit } from "./native-goldfish-host-state.mjs";
+import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE, nativeGoldfishHostStateInternals } from "./native-goldfish-host-state.mjs";
+import { validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal } from './native-goldfish-host-state.mjs';
 import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
-import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync } from 'node:fs';
+import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
 import { parseStrictJson } from './governance-event.mjs';
 // SPDX-License-Identifier: SUL-1.0
 /** Host-owned Claude/Codex Goldfish completion: validate, commit, receipt, then v4 record. */
 import { realpathSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname, isAbsolute, join } from "node:path";
 import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit, NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA } from "./agy-host-commit-admission.mjs";
 import { commitAdmittedNativeGoldfishReturn } from "./agy-host-commit-execution.mjs";
 import { CRITIC_REQUIRED_SCHEMA, criticDecisionPathFinding, validateCriticDecision } from "./critic-skip-decision.mjs";
@@ -24,11 +25,6 @@ function fail(code, status = "recovery-required") { return { status, code, commi
 function physicalRoot(value) {
   try { return realpathSync(resolve(value)); } catch { return null; }
 }
-
-import { NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE, nativeGoldfishHostStateInternals } from "./native-goldfish-host-state.mjs";
-import { validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
-import { isAbsolute, join } from "node:path";
-import { readdirSync } from "node:fs";
 
 // The observation receipt is keyed by dispatchId + the NEW host commit, which a replayed stop cannot know, so "already
 // committed" is a scan of the private receipts for this dispatch, candidate and launching call. An unreadable private
@@ -253,10 +249,35 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
     const terminalAssociation = writeNativeGoldfishAttemptTerminalAssociation({ repoRoot: physical, record: drafted.record, attempt });
     postCommitStage = "authority-terminal-release";
     const delivery=publishNativeAuthorityTerminal({physical,commonDir,pending,state,stored,published,terminalAssociation,record:drafted.record});
-    return { attempt, terminalAssociation, ...(state.delivery?{delivery:{...delivery,pendingSha256:pending.sha256}}:{}), status: "authored-commit-recorded", code: "NGHF-AUTHORED-RECORD-VERIFIED",
+    const deliveryResult = state.delivery?{...delivery,pendingSha256:pending.sha256}:null;
+    let checks = null;
+    if (deliveryResult?.checkStatus) {
+      postCommitStage = "checks-publication";
+      checks = publishNativeDispatchChecks({ physical, dispatchId: state.binding.dispatchId, commit: committed.commit, published, delivery: deliveryResult });
+    }
+    return { attempt, terminalAssociation, ...(deliveryResult?{delivery:deliveryResult}:{}), ...(checks?{checks}:{}), status: "authored-commit-recorded", code: "NGHF-AUTHORED-RECORD-VERIFIED",
       commit: committed.commit, record: { target: published.target, sha256: published.sha256,
         authorship: "host-observed-local" } };
   } catch(error) { return { ...fail(`NGHF-${postCommitStage.toUpperCase()}-EXCEPTION`), causeCode:error?.code??null, causeMessage:error?.message??null, commit: committed.commit }; }
+}
+
+// The published dispatch record is immutable and carries no item-check verdict, so the verdict is published beside it as
+// its own public file, bound to the record by sha. Exclusive create, no symlink follow, physical in-repo parent only.
+const NATIVE_DISPATCH_CHECKS_SCHEMA = "pipeline.native-goldfish-dispatch-checks.v1";
+function publishNativeDispatchChecks({ physical, dispatchId, commit, published, delivery }) {
+  const target = `evidence/dispatch-checks-${dispatchId}.json`;
+  if (!/^evidence\/[A-Za-z0-9._:-]+\.json$/u.test(target)) throw nativeManagedFault("native-checks-target");
+  const path = resolve(physical, target), parent = dirname(path), info = lstatSync(parent);
+  if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(parent) !== parent) throw nativeManagedFault("native-checks-parent");
+  const bytes = Buffer.from(`${JSON.stringify({ schema: NATIVE_DISPATCH_CHECKS_SCHEMA, dispatchId, commit, recordTarget: published.target,
+    recordSha256: published.sha256, pendingSha256: delivery.pendingSha256, checkStatus: delivery.checkStatus }, null, 2)}\n`, "utf8");
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o644);
+  try {
+    let offset = 0;
+    while (offset < bytes.length) { const count = writeSync(fd, bytes, offset, bytes.length - offset, offset); if (!(count > 0)) throw nativeManagedFault("native-checks-write"); offset += count; }
+    fsyncSync(fd);
+  } finally { closeSync(fd); }
+  return { target, sha256: nativeManagedDigest(bytes) };
 }
 
 const nativeAuthorityTerminals=new WeakMap();

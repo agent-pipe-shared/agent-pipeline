@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
+import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
+import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
@@ -95,6 +96,36 @@ function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfi
       return run({root,commonDir,binding,input,dependencies,facts,prepared,git,writeMeta,stopInput});
     });
   } finally {rmSync(root,{recursive:true,force:true});rmSync(stopDir,{recursive:true,force:true});}
+}
+
+// Smallest item-governed host commit: the approved-course fixture plus a Codex binding carrying itemDelivery (as NGHF07 in the regression suite).
+function itemFixture(check, options = {}) {
+  const root = fixtureRoot("native-item-checks-");
+  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
+  try {
+    const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") });
+    const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "controlled METHOD explicit selection" }); controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    const pipelineUserSource = readFileSync(join(nativeContractFixtureRepositoryRoot(), "pipeline.user.yaml"), "utf8").replace("gates:\n", "gates:\n  human_approval: chat\n");
+    const original = prepareApprovedItemCourseFixture({ root, pipelineUserSource });
+    git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid"); git("config", "commit.gpgsign", "false");
+    const repository = inspectSignedDescriptorCustodyRepository(root), runtime = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/checks-owner"), sessionId: "checks-owner" });
+    assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
+    return runtime.run(() => {
+      const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: "CODEX-AC-1", itemId: "AC-1", criterionLocator: original.criterionLocator, checks: [{ id: "original-criterion", path: "src/change.test.mjs", dependencies: ["src/change.mjs", "src/change.test.mjs"] }] };
+      const binding = { schema: "pipeline.native-goldfish-host-briefing.v3", dispatchId: "CODEX-AC-1", candidateCommit: original.candidate.commit, candidateTree: original.candidate.tree, runner: "codex", role: "pipeline-core:goldfish-implementor", nativeAgentType: "worker", model: "gpt-6-luna", effort: "high", rulesetSha, allowedPaths: ["src/change.mjs"], criticDecision, itemDelivery };
+      const prompt = `Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}\nSlice: CODEX-AC-1\nWrite scope: src/change.mjs\n`;
+      const pre = { cwd: root, session_id: "codex-item-session", hook_event_name: "PreToolUse", tool_name: "spawn_agent", tool_use_id: "codex-item-tool", tool_input: { agent_type: "worker", message: prompt } };
+      const prepared = prepareNativeGoldfishHostState({ root, runner: "codex", input: pre }); assert.equal(prepared.ok, true, JSON.stringify(prepared));
+      assert.equal(finalizeNativeGoldfishHostReturn({ root, runner: "codex", input: { ...pre, hook_event_name: "SubagentStart", agent_id: "codex-item-worker", agent_type: "worker", model: binding.model } }).status, "agent-bound");
+      writeFileSync(join(root, "src/change.mjs"), "// actual approved Codex item change\nexport const value='expected';\n");
+      // Planted only after commit admission (an untracked file earlier would fail the path check): right after the record is published.
+      const dependencies = options.preExisting ? { writeRecord: (request) => { const written = writeHostObservedNativeGoldfishDispatchRecord(request);
+        writeFileSync(join(root, "evidence/dispatch-checks-CODEX-AC-1.json"), "{\"pre\":\"existing\"}\n"); return written; } } : {};
+      const text = JSON.stringify({ schema: NATIVE_GOLDFISH_RETURN_SCHEMA, dispatchId: binding.dispatchId, candidateCommit: binding.candidateCommit, outcome: "succeeded", report: "Authored original criterion; candidate-bound check recorded.", changedPaths: ["src/change.mjs"] });
+      const finalized = finalizeNativeGoldfishHostReturn({ root, runner: "codex", input: { hook_event_name: "SubagentStop", session_id: pre.session_id, agent_id: "codex-item-worker", agent_type: "worker", model: binding.model, last_assistant_message: text } }, dependencies);
+      return check({ root, finalized, git });
+    });
+  } finally { rmSync(root, { recursive: true, force: true }); }
 }
 
 const cases = [
@@ -347,6 +378,36 @@ const cases = [
     const receipt = readReceipt(commonDir);
     assert.equal(receipt.assurance, POST_ASSURANCE);
     assert.equal(receipt.agentId, null);
+  }) },
+  { id: "NGHF11", name: "An item-governed host commit publishes an immutable checks file next to the record, bound to the record and the check verdict", run: () => itemFixture(({ root, finalized }) => {
+    assert.equal(finalized.status, "authored-commit-recorded", JSON.stringify(finalized));
+    assert.equal(finalized.delivery.checkStatus.verdict, "passed");
+    const target = "evidence/dispatch-checks-CODEX-AC-1.json";
+    assert.deepEqual(finalized.checks, { target, sha256: nativeManagedDigest(readFileSync(join(root, target))) });
+    const doc = JSON.parse(readFileSync(join(root, target), "utf8"));
+    assert.deepEqual(Object.keys(doc).sort(), ["checkStatus", "commit", "dispatchId", "pendingSha256", "recordSha256", "recordTarget", "schema"]);
+    assert.equal(doc.schema, "pipeline.native-goldfish-dispatch-checks.v1");
+    assert.equal(doc.dispatchId, "CODEX-AC-1");
+    assert.equal(doc.commit, finalized.commit);
+    assert.equal(doc.recordTarget, finalized.record.target);
+    assert.equal(doc.recordSha256, finalized.record.sha256);
+    assert.equal(doc.recordSha256, nativeManagedDigest(readFileSync(join(root, finalized.record.target))));
+    assert.equal(doc.pendingSha256, finalized.delivery.pendingSha256);
+    assert.deepEqual(doc.checkStatus, finalized.delivery.checkStatus);
+  }) },
+  { id: "NGHF12", name: "An existing checks file is never overwritten; the typed code is returned alongside the commit", run: () => itemFixture(({ root, finalized, git }) => {
+    assert.equal(finalized.status, "recovery-required");
+    assert.equal(finalized.code, "NGHF-CHECKS-PUBLICATION-EXCEPTION");
+    assert.equal(finalized.commit, git("rev-parse", "HEAD"));
+    assert.equal(readFileSync(join(root, "evidence/dispatch-checks-CODEX-AC-1.json"), "utf8"), "{\"pre\":\"existing\"}\n");
+  }, { preExisting: true }) },
+  { id: "NGHF13", name: "A non-item-governed host commit writes no checks file and returns no checks field", run: () => fixture(({ root, binding, dependencies }) => {
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
+      tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
+      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] } } }, dependencies);
+    assert.equal(result.status, "authored-commit-recorded", result.code);
+    assert.equal("checks" in result, false);
+    assert.deepEqual(readdirSync(join(root, "evidence")).filter((name) => name.startsWith("dispatch-checks-")), []);
   }) },
 
 ];
