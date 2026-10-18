@@ -7,6 +7,7 @@ import { createManagedCodexRequesterRuntime } from './session-requester-bridge.m
 // Owned POSIX process supervision; final receipts belong to readiness composition.
 import { spawn } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
+import { relative, sep, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHostJournal, hostDigest, hostFault, journalExecutable,
   sameProcess, readHostJournal, writeHostJournal, listOwnedSession } from './codex-host-process-journal.mjs';
@@ -246,10 +247,24 @@ export function readManagedCodexTerminalJournal({directory}){
 function managedTerminalHandle(directory,expected){
   const terminalHandle=Object.freeze({});managedAuthorityTerminals.set(terminalHandle,{directory,expected});return terminalHandle;
 }
+// A managed terminal's launch cwd is bound to the repository, not to one path string: the readiness host
+// launches from a directory under the Git common directory's store, the fixtures from a directory inside the
+// checkout. Real paths are compared on path segments (never a raw string prefix), and anything unresolvable fails closed.
+export function cwdBoundToRepository(cwd,repository){
+  if(typeof cwd!=='string'||!isAbsolute(cwd))return false;
+  let realCwd;try{realCwd=realpathSync(cwd);}catch{return false;}
+  for(const root of [repository?.primaryRoot,repository?.commonDir]){
+    if(typeof root!=='string'||!isAbsolute(root))continue;
+    let realRoot;try{realRoot=realpathSync(root);}catch{continue;}
+    const rel=relative(realRoot,realCwd);
+    if(rel===''||!(rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel)))return true;
+  }
+  return false;
+}
 export function inspectManagedCodexAuthorityTerminal({repository,terminalHandle}){
   const entry=managedAuthorityTerminals.get(terminalHandle);if(!entry)throw hostFault('managed-terminal-unowned');
   const intent=readHostJournal(entry.directory,'intent'),launcher=readHostJournal(entry.directory,'launcher'),terminal=readHostJournal(entry.directory,'terminal');
-  if(!intent||!launcher||!terminal||intent.value.cwd!==repository.primaryRoot
+  if(!intent||!launcher||!terminal||!cwdBoundToRepository(intent.value.cwd,repository)
     ||intent.sha256!==entry.expected.intentReceiptSha256||terminal.sha256!==entry.expected.terminalReceiptSha256
     ||terminal.value.intentSha256!==intent.sha256||terminal.value.launcherSha256!==launcher.sha256
     ||terminal.value.exitCode!==0||terminal.value.signal!==null||terminal.value.registered!==true

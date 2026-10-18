@@ -169,3 +169,31 @@ test('A2: altered report or receipt is rejected; the Advisor result is never sil
   assert.equal(verifyCodexAdvisorInitialExecution({...base,receipt:forgedReceipt,trustedExecutablePath:process.execPath}).ok,false);
   assert.equal(verifyCodexAdvisorInitialExecution({...base,hostReceipt:{...base.hostReceipt,sha256:'0'.repeat(64)},trustedExecutablePath:process.execPath}).ok,false);
 });
+
+// ---- AC-135: a managed terminal binds its working directory to the repository, not to one root path string ----
+test('AC-135: a managed terminal whose cwd is strictly inside the repository (not the root string) completes',{skip:HOST_LIMITATION},async t=>{
+  const {f,result}=await boundFixture(t);
+  assert.notEqual(f.input,f.root);
+  assert.ok(f.input.startsWith(f.root+'/'),'the launch cwd is strictly inside the repository root');
+  assert.equal(result.ok,true,result.code);
+});
+
+test('AC-135: cwdBoundToRepository accepts the roots and their interiors, and refuses everything else',async t=>{
+  const {cwdBoundToRepository}=await import('../codex-host-process-supervisor.mjs');
+  const {symlinkSync}=await import('node:fs');
+  const {tmpdir}=await import('node:os');
+  const base=mkdtempSync(join(tmpdir(),'ac135-cwd-'));
+  t.after(()=>rmSync(base,{recursive:true,force:true}));
+  const primaryRoot=join(base,'root'),commonDir=join(base,'common'),sibling=primaryRoot+'2',elsewhere=join(base,'elsewhere');
+  const inside=join(primaryRoot,'sub'),store=join(commonDir,'agent-pipeline','x','processes','input-x');
+  for(const d of [inside,store,sibling,elsewhere])mkdirSync(d,{recursive:true});
+  const link=join(primaryRoot,'escape');symlinkSync(elsewhere,link);
+  const repository={primaryRoot,commonDir};
+  assert.equal(cwdBoundToRepository(primaryRoot,repository),true,'equal to primaryRoot');
+  assert.equal(cwdBoundToRepository(inside,repository),true,'strictly inside primaryRoot');
+  assert.equal(cwdBoundToRepository(store,repository),true,'strictly inside commonDir, outside primaryRoot');
+  assert.equal(cwdBoundToRepository(sibling,repository),false,'sibling sharing a name prefix');
+  assert.equal(cwdBoundToRepository(join(base,'missing'),repository),false,'nonexistent');
+  assert.equal(cwdBoundToRepository('relative/dir',repository),false,'relative');
+  assert.equal(cwdBoundToRepository(link,repository),false,'symlink inside primaryRoot pointing outside both roots');
+});
