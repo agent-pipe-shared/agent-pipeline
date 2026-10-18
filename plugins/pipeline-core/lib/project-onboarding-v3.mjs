@@ -1055,10 +1055,11 @@ const KICKOFF_PROFILES = Object.freeze(["epic", "feature", "mini"]);
 // --by <name> --profile <epic|feature|mini>` (exit 0) -> `approve-plan --by
 // <name>` (exit 0) -> `set-phase --phase implementation` (exit 0), after which
 // the same non-exempt implementation write the gate refused is admitted (guard
-// exit 0). The path was measured for all three PO profiles AND for a project
-// that never promotes a design package (the kickoff seed is itself valid PRD
-// authority), so no reachable fresh-project shape is left standing in front of
-// a gate it cannot pass. The two conditions the path does depend on are already
+// exit 0). That measurement predates the design-package-first lifecycle: for
+// epic and feature, `submit-plan` now refuses with
+// ARCHITECTURE-DESIGN-PACKAGE-REQUIRED until the draft PRD carries the
+// architecture design package, and the sequence is submit-plan, present-plan,
+// approve-plan, set-phase implementation. The two conditions the path does depend on are already
 // satisfied by the seeded artifacts: the active PRD declares the repository PO
 // language once (`<!-- po-language: en -->`) and binds the neighbouring spec.md
 // digest once (`<!-- technical-spec-sha256: ... -->`), which is what the kickoff
@@ -1108,7 +1109,10 @@ const DEV_PLAN_BLOCKING_GATE = "gates:\n"
   // sequence out of it, so the enforcing artifact carries it.
   + "  # Human plan approval. Implementation writes are REFUSED until the PO has\n"
   + "  # approved this feature's plan and the phase has been switched:\n"
+  + "  # For epic/feature, first author the architecture design package in the draft\n"
+  + "  # PRD, then:\n"
   + "  #   pipeline-state submit-plan --by <name> --profile <epic|feature|mini>\n"
+  + "  #   pipeline-state present-plan\n"
   + "  #   pipeline-state approve-plan --by <name>\n"
   + "  #   pipeline-state set-phase --phase implementation\n"
   + "  dev-plan:\n    mode: blocking\n    type: human\n"

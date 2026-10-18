@@ -41,7 +41,12 @@ was needed; capability evidence is not an Advisor answer.
    a tracked, unmodified regular file. If bound or submitted sources require
    material edits, use the current inspector's sanctioned draft recovery;
    never edit authority markers manually or invent a rebind command.
-4. Establish an exact current submission with `submit-plan` when needed. This
+4. Author the architecture design package in the draft PRD (physical map,
+   fitness model, baseline and the declared implementation surface, committed
+   in draft) before `submit-plan`; without it `submit-plan` refuses with
+   `ARCHITECTURE-DESIGN-PACKAGE-REQUIRED`. Source files stay out of the draft
+   commit until `set-phase implementation`.
+5. Establish an exact current submission with `submit-plan` when needed. This
    is mechanical agent work, not another PO permission. Inspect the resulting
    state. For `epic`/`feature`, use `present-plan --by <presenter>
    --review-receipt <repo-relative-json-path>`, repeating `--review-receipt`
@@ -49,7 +54,7 @@ was needed; capability evidence is not an Advisor answer.
    Supply one or two distinct tracked receipts in chain order. The retired
    `--design-workflow-package` flag is rejected with `DWP-PRESENT-RETIRED`;
    it is not a recovery route.
-5. The lifecycle writer checks the current source/receipt binding mechanically:
+6. The lifecycle writer checks the current source/receipt binding mechanically:
    PRD/Spec hashes and technical marker, register/traceability consistency,
    tracked unchanged paths, receipt/report provenance and committed candidate.
    Resolve typed inconsistencies through the returned sanctioned actions; this
