@@ -376,6 +376,7 @@
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | closed | workflow-improvement | pipeline | alfred | 2026-08-17 | — | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | — | 2026-08-18 | — | — |
+| pipeline.goldfish-mechanic-is-not-routed-to-the-haiku-tier | open | improvement | pipeline | none | 2026-10-19 | — | — |
 | pipeline.goldfish-quick-field-has-no-emitter | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
@@ -919,7 +920,7 @@
 
 ## Counts
 
-- open: 233
+- open: 234
 - in_progress: 0
 - closed: 664
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "63d2c899a01f2b4d38deff448f5704b2e6f301a6a36a26b30cfff7165560022e"
+    "transitionHead": "197fa57516c3b5e70eafce77455486de1097a85249c1ffc4314d1c8876fe03d5"
   },
   "counts": {
-    "open": 233,
+    "open": 234,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -4741,6 +4741,16 @@
       "closureRepository": "self",
       "closureCommit": "00bd47c1871f9d7c660735aecc2e6eb653e40737",
       "closureEvidence": "templates/prompts/goldfish-task.md"
+    },
+    {
+      "id": "pipeline.goldfish-mechanic-is-not-routed-to-the-haiku-tier",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "Elephant decision E7 (2026-10-19, under PO decision D26): point (e) MECH-HAIKU of opus-critic-only-batched-for-architecture-and-security leaves 0.7.0",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.goldfish-quick-field-has-no-emitter",
