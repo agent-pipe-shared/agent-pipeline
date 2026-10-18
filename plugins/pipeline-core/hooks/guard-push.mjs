@@ -2686,11 +2686,16 @@ if (allFailures.length === 0) {
   } catch {
     custodyReport = { schema: "pipeline.scratch-custody-report.v1", mode: "report-only", warnings: [{ code: "observer-unavailable" }], views: [] };
   }
-  const custodyAdvisory = custodyReport.warnings.length
-    ? `[guard-push] WARN (report-only): scratch custody has ${custodyReport.warnings.length} typed finding(s) for pushed source ${sourceCommit}.\n${JSON.stringify(custodyReport)}\nThis report does not change Push-Gate policy or refuse the push.`
+  // A repository with no scratch custody manifest has nothing to account for: the
+  // manifest-absent statuses are not findings. The custody report is report-only and
+  // NEVER changes the exit code -- it is written to stderr and the allow verdict stands.
+  const ABSENT_MANIFEST_CODES = new Set(["manifest-untracked", "manifest-unavailable", "candidate-unavailable"]);
+  const custodyFindings = custodyReport.warnings.filter((w) => !ABSENT_MANIFEST_CODES.has(w.code));
+  const custodyAdvisory = custodyFindings.length
+    ? `[guard-push] WARN (report-only): scratch custody has ${custodyFindings.length} typed finding(s) for pushed source ${sourceCommit}.\n${JSON.stringify({ ...custodyReport, warnings: custodyFindings })}\nThis report does not change Push-Gate policy or refuse the push.`
     : null;
-  const advisories = [scratchAdvisory, custodyAdvisory].filter(Boolean);
-  if (advisories.length) emit(1, advisories);
+  if (scratchAdvisory) emit(1, [scratchAdvisory, custodyAdvisory]);
+  if (custodyAdvisory) process.stderr.write(custodyAdvisory + "\n");
   allowExit(); // all-green -- allow (NVA-B-TAGNOTICE3: routes any pending ancestry notice through WARN=1 instead of discarding it at exit 0)
 }
 

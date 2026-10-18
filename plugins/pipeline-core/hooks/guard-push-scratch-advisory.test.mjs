@@ -237,6 +237,18 @@ const ALLOW = 0, ADVISORY = 1;
   });
 }
 
+// ---- PGSA04: a report-only custody finding is printed but NEVER changes the exit code --------
+{
+  const { dir } = signedPushRepo("custody-exit");
+  const home = mkdtempSync(join(tmpdir(), "guard-push-scratchadv-home-"));
+  ALL_DIRS.push(home);
+  mkdirSync(join(dir, "scratch"), { recursive: true });
+  writeFileSync(join(dir, "scratch", "unclassified-note.md"), "note\n");
+  check("PGSA04 allow  a report-only custody finding is printed yet the exit stays 0", PUSH_CMD, dir, home, ALLOW, {
+    stderrIncludes: ["scratch custody", "unclassified-markdown"],
+  });
+}
+
 for (const dir of ALL_DIRS) {
   try { rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
 }
