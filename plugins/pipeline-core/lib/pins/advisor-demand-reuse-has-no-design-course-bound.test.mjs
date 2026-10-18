@@ -351,3 +351,66 @@ test("A5: file-mode drift of private course metadata fails closed (needs POSIX m
     assert.equal(f.store.readCurrent().status, "unavailable");
   } finally { f.close(); }
 });
+
+// ---- A4/A7 second managed launch -------------------------------------------------------------
+// The first managed launch publishes advisor-finalization.json into its own, already released
+// journal directory. The inventory used to reject that file as an unknown managed entry, so the
+// next launch in the same repository ended in recovery-required / SDC-AUTHORITY-UNAVAILABLE.
+async function managedLaunchModules() {
+  const load = rel => import(pathToFileURL(join(lib, rel)).href);
+  const [fixtureMod, coordinator, support, journal, worktree] = await Promise.all([
+    load("codex-advisor-host.fixture.mjs"), load("design-advisory-coordinator-v2.mjs"), load("native-managed-authority-support.mjs"),
+    load("codex-host-process-journal.mjs"), load("worktree-lifecycle.mjs")]);
+  return { advisorHostFixture: fixtureMod.advisorHostFixture, coordinate: coordinator.coordinateInitialDesignAdvisory,
+    readInventory: support.readNativeManagedInventory, createPort: journal.createManagedCodexAuthorityProducerPort,
+    inspectRepository: worktree.inspectSignedDescriptorCustodyRepository };
+}
+const launchArgs = f => ({ repoRoot: f.root, featureId: "advisor-feature", authoringDispatchId: "elephant-author", sources: f.sources, reason: "risk-review", profile: "feature", dispatch: f.args.dispatch, route: f.route, hostExecution: f.execution });
+const ownerDecision = m => ({ status: "approved", ...m, decisionRef: "owner-new-question", decisionSha256: "a".repeat(64) });
+function retainedLaunchDirectories(root) {
+  const base = join(root, ".git", "agent-pipeline", "advisor-codex");
+  return readdirSync(base, { recursive: true }).filter(p => p.endsWith("advisor-finalization.json")).map(p => dirname(join(base, p)));
+}
+
+test("A4/A7: a second managed launch in the same repository is not refused by the first launch's retained finalization record", { skip: WIN ? HOST_LIMITATION + "; coordinator fixture CRHS-INPUT on win32" : false }, async t => {
+  const { advisorHostFixture, coordinate } = await managedLaunchModules();
+  const f = advisorHostFixture(t), input = launchArgs(f);
+  const first = await coordinate(input);
+  assert.equal(first.status, "answered", JSON.stringify(first));
+  assert.equal(retainedLaunchDirectories(f.root).length, 1);
+  const successor = await coordinate({ ...input, reason: "architecture-tradeoff", dispatch: { ...input.dispatch, dispatchId: "advisor-successor" }, newCourseParentId: first.courseBinding.courseId, observeInitialCourseDecision: ownerDecision });
+  assert.equal(successor.status, "answered", JSON.stringify(successor));
+  assert.notEqual(successor.courseBinding.courseId, first.courseBinding.courseId);
+  assert.equal(retainedLaunchDirectories(f.root).length, 2);
+});
+
+test("A4/A7: only a terminal-verified launch is released; unknown, mis-schemed and unterminated entries still fail closed", { skip: WIN ? HOST_LIMITATION + "; coordinator fixture CRHS-INPUT on win32" : false }, async t => {
+  const { advisorHostFixture, coordinate, readInventory, createPort, inspectRepository } = await managedLaunchModules();
+  const { unlinkSync } = await import("node:fs");
+  const f = advisorHostFixture(t);
+  assert.equal((await coordinate(launchArgs(f))).status, "answered");
+  const repository = inspectRepository(f.root), [dir] = retainedLaunchDirectories(f.root);
+  const reasonOf = run => { try { run(); } catch (error) { return error.reason; } return null; };
+  const held = () => createPort({ repository }).readBaseline().legacyOperations.length;
+  // the retained finalization record is classified and its completed launch is no longer held
+  assert.equal(reasonOf(() => readInventory(repository, "managed-codex")), null);
+  assert.equal(held(), 0);
+  // a launch without its terminal journal is not terminal-verified and stays held
+  const terminalPath = join(dir, "terminal.json"), terminalBytes = readFileSync(terminalPath);
+  unlinkSync(terminalPath);
+  assert.equal(held(), 1);
+  writeFileSync(terminalPath, terminalBytes, { mode: 0o600 });
+  assert.equal(held(), 0);
+  // an entry outside the closed name list is still refused
+  const foreign = join(dir, "foreign.json");
+  writeFileSync(foreign, JSON.stringify({ schema: "pipeline.codex-host-foreign.v1" }), { mode: 0o600 });
+  assert.equal(reasonOf(() => readInventory(repository, "managed-codex")), "native-managed-unknown-managed-entry");
+  unlinkSync(foreign);
+  assert.equal(reasonOf(() => readInventory(repository, "managed-codex")), null);
+  // a finalization name carrying another record's schema is still refused
+  const finalization = join(dir, "advisor-finalization.json"), finalizationBytes = readFileSync(finalization);
+  writeFileSync(finalization, JSON.stringify({ schema: "pipeline.codex-readiness-finalization.v1" }), { mode: 0o600 });
+  assert.equal(reasonOf(() => readInventory(repository, "managed-codex")), "native-managed-managed-schema");
+  writeFileSync(finalization, finalizationBytes, { mode: 0o600 });
+  assert.equal(reasonOf(() => readInventory(repository, "managed-codex")), null);
+});

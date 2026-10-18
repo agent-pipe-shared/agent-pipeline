@@ -44,6 +44,8 @@ export function readNativeManagedSource(namespaceId, filePath) {
     return value;
   } });
 }
+/** True for a post-terminal custody record: published after the operation was released, so it is not part of the authority fact set once the terminal journal is closed. */
+export const nativeManagedPostTerminalRecord = relativePath => /\/(advisor|readiness)-finalization\.json$/.test(relativePath);
 export function readNativeManagedInventory(repository, domain) {
   nativeManagedRepository(repository);
   const roots = domain === 'native-goldfish' ? [['native-goldfish-host-commit', join(repository.commonDir, 'agent-pipeline/run/native-goldfish-host-commit')]]
@@ -64,14 +66,18 @@ export function readNativeManagedInventory(repository, domain) {
       if(relativePath.startsWith('authority-owner-')&&value.schema!=='pipeline.native-goldfish-authority-owner.v1')throw nativeManagedFault('native-managed-native-owner-schema');
       if(relativePath.startsWith('observation-')&&!validateNativeGoldfishHostObservation(value))throw nativeManagedFault('native-managed-native-observation-shape');
     } else {
-      const names = '(intent|launcher|admission|child-intent|worker|child|exec-admission|execution|terminal|recovered-child|recovery|authority)';
+      // The two finalization names are the controller's post-terminal records: the host publishes them into
+      // the journal directory after finish() has released the operation (codex-isolated-structured-host.mjs).
+      const names = '(intent|launcher|admission|child-intent|worker|child|exec-admission|execution|terminal|recovered-child|recovery|authority|advisor-finalization|readiness-finalization)';
       if (!(new RegExp(`^[a-f0-9]{64}/processes/codex-host-drh_[a-f0-9]{32}/${names}\\.json$`)).test(relativePath)) throw nativeManagedFault('native-managed-unknown-managed-entry');
       const name=relativePath.split('/').at(-1).slice(0,-5);
       const schemas={intent:'pipeline.codex-host-process-intent.v1',launcher:'pipeline.codex-host-launcher.v1',admission:'pipeline.codex-host-admission.v1',
         'child-intent':'pipeline.codex-host-child-intent.v1',worker:'pipeline.codex-host-worker.v1',child:'pipeline.codex-host-child.v1',
         'exec-admission':'pipeline.codex-host-exec-admission.v1',execution:'pipeline.codex-host-execution.v1',terminal:'pipeline.codex-host-terminal.v1',
-        recovery:'pipeline.codex-host-recovery.v1',authority:'pipeline.codex-host-authority.v1'};
-      if(!schemas[name]||value.schema!==schemas[name])throw nativeManagedFault('native-managed-managed-schema');
+        recovery:'pipeline.codex-host-recovery.v1',authority:'pipeline.codex-host-authority.v1',
+        'advisor-finalization':['pipeline.codex-advisor-finalization.v1','pipeline.codex-advisor-failed-finalization.v1'],
+        'readiness-finalization':'pipeline.codex-readiness-finalization.v1'};
+      if(![].concat(schemas[name]??[]).includes(value.schema))throw nativeManagedFault('native-managed-managed-schema');
     }
     return value;
   } }));

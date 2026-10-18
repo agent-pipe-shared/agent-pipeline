@@ -1,4 +1,4 @@
-import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation, nativeManagedPostTerminalRecord } from './native-managed-authority-support.mjs';
 import { withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectManagedCodexAuthorityTerminal, readManagedCodexTerminalJournal } from './codex-host-process-supervisor.mjs';
@@ -229,9 +229,11 @@ function managedScan(owner){
         managedAuthorityOperations.set(handle,{owner,operation});owner.operations.set(directory,operation);}
       if(operation.intentSha256!==intent.sourceFact.sha256)throw nativeManagedFault('managed-authority-intent-drift');
       if(authority&&(authority.value.operationSha256!==operation.bindingSha256||canonicalJson(authority.value.association)!==canonicalJson(operation.association)))throw nativeManagedFault('managed-authority-retained-owner-drift');
-      operation.namespaceId=scan.membership.namespaceId;operation.sourceFacts=entries.map(e=>e.sourceFact).sort((a,b)=>a.pathSha256.localeCompare(b.pathSha256));
-      operation.intentEntry=intent;
       const closed=readManagedCodexTerminalJournal({directory});
+      // Post-terminal finalization records are published after the release, so a closed operation binds the same
+      // facts it was released with; a record that appears before the terminal journal closes stays a bound fact.
+      operation.namespaceId=scan.membership.namespaceId;operation.sourceFacts=entries.filter(e=>closed.status!=='closed'||!nativeManagedPostTerminalRecord(e.relativePath)).map(e=>e.sourceFact).sort((a,b)=>a.pathSha256.localeCompare(b.pathSha256));
+      operation.intentEntry=intent;
       if(closed.status==='closed')operation.phase='terminal-observed';
       else if(!operation.memberHandle)operation.phase=entries.some(e=>e.relativePath.endsWith('/execution.json'))?'running':'armed';
     }
