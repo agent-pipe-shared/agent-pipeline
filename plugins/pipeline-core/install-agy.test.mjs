@@ -2,11 +2,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { installerUsageLines, postInstallGuidanceLines, refreshAntigravityInstallation, selectPluginSource, updateAutonomousSettings, updatePluginRegistry, verifyAntigravityInstallerSource } from "./install-agy.mjs";
+import { installerUsageLines, postInstallGuidanceLines, refreshAntigravityInstallation, resolveAntigravityInstallerAttestationSource, selectPluginSource, updateAutonomousSettings, updatePluginRegistry, verifyAntigravityInstallerSource } from "./install-agy.mjs";
+import * as installerModule from "./install-agy.mjs";
 import { resolveAntigravityRegistryInstalledRoot } from "./scripts/installed-plugin-attestation-host.mjs";
 import { observePipelineStartPreflight } from "./scripts/pipeline-start-preflight.mjs";
 import { createGovernanceScopeController } from "./lib/governance-scope.mjs";
@@ -237,6 +238,70 @@ test("Agy source install writes a receipt readable by the first preflight in an 
   writeFileSync(join(marketplaceRoot, "hooks", "antigravity-pretool-guard.mjs"), "// changed marketplace copy\n");
   assert.equal(verifyAntigravityInstallerSource({ configRoot, workspaceRoot, sourcePluginRoot: marketplaceRoot, attestationSourceRoot: sourcePluginRoot, scope: "global" }).status, "rejected",
     "a copy changed after approval must not inherit the Git source identity");
+});
+
+// ALF-AGY1: a gitless copy cannot name its own Git source. Discovery therefore also
+// considers the repository of the invoking directory as a LOCATOR. Every fixture
+// owns its repositories (own git init) in a temp root outside the checkout.
+function syntheticCheckout(base, name, marker) {
+  const repo = join(base, name);
+  const pluginRoot = join(repo, "plugins", "pipeline-core");
+  mkdirSync(join(pluginRoot, "hooks"), { recursive: true });
+  mkdirSync(join(pluginRoot, "skills", "critic-review"), { recursive: true });
+  mkdirSync(join(pluginRoot, "scripts"), { recursive: true });
+  writeFileSync(join(pluginRoot, "plugin.json"), '{"name":"agent-pipeline-core","version":"0.7.0","description":"Synthetic test plugin"}\n');
+  writeFileSync(join(pluginRoot, "hooks.json"), '{"pipeline-core":{"PreInvocation":[{"type":"command","command":"node hooks/antigravity-start-hint.mjs"}]}}\n');
+  for (const path of ["hooks/antigravity-pretool-guard.mjs", "hooks/antigravity-start-hint.mjs", "skills/critic-review/SKILL.md", "scripts/pipeline-start-preflight.mjs"]) {
+    writeFileSync(join(pluginRoot, path), `// synthetic fixture ${marker}\n`);
+  }
+  execFileSync("git", ["-C", repo, "init", "--initial-branch", "main"], { stdio: "ignore" });
+  execFileSync("git", ["-C", repo, "remote", "add", "origin", "https://example.invalid/synthetic-pipeline.git"], { stdio: "ignore" });
+  execFileSync("git", ["-C", repo, "add", "."], { stdio: "ignore" });
+  execFileSync("git", ["-C", repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture"], { stdio: "ignore" });
+  return { repo, pluginRoot };
+}
+
+function discoveryFixture(t) {
+  const base = mkdtempSync(join(tmpdir(), "agy-installer-cwd-discovery-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const source = syntheticCheckout(base, "source", "approved");
+  const other = syntheticCheckout(base, "other", "different bytes");
+  const marketplaceRoot = join(base, "marketplace", "plugins", "pipeline-core");
+  cpSync(source.pluginRoot, marketplaceRoot, { recursive: true });
+  assert.equal(existsSync(join(base, "marketplace", ".git")), false, "the selected marketplace copy is gitless");
+  const notARepository = join(base, "not-a-repository");
+  mkdirSync(notARepository);
+  return { base, source, other, marketplaceRoot, notARepository };
+}
+
+test("Agy installer discovery finds the Git source from the invoking directory when its own directory is gitless", (t) => {
+  const f = discoveryFixture(t);
+  const selected = { sourcePluginRoot: f.marketplaceRoot, discoveryPluginRoot: f.marketplaceRoot };
+  const resolved = resolveAntigravityInstallerAttestationSource({ ...selected, cwd: join(f.source.repo, "plugins") });
+  assert.equal(resolved.status, "attestable-source", JSON.stringify(resolved));
+  assert.equal(realpathSync(resolved.attestationSourceRoot), realpathSync(f.source.pluginRoot));
+  const control = resolveAntigravityInstallerAttestationSource({ ...selected, cwd: f.notARepository });
+  assert.equal(control.status, "rejected", "the invoking directory is what supplied the locator");
+  assert.equal(control.reason, "ATR-SOURCE-CANDIDATE-UNAVAILABLE");
+  assert.ok(control.reasonCodes.includes("ATR-SOURCE-CANDIDATE-DISCOVERY-UNAVAILABLE"), JSON.stringify(control));
+});
+
+test("Agy installer discovery never accepts a locator whose bytes differ and names the repair", (t) => {
+  const f = discoveryFixture(t);
+  const resolved = resolveAntigravityInstallerAttestationSource({ sourcePluginRoot: f.marketplaceRoot, discoveryPluginRoot: f.marketplaceRoot, cwd: f.other.repo });
+  assert.equal(resolved.status, "rejected", JSON.stringify(resolved));
+  assert.equal(resolved.reason, "ATR-SOURCE-CANDIDATE-UNAVAILABLE");
+  assert.ok(resolved.reasonCodes.includes("SNT-A2-GIT-UNAVAILABLE"), "the gitless copy itself stays a refused candidate");
+  assert.ok(resolved.reasonCodes.includes("SNT-A2-CONTENT-MISMATCH"), "a checkout with different bytes is observed and refused, never trusted as a locator");
+  assert.equal(Object.hasOwn(resolved, "attestationSourceRoot"), false);
+  for (const text of [resolved.guidance, installerModule.describeInstallerSourceRefusal(resolved)]) {
+    assert.match(text, /approved Git source checkout/u);
+    assert.match(text, /byte-for-byte/u);
+    assert.match(text, /refreshing that copy/u);
+  }
+  const line = installerModule.describeInstallerSourceRefusal(resolved);
+  assert.ok(line.startsWith("ATR-SOURCE-CANDIDATE-UNAVAILABLE: "), line);
+  assert.ok(line.includes("SNT-A2-CONTENT-MISMATCH"), line);
 });
 
 function fixture(t) {

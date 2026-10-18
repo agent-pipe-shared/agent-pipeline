@@ -215,8 +215,23 @@ export function refreshAntigravityInstallation(options, dependencies = {}) {
   return host.apply(plan);
 }
 
-/** Discover provenance locally; a worktree path is a locator, never authority. */
-export function resolveAntigravityInstallerAttestationSource({ sourcePluginRoot, discoveryPluginRoot = sourcePluginRoot }, {
+/** One sentence naming the only repair for a refused source: a gitless copy cannot name its own Git source. */
+export const ANTIGRAVITY_INSTALLER_SOURCE_REPAIR = "Repair: run the installer from (or with the working directory inside) the approved Git source checkout whose plugins/pipeline-core matches the selected copy byte-for-byte, after refreshing that copy from the checkout.";
+
+/** Operator-facing text of a source refusal: the existing reason and codes, then the repair when the result carries one. */
+export function describeInstallerSourceRefusal(result) {
+  const codes = Array.isArray(result?.reasonCodes) && result.reasonCodes.length > 0 ? `: ${result.reasonCodes.join(", ")}` : "";
+  const base = `${result?.reason ?? "ATR-SOURCE-UNVERIFIABLE"}${codes}`;
+  return typeof result?.guidance === "string" && result.guidance !== "" ? `${base}. ${result.guidance}` : base;
+}
+
+/**
+ * Discover provenance locally; a worktree path is a locator, never authority.
+ * Locators come from the installer's own directory and from the Git worktrees of
+ * the invoking directory (`cwd`, resolved to its Git toplevel). Each candidate
+ * still has to pass the full observer below.
+ */
+export function resolveAntigravityInstallerAttestationSource({ sourcePluginRoot, discoveryPluginRoot = sourcePluginRoot, cwd = process.cwd() }, {
   execFileSync = nodeExecFileSync,
   observeSource = observeRunnerPublicCoreIdentity,
   snapshotSource = snapshotPhysicalPluginRoot,
@@ -227,17 +242,29 @@ export function resolveAntigravityInstallerAttestationSource({ sourcePluginRoot,
     return { status: "rejected", reason: "ATR-SOURCE-PHYSICAL-UNAVAILABLE", reasonCodes: [error.code ?? "SNT-A2-INTERNAL-ERROR"] };
   }
   const roots = [discoveryPluginRoot];
-  let discoveryUnavailable = false;
-  try {
-    const output = execFileSync("git", ["worktree", "list", "--porcelain", "-z"], {
-      cwd: dirname(dirname(discoveryPluginRoot)), shell: false, encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"], timeout: 20000, maxBuffer: 1048576,
-    });
+  const git = (directory, args) => execFileSync("git", args, {
+    cwd: directory, shell: false, encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"], timeout: 20000, maxBuffer: 1048576,
+  });
+  // Appends the plugin root of every worktree of the repository containing `directory`.
+  const locateWorktrees = (directory) => {
+    const output = git(directory, ["worktree", "list", "--porcelain", "-z"]);
     if (typeof output !== "string" || !output.endsWith("\0")) throw new Error("Invalid worktree discovery");
     for (const field of output.split("\0")) {
       if (field.startsWith("worktree ")) roots.push(join(field.slice(9), "plugins", "pipeline-core"));
     }
-  } catch { discoveryUnavailable = true; }
+  };
+  let installerDirectoryLocated = false;
+  try { locateWorktrees(dirname(dirname(discoveryPluginRoot))); installerDirectoryLocated = true; } catch { /* a gitless copy has no worktrees to list */ }
+  let invokingDirectoryLocated = false;
+  try {
+    const toplevel = String(git(cwd, ["rev-parse", "--show-toplevel"])).trim();
+    if (!isAbsolute(toplevel)) throw new Error("Invalid Git toplevel");
+    locateWorktrees(toplevel);
+    invokingDirectoryLocated = true;
+  } catch { /* the invoking directory is not inside a Git repository */ }
+  // Discovery is unavailable only when neither locator source produced a worktree list.
+  const discoveryUnavailable = !installerDirectoryLocated && !invokingDirectoryLocated;
   const reasonCodes = [];
   for (const root of new Set(roots)) {
     // The existing observer independently checks canonical physical roots,
@@ -270,7 +297,7 @@ export function resolveAntigravityInstallerAttestationSource({ sourcePluginRoot,
     } catch (error) { reasonCodes.push(error.code ?? "SNT-A2-INTERNAL-ERROR"); }
   }
   if (discoveryUnavailable) reasonCodes.push("ATR-SOURCE-CANDIDATE-DISCOVERY-UNAVAILABLE");
-  return { status: "rejected", reason: "ATR-SOURCE-CANDIDATE-UNAVAILABLE", reasonCodes: [...new Set(reasonCodes)] };
+  return { status: "rejected", reason: "ATR-SOURCE-CANDIDATE-UNAVAILABLE", reasonCodes: [...new Set(reasonCodes)], guidance: ANTIGRAVITY_INSTALLER_SOURCE_REPAIR };
 }
 
 /** Check that any copy which may execute can receive a source-bound receipt. */
@@ -292,9 +319,9 @@ export function verifyAntigravityInstallerSource({ configRoot, workspaceRoot, so
   // The observer checks the entire physical copy; a manifest/hash assertion supplied
   // by the copy itself is never treated as Git provenance.
   const source = observeSource("antigravity", { sourcePluginRoot: attestationSourceRoot, installedPluginRoot: sourcePluginRoot });
-  return source?.status === "ready"
-    ? { status: "attestable-source" }
-    : { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE", reasonCodes: source?.reasonCodes ?? ["SNT-A2-INTERNAL-ERROR"] };
+  if (source?.status === "ready") return { status: "attestable-source" };
+  // A plain rejection is not an internal error: forward only the codes the observer supplied.
+  return { status: "rejected", reason: "ATR-SOURCE-ATTESTATION-UNAVAILABLE", ...(Array.isArray(source?.reasonCodes) ? { reasonCodes: source.reasonCodes } : {}) };
 }
 
 /** Choice 3: publish the per-user central agy snapshot and refresh the global agy copy from it. Injectable for tests. */
@@ -347,7 +374,7 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
     Promise.resolve()
       .then(() => {
         const sourceCheck = resolveAntigravityInstallerAttestationSource({ sourcePluginRoot: selectedSource.pluginRoot, discoveryPluginRoot: SCRIPT_DIR });
-        if (sourceCheck.status === "rejected") throw new Error(`${sourceCheck.reason}: ${sourceCheck.reasonCodes.join(", ")}`);
+        if (sourceCheck.status === "rejected") throw new Error(describeInstallerSourceRefusal(sourceCheck));
         if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
         return runCentralSnapshotInstall({ sourcePluginRoot: selectedSource.pluginRoot, attestationSourceRoot: sourceCheck.attestationSourceRoot, configRoot, workspaceRoot: process.cwd(), runCli: centralSnapshotRunCli(configRoot) });
       })
@@ -389,7 +416,7 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
 
     try {
       const binding = resolveAntigravityInstallerAttestationSource({ sourcePluginRoot: corePluginPath, discoveryPluginRoot: SCRIPT_DIR });
-      if (binding.status === "rejected") throw new Error(`${binding.reason}: ${binding.reasonCodes.join(", ")}`);
+      if (binding.status === "rejected") throw new Error(describeInstallerSourceRefusal(binding));
       const configRoot = join(homedir(), ".gemini");
       if (!existsSync(configRoot)) mkdirSync(configRoot, { mode: 0o700 });
       const attestationSourceRoot = binding.attestationSourceRoot;
