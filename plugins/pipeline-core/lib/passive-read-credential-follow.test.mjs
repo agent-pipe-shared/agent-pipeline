@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Independent accepted-contract regression. All identities/content are synthetic.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -60,7 +61,14 @@ const secret = join(fixture, 'synthetic-private');
 mkdirSync(project, { recursive: true }); mkdirSync(secret, { recursive: true });
 writeFileSync(join(project, 'README.md'), 'synthetic public marker\n', { flag: 'wx' });
 writeFileSync(join(secret, '.netrc'), 'SYNTHETIC PLACEHOLDER ONLY\n', { flag: 'wx' });
-symlinkSync(join(secret, '.netrc'), join(project, 'alias.md'));
+// The no-follow alias exists to prove that the names-only rg inventory does not follow a link to a credential
+// name. That inventory is only the primary engine: when no `rg` binary can be spawned (a host whose `rg` is a
+// shell function, e.g. an interactive agent shell), safeRecursiveTree in passive-read-policy.mjs falls back to
+// a filesystem walk that by design inspects every entry and refuses a link whose physical target is a
+// credential name. The alias therefore belongs to this fixture exactly where the engine that implements
+// no-follow is present; without it the fixture must not contain a credential-named link in the searched tree.
+const rgInventoryEngine = spawnSync('rg', ['--version'], { encoding: 'utf8', timeout: 10000 });
+if (rgInventoryEngine.status === 0) symlinkSync(join(secret, '.netrc'), join(project, 'alias.md'));
 add('retain no-follow bounded public search', () => assert.equal(isBoundedSingleRg(['marker', project], project), true));
 add('refuse short follow search reaching forbidden synthetic target', () => assert.equal(isBoundedSingleRg(['-L', 'marker', project], project), false));
 add('refuse long follow search reaching forbidden synthetic target', () => assert.equal(isBoundedSingleRg(['--follow', 'marker', project], project), false));

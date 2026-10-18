@@ -17,15 +17,29 @@
  * Run: node --test plugins/pipeline-core/scripts/push-init.test.mjs
  */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, main, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
-import { run as pipelineStateRun } from "./pipeline-state.mjs";
+import { observeCurrentPlanApprovalForCalibration, readState, run as pipelineStateRun } from "./pipeline-state.mjs";
+import { compileDecisionSummary } from "./architecture-baseline.mjs";
 import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
 import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { fixtureGit } from "./architecture-adoption-test-fixture.mjs";
+import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../lib/architecture-map-scaffold.mjs";
+import { createDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+import { NEUTRAL_MANIFEST } from "../lib/project-authority.mjs";
+import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+import * as po from "../lib/po-gate-authority.mjs";
+import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../lib/windows-owned-authority-backend.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -212,6 +226,140 @@ function writeLateVerifyFixture(root) {
   }, null, 2));
 }
 
+// configure-verify refuses (CVCT-APPROVAL-UNAVAILABLE) unless the genuine plan-approval reader sees an eligible,
+// candidate-bound approval, so a hand-written State cannot stand in for it. This fixture reaches the approved
+// implementation State through the PUBLIC step sequence only (set-feature, continuity-init, submit-plan,
+// present-plan, approve-plan, materialize-architecture, package validation, set-phase implementation). It is the
+// minimum of lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs fixture(), copied rather than
+// imported: every approval, submission, authority and accepted-contract record is written by its real producer.
+// The approval mode is `chat` (a committed pipeline.user.yaml); no proof is ever signed.
+const LIFECYCLE_AT = "2026-10-10T10:00:00.000Z";
+const LIFECYCLE_NOW = "2026-10-16T12:00:00.000Z";
+const LIFECYCLE_SEEDED_VERIFY = "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"";
+const LIFECYCLE_TWINS = ["project/pipeline.json", ".claude/pipeline.json"];
+const LIFECYCLE_FEATURE = "e2e";
+const LIFECYCLE_PLAN = "specs/e2e/prd_e2e.md";
+const LIFECYCLE_SPEC = "specs/e2e/spec.md";
+const LIFECYCLE_COMPANIONS = ["specs/e2e/design.md", "specs/e2e/traceability.md"];
+const LIFECYCLE_REPORT = "specs/e2e/review/design-review-1.md";
+const LIFECYCLE_RECEIPT = "specs/e2e/review/design-review-receipt-1.json";
+const LIFECYCLE_ARCHITECTURE = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "architecture/", "src/", "tests/"], rationale: "Synthetic scoped method fixture; no new material decision" }, modules: [{ id: "unit", responsibility: "Own synthetic unit", nonResponsibilities: ["No external authority"], ownedPaths: ["src/**", "tests/**"], publicContracts: ["src/index.mjs"], allowedDependencies: [], authorityEffects: [], verificationEntryPoints: ["tests/unit.test.mjs"], adrReferences: [] }], implementationSurface: ["src/index.mjs"], fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "synthetic-unit", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { decision: "bounded" } } };
+
+// `parent` is an exclusively owned, realpath'd directory; the repository is `<parent>/repo`. The caller restores
+// GIT_CEILING_DIRECTORIES, which this sets so no git call in this process can resolve above the fixture.
+function provisionApprovedImplementationFixture(parent) {
+  const digestHex = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const root = join(parent, "repo");
+  mkdirSync(root);
+  process.env.GIT_CEILING_DIRECTORIES = parent;
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: parent };
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 60000, env });
+  const gitOk = (...args) => { const out = git(...args); assert.equal(out.status, 0, `SETUP git ${args[0]}: ${out.stderr}`); return out.stdout.trim(); };
+  const write = (path, bytes) => { const target = join(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, bytes); };
+  const read = (path) => readFileSync(join(root, path));
+  const writeJson = (path, value) => write(path, `${JSON.stringify(value, null, 2)}\n`);
+  // The repository is initialised BEFORE the first git write, so no git call can ever resolve above the fixture.
+  gitOk("init", "-q", "-b", "main");
+  gitOk("config", "user.email", "goldfish@example.invalid");
+  gitOk("config", "user.name", "Goldfish");
+  gitOk("config", "core.autocrlf", "false");
+  assert.equal(realpathSync(root), root);
+  assert.equal(realpathSync(gitOk("rev-parse", "--show-toplevel")), root, "the fixture is its own repository");
+  const lifecycle = (argv) => {
+    const logs = [];
+    const old = { log: console.log, error: console.error, warn: console.warn };
+    for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
+    let status;
+    try { status = pipelineStateRun(argv, { dir: root, now: () => LIFECYCLE_AT }); } finally { Object.assign(console, old); }
+    assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
+  };
+
+  write("README.md", "Synthetic push-init late-verify fixture\n");
+  write(".gitignore", "scratch/\nproject/pipeline-state.json\n.claude/pipeline-state.json\n");
+  const baseline = { schema: "pipeline.project.v1", project: "push-init-late-verify", verify: LIFECYCLE_SEEDED_VERIFY, autonomy: "gated", handover: "docs/state.md" };
+  for (const twin of LIFECYCLE_TWINS) writeJson(twin, baseline);
+  gitOk("add", "--", "README.md", ".gitignore", ...LIFECYCLE_TWINS);
+  gitOk("commit", "-q", "-m", "seed baseline verification");
+  // Enroll BEFORE the State file exists: a present project/pipeline-state.json is "retained enrollment history"
+  // (governance-scope.mjs enrollmentHistory) and would turn this activation into a declined retirement route.
+  const governance = createGovernanceScopeController({ hostStateRoot: join(parent, "host-state") });
+  const enrollment = governance.planDecision({ rootDir: root, decision: "enroll", by: "push-init-fixture" });
+  assert.equal(governance.applyDecision(enrollment, { activate: true, planSha256: enrollment.planSha256 }).state, "active", "SETUP real governance decision");
+  write("pipeline.user.yaml", "schema: pipeline.user.v1\nlanguage:\n  human_facing: de\n  agent_facing: en\ngates:\n  human_approval: chat\n");
+  gitOk("add", "--", "pipeline.user.yaml");
+  gitOk("commit", "-q", "-m", "selected approval mode");
+  write(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: de\n");
+  write(NEUTRAL_MANIFEST, read(".claude/pipeline.yaml"));
+  for (const target of initialGreenfieldMapTargets("fresh")) write(target.path, target.bytes);
+  const pointer = initialGreenfieldAgentEntryTarget("fresh");
+  write(pointer.path, pointer.bytes);
+  write("docs/adr/.gitkeep", "");
+  write("specs/e2e/acceptance.md", "# Synthetic acceptance\n");
+  write("specs/e2e/result.md", "# Synthetic result\n");
+  write(LIFECYCLE_SPEC, "# Synthetic Test Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | The package must receive a PASS verdict from an independent Critic before acceptance. | Synthetic candidate-bound review |\n");
+  write(LIFECYCLE_PLAN, `${po.PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${po.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${digestHex(read(LIFECYCLE_SPEC))} -->\n# Synthetic Test PRD\nImplementation surface: \`src/index.mjs\`.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(LIFECYCLE_ARCHITECTURE)}\n\`\`\`\n`);
+  write(LIFECYCLE_COMPANIONS[0], "# Synthetic Design\n");
+  write(LIFECYCLE_COMPANIONS[1], "| ID | Evidence |\n| --- | --- |\n");
+  write(LIFECYCLE_REPORT, "# Synthetic method review\nVerdict: pass.\n");
+  // The profile receipt is written by the real po-gate producer, bound to this repository's exact path.
+  const common = join(root, ".git");
+  const profile = po.createPoGateProfileReceipt({ repositoryFingerprint: po.derivePoGateRepositoryFingerprint({ gitCommonDir: common, primaryRoot: root }), primaryRoot: root, sourceBytes: read("pipeline.user.yaml"), runtimeBytes: read(".claude/pipeline.yaml"), updatedAt: LIFECYCLE_AT });
+  const profilePath = resolve(po.poGateProfileReceiptPath(common));
+  if (process.platform === "win32") {
+    // On win32 the session-authority boundary inspects .git/agent-pipeline as a private-owned path (protected DACL);
+    // the source-owned creators below are what production uses for that private custody.
+    createWindowsOwnedAuthorityDirectory({ path: join(common, "agent-pipeline") });
+    createWindowsOwnedAuthorityDirectory({ path: dirname(profilePath) });
+    createWindowsOwnedAuthorityExclusiveFile({ path: profilePath, bytes: Buffer.from(po.serializePoGateProfileReceipt(profile)) });
+  } else {
+    mkdirSync(dirname(profilePath), { recursive: true, mode: 0o700 });
+    writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+  }
+  const source = (path) => ({ path, sha256: digestHex(read(path)) });
+  const review = createDesignReviewReceipt({ featureId: LIFECYCLE_FEATURE, previous: null, sources: { prd: source(LIFECYCLE_PLAN), spec: source(LIFECYCLE_SPEC), companions: LIFECYCLE_COMPANIONS.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(LIFECYCLE_REPORT), openFindingIds: [], reviewedAt: LIFECYCLE_AT });
+  assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+  write(LIFECYCLE_RECEIPT, Buffer.from(review.bytes));
+  // Only the PUBLIC half of a throwaway key is used: the policy needs a trust anchor, no proof is ever signed.
+  const publicKey = generateKeyPairSync("ed25519").publicKey.export({ type: "spki", format: "pem" });
+  writeJson("project/critical-human-proof.json", { schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "synthetic-push-init-key", publicKeySha256: digestHex(publicKey) }] });
+  gitOk("add", "--", LIFECYCLE_PLAN, LIFECYCLE_SPEC, ...LIFECYCLE_COMPANIONS, LIFECYCLE_REPORT, LIFECYCLE_RECEIPT, "project/critical-human-proof.json", "specs/e2e/acceptance.md", "specs/e2e/result.md", "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", "docs/adr/.gitkeep", NEUTRAL_MANIFEST);
+  gitOk("commit", "-q", "-m", "finished design");
+
+  if (process.platform === "win32") {
+    // The private State file inherits project/'s ACL; production hardens such directories before the State exists.
+    const hardened = hardenWindowsPrivateDirectory(join(root, "project"));
+    assert.equal(hardened.status, "secure", `SETUP harden the State parent: ${JSON.stringify(hardened)}`);
+  }
+  // The public lifecycle route, in order; each step is the real CLI verb.
+  lifecycle(["set-feature", "--id", LIFECYCLE_FEATURE, "--plan-path", LIFECYCLE_PLAN]);
+  const continuity = { schema: "pipeline.continuity.v0", featureId: LIFECYCLE_FEATURE, revision: 0, runtime: { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null }, authority: { prd: source(LIFECYCLE_PLAN), spec: source(LIFECYCLE_SPEC), result: null }, queueHead: { packageId: "initial-planning", actionId: "review-plan", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+  writeJson("continuity-init-request.json", continuity);
+  lifecycle(["continuity-init", "--expected-revision", "absent", "--request-file", "continuity-init-request.json", "--lock-token", "push-init-fixture-token"]);
+  lifecycle(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  lifecycle(["present-plan", "--by", "synthetic-presenter", "--review-receipt", LIFECYCLE_RECEIPT]);
+  const readCurrent = () => { const observed = readState(root); assert.equal(observed.status, "ok"); return observed.state; };
+  const requestPath = readCurrent().planPresentation.designApprovalRequestPath;
+  const request = JSON.parse(read(requestPath));
+  lifecycle(["approve-plan", "--by", "synthetic-po", "--design-approval-request", requestPath]);
+  const approved = readCurrent();
+  assert.equal(approved.planApproval.schema, "pipeline.plan-approval.v9");
+  lifecycle(["materialize-architecture"]);
+  const compiled = compileDecisionSummary(root, { now: LIFECYCLE_AT });
+  assert.equal(compiled.count, 0);
+  assert.equal(compiled.authorityStatus, "source-validated");
+  const artifact = (kind, path, authority, mutability, retention) => ({ class: kind, path, sha256: digestHex(read(path)), authority, mutability, retention });
+  // Synthetic project input, then the actual topology validator registers its real envelope.
+  writeJson("specs/e2e/lifecycle.json", { schema: "pipeline.feature-package.v1", feature: { id: LIFECYCLE_FEATURE, rigor: 2 }, state: "approved", artifacts: [artifact("prd", LIFECYCLE_PLAN, true, "mutable", "active"), artifact("spec", LIFECYCLE_SPEC, true, "mutable", "active"), artifact("acceptance", "specs/e2e/acceptance.md", true, "mutable", "active"), artifact("result", "specs/e2e/result.md", true, "mutable", "active"), artifact("candidate-evidence", approved.planApproval.acceptedContract.path, false, "immutable", "retain")], candidate: structuredClone(request.approvalIntent.value.candidate), supersedes: null });
+  const packageRead = validateFeaturePackage(root, "specs/e2e/lifecycle.json");
+  assert.ok(packageRead.ok, `SETUP registered package: ${JSON.stringify(packageRead.findings)}`);
+  lifecycle(["set-phase", "--phase", "implementation"]);
+  assert.equal(derivePlanLifecycle(readCurrent()).status, "implementing");
+  // The genuine approval reader must see this State as eligible BEFORE the test exercises configure-verify.
+  const observed = observeCurrentPlanApprovalForCalibration({ rootDir: root });
+  assert.equal(observed.status, "eligible", `SETUP genuine default approval reader: ${JSON.stringify(observed)}`);
+  return root;
+}
+
 function pushInitGateReport() {
   return {
     ok: true,
@@ -236,24 +384,32 @@ function chatPrepareResult(humanApproval) {
 
 test("drivePushInit: baseline-only implementation publishes configure-verify and proceeds after its exact apply action", () => {
   const root = freshFixtureRoot();
+  const ceilingBefore = process.env.GIT_CEILING_DIRECTORIES;
+  let lifecycleParent = null;
   try {
     writeLateVerifyFixture(root);
+    fixtureGit(root, ["init", "-q"]);
+    fixtureGit(root, ["add", "-A"]);
+    fixtureGit(root, ["commit", "-qm", "fixture base", "--allow-empty"]);
     const missingReadiness = pipelineStateRun(["set-phase", "--phase", "implementation"], {
       dir: root,
       now: () => "2026-09-18T12:00:00.000Z",
     });
     assert.equal(missingReadiness, 2, "a late-verify fixture without architecture evidence must fail closed");
+    // The positive path runs on a repository whose approved implementation State was reached through the
+    // product's own lifecycle writers (set-phase implementation included, with no readiness stub).
+    lifecycleParent = realpathSync(mkdtempSync(join(tmpdir(), "push-init-lifecycle-")));
+    const lifecycleRoot = provisionApprovedImplementationFixture(lifecycleParent);
     const stateDeps = {
-      dir: root,
-      now: () => "2026-09-18T12:00:00.000Z",
+      dir: lifecycleRoot,
+      now: () => LIFECYCLE_NOW,
       // This test isolates the verify deadlock; architecture readiness has its
       // own physical-map and signed-authority coverage in pipeline-state tests.
       architectureEntryReadiness: () => ({ status: "ready" }),
     };
-    assert.equal(pipelineStateRun(["set-phase", "--phase", "implementation"], stateDeps), 0);
 
     const blocked = drivePushInit({
-      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      rootDir: lifecycleRoot, by: "tester", remote: "origin", destination: "refs/heads/main",
       satisfiabilityDeps: {},
       assessPushGateSatisfiability: () => pushInitGateReport(),
       pushPrepareReport: () => ({ ok: true, report: { ready: false, checks: [{ id: "verify-evidence-bound", ok: false, message: "baseline has no release evidence" }] } }),
@@ -274,10 +430,10 @@ test("drivePushInit: baseline-only implementation publishes configure-verify and
 
     const command = `${process.execPath} --test harness/scripts/check-consumer-safe-paths.test.mjs`;
     assert.equal(pipelineStateRun(["configure-verify", "--verify-command", command], stateDeps), 0);
-    assert.equal(checkVerifyContractConfigured(root).ok, true,
+    assert.equal(checkVerifyContractConfigured(lifecycleRoot).ok, true,
       "the exact late recovery replaces the baseline contract for push readiness");
     const ready = drivePushInit({
-      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      rootDir: lifecycleRoot, by: "tester", remote: "origin", destination: "refs/heads/main",
       satisfiabilityDeps: {},
       assessPushGateSatisfiability: () => pushInitGateReport(),
       pushPrepareReport: () => ({
@@ -289,7 +445,11 @@ test("drivePushInit: baseline-only implementation publishes configure-verify and
     assert.equal(ready.outcome, "signature-required", JSON.stringify(ready, null, 2));
     assert.equal(Object.hasOwn(ready, "recovery"), false,
       "once configured, ordinary push-init can continue into its existing signature boundary");
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    if (ceilingBefore === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = ceilingBefore;
+    if (lifecycleParent !== null) rmSync(lifecycleParent, { recursive: true, force: true, maxRetries: 3 });
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("drivePushInit: chains all three steps (reconciliation, gate-satisfiability, push-prepare) in one call, reaches signature-required", () => {
