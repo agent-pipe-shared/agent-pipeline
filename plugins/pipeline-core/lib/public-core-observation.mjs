@@ -16,6 +16,7 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
 import { observeSelectedCodexPipelinePlugin } from "./codex-host-plugin-list.mjs";
+import { transformAgyRunnerAgent } from "./agy-central-snapshot.mjs";
 
 const SCHEMA = "pipeline.public-core-observation.v1";
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
@@ -301,7 +302,9 @@ export function snapshotPhysicalPluginRoot(pluginRoot, { afterOpen, rootCode = "
 const RUNNER_MANIFEST_PROFILES = Object.freeze({
   codex: Object.freeze({ path: MANIFEST_PATH, name: "pipeline-core" }),
   claude: Object.freeze({ path: ".claude-plugin/plugin.json", name: "pipeline-core" }),
-  antigravity: Object.freeze({ path: "plugin.json", name: "agent-pipeline-core", normalizedName: "pipeline-core" }),
+  // `viewTransform`: an Antigravity install may be the generated runner view (agents/*.md model lines mapped through one closed
+  // table). Such a copy is accepted ONLY as exactly the deterministic transform of the approved source; see observe().
+  antigravity: Object.freeze({ path: "plugin.json", name: "agent-pipeline-core", normalizedName: "pipeline-core", viewTransform: transformAgyRunnerAgent }),
 });
 
 function parseManifest(snapshot, side, hostPluginVersion, profile = RUNNER_MANIFEST_PROFILES.codex) {
@@ -342,6 +345,22 @@ function sameSnapshot(source, installed) {
   });
 }
 
+/**
+ * The snapshot the source must have after `transform` (relative path, bytes -> bytes) and nothing else: same directories, same
+ * files, each file's digest and length recomputed from its transformed bytes. Null when the transform refuses the source (an
+ * unmapped value has no view, so there is nothing to compare an installed copy with).
+ */
+function transformedSnapshot(source, transform) {
+  try {
+    const content = source.files.map(({ path, sha256, byteLength, bytes }) => {
+      const next = transform(path, bytes);
+      if (next === bytes) return { path, sha256, byteLength };
+      return { path, sha256: createHash("sha256").update(next).digest("hex"), byteLength: next.length };
+    });
+    return { directories: source.directories, content, contentSha256: createHash("sha256").update(JSON.stringify(content)).digest("hex") };
+  } catch { return null; }
+}
+
 function rejected(code) {
   return { schema: SCHEMA, status: "rejected", reasonCodes: [code] };
 }
@@ -365,7 +384,14 @@ function observe(input = {}, deps = {}, hostPlugin = undefined, profile = RUNNER
     if (sourceManifest.name !== installedManifest.name
       || sourceManifest.version !== installedManifest.version
       || sourceManifest.manifestSha256 !== installedManifest.manifestSha256) fail("SNT-A2-MANIFEST-MISMATCH");
-    if (!sameSnapshot(source, installed) || source.contentSha256 !== installed.contentSha256) fail("SNT-A2-CONTENT-MISMATCH");
+    // Raw equality first (a registered copy of the source itself). Only a profile that declares a view transform gets a second,
+    // equally exact comparison: against the deterministic transform of the source. It never replaces the comparison, and a copy
+    // that differs from that transform in any other byte, file or directory matches neither and is a mismatch.
+    const matches = (expected) => sameSnapshot(expected, installed) && expected.contentSha256 === installed.contentSha256;
+    if (!matches(source)) {
+      const viewOfSource = typeof profile.viewTransform === "function" ? transformedSnapshot(source, profile.viewTransform) : null;
+      if (viewOfSource === null || !matches(viewOfSource)) fail("SNT-A2-CONTENT-MISMATCH");
+    }
     return {
       schema: SCHEMA,
       status: "ready",

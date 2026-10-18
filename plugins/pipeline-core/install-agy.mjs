@@ -202,6 +202,65 @@ export function updateAutonomousSettings({ targetFile }) {
   }
 }
 
+import { publishAgyRunnerView, pruneAgyRunnerViews, agyRunnerViewDigestOfTree } from "./lib/agy-central-snapshot.mjs";
+
+/**
+ * What still points at a generated view: registry entries (global and this workspace), import-manifest sources, and the view
+ * digest of the installed managed copy. Returns null when a reference file that exists cannot be read as the shape it is
+ * expected to have - a null answer means nothing is pruned, because an unknown reference is treated as a live one.
+ */
+function observeRunnerViewReferences({ configRoot, workspaceRoot }) {
+  try {
+    const read = (path) => {
+      try { return JSON.parse(readFileSync(path, "utf8")); }
+      catch (error) { if (error?.code === "ENOENT") return null; throw error; }
+    };
+    const paths = [];
+    for (const file of [join(configRoot, "config", "plugins.json"), join(workspaceRoot, ".agents", "plugins.json")]) {
+      const document = read(file);
+      if (document === null) continue;
+      if (!Array.isArray(document.entries)) return null;
+      for (const entry of document.entries) if (typeof entry?.path === "string") paths.push(isAbsolute(entry.path) ? entry.path : resolve(workspaceRoot, entry.path));
+    }
+    const imports = read(join(configRoot, "config", "import_manifest.json"));
+    if (imports !== null && imports.imports !== null) {
+      if (!Array.isArray(imports.imports)) return null;
+      for (const entry of imports.imports) if (typeof entry?.source === "string") paths.push(entry.source);
+    }
+    const managed = join(configRoot, "config", "plugins", "agent-pipeline-core");
+    return { paths, digests: existsSync(managed) ? [agyRunnerViewDigestOfTree(managed)] : [] };
+  } catch { return null; }
+}
+
+/** Bounded storage after a successful view install: older Pipeline-created views nothing references any more are removed. Never throws. */
+function pruneRunnerViewsAfterInstall({ view, configRoot, workspaceRoot, deps }) {
+  try {
+    const references = observeRunnerViewReferences({ configRoot, workspaceRoot });
+    if (references === null) return { removed: [], retained: [], skipped: "AGV-PRUNE-UNCERTAIN" };
+    return pruneAgyRunnerViews({ keepPaths: [view.root, ...references.paths], keepDigests: references.digests, deps });
+  } catch { return { removed: [], retained: [], skipped: "AGV-PRUNE-UNAVAILABLE" }; }
+}
+
+/**
+ * Installer option 2: the global install validates and installs the generated runner view, never the shared source.
+ * Only inside an approved global change; a view that cannot be generated refuses before the host touches anything.
+ * The receipt and the readback compare the installed copy with the approved Git source through the shared observer, which
+ * accepts a view only as exactly the deterministic transform of that source (public-core-observation.mjs).
+ */
+export function refreshAntigravityGlobalFromRunnerView(options, dependencies = {}) {
+  const refused = (reason) => ({ schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason, completed: [] });
+  if (options?.scope !== "global" || options.globalChangeApproved !== true) return refused("ATR-GLOBAL-SCOPE");
+  const { publishRunnerView, pruneRunnerViews, snapshotDeps, ...hostDependencies } = dependencies;
+  const receiptSourceRoot = options.attestationSourceRoot ?? options.approvedSourceRoot;
+  let view;
+  try { view = (publishRunnerView ?? publishAgyRunnerView)({ sourcePluginRoot: options.approvedSourceRoot, deps: snapshotDeps }); }
+  catch (error) { return refused(typeof error?.code === "string" && /^(?:AGV|AGS)-[A-Z-]+$/.test(error.code) ? error.code : "AGV-VIEW-UNAVAILABLE"); }
+  const result = refreshAntigravityInstallation({ ...options, approvedSourceRoot: view.root, attestationSourceRoot: receiptSourceRoot }, hostDependencies);
+  if (result.status !== "refreshed") return result;
+  const pruned = (pruneRunnerViews ?? pruneRunnerViewsAfterInstall)({ view, configRoot: options.configRoot, workspaceRoot: options.workspaceRoot, deps: snapshotDeps });
+  return { ...result, runnerView: { viewSha256: view.viewSha256, removed: pruned.removed, ...(pruned.skipped ? { pruneSkipped: pruned.skipped } : {}) } };
+}
+
 export function refreshAntigravityInstallation(options, dependencies = {}) {
   const receiptSourceRoot = options.attestationSourceRoot ?? options.approvedSourceRoot;
   if (receiptSourceRoot !== options.approvedSourceRoot) {
@@ -422,7 +481,9 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
       const attestationSourceRoot = binding.attestationSourceRoot;
       const sourceCheck = verifyAntigravityInstallerSource({ configRoot, workspaceRoot: process.cwd(), sourcePluginRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace" });
       if (sourceCheck.status === "rejected") throw new Error(`${sourceCheck.reason}${sourceCheck.reasonCodes ? `: ${sourceCheck.reasonCodes.join(", ")}` : ""}`);
-      const result = refreshAntigravityInstallation({ configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() });
+      // Option 2 validates and installs the generated Antigravity runner view; option 1 keeps registering the shared source.
+      const refreshOptions = { configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() };
+      const result = answer.trim() === "2" ? refreshAntigravityGlobalFromRunnerView(refreshOptions) : refreshAntigravityInstallation(refreshOptions);
       console.log(JSON.stringify(result));
       if (result.status !== "refreshed") throw new Error(result.reason ?? "ATR-REFRESH-UNAVAILABLE");
     } catch (error) {

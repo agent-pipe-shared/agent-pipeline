@@ -3,7 +3,7 @@
 /** Provider-neutral, read-only verifier for installer-owned plugin receipts. */
 import { createHash } from "node:crypto";
 import { isAbsolute, relative, sep } from "node:path";
-import { observePublicCoreIdentity, snapshotPhysicalPluginRoot } from "./public-core-observation.mjs";
+import { observePublicCoreIdentity, observeRunnerPublicCoreIdentity, snapshotPhysicalPluginRoot } from "./public-core-observation.mjs";
 import { evaluateProvenanceAdmission } from "./provenance-envelope.mjs";
 
 export const INSTALLED_PLUGIN_ATTESTATION_SCHEMA = "pipeline.installed-plugin-attestation.v1";
@@ -171,7 +171,9 @@ function receiptPayload(receipt) {
 export function verifyInstalledPluginAttestation(input = {}, {
   readExternalReceipt,
   trustedHostPolicy = null,
-  observeLocal = observePublicCoreIdentity,
+  // The generic observer reads the Codex manifest profile and cannot observe an Antigravity tree at all, so an Antigravity input
+  // defaults to its own runner profile - the one that accepts the generated runner view, and only as the exact transform of the source.
+  observeLocal = (value, deps) => input?.provider === "antigravity" ? observeRunnerPublicCoreIdentity("antigravity", value, deps) : observePublicCoreIdentity(value, deps),
   snapshot = snapshotPhysicalPluginRoot,
   platform = process.platform,
 } = {}) {

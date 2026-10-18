@@ -107,7 +107,7 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    // A replaced managed copy is retired only after the source validates, so the plan validates first and again before the install.
    const validation=()=>({kind:'cli',argv:Object.freeze(['plugin','validate',observation.source.root])}),actions=[];if(retire&&install)actions.push(validation());if(retire)actions.push({kind:'cli',argv:Object.freeze(['plugin','uninstall',NAME])});if(install)actions.push(validation(),{kind:'cli',argv:Object.freeze(['plugin','install',observation.source.root])});
    for(const h of hooks)if(h.changes)actions.push({kind:'owned-wiring-rebind',scope:h.scope,path:h.path,sha256:h.sha256,changes:h.changes,preserveForeignBytes:true});
-   for(const selected of globalChangeApproved?[scope,other]:[scope]){const r=observation.registries[selected],owned=r.entries.filter(e=>e.status==='observed');if(selected!==scope&&!owned.length)continue;if(owned.length!==1||owned[0].root!==observation.source.root)actions.push({kind:'owned-registry-rebind',scope:selected,path:r.path,sha256:r.sha256,preserveForeignBytes:true});}
+   for(const selected of globalChangeApproved?[scope,other]:[scope]){const r=observation.registries[selected],owned=r.entries.filter(e=>e.status==='observed'),dangling=r.entries.filter(e=>e.status==='dangling-managed');if(selected!==scope&&!owned.length&&!dangling.length)continue;if(owned.length!==1||owned[0].root!==observation.source.root||dangling.length)actions.push({kind:'owned-registry-rebind',scope:selected,path:r.path,sha256:r.sha256,preserveForeignBytes:true});}
    const plan=Object.freeze({schema:'pipeline.antigravity-refresh-plan.v2',status:'prepared',scope,globalChangeApproved,sourceRoot:observation.source.root,sourceContentSha256:observation.source.content.sha256,observationSha256:antigravityTopologySha256(observation),actions:Object.freeze(actions.map(Object.freeze)),requiresFreshExecutingSession:true});plans.set(plan,plan.observationSha256);return plan;
   }catch(e){return Object.freeze({schema:'pipeline.antigravity-refresh-plan.v2',status:'refused',reason:/^ATR-[A-Z-]+$/.test(e.message)?e.message:'ATR-UNAVAILABLE'});}
  },apply(plan){
@@ -131,7 +131,7 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    if((retire||install||globalWiring||scope==='global')&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');
    // Preserve the physically verified ownership/preimage before an authorized
    // CLI uninstall removes a root referenced by an existing registry entry.
-   const registryPlans=(globalChangeApproved?[scope,other]:[scope]).map(selected=>({selected,registry:observation.registries[selected],pipeline:observation.registries[selected].entries.filter(e=>e.status==='observed')})).filter(p=>p.selected===scope||p.pipeline.length>0);
+   const registryPlans=(globalChangeApproved?[scope,other]:[scope]).map(selected=>({selected,registry:observation.registries[selected],pipeline:observation.registries[selected].entries.filter(e=>e.status==='observed'),dangling:observation.registries[selected].entries.filter(e=>e.status==='dangling-managed')})).filter(p=>p.selected===scope||p.pipeline.length>0||p.dangling.length>0);
    let checkpoint=antigravityTopologySha256(observation);
    function recheck(){const fresh=observeAntigravityPluginTopology(args);if(antigravityTopologySha256(fresh)!==checkpoint)throw Error('ATR-TOPOLOGY-DRIFT');return fresh;}
    const registryDigests=Object.fromEntries(Object.entries(observation.registries).map(([key,r])=>[key,r.sha256]));
@@ -153,8 +153,12 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    // bind it after lifecycle; a stale/unknown new command cannot become success.
    const newWiring=wiring(observation,configRoot,workspaceRoot);
    for(const hook of newWiring)if(hook.changes){if(hook.scope==='global'&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');recheck();changed=true;write(hook.path,hook.nextBytes,hook.sha256);completed.push('post-cli-wiring-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
-   for(const {selected,registry,pipeline} of registryPlans){
-    if(pipeline.length!==1||pipeline[0].root!==source.root){recheck();const f=read(registry.path);const original=f.bytes??Buffer.from('{"entries":[]}\n');const next=rewriteAntigravityJsonBytes(original,{deletions:pipeline.map(e=>['entries',e.index]),appends:[{path:['entries'],values:[{path:source.root}]}]});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
+   for(const {selected,registry,pipeline,dangling} of registryPlans){
+    const bound=pipeline.length===1&&pipeline[0].root===source.root;
+    if(!bound||dangling.length){recheck();const f=read(registry.path);const original=f.bytes??Buffer.from('{"entries":[]}\n');
+     // A dangling managed entry (its directory is gone) is removed in the same owned rebind. Only the selected scope, or a registry already holding a Pipeline entry, gains the source root; foreign entries are never touched.
+     const removed=(bound?dangling:[...pipeline,...dangling]).map(e=>e.index).sort((a,b)=>a-b),appends=!bound&&(selected===scope||pipeline.length>0)?[{path:['entries'],values:[{path:source.root}]}]:[];
+     const next=rewriteAntigravityJsonBytes(original,{deletions:removed.map(i=>['entries',i]),...(appends.length?{appends}:{})});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
    }
    const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||final.registries[scope].status!=='observed'||final.registries[scope].entries.filter(e=>e.status==='observed').length!==1||final.registries[scope].entries.find(e=>e.status==='observed').root!==source.root)throw Error('ATR-FINAL-READBACK');
    if(registryPlans.some(({selected})=>final.registries[selected].entries.some(e=>e.status==='observed'&&e.root!==source.root)||final.registries[selected].status!=='observed'))throw Error('ATR-FINAL-READBACK');

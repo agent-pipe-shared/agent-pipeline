@@ -24,7 +24,13 @@ export async function installAgyFromCentralSnapshot({
   runCli,
   writeInstalledReceipt,
 } = {}) {
-  const snapshot = publishAgySnapshot({ sourcePluginRoot, attestationSourceRoot, deps });
+  // The published snapshot carries the Antigravity runner model lines (agy-central-snapshot.mjs), so Antigravity 1.4.2 validates it.
+  // A model value outside the closed table has no snapshot: that is a typed refusal before anything is published or touched.
+  let snapshot;
+  try { snapshot = publishAgySnapshot({ sourcePluginRoot, attestationSourceRoot, deps }); } catch (error) {
+    if (typeof error?.code === 'string' && /^AGV-[A-Z-]+$/.test(error.code)) return { status: 'refused', reason: error.code, snapshot: null, refresh: null };
+    throw error;
+  }
   const receiptWriter = typeof writeInstalledReceipt === 'function'
     ? (receipt) => writeInstalledReceipt({ ...receipt, attestationSourceRoot })
     : undefined;

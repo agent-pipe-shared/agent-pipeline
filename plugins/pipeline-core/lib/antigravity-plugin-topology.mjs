@@ -71,14 +71,20 @@ function candidate(root,pluginName){
     return {root,status:'observed',name:pluginName,version:m.value.version,manifestSha256:m.sha256,content:tree(root)};
   }catch{return {root,status:'unavailable'};}
 }
-function registry(path,pluginName,workspaceRoot=null){
+// Exactly ENOENT: any other failure (ENOTDIR, EACCES, a dangling symlink that still exists as an object) is not "gone".
+function absent(path){try{lstatSync(path);return false;}catch(e){return e?.code==='ENOENT';}}
+// `managedRoot` is the Pipeline-owned managed-copy location (global registry only). An entry on exactly that path whose
+// directory no longer exists is what an earlier uninstall leaves behind: a known, removable state, never an unverifiable one.
+function registry(path,pluginName,workspaceRoot=null,managedRoot=null){
   const f=optional(path);if(f.status!=='observed')return {path,status:f.status,sha256:null,entries:[]};
   if(!Array.isArray(f.value?.entries)||f.value.entries.length>128)return {path,status:'unavailable',sha256:f.sha256,entries:[]};
   const entries=f.value.entries.map((v,index)=>{
     if(typeof v?.path!=='string')return {index,status:'unavailable'};
     const root=isAbsolute(v.path)||workspaceRoot===null?v.path:resolve(workspaceRoot,v.path);
     if(!isAbsolute(v.path)&&(workspaceRoot===null||!root.startsWith(workspaceRoot+sep)))return {index,status:'unavailable'};
-    return {index,...candidate(root,pluginName)};
+    const c=candidate(root,pluginName);
+    if(c.status==='unavailable'&&managedRoot!==null&&v.path===managedRoot&&absent(root))return {index,root,status:'dangling-managed'};
+    return {index,...c};
   });
   return {path,status:entries.some(e=>e.status==='unavailable')?'unavailable':'observed',sha256:f.sha256,entries};
 }
@@ -94,10 +100,12 @@ export function observeAntigravityPluginTopology({configRoot,workspaceRoot,appro
   const imported=optional(join(configRoot,'config','import_manifest.json'));
   let importState={status:imported.status,sha256:imported.sha256??null,entries:[]};
   if(imported.status==='observed'){
-    if(!Array.isArray(imported.value?.imports)||imported.value.imports.length>128)importState.status='unavailable';
+    // Antigravity writes `"imports": null` when no import remains: observed, with no entries. Any other non-array stays unavailable.
+    if(imported.value?.imports===null)importState.entries=[];
+    else if(!Array.isArray(imported.value?.imports)||imported.value.imports.length>128)importState.status='unavailable';
     else importState.entries=imported.value.imports.filter(e=>e?.name===pluginName).map(e=>({name:pluginName,source:typeof e.source==='string'?e.source:null}));
   }
-  const registries={global:registry(join(configRoot,'config','plugins.json'),pluginName),workspace:registry(join(workspaceRoot,'.agents','plugins.json'),pluginName,workspaceRoot)};
+  const registries={global:registry(join(configRoot,'config','plugins.json'),pluginName,null,join(configRoot,'config','plugins',pluginName)),workspace:registry(join(workspaceRoot,'.agents','plugins.json'),pluginName,workspaceRoot)};
   const wiring=[join(configRoot,'config','hooks.json'),join(configRoot,'config','external-hooks.json'),join(workspaceRoot,'.agents','hooks.json'),join(workspaceRoot,'.agents','external-hooks.json')].map(path=>{
     const f=optional(path);return {path,status:f.status,sha256:f.sha256??null,ownership:f.status==='observed'?'unclassified':'not-observed'};
   });
@@ -128,8 +136,8 @@ export function planAntigravityTopologyRefresh({observation,scope,globalChangeAp
     if(scope==='global')actions.push({kind:'cli',argv:['plugin','validate',desired.root]},{kind:'cli',argv:['plugin','install',desired.root]});
   }
   const registry=observation.registries[scope];
-  const pipeline=registry.entries.filter(e=>e.status==='observed');
-  if(pipeline.length!==1||pipeline[0].root!==desired.root)actions.push({kind:'registry-rebind',scope,path:registry.path,expectedSha256:registry.sha256,removeIndexes:pipeline.map(e=>e.index),appendPath:desired.root,preserveOtherEntries:true});
+  const pipeline=registry.entries.filter(e=>e.status==='observed'),dangling=registry.entries.filter(e=>e.status==='dangling-managed');
+  if(pipeline.length!==1||pipeline[0].root!==desired.root||dangling.length)actions.push({kind:'registry-rebind',scope,path:registry.path,expectedSha256:registry.sha256,removeIndexes:[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),appendPath:desired.root,preserveOtherEntries:true});
   return freeze({schema:'pipeline.antigravity-refresh-plan.v1',status:actions.length?'prepared':'metadata-current',observationSha256:binding.digest,sourceContentSha256:desired.content.sha256,actions,requiresIndependentReadback:true,executingPath:'unknown'});
 }
 export function reobserveAntigravityTopology(observation){const args=snapshots.get(observation);if(!args)throw Error('AT-NOT-PHYSICAL-OBSERVATION');return observeAntigravityPluginTopology(args);}

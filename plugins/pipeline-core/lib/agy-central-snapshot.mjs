@@ -8,7 +8,7 @@
 // snapshotSha256 is the sha256 of the exact bytes of snapshot.json, so every manifest field is part of the digest.
 // Failures are thrown Errors carrying `.code` (AGS-*); agySnapshotRoot and classifyAgySnapshot never throw.
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync, writeSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { machinePlaneFilePath } from './machine-plane.mjs';
 import { fsyncDirectoryDurable } from './fs-durability.mjs';
@@ -375,7 +375,7 @@ export function publishAgySnapshot({ sourcePluginRoot, attestationSourceRoot, de
   const deadline = Date.now() + (Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? Math.min(timeBudgetMs, DEFAULT_BUDGET_MS) : DEFAULT_BUDGET_MS);
   const budget = () => { if (Date.now() > deadline) throw fail('AGS-TIME-BUDGET'); };
 
-  const first = readSourceInventory(sourcePluginRoot, deps);
+  const first = readSnapshotInventory(sourcePluginRoot, deps);
   const version = versionOf(first);
   const manifestBytes = Buffer.from(`${JSON.stringify({ schema: SNAPSHOT_SCHEMA, owner: OWNER_NAME, inventory: publicRows(first) })}\n`);
   const snapshotSha256 = sha256(manifestBytes);
@@ -395,7 +395,7 @@ export function publishAgySnapshot({ sourcePluginRoot, attestationSourceRoot, de
     sweepStaleTemps(root);
     const assertSourceUnchanged = () => {
       budget();
-      const second = readSourceInventory(sourcePluginRoot, deps);
+      const second = readSnapshotInventory(sourcePluginRoot, deps);
       if (JSON.stringify(publicRows(second)) !== JSON.stringify(publicRows(first))) throw fail('AGS-SOURCE-DRIFT');
     };
 
@@ -490,4 +490,177 @@ export function classifyAgySnapshot({ observation = {}, deps = {} } = {}) {
   } catch {
     return { status: 'unverifiable', code: 'AGS-SNAPSHOT-UNVERIFIABLE' };
   }
+}
+
+// ---- Antigravity runner view ------------------------------------------------------------------------------------------
+// Antigravity 1.4.2 `plugin validate` rejects `model: sonnet` / `model: haiku` in agents/*.md, while Claude Code needs them in
+// the same shared files. The global install therefore validates and installs a GENERATED copy: byte-identical to the approved
+// source (tests included) except the single frontmatter `model:` line of agents/*.md, rewritten through ONE closed table.
+// Every comparison of the managed copy with the approved source goes through this deterministic transform, never through the
+// raw source bytes. It is not the central snapshot: that one drops tests/ and *.test.mjs and exceeds the view's byte-identity.
+// Layout: <anchor dir>/agy-runner-view/view-<viewSha256>/ - the tree IS the plugin, no manifest file is added to it.
+// The table is PO decision D13 (Antigravity model tier mapping): sonnet and haiku run on the flash tier, opus on the pro tier.
+// `inherit` is not a target, and every other `model:` value (inherit, flash, pro, any full model id) is a typed refusal.
+export const AGY_RUNNER_MODEL_MAP = Object.freeze({ sonnet: 'flash', haiku: 'flash', opus: 'pro' });
+const VIEW_DIR = 'agy-runner-view';
+const VIEW_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
+const AGENT_FILE = /^agents\/[^/]+\.md$/;
+
+/** The bytes the runner view carries for `relPath`: the same Buffer object when nothing changes, a typed AGV-* refusal otherwise. */
+export function transformAgyRunnerAgent(relPath, bytes) {
+  if (!AGENT_FILE.test(relPath)) return bytes;
+  const text = bytes.toString('utf8');
+  if (!Buffer.from(text, 'utf8').equals(bytes)) throw fail('AGV-AGENT-ENCODING', relPath);
+  const lines = text.split('\n');
+  if (lines[0].replace(/\r$/, '') !== '---') return bytes;
+  const close = lines.findIndex((line, index) => index > 0 && line.replace(/\r$/, '') === '---');
+  if (close === -1) return bytes;
+  const hits = [];
+  for (let index = 1; index < close; index++) if (/^model:/.test(lines[index])) hits.push(index);
+  if (hits.length === 0) return bytes;
+  if (hits.length > 1) throw fail('AGV-AGENT-MODEL-AMBIGUOUS', relPath);
+  const match = /^model:[ \t]*(.*?)[ \t]*(\r?)$/.exec(lines[hits[0]]);
+  if (!match || !Object.hasOwn(AGY_RUNNER_MODEL_MAP, match[1])) throw fail('AGV-AGENT-MODEL-UNMAPPED', relPath);
+  lines[hits[0]] = `model: ${AGY_RUNNER_MODEL_MAP[match[1]]}${match[2]}`;
+  return Buffer.from(lines.join('\n'), 'utf8');
+}
+
+// The whole tree, no exclusions. readSourceFile keeps its physical checks and its 1 MiB per-file cap; its running total is
+// reset per file because the view enforces its own total cap (the topology's 64 MiB bound) here.
+function readViewTree(root, deps) {
+  const items = [];
+  const budget = { used: 0 };
+  let total = 0;
+  const walk = (dir, rel) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink()) throw fail('AGS-SOURCE-SYMLINK', relPath);
+      if (stat.isDirectory()) walk(path, relPath);
+      else if (stat.isFile()) {
+        budget.used = 0;
+        const bytes = readSourceFile(path, relPath, stat, budget, deps);
+        total += bytes.length;
+        if (total > VIEW_MAX_TOTAL_BYTES || items.length >= MAX_FILES) throw fail('AGS-SOURCE-TOO-LARGE', relPath);
+        items.push({ path: relPath, sha256: sha256(bytes), bytes });
+      } else throw fail('AGS-SOURCE-SPECIAL-FILE', relPath);
+    }
+  };
+  walk(root, '');
+  return items.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+const withRunnerAgentBytes = (item) => {
+  const bytes = transformAgyRunnerAgent(item.path, item.bytes);
+  return bytes === item.bytes ? item : { path: item.path, sha256: sha256(bytes), bytes };
+};
+/** The deterministic transform of a source tree: the exact inventory its runner view must carry. */
+export function buildAgyRunnerViewInventory(sourcePluginRoot, deps = {}) {
+  return readViewTree(sourcePluginRoot, deps).map(withRunnerAgentBytes);
+}
+// The central snapshot is installed into Antigravity as well, so it carries the same model lines as the runner view: the
+// transform runs before the inventory is digested, which keeps snapshot.json describing the bytes actually written (verifyTree
+// still compares every file on disk with its inventory row) and keeps the two source passes comparable.
+function readSnapshotInventory(sourceRoot, deps) {
+  return readSourceInventory(sourceRoot, deps).map(withRunnerAgentBytes);
+}
+const viewDigest = (items) => sha256(Buffer.from(JSON.stringify(publicRows(items))));
+const sameRows = (left, right) => JSON.stringify(publicRows(left)) === JSON.stringify(publicRows(right));
+const viewMatches = (root, items, deps) => { try { return sameRows(readViewTree(root, deps), items); } catch { return false; } };
+
+/** `<anchor dir>/agy-runner-view` or null; the anchor is derived only through the snapshot root, hence machinePlaneFilePath. */
+export function agyRunnerViewRoot(deps = {}) {
+  const snapshotRoot = agySnapshotRoot(deps);
+  return snapshotRoot === null ? null : join(dirname(snapshotRoot), VIEW_DIR);
+}
+
+/** Throws AGV-VIEW-MISMATCH unless the physical tree at `viewRoot` (a view or an installed copy of it) is exactly the transform of the source. */
+export function assertAgyRunnerViewMatchesSource({ sourcePluginRoot, viewRoot, deps = {} } = {}) {
+  const expected = buildAgyRunnerViewInventory(sourcePluginRoot, deps);
+  if (!viewMatches(viewRoot, expected, deps)) throw fail('AGV-VIEW-MISMATCH');
+  return { viewSha256: viewDigest(expected), version: versionOf(expected) };
+}
+
+/** Generate (or converge on) the runner view of `sourcePluginRoot`: temp tree, readback, source re-read, rename. A foreign tree at the digest path is refused, never overwritten. */
+export function publishAgyRunnerView({ sourcePluginRoot, deps = {} } = {}) {
+  const base = agyRunnerViewRoot(deps);
+  if (base === null) throw fail('AGS-ANCHOR-UNRESOLVED');
+  if (typeof sourcePluginRoot !== 'string' || sourcePluginRoot === '') throw fail('AGV-SOURCE-INVALID', 'root');
+  const items = buildAgyRunnerViewInventory(sourcePluginRoot, deps);
+  const version = versionOf(items);
+  const viewSha256 = viewDigest(items);
+  const destination = join(base, `view-${viewSha256}`);
+  let present = true;
+  try { lstatSync(destination); } catch (e) { if (e?.code !== 'ENOENT') throw e; present = false; }
+  if (present) {
+    if (!viewMatches(destination, items, deps)) throw fail('AGV-VIEW-FOREIGN');
+    return { root: destination, viewSha256, version };
+  }
+  mkdirSync(base, { recursive: true, mode: 0o700 });
+  const temporary = join(base, `view-tmp-${randomBytes(8).toString('hex')}`);
+  mkdirSync(temporary, { mode: 0o700 });
+  try {
+    for (const item of items) {
+      const target = join(temporary, ...item.path.split('/'));
+      mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+      writeSyncedFile(target, item.bytes);
+    }
+    if (viewDigest(buildAgyRunnerViewInventory(sourcePluginRoot, deps)) !== viewSha256) throw fail('AGV-SOURCE-DRIFT');
+    if (!viewMatches(temporary, items, deps)) throw fail('AGV-VIEW-MISMATCH');
+    try { renameSync(temporary, destination); } catch (e) {
+      if (!viewMatches(destination, items, deps)) throw e;
+      rmSync(temporary, { recursive: true, force: true });
+    }
+  } catch (e) {
+    try { rmSync(temporary, { recursive: true, force: true }); } catch { /* retained: a stale view-tmp directory is harmless */ }
+    throw e;
+  }
+  flushDirectory(base, deps);
+  return { root: destination, viewSha256, version };
+}
+
+const VIEW_NAME = /^view-([a-f0-9]{64})$/;
+/** The view digest a physical tree has: the sha that names its `view-<sha>` directory. Throws a typed AGS-* code on an unsafe tree. */
+export function agyRunnerViewDigestOfTree(root, deps = {}) {
+  return viewDigest(readViewTree(root, deps));
+}
+// The `view-<sha>` directory a path lies in or on, or null when the path is outside the view base.
+function viewNameWithin(base, path) {
+  if (typeof path !== 'string' || path === '') return null;
+  const rel = relative(base, resolve(path));
+  if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  return rel.split(sep)[0];
+}
+
+/**
+ * Bounded storage: remove the runner views the Pipeline created and nothing references any more.
+ * `keepPaths` are the roots (or paths inside them) the caller observed as still referenced - the view just installed, registry
+ * entries, import sources; `keepDigests` are view digests an installed copy has. A directory is removed only when ALL of these hold: it is a real
+ * directory (not a link) directly under the view base, it is named `view-<64 hex>`, and its own content digests to that very name,
+ * which only a view this module published can do. Anything else - view-tmp-* leftovers, a foreign or edited directory, a file -
+ * is retained untouched. Returns the names removed and retained; one failing directory never stops the others.
+ */
+export function pruneAgyRunnerViews({ keepPaths = [], keepDigests = [], deps = {} } = {}) {
+  const removed = [];
+  const retained = [];
+  const base = agyRunnerViewRoot(deps);
+  if (base === null) return { removed, retained };
+  let names;
+  try { names = readdirSync(base); } catch (e) {
+    if (e?.code === 'ENOENT') return { removed, retained };
+    throw e;
+  }
+  const keep = new Set([...keepPaths.map((path) => viewNameWithin(base, path)).filter((name) => name !== null), ...keepDigests.map((digest) => `view-${digest}`)]);
+  for (const name of names.sort()) {
+    const match = VIEW_NAME.exec(name);
+    if (match === null) continue;
+    if (keep.has(name)) { retained.push(name); continue; }
+    try {
+      const path = join(base, name);
+      if (!lstatSync(path).isDirectory() || viewDigest(readViewTree(path, deps)) !== match[1]) { retained.push(name); continue; }
+      rmSync(path, { recursive: true, force: true });
+      removed.push(name);
+    } catch { retained.push(name); }
+  }
+  return { removed, retained };
 }
