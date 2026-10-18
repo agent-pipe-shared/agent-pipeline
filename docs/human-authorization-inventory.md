@@ -42,7 +42,8 @@ exact candidate commit+tree.
 | Feature-package reconcile <!-- inventory-id: feature-package-reconcile-signature --> | `feature-package-reconcile` (cross-repository package reconciliation) | `feature-package-reconcile` | `gates.reconcile_approval` in `pipeline.user.yaml`, same shape as push (ADR-0056 2026-08-11 follow-up) | `plugins/pipeline-core/scripts/pipeline-state.mjs` (`defaultFeaturePackageReconcileApproval`, ~L6259-6284); this kind is in `ALWAYS_REQUIRED_KINDS` — always demanded, not gated by `requiredKinds` membership |
 | Release preflight consent <!-- inventory-id: release-preflight-signature --> | Consenting that a release attempt for the candidate may be prepared and taken to the independently operated final gates — explicitly not a release, not a publication authorization, and not a pass of any of those gates (GF-105/ADR-0064 Decision 4) | `release-preflight` | Same shared contract; reachable via the direct `prepare-critical`/`approve-critical`/`verify-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`), same as `push`/`deploy`/`publication`/`feature-package-reconcile` | `plugins/pipeline-core/scripts/po-human-approval.mjs` (`resolveSubjectPreimage` ~L745-761, `releasePreflightConfirmationLines` ~L798-814), `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`) |
 | Governance fork disposition <!-- inventory-id: governance-fork-disposition --> | Disposing of a forked-subagent scope-creep finding | `governance-fork-disposition` | Same shared contract | `plugins/pipeline-core/scripts/po-human-approval.mjs` (`runForkDispositionApproval`, ~L426-484) |
-| Critical action (generic H-AC ceremony) <!-- inventory-id: critical-action-family --> | The ADR-0061-ported "authorize-critical" flow: an agent-prepared request over one of the `CRITICAL_ACTION_KINDS` (`push`, `deploy`, `publication`, `release-preflight`, `governance-fork-disposition`, `feature-package-reconcile`), authorized externally | `critical-action` (outer intent) wrapping the actual action `kind` + `subjectSha256` in the signed subject | Same shared contract | `plugins/pipeline-core/lib/critical-action-approval-request.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs` (`criticalApprovalRequest`, ~L223-249) |
+| Interruption promotion <!-- inventory-id: interruption-promotion --> | Approving the promotion of an interruption-telemetry candidate; the signed subject binds the candidate and the promotion subject digest | `interruption-promotion` | Same shared contract; reachable via the direct `prepare-critical`/`approve-critical`/`verify-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`) | `plugins/pipeline-core/lib/interruption-promotion.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/scripts/po-human-approval.mjs` |
+| Critical action (generic H-AC ceremony) <!-- inventory-id: critical-action-family --> | The ADR-0061-ported "authorize-critical" flow: an agent-prepared request over one of the `CRITICAL_ACTION_KINDS` (`push`, `deploy`, `publication`, `release-preflight`, `governance-fork-disposition`, `feature-package-reconcile`, `interruption-promotion`), authorized externally | `critical-action` (outer intent) wrapping the actual action `kind` + `subjectSha256` in the signed subject | Same shared contract | `plugins/pipeline-core/lib/critical-action-approval-request.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs` (`criticalApprovalRequest`, ~L223-249) |
 | Guard Maintenance Window (GMW) install/lift <!-- inventory-id: guard-maintenance-window --> | Time-boxed PO-signed exception letting a self-protecting guard rule (GS-6, protected test paths) honor an additional allow-path | `guard-lift` | Same shared contract, trust-anchor default `project/critical-human-proof.json`; signed via `po-human-approval.mjs sign-intent` against a bare intent digest | `plugins/pipeline-core/lib/guard-maintenance-window.mjs`, `guard-maintenance-window.mjs install`; ADR-0058; `docs/guard-maintenance-window-threat-model.md`, `docs/po-human-approval.md` §"Signing a bare intent digest" |
 | Human Guard Override (HGO), signed route <!-- inventory-id: human-guard-override-signature --> | Signed admission past a PreToolUse guard denial for one exact request/plan pair, via `guard-human-override.mjs plan`/`prepare-authorization`/`emit-signature-digest`/`authorize-by-signature` | `guard-override` | Same shared contract (default trust anchor same file); the `activate`/chat route also exists alongside this signed one (ADR-0059 Decision 1) | `plugins/pipeline-core/lib/human-guard-override.mjs` (~L1796-1825), `plugins/pipeline-core/scripts/guard-human-override.mjs` |
 | Threat model approval (Cyborg CYB-4) <!-- inventory-id: threat-model-approval --> | PO decision on a threat-model boundary (`approved`/other) | `threat-model` | Same shared contract — the original adapter this whole contract generalized from | `plugins/pipeline-core/lib/threat-model.mjs`, `lib/threat-model-approval-request.mjs` |
@@ -78,7 +79,14 @@ are cataloged here so their templates cannot be mistaken for new PO gates.
 | Intent/gate | Authorizes | Mechanism | Authoring file(s) |
 |---|---|---|---|
 | First PO-key setup <!-- inventory-id: po-key-setup --> | Nothing; creates or registers the local signing authority used by later, separately confirmed approvals | Existing `po-human-approval.mjs setup` command and independent authority-file readback | `plugins/pipeline-core/scripts/po-human-approval.mjs` |
-| Installed-plugin attestation setup <!-- inventory-id: installed-plugin-attestation-setup --> | Nothing; writes the existing local-development install receipt after source/install readback | Existing `installed-plugin-attestation-host.mjs` provider-specific writer and receipt verifier | `plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs` |
+
+Installed-plugin attestation setup is deliberately **not** a human terminal
+action and is not in the catalog: it is an agent-executed host action
+(`INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY`: `agent-tool-call`,
+`codexToolCallPermitted: true`) that the Elephant runs at the host boundary
+without asking the PO. It authorizes nothing; it writes the existing
+local-development install receipt after source/install readback, via
+`plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs`.
 
 ## Explicitly out of scope for this inventory
 
@@ -121,6 +129,7 @@ new approval gates.
 | `feature-package-reconcile-signature` | `legacy-renderer` | — |
 | `release-preflight-signature` | `legacy-renderer` | — |
 | `governance-fork-disposition` | `legacy-renderer` | — |
+| `interruption-promotion` | `legacy-renderer` | — |
 | `critical-action-family` | `abstract-family` | — |
 | `guard-maintenance-window` | `legacy-renderer` | — |
 | `human-guard-override-signature` | `legacy-renderer` | — |
@@ -134,7 +143,6 @@ new approval gates.
 | `kickoff-language-confirmation` | `legacy-renderer` | — |
 | `remote-provisional-approval` | `excluded` | — |
 | `po-key-setup` | `registered` | `po-key-setup` |
-| `installed-plugin-attestation-setup` | `registered` | `installed-plugin-attestation-setup` |
 
 The registered push builder is
 `authorizeCriticalPushCommand()` in `po-human-approval.mjs`. Its current output

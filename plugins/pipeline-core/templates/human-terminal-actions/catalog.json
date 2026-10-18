@@ -198,6 +198,26 @@
       "platforms": null
     },
     {
+      "id": "interruption-promotion",
+      "inventoryId": "interruption-promotion",
+      "revision": 1,
+      "purpose": "Record the interruption promotion terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/lib/interruption-promotion.mjs#recordInterruptionPromotion"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
       "id": "critical-action-family",
       "inventoryId": "critical-action-family",
       "revision": 1,
@@ -510,86 +530,6 @@
         "schema": "pipeline.po-human-authority-readback.v1",
         "code": "PO-HUMAN-AUTHORITY-READY",
         "command": "read-authority"
-      },
-      "runners": [
-        "claude",
-        "codex",
-        "antigravity"
-      ],
-      "platforms": [
-        "posix"
-      ]
-    },
-    {
-      "id": "installed-plugin-attestation-setup",
-      "inventoryId": "installed-plugin-attestation-setup",
-      "revision": 1,
-      "purpose": "Render the existing provider-specific installed-plugin attestation writer",
-      "audience": "user",
-      "disposition": "registered",
-      "templateId": "installed-plugin-attestation-setup",
-      "builderId": "installed-plugin-attestation-setup",
-      "producerRefs": [
-        "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs#installedPluginAttestationSetupCommand"
-      ],
-      "boundary": {
-        "executionBoundary": "host",
-        "invocation": "user-copy-only",
-        "codexToolCallPermitted": false
-      },
-      "mutation": true,
-      "requiresPoApproval": false,
-      "slots": [
-        {
-          "name": "provider",
-          "type": "enum",
-          "enum": [
-            "claude",
-            "codex",
-            "antigravity"
-          ],
-          "source": "tool-result",
-          "required": true,
-          "sensitivity": "public",
-          "prompt": "Runner provider"
-        },
-        {
-          "name": "version",
-          "type": "plugin-version",
-          "source": "tool-result",
-          "required": true,
-          "sensitivity": "public",
-          "prompt": "Installed plugin version"
-        },
-        {
-          "name": "sourcePluginRoot",
-          "type": "absolute-directory",
-          "source": "tool-result",
-          "required": false,
-          "sensitivity": "machine-private",
-          "prompt": "Local source plugin root"
-        },
-        {
-          "name": "installedPluginRoot",
-          "type": "absolute-directory",
-          "source": "tool-result",
-          "required": true,
-          "sensitivity": "machine-private",
-          "prompt": "Installed plugin root"
-        },
-        {
-          "name": "launcher",
-          "type": "absolute-file",
-          "source": "tool-result",
-          "required": false,
-          "sensitivity": "machine-private",
-          "prompt": "Installed attestation driver"
-        }
-      ],
-      "expectedReadback": {
-        "schema": "pipeline.installed-plugin-attestation-host-result.v1",
-        "code": "IPA-HOST-RECEIPT-VERIFIED",
-        "command": "verify-receipt"
       },
       "runners": [
         "claude",

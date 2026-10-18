@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { authorizeCriticalPushCommand, poHumanApprovalSetupCommand } from "../../plugins/pipeline-core/scripts/po-human-approval.mjs";
-import { installedPluginAttestationSetupCommand } from "../../plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs";
 import {
   HUMAN_TERMINAL_ACTION_CATALOG_PATH as SHIPPED_CATALOG_PATH,
   buildRegisteredHumanTerminalAction,
@@ -78,7 +77,6 @@ const BASE_DOC = `
 | Intent/gate | Authorizes | Mechanism |
 |---|---|---|
 | First PO-key setup <!-- inventory-id: po-key-setup --> | ... | ... |
-| Installed-plugin attestation setup <!-- inventory-id: installed-plugin-attestation-setup --> | ... | ... |
 
 ## Explicitly out of scope for this inventory
 Explicitly out of scope: \`submit-plan\`, \`set-feature\`.
@@ -94,7 +92,6 @@ Explicitly out of scope: \`submit-plan\`, \`set-feature\`.
 | \`critical-action-family\` | \`abstract-family\` | — |
 | \`plan-prd-approval\` | \`legacy-renderer\` | — |
 | \`po-key-setup\` | \`registered\` | \`po-key-setup\` |
-| \`installed-plugin-attestation-setup\` | \`registered\` | \`installed-plugin-attestation-setup\` |
 `;
 
 const catalogEntry = (inventoryId, disposition, templateId = null, builderId = null, boundary = null) => ({
@@ -129,9 +126,6 @@ const BASE_CATALOG = JSON.stringify({
     catalogEntry("plan-prd-approval", "legacy-renderer"),
     catalogEntry("po-key-setup", "registered", "po-key-setup", "po-human-approval-setup", {
       executionBoundary: "attended-external-terminal", invocation: "user-copy-only", codexToolCallPermitted: false,
-    }),
-    catalogEntry("installed-plugin-attestation-setup", "registered", "installed-plugin-attestation-setup", "installed-plugin-attestation-setup", {
-      executionBoundary: "host", invocation: "user-copy-only", codexToolCallPermitted: false,
     }),
   ],
 });
@@ -178,7 +172,7 @@ test("canonical terminal rows derive their ids from the authorization and non-au
     extractCanonicalHumanAuthorizationRows(BASE_DOC).map((row) => row.inventoryId),
     ["push-signature", "deploy-signature", "publication-signature", "feature-package-reconcile-signature",
       "governance-fork-disposition", "critical-action-family", "plan-prd-approval",
-      "po-key-setup", "installed-plugin-attestation-setup"],
+      "po-key-setup"],
   );
 });
 
@@ -288,7 +282,7 @@ test("shipped terminal catalog is immutable and covers unique inventory disposit
   assert.equal(new Set(catalog.entries.map((entry) => entry.id)).size, catalog.entries.length);
   assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
   assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [
-    "authorize-critical-push", "installed-plugin-attestation-setup", "po-human-approval-setup",
+    "authorize-critical-push", "po-human-approval-setup",
   ]);
 });
 
@@ -304,16 +298,6 @@ test("Slice 3 producer commands are byte-equal to their registered builder outpu
       executionBoundary: "attended-external-terminal", invocation: "user-copy-only", codexToolCallPermitted: false,
     } },
   );
-  const installedInput = {
-    provider: "codex", version: "0.6.2+codex.test", installedPluginRoot: "/installed plugin",
-    launcher: "/installed plugin/scripts/installed-plugin-attestation-host.mjs",
-  };
-  assert.deepEqual(
-    buildRegisteredHumanTerminalAction("installed-plugin-attestation-setup", installedInput),
-    { output: installedPluginAttestationSetupCommand(installedInput), boundary: {
-      executionBoundary: "host", invocation: "user-copy-only", codexToolCallPermitted: false,
-    } },
-  );
 });
 
 test("Slice 3 producer templates prepare as bound POSIX instances without a PO gate", () => {
@@ -323,7 +307,6 @@ test("Slice 3 producer templates prepare as bound POSIX instances without a PO g
   try {
     for (const [templateId, values, boundary] of [
       ["po-key-setup", { repoRoot: root, directory: join(tmpdir(), "po material"), humanName: "Test Operator", launcher: "/plugin/scripts/po-human-approval.mjs" }, "attended-external-terminal"],
-      ["installed-plugin-attestation-setup", { provider: "codex", version: "0.6.2+codex.test", installedPluginRoot: "/installed plugin", launcher: "/installed plugin/scripts/installed-plugin-attestation-host.mjs" }, "host"],
     ]) {
       const result = prepareHumanTerminalAction({ rootDir: root, templateId, runner: "codex", platform: "posix", values }, {
         observeCandidate: () => candidate, randomBytes: () => Buffer.alloc(12, sequence++),

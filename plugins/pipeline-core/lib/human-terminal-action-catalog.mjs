@@ -10,11 +10,6 @@ import {
   poHumanApprovalSetupCommand,
   readPoHumanApprovalAuthority,
 } from "../scripts/po-human-approval.mjs";
-import {
-  INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY,
-  installedPluginAttestationSetupCommand,
-  readInstalledPluginAttestationSetup,
-} from "../scripts/installed-plugin-attestation-host.mjs";
 
 export const HUMAN_TERMINAL_ACTION_CATALOG_SCHEMA = "pipeline.human-terminal-action-catalog.v1";
 export const HUMAN_TERMINAL_ACTION_CATALOG_PATH = fileURLToPath(
@@ -55,8 +50,11 @@ const PLATFORMS = new Set(["posix", "windows"]);
 const REGISTERED_BOUNDARIES = Object.freeze({
   "authorize-critical-push": null,
   "po-human-approval-setup": PO_HUMAN_APPROVAL_SETUP_BOUNDARY,
-  "installed-plugin-attestation-setup": INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY,
 });
+
+// The installed-plugin attestation setup action is deliberately NOT registered here: it is an
+// agent-executed host action (INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY: agent-tool-call,
+// codexToolCallPermitted: true), while this catalog holds only user-copy-only terminal actions.
 
 const BUILDERS = Object.freeze({
   "authorize-critical-push": Object.freeze({
@@ -69,12 +67,6 @@ const BUILDERS = Object.freeze({
     readback: ({ values }) => readPoHumanApprovalAuthority(values),
     boundary: REGISTERED_BOUNDARIES["po-human-approval-setup"],
     source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
-  }),
-  "installed-plugin-attestation-setup": Object.freeze({
-    build: installedPluginAttestationSetupCommand,
-    readback: ({ values }) => readInstalledPluginAttestationSetup(values),
-    boundary: REGISTERED_BOUNDARIES["installed-plugin-attestation-setup"],
-    source: fileURLToPath(new URL("../scripts/installed-plugin-attestation-host.mjs", import.meta.url)),
   }),
 });
 
