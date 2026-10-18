@@ -60,6 +60,22 @@ The dispatch-budget counter and its lock; the dispatch-record collision guard
 - Until then, document that exactly one committing agent and one tool call at
   a time is the supported mode in a shared checkout.
 
+## Observed 2026-10-18: AGY greenfield ran disjoint packages serially (improvement 5.2)
+
+Source: PO-supplied forensic analysis of the Antigravity greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_agy_20261026.md`, improvement 5),
+installed `pipeline-core` 0.6.2.
+
+- Every work package ran serially in the one checkout, although the architecture map gave
+  WP-1A, WP-1B and WP-2A disjoint file sets. The PO asked why nothing ran in parallel.
+- Re-check against 0.7.0 (2026-10-18): `antigravity-native-dispatch-prepare.mjs` has no
+  worktree mode. Its reference keeps the existing Workflow/worktree route as the only
+  parallel path. That route does not exist on Antigravity.
+
+Added acceptance (post-0.7.0 unless the PO pulls it in): AGY native dispatch prepares
+disjoint packages for parallel execution in isolated worktrees, under the
+single-committer rule above.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**

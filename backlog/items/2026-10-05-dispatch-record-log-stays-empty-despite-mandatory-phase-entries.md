@@ -28,6 +28,25 @@ Three Goldfish dispatches in a row left the dispatch record's `log` empty althou
 
 Reproduction shape: dispatch a Goldfish with the standard briefing and inspect `evidence/dispatch-record-<TASK_ID>.json` at the end. Fix direction: measure why entries are skipped (budget pressure vs. ordering vs. wording); consider a mechanical check at dispatch close that rejects a terminal record with an empty `log`, and fold log appends into existing writes rather than extra tool calls.
 
+## Observed 2026-10-18: AGY greenfield, hand-typed JSON records (F-06)
+
+Source: PO-supplied forensic analysis of the Antigravity greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_agy_20261026.md`, finding F-06, improvement 4.2),
+installed `pipeline-core` 0.6.2.
+
+- About 65 steps were lost on schema refusals for the design review, the architecture
+  input and the dispatch records. Required fields (`bundleSha256`, `criteria[]`,
+  `outcomeClassification`, `criticRequired.appliedRow`) had to be read out of the
+  validators.
+- Re-check against 0.7.0 (2026-10-18): no scaffolder exists. There is no
+  `init-dispatch-record` and no `init-design-review`. The architecture input is gone
+  because materialization reads the design itself.
+
+Added acceptance (0.7.0, minor):
+
+- A dispatch record and a design review can be started from a generated, valid skeleton
+  with the digests pre-filled. The agent fills judgment fields only.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**

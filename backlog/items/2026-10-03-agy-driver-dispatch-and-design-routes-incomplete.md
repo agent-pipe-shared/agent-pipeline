@@ -54,6 +54,36 @@ Each one must be verified against the source before it is fixed:
   recorded self-dispatch fallback
   (`2026-10-03-role-route-preflight-with-self-dispatch-fallback.md`).
 
+## Observed 2026-10-18: AGY greenfield run on WSL (F-02, F-04, F-05, handover)
+
+Source: PO-supplied forensic analysis of the Antigravity greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_agy_20261026.md`, findings F-02, F-04, F-05,
+improvements 4 and 5), installed `pipeline-core` 0.6.2.
+
+- F-02: `node` lives under an `fnm` install outside the default sandbox. 45 commands,
+  including `git commit` through the `exec node` pre-commit hook, failed first with
+  exit 127 and were retried outside the sandbox (about 90 steps). Re-check against 0.7.0:
+  preflight does not report whether `node` is reachable inside the runner sandbox. The only
+  related signal is `observeAntigravityHardEnforcement`, which cannot see exit 127 or
+  version-manager installs.
+- F-04: `invoke_subagent` was refused three times: a missing agent definition, missing
+  native-dispatch preparation, and a re-invocation without a new prepare batch. Re-check
+  against 0.7.0: `skills/pipeline-start/references/antigravity-native-dispatch.md`
+  documents prepare, then `invoke_subagent`. Considered closed for the documented path.
+- F-05: parallel `write_to_file` calls in a Goldfish failed with `permission check failed
+  for write_file` (3 of 4). Not re-checked: it needs a live AGY run.
+- Handover: `docs/state.md` stayed at its stage-0 text through implementation. Re-check
+  against 0.7.0: EL-01 admits `docs/`, but lifecycle readiness may still refuse the write.
+  This is unproven.
+
+Added acceptance (0.7.0, minor unless the PO raises it):
+
+- Preflight reports whether the resolved `node` runs inside the runner's default sandbox
+  and names the one-time remedy instead of 45 per-command retries.
+- The AGY Goldfish agent template forbids parallel file writes in one turn until the hook
+  race is fixed.
+- The main agent can update the calibrated handover in every phase through an admitted route.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**

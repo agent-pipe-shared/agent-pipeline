@@ -45,6 +45,36 @@ a design text that changed direction three times under review pressure
   "follow-up = delta Critic only, at most one" where they offer a Critic
   dispatch.
 
+## Observed 2026-10-18: AGY greenfield, rigor 2 ran with zero Critic reviews (T3)
+
+Source: PO-supplied forensic analysis of the Antigravity greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_agy_20261026.md`, improvement 3),
+installed `pipeline-core` 0.6.2.
+
+- All eight dispatch records declared `riskClass: "low"` and an all-false diff matrix, and
+  applied row T3 (rigor 2). T3 makes a Critic required, yet no Critic ran and the feature
+  closed. The PO later found, while playing, a product defect that an independent review
+  would likely have caught.
+- Re-check against 0.7.0 (2026-10-18):
+  - Path-derived triggers are enforced. `classifyCriticChangedPaths` /
+    `criticDecisionPathFinding` (`lib/critic-skip-decision.mjs`) run in the native host
+    finalizer, the AGY final return and `dispatch-authorship-verify.mjs`.
+  - A required Critic without evidence is report-only. `check-critic-skip-coverage.mjs`
+    detects it, and `dispatch-authorship-verify.mjs` returns `critic-evidence-pending`,
+    but `close-feature` (`scripts/pipeline-state.mjs`) does not read per-dispatch
+    `criticRequired` records and closes regardless.
+  - `rigorLevel` and `riskClass` in the trigger are self-declared. They are checked only
+    for internal consistency, never against the calibrated project rigor.
+
+Added acceptance (0.7.0, major: a quality gate that does not hold in a user repository):
+
+- `close-feature` refuses with a typed code while any dispatch record of the feature
+  carries `criticRequired` without matching Critic evidence, and names the Critic dispatch
+  as the repair.
+- A dispatch record whose trigger declares a lower `rigorLevel` than the calibrated
+  project rigor is refused at write time.
+- A pin drives both refusals in a fixture user repository.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted for the next local 0.7.0 candidate (PO 2026-10-07:

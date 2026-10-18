@@ -85,6 +85,33 @@ Added acceptance (0.7.0, blocker):
 - A pin drives: approved German-table Spec with `.test.js` checks -> course written ->
   first item dispatch admitted; and the absent-course repair route end to end.
 
+## Observed 2026-10-18: AGY greenfield, design signature took two PO attempts (F-03)
+
+Source: PO-supplied forensic analysis of the Antigravity greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_agy_20261026.md`, finding F-03, improvement 2),
+installed `pipeline-core` 0.6.2.
+
+- The agent handed the PO a long `sign-intent ... && node -e 'import(...)'` chain. It
+  wrapped on paste and failed. The second attempt signed, but importing
+  `po-human-approval.mjs` through `node -e` ran its CLI block and broke the proof copy, so
+  the agent copied the proof out of the key directory by hand.
+- `sign-intent` showed the PO `no recorded request resolves for this digest
+  (HGO-RECORD-DIGEST-MISMATCH)` for an ordinary design approval.
+- Re-check against 0.7.0 (2026-10-18): the CLI block is now guarded
+  (`isDirectInvocation`, `scripts/po-human-approval.mjs`). The design approval is still
+  `prepare` plus `approve` with a manual proof hand-off. No single command reads the request,
+  shows the PO the feature and bundle digest, signs, and writes the proof into `scratch/`.
+  Whether a bare design-approval digest still produces a misleading "no recorded request"
+  warning is not yet proven either way.
+
+Added acceptance (0.7.0, major):
+
+- The design approval is one PO-run command, rendered through the tested copy-command
+  renderer, that signs and writes the proof where the next agent step reads it. No
+  `node -e`, no `&&` chain, no manual copy.
+- A design-approval signature never reports a guard-override "no recorded request"
+  warning. A pin drives the design-approval path and asserts the PO-facing output.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**

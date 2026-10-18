@@ -60,6 +60,36 @@ observation shape in the `approved` state; opaque-execution lane);
   transition can be one writer transaction when entry readiness passes (input
   for the Fable process review).
 
+## Observed 2026-10-18: AGY greenfield, materialize-architecture refused in devplan (F-01)
+
+Source: PO-supplied forensic analysis of the Antigravity greenfield run on WSL
+(`scratch/pipeline-analyse-greenfield_agy_20261026.md`, finding F-01, improvement 1).
+The run used installed `pipeline-core` 0.6.2, not the 0.7.0 candidate.
+
+- After the design signature, `onboarding-init.mjs` refused the move to `implementation`
+  until the architecture was materialized, while `guard-lifecycle-ready` refused the agent's
+  `pipeline-state.mjs materialize-architecture --input scratch/<file>.json` in `devplan`
+  (`GUARD-UNAPPROVED-COMMAND-FORM`). The agent escaped through a `perl` scratch script
+  (164 steps, about 22 minutes).
+- Re-check against 0.7.0 (2026-10-18): the `--input` form no longer exists. The materializer
+  reads the approved design itself, and `pipeline-state.mjs` refuses any argument.
+  `lib/guard/sanctioned-args-scripts.mjs` admits exactly the bare
+  `materialize-architecture`, the devplan lane delegates to that sanctioned set, and the
+  onboarding plan now emits the step itself (`scripts/project-onboarding-e2e.test.mjs`).
+  The deadlock as observed is therefore not reproducible from 0.7.0 source.
+- Remaining gap: no test drives the devplan shell lane with the exact producer-emitted
+  `node <plugin>/scripts/pipeline-state.mjs materialize-architecture` and proves it is
+  admitted, nor that the dead `--input` spelling is refused with a typed hint naming the
+  bare form. The `perl` escape also shows that an opaque interpreter is a working way
+  around a lane refusal.
+
+Added acceptance (0.7.0, major):
+
+- A pin drives the devplan lane with the onboarding plan's exact materialize action and
+  proves it is admitted; the `--input` spelling is refused with a hint naming the bare form.
+- An opaque `perl <scratch script>` (and other interpreters) is no wider in devplan than
+  `node <scratch script>`.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
