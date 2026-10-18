@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
@@ -13,6 +14,10 @@ import { createModelFamilyMainPrelaunch } from "./model-family-main-prelaunch.mj
 import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { createModelFamilyInvocationEntry } from "./model-family-invocation.mjs";
 import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+import { initializeSessionAuthorityRegistry } from "./session-authority-registry.mjs";
+import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
 
 const sha = (value) => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
 const taskRoute = "profile.synthetic_main";
@@ -55,8 +60,31 @@ async function signedRunnerFixture(runner, createAdapter) {
   const sessionId = `host-${runner}-session`, installationBindingSha256 = sha(`${runner}-install`);
   const accountBindingSha256 = sha(`${runner}-account`), hostProcessBindingSha256 = sha(`${runner}-process`);
   const adapterContractSha256 = sha(`${runner}-synthetic-contract`);
-  const commonDir = mkdtempSync(join(tmpdir(), `main-positive-${runner}-`));
+  const repoDir = mkdtempSync(join(tmpdir(), `main-positive-${runner}-`));
+  execFileSync("git", ["init", "-q"], { cwd: repoDir, stdio: "ignore" });
+  const commonDir = join(repoDir, ".git");
   mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
+  // The session-authority registry only initializes over a repository that carries a manifest and a
+  // pipeline State with a continuity object (the same inputs the finalizer reference fixture writes).
+  mkdirSync(join(repoDir, ".claude"), { recursive: true, mode: 0o700 });
+  writeFileSync(join(repoDir, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const ref = (path) => ({ path, sha256: "a".repeat(64) });
+  const continuity = { schema: "pipeline.continuity.v0", featureId: "unit", revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+    authority: { prd: ref("specs/unit/prd.md"), spec: ref("specs/unit/spec.md"), result: null },
+    queueHead: { packageId: "unit-package", actionId: "prelaunch-fixture", nextAction: "dispatch", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, closeTransition: null,
+    capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+  writeFileSync(join(repoDir, ".claude/pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0",
+    activeFeature: { id: "unit", planPath: "specs/unit/prd.md", phase: "design" }, planApproved: false, continuity }), { mode: 0o600 });
+  const repository = inspectSignedDescriptorCustodyRepository(repoDir);
+  // Controlled METHOD fixture: genuine Source requester custody for the registry-owned lifetimes, not provider-host proof.
+  const runtime = createControlledMethodRuntimeFixture({ repository,
+    fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/prelaunch-owner"), sessionId: `prelaunch-${runner}-owner` });
+  const ports = createSessionAuthorityParticipantPorts({ repository });
+  for (const row of ports) assert.doesNotThrow(() => row.port.readBaseline(), row.producerId);
+  const initialized = initializeSessionAuthorityRegistry({ repository }, ports);
+  assert.equal(initialized.status, "initialized", JSON.stringify(initialized));
   let models = [{ modelId: `${runner}-family-6`, version: [6] }];
   let mainOrdinal = 0;
   const calls = { apply: 0, readback: 0, launch: 0, identity: 0 };
@@ -115,10 +143,10 @@ async function signedRunnerFixture(runner, createAdapter) {
   };
   const adapter = createAdapter(Object.freeze({}), { mainLaunchPort: port });
   trustedSources.launchDriver = ({ driverContext }) => adapter.launchMainFromDriverContext(driverContext);
-  const runtimeHost = createModelFamilyRuntimeHost({ cwd: commonDir, resolveCommonDir: () => commonDir,
+  const runtimeHost = createModelFamilyRuntimeHost({ cwd: repoDir, resolveCommonDir: () => commonDir,
     trustedSources, clock: () => Date.parse("2026-10-02T09:00:30.000Z") });
-  const activated = runtimeHost.store().activate();
-  if (!activated.ok) { rmSync(commonDir, { recursive: true, force: true }); throw new Error(activated.code); }
+  const activated = runtime.run(() => runtimeHost.store().activate());
+  if (!activated.ok) { rmSync(repoDir, { recursive: true, force: true }); throw new Error(activated.code); }
   const entry = createModelFamilyInvocationEntry({ runtimeHost, routeSource: policy.routeSource });
   const packetFor = (receipt) => ({ runner, sessionId: receipt.sessionId, invocationId: receipt.invocationId,
     candidateCommit: receipt.candidateCommit, candidateTree: receipt.candidateTree, taskRoute: receipt.taskRoute,
@@ -131,8 +159,8 @@ async function signedRunnerFixture(runner, createAdapter) {
     modelId: receipt.selectedModelId, effort: receipt.effort, authoritySha256: receipt.authoritySha256,
     adapterContractSha256: receipt.adapterContractSha256, packetBindingSha256: receipt.packetBindingSha256,
     existingMainSessionId: null, payload: { testOnly: true } });
-  return { entry, port, calls, packetFor, requestFor, setModels(next) { models = next; }, cleanup() {
-    rmSync(commonDir, { recursive: true, force: true });
+  return { entry, port, calls, packetFor, requestFor, run: runtime.run, setModels(next) { models = next; }, cleanup() {
+    rmSync(repoDir, { recursive: true, force: true });
   } };
 }
 
@@ -164,7 +192,7 @@ completionCases.push({ id: "MFMP003", name: "signed S1 opaque S2 S4 S5 path comp
     const fixture = await signedRunnerFixture(runner, createAdapter);
     try {
       const sessionId = `host-${runner}-session`;
-      const prepareLaunch = async (invocationId, { expectSuccess = true } = {}) => {
+      const prepareLaunchInContext = async (invocationId, { expectSuccess = true } = {}) => {
         const prepared = await fixture.entry.prepareModelFamilyInvocation({ kind: "dispatch", runner, taskRoute,
           sessionId, invocationId, candidateCommit: actualCandidate.candidateCommit,
           candidateTree: actualCandidate.candidateTree });
@@ -185,6 +213,8 @@ completionCases.push({ id: "MFMP003", name: "signed S1 opaque S2 S4 S5 path comp
         assert.notEqual(launched.value.mainSessionId, invocationId);
         return { modelId: receipt.selectedModelId, mainSessionId: launched.value.mainSessionId };
       };
+      // Every registry-owned lifetime runs inside the controlled Source requester's authority context.
+      const prepareLaunch = (invocationId, options) => fixture.run(() => prepareLaunchInContext(invocationId, options));
       const first = await prepareLaunch(`${runner}-invocation-1`);
       const firstConfiguration = fixture.port.applied;
       fixture.setModels([{ modelId: `${runner}-family-6`, version: [6] }, { modelId: `${runner}-family-7`, version: [7] }]);
