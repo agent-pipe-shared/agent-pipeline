@@ -71,9 +71,12 @@ Added acceptance (0.7.0, major: a quality gate that does not hold in a user repo
 - `close-feature` refuses with a typed code while any dispatch record of the feature
   carries `criticRequired` without matching Critic evidence, and names the Critic dispatch
   as the repair.
-- A dispatch record whose trigger declares a lower `rigorLevel` than the calibrated
-  project rigor is refused at write time.
-- A pin drives both refusals in a fixture user repository.
+- The gate counts only records of the closing feature's own delivery course, so records
+  of earlier features never block a later close (PO decision D4, 2026-10-18).
+- A pin drives the refusal in a fixture user repository.
+- Withdrawn on 2026-10-18: a write-time check of `rigorLevel` against a calibrated project
+  rigor. No per-project rigor source exists, and the operating model sets rigor per change,
+  so a rigor-0 slice inside an epic feature is legitimate.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

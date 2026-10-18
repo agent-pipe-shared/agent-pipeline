@@ -97,20 +97,21 @@ installed `pipeline-core` 0.6.2.
   the agent copied the proof out of the key directory by hand.
 - `sign-intent` showed the PO `no recorded request resolves for this digest
   (HGO-RECORD-DIGEST-MISMATCH)` for an ordinary design approval.
-- Re-check against 0.7.0 (2026-10-18): the CLI block is now guarded
-  (`isDirectInvocation`, `scripts/po-human-approval.mjs`). The design approval is still
-  `prepare` plus `approve` with a manual proof hand-off. No single command reads the request,
-  shows the PO the feature and bundle digest, signs, and writes the proof into `scratch/`.
-  Whether a bare design-approval digest still produces a misleading "no recorded request"
-  warning is not yet proven either way.
+- Re-check against 0.7.0 (2026-10-18):
+  - The CLI block is now guarded (`isDirectInvocation`, `scripts/po-human-approval.mjs`).
+  - The design approval is already one PO command. `present-plan` prints
+    `po-human-approval.mjs sign-intent --request scratch/design-approval-request-<sha>.json`
+    (`scripts/pipeline-state.mjs`, around line 11031). That command writes
+    `scratch/design-approval-proof-<sha>.json`, which `approve-plan` reads.
+  - The "no recorded request" text (`compactSigningDisclosure`, `po-human-approval.mjs`
+    around line 480) appears only for the bare `sign-intent --intent-sha256` form or an
+    unknown request schema. In the observed run the agent handed over the wrong form.
 
-Added acceptance (0.7.0, major):
+Added acceptance (0.7.0, minor; toil, PO 2026-10-18):
 
-- The design approval is one PO-run command, rendered through the tested copy-command
-  renderer, that signs and writes the proof where the next agent step reads it. No
-  `node -e`, no `&&` chain, no manual copy.
-- A design-approval signature never reports a guard-override "no recorded request"
-  warning. A pin drives the design-approval path and asserts the PO-facing output.
+- Every doc and every rendered next action hands the PO the `--request` form for a design
+  approval, never `--intent-sha256`. A pin asserts that the design-approval PO output
+  carries no guard-override warning.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

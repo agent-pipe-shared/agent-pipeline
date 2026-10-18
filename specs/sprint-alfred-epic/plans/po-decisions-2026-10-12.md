@@ -282,3 +282,18 @@ AGY WSL greenfield analysis (installed 0.6.2, PO-supplied 2026-10-18): `dacf773b
   - F-03: there is no single PO command for the design approval.
   - F-01: the lane pin is missing. The deadlock itself does not occur in 0.7.0.
 - Minor: F-02, F-04/F-05, F-06, and AGY parallel packages.
+
+Correction after a read-only re-check: F-03 is minor. `present-plan` already prints one PO command, `sign-intent --request`, which writes the proof that `approve-plan` reads. The misleading warning appears only for the bare `--intent-sha256` hand-off.
+
+PO decision (2026-10-18): fix what causes massive toil and slowdown as part of 0.7.0. In scope:
+- F-02: node outside the sandbox.
+- F-06: record scaffolders.
+- F-03: hand off only the `--request` form.
+- F-07: `commit -F` as the only commit pattern in the Goldfish template.
+- F-05: one write per turn on AGY.
+- Seen in this session: `perl scratch/<file>` admitted in devplan (`6a84c5a20` pins it as a todo).
+- Seen in this session: the pre-commit and commit-msg hook snapshots each go stale after a plugin copy and are only found by a failed commit.
+
+PO decision D4 (2026-10-18): the T3 Critic gate is scoped to the closing feature's delivery course. The PO granted Tier-0 and one override ceremony in case the gate has to sit in the protected `pipeline-state.mjs`. The write-time rigor check is withdrawn: rigor is set per change, and no per-project rigor source exists. `6a84c5a20` is the devplan materialize pin (F-01).
+
+Diagnostic Full WSL Verify at `617a6d4a0` (29 minutes, TMPDIR outside the checkout): 1042 suites, 161 red. These are the known Weg B groups (P1-P8), not a regression from today's commits. The run ended with `VERIFY-CANDIDATE-DRIFT` because `6a84c5a20` was committed during the run. It is not evidence for a candidate.
