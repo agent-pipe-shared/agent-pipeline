@@ -866,7 +866,12 @@ if (isDirectInvocation(import.meta.url)) {
           const claudeBackgroundOnly = nativeRunner === "claude" && prepared.code === "NGHS-CLAUDE-FOREGROUND-REQUIRED"
             && !Object.hasOwn(toolInput, "run_in_background");
           if (markedV2.length > 0 || (itemGovernanceRequired && !claudeBackgroundOnly)) {
-            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.\n`);
+            // The typed reason (when the refusal carries one) names the cause behind a code such as SDC-AUTHORITY-UNAVAILABLE,
+            // which the code alone leaves invisible. The pinned prefix "BLOCKED (guard-dispatch): <code>" is unchanged.
+            const reasonText = typeof prepared.reason === "string" && prepared.reason.trim() !== ""
+              ? ` Reason: ${prepared.reason.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 240)}`
+              : "";
+            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}\n`);
             process.exit(2);
           }
           // The dispatch continues with no pending state: leave the typed code where this launch's PostToolUse can name it
