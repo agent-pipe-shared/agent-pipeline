@@ -17,6 +17,13 @@ const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const HOST_MARKER = (runner, version = 1) => `Native-Host-Observed: v${version} (${runner})`;
+// Exactly two Claude assurances exist, one per completion route. The receipt's KEYS are unchanged: the assurance string
+// itself is the route marker, so validation admits either and the draft selects by the pending state's completionRoute.
+const CLAUDE_POSTTOOL_ASSURANCE = "host-observed-tool-use-and-resolved-model-not-provider-attested";
+const CLAUDE_SUBAGENT_STOP_ASSURANCE = "host-observed-subagent-stop-correlation-model-not-observed";
+const claudeAssuranceFor = (state) => state.completionRoute === NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE
+  ? CLAUDE_SUBAGENT_STOP_ASSURANCE : CLAUDE_POSTTOOL_ASSURANCE;
+import { NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE } from "./native-goldfish-host-state.mjs";
 const KEYS = ["schema", "runner", "dispatchId", "sessionId", "toolUseId", "agentId", "candidateCommit",
   "candidateTree", "role", "model", "effort", "rulesetSha", "allowedPaths", "resultSha256",
   "reportSha256", "commit", "parent", "tree", "changedPaths", "hostMarker", "assurance",
@@ -78,10 +85,10 @@ export function validateNativeGoldfishHostObservation(receipt, { record = null, 
     || [...subject.changedPaths].sort().join("\0") !== subject.changedPaths.join("\0")
     || !subject.changedPaths.every((path) => subject.allowedPaths.includes(path))
     || subject.hostMarker !== HOST_MARKER(subject.runner, version)
-    || subject.assurance !== (subject.runner === "claude"
-      ? "host-observed-tool-use-and-resolved-model-not-provider-attested"
-      : version === 2 ? "host-observed-subagent-start-stop-native-worker-and-session-route-not-provider-attested"
-        : "host-observed-subagent-start-stop-and-configured-route-not-provider-attested")
+    || (subject.runner === "claude"
+      ? ![CLAUDE_POSTTOOL_ASSURANCE, CLAUDE_SUBAGENT_STOP_ASSURANCE].includes(subject.assurance)
+      : subject.assurance !== (version === 2 ? "host-observed-subagent-start-stop-native-worker-and-session-route-not-provider-attested"
+        : "host-observed-subagent-start-stop-and-configured-route-not-provider-attested"))
     || !SHA.test(subject.recordSha256 ?? "") || !SHA.test(receiptSha256 ?? "")) return false;
   if(shared&&(![1,2].includes(version)||!Array.isArray(subject.foreignCommits)||!subject.foreignCommits.length||subject.foreignCommits.length>64||subject.foreignCommits.some(row=>!exact(row,["pendingSha256","observationSha256","commit"])||!SHA.test(row.pendingSha256)||!SHA.test(row.observationSha256)||!OID.test(row.commit))||subject.foreignCommits.at(-1).commit!==subject.parent))return false;
   try { if (receiptSha256 !== hash(canonicalizeJson(subject))) return false; } catch { return false; }
@@ -110,7 +117,7 @@ export function draftNativeGoldfishHostObservation({ state, observation, commitR
     commit: commitReadback.commit, parent: commitReadback.parent, tree: commitReadback.tree,
     changedPaths: [...commitReadback.paths].sort(), hostMarker: HOST_MARKER(state.runner, version),
     assurance: state.runner === "claude"
-      ? "host-observed-tool-use-and-resolved-model-not-provider-attested"
+      ? claudeAssuranceFor(state)
       : version === 2 ? "host-observed-subagent-start-stop-native-worker-and-session-route-not-provider-attested"
         : "host-observed-subagent-start-stop-and-configured-route-not-provider-attested",
     recordSha256: hash(nativeAuthoredRecordBytes(record)) };

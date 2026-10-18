@@ -10,6 +10,7 @@ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finaliz
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "./native-goldfish-host-return.mjs";
 import { inspectSourceOwnedNativeConfiguredRoute, prepareNativeGoldfishHostState } from "./native-goldfish-host-state.mjs";
 import { nativeGoldfishHookMessage } from "../hooks/native-goldfish-host.mjs";
+import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes } from "./native-goldfish-host-observation.mjs";
 import { writeHostObservedNativeGoldfishDispatchRecord } from "../scripts/dispatch-record-write.mjs";
 
 import { nativeManagedDigest } from "./native-managed-authority-support.mjs";
@@ -50,8 +51,26 @@ const criticDecision = { schema: "pipeline.critic-required-decision.v1",
     diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" };
 
 // Claude binding effort mirrors the agent definition (owner: agents/<name>.md frontmatter): goldfish-deep declares xhigh, the others medium.
-function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor") {
+// `options.background` launches the Claude dispatch with an explicit run_in_background: true while the SubagentStop
+// completion route is registered, so the pending state carries completionRoute "subagent-stop". The stop-hook fixtures
+// (meta files, SubagentStop input) live in a directory OUTSIDE the repository root: the host-commit admission compares
+// the working tree to its pre-launch baseline, so nothing the harness itself writes may appear inside the root.
+const STOP_ASSURANCE = "host-observed-subagent-stop-correlation-model-not-observed";
+const POST_ASSURANCE = "host-observed-tool-use-and-resolved-model-not-provider-attested";
+const finalText = (binding, over = {}) => JSON.stringify({ schema: NATIVE_GOLDFISH_RETURN_SCHEMA, dispatchId: binding.dispatchId,
+  candidateCommit: binding.candidateCommit, outcome: "succeeded", report: "Implemented and verified; independent review pending.",
+  changedPaths: ["src/change.mjs"], ...over });
+const privateDir = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
+const privateEntries = (commonDir, prefix) => readdirSync(privateDir(commonDir)).filter((name) => name.startsWith(prefix)).sort();
+const snapshot = (commonDir) => JSON.stringify(readdirSync(privateDir(commonDir)).sort()
+  .map((name) => [name, readFileSync(join(privateDir(commonDir), name), "utf8")]));
+const readReceipt = (commonDir) => { const names = privateEntries(commonDir, "observation-claude-"); assert.equal(names.length, 1);
+  return JSON.parse(readFileSync(join(privateDir(commonDir), names[0]), "utf8")); };
+function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor", options = {}) {
   const root=fixtureRoot("native-goldfish-host-finalizer-"); const commonDir=join(root,".git");
+  const stopDir=fixtureRoot("native-goldfish-stop-hook-"); const background=options.background===true;
+  const writeMeta=(agentId,meta)=>{mkdirSync(join(stopDir,"session","subagents"),{recursive:true});writeFileSync(join(stopDir,"session","subagents",`agent-${agentId}.meta.json`),JSON.stringify(meta));};
+  const stopInput=(binding,text,over={})=>({hook_event_name:"SubagentStop",session_id:"session-claude",transcript_path:join(stopDir,"session.jsonl"),cwd:root,agent_id:"agent-bg",agent_type:binding.role,last_assistant_message:text,...over});
   const git=(...args)=>execFileSync("git",["-C",root,...args],{encoding:"utf8"}).trim();
   const facts={commits:0,publishedRecord:null,lastCommit:null};
   try {
@@ -67,15 +86,15 @@ function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfi
         candidateCommit:git("rev-parse","HEAD"),candidateTree:git("rev-parse","HEAD^{tree}"),runner,role:`pipeline-core:${agentName}`,
         ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:agentName}),model:runner==="claude"?"sonnet":"gpt-6-luna",effort:runner==="claude"?(agentName==="goldfish-deep"?"xhigh":"medium"):"high",rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
       const prompt=`Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v${adapterVersion}\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
-      const input=runner==="claude"?{cwd:root,session_id:"session-claude",hook_event_name:"PreToolUse",tool_name:"Agent",tool_use_id:"tool-claude",tool_input:{subagent_type:binding.role,prompt,run_in_background:false}}
+      const input=runner==="claude"?{cwd:root,session_id:"session-claude",hook_event_name:"PreToolUse",tool_name:"Agent",tool_use_id:"tool-claude",tool_input:{subagent_type:binding.role,prompt,run_in_background:background}}
         :{cwd:root,session_id:"session-codex",hook_event_name:"PreToolUse",tool_name:"spawn_agent",tool_use_id:"tool-codex",tool_input:{agent_type:binding.nativeAgentType??binding.agentType,message:prompt}};
-      const prepared=prepareNativeGoldfishHostState({root,runner,input});assert.equal(prepared.ok,true,JSON.stringify(prepared));
+      const prepared=prepareNativeGoldfishHostState({root,runner,input,...(background?{subagentStopCompletionRegistered:true}:{})});assert.equal(prepared.ok,true,JSON.stringify(prepared));
       if(runner==="codex") {const started=finalizeNativeGoldfishHostReturn({runner,root,input:{...input,hook_event_name:"SubagentStart",agent_id:"agent-1",agent_type:binding.nativeAgentType??binding.agentType,model:binding.model}});assert.equal(started.status,"agent-bound",started.code);}
       writeFileSync(join(root,"src/change.mjs"),"export const value='after';\n");
       const dependencies={commit:request=>{facts.commits++;const actual=commitAdmittedNativeGoldfishReturn(request);facts.lastCommit=actual.commit;return actual;},writeRecord:request=>{facts.publishedRecord=request.record;return writeHostObservedNativeGoldfishDispatchRecord(request);}};
-      return run({root,commonDir,binding,input,dependencies,facts,prepared,git});
+      return run({root,commonDir,binding,input,dependencies,facts,prepared,git,writeMeta,stopInput});
     });
-  } finally {rmSync(root,{recursive:true,force:true});}
+  } finally {rmSync(root,{recursive:true,force:true});rmSync(stopDir,{recursive:true,force:true});}
 }
 
 const cases = [
@@ -183,6 +202,152 @@ const cases = [
     assert.throws(read,error=>error.reason==="native-configured-family-port-required");
     rmSync(familyDir,{recursive:true});assert.deepEqual(read(),original);
   },"codex",2) },
+
+  // NGHF05-NGHF10 -- ALF-G2C2B-SUBAGENT-STOP-FINALIZE: an explicit background Claude launch whose pending state carries
+  // completionRoute "subagent-stop" is completed ONLY by the Claude SubagentStop hook, never by a PostToolUse.
+  { id: "NGHF05", name: "Claude background launch on the SubagentStop route is a non-consuming no-op, and no PostToolUse ever commits that state", run: () => fixture(({ root, commonDir, binding, dependencies, facts, git }) => {
+    const names = privateEntries(commonDir, "pending-claude-");
+    assert.equal(names.length, 1);
+    assert.equal(JSON.parse(readFileSync(join(privateDir(commonDir), names[0]), "utf8")).completionRoute, "subagent-stop");
+    const post = (tool_response) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude", tool_use_id: "tool-claude",
+      tool_input: { subagent_type: binding.role, prompt: "marked", run_in_background: true }, tool_response });
+    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    const before = snapshot(commonDir);
+    const launched = finalize(post({ status: "async_launched", agentId: "agent-bg" }));
+    assert.equal(launched.status, "awaiting-subagent-stop", launched.code);
+    assert.equal(launched.commit, null);
+    assert.equal(launched.record, null);
+    assert.match(nativeGoldfishHookMessage(launched), /SubagentStop/u);
+    assert.match(nativeGoldfishHookMessage(launched), /No commit or authorship record is claimed/u);
+    assert.equal(snapshot(commonDir), before);
+    const completed = finalize(post({ status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model],
+      content: [{ type: "text", text: finalText(binding) }] }));
+    assert.equal(completed.status, "not-applicable", completed.code);
+    assert.equal(nativeGoldfishHookMessage(completed), null);
+    assert.equal(snapshot(commonDir), before);
+    assert.equal(facts.commits, 0);
+    assert.equal(git("rev-parse", "HEAD"), binding.candidateCommit);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF06", name: "Claude SubagentStop with a valid final commits exactly once and records the subagent-stop assurance", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    // The stopping agent_type carries the plugin prefix and the meta file does not: both spellings normalize to one role.
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, finalText(binding)) }, dependencies);
+    assert.equal(result.status, "authored-commit-recorded", result.code);
+    assert.equal(facts.commits, 1);
+    assert.equal(result.commit, facts.lastCommit);
+    assert.equal(facts.publishedRecord.runner, "claude");
+    assert.equal(facts.publishedRecord.model, binding.model);
+    assert.equal(facts.publishedRecord.candidateCommit, facts.lastCommit);
+    assert.equal(facts.publishedRecord.log.length, 2);
+    assert.match(nativeGoldfishHookMessage(result), /host commit verified/u);
+    const receipt = readReceipt(commonDir);
+    assert.equal(receipt.assurance, STOP_ASSURANCE);
+    assert.equal(receipt.agentId, null);
+    assert.equal(receipt.schema, "pipeline.native-goldfish-host-observation.v1");
+    assert.equal(receipt.hostMarker, "Native-Host-Observed: v1 (claude)");
+    assert.equal(receipt.toolUseId, "tool-claude");
+    assert.equal(receipt.commit, facts.lastCommit);
+    const readback = inspectNativeGoldfishHostObservation({ root, taskId: binding.dispatchId, record: facts.publishedRecord,
+      recordBytes: nativeAuthoredRecordBytes(facts.publishedRecord) });
+    assert.equal(readback.ok, true, JSON.stringify(readback));
+    assert.equal(readback.assurance, STOP_ASSURANCE);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF07", name: "Claude SubagentStop consumes once: a replayed stop and a later PostToolUse never commit twice", run: () => fixture(({ root, commonDir, binding, dependencies, facts, git, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    const stop = stopInput(binding, finalText(binding));
+    const first = finalize(stop);
+    assert.equal(first.status, "authored-commit-recorded", first.code);
+    const replay = finalize(stop);
+    assert.equal(replay.status, "not-applicable", replay.code);
+    assert.equal(replay.code, "NGHF-RECEIPT-EXISTS");
+    assert.equal(nativeGoldfishHookMessage(replay), null);
+    for (const tool_response of [{ status: "async_launched", agentId: "agent-bg" },
+      { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] }]) {
+      const later = finalize({ hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude", tool_use_id: "tool-claude",
+        tool_input: { subagent_type: binding.role, prompt: "marked", run_in_background: true }, tool_response });
+      assert.notEqual(later.status, "authored-commit-recorded", later.code);
+    }
+    assert.equal(facts.commits, 1);
+    assert.equal(git("rev-parse", "HEAD"), first.commit);
+    assert.equal(privateEntries(commonDir, "observation-claude-").length, 1);
+    assert.equal(readdirSync(join(root, "evidence")).filter((name) => name.startsWith("dispatch-record-")).length, 1);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF08", name: "Claude SubagentStop refuses a final whose candidate, paths, JSON or working tree do not match, and a refusal consumes nothing", run: () => fixture(({ root, commonDir, binding, dependencies, facts, git, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const attempt = (text) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, text) }, dependencies);
+    const before = snapshot(commonDir);
+    for (const [label, text, code] of [
+      ["foreign candidate", finalText(binding, { candidateCommit: "f".repeat(40) }), "NGHR-FINAL-SHAPE"],
+      ["path outside the allowed paths", finalText(binding, { changedPaths: ["src/other.mjs"] }), "NGHR-FINAL-SHAPE"],
+      ["foreign dispatch id", finalText(binding, { dispatchId: "NGHF-OTHER" }), "NGHR-FINAL-SHAPE"],
+      ["prose instead of the JSON contract", "All done, no JSON here.", "NGHR-FINAL-JSON"],
+    ]) {
+      const refused = attempt(text);
+      assert.equal(refused.status, "not-finalized", `${label}: ${refused.code}`);
+      assert.equal(refused.code, code, label);
+      assert.equal(refused.commit, null, label);
+    }
+    assert.equal(facts.commits, 0);
+    assert.equal(snapshot(commonDir), before);
+    writeFileSync(join(root, "src/extra.mjs"), "export const extra=1;\n");
+    const undeclared = attempt(finalText(binding));
+    assert.notEqual(undeclared.status, "authored-commit-recorded", undeclared.code);
+    assert.equal(facts.commits, 0);
+    assert.equal(git("rev-parse", "HEAD"), binding.candidateCommit);
+    rmSync(join(root, "src/extra.mjs"));
+    const accepted = attempt(finalText(binding));
+    assert.equal(accepted.status, "authored-commit-recorded", accepted.code);
+    assert.equal(facts.commits, 1);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF09", name: "Claude SubagentStop for an unmarked, unknown or mismatching child is a silent not-applicable", run: () => fixture(({ root, commonDir, binding, dependencies, facts, git, writeMeta, stopInput }) => {
+    const meta = { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" };
+    writeMeta("agent-ok", meta);
+    writeMeta("agent-type-drift", { ...meta, agentType: "goldfish-deep" });
+    writeMeta("agent-other-tool", { ...meta, toolUseId: "tool-never-prepared" });
+    writeMeta("agent-top-level", { ...meta, spawnDepth: 0 });
+    writeMeta("agent-general", { ...meta, agentType: "general-purpose" });
+    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    const text = finalText(binding);
+    const before = snapshot(commonDir);
+    for (const [label, over] of [
+      ["meta agentType differs from the stopping agent", { agent_id: "agent-type-drift" }],
+      ["no meta file for the stopping agent", { agent_id: "agent-missing" }],
+      ["meta toolUseId names no pending dispatch", { agent_id: "agent-other-tool" }],
+      ["meta spawnDepth below one", { agent_id: "agent-top-level" }],
+      ["stopping agent is not a Goldfish role", { agent_id: "agent-general", agent_type: "general-purpose" }],
+      ["agent_id escapes the meta directory", { agent_id: "../agent-ok" }],
+      ["session differs from the pending dispatch", { agent_id: "agent-ok", session_id: "session-other" }],
+      ["transcript path is not an absolute .jsonl", { agent_id: "agent-ok", transcript_path: "relative/session.jsonl" }],
+    ]) {
+      const result = finalize(stopInput(binding, text, over));
+      assert.equal(result.status, "not-applicable", `${label}: ${result.code}`);
+      assert.equal(nativeGoldfishHookMessage(result), null, label);
+    }
+    assert.equal(facts.commits, 0);
+    assert.equal(git("rev-parse", "HEAD"), binding.candidateCommit);
+    assert.equal(snapshot(commonDir), before);
+    // The same fixtures with the one child that matches do complete the dispatch.
+    const ok = finalize(stopInput(binding, text, { agent_id: "agent-ok" }));
+    assert.equal(ok.status, "authored-commit-recorded", ok.code);
+    assert.equal(facts.commits, 1);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF10", name: "A foreground pending state is never completed at SubagentStop, and its PostToolUse receipt keeps the original assurance", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    const stopped = finalize(stopInput(binding, finalText(binding)));
+    assert.equal(stopped.status, "not-applicable", stopped.code);
+    assert.equal(nativeGoldfishHookMessage(stopped), null);
+    assert.equal(facts.commits, 0);
+    const completed = finalize({ hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude", tool_use_id: "tool-claude",
+      tool_input: { subagent_type: binding.role, prompt: "marked" },
+      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] } });
+    assert.equal(completed.status, "authored-commit-recorded", completed.code);
+    assert.equal(facts.commits, 1);
+    const receipt = readReceipt(commonDir);
+    assert.equal(receipt.assurance, POST_ASSURANCE);
+    assert.equal(receipt.agentId, null);
+  }) },
 
 ];
 

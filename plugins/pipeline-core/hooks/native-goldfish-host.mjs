@@ -24,6 +24,10 @@ export function nativeGoldfishHookMessage(result) {
   if (result.status === "authored-commit-recorded") {
     return `Goldfish host commit verified: ${result.commit}; v4 dispatch record: ${result.record?.target ?? "written"}.${result.delivery?` Item checks ${result.delivery.checkStatus?.verdict??"unqualified"}; Main integration ${result.integration?.status??"pending"} (${result.integration?.code??"held"}).`:""}`;
   }
+  if (result.status === "awaiting-subagent-stop") {
+    // The SubagentStop completion route is registered and this launch is its pending state: nothing is committed yet.
+    return `Goldfish background launch observed${result.dispatchId ? ` (${result.dispatchId})` : ""}: the host commit completes when this child stops (Claude SubagentStop hook), not at this launch. No commit or authorship record is claimed until then.`;
+  }
   if (result.code === "NGHF-PENDING-UNAVAILABLE") {
     const why = result.reason === "async-launch"
       ? "this Agent call ran in the background (run_in_background true, or an async_launched result), so no final return reached this hook and no pending host-commit state could complete it"
@@ -47,7 +51,9 @@ if (isDirectInvocation(import.meta.url)) {
     result = finalizeNativeGoldfishHostReturn({ runner,
       root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), input });
   } catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION" }; }
-  result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result});
+  // A stop hook must never block the stop: a fault after the finalizer ran degrades to the recovery message, exit 0.
+  try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
+  catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
   const message = nativeGoldfishHookMessage(result);
   if (!message) process.exit(0);
   if (runner === "claude" && input.hook_event_name === "PostToolUse") {
@@ -55,8 +61,9 @@ if (isDirectInvocation(import.meta.url)) {
       hookEventName: "PostToolUse", additionalContext: message,
     } })}\n`);
   } else {
-    // Codex SubagentStop has no documented context-injection field. Keep the hook
-    // non-blocking and surface the exact status through its command stderr channel.
+    // Claude and Codex SubagentStop have no documented context-injection field. Keep the hook
+    // non-blocking (exit 0 always) and surface the exact status through its command stderr channel.
     process.stderr.write(`${message}\n`);
   }
+  process.exit(0);
 }

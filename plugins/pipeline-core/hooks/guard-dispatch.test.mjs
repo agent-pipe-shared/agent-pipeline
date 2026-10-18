@@ -842,7 +842,7 @@ manualCheck("GD57 allow  an item-governed marked Claude dispatch with NO run_in_
 
 manualCheck("GD58 block  an item-governed marked Claude dispatch with an EXPLICIT run_in_background: true stays blocked (typed, no WARNING fallback)", () => {
   const { root, parent } = itemBackgroundRepo();
-  const { code, stderr } = runAt(markedGoldfishDispatch(root, "gd58", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
+  const { code, stderr } = runAtGuard(guardCopyWithHooks("unregistered-pinned", UNREGISTERED_HOOKS), markedGoldfishDispatch(root, "gd58", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
   assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
   assert.ok(stderr.includes(`BLOCKED (guard-dispatch): ${FOREGROUND_CODE}`), `stderr missing the typed BLOCKED code -- got ${JSON.stringify(stderr.slice(0, 300))}`);
   assert.ok(!stderr.includes("WARNING (guard-dispatch): native host-commit preparation failed"), stderr.slice(0, 300));
@@ -862,7 +862,7 @@ manualCheck("GD59 an item-governed marked Claude dispatch with an explicit run_i
 manualCheck("GD60 allow  a marked Claude dispatch that is NOT item-governed is unchanged: key absent and explicit true both continue with the WARNING", () => {
   const { root, parent } = itemBackgroundRepo(false);
   for (const [label, background] of [["key absent", {}], ["explicit true", { run_in_background: true }]]) {
-    const { code, stderr } = runAt(markedGoldfishDispatch(root, `gd60-${label.replace(/\W+/gu, "-")}`, background), root, { GIT_CEILING_DIRECTORIES: parent });
+    const { code, stderr } = runAtGuard(guardCopyWithHooks("unregistered-pinned", UNREGISTERED_HOOKS), markedGoldfishDispatch(root, `gd60-${label.replace(/\W+/gu, "-")}`, background), root, { GIT_CEILING_DIRECTORIES: parent });
     assert.equal(code, ALLOW, `${label}: ${stderr.trim().slice(0, 300)}`);
     assert.ok(stderr.includes(FOREGROUND_WARNING), `${label}: stderr missing the WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
     assert.ok(!stderr.includes("BLOCKED"), `${label}: ${stderr.slice(0, 300)}`);
@@ -872,7 +872,10 @@ manualCheck("GD60 allow  a marked Claude dispatch that is NOT item-governed is u
 // GD61-GD65 -- ALF-G2C2A-BACKGROUND-PENDING-GATE: an explicit `run_in_background: true` is admitted past the foreground
 // check ONLY while the Claude SubagentStop completion route is registered. The guard derives that fact from the
 // hooks/hooks.json that sits beside the running module (never from cwd, the project or an environment switch). GD58/GD60
-// above run the real guard and keep their expectations because the real hooks.json carries no SubagentStop entry yet.
+// above assert the UNREGISTERED behaviour of an explicit run_in_background: true, so they run a guard copy beside a
+// hooks.json with no SubagentStop entry (UNREGISTERED_HOOKS): the shipped hooks.json registers the route, and these two
+// must not depend on whether it does. (Their runtime ids are GD59/GD61: ids are positional, the labels are not.)
+const UNREGISTERED_HOOKS = "{}";
 // The seam for the registered/unregistered variants is the module-location rule itself: a throwaway plugin-shaped
 // directory holding a COPY of the guard (its `./` sibling and `../lib` symlinked, so every import still resolves to the real
 // code), so the copy's import.meta.url -- and therefore the hooks.json it reads -- is the only thing that differs.

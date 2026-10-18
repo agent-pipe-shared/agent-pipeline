@@ -25,6 +25,76 @@ function physicalRoot(value) {
   try { return realpathSync(resolve(value)); } catch { return null; }
 }
 
+import { NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE, nativeGoldfishHostStateInternals } from "./native-goldfish-host-state.mjs";
+import { validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
+import { isAbsolute, join } from "node:path";
+import { readdirSync } from "node:fs";
+
+// The observation receipt is keyed by dispatchId + the NEW host commit, which a replayed stop cannot know, so "already
+// committed" is a scan of the private receipts for this dispatch, candidate and launching call. An unreadable private
+// directory fails closed (treated as consumed); a corrupt single entry is never a match (the HEAD == candidate admission
+// remains the backstop behind this scan).
+function subagentStopAlreadyObserved({ commonDir, state }) {
+  let names;
+  try { names = readdirSync(nativeGoldfishHostStateInternals.privateDirectory(commonDir, false)); } catch { return true; }
+  for (const name of names) {
+    if (!name.startsWith("observation-claude-") || !name.endsWith(".json")) continue;
+    try {
+      const { value } = nativeGoldfishHostStateInternals.readPrivate(commonDir, name);
+      if (value?.runner === "claude" && value.dispatchId === state.binding.dispatchId
+        && value.candidateCommit === state.binding.candidateCommit && value.toolUseId === state.toolUseId) return true;
+    } catch { /* corrupt private evidence is never a match */ }
+  }
+  return false;
+}
+
+// Claude SubagentStop completion of an explicit background dispatch (completionRoute "subagent-stop"). The stop input
+// carries no tool_use_id, so the launching call is resolved from the child's own meta file, exactly as
+// resolveParentDispatchToolUseId does in hooks/guard-dispatch-budget.mjs (re-stated here: lib never imports hooks).
+const SUBAGENT_STOP_ASSURANCE = "host-observed-subagent-stop-correlation-model-not-observed";
+const GOLDFISH_AGENT_TYPES = new Set(["goldfish-implementor", "goldfish-mechanic", "goldfish-deep"]);
+const normalizedAgentType = (value) => typeof value !== "string" ? null
+  : value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
+
+function resolveSubagentStopToolUseId(input) {
+  const transcriptPath = input.transcript_path;
+  if (typeof transcriptPath !== "string" || !isAbsolute(transcriptPath) || !transcriptPath.endsWith(".jsonl")) return null;
+  const agentId = input.agent_id;
+  if (typeof agentId !== "string" || agentId.trim() === "" || agentId.includes("/") || agentId.includes("\\")) return null;
+  let meta;
+  try { meta = JSON.parse(readFileSync(join(transcriptPath.slice(0, -".jsonl".length), "subagents", `agent-${agentId}.meta.json`), "utf8")); }
+  catch { return null; }
+  if (!Number.isFinite(meta?.spawnDepth) || meta.spawnDepth < 1
+    || normalizedAgentType(meta.agentType) !== normalizedAgentType(input.agent_type)
+    || typeof meta.toolUseId !== "string" || meta.toolUseId.trim() === "") return null;
+  return meta.toolUseId;
+}
+
+// Any child that is not a known Goldfish role, has no usable meta file, names no pending dispatch, or belongs to a
+// foreground (PostToolUse-completed) state is simply not this route's: the caller reports a silent not-applicable.
+function readSubagentStopPending({ commonDir, input }) {
+  const agentType = normalizedAgentType(input.agent_type);
+  if (!GOLDFISH_AGENT_TYPES.has(agentType)) return { ok: false, code: "NGHF-NOT-APPLICABLE" };
+  const toolUseId = resolveSubagentStopToolUseId(input);
+  if (toolUseId === null) return { ok: false, code: "NGHF-STOP-UNRESOLVED" };
+  const pending = readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: input.session_id, correlationId: toolUseId });
+  if (!pending.ok) return { ok: false, code: "NGHF-PENDING-UNAVAILABLE" };
+  if (pending.state.completionRoute !== NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE
+    || pending.state.binding?.agentType !== agentType) return { ok: false, code: "NGHF-NOT-SUBAGENT-STOP-ROUTE" };
+  return { ok: true, pending };
+}
+
+// The stop carries no resolved model and no tool_response: only the final message is validated, against the binding.
+// A model identity is never inferred; the receipt names its assurance as correlation-only.
+function observeClaudeSubagentStop(input, pending) {
+  const state = pending.state;
+  if (typeof input.session_id !== "string" || input.session_id !== state.sessionId
+    || state.runner !== "claude" || state.binding?.runner !== "claude"
+    || typeof input.last_assistant_message !== "string") return { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
+  const final = validateNativeGoldfishFinal(input.last_assistant_message, { binding: state.binding });
+  return final.ok ? { ...final, runner: "claude", assurance: SUBAGENT_STOP_ASSURANCE } : final;
+}
+
 // Only the host launch call and its correlated successful return are observed.
 // This is diagnostic history; it cannot attest worker phases or tool counts.
 function observedNativeHostProgress({ state, observation }) {
@@ -98,7 +168,23 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
       return marked ? { ...fail("NGHF-PENDING-UNAVAILABLE"), reason: asyncLaunch ? "async-launch" : "no-pending" }
         : fail("NGHF-NOT-APPLICABLE", "not-applicable");
     }
+    if (pending.state.completionRoute === NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE) {
+      // This state is completed only at SubagentStop. No PostToolUse reads a return, validates, or consumes it; the
+      // async launch is acknowledged, anything else is silent.
+      return input.tool_response?.status === "async_launched"
+        ? { status: "awaiting-subagent-stop", code: "NGHF-AWAITING-SUBAGENT-STOP", dispatchId: pending.state.binding.dispatchId, commit: null, record: null }
+        : fail("NGHF-SUBAGENT-STOP-ROUTE-ONLY", "not-applicable");
+    }
     observation = observeClaudeGoldfishReturn(input, pending.state);
+  } else if (runner === "claude" && input.hook_event_name === "SubagentStop") {
+    const stop = readSubagentStopPending({ commonDir, input });
+    if (!stop.ok) return fail(stop.code, "not-applicable");
+    pending = stop.pending;
+    if (pending.state.root !== physical || pending.state.commonDir !== commonDir) return fail("NGHF-STATE-ROOT-MISMATCH");
+    // Consume once: any observation receipt for this dispatch and candidate means the host already committed (a
+    // replayed stop must not commit again); the HEAD == candidate admission is only the backstop behind this check.
+    if (subagentStopAlreadyObserved({ commonDir, state: pending.state })) return fail("NGHF-RECEIPT-EXISTS", "not-applicable");
+    observation = observeClaudeSubagentStop(input, pending);
   } else if (runner === "codex" && input.hook_event_name === "SubagentStop") {
     pending = readNativeCodexPending({ commonDir, input });
     if (!pending.ok) return fail("NGHF-PENDING-UNAVAILABLE", "not-applicable");
@@ -118,7 +204,11 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
   // Read before committing; new public evidence is published afterwards so it
   // cannot alter the exact diff admitted for this host commit.
   let observedAttempt;
-  try { observedAttempt = inspectNativeGoldfishDispatchAttempt({ repoRoot: physical, runner, input }); }
+  // A SubagentStop completion has no PostToolUse of its own: the attempt/record writer reopens the pending state from a
+  // PostToolUse-shaped selector, so it is handed exactly the identifiers of the launching call and nothing else.
+  const attemptInput = state.completionRoute === NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE && input.hook_event_name === "SubagentStop"
+    ? { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: state.sessionId, tool_use_id: state.toolUseId } : input;
+  try { observedAttempt = inspectNativeGoldfishDispatchAttempt({ repoRoot: physical, runner, input: attemptInput }); }
   catch (error) { return fail(error.code ?? "NGHF-ATTEMPT-ADMISSION"); }
 
   try { prepareNativeGoldfishAuthorityTerminal({repository:inspectSignedDescriptorCustodyRepository(physical),pendingSha256:pending.sha256}); }
@@ -141,7 +231,7 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
   let postCommitStage = "attempt-admission";
   let attempt;
   try {
-    attempt = bindNativeGoldfishDispatchAttempt({ repoRoot: physical, runner, input,
+    attempt = bindNativeGoldfishDispatchAttempt({ repoRoot: physical, runner, input: attemptInput,
       expectedPendingSha256: observedAttempt.pendingSha256 });
     postCommitStage = "record-draft";
     const drafted = draftRecord({ state, observation, commitReadback: committed });
