@@ -73,6 +73,10 @@ function candidate(root,pluginName){
 }
 // Exactly ENOENT: any other failure (ENOTDIR, EACCES, a dangling symlink that still exists as an object) is not "gone".
 function absent(path){try{lstatSync(path);return false;}catch(e){return e?.code==='ENOENT';}}
+export const antigravityPathAbsent=absent;
+// The Pipeline-owned managed-copy location (global): where `plugin install` puts the plugin. One definition site, shared by the registry
+// classification below (dangling-managed) and the refresh host's hook-ownership rule, so the two can never disagree about which path is "ours".
+export function antigravityManagedPluginRoot(configRoot,pluginName='agent-pipeline-core'){return join(configRoot,'config','plugins',pluginName);}
 // `managedRoot` is the Pipeline-owned managed-copy location (global registry only). An entry on exactly that path whose
 // directory no longer exists is what an earlier uninstall leaves behind: a known, removable state, never an unverifiable one.
 function registry(path,pluginName,workspaceRoot=null,managedRoot=null){
@@ -105,7 +109,7 @@ export function observeAntigravityPluginTopology({configRoot,workspaceRoot,appro
     else if(!Array.isArray(imported.value?.imports)||imported.value.imports.length>128)importState.status='unavailable';
     else importState.entries=imported.value.imports.filter(e=>e?.name===pluginName).map(e=>({name:pluginName,source:typeof e.source==='string'?e.source:null}));
   }
-  const registries={global:registry(join(configRoot,'config','plugins.json'),pluginName,null,join(configRoot,'config','plugins',pluginName)),workspace:registry(join(workspaceRoot,'.agents','plugins.json'),pluginName,workspaceRoot)};
+  const registries={global:registry(join(configRoot,'config','plugins.json'),pluginName,null,antigravityManagedPluginRoot(configRoot,pluginName)),workspace:registry(join(workspaceRoot,'.agents','plugins.json'),pluginName,workspaceRoot)};
   const wiring=[join(configRoot,'config','hooks.json'),join(configRoot,'config','external-hooks.json'),join(workspaceRoot,'.agents','hooks.json'),join(workspaceRoot,'.agents','external-hooks.json')].map(path=>{
     const f=optional(path);return {path,status:f.status,sha256:f.sha256??null,ownership:f.status==='observed'?'unclassified':'not-observed'};
   });

@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { observeAntigravityLoadedTopology, observeAntigravityPluginTopology } from '../antigravity-plugin-topology.mjs';
-import { createAntigravityRefreshHost } from '../antigravity-topology-refresh-host.mjs';
+import { createAntigravityRefreshHost, observeAntigravityLoadedTopologyWithWiring } from '../antigravity-topology-refresh-host.mjs';
 import * as snap from '../agy-central-snapshot.mjs';
 import * as installer from '../../install-agy.mjs';
 import { observePublicCoreIdentity, observeRunnerPublicCoreIdentity } from '../public-core-observation.mjs';
@@ -35,7 +35,8 @@ function files(root) {
   return out;
 }
 
-function world(t, { agents = { 'a.md': agentFile('sonnet'), 'b.md': agentFile('haiku') } } = {}) {
+const DEFAULT_HOOKS = '{"pipeline-core":{"PreInvocation":[{"type":"command","command":"node hooks/antigravity-start-hint.mjs"}]}}\n';
+function world(t, { agents = { 'a.md': agentFile('sonnet'), 'b.md': agentFile('haiku') }, hooks = DEFAULT_HOOKS } = {}) {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'agy-view-pin-')));
   const home = join(base, 'home'), configRoot = join(home, '.gemini'), workspaceRoot = join(base, 'workspace');
   const repo = join(base, 'source'), pluginRoot = join(repo, 'plugins', 'pipeline-core'), foreign = join(base, 'foreign-plugin');
@@ -44,7 +45,7 @@ function world(t, { agents = { 'a.md': agentFile('sonnet'), 'b.md': agentFile('h
   for (const dir of [join(configRoot, 'config', 'plugins'), workspaceRoot, foreign, join(pluginRoot, 'hooks'), join(pluginRoot, 'skills', 'critic-review'), join(pluginRoot, 'scripts'), join(pluginRoot, 'agents'), join(pluginRoot, 'lib')]) mkdirSync(dir, { recursive: true });
   writeFileSync(join(foreign, 'plugin.json'), '{"name":"foreign-plugin","version":"1.0.0"}\n');
   writeFileSync(join(pluginRoot, 'plugin.json'), `{"name":"${NAME}","version":"0.7.0","description":"Synthetic test plugin"}\n`);
-  writeFileSync(join(pluginRoot, 'hooks.json'), '{"pipeline-core":{"PreInvocation":[{"type":"command","command":"node hooks/antigravity-start-hint.mjs"}]}}\n');
+  writeFileSync(join(pluginRoot, 'hooks.json'), hooks);
   for (const path of ['hooks/antigravity-pretool-guard.mjs', 'hooks/antigravity-start-hint.mjs', 'skills/critic-review/SKILL.md', 'scripts/pipeline-start-preflight.mjs', 'lib/example.test.mjs']) writeFileSync(join(pluginRoot, path), '// synthetic fixture\n');
   writeFileSync(join(pluginRoot, 'skills', 'critic-review', 'NOTES.md'), 'model: sonnet\nuntouched outside agents\n');
   for (const [name, body] of Object.entries(agents)) writeFileSync(join(pluginRoot, 'agents', name), body);
@@ -486,4 +487,172 @@ test('bounded storage: a refused validate prunes nothing', (t) => {
   const after = names(w);
   assert.equal(after.length, before.length + 1, 'only the newly generated view was added');
   assert.deepEqual(before.filter((name) => !after.includes(name)), [], 'the older view and the unreferenced view are both still there');
+});
+
+// ---- dangling hook wiring: hook commands that point into a managed copy an earlier uninstall removed ------------------------------
+// The state the installer's option 2 met on a real configuration: the managed copy is gone, the global registry still names it (next to
+// a developer checkout of the same plugin), and the global hook wiring still runs scripts from the removed directory. Those scripts
+// cannot exist any more, so the Pipeline owns the commands; they follow the same rewrite as any other owned command.
+
+// The real source's hook manifest lists both scripts; the fixture default lists only the start hint.
+const BOTH_HOOKS = '{"pipeline-core":{"PreToolUse":[{"type":"command","command":"node hooks/antigravity-pretool-guard.mjs"}],"PreInvocation":[{"type":"command","command":"node hooks/antigravity-start-hint.mjs"}]}}\n';
+const FLASH_PRO = { 'a.md': agentFile('flash'), 'b.md': agentFile('pro') };
+const hookCommand = (root, name, arg = '') => `node "${join(root, 'hooks', `${name}.mjs`)}"${arg}`;
+const hookLine = (command) => `{"type":"command","command":${JSON.stringify(command)}}`;
+const danglingHooks = (w) => `{\n "hooks": {\n  "PreToolUse": [\n   { "type": "command", "command": ${JSON.stringify(hookCommand(w.managed, 'antigravity-pretool-guard'))} },\n   {"type":"command","command":"foreign-check --safe"}\n  ],\n  "PreInvocation": [ {"type":"command", "command":${JSON.stringify(hookCommand(w.managed, 'antigravity-start-hint'))}} ]\n },\n "foreign": { "keep": true }\n}\n`;
+
+function poState(t, { hooks = danglingHooks, agents = FLASH_PRO } = {}) {
+  const w = world(t, { agents, hooks: BOTH_HOOKS });
+  const developer = join(w.base, 'developer-checkout', 'plugins', 'pipeline-core');
+  mkdirSync(dirname(developer), { recursive: true });
+  cpSync(w.pluginRoot, developer, { recursive: true });
+  writeFileSync(w.importsPath, '{"imports":null}\n');
+  writeFileSync(w.registryPath, `{\n "entries":[\n  {"path":${JSON.stringify(w.managed)}},\n  ${FOREIGN_ENTRY(w)},\n  {"path":${JSON.stringify(developer)}}\n ]\n}\n`);
+  w.developer = developer;
+  w.hooksPath = join(w.configRoot, 'config', 'hooks.json');
+  writeFileSync(w.hooksPath, hooks(w));
+  assert.equal(existsSync(w.managed), false, 'the managed copy is gone');
+  return w;
+}
+const registryPaths = (w) => JSON.parse(readFileSync(w.registryPath, 'utf8')).entries.map((entry) => entry.path);
+
+test('PO state: hook commands into the removed managed copy are rewritten together with the registry rebind and the install, foreign bytes kept', (t) => {
+  const w = poState(t);
+  const before = readFileSync(w.hooksPath, 'utf8');
+  const cli = fakeCli(w);
+  const subject = host(w, cli.run);
+  const plan = subject.prepare();
+  assert.equal(plan.status, 'prepared', JSON.stringify(plan));
+  assert.deepEqual(plan.actions.map((action) => (action.kind === 'cli' ? `cli:${action.argv[1]}` : `${action.kind}:${action.scope}`)),
+    ['cli:validate', 'cli:install', 'owned-wiring-rebind:global', 'owned-registry-rebind:global']);
+  const rebind = plan.actions.find((action) => action.kind === 'owned-wiring-rebind');
+  assert.equal(rebind.path, w.hooksPath);
+  assert.equal(rebind.changes, 2);
+  assert.equal(rebind.preserveForeignBytes, true);
+  assert.equal(readFileSync(w.hooksPath, 'utf8'), before, 'prepare changes nothing');
+  assert.deepEqual(verbs(cli.calls), []);
+
+  const result = subject.refresh();
+  assert.equal(result.status, 'refreshed', JSON.stringify(result));
+  assert.deepEqual(result.completed, ['validate', 'install', 'wiring-rebind', 'global-registry-rebind']);
+  const after = readFileSync(w.hooksPath, 'utf8');
+  assert.equal(after, before.replaceAll(join(w.managed, 'hooks'), join(w.pluginRoot, 'hooks')), 'only the two command strings changed; every other byte is the original');
+  assert.equal(after.includes(w.managed), false, 'no hook points into the removed location any more');
+  assert.equal(after.includes('foreign-check --safe'), true);
+  assert.deepEqual(registryPaths(w), [w.foreign, w.pluginRoot], 'the dangling entry and the developer checkout are replaced by exactly the source entry');
+  assert.ok(readFileSync(w.registryPath, 'utf8').includes(FOREIGN_ENTRY(w)), 'the foreign registry entry bytes are kept exactly');
+  assert.equal(readFileSync(w.importsPath, 'utf8').includes('foreign'), false, 'no foreign import was invented');
+  assert.deepEqual(verbs(cli.calls), ['validate', 'install']);
+  const again = subject.refresh();
+  assert.equal(again.status, 'refreshed', JSON.stringify(again));
+  assert.equal(again.changed, false, 'the converged state needs no further change');
+});
+
+test('PO state through the runner view (option 2): the hooks end up inside the installed view and none in the removed location', (t) => {
+  const w = poState(t, { agents: { 'a.md': agentFile('sonnet'), 'b.md': agentFile('haiku') } });
+  const before = readFileSync(w.hooksPath, 'utf8');
+  const cli = fakeCli(w);
+  const result = installView(w, cli);
+  assert.equal(result.status, 'refreshed', JSON.stringify(result));
+  const viewRoot = cli.calls.find((argv) => argv[1] === 'install')[2];
+  const after = readFileSync(w.hooksPath, 'utf8');
+  assert.equal(after, before.replaceAll(join(w.managed, 'hooks'), join(viewRoot, 'hooks')));
+  assert.equal(after.includes(w.managed), false);
+  assert.deepEqual(registryPaths(w), [w.foreign, viewRoot]);
+});
+
+test('a hook command into the removed managed location that no template covers is deleted from its array, foreign commands stay', (t) => {
+  const w = poState(t, {
+    hooks: (state) => `{\n "hooks": [\n  ${hookLine(hookCommand(state.managed, 'antigravity-start-hint'))},\n  ${hookLine(hookCommand(state.managed, 'antigravity-retired-hook'))},\n  ${hookLine(hookCommand(state.managed, 'antigravity-start-hint', ' deliver'))},\n  {"type":"command","command":"foreign-check --safe"}\n ],\n "foreign": {"keep":true}\n}\n`,
+  });
+  const cli = fakeCli(w);
+  const subject = host(w, cli.run);
+  const plan = subject.prepare();
+  assert.equal(plan.status, 'prepared', JSON.stringify(plan));
+  assert.equal(plan.actions.find((action) => action.kind === 'owned-wiring-rebind').changes, 3, 'one rewrite and two deletions');
+  const result = subject.refresh();
+  assert.equal(result.status, 'refreshed', JSON.stringify(result));
+  const parsed = JSON.parse(readFileSync(w.hooksPath, 'utf8'));
+  assert.deepEqual(parsed.hooks, [JSON.parse(hookLine(hookCommand(w.pluginRoot, 'antigravity-start-hint'))), { type: 'command', command: 'foreign-check --safe' }]);
+  assert.deepEqual(parsed.foreign, { keep: true });
+  assert.equal(readFileSync(w.hooksPath, 'utf8').includes(w.managed), false);
+});
+
+test('a template-less hook command into the removed managed location outside an array stays the typed refusal, nothing changes', (t) => {
+  const w = poState(t, { hooks: (state) => `{"hooks":{"PreToolUse":${hookLine(hookCommand(state.managed, 'antigravity-retired-hook'))}}}\n` });
+  const before = files(w.configRoot);
+  const cli = fakeCli(w);
+  const subject = host(w, cli.run);
+  const plan = subject.prepare();
+  assert.deepEqual({ status: plan.status, reason: plan.reason }, { status: 'refused', reason: 'ATR-WIRING-OWNERSHIP-UNVERIFIABLE' });
+  const result = subject.refresh();
+  assert.deepEqual({ status: result.status, reason: result.reason, completed: result.completed }, { status: 'refused', reason: 'ATR-WIRING-OWNERSHIP-UNVERIFIABLE', completed: [] });
+  assert.deepEqual(verbs(cli.calls), []);
+  assert.deepEqual(files(w.configRoot), before);
+});
+
+test('a pipeline-shaped hook command into any other absent location is still refused: elsewhere, a sibling of the managed location, an escape from it, the location itself', (t) => {
+  const w = poState(t);
+  const cli = fakeCli(w);
+  const scripts = {
+    elsewhere: join(w.base, 'elsewhere', NAME, 'hooks', 'antigravity-start-hint.mjs'),
+    'sibling whose name starts with the managed name': join(w.configRoot, 'config', 'plugins', `${NAME}x`, 'hooks', 'antigravity-start-hint.mjs'),
+    'escape through the managed location': `${w.managed}/../other-plugin/hooks/antigravity-start-hint.mjs`,
+    'the managed location itself': w.managed,
+  };
+  for (const [label, script] of Object.entries(scripts)) {
+    writeFileSync(w.hooksPath, `{"hooks":[${hookLine(`node "${script}"`)}]}\n`);
+    const before = files(w.configRoot);
+    const plan = host(w, cli.run).prepare();
+    assert.deepEqual({ status: plan.status, reason: plan.reason }, { status: 'refused', reason: 'ATR-WIRING-OWNERSHIP-UNVERIFIABLE' }, label);
+    const result = host(w, cli.run).refresh();
+    assert.deepEqual({ status: result.status, reason: result.reason, completed: result.completed }, { status: 'refused', reason: 'ATR-WIRING-OWNERSHIP-UNVERIFIABLE', completed: [] }, label);
+    assert.deepEqual(files(w.configRoot), before, label);
+  }
+  assert.deepEqual(verbs(cli.calls), []);
+});
+
+test('a hook command into the managed location while it exists keeps the old rule: owned only through the copy\'s own template set', (t) => {
+  const w = world(t, { agents: FLASH_PRO, hooks: BOTH_HOOKS });
+  cpSync(w.pluginRoot, w.managed, { recursive: true });
+  writeFileSync(join(w.managed, 'plugin.json'), `{"name":"${NAME}","version":"0.6.0","description":"Older synthetic copy"}\n`);
+  writeFileSync(w.importsPath, `{"imports":[{"name":"${NAME}"}]}\n`);
+  writeFileSync(w.registryPath, `{\n "entries":[\n  ${FOREIGN_ENTRY(w)},\n  {"path":${JSON.stringify(w.managed)}}\n ]\n}\n`);
+  const hooksPath = join(w.configRoot, 'config', 'hooks.json');
+  writeFileSync(hooksPath, `{"hooks":[${hookLine(hookCommand(w.managed, 'antigravity-start-hint'))},${hookLine(hookCommand(w.managed, 'antigravity-retired-hook'))}]}\n`);
+  const before = files(w.configRoot);
+  const cli = fakeCli(w);
+  const result = host(w, cli.run).refresh();
+  assert.deepEqual({ status: result.status, reason: result.reason, completed: result.completed }, { status: 'refused', reason: 'ATR-WIRING-OWNERSHIP-UNVERIFIABLE', completed: [] });
+  assert.deepEqual(verbs(cli.calls), []);
+  assert.deepEqual(files(w.configRoot), before);
+});
+
+test('the loaded-topology wiring observation stays fail-closed and surfaces the inner typed ATR reason, any other failure keeps the generic one', (t) => {
+  const w = world(t);
+  writeFileSync(w.importsPath, '{"imports":null}\n');
+  writeFileSync(w.registryPath, `{"entries":[{"path":${JSON.stringify(w.pluginRoot)}}]}\n`);
+  const loaded = () => observeAntigravityLoadedTopologyWithWiring({ loadedPluginRoot: w.pluginRoot, configRoot: w.configRoot, workspaceRoot: w.workspaceRoot });
+  const current = loaded();
+  assert.equal(current.status, 'current', JSON.stringify(current));
+  assert.equal(current.wiringStatus, 'current-or-foreign');
+  const unverifiable = (reason) => {
+    const seen = loaded();
+    assert.equal(seen.status, 'unavailable', JSON.stringify(seen));
+    assert.equal(seen.wiringStatus, 'unverifiable');
+    assert.equal(seen.reason, reason, JSON.stringify(seen));
+  };
+  // A typed inner reason is surfaced.
+  const manifest = join(w.pluginRoot, 'hooks.json');
+  writeFileSync(manifest, '{"pipeline-core":{"PreInvocation":[{"type":"command","command":"node scripts/not-a-hook.mjs"}]}}\n');
+  unverifiable('ATR-HOOK-TEMPLATE');
+  rmSync(manifest);
+  unverifiable('ATR-HOOK-MANIFEST');
+  // An error that is not a typed ATR code keeps the generic reason (here: a template names a script that does not exist).
+  writeFileSync(manifest, '{"pipeline-core":{"PreInvocation":[{"type":"command","command":"node hooks/antigravity-missing-script.mjs"}]}}\n');
+  unverifiable('ATR-WIRING-OWNERSHIP-UNVERIFIABLE');
+  // An unproved pipeline-shaped command is itself the generic typed reason.
+  writeFileSync(manifest, DEFAULT_HOOKS);
+  writeFileSync(join(w.configRoot, 'config', 'hooks.json'), `{"hooks":[${hookLine(`node "${join(w.base, 'elsewhere', NAME, 'hooks', 'antigravity-start-hint.mjs')}"`)}]}\n`);
+  unverifiable('ATR-WIRING-OWNERSHIP-UNVERIFIABLE');
 });

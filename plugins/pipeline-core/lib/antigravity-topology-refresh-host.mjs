@@ -5,7 +5,7 @@ import {mkdirSync,lstatSync,realpathSync,openSync,closeSync,writeFileSync,fsyncS
 import {join,dirname,resolve,isAbsolute,relative,sep} from 'node:path';
 import {homedir} from 'node:os';
 import {randomUUID} from 'node:crypto';
-import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256,supportsAntigravityPluginCliVersion} from './antigravity-plugin-topology.mjs';
+import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256,supportsAntigravityPluginCliVersion,antigravityManagedPluginRoot,antigravityPathAbsent} from './antigravity-plugin-topology.mjs';
 import {rewriteAntigravityJsonBytes} from './antigravity-json-spans.mjs';
 import {createHash} from 'node:crypto';
 const NAME='agent-pipeline-core';
@@ -39,6 +39,8 @@ function wiring(observation,configRoot,workspaceRoot){
  if(/["'\r\n$`;&|<>]/.test(observation.source.root))throw Error('ATR-UNSAFE-COMMAND-PATH');
  const roots=[observation.source,...observation.managed.candidates,...Object.values(observation.registries).flatMap(r=>r.entries)].filter(c=>c.status==='observed');
  const sets=new Map(roots.map(c=>[c.root,templates(c.root)]));const desired=sets.get(observation.source.root),result=[];
+ // The managed-copy location while it is gone (an earlier uninstall removed it): its scripts cannot exist, so a command into it is Pipeline-owned.
+ const managedRoot=antigravityManagedPluginRoot(configRoot,NAME),managedGone=antigravityPathAbsent(managedRoot);
  for(const [scope,path] of [['global',join(configRoot,'config','hooks.json')],['global',join(configRoot,'config','external-hooks.json')],['workspace',join(workspaceRoot,'.agents','hooks.json')],['workspace',join(workspaceRoot,'.agents','external-hooks.json')]]){
   const f=read(path);if(f.status==='absent'){result.push({scope,path,sha256:null,nextBytes:null,changes:0});continue;}
   let changes=0,visits=0;const replacements=[],deletions=[];
@@ -48,7 +50,11 @@ function wiring(observation,configRoot,workspaceRoot){
    if(value===null||typeof value!=='object')return value;
    if(Object.hasOwn(value,'command')){
     const c=command(value.command);let owner=null,key=null;
-    if(c&&isAbsolute(c.path))for(const [root,set] of sets){{const rel=within(root,c.path);if(rel===null)continue;const candidate=rel+'\0'+(c.arg??'');if(set.has(candidate)){owner=root;key=candidate;break;}}}
+    if(c&&isAbsolute(c.path)){
+     for(const [root,set] of sets){{const rel=within(root,c.path);if(rel===null)continue;const candidate=rel+'\0'+(c.arg??'');if(set.has(candidate)){owner=root;key=candidate;break;}}}
+     // Strictly inside the vanished managed location: owned whether or not the approved source still ships that script (rewritten, or deleted from its array below).
+     if(owner===null&&managedGone){const rel=within(managedRoot,c.path);if(rel!==null){owner=managedRoot;key=rel+'\0'+(c.arg??'');}}
+    }
     if(owner!==null){if(!desired.has(key)){if(!parentArray)throw Error('ATR-WIRING-OWNERSHIP-UNVERIFIABLE');changes++;deletions.push(location);return;}const [rel,arg]=key.split('\0'),next='node "'+join(observation.source.root,rel)+'"'+(arg?' '+arg:'');if(next!==value.command){changes++;replacements.push({path:[...location,'command'],value:next});}return;}
     // A pipeline-shaped but unproved command is held, not foreign-classified.
     if(typeof value.command==='string'&&(/pipeline-core|antigravity-(?:pretool|start|stop|slicing)/.test(value.command)||roots.some(r=>value.command.includes(r.root))))throw Error('ATR-WIRING-OWNERSHIP-UNVERIFIABLE');
@@ -65,7 +71,7 @@ export function resolveAntigravityCliPath(){const r=spawnSync(process.platform==
 export function observeAntigravityLoadedTopologyWithWiring(args){
  const result=observeAntigravityLoadedTopology(args);if(result.status==='unavailable')return result;
  try{const observation=observeAntigravityPluginTopology({configRoot:args.configRoot,workspaceRoot:args.workspaceRoot,approvedSourceRoot:result.sourcePluginRoot});const plans=wiring(observation,args.configRoot,args.workspaceRoot);return Object.freeze({...result,status:result.status==='current'&&plans.some(p=>p.changes>0)?'refresh-required':result.status,wiringStatus:plans.some(p=>p.changes>0)?'stale-owned':'current-or-foreign'});}
- catch{return Object.freeze({...result,status:'unavailable',reason:'ATR-WIRING-OWNERSHIP-UNVERIFIABLE',wiringStatus:'unverifiable'});}
+ catch(e){return Object.freeze({...result,status:'unavailable',reason:/^ATR-[A-Z-]+$/.test(e?.message)?e.message:'ATR-WIRING-OWNERSHIP-UNVERIFIABLE',wiringStatus:'unverifiable'});}
 }
 export function observeAntigravityWorkspaceBindings({workspaceRoot}){
  const path=join(workspaceRoot,'.agents','plugins.json');
