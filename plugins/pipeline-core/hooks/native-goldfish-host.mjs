@@ -32,7 +32,9 @@ export function nativeGoldfishHookMessage(result) {
     const why = result.reason === "async-launch"
       ? "this Agent call ran in the background (run_in_background true, or an async_launched result), so no final return reached this hook and no pending host-commit state could complete it"
       : "no pending host-commit state was prepared for this launch (the PreToolUse WARNING names the preparation code)";
-    return `Goldfish host commit was not completed (${result.code}): ${why}. No commit or authorship record is claimed. Orchestrator route: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
+    // PF-26B: when the PreToolUse guard recorded why preparation failed, name that exact code instead of pointing at a warning.
+    const prepared = typeof result.preparationCode === "string" ? ` The pre-launch preparation failed with ${result.preparationCode}.` : "";
+    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Orchestrator route: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
   }
   return `Goldfish host commit was not completed (${result.code}). No commit or authorship record is claimed; inspect the worktree and recover explicitly if Git may have changed.`;
 }

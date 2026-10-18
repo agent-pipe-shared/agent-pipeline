@@ -831,9 +831,16 @@ function pendingNativeStates(root) {
 }
 const FOREGROUND_WARNING = `WARNING (guard-dispatch): native host-commit preparation failed (${FOREGROUND_CODE}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.`;
 
-manualCheck("GD57 allow  an item-governed marked Claude dispatch with NO run_in_background key continues with the WARNING and claims no authorship", () => {
+// D19 (PF-26) re-pin of the ALF-G2C2A keyless refusal: with the SubagentStop route REGISTERED (the shipped hooks.json this
+// real guard reads) a keyless item-governed dispatch takes the SubagentStop route like an explicit true and stops only at
+// the next preparation step (the candidate check); with the route UNREGISTERED it keeps the WARNING and claims no authorship.
+manualCheck("GD57 block  D19: an item-governed marked Claude dispatch with NO run_in_background key passes the foreground check while the route is registered (stops at the candidate check); UNREGISTERED it continues with the WARNING and claims no authorship", () => {
   const { root, parent } = itemBackgroundRepo();
-  const { code, stderr } = runAt(markedGoldfishDispatch(root, "gd57", {}), root, { GIT_CEILING_DIRECTORIES: parent });
+  const registered = runAt(markedGoldfishDispatch(root, "gd57", {}), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.ok(!registered.stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the keyless launch -- got ${JSON.stringify(registered.stderr.slice(0, 300))}`);
+  assert.equal(registered.code, BLOCK, `exit ${registered.code} (expected ${BLOCK}) -- ${registered.stderr.trim().slice(0, 300)}`);
+  assert.ok(registered.stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(registered.stderr.slice(0, 300))}`);
+  const { code, stderr } = runAtGuard(guardCopyWithHooks("unregistered-pinned", UNREGISTERED_HOOKS), markedGoldfishDispatch(root, "gd57-unregistered", {}), root, { GIT_CEILING_DIRECTORIES: parent });
   assert.equal(code, ALLOW, stderr.trim().slice(0, 300));
   assert.ok(stderr.includes(FOREGROUND_WARNING), `stderr missing the background-only WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
   assert.ok(!stderr.includes("BLOCKED"), stderr.slice(0, 300));
@@ -926,13 +933,14 @@ manualCheck("GD62 allow  REGISTERED: a marked Claude dispatch that is NOT item-g
   assert.ok(!stderr.includes("BLOCKED"), stderr.slice(0, 300));
 });
 
-manualCheck("GD63 allow  REGISTERED: a MISSING run_in_background key is still the background-only fallback (the registration never admits an absent key)", () => {
+manualCheck("GD63 block  D19 REGISTERED: a MISSING run_in_background key takes the same route as an explicit true (passes the foreground check, stops at the candidate check)", () => {
   const { root, parent } = itemBackgroundRepo();
   const guard = guardCopyWithHooks("registered", REGISTERED_HOOKS);
   const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd63", {}), root, { GIT_CEILING_DIRECTORIES: parent });
-  assert.equal(code, ALLOW, stderr.trim().slice(0, 300));
-  assert.ok(stderr.includes(FOREGROUND_WARNING), `stderr missing the background-only WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  assert.ok(!stderr.includes("BLOCKED"), stderr.slice(0, 300));
+  assert.ok(!stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the keyless launch -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
+  assert.ok(stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.deepEqual(pendingNativeStates(root), []);
 });
 
 manualCheck("GD64 an unreadable, malformed or non-matching hooks.json fails closed to today's behaviour for an explicit run_in_background: true", () => {

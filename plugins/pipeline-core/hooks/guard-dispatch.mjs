@@ -81,7 +81,7 @@ import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-reco
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
-import { prepareNativeGoldfishHostState, resolveGovernedItemQueue, prepareGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
@@ -859,12 +859,19 @@ if (isDirectInvocation(import.meta.url)) {
           // the Claude SubagentStop completion route is registered (claudeSubagentStopCompletionRegistered, read from
           // the hooks.json beside this module). Unregistered (or unreadable), NGHS-CLAUDE-FOREGROUND-REQUIRED
           // also fires for it, and that stays BLOCKED for an item-governed dispatch and warns otherwise.
+          // D19 (PF-26): with the route REGISTERED a launch with NO run_in_background key is admitted exactly like an
+          // explicit true (it takes the SubagentStop completion route), so this fallback now only fires for a keyless
+          // launch while the route is unregistered or unreadable. A preparation failure for any other reason stays BLOCKED
+          // for an item-governed dispatch, as before.
           const claudeBackgroundOnly = nativeRunner === "claude" && prepared.code === "NGHS-CLAUDE-FOREGROUND-REQUIRED"
             && !Object.hasOwn(toolInput, "run_in_background");
           if (markedV2.length > 0 || (itemGovernanceRequired && !claudeBackgroundOnly)) {
             process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.\n`);
             process.exit(2);
           }
+          // The dispatch continues with no pending state: leave the typed code where this launch's PostToolUse can name it
+          // (PF-26B; best effort, diagnostic only -- a failed write never changes the outcome).
+          recordNativeGoldfishPrepareFailure({ root: rootDir, runner: nativeRunner, input, code: prepared.code });
           process.stderr.write(`WARNING (guard-dispatch): native host-commit preparation failed (${prepared.code}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.\n`);
         }
       }

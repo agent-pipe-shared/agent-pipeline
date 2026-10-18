@@ -47,12 +47,12 @@ function safeRunner(value) { return RUNNERS.has(value); }
 function safeCorrelation(value) { return typeof value === "string" && value.length > 0 && value.length <= 512; }
 function key(kind, runner, value) { return `${kind}-${runner}-${digest(value)}.json`; }
 
-function privateDirectory(commonDir, create) {
+function privateDirectory(commonDir, create, subdirs = SUBDIRS) {
   if (typeof commonDir !== "string" || !isAbsolute(commonDir)) throw new Error("NGHS-ROOT");
   let path = resolve(commonDir);
   const root = lstatSync(path);
   if (!root.isDirectory() || root.isSymbolicLink() || realpathSync(path) !== path) throw new Error("NGHS-ROOT");
-  for (const component of SUBDIRS) {
+  for (const component of subdirs) {
     path = join(path, component);
     if (create) {
       try { mkdirSync(path, { mode: 0o700 }); }
@@ -64,8 +64,8 @@ function privateDirectory(commonDir, create) {
   return path;
 }
 
-function writeExclusive(commonDir, name, value) {
-  const path = privateDirectory(commonDir, true);
+function writeExclusive(commonDir, name, value, subdirs = SUBDIRS) {
+  const path = privateDirectory(commonDir, true, subdirs);
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
   if (bytes.length > MAX_BYTES) throw new Error("NGHS-SIZE");
   const temp = `.${name}.${randomBytes(16).toString("hex")}.tmp`;
@@ -91,7 +91,7 @@ function writeExclusive(commonDir, name, value) {
     if (after.dev !== published.dev || after.ino !== published.ino || after.size !== published.size
       || after.mtimeMs !== published.mtimeMs || target.isSymbolicLink()
       || target.dev !== published.dev || target.ino !== published.ino || !readback.equals(bytes)) throw new Error("NGHS-READBACK");
-    return { ok: true, code: "NGHS-STORED", sha256: digest(bytes), path: join(...SUBDIRS, name) };
+    return { ok: true, code: "NGHS-STORED", sha256: digest(bytes), path: join(...subdirs, name) };
   } finally {
     if (tempFd !== undefined) closeSync(tempFd);
     if (targetFd !== undefined) closeSync(targetFd);
@@ -99,8 +99,8 @@ function writeExclusive(commonDir, name, value) {
   }
 }
 
-function readPrivate(commonDir, name) {
-  const path = privateDirectory(commonDir, false);
+function readPrivate(commonDir, name, subdirs = SUBDIRS) {
+  const path = privateDirectory(commonDir, false, subdirs);
   const target = join(path, name);
   const before = lstatSync(target);
   if (!before.isFile() || before.isSymbolicLink() || before.size < 1 || before.size > MAX_BYTES) throw new Error("NGHS-TARGET");
@@ -154,8 +154,14 @@ export function prepareNativeGoldfishHostState({ root, runner, input, subagentSt
   const parsed = parseNativeGoldfishBriefing(fields.prompt);
   if (!parsed.ok) return fail(parsed.code);
   // A background launch is admitted only when the caller states the SubagentStop completion route is registered, so a
-  // pending state is never written for a dispatch nothing would complete. A missing run_in_background key never qualifies.
-  const backgroundCompletion = runner === "claude" && fields.runInBackground === true && subagentStopCompletionRegistered === true;
+  // pending state is never written for a dispatch nothing would complete. D19 (PF-26): the Claude host launches every
+  // Agent-tool subagent asynchronously and its tool input may carry NO run_in_background key, so an ABSENT key takes the
+  // same SubagentStop route as an explicit true. An explicit false keeps the foreground (PostToolUse) route; any other
+  // value (null, a string, a number) and an unregistered or unreadable route keep the NGHS-CLAUDE-FOREGROUND-REQUIRED refusal.
+  // SubagentStop also fires for a child that happened to run in the foreground, and a subagent-stop state answers a
+  // non-async PostToolUse silently (NGHF-SUBAGENT-STOP-ROUTE-ONLY), so such a child is still committed exactly once.
+  const backgroundCapable = fields.runInBackground === true || fields.runInBackground === undefined;
+  const backgroundCompletion = runner === "claude" && backgroundCapable && subagentStopCompletionRegistered === true;
   if (runner === "claude" && fields.runInBackground !== false && !backgroundCompletion) return fail("NGHS-CLAUDE-FOREGROUND-REQUIRED");
   const binding = parsed.binding;
   const deliveryQueue = binding.itemDelivery
@@ -205,6 +211,38 @@ export function prepareNativeGoldfishHostState({ root, runner, input, subagentSt
   try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state); }
   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??null}; }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
+}
+
+// Preparation-failure sidecar (PF-26B). A marked dispatch whose preparation failed but which still continued leaves NO
+// pending state, so its PostToolUse could only say "no pending state". The guard records the typed preparation code here,
+// keyed by runner, session and tool_use_id, in a directory SIBLING to native-goldfish-host-commit (so the authority
+// inventory of that directory never sees it); the PostToolUse hook names the code. Best effort and diagnostic only: it
+// confers no authority, a failed write never changes the dispatch outcome, and the first record for a launch wins.
+export const NATIVE_GOLDFISH_PREPARE_FAILURE_SCHEMA = "pipeline.native-goldfish-host-prepare-failure.v1";
+const PREPARE_FAILURE_SUBDIRS = ["agent-pipeline", "run", "native-goldfish-host-prepare-failure"];
+const PREPARE_FAILURE_CODE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
+export function recordNativeGoldfishPrepareFailure({ root, runner, input, code } = {}, dependencies = {}) {
+  try {
+    if (!safeRunner(runner) || typeof code !== "string" || !PREPARE_FAILURE_CODE.test(code)) return fail("NGHS-PREPARE-FAILURE-INPUT");
+    const fields = toolFields(runner, input);
+    if (!fields || !safeCorrelation(fields.correlation) || !ID.test(fields.sessionId ?? "")) return fail("NGHS-PREPARE-FAILURE-INPUT");
+    const physicalRoot = realpathSync(resolve(root ?? input.cwd ?? process.cwd()));
+    const commonDir = (dependencies.resolveCommonDir ?? resolveGitCommonDir)(physicalRoot);
+    if (typeof commonDir !== "string") return fail("NGHS-COMMON-DIR");
+    return writeExclusive(commonDir, key("prepare-failure", runner, `${fields.sessionId}\0${fields.correlation}`), {
+      schema: NATIVE_GOLDFISH_PREPARE_FAILURE_SCHEMA, runner, sessionId: fields.sessionId, toolUseId: fields.correlation, code,
+    }, PREPARE_FAILURE_SUBDIRS);
+  } catch { return fail("NGHS-PREPARE-FAILURE-WRITE"); }
+}
+/** The recorded preparation code of one launch, or null when none was recorded or the record is not exactly this launch's. */
+export function readNativeGoldfishPrepareFailure({ commonDir, runner, sessionId, correlationId } = {}) {
+  try {
+    if (!safeRunner(runner) || !ID.test(sessionId ?? "") || !safeCorrelation(correlationId)) return null;
+    const { value } = readPrivate(commonDir, key("prepare-failure", runner, `${sessionId}\0${correlationId}`), PREPARE_FAILURE_SUBDIRS);
+    return exact(value, ["schema", "runner", "sessionId", "toolUseId", "code"]) && value.schema === NATIVE_GOLDFISH_PREPARE_FAILURE_SCHEMA
+      && value.runner === runner && value.sessionId === sessionId && value.toolUseId === correlationId
+      && typeof value.code === "string" && PREPARE_FAILURE_CODE.test(value.code) ? value.code : null;
+  } catch { return null; }
 }
 
 /** Codex's SubagentStart lacks tool_use_id: permit only one exact waiting native dispatch. */

@@ -635,14 +635,21 @@ const cases = [
       assert.equal(refused.code, "NGHS-CLAUDE-FOREGROUND-REQUIRED", label);
     }
     assert.deepEqual(pendingFiles(), [], "a refused background launch must leave no pending state");
-    // A missing run_in_background key stays refused even when the completion route is registered (NGHS02 unchanged).
-    const keyless = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch("s-keyless", "t-keyless", undefined), subagentStopCompletionRegistered: true }, deps);
-    assert.equal(keyless.code, "NGHS-CLAUDE-FOREGROUND-REQUIRED");
+    // D19 (PF-26): a missing run_in_background key is refused WITHOUT the completion-route fact (NGHS02 unchanged) ...
+    const keylessRefused = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch("s-keyless-refused", "t-keyless-refused", undefined) }, deps);
+    assert.equal(keylessRefused.code, "NGHS-CLAUDE-FOREGROUND-REQUIRED");
     assert.deepEqual(pendingFiles(), []);
+    // ... and, WITH the registered fact, takes the SubagentStop route exactly like an explicit true.
+    const keyless = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch("s-keyless", "t-keyless", undefined), subagentStopCompletionRegistered: true }, deps);
+    assert.equal(keyless.ok, true, JSON.stringify(keyless));
+    assert.equal(pendingFiles().length, 1);
+    const keylessReadback = readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: "s-keyless", correlationId: "t-keyless" });
+    assert.equal(keylessReadback.ok, true, keylessReadback.code);
+    assert.equal(keylessReadback.state.completionRoute, "subagent-stop");
     // Explicit background plus the registered fact is admitted and records the one exact discriminator.
     const admitted = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch("s-bg", "t-bg", true), subagentStopCompletionRegistered: true }, deps);
     assert.equal(admitted.ok, true, JSON.stringify(admitted));
-    assert.equal(pendingFiles().length, 1);
+    assert.equal(pendingFiles().length, 2);
     const readback = readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: "s-bg", correlationId: "t-bg" });
     assert.equal(readback.ok, true, readback.code);
     assert.equal(readback.state.completionRoute, "subagent-stop");

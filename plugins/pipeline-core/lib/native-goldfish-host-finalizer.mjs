@@ -14,7 +14,7 @@ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit, NATIVE_CONCURRE
 import { commitAdmittedNativeGoldfishReturn } from "./agy-host-commit-execution.mjs";
 import { CRITIC_REQUIRED_SCHEMA, criticDecisionPathFinding, validateCriticDecision } from "./critic-skip-decision.mjs";
 import { OUTCOME_CLASSIFICATION_SCHEMA, validateDispatchRecord } from "./dispatch-record.mjs";
-import { bindNativeCodexStart, readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
+import { bindNativeCodexStart, readNativeCodexPending, readNativeGoldfishPending, readNativeGoldfishPrepareFailure } from "./native-goldfish-host-state.mjs";
 import { draftNativeGoldfishHostObservation, nativeAuthoredRecordBytes,
   persistNativeGoldfishHostObservation } from "./native-goldfish-host-observation.mjs";
 import { observeClaudeGoldfishReturn, observeCodexGoldfishReturn } from "./native-goldfish-host-return.mjs";
@@ -161,7 +161,11 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
       // run_in_background true) never reaches a final PostToolUse return, whereas every other missing-state case
       // means the pre-launch preparation did not write pending state (its PreToolUse WARNING names the code).
       const asyncLaunch = input.tool_response?.status === "async_launched" || input.tool_input?.run_in_background === true;
-      return marked ? { ...fail("NGHF-PENDING-UNAVAILABLE"), reason: asyncLaunch ? "async-launch" : "no-pending" }
+      // PF-26B: the typed preparation code the PreToolUse guard left for this exact launch (null when it left none).
+      const preparationCode = marked ? readNativeGoldfishPrepareFailure({ commonDir, runner, sessionId: input.session_id,
+        correlationId: input.tool_use_id }) : null;
+      return marked ? { ...fail("NGHF-PENDING-UNAVAILABLE"), reason: asyncLaunch ? "async-launch" : "no-pending",
+        ...(preparationCode ? { preparationCode } : {}) }
         : fail("NGHF-NOT-APPLICABLE", "not-applicable");
     }
     if (pending.state.completionRoute === NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE) {
