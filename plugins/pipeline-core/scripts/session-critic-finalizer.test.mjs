@@ -6,17 +6,19 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { consumeCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
 
 import {
   SESSION_CRITIC_ASSURANCE,
   SESSION_CRITIC_CLI_ERROR_SCHEMA,
   SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA,
+  SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA,
   SESSION_CRITIC_RECEIPT_SCHEMA,
   SessionCriticFinalizerError,
   admitSessionCriticReview,
@@ -37,12 +39,14 @@ function commit(root, message) {
 }
 function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-"));
-  git(root, ["init", "-q"]);
+  git(root, ["init", "-q", "-b", "main"]);
   mkdirSync(join(root, ".claude"));
   mkdirSync(join(root, "specs"));
   mkdirSync(join(root, "evidence"));
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-  writeFileSync(join(root, "specs", "spec.md"), "# Spec\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\n");
+  // The review-unit purpose is committed with the base, before any work, and never touched again.
+  writeFileSync(join(root, "specs", "review-unit.json"), JSON.stringify(reviewUnit()));
   const emptyTree = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
   const base = rootCandidate ? emptyTree : commit(root, "base");
   if (!rootCandidate) writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nSource candidate.\n");
@@ -60,7 +64,7 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
     commits: [historicalCandidate],
     candidateCommit: historicalCandidate,
     resultSha256: "a".repeat(64),
-    log: [],
+    log: [{ phase: "verify", toolUseCount: 1 }],
     report: { text: "done", changedFiles: ["specs/spec.md"] },
     criticRequired: {
       schema: "pipeline.critic-required-decision.v1",
@@ -83,6 +87,32 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
   return { root, base, historicalCandidate, recordCommit, candidate, tree, taskId, recordPath, recordBytes };
 }
+function reviewUnit() {
+  return {
+    schema: "pipeline.critic-review-unit.v1", kind: "related-fixes",
+    purpose: "Repair one delivery boundary across the affected consumers", specPath: "specs/spec.md",
+    logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"],
+    deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null,
+  };
+}
+// A non-feature finalize needs a generic batch reservation. Register through the product's own
+// producer, lazily and once per fixture: registration creates the control root, and the two
+// tests that assert nothing was published must be able to run without it.
+function batchFor(fx) {
+  if (fx.batch === undefined) {
+    const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
+    mkdirSync(controlRoot, { recursive: true, mode: 0o700 });
+    chmodSync(join(fx.root, ".git", "agent-pipeline"), 0o700);
+    chmodSync(controlRoot, 0o700);
+    const registered = registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: {
+      taskId: fx.taskId, baseCommit: fx.base, candidateCommit: fx.candidate,
+      logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
+      signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json",
+    } });
+    fx.batch = { ...registered.batchRef, memberSha256: registered.memberSha256 };
+  }
+  return fx.batch;
+}
 function verdict(overrides = {}) {
   return {
     findings: [],
@@ -101,7 +131,7 @@ function options(fx, overrides = {}) {
       base: fx.base,
       candidate: fx.candidate,
       specPath: "specs/spec.md",
-      guardrailPaths: [],
+      guardrailPaths: [".claude/pipeline.yaml"],
       evidencePaths: ["evidence/verify.json"],
       priorCriticEvidencePath: null,
     },
@@ -121,8 +151,11 @@ function options(fx, overrides = {}) {
     ...overrides,
   };
 }
+function registered(fx, overrides = {}) {
+  return options(fx, { genericBatchRef: batchFor(fx), ...overrides });
+}
 function preadmitted(fx, overrides = {}) {
-  const request = options(fx, overrides);
+  const request = registered(fx, overrides);
   admitSessionCriticReview(request);
   return request;
 }
@@ -140,7 +173,7 @@ function cliRequest(fx, overrides = {}) {
       base: fx.base,
       candidate: fx.candidate,
       specPath: "specs/spec.md",
-      guardrailPaths: [],
+      guardrailPaths: [".claude/pipeline.yaml"],
       evidencePaths: ["evidence/verify.json"],
       priorCriticEvidencePath: null,
     },
@@ -149,12 +182,23 @@ function cliRequest(fx, overrides = {}) {
     ...overrides,
   };
 }
+// The v3 request names the registered batch; the CLI refuses request files that are not physical scratch files.
+function cliBatchRequest(fx, overrides = {}) {
+  const base = cliRequest(fx);
+  return { ...base, schema: SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA,
+    review: { ...base.review, genericBatchRef: batchFor(fx) }, ...overrides };
+}
+function writeScratchRequest(fx, name, request) {
+  mkdirSync(join(fx.root, "scratch"), { recursive: true });
+  writeFileSync(join(fx.root, "scratch", name), `${JSON.stringify(request)}\n`);
+  return `scratch/${name}`;
+}
 
 test("private task snapshot binds uppercase delivered-v3 bytes without exporting record prose", () => {
   const fx = fixture({ taskId: "ALF-HISTORICAL-01" });
   try {
     assert.equal(isSafeTaskId(fx.taskId), true);
-    const request = options(fx, { packetId: "8".repeat(32) });
+    const request = registered(fx, { packetId: "8".repeat(32) });
     admitSessionCriticReview(request);
     const controlRoot = join(fx.root, git(fx.root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
     const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
@@ -188,9 +232,9 @@ test("uppercase task ID is safe and wrong or traversal IDs cannot select a diffe
   assert.equal(isSafeTaskId("../ALF-HISTORICAL-01"), false);
   const fx = fixture({ taskId: "ALF-HISTORICAL-01" });
   try {
-    const wrong = options(fx, { taskId: "ALF-WRONG-02", packetId: "9".repeat(32) });
+    const wrong = registered(fx, { taskId: "ALF-WRONG-02", packetId: "9".repeat(32) });
     assert.throws(() => admitSessionCriticReview(wrong), (error) => error.code === "CPP-REVIEW-ADMISSION");
-    const unsafe = options(fx, { taskId: "../ALF-HISTORICAL-01", packetId: "a".repeat(32) });
+    const unsafe = registered(fx, { taskId: "../ALF-HISTORICAL-01", packetId: "a".repeat(32) });
     assert.throws(() => admitSessionCriticReview(unsafe),
       (error) => error instanceof SessionCriticFinalizerError && error.code === "SCF-TASK");
   } finally { cleanup(fx); }
@@ -200,7 +244,7 @@ test("empty-tree packet base rejects a non-root authored candidate", () => {
   const fx = fixture();
   try {
     const emptyTree = git(fx.root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
-    const request = options(fx, { packetId: "c".repeat(32) });
+    const request = registered(fx, { packetId: "c".repeat(32) });
     request.preflightInput = { ...request.preflightInput, base: emptyTree };
     assert.throws(() => admitSessionCriticReview(request), (error) => error.code === "CPP-REF");
   } finally { cleanup(fx); }
@@ -209,7 +253,7 @@ test("empty-tree packet base rejects a non-root authored candidate", () => {
 test("prelaunch admission creates one claimed, digest-bound packet before the verdict exists", () => {
   const fx = fixture();
   try {
-    const request = options(fx, { packetId: "9".repeat(32) });
+    const request = registered(fx, { packetId: "9".repeat(32) });
     const admitted = admitSessionCriticReview(request);
     assert.equal(admitted.status, "admitted");
     assert.equal(admitted.packetId, request.packetId);
@@ -222,14 +266,22 @@ test("prelaunch admission creates one claimed, digest-bound packet before the ve
     assert.equal(readback.packet.references.some(({ path }) => path === fx.recordPath), false);
     assert.equal(readback.packet.coordinatorOnly.localDispatchEvidence.recordSha256,
       createHash("sha256").update(readFileSync(join(fx.root, fx.recordPath))).digest("hex"));
-    assert.throws(() => admitSessionCriticReview(request), (error) => error.code === "CPP-OVERWRITE");
+    // An already-claimed packet is an idempotent replay of the same durable admission, not an overwrite.
+    const replayed = admitSessionCriticReview(request);
+    assert.equal(replayed.status, "already-admitted");
+    assert.equal(replayed.replay, true);
+    assert.equal(replayed.packetId, request.packetId);
+    assert.equal(replayed.packetDigest, admitted.packetDigest);
+    assert.equal(replayed.admissionSha256, admitted.admissionSha256);
   } finally { cleanup(fx); }
 });
 
 test("invalid optional Critic selection retains V3, while valid selection binds before packet creation", () => {
   const fx = fixture();
+  // A second admission on one batch needs the first packet consumed; the valid selection gets its own fixture.
+  const approvedFx = fixture();
   try {
-    const request = options(fx, { packetId: "8".repeat(32) });
+    const request = registered(fx, { packetId: "8".repeat(32) });
     const env = { CODEX_SESSION_ID: "fixture-codex-session" };
     const select = ({ runner, taskRoute }) => {
       assert.equal(runner, "codex");
@@ -244,7 +296,7 @@ test("invalid optional Critic selection retains V3, while valid selection binds 
     const fallback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
     assert.equal(fallback.packet.route.modelTier, request.route.modelTier);
     assert.equal(Object.hasOwn(fallback.packet.request.sessionBinding, "modelRole"), false);
-    const approvedRequest = { ...request, packetId: "9".repeat(32) };
+    const approvedRequest = registered(approvedFx, { packetId: "9".repeat(32) });
     const admitted = admitSessionCriticReview(approvedRequest, {
       modelRoleEnvironment: env,
       selectModelRoleForTaskFn: () => ({ ok: true, status: "ready",
@@ -254,7 +306,7 @@ test("invalid optional Critic selection retains V3, while valid selection binds 
     });
     assert.equal(admitted.status, "admitted");
     const readback = inspectClaimedSessionAdmission({
-      controlRoot, packetId: approvedRequest.packetId,
+      controlRoot: join(approvedFx.root, common, "agent-pipeline", "critic-packets"), packetId: approvedRequest.packetId,
     });
     assert.equal(readback.packet.route.modelTier, "new-reviewed-model");
     assert.deepEqual(readback.packet.request.sessionBinding.modelRole, {
@@ -262,7 +314,7 @@ test("invalid optional Critic selection retains V3, while valid selection binds 
       taskRoute: "duty.critic_high_risk", modelId: "new-reviewed-model",
       effort: request.route.effortTier, readbackSha256: "a".repeat(64), receiptSha256: "b".repeat(64),
     });
-  } finally { cleanup(fx); }
+  } finally { cleanup(fx); cleanup(approvedFx); }
 });
 
 test("an admitted exact session model survives finalization without reselecting the V3 model", () => {
@@ -272,7 +324,7 @@ test("an admitted exact session model survives finalization without reselecting 
   ]) {
     const fx = fixture();
     try {
-      const request = options(fx, { packetId: "a".repeat(32),
+      const request = registered(fx, { packetId: "a".repeat(32),
         route: { ...options(fx).route, runner, provider } });
       let selections = 0;
       admitSessionCriticReview(request, {
@@ -301,8 +353,10 @@ test("an admitted exact session model survives finalization without reselecting 
 
 test("missing optional model selection retains the independently admitted V3 Critic route", () => {
   const fx = fixture();
+  // A second admission on one batch needs the first packet consumed; the throwing selector gets its own fixture.
+  const throwingFx = fixture();
   try {
-    const request = options(fx, { packetId: "7".repeat(32) });
+    const request = registered(fx, { packetId: "7".repeat(32) });
     admitSessionCriticReview(request, {
       modelRoleEnvironment: { CODEX_SESSION_ID: "fixture-codex-session" },
       selectModelRoleForTaskFn: () => ({ ok: true, status: "legacy-v3", runner: "codex",
@@ -314,18 +368,18 @@ test("missing optional model selection retains the independently admitted V3 Cri
     });
     assert.equal(readback.packet.route.modelTier, request.route.modelTier);
     assert.equal(Object.hasOwn(readback.packet.request.sessionBinding, "modelRole"), false);
-    const throwingRequest = { ...request, packetId: "6".repeat(32) };
+    const throwingRequest = registered(throwingFx, { packetId: "6".repeat(32) });
     admitSessionCriticReview(throwingRequest, {
       modelRoleEnvironment: { CODEX_SESSION_ID: "fixture-codex-session" },
       selectModelRoleForTaskFn: () => { throw new Error("optional selector unavailable"); },
     });
     const throwingReadback = inspectClaimedSessionAdmission({
-      controlRoot: join(fx.root, common, "agent-pipeline", "critic-packets"),
+      controlRoot: join(throwingFx.root, common, "agent-pipeline", "critic-packets"),
       packetId: throwingRequest.packetId,
     });
     assert.equal(throwingReadback.packet.route.modelTier, request.route.modelTier);
     assert.equal(Object.hasOwn(throwingReadback.packet.request.sessionBinding, "modelRole"), false);
-  } finally { cleanup(fx); }
+  } finally { cleanup(fx); cleanup(throwingFx); }
 });
 
 test("high-risk T2 and normal T3 retain their V3 duties when optional selection is unavailable", () => {
@@ -333,7 +387,7 @@ test("high-risk T2 and normal T3 retain their V3 duties when optional selection 
     ["T3", "duty.critic_normal"]]) {
     const fx = fixture();
     try {
-      const request = options(fx, { trigger });
+      const request = registered(fx, { trigger });
       admitSessionCriticReview(request, {
         modelRoleEnvironment: { CODEX_SESSION_ID: "fixture-codex-session" },
         selectModelRoleForTaskFn: ({ runner, taskRoute }) => {

@@ -183,7 +183,7 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
     commits: [historicalCandidate],
     candidateCommit: historicalCandidate,
     resultSha256: "a".repeat(64),
-    log: [],
+    log: [{ phase: "verify", toolUseCount: 1 }],
     report: { text: "done", changedFiles: ["specs/spec.md"] },
     criticRequired: {
       schema: "pipeline.critic-required-decision.v1",
