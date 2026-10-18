@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { canonicalJson } from './codex-sandbox-compatibility.mjs';
 import { parseStrictJson } from './governance-event.mjs';
-import { hostDigest, hostFault, checkedHostDirectory } from './codex-host-process-journal.mjs';
+import { hostDigest, hostFault, checkedHostDirectory, registerCodexHostProcessRoot } from './codex-host-process-journal.mjs';
 import { validateCodexReadinessHostRecord } from './codex-readiness-host-record.mjs';
 import { readFinalizedReadinessObservation } from './codex-readiness-finalization.mjs';
 import { readHostJournal } from './codex-host-process-journal.mjs';
@@ -86,13 +86,16 @@ export function createCodexDesignReadinessHostStore({ gitCommonDir, repoFingerpr
     } catch { throw hostFault('CRHS-ROOT-DRIFT'); }
   }
   const namespace = join(shared, 'design-readiness-codex'), repository = join(namespace, repoFingerprint);
-  const directory = join(repository, 'receipts'), processRoot = join(repository, 'processes');
-  for(const path of [namespace,repository,directory,processRoot]) {
+  const directory = join(repository, 'receipts'), laidOutProcessRoot = join(repository, 'processes');
+  for(const path of [namespace,repository,directory,laidOutProcessRoot]) {
     try { mkdirSync(path,{mode:0o700}); } catch(error) { if(error?.code !== 'EEXIST') throw error; }
     checkedHostDirectory(path);
     syncDirectory(dirname(path));
   }
   assertSharedRoots();
+  // The journal admits a managed launch only from a registered root. The registry owns the path, so expose exactly what it returns.
+  const processRoot = registerCodexHostProcessRoot({ gitCommonDir, repoFingerprint, purpose: 'design-readiness' });
+  if (processRoot !== laidOutProcessRoot) throw hostFault('CRHS-PROCESS-ROOT');
   function pathFor(receiptId) {
     if (!idPattern.test(receiptId ?? '')) throw hostFault('CRHS-ID');
     assertSharedRoots();
