@@ -448,6 +448,14 @@ export function fakeGit(command, args, options = {}) {
   }
   return { status: 1, stderr: "unexpected git arguments" };
 }
+// Existing project source is committed before onboarding installs the
+// commit-msg hook, so the design fixture finds it already tracked.
+function commitExistingProjectSource(rootDir) {
+  mkdirSync(join(rootDir, "src"), { recursive: true });
+  writeFileSync(join(rootDir, "src", "index.mjs"), "export const ready = true;\n");
+  hostGit(rootDir, ["add", "src/index.mjs"]);
+  hostGit(rootDir, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "existing source", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
+}
 function hostGit(rootDir, args) {
   const result = spawnSync("git", args, {
     cwd: rootDir,
@@ -4734,13 +4742,16 @@ test("a real fresh local kickoff is immediately a valid canonical PO authority",
   const path = root();
   try {
     hostGit(path, ["init", "--initial-branch=main"]);
+    commitExistingProjectSource(path);
     const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
     const barrier = initializeRestartRequiredRoot(path, localDeps);
     clearRuntimeBarrier(path, barrier);
     completeKickoff(path, "Create one canonical fresh feature", localDeps);
     const authority = validatePoGateAuthorityForRepository({ repoRoot: path });
     assert.equal(authority.ok, true, JSON.stringify(authority));
-    acknowledgePoGatePlan(path, JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath);
+    const kickoffPlanPath = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath;
+    acknowledgePoGatePlan(path, kickoffPlanPath);
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-AUTHORITY" });
     const stderr = [];
     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
       dir: path,
@@ -4763,6 +4774,7 @@ test("kickoff choosing a language different from the portable-seed default reach
   const path = root();
   try {
     hostGit(path, ["init", "--initial-branch=main"]);
+    commitExistingProjectSource(path);
     const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
     const barrier = initializeRestartRequiredRoot(path, localDeps);
     clearRuntimeBarrier(path, barrier);
@@ -4786,7 +4798,9 @@ test("kickoff choosing a language different from the portable-seed default reach
     // "ready", not send the caller through plan-repair/apply-repair to
     // reconcile the runtime manifest the migration owned-keys table tracks.
     assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status, "ready");
-    acknowledgePoGatePlan(path, JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath);
+    const kickoffPlanPath = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath;
+    acknowledgePoGatePlan(path, kickoffPlanPath);
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-LANGUAGE" });
     const stderr = [];
     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
       dir: path,
@@ -5170,6 +5184,7 @@ for (const runner of ["claude", "codex", "antigravity"]) {
     const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
     try {
       hostGit(path, ["init", "--initial-branch=main"]);
+      commitExistingProjectSource(path);
       const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
 
       const portable = planProjectOnboardingV3({ rootDir: path, deps: localDeps, runner });
@@ -5376,6 +5391,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
   const path = root();
   try {
     hostGit(path, ["init", "--initial-branch=main"]);
+    commitExistingProjectSource(path);
     const runner = "codex";
     const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
     const barrier = initializeRestartRequiredRoot(path, localDeps, runner);
@@ -9377,11 +9393,14 @@ for (const runner of ["claude", "codex", "antigravity"]) {
       const consentNames = consent.inputs.map((input) => input.name);
       assert.equal(consentNames.includes("gitAuthorName"), false, `${runner}: local Git already resolved the name`);
       assert.equal(consentNames.includes("gitAuthorEmail"), false, `${runner}: local Git already resolved the email`);
-      assert.deepEqual(consentNames, ["language", "profile", "projectDescription"]);
+      // The Claude runner deliberately omits the project description input and
+      // the --text-file flag: its material arrives through a separate capture action.
+      assert.deepEqual(consentNames, runner === "claude" ? ["language", "profile"] : ["language", "profile", "projectDescription"]);
       assert.deepEqual(consent.applyAction.argv, [
         ONBOARDING_SCRIPT, "intake-consent-apply", "--root", path, "--granted",
         "--language", "<PO_INTAKE_LANGUAGE>", "--profile", "<PO_INTAKE_PROFILE>",
-        "--text-file", "scratch/onboarding-intake.txt", "--activate", "--runner", runner,
+        ...(runner === "claude" ? [] : ["--text-file", "scratch/onboarding-intake.txt"]),
+        "--activate", "--runner", runner,
       ]);
       mkdirSync(join(path, "scratch"));
       writeFileSync(join(path, "scratch", "onboarding-intake.txt"), "Build one local mini HTML game.\nKeyboard only.\n");
