@@ -3,15 +3,16 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { applyQualityPackage, authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA, verifyQualityPackageCommitAuthorization, verifyQualityPackageIntegrationPreCommit, verifyQualityPackageIntegrationPostCommit } from "./signed-quality-package.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const git = (root, args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
-const FIXTURE_TMP = fileURLToPath(new URL("../../tmp/", import.meta.url));
-mkdirSync(FIXTURE_TMP, { recursive: true });
+// Fixture repositories live in a private (0700) directory under the temp root, never inside the checkout.
+const FIXTURE_TMP = mkdtempSync(join(tmpdir(), "signed-quality-package-fixtures-"));
+process.on("exit", () => { try { rmSync(FIXTURE_TMP, { recursive: true, force: true }); } catch { /* best-effort fixture cleanup */ } });
 
 function fixture() {
   const root = mkdtempSync(join(FIXTURE_TMP, "signed-quality-package-"));
