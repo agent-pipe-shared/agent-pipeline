@@ -50,16 +50,17 @@ no hand-maintained guard count or command list.
 | Claude Code | PreToolUse | Task&#124;Agent&#124;Workflow&#124;TodoWrite | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs" |
 | Claude Code | PreToolUse | advisor | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs" |
 | Claude Code | SessionStart | compact | node "${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs" |
-| Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs" |
+| Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs" --runner claude |
 | Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs" |
 | Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs" |
 | Claude Code | Stop | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs" |
+| Claude Code | SubagentStart | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start-receipt.mjs" |
 | Claude Code | UserPromptSubmit | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/claude-intake-prompt-capture.mjs" |
 | Codex | PreToolUse | Bash | node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs" |
 | Codex | PreToolUse | apply_patch&#124;Edit&#124;Write | node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs" |
 | Codex | PreToolUse | spawn_agent | node "${PLUGIN_ROOT}/hooks/guard-dispatch.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/guard-dispatch.mjs" |
 | Codex | PreToolUse | spawn_agent&#124;update_plan | node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" PreToolUse; Windows: node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" PreToolUse |
-| Codex | SessionStart | startup&#124;resume&#124;clear&#124;compact | node "${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs" |
+| Codex | SessionStart | startup&#124;resume&#124;clear&#124;compact | node "${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs" --runner codex; Windows: node "${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs" --runner codex |
 | Codex | SubagentStart | (all) | node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStart; Windows: node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStart |
 | Codex | SubagentStart | (all) | node "${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner codex; Windows: node "${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner codex |
 | Codex | SubagentStop | (all) | node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStop; Windows: node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStop |
@@ -81,6 +82,6 @@ The hashes bind this generated page to the exact manifest bytes it read.
 
 | Runner | Manifest | SHA-256 |
 | --- | --- | --- |
-| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `65dec57031b859906087bcd0669390c2d1eb0a9409ae6a93890eab32950f983d` |
-| Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `dcc23075e81a254603c9b7ab96bc6e2bc046830532b1cc0535934e6af67aa010` |
+| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `493b78d34a6bc2714167e9c5d424d121b47c719daa28e877cd2469b42e196363` |
+| Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `6ea0eba1803ea886a6da30328d1618873d39e03759822acd479b066fa56d1e34` |
 | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96` |
