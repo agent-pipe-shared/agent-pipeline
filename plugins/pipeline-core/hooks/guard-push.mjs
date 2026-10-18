@@ -355,8 +355,102 @@ const ghDelivery = classifyGhCommand(cmd);
 if (ghDelivery.kind === "refused") emit(2, [
   `[guard-push] ${ghDelivery.code}: ${ghDelivery.reason}`,
 ]);
+// ---- Ruling 157 (GREP-PUSH-F): second-stage proof for a marker-only push candidate --------------------------
+// `commandIsGitPush` stays deliberately broad (the Q12 option-B marker rule, pinned by lib/git-cmd.test.mjs): a git word next to a
+// parenthesis, brace, dollar sign or backtick is a CANDIDATE, routed here. Before this proof existed the candidate fell straight
+// through to `parsePushBinding`, which can only parse a push and so refused `git commit -m "... (goldfish)"` and
+// `git grep -n "(a|b)"` as "only git [-C <path>] push is accepted". The proof below admits a candidate ONLY when the whole
+// command is provably one plain `git <commit|grep|log|show|diff|status> ...` whose markers are all inert data. Anything not
+// proven keeps today's behaviour (the candidate is refused), so an unproven shape can never become a missed push.
+//   - one simple command: printable ASCII only, no backslash (decision S), no newline or here-document, no unquoted
+//     parenthesis, brace, dollar sign, backtick, `; & | < > # * ? [ ] !`, no unterminated quote; words 0 and 1 are the unquoted literals `git` and one
+//     of the six subcommands, so no global option (`-c`, `-C`, `--git-dir`) and no alias form is ever admitted;
+//   - single quotes hold everything literally; inside double quotes `( ) { }` are literal while `$NAME`, `$( )` and a backtick
+//     pair are active: `$NAME` is a plain variable, `${`, `$'`, `$((` and a bare `$` are not proven, and EVERY substitution body
+//     must be a plain read (a small allow-list program or `git <read-only subcommand>`, a body charset with no quote, `$`, `;`,
+//     `|`, `&`, `<` or `>`) that `commandIsGitPush` itself does not classify as a push;
+//   - `git grep -O` / `--open-files-in-pager` runs a command, so it is never admitted.
+const NON_PUSH_MARKER_SUBCOMMANDS = new Set(["commit", "grep", "log", "show", "diff", "status"]);
+const NON_PUSH_BODY_GIT_SUBCOMMANDS = new Set(["merge-base", "rev-parse", "log", "show", "diff", "status", "rev-list", "describe", "ls-files", "symbolic-ref"]);
+const NON_PUSH_BODY_PROGRAMS = new Set(["date", "pwd", "whoami", "hostname", "uname", "basename", "dirname", "id"]);
+const NON_PUSH_UNQUOTED_RE = /^[A-Za-z0-9_./:@%+,=^~-]$/u;
+const NON_PUSH_BODY_RE = /^[A-Za-z0-9_./:@%+,=^~ -]+$/u;
+
+function substitutionBodyIsPlain(body) {
+  if (!NON_PUSH_BODY_RE.test(body)) return false;
+  const words = body.trim().split(/ +/u);
+  if (words[0] === "git") {
+    if (!NON_PUSH_BODY_GIT_SUBCOMMANDS.has(words[1] ?? "")) return false;
+  } else if (!NON_PUSH_BODY_PROGRAMS.has(words[0])) return false;
+  return !commandIsGitPush(body);
+}
+
+function provenNonPushMarkerCandidate(text) {
+  if (typeof text !== "string" || text === "" || text.length > 4096) return false;
+  if (/[^\x20-\x7e\t]/u.test(text) || text.includes("\\")) return false;
+  const words = [];
+  const bodies = [];
+  let cur = null;
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === " " || ch === "\t") {
+      if (cur !== null) words.push(cur);
+      cur = null;
+      i += 1;
+      continue;
+    }
+    cur ??= { text: "", quoted: false };
+    if (ch === "'") {
+      const close = text.indexOf("'", i + 1);
+      if (close === -1) return false;
+      cur.text += text.slice(i + 1, close);
+      cur.quoted = true;
+      i = close + 1;
+    } else if (ch === '"') {
+      cur.quoted = true;
+      i += 1;
+      for (;;) {
+        if (i >= text.length) return false;
+        const c = text[i];
+        if (c === '"') { i += 1; break; }
+        if (c === "`") {
+          const close = text.indexOf("`", i + 1);
+          if (close === -1) return false;
+          bodies.push(text.slice(i + 1, close));
+          i = close + 1;
+        } else if (c === "$") {
+          if (text[i + 1] === "(") {
+            const close = text.indexOf(")", i + 2);
+            if (close === -1) return false;
+            bodies.push(text.slice(i + 2, close));
+            i = close + 1;
+          } else {
+            const name = /^[A-Za-z_][A-Za-z0-9_]*/u.exec(text.slice(i + 1));
+            if (name === null) return false;
+            cur.text += "$";
+            i += 1 + name[0].length;
+          }
+        } else {
+          cur.text += c;
+          i += 1;
+        }
+      }
+    } else if (NON_PUSH_UNQUOTED_RE.test(ch)) {
+      cur.text += ch;
+      i += 1;
+    } else return false;
+  }
+  if (cur !== null) words.push(cur);
+  if (words.length < 2 || words[0].quoted || words[0].text !== "git") return false;
+  if (words[1].quoted || !NON_PUSH_MARKER_SUBCOMMANDS.has(words[1].text)) return false;
+  if (words.some((word) => word.text.startsWith("-O") || word.text.startsWith("--open-files-in-pager"))) return false;
+  return bodies.every(substitutionBodyIsPlain);
+}
+
 const isPush = commandIsGitPush(cmd);
 if (!isPush) process.exit(0); // fast path: not a push at all
+if (provenNonPushMarkerCandidate(cmd)) process.exit(0); // marker-only candidate proven to be a plain non-push read or commit
 
 /**
  * `detectionTokens` below is a SEPARATE concern from push detection above:
