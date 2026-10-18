@@ -4,13 +4,20 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,lstatSync,linkSync,symlinkSync,unlinkSync,chmodSync,realpathSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {authorizeQualityPackageCommit,qualityPackageIntentSha256,SIGNED_QUALITY_PACKAGE_SCHEMA,verifyQualityPackageCommitAuthorization,verifyQualityPackageIntegrationPreCommit,receiptModeBitsRefused} from './signed-quality-package.mjs';
 import {registerTestCaseCompletion} from './test-case-completion.mjs';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const git=(root,args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
+let ownedBase;
+function fixtureBase(){
+ if(process.env.QUALITY_SINGLE_LINK_FIXTURE_ROOT)return realpathSync(process.env.QUALITY_SINGLE_LINK_FIXTURE_ROOT);
+ if(!ownedBase){ownedBase=realpathSync(mkdtempSync(join(tmpdir(),'q-')));process.on('exit',()=>{try{rmSync(ownedBase,{recursive:true,force:true});}catch{}});}
+ return ownedBase;
+}
 function fixture(){
- const base=realpathSync(process.env.QUALITY_SINGLE_LINK_FIXTURE_ROOT);
+ const base=fixtureBase();
  const root=mkdtempSync(join(base,'quality-unit-'));
  try{
   git(root,['init','-q']);for(const [k,v] of [['user.email','unit@example.invalid'],['user.name','Synthetic Unit'],['core.autocrlf','false']])git(root,['config',k,v]);

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 // Independent accepted-contract regression. All identities/content are synthetic.
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, writeFileSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { isAllowedPassiveReadTarget } from './passive-read-policy.mjs';
 import { isBoundedSingleRg, parseGuardCommand } from '../hooks/guard-command-grammar.mjs';
 import { registerTestCaseCompletion } from './test-case-completion.mjs';
@@ -50,6 +51,8 @@ add('refuse protected cloud credential root', () => assert.equal(admitted(`${hom
 // This tree is exclusively owned and outside any Git discovery boundary.
 // The policy may run its names-only rg inventory here; no credential contents
 // are read, and no command string or substitution is executed.
+if (!process.env.PCF_SYNTHETIC_FIXTURE) process.env.PCF_SYNTHETIC_FIXTURE = mkdtempSync(join(tmpdir(), 'pcf-'));
+if (!process.env.GIT_CEILING_DIRECTORIES) process.env.GIT_CEILING_DIRECTORIES = dirname(process.env.PCF_SYNTHETIC_FIXTURE);
 const fixture = process.env.PCF_SYNTHETIC_FIXTURE;
 assert.ok(fixture && process.env.GIT_CEILING_DIRECTORIES, 'owned fixture and Git ceiling required');
 const project = join(fixture, 'project');
