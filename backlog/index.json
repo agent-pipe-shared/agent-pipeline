@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5d711824e49f23cecf89fad93e61fdc1fe05ab1e0b1f8eb10a3bf20698cc14db"
+    "transitionHead": "6f1bef71ab4eb1b7d35cd88f02680696064165f901dafd1fb720c1da0dd93652"
   },
   "counts": {
-    "open": 212,
+    "open": 222,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -1536,6 +1536,16 @@
       "deferred": true,
       "due": "2026-08-16",
       "sprint": "nightwing"
+    },
+    {
+      "id": "pipeline.bootstrap-bind-plan-reference-claims-signature-is-plan-approval",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-11)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block",
@@ -3583,6 +3593,16 @@
       "closureEvidence": "backlog/items/2026-09-02-documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it.md"
     },
     {
+      "id": "pipeline.draft-phase-blocks-commit-and-unstage-of-po-concept-files",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-13)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
       "status": "open",
       "type": "defect",
@@ -3998,6 +4018,16 @@
       "closureEvidence": "backlog/items/2026-08-08-first-verify-run-is-red-with-four-failures.md"
     },
     {
+      "id": "pipeline.fitness-denial-names-no-finding-and-inspect-recommends-the-refused-transition",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (unnumbered finding from the same run)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.foreign-worktree-closes-the-implementation-gate",
       "status": "open",
       "type": "workflow-improvement",
@@ -4251,6 +4281,16 @@
       "closureEvidence": "backlog/evidence/2026-09-09-local-candidate-po-decisions.md"
     },
     {
+      "id": "pipeline.gh-commands-blocked-before-binding-though-design-phase-requests-a-repo",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-07)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.gh-delivery-classifier-is-not-wired",
       "status": "open",
       "type": "workflow-improvement",
@@ -4260,6 +4300,26 @@
       "deferred": false,
       "due": "2026-10-12",
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.gh-repo-create-has-no-typed-route-in-guard-push",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-12)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
+      "id": "pipeline.git-03-forbids-provider-trailers-the-runner-environment-demands",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-08)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file",
@@ -5750,6 +5810,16 @@
       "closureEvidence": "backlog/items/2026-08-18-inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home.md"
     },
     {
+      "id": "pipeline.initial-answers-guidance-claims-git-author-recorded-but-config-is-empty",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-04)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.inode-identity-decides-deletion-in-a-second-rollback-path",
       "status": "closed",
       "type": "defect",
@@ -5831,6 +5901,16 @@
       "closureRepository": "self",
       "closureCommit": "2640075144cdd0a2ddac36a2a41f2181c01c19f7",
       "closureEvidence": "backlog/items/2026-08-08-an-installing-consumer-is-never-asked-any-setup-decision.md"
+    },
+    {
+      "id": "pipeline.intake-capture-apply-closes-collecting-after-one-material-input",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-03)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.intake-generate-coordinator-path-undocumented-in-skill-references",
@@ -6373,6 +6453,16 @@
       "closureRepository": "self",
       "closureCommit": "3fedc770a8a8196d49376f3c033558eaf51bf057",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+    },
+    {
+      "id": "pipeline.materialize-architecture-leaves-inventory-json-as-the-empty-scaffold",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (unnumbered finding from the same run)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart",
@@ -7164,6 +7254,16 @@
       "source": "Round-2/3 review of the read-target fixes in the signed bundle commit 866be2139, left over from finding F-2; Alfred session 2026-10-05.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.outside-root-read-scope-denies-ls-and-rg-o-on-po-named-folders",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-02)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.over-broad-ignore-rule-swallows-closure-evidence",

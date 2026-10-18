@@ -121,6 +121,7 @@
 | pipeline.blind-session-zero-followable-steps-on-push-path | closed | defect | pipeline | nova-a | 2026-08-28 | — | NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it. |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | nightwing | 2026-08-09 | 2026-08-16 | — |
+| pipeline.bootstrap-bind-plan-reference-claims-signature-is-plan-approval | open | workflow-improvement | pipeline | none | 2026-10-18 | — | — |
 | pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module | open | workflow-improvement | pipeline | nightwing | 2026-08-08 | 2026-09-05 | — |
@@ -282,6 +283,7 @@
 | pipeline.documentation-has-no-reader-facing-review-and-no-machine-binding-for-one | closed | requirement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.documentation-information-architecture | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
+| pipeline.draft-phase-blocks-commit-and-unstage-of-po-concept-files | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.dual-channel-publication | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.el-01-has-no-in-session-tripwire | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -315,6 +317,7 @@
 | pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors | closed | defect | pipeline | nova-b | 2026-09-13 | — | Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry. |
 | pipeline.first-enrollment-enters-retirement-before-consent | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.first-verify-run-is-red-with-four-failures | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
+| pipeline.fitness-denial-names-no-finding-and-inspect-recommends-the-refused-transition | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.foreign-worktree-closes-the-implementation-gate | open | workflow-improvement | pipeline | alfred | 2026-10-09 | 2026-10-31 | — |
 | pipeline.forensics-and-audit-evidence-not-reconstructable | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | closed | defect | pipeline | — | 2026-08-12 | — | — |
@@ -334,7 +337,10 @@
 | pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- T1 Critic closing round for NVA-B-GG22FIX-2 (F2, minor): normalizePathspecLexically() drops empty path segments, so a trailing-slash directory pathspec token (backlog/items/) normalizes to backlog/items, which then fails the backlog/items/ prefix check and is classed disallowed -- a legitimate git commit -F <msg> -- backlog/items/ is now blocked while GG-22 debt is outstanding. Fail-closed direction (a false block, not a false admission), so this is NOT a security regression, but it does regress the deadlock fix's own intent for the directory form of a pathspec. |
 | pipeline.gg22-pathspec-fix-lacks-permanent-test | closed | defect | pipeline | nova-b | 2026-09-06 | 2026-10-06 | Nova B — NVA-B-GG22FIX-1 (commit fe2d7afe) fixed the GG-22 shared-index deadlock, but plugins/pipeline-core/hooks/guard-git.test.mjs is TP-1 protected with no in-session override route, so the dispatch could not add a permanent regression test there. The fix was proven RED-then-GREEN via an ephemeral scratch/ reproduction script instead, which is not committed and does not guard against a future regression of this exact scoping logic. |
+| pipeline.gh-commands-blocked-before-binding-though-design-phase-requests-a-repo | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.gh-delivery-classifier-is-not-wired | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-12 | — |
+| pipeline.gh-repo-create-has-no-typed-route-in-guard-push | open | defect | pipeline | none | 2026-10-18 | — | — |
+| pipeline.git-03-forbids-provider-trailers-the-runner-environment-demands | open | workflow-improvement | pipeline | none | 2026-10-18 | — | — |
 | pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.git-apply-bypasses-draft-source-guard | closed | defect | pipeline | alfred | 2026-09-27 | — | — |
@@ -451,12 +457,14 @@
 | pipeline.identity-attestation-fails-open-on-unresolved-transcript-path | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
+| pipeline.initial-answers-guidance-claims-git-author-recorded-but-config-is-empty | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.inode-identity-decides-deletion-in-a-second-rollback-path | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.installed-design-trailer-example-is-rejected-by-git-guard | open | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source | closed | defect | pipeline | nova | 2026-08-29 | — | PO decision 2026-08-29: candidate 3 (accept as inherent), documented permanently. |
 | pipeline.installed-plugin-copy-stale-vs-repo-source | closed | defect | pipeline | nova-b | 2026-09-06 | 2026-09-30 | Nova B — a T1 Critic reviewing NVA-B-TILDEFIX-1 ran a live reachability probe (a synthetic marker path, never a real credential) and found the shell-expanded tilde was ADMITTED AND EXECUTED by the guard actually enforcing that dispatch's own session — even though the source fix is confirmed present and Critic-approved in the reviewed working tree. Traced by the Elephant: the enforcing hook is loaded from the installed marketplace copy (/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs), a plain regular file (not a symlink) last modified 2026-09-04 07:42, which diverges from the repo's own copy by roughly six commits and predates NVA-B-READCONTAIN-1 entirely, not only NVA-B-TILDEFIX-1. |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | — | 2026-08-16 | 2026-08-20 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
+| pipeline.intake-capture-apply-closes-collecting-after-one-material-input | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | closed | defect | pipeline | — | 2026-08-24 | — | — |
 | pipeline.intake-values-restart-resilient-immediately | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.interruption-receipts-adapter-tripwire-reaches-a-json-schema | open | defect | pipeline | alfred | 2026-10-17 | — | — |
@@ -499,6 +507,7 @@
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.marketplace-install-topology-unattested | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate | closed | defect | pipeline | — | 2026-08-19 | — | — |
+| pipeline.materialize-architecture-leaves-inventory-json-as-the-empty-scaffold | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart | closed | requirement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -559,6 +568,7 @@
 | pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- a commit carrying a Dispatch: trailer can legitimately contain files the dispatch did not write (an EL-01-permitted orchestrator append, e.g. a governance registry line added at commit time). The dispatch record's changedFiles then under-reports the commit's file set, and there is no field in which the orchestrator's own addition can be disclosed. A Critic comparing git show --stat against the record sees an unexplained discrepancy and must reason its way to the benign reading. |
 | pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.outside-root-read-label-skips-option-value-file-tokens | open | defect | pipeline | alfred | 2026-10-05 | — | — |
+| pipeline.outside-root-read-scope-denies-ls-and-rg-o-on-po-named-folders | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.p-ac-11-four-dimensions-declared-but-inert | closed | defect | pipeline | — | 2026-08-16 | 2026-09-15 | — |
 | pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry | closed | defect | pipeline | — | 2026-08-17 | 2026-09-15 | — |
@@ -898,7 +908,7 @@
 
 ## Counts
 
-- open: 212
+- open: 222
 - in_progress: 0
 - closed: 664
 - rejected: 3
