@@ -86,6 +86,10 @@ The result also names the manifest's `rigor` and its `rigorSource`
 (`profile-mapping`, a judgment call from the plan's profile). It refuses with a typed
 `FPR-*` code, for example `FPR-ARTIFACT-MISSING` when the plan's PRD or Spec does not
 exist (the command never invents those).
+After registration, do not edit any file the manifest registers (PRD, Spec,
+`acceptance.md`, `result.md`, the envelope). Every item dispatch re-checks their
+digests, so an edit makes the next one `CAC-REGISTRATION-INVALID` again; an
+edited PRD or Spec also fails the approval binding (`CAC-SOURCE-BINDING-MISMATCH`).
 
 The guard creates `slice-queue.json` itself from the first productive dispatch
 whose prompt opens with a generated binding carrying `itemDelivery`; without
