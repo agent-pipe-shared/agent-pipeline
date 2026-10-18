@@ -97,21 +97,40 @@ location ADR-0045 already names removes the distinction instead of guarding
 against getting it wrong. There is no promotion move and nothing to clean up
 afterwards.
 
-- `design-input.md` — the verbatim captured material input. Immutable; never
-  hand-edit (mirrors `kickoff-design.md`'s source-evidence rule for the
+- `design-input.md` — the provenance record: capture date, a "Private source"
+  block (per chunk sha256, byte length, receive time, plus the intake data
+  sha256) and the design question texts. It repeats neither the captured
+  material nor the answers, which stay in the private intake store. Immutable;
+  never hand-edit (mirrors `kickoff-design.md`'s source-evidence rule for the
   promoted flow's own `design-input.md`).
 - `prd_<featureId>.md` — a first-draft PRD. Already carries valid
   `<!-- po-language: xx -->` and `<!-- technical-spec-sha256: ... -->`
-  markers; still needs product framing (What/Why/Scope/Non-goals/Risks/
-  Alternatives/DoD) authored before binding.
-- `spec.md` — a first-draft Spec, needing EARS acceptance criteria and
-  implementation detail authored before binding.
+  markers, one `Source:` line (the `design-input.md` path and sha256) and an
+  empty "Sanitised input summary (agent-authored)" section; still needs
+  product framing (What/Why/Scope/Non-goals/Risks/Alternatives/DoD) authored
+  before binding.
+- `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
+  acceptance criteria and implementation detail authored before binding.
 
-**These are drafts, not the finished design.** They are the captured material
-input plus scaffolding — the agent is expected to author them into a real PRD
-and Spec against the quality bar in `kickoff-design.md` BEFORE binding. Handing
-them to the PO as-is and asking for approval is the failure mode observed on
-2026-08-27, and it is what the PO saw as "the files are completely empty".
+**These are drafts, not the finished design.** They are provenance plus
+scaffolding, not the captured material — the agent is expected to author them
+into a real PRD and Spec against the quality bar in `kickoff-design.md`
+BEFORE binding. Handing them to the PO as-is and asking for approval is the
+failure mode observed on 2026-08-27, and it is what the PO saw as "the files
+are completely empty".
+
+**Reading the material (PO decision 2026-10-18).** Generation also writes a
+private authoring copy, `scratch/intake/<featureId>/material.md` (mode 0600:
+verbatim material, questions, answers), but only when that path is
+git-ignored; it is never digested, bound or promoted. Read it, then write the
+sanitised summary into the PRD section — never names of private persons,
+URLs, identifiers or raw quotes. Plan (summary and full) and apply report
+`authoringCopy {path, status, code, requiredIgnoreRule}`, never content. On
+`INTAKE-AUTHORING-COPY-NOT-IGNORED`, add `scratch/` to `.gitignore` and
+re-run generate plan/apply: the tracked targets are a no-op and the replay
+writes the copy. Any other `INTAKE-AUTHORING-COPY-*` code also means no copy
+exists (the tracked package is unaffected); the private intake store is then
+the only source.
 
 `featureId` is `onboarding-<sha256(checkpoint.createdAt)[:12]>`
 (`deriveIntakeFeatureId`), stable across regeneration so the package never

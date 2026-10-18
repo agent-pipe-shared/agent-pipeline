@@ -6924,21 +6924,21 @@ function trackedIntakeProjectionText(text) {
   ), text);
 }
 
-function projectIntakeMaterialInputChunks(chunks) {
-  return chunks.map((chunk) => {
-    const text = trackedIntakeProjectionText(chunk.text);
-    return text === chunk.text ? chunk : { ...chunk, text, trackedProjection: "local-path-redacted" };
-  });
+// PO decision 2026-10-18 (ALF-H4-PF14-DESIGN-INPUT-PROVENANCE): no tracked design artifact
+// repeats the captured material or the recorded answers any more. The private intake store
+// stays the lossless source; the verbatim text is rendered ONLY into the git-ignored
+// authoring copy below (renderIntakeMaterialInputSection, raw chunks, never projected).
+// What remains of the tracked projection is the QUESTION text listed in design-input.md,
+// which still passes through the local-path projection above.
+function renderIntakeDesignQuestionList(designQuestions) {
+  if (designQuestions === null) return "(design questions not yet answered)\n";
+  if (designQuestions.length === 0) return "No open design questions were affirmed at intake.\n";
+  return designQuestions.map((entry, index) => `### Q${index + 1}: ${trackedIntakeProjectionText(entry.question)}`).join("\n\n");
 }
 
 function renderIntakeMaterialInputSection(chunks) {
   if (chunks.length === 0) return "(no material input captured)\n";
   return chunks.map((chunk, index) => [
-    ...(chunk.trackedProjection === "local-path-redacted" ? [
-      "> Tracked projection: local/private host paths were replaced with "
-        + INTAKE_TRACKED_LOCAL_PATH_MARKER + "; private intake evidence remains unchanged.",
-      "",
-    ] : []),
     `### Chunk ${index + 1} -- sha256:${chunk.sha256}, ${chunk.byteLength} bytes, received ${chunk.receivedAt}`,
     "",
     chunk.text.endsWith("\n") ? chunk.text : `${chunk.text}\n`,
@@ -6973,22 +6973,51 @@ function intakeStagingGeneratedBanner(checkpoint) {
   ].join("\n");
 }
 
+// design-input.md is a PROVENANCE record: it names the private source by digest and lists the
+// design QUESTIONS (text only). It carries no chunk text and no answer text.
+function renderIntakeProvenanceChunks(chunks) {
+  if (chunks.length === 0) return "(no material input captured)\n";
+  return `${chunks.map((chunk, index) => (
+    `- Chunk ${index + 1} -- sha256:${chunk.sha256}, ${chunk.byteLength} bytes, received ${chunk.receivedAt}`
+  )).join("\n")}\n`;
+}
+
+function intakeCaptureDates(chunks) {
+  const dates = [...new Set(chunks.map((chunk) => String(chunk.receivedAt).slice(0, 10)))].sort();
+  return dates.length === 0 ? "(no material input captured)" : dates.join(", ");
+}
+
 function buildIntakeDesignInputContent(checkpoint, chunks) {
   return [
     intakeStagingGeneratedBanner(checkpoint),
     "",
-    "# Design input",
+    "# Design input (provenance record)",
     "",
     `- Intake data: sha256:${intakeDataSha256(checkpoint)}`,
+    `- Captured: ${intakeCaptureDates(chunks)}`,
     "",
-    "## Captured material input (verbatim, in capture order)",
+    "## Private source",
     "",
-    renderIntakeMaterialInputSection(chunks),
-    "## Design questions and answers",
+    "The verbatim captured material and the recorded answers stay in the private intake",
+    "store and are not part of the repository. This file records only where they came",
+    "from, so the PRD and Spec can reference them without repeating them:",
     "",
-    renderIntakeDesignQuestionsSection(checkpoint.designQuestions),
+    renderIntakeProvenanceChunks(chunks),
+    "## Design questions (question text only)",
+    "",
+    renderIntakeDesignQuestionList(checkpoint.designQuestions),
     "",
   ].join("\n");
+}
+
+const INTAKE_AUTHORING_COPY_IGNORE_RULE = "scratch/";
+
+function intakeAuthoringCopyPath(featureId) {
+  return `scratch/intake/${featureId}/material.md`;
+}
+
+function intakeDesignInputSourceLine(featureId, designInputSha256) {
+  return `\`${intakeDesignDirname(featureId)}/design-input.md\` (sha256:${designInputSha256}) -- provenance record only; the captured material and the answers stay private.`;
 }
 
 // NVA-BL-INTAKEBIND-1: the two mechanical PO-gate markers (po-language,
@@ -7003,7 +7032,7 @@ function buildIntakeDesignInputContent(checkpoint, chunks) {
 // NOT written here. The policy-selected acknowledgement writer (attended chat
 // or detached signature) adds it; ordinary staging authoring is explicitly
 // forbidden from adding it by guard-lifecycle-ready.mjs.
-function buildIntakePrdContent(checkpoint, featureId, chunks, specSha256) {
+function buildIntakePrdContent(checkpoint, featureId, designInputSha256, specSha256) {
   return [
     `<!-- po-language: ${checkpoint.values.language} -->`,
     `<!-- technical-spec-sha256: ${specSha256} -->`,
@@ -7013,15 +7042,24 @@ function buildIntakePrdContent(checkpoint, featureId, chunks, specSha256) {
     `# PRD -- ${featureId} (staging draft)`,
     "",
     `- Intake data: sha256:${intakeDataSha256(checkpoint)}`,
+    `- Source: ${intakeDesignInputSourceLine(featureId, designInputSha256)}`,
     `- Profile: ${checkpoint.values.profile ?? "(not yet set)"}`,
     `- Language: ${checkpoint.values.language ?? "(not yet set)"}`,
     "",
-    "## Captured material input (verbatim, in capture order)",
+    "## Sanitised input summary (agent-authored)",
     "",
-    renderIntakeMaterialInputSection(chunks),
-    "## Design questions and answers",
+    "<!-- AUTHORING REQUIRED: this section is deliberately empty. The agent reads the",
+    `     private authoring copy (${intakeAuthoringCopyPath(featureId)}, when it was written)`,
+    "     and authors the sanitised summary here. Rule: no names of private persons, URLs,",
+    "     identifiers or raw quotes. -->",
     "",
-    renderIntakeDesignQuestionsSection(checkpoint.designQuestions),
+    "- Context:",
+    "- Goals / non-goals:",
+    "- Requested behaviour:",
+    "- Constraints:",
+    "- Risks:",
+    "- Open questions:",
+    "- Stated decisions:",
     "",
     "## Notes",
     "",
@@ -7036,20 +7074,14 @@ function buildIntakePrdContent(checkpoint, featureId, chunks, specSha256) {
   ].join("\n");
 }
 
-function buildIntakeSpecContent(checkpoint, featureId, chunks) {
+function buildIntakeSpecContent(checkpoint, featureId, designInputSha256) {
   return [
     intakeStagingGeneratedBanner(checkpoint),
     "",
     `# Spec -- ${featureId} (staging draft)`,
     "",
     `- Intake data: sha256:${intakeDataSha256(checkpoint)}`,
-    "",
-    "## Captured material input (verbatim, in capture order)",
-    "",
-    renderIntakeMaterialInputSection(chunks),
-    "## Design questions and answers",
-    "",
-    renderIntakeDesignQuestionsSection(checkpoint.designQuestions),
+    `- Source: ${intakeDesignInputSourceLine(featureId, designInputSha256)}`,
     "",
     "## Notes",
     "",
@@ -7101,24 +7133,26 @@ function buildOnboardingIntakeGeneratePlan({
   if (!INTAKE_GENERATE_READY_STATES.has(checkpoint.transactionState)) {
     fail("INTAKE-GENERATE-PRECONDITION", "intake staging generation requires transactionState ready-to-generate or generated");
   }
-  // One projection, shared by design-input.md, PRD and spec. The private
-  // source chunks remain untouched and are still returned verbatim by
-  // readOnboardingIntakeMaterialInput() across a restart.
-  const chunks = projectIntakeMaterialInputChunks(readIntakeMaterialInputChunks(observed.paths, checkpoint));
+  // The chunks are read for their evidence-integrity check and their digests only:
+  // no tracked target repeats their text. The private source chunks remain
+  // untouched and are still returned verbatim by readOnboardingIntakeMaterialInput()
+  // across a restart.
+  const chunks = readIntakeMaterialInputChunks(observed.paths, checkpoint);
   const featureId = deriveIntakeFeatureId(checkpoint);
   const designInputContent = buildIntakeDesignInputContent(checkpoint, chunks);
+  const designInputSha256 = sha256(Buffer.from(designInputContent, "utf8"));
   // NVA-BL-INTAKEBIND-1: spec content (and its sha256) must be computed BEFORE
   // the PRD, because the PRD's own technical-spec-sha256 marker (AC-1) must
   // bind to the real generated spec's bytes -- the same sha256 the spec
   // target below carries, never re-derived independently.
-  const specContent = buildIntakeSpecContent(checkpoint, featureId, chunks);
+  const specContent = buildIntakeSpecContent(checkpoint, featureId, designInputSha256);
   const specSha256 = sha256(Buffer.from(specContent, "utf8"));
-  const prdContent = buildIntakePrdContent(checkpoint, featureId, chunks, specSha256);
+  const prdContent = buildIntakePrdContent(checkpoint, featureId, designInputSha256, specSha256);
   const designDirectory = intakeDesignDirname(featureId);
   const targets = {
     designInput: {
       path: `${designDirectory}/design-input.md`,
-      afterSha256: sha256(Buffer.from(designInputContent, "utf8")),
+      afterSha256: designInputSha256,
       content: designInputContent,
     },
     prd: {
@@ -7141,7 +7175,97 @@ function buildOnboardingIntakeGeneratePlan({
     targets,
   };
   const planSha256 = canonicalSha256(binding);
-  return { ...binding, planSha256, nextAction: intakeGenerateApplyAction(binding.root, planSha256, runner) };
+  // The authoring copy is deliberately OUTSIDE `binding` and `targets`: it is never
+  // part of a digest, line-ending preparation, binding or promotion, and the plan
+  // carries only this descriptor (never the material).
+  const authoringCopy = observeIntakeAuthoringCopyAdmission({
+    root: binding.root, featureId, repositoryCapability, spawn,
+  });
+  return { ...binding, planSha256, authoringCopy, nextAction: intakeGenerateApplyAction(binding.root, planSha256, runner) };
+}
+
+// The private authoring copy is admitted ONLY when its path is git-ignored in the target
+// repository. Anything but a positive answer writes no copy and names why, with a typed code.
+function observeIntakeAuthoringCopyAdmission({ root, featureId, repositoryCapability, spawn }) {
+  const base = { path: intakeAuthoringCopyPath(featureId), requiredIgnoreRule: INTAKE_AUTHORING_COPY_IGNORE_RULE };
+  if (repositoryCapability !== "local") {
+    return { ...base, status: "will-not-write", code: "INTAKE-AUTHORING-COPY-IGNORE-UNVERIFIABLE" };
+  }
+  let probe = null;
+  try {
+    probe = spawn("git", ["check-ignore", "-q", "--", base.path], { cwd: root, encoding: "utf8", shell: false });
+  } catch {
+    probe = null;
+  }
+  if (probe?.status === 0) return { ...base, status: "will-write", code: null };
+  return {
+    ...base,
+    status: "will-not-write",
+    code: probe?.status === 1 ? "INTAKE-AUTHORING-COPY-NOT-IGNORED" : "INTAKE-AUTHORING-COPY-IGNORE-UNVERIFIABLE",
+  };
+}
+
+function renderIntakeAuthoringCopy(checkpoint, featureId, chunks) {
+  return [
+    "<!-- PRIVATE AUTHORING COPY (git-ignored). Never commit, bind, digest or promote this file. -->",
+    "",
+    `# Private authoring copy -- ${featureId}`,
+    "",
+    `- Intake data: sha256:${intakeDataSha256(checkpoint)}`,
+    "",
+    "## Captured material input (verbatim, in capture order)",
+    "",
+    renderIntakeMaterialInputSection(chunks),
+    "## Design questions and answers",
+    "",
+    renderIntakeDesignQuestionsSection(checkpoint.designQuestions),
+    "",
+  ].join("\n");
+}
+
+// Writes the verbatim material plus the questions and answers to the git-ignored path the
+// plan admitted (mode 0600). Write-if-different, so a replay is a no-op. A refusal or a
+// failed write never blocks the tracked design package: it is reported with a typed code.
+function writeIntakeAuthoringCopy(plan, { rootDir, repositoryCapability, spawn, deps = {} }) {
+  const descriptor = plan.authoringCopy;
+  if (descriptor.status !== "will-write") return { ...descriptor, status: "not-written" };
+  try {
+    const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
+    if (observed.status !== "present") return { ...descriptor, status: "not-written", code: "INTAKE-AUTHORING-COPY-WRITE-FAILED" };
+    const chunks = readIntakeMaterialInputChunks(observed.paths, observed.value);
+    const bytes = Buffer.from(renderIntakeAuthoringCopy(observed.value, plan.featureId, chunks), "utf8");
+    const absolute = join(plan.root, ...descriptor.path.split("/"));
+    try {
+      assertPhysicalChain(plan.root, absolute);
+    } catch {
+      return { ...descriptor, status: "not-written", code: "INTAKE-AUTHORING-COPY-PATH-UNSAFE" };
+    }
+    let directory = plan.root;
+    for (const part of dirname(descriptor.path).split("/")) {
+      const parent = directory;
+      directory = join(directory, part);
+      if (!existsSync(directory)) {
+        mkdirSync(directory, { mode: 0o700 });
+        fsyncDirectory(parent);
+      }
+    }
+    if (existsSync(absolute) && sha256(readPhysicalFile(absolute, "intake authoring copy")) === sha256(bytes)) {
+      return { ...descriptor, status: "unchanged" };
+    }
+    const suffix = String((deps.randomUUID ?? randomUUID)()).replaceAll("-", "");
+    const temporary = join(directory, `.material.md.staging-${suffix}.tmp`);
+    let record = writeExclusiveSynced(temporary, bytes, 0o600);
+    try {
+      renameSync(temporary, absolute);
+      record = null;
+      fsyncDirectory(directory);
+    } finally {
+      if (record) { try { unlinkOwned(record); } catch {} }
+    }
+    return { ...descriptor, status: "written" };
+  } catch {
+    return { ...descriptor, status: "not-written", code: "INTAKE-AUTHORING-COPY-WRITE-FAILED" };
+  }
 }
 
 export function planOnboardingIntakeGenerate(options = {}) {
@@ -7222,7 +7346,18 @@ function writeIntakeStagingTargetIfDifferent(root, stagingDirectory, key, target
  * recomputes the identical bytes and finds them already correct), the
  * checkpoint mutation is the sole commit point.
  */
-export function applyOnboardingIntakeGenerate({
+export function applyOnboardingIntakeGenerate(options = {}) {
+  // The tracked package (and the checkpoint commit) comes first and is unchanged by the
+  // authoring copy; the private authoring copy is then written write-if-different from the
+  // same pure plan, so a replay (or a later-added ignore rule) converges on it.
+  const result = applyOnboardingIntakeGenerateTracked(options);
+  const { rootDir, repositoryCapability = "local", deps = {} } = options;
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const plan = buildOnboardingIntakeGeneratePlan({ rootDir, repositoryCapability, spawn });
+  return { ...result, authoringCopy: writeIntakeAuthoringCopy(plan, { rootDir, repositoryCapability, spawn, deps }) };
+}
+
+function applyOnboardingIntakeGenerateTracked({
   rootDir, repositoryCapability = "local", expectedPlanSha256, activate = false, deps = {},
 } = {}) {
   if (activate !== true) fail("INTAKE-GENERATE-ACTIVATION-REQUIRED", "intake staging generation requires explicit activation");

@@ -794,6 +794,15 @@ export function summarizeOnboardingIntakeGeneratePlan(plan, { runner, intent } =
       afterSha256: target.afterSha256,
       byteLength: Buffer.byteLength(target.content, "utf8"),
     }])),
+    // PF-14: the private authoring copy sits outside `targets`; surface only its descriptor
+    // (path, status, typed code, required ignore rule) so the agent knows whether it can read
+    // the verbatim material. Never the content.
+    authoringCopy: plan.authoringCopy === undefined || plan.authoringCopy === null ? null : {
+      path: plan.authoringCopy.path,
+      status: plan.authoringCopy.status,
+      code: plan.authoringCopy.code ?? null,
+      requiredIgnoreRule: plan.authoringCopy.requiredIgnoreRule,
+    },
     nextAction: plan.nextAction,
     fullPlanAction: {
       kind: "command", executable: "node", argv: fullArgv,

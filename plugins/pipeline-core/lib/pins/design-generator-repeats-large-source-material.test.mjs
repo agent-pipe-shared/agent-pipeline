@@ -2,11 +2,17 @@
 // Pin: pipeline.design-generator-repeats-large-source-material (AC-152).
 // Drives the real onboarding CLI main() and the real intake-generate library
 // against a ~14 KB Unicode/CRLF request. No behavior under test is mocked.
+//
+// Re-expressed 2026-10-18 (PO decision, ALF-H4-PF14-DESIGN-INPUT-PROVENANCE):
+// the generator no longer copies the captured material into ANY tracked target.
+// design-input.md is a provenance record (digests + questions); the PRD and Spec
+// reference it; the verbatim material stays in the private intake store and, only
+// when scratch/ is git-ignored, in an ignored authoring copy that is never bound.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { main, summarizeOnboardingIntakeGeneratePlan } from "../../scripts/project-onboarding-v3.mjs";
 import { mkdtempTestScratch } from "../test-tmpdir.mjs";
@@ -27,7 +33,7 @@ function request(targetBytes) {
   return `${text}REQ-END\r\n`;
 }
 
-function readyRoot(text) {
+function readyRoot(text, { ignored = true } = {}) {
   const root = mkdtempTestScratch("alf-c-p16-03-");
   mkdirSync(join(root, "project"), { recursive: true });
   writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.project.v1\n");
@@ -37,6 +43,7 @@ function readyRoot(text) {
   }, null, 2)}\n`);
   const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
   assert.equal(git.status, 0, git.stderr);
+  if (ignored) writeFileSync(join(root, ".gitignore"), "scratch/\n");
   applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", profile: "feature", activate: true });
   applyOnboardingIntakeCapture({ rootDir: root, text, activate: true });
   applyOnboardingIntakeDesignQuestions({
@@ -54,14 +61,17 @@ function cli(root, extra = []) {
 }
 
 // Pure assertions, reused to prove the pin can fail against a mutant (RED).
-function assertCompact(summaryText, request_, fullText, budget) {
+function assertNoSourceMaterial(text, label) {
+  for (const needle of ["REQ-START", "REQ-END", "Anforderung", "keep every requirement exactly once"]) {
+    assert.equal(countOf(text, needle), 0, `${label} must not repeat the source material (${needle})`);
+  }
+}
+function assertCompact(summaryText, budget) {
   assert.ok(bytes(summaryText) <= budget, `summary ${bytes(summaryText)} exceeds budget ${budget}`);
-  assert.equal(countOf(summaryText, "REQ-START"), 0, "summary must not repeat the source material");
-  assert.ok(bytes(summaryText) * 10 < bytes(fullText), "summary must be at least 10x smaller than the full plan");
-  assert.ok(request_.length > 0);
+  assertNoSourceMaterial(summaryText, "summary");
 }
 
-test("measured before/after: summary drops the repeated request, full plan is the repeated baseline", (t) => {
+test("measured before/after: no tracked target and no plan output carries the source material", (t) => {
   const text = request(14030);
   const root = readyRoot(text);
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -71,16 +81,15 @@ test("measured before/after: summary drops the repeated request, full plan is th
   assert.deepEqual([verbose.code, summary.code, dflt.code], [0, 0, 0]);
   assert.equal(dflt.out, summary.out, "default output is the compact summary");
   const full = JSON.parse(verbose.out);
-  // duplication measured: the request is stored in design-input, PRD and spec (3 copies, source unchanged by the compaction)
+  // duplication measured: the request was stored in design-input, PRD and spec (3 copies); now 0 copies
   const stored = Object.values(full.targets).map((target) => countOf(target.content, "REQ-START"));
-  assert.deepEqual(stored, [1, 1, 1]);
-  assert.ok(countOf(verbose.out, "REQ-START") >= 3, "full plan repeats the request per target");
-  assert.equal(countOf(summary.out, "REQ-START"), 0);
-  assertCompact(summary.out, text, verbose.out, 8192);
-  assert.ok(bytes(verbose.out) > bytes(text) * 3, "full plan is dominated by the repeated request");
+  assert.deepEqual(stored, [0, 0, 0]);
+  for (const [name, target] of Object.entries(full.targets)) assertNoSourceMaterial(target.content, name);
+  assertNoSourceMaterial(verbose.out, "full plan");
+  assertCompact(summary.out, 8192);
 });
 
-test("identical requirement coverage: summary references bind the full plan's exact bytes; full action reproduces it", (t) => {
+test("provenance coverage: summary references bind the full plan's exact bytes; design-input records the source digest, not the text", (t) => {
   const text = request(14030);
   const root = readyRoot(text);
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -94,7 +103,15 @@ test("identical requirement coverage: summary references bind the full plan's ex
     assert.equal(summary.targets[name].path, target.path);
     assert.equal(summary.targets[name].afterSha256, sha(target.content));
     assert.equal(summary.targets[name].byteLength, bytes(target.content));
-    assert.ok(target.content.includes(text), `${name} still carries the whole request verbatim (CRLF/Unicode)`);
+    assert.equal(target.content.includes(text), false, `${name} must not carry the request`);
+  }
+  const designInput = full.targets.designInput.content;
+  assert.ok(designInput.includes(`sha256:${sha(text)}`), "design-input records the source chunk digest");
+  assert.ok(designInput.includes(`${bytes(text)} bytes`), "design-input records the source chunk byte length");
+  assert.ok(designInput.includes("What is the goal?"), "design-input lists the design question");
+  for (const name of ["prd", "spec"]) {
+    assert.ok(full.targets[name].content.includes(`specs/${full.featureId}/design-input.md`), `${name} names design-input.md`);
+    assert.ok(full.targets[name].content.includes(`sha256:${full.targets.designInput.afterSha256}`), `${name} names the design-input digest`);
   }
   assert.deepEqual(summary.nextAction, full.nextAction);
   const replay = summary.fullPlanAction;
@@ -104,33 +121,73 @@ test("identical requirement coverage: summary references bind the full plan's ex
   assert.equal(again.out, verbose.out, "explicit full-plan action reproduces the full response byte-for-byte");
 });
 
-test("a fresh reviewer can reach the source: apply writes artifacts matching the summary and the private source is retrievable", (t) => {
+test("a fresh reviewer can reach the source: apply writes provenance only; the authoring copy and the private store hold the material", (t) => {
   const text = request(14030);
   const root = readyRoot(text);
   t.after(() => rmSync(root, { recursive: true, force: true }));
+  const storeBefore = readOnboardingIntakeMaterialInput({ rootDir: root }).chunks.map((chunk) => chunk.text);
   const summary = JSON.parse(cli(root).out);
+  const plan = planOnboardingIntakeGenerate({ rootDir: root, runner: "claude" });
+  assert.equal(plan.authoringCopy.status, "will-write");
+  assert.equal(plan.authoringCopy.code, null);
+  assert.equal(plan.authoringCopy.path, `scratch/intake/${plan.featureId}/material.md`);
+  assert.equal(JSON.stringify(plan.authoringCopy).includes("REQ-START"), false, "the plan descriptor carries no material");
+  assert.equal(plan.planSha256, summary.planSha256);
   const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: summary.planSha256, activate: true });
   assert.equal(applied.mutated, true);
   for (const target of Object.values(summary.targets)) {
     const disk = readFileSync(join(root, target.path), "utf8");
     assert.equal(sha(disk), target.afterSha256);
     assert.equal(bytes(disk), target.byteLength);
-    assert.ok(disk.includes(text));
+    assertNoSourceMaterial(disk, target.path);
   }
-  const material = readOnboardingIntakeMaterialInput({ rootDir: root });
-  assert.ok(JSON.stringify(material).includes("REQ-END"), "original request stays retrievable from the immutable intake store");
+  assert.equal(applied.authoringCopy.status, "written");
+  const copy = readFileSync(join(root, applied.authoringCopy.path), "utf8");
+  assert.ok(copy.includes(text), "the ignored authoring copy holds the whole request verbatim (CRLF/Unicode)");
+  assert.ok(copy.includes("A: Ship it."), "the authoring copy holds the answer verbatim");
+  assert.deepEqual(readOnboardingIntakeMaterialInput({ rootDir: root }).chunks.map((chunk) => chunk.text), storeBefore,
+    "the private intake store is untouched");
+  assert.ok(JSON.stringify(readOnboardingIntakeMaterialInput({ rootDir: root })).includes("REQ-END"),
+    "original request stays retrievable from the immutable intake store");
 });
 
-test("output budget: summary size is independent of the input size while the full plan grows", (t) => {
+test("without an ignore rule for scratch/ no authoring copy is written and the plan and apply result say so with a typed code", (t) => {
+  const text = request(14030);
+  const root = readyRoot(text, { ignored: false });
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const plan = planOnboardingIntakeGenerate({ rootDir: root, runner: "claude" });
+  assert.equal(plan.authoringCopy.status, "will-not-write");
+  assert.equal(plan.authoringCopy.code, "INTAKE-AUTHORING-COPY-NOT-IGNORED");
+  assert.equal(plan.authoringCopy.requiredIgnoreRule, "scratch/");
+  const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.authoringCopy.status, "not-written");
+  assert.equal(applied.authoringCopy.code, "INTAKE-AUTHORING-COPY-NOT-IGNORED");
+  assert.equal(existsSync(join(root, plan.authoringCopy.path)), false, "no copy is written outside an ignored path");
+  assert.equal(existsSync(join(root, "scratch")), false);
+  // The authoring copy is never part of a binding: adding the ignore rule later keeps the plan digest and the copy appears on replay.
+  writeFileSync(join(root, ".gitignore"), "scratch/\n");
+  const replayPlan = planOnboardingIntakeGenerate({ rootDir: root, runner: "claude" });
+  assert.equal(replayPlan.planSha256, plan.planSha256);
+  assert.equal(replayPlan.authoringCopy.status, "will-write");
+  const replay = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: replayPlan.planSha256, activate: true });
+  assert.equal(replay.mutated, false);
+  assert.equal(replay.authoringCopy.status, "written");
+  assert.ok(readFileSync(join(root, replay.authoringCopy.path), "utf8").includes(text));
+});
+
+test("output budget: summary and full plan sizes are independent of the input size", (t) => {
+  const source = request(56000);
   const small = readyRoot(request(14030));
-  const large = readyRoot(request(56000));
+  const large = readyRoot(source);
   t.after(() => { rmSync(small, { recursive: true, force: true }); rmSync(large, { recursive: true, force: true }); });
   const s = cli(small).out;
   const l = cli(large).out;
+  const sf = cli(small, ["--verbose"]).out;
   const lf = cli(large, ["--verbose"]).out;
   assert.ok(bytes(l) <= 8192);
   assert.ok(Math.abs(bytes(l) - bytes(s)) < 256, "summary does not scale with the source size");
-  assert.ok(bytes(lf) > 150000, "full plan scales with the source size (3 copies)");
+  assert.ok(Math.abs(bytes(lf) - bytes(sf)) < 256, "the full plan does not scale with the source size either");
+  assert.ok(bytes(lf) < bytes(source), "the full plan is smaller than the source it no longer repeats");
 });
 
 test("argument contract: --summary/--verbose are exclusive and plan-only", (t) => {
@@ -143,16 +200,20 @@ test("argument contract: --summary/--verbose are exclusive and plan-only", (t) =
   assert.match(out, /--summary is only valid for intake-generate-plan/u);
 });
 
-test("RED mirror: the compactness assertion fails against a mutant that embeds the target content", (t) => {
+test("RED mirror: the no-source-material assertion fails against a mutant that embeds the request in a target", (t) => {
   const text = request(14030);
   const root = readyRoot(text);
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const plan = planOnboardingIntakeGenerate({ rootDir: root, runner: "claude" });
   const real = JSON.stringify(summarizeOnboardingIntakeGeneratePlan(plan, { runner: "claude" }), null, 2);
-  const fullText = JSON.stringify(plan, null, 2);
-  assertCompact(real, text, fullText, 8192);
-  const mutant = JSON.stringify({ ...summarizeOnboardingIntakeGeneratePlan(plan, { runner: "claude" }), targets: plan.targets }, null, 2);
-  assert.throws(() => assertCompact(mutant, text, fullText, 8192));
+  assertCompact(real, 8192);
+  assertNoSourceMaterial(JSON.stringify(plan, null, 2), "full plan");
+  // The mutant restores the old verbatim behaviour; the budget is lifted so only the material check can throw.
+  const mutantPlan = { ...plan, targets: { ...plan.targets, designInput: { ...plan.targets.designInput,
+    content: `${plan.targets.designInput.content}\n${text}` } } };
+  assert.throws(() => assertNoSourceMaterial(JSON.stringify(mutantPlan, null, 2), "full plan"), /source material/u);
+  const mutantSummary = JSON.stringify({ ...summarizeOnboardingIntakeGeneratePlan(plan, { runner: "claude" }), source: text }, null, 2);
+  assert.throws(() => assertCompact(mutantSummary, 1_000_000), /source material/u);
 });
 
 function inspect(root) {

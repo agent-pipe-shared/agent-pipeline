@@ -211,15 +211,24 @@ lowercase two-letter language code (not restricted to `(de|en)` — see above),
 exactly once on its own line, and
 `<!-- technical-spec-sha256: <sha256-of-spec.md> -->`.
 
-`design-input.md` is source evidence, not an unbounded conversation dump. It
-records a faithful, sanitised structured extraction of the material input
-(context, goals/non-goals, requested behaviour, constraints, risks, open
-questions, and stated decisions) plus its capture date. The PRD and Spec both
-link to it and carry a compact traceability table from its sections to their
-requirements/decisions. Preserve the user's specificity; never collapse a
-detailed design into the initial one-line goal. Never persist private
-identifiers, credentials, host paths, URLs, commands, or raw transcripts;
-when material, record only a redacted statement and a safe digest/reference.
+`design-input.md` is a provenance record, not a conversation dump and not a
+copy of the material. It records the capture date, a "Private source" block
+(per chunk sha256, byte length, receive time) and the design question texts.
+The captured material and the recorded answers stay in the private intake
+store; the agent reads them from the git-ignored authoring copy
+`scratch/intake/<featureId>/material.md`. When no copy was written
+(`authoringCopy.code`), add `scratch/` to `.gitignore` and replay generation
+(`references/intake-generate-design.md`). The PRD and Spec both carry a
+`Source:` line (the `design-input.md` path and sha256); the PRD's "Sanitised
+input summary (agent-authored)" section holds the faithful, sanitised
+structured extraction of the material input (context, goals/non-goals,
+requested behaviour, constraints, risks, open questions, and stated
+decisions), and the PRD and Spec carry a compact traceability table from its
+sections to their requirements/decisions. Preserve the user's specificity;
+never collapse a detailed design into the initial one-line goal. Never
+persist names of private persons, private identifiers, credentials, host
+paths, URLs, commands, raw quotes or raw transcripts; when material, record
+only a redacted statement and a safe digest/reference.
 
 The source-evidence file is immutable after its PRD/Spec reference is bound.
 If the design input materially changes, create a new safely named evidence

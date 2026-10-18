@@ -18,7 +18,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { main as onboardingCli } from "./project-onboarding-v3.mjs";
+import { main as onboardingCli, summarizeOnboardingIntakeGeneratePlan } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
 import { main as settingsAllowlistMergeCli } from "./settings-allowlist-merge.mjs";
@@ -982,8 +982,12 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         assert.equal(beforeRefusal.planSubmission, undefined, `${runner}: architecture authoring precedes submission`);
         const prdFile = join(cwd, preSubmissionResult.nextAction.prdPath);
         const generatedPrd = readFileSync(prdFile, "utf8");
-        assert.match(generatedPrd, /## Captured material input/u,
-          `${runner}: the generated PRD retains the original intake material before authoring`);
+        assert.match(generatedPrd, /^- Source: `specs\/[^`\n]+\/design-input\.md` \(sha256:[a-f0-9]{64}\)/mu,
+          `${runner}: the generated PRD references the intake provenance record before authoring`);
+        assert.match(generatedPrd, /## Sanitised input summary \(agent-authored\)/u,
+          `${runner}: the generated PRD reserves the sanitised-summary section for authoring`);
+        assert.doesNotMatch(generatedPrd, /## Captured material input|mini HTML game/u,
+          `${runner}: the generated PRD does not repeat the original intake material`);
         const technicalSpecDigest = generatedPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
         assert.match(technicalSpecDigest ?? "", /^[a-f0-9]{64}$/u,
           `${runner}: generation supplied the bound Spec digest without a fixture-side replacement`);
@@ -996,7 +1000,7 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
           generatedArchitectureDraftSeen.add(cwd);
         }
         const missingArchitecturePrd = stripGeneratedArchitectureTemplate(generatedPrd, { required: draftCount === 1 });
-        assert.match(missingArchitecturePrd, /## Captured material input/u);
+        assert.match(missingArchitecturePrd, /## Sanitised input summary \(agent-authored\)/u);
         assert.equal(missingArchitecturePrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], technicalSpecDigest,
           `${runner}: stripping only the reserved draft template leaves the generated Spec binding untouched`);
         writeFileSync(prdFile, missingArchitecturePrd);
@@ -1357,8 +1361,15 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const prdFile = join(path, prdPath);
       assert.equal(existsSync(prdFile), true, "the named generated PRD exists before it may be edited");
       const generatedPrdBeforeRefusal = readFileSync(prdFile, "utf8");
-      assert.match(generatedPrdBeforeRefusal, /## Captured material input/u,
-        `${runner}: the pre-submit refusal fixture retains the original intake material`);
+      const refusalSourceMatch = generatedPrdBeforeRefusal.match(/^- Source: `(specs\/[^`\n]+\/design-input\.md)` \(sha256:([a-f0-9]{64})\)/mu);
+      assert.ok(refusalSourceMatch,
+        `${runner}: the pre-submit refusal fixture references the intake provenance record`);
+      assert.equal(refusalSourceMatch[2], sha256(readFileSync(join(path, refusalSourceMatch[1]))),
+        `${runner}: the Source line carries the exact digest of the generated provenance record`);
+      assert.match(generatedPrdBeforeRefusal, /## Sanitised input summary \(agent-authored\)/u,
+        `${runner}: the pre-submit refusal fixture reserves the sanitised-summary section`);
+      assert.doesNotMatch(generatedPrdBeforeRefusal, /## Captured material input|mini HTML game/u,
+        `${runner}: the pre-submit refusal fixture does not repeat the original intake material`);
       const refusalSpecDigest = generatedPrdBeforeRefusal.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
       assert.match(refusalSpecDigest ?? "", /^[a-f0-9]{64}$/u,
         `${runner}: the generated PRD already carries its Spec binding`);
@@ -1410,10 +1421,13 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
       const generatedSpecDigest = generatedPrdBeforeAuthoring.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1];
       assert.match(generatedSpecDigest ?? "", /^[a-f0-9]{64}$/u,
         `${runner}: final authoring starts from the generated PRD's existing Spec binding`);
-      assert.match(generatedPrdBeforeAuthoring, /## Captured material input/u,
-        `${runner}: authoring preserves the complete original intake section`);
+      assert.match(generatedPrdBeforeAuthoring, /^- Source: `specs\/[^`\n]+\/design-input\.md` \(sha256:[a-f0-9]{64}\)/mu,
+        `${runner}: authoring preserves the intake provenance reference`);
+      assert.match(generatedPrdBeforeAuthoring, /## Sanitised input summary \(agent-authored\)/u,
+        `${runner}: authoring preserves the sanitised-summary section`);
       const authoringBase = stripGeneratedArchitectureTemplate(generatedPrdBeforeAuthoring);
-      assert.match(authoringBase, /## Captured material input/u);
+      assert.match(authoringBase, /^- Source: `specs\/[^`\n]+\/design-input\.md` \(sha256:[a-f0-9]{64}\)/mu);
+      assert.match(authoringBase, /## Sanitised input summary \(agent-authored\)/u);
       assert.equal(authoringBase.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], generatedSpecDigest,
         `${runner}: authoring does not replace the generated Spec hash with a fixture constant`);
       const authoredArchitectureBlock = "```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n";
@@ -1622,6 +1636,38 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
   } finally {
     for (const path of fixtures) dispose(path);
   }
+});
+
+test("the intake-generate-plan summary carries the authoring-copy descriptor (path, status, typed code, required ignore rule) and never content", () => {
+  const descriptor = {
+    path: "scratch/intake/onboarding-0123456789ab/material.md",
+    status: "will-not-write",
+    code: "INTAKE-AUTHORING-COPY-NOT-IGNORED",
+    requiredIgnoreRule: "scratch/",
+    content: "MATERIAL-MUST-NOT-APPEAR",
+  };
+  const plan = {
+    root: "example-root",
+    repositoryCapability: "local",
+    featureId: "onboarding-0123456789ab",
+    checkpointDataSha256: "a".repeat(64),
+    planSha256: "b".repeat(64),
+    targets: { designInput: { path: "specs/onboarding-0123456789ab/design-input.md", afterSha256: "c".repeat(64), content: "provenance\n" } },
+    authoringCopy: descriptor,
+    nextAction: { kind: "command" },
+  };
+  const refused = summarizeOnboardingIntakeGeneratePlan(plan, { runner: "claude" });
+  assert.deepEqual(refused.authoringCopy, {
+    path: descriptor.path, status: "will-not-write", code: "INTAKE-AUTHORING-COPY-NOT-IGNORED", requiredIgnoreRule: "scratch/",
+  }, "the summary names the refusal code and the ignore rule that would lift it");
+  assert.equal(JSON.stringify(refused).includes("MATERIAL-MUST-NOT-APPEAR"), false, "the summary carries no authoring-copy content");
+  const admitted = summarizeOnboardingIntakeGeneratePlan({ ...plan, authoringCopy: { ...descriptor, status: "will-write", code: null } });
+  assert.deepEqual(admitted.authoringCopy, {
+    path: descriptor.path, status: "will-write", code: null, requiredIgnoreRule: "scratch/",
+  });
+  assert.equal(summarizeOnboardingIntakeGeneratePlan({ ...plan, authoringCopy: undefined }).authoringCopy, null,
+    "a plan without a descriptor yields an explicit null, not a missing field");
+  assert.deepEqual(Object.keys(refused.targets), ["designInput"], "the authoring copy is reported beside the targets, not among them");
 });
 
 test.skip("legacy helper-driven intake-to-implementation path (superseded by the driver-only E2E above)", () => {

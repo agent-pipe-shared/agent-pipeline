@@ -3952,7 +3952,10 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
 // intake-generate-apply publishes one deterministic tracked projection. A
 // local operator path must not strand the greenfield flow or ride unchanged
 // into design-input.md, the PRD, and the spec.
-check("applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence", () => {
+// PF-14 (PO decision 2026-10-18): the tracked package is now a provenance record, so the same
+// privacy properties hold with no captured material in any tracked target at all; the verbatim
+// input lives only in the git-ignored authoring copy.
+check("applyOnboardingIntakeGenerate: private host paths and material never reach a tracked target, the ignored authoring copy keeps the original verbatim, and restart-readable intake evidence is unchanged", () => {
   const posixHomeKeyPath = "/home/example-operator/.ssh/nova-signing-key.pem";
   const macOsPrivateVarPath = "/private/var/folders/example-operator/T/nova-signing-key.pem";
   const posixVarPath = "/var/lib/nova/operator-state.json";
@@ -3986,7 +3989,16 @@ check("applyOnboardingIntakeGenerate: private host paths are projected consisten
   const beforeEvidence = readFileSync(privateEvidencePath);
   assert.equal(beforeEvidence.toString("utf8"), material);
 
+  writeFileSync(join(root, ".gitignore"), "scratch/\n");
   const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(plan.authoringCopy.status, "will-write");
+  assert.equal(plan.authoringCopy.code, null);
+  assert.equal(plan.authoringCopy.path, `scratch/intake/${plan.featureId}/material.md`);
+  for (const privatePath of privatePaths) {
+    assert.equal(JSON.stringify(plan.authoringCopy).includes(privatePath), false, "the plan descriptor carries no material");
+  }
+  assert.equal(Object.values(plan.targets).some((target) => target.path === plan.authoringCopy.path), false,
+    "the authoring copy is never a bound target");
   const applied = applyOnboardingIntakeGenerate({
     rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
   });
@@ -3997,11 +4009,36 @@ check("applyOnboardingIntakeGenerate: private host paths are projected consisten
     for (const privatePath of privatePaths) {
       assert.equal(tracked.includes(privatePath), false, `${key} must not contain a captured private host path`);
     }
-    assert.equal(tracked.includes(projectedMaterial), true,
-      `${key} must use the same projection while retaining surrounding requirement prose`);
-    assert.equal(tracked.includes(marker), true, `${key} must carry an explicit deterministic redaction marker`);
-    assert.equal(tracked.includes("/v1/onboarding/intake"), true,
-      `${key} must preserve ordinary route prose that is not a host path`);
+    for (const line of material.split("\n")) {
+      assert.equal(tracked.includes(line), false, `${key} must not repeat any line of the captured material`);
+    }
+    assert.equal(tracked.includes(projectedMaterial), false, `${key} must not carry a projected copy of the material`);
+    assert.equal(tracked.includes(marker), false, `${key} has no captured material left to redact`);
+    assert.equal(tracked.includes("/v1/onboarding/intake"), false, `${key} carries no material prose, route mentions included`);
+    assert.equal(tracked.includes("Ship the coordinator."), false, `${key} must not repeat the recorded answers`);
+    assert.equal(tracked.includes("## Captured material input"), false, `${key} has no captured-material section`);
+  }
+  const provenanceEntry = beforeCheckpoint.value.materialInput[0];
+  const designInputText = readFileSync(join(root, plan.targets.designInput.path), "utf8");
+  assert.equal(designInputText.includes("## Private source"), true);
+  assert.equal(designInputText.includes(
+    `- Chunk 1 -- sha256:${provenanceEntry.sha256}, ${provenanceEntry.byteLength} bytes, received ${provenanceEntry.receivedAt}`), true,
+  "design-input.md names the private source by digest, size and capture time");
+  const sourceLine = `\`specs/${plan.featureId}/design-input.md\` (sha256:${plan.targets.designInput.afterSha256})`;
+  for (const key of ["prd", "spec"]) {
+    assert.equal(readFileSync(join(root, plan.targets[key].path), "utf8").includes(`- Source: ${sourceLine}`), true,
+      `${key} references the provenance record by path and sha256 instead of repeating the material`);
+  }
+
+  assert.equal(applied.authoringCopy.status, "written");
+  const authoringCopyPath = join(root, applied.authoringCopy.path);
+  const authoringCopyText = readFileSync(authoringCopyPath, "utf8");
+  assert.equal(authoringCopyText.includes(material), true,
+    "the git-ignored authoring copy holds the PO's original input verbatim, private paths included");
+  assert.equal(authoringCopyText.includes("Ship the coordinator."), true,
+    "the authoring copy also holds the recorded answers");
+  if (process.platform !== "win32") {
+    assert.equal(lstatSync(authoringCopyPath).mode & 0o777, 0o600, "the authoring copy is owner-only");
   }
 
   const afterCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
@@ -4013,15 +4050,16 @@ check("applyOnboardingIntakeGenerate: private host paths are projected consisten
     "restart consumption must still recover the PO's exact original input");
 
   const replayPlan = planOnboardingIntakeGenerate({ rootDir: root });
-  assert.equal(replayPlan.planSha256, plan.planSha256, "the tracked projection must reconstruct deterministically");
+  assert.equal(replayPlan.planSha256, plan.planSha256, "the tracked provenance package must reconstruct deterministically");
   const replay = applyOnboardingIntakeGenerate({
     rootDir: root, expectedPlanSha256: replayPlan.planSha256, activate: true,
   });
   assert.equal(replay.mutated, false);
   for (const key of ["designInput", "prd", "spec"]) assert.equal(replay.targets[key].wrote, false);
+  assert.equal(replay.authoringCopy.status, "unchanged", "a replay leaves the already-correct authoring copy alone");
 });
 
-check("planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts", () => {
+check("planOnboardingIntakeGenerate: path-free material is repeated in no tracked artifact and keeps its exact byte layout in the ignored authoring copy", () => {
   const material = "The coordinator must preserve ordinary requirement prose byte for byte, including café and punctuation: yes.";
   const root = readyToGenerateRoot("intake-generate-path-free-byte-identity", material);
   const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root }).value;
@@ -4031,20 +4069,40 @@ check("planOnboardingIntakeGenerate: path-free material keeps the pre-projection
     "",
     material + "\n",
   ].join("\n");
+  writeFileSync(join(root, ".gitignore"), "scratch/\n");
   const plan = planOnboardingIntakeGenerate({ rootDir: root });
   for (const key of ["designInput", "prd", "spec"]) {
-    assert.equal(plan.targets[key].content.includes(expectedMaterialBlock), true,
-      key + " must retain the exact legacy material-input rendering for clean text");
+    assert.equal(plan.targets[key].content.includes(material), false,
+      key + " must not repeat clean material text either: it is a provenance record, not a copy");
+    assert.equal(plan.targets[key].content.includes(expectedMaterialBlock), false);
     assert.equal(plan.targets[key].content.includes("[REDACTED LOCAL PATH]"), false);
     assert.equal(plan.targets[key].content.includes("Tracked projection:"), false);
   }
+  assert.equal(plan.targets.designInput.content.includes(
+    "- Chunk 1 -- sha256:" + entry.sha256 + ", " + entry.byteLength + " bytes, received " + entry.receivedAt), true,
+  "design-input.md records the private source by digest, size and capture time");
+  for (const key of ["prd", "spec"]) {
+    assert.equal(plan.targets[key].content.includes(
+      "`specs/" + plan.featureId + "/design-input.md` (sha256:" + plan.targets.designInput.afterSha256 + ")"), true,
+    key + " references the provenance record by path and sha256");
+  }
+  const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.authoringCopy.status, "written");
+  const authoringCopyText = readFileSync(join(root, applied.authoringCopy.path), "utf8");
+  assert.equal(authoringCopyText.includes(expectedMaterialBlock), true,
+    "the ignored authoring copy retains the exact legacy material-input rendering for clean text");
+  assert.equal(authoringCopyText.includes("[REDACTED LOCAL PATH]"), false);
+  assert.equal(authoringCopyText.includes("Tracked projection:"), false);
 });
 
 // NVA-GF-GREENFIELD-INTAKEPROJ-1: capture remains lossless and private, while
 // intake-generate-apply publishes one deterministic tracked projection. A
 // local operator path must not strand the greenfield flow or ride unchanged
 // into design-input.md, the PRD, and the spec.
-check("applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence", () => {
+// PF-14 (PO decision 2026-10-18): the tracked package is now a provenance record, so the same
+// privacy properties hold with no captured material in any tracked target at all; the verbatim
+// input lives only in the git-ignored authoring copy.
+check("applyOnboardingIntakeGenerate: private host paths and material never reach a tracked target, the ignored authoring copy keeps the original verbatim, and restart-readable intake evidence is unchanged", () => {
   const posixHomeKeyPath = "/home/example-operator/.ssh/nova-signing-key.pem";
   const macOsPrivateVarPath = "/private/var/folders/example-operator/T/nova-signing-key.pem";
   const posixVarPath = "/var/lib/nova/operator-state.json";
@@ -4078,7 +4136,16 @@ check("applyOnboardingIntakeGenerate: private host paths are projected consisten
   const beforeEvidence = readFileSync(privateEvidencePath);
   assert.equal(beforeEvidence.toString("utf8"), material);
 
+  writeFileSync(join(root, ".gitignore"), "scratch/\n");
   const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(plan.authoringCopy.status, "will-write");
+  assert.equal(plan.authoringCopy.code, null);
+  assert.equal(plan.authoringCopy.path, `scratch/intake/${plan.featureId}/material.md`);
+  for (const privatePath of privatePaths) {
+    assert.equal(JSON.stringify(plan.authoringCopy).includes(privatePath), false, "the plan descriptor carries no material");
+  }
+  assert.equal(Object.values(plan.targets).some((target) => target.path === plan.authoringCopy.path), false,
+    "the authoring copy is never a bound target");
   const applied = applyOnboardingIntakeGenerate({
     rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
   });
@@ -4089,11 +4156,36 @@ check("applyOnboardingIntakeGenerate: private host paths are projected consisten
     for (const privatePath of privatePaths) {
       assert.equal(tracked.includes(privatePath), false, `${key} must not contain a captured private host path`);
     }
-    assert.equal(tracked.includes(projectedMaterial), true,
-      `${key} must use the same projection while retaining surrounding requirement prose`);
-    assert.equal(tracked.includes(marker), true, `${key} must carry an explicit deterministic redaction marker`);
-    assert.equal(tracked.includes("/v1/onboarding/intake"), true,
-      `${key} must preserve ordinary route prose that is not a host path`);
+    for (const line of material.split("\n")) {
+      assert.equal(tracked.includes(line), false, `${key} must not repeat any line of the captured material`);
+    }
+    assert.equal(tracked.includes(projectedMaterial), false, `${key} must not carry a projected copy of the material`);
+    assert.equal(tracked.includes(marker), false, `${key} has no captured material left to redact`);
+    assert.equal(tracked.includes("/v1/onboarding/intake"), false, `${key} carries no material prose, route mentions included`);
+    assert.equal(tracked.includes("Ship the coordinator."), false, `${key} must not repeat the recorded answers`);
+    assert.equal(tracked.includes("## Captured material input"), false, `${key} has no captured-material section`);
+  }
+  const provenanceEntry = beforeCheckpoint.value.materialInput[0];
+  const designInputText = readFileSync(join(root, plan.targets.designInput.path), "utf8");
+  assert.equal(designInputText.includes("## Private source"), true);
+  assert.equal(designInputText.includes(
+    `- Chunk 1 -- sha256:${provenanceEntry.sha256}, ${provenanceEntry.byteLength} bytes, received ${provenanceEntry.receivedAt}`), true,
+  "design-input.md names the private source by digest, size and capture time");
+  const sourceLine = `\`specs/${plan.featureId}/design-input.md\` (sha256:${plan.targets.designInput.afterSha256})`;
+  for (const key of ["prd", "spec"]) {
+    assert.equal(readFileSync(join(root, plan.targets[key].path), "utf8").includes(`- Source: ${sourceLine}`), true,
+      `${key} references the provenance record by path and sha256 instead of repeating the material`);
+  }
+
+  assert.equal(applied.authoringCopy.status, "written");
+  const authoringCopyPath = join(root, applied.authoringCopy.path);
+  const authoringCopyText = readFileSync(authoringCopyPath, "utf8");
+  assert.equal(authoringCopyText.includes(material), true,
+    "the git-ignored authoring copy holds the PO's original input verbatim, private paths included");
+  assert.equal(authoringCopyText.includes("Ship the coordinator."), true,
+    "the authoring copy also holds the recorded answers");
+  if (process.platform !== "win32") {
+    assert.equal(lstatSync(authoringCopyPath).mode & 0o777, 0o600, "the authoring copy is owner-only");
   }
 
   const afterCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
@@ -4105,15 +4197,16 @@ check("applyOnboardingIntakeGenerate: private host paths are projected consisten
     "restart consumption must still recover the PO's exact original input");
 
   const replayPlan = planOnboardingIntakeGenerate({ rootDir: root });
-  assert.equal(replayPlan.planSha256, plan.planSha256, "the tracked projection must reconstruct deterministically");
+  assert.equal(replayPlan.planSha256, plan.planSha256, "the tracked provenance package must reconstruct deterministically");
   const replay = applyOnboardingIntakeGenerate({
     rootDir: root, expectedPlanSha256: replayPlan.planSha256, activate: true,
   });
   assert.equal(replay.mutated, false);
   for (const key of ["designInput", "prd", "spec"]) assert.equal(replay.targets[key].wrote, false);
+  assert.equal(replay.authoringCopy.status, "unchanged", "a replay leaves the already-correct authoring copy alone");
 });
 
-check("planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts", () => {
+check("planOnboardingIntakeGenerate: path-free material is repeated in no tracked artifact and keeps its exact byte layout in the ignored authoring copy", () => {
   const material = "The coordinator must preserve ordinary requirement prose byte for byte, including café and punctuation: yes.";
   const root = readyToGenerateRoot("intake-generate-path-free-byte-identity", material);
   const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root }).value;
@@ -4123,13 +4216,30 @@ check("planOnboardingIntakeGenerate: path-free material keeps the pre-projection
     "",
     material + "\n",
   ].join("\n");
+  writeFileSync(join(root, ".gitignore"), "scratch/\n");
   const plan = planOnboardingIntakeGenerate({ rootDir: root });
   for (const key of ["designInput", "prd", "spec"]) {
-    assert.equal(plan.targets[key].content.includes(expectedMaterialBlock), true,
-      key + " must retain the exact legacy material-input rendering for clean text");
+    assert.equal(plan.targets[key].content.includes(material), false,
+      key + " must not repeat clean material text either: it is a provenance record, not a copy");
+    assert.equal(plan.targets[key].content.includes(expectedMaterialBlock), false);
     assert.equal(plan.targets[key].content.includes("[REDACTED LOCAL PATH]"), false);
     assert.equal(plan.targets[key].content.includes("Tracked projection:"), false);
   }
+  assert.equal(plan.targets.designInput.content.includes(
+    "- Chunk 1 -- sha256:" + entry.sha256 + ", " + entry.byteLength + " bytes, received " + entry.receivedAt), true,
+  "design-input.md records the private source by digest, size and capture time");
+  for (const key of ["prd", "spec"]) {
+    assert.equal(plan.targets[key].content.includes(
+      "`specs/" + plan.featureId + "/design-input.md` (sha256:" + plan.targets.designInput.afterSha256 + ")"), true,
+    key + " references the provenance record by path and sha256");
+  }
+  const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.authoringCopy.status, "written");
+  const authoringCopyText = readFileSync(join(root, applied.authoringCopy.path), "utf8");
+  assert.equal(authoringCopyText.includes(expectedMaterialBlock), true,
+    "the ignored authoring copy retains the exact legacy material-input rendering for clean text");
+  assert.equal(authoringCopyText.includes("[REDACTED LOCAL PATH]"), false);
+  assert.equal(authoringCopyText.includes("Tracked projection:"), false);
 });
 
 check("planOnboardingIntakeGenerate: publishes a nextAction naming intake-generate-apply with the plan's own digest, so the generic guided driver (onboarding-init.mjs, which reads ONLY nextAction) does not stall here", () => {
