@@ -1,0 +1,4898 @@
+{
+  "schema": "pipeline.alfred-delivery-snapshot.v1",
+  "measuredAt": "2026-10-18",
+  "head": "98b6e5ca2",
+  "previous": {
+    "path": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-17/snapshot.json",
+    "sha256": "0a45af93989c0018f3d267c0a76469976738a4f597c356622523d20b248ada6e"
+  },
+  "method": "read-only readers over the previous snapshot's stage meanings; no tests rerun; reader outputs adjudicated, 100 never accepted from a reader",
+  "total": 174,
+  "baseline": {
+    "counts": {
+      "25": 7,
+      "50": 151,
+      "75": 15,
+      "100": 0,
+      "UNKNOWN": 1
+    },
+    "index": 50.86
+  },
+  "current": {
+    "counts": {
+      "25": 7,
+      "50": 150,
+      "75": 16,
+      "100": 0,
+      "UNKNOWN": 1
+    },
+    "index": 51.01
+  },
+  "integrity": {
+    "missing": [],
+    "extra": [],
+    "duplicate": [],
+    "badStage": [],
+    "badOwner": [],
+    "emptyOpen": []
+  },
+  "moves": [
+    {
+      "itemId": "pipeline.design-intake-generator-omits-question-answers",
+      "from": "50",
+      "to": "75",
+      "reason": "38e1758a4 re-expresses the AC-153 pin under PO decision D11 (answers stay out of tracked files, held verbatim and in order in the git-ignored authoring copy) and states both pins green (8/8 and 7/7). The item has no backlog file, so coverage was judged from the commit and pin header only."
+    }
+  ],
+  "openByOwner": {
+    "critic": 174,
+    "verify-wsl": 45,
+    "po-acceptance": 172,
+    "agent": 146,
+    "po-decision": 20,
+    "native-host": 64,
+    "po-signature": 13
+  },
+  "rows": [
+    {
+      "part": "01",
+      "itemId": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since 76fe529b3 names or fits this item (keep-baseline rule); baseline pin coverage stands.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the item's change is missing."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Counted GREEN is not stated in a message; re-run the item pin in the WSL Full Verify."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.advertised-git-to-head-pipeline-is-refused",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "Original acceptance (git show HEAD:path | head admitted) stays covered by 56015a99e (57 of 57) per baseline. 3636e4332 only adds an 'Observed 2026-10-18' note (PF-17: git -C ... show --format= -- | head, rg -o/-c, ls -la refused); ef3278d58 (guard-push 251/251) does not cover that shape.",
+      "evidence": [
+        "3636e4332",
+        "ef3278d58"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the PF-17 re-observation: git -C show --format= -- | head, rg -o/-c and ls -la, and make the refusal name the offending flag."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Re-run the pins in the WSL Full Verify after the PF-17 work."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the export-consent clause remains skip-only.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the export-consent typed skip with a running test."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the cause-field clause and the policy gate stay uncovered.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement and pin the cause-field clause and the policy gate."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the central end-to-end clause is still a typed skip and no count is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Turn the central end-to-end clause from a typed skip into a running test with a counted result."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "ef3278d58 makes guard-push admit a plain git commit carrying a '(goldfish)' trailer (guard-push.test.mjs 251/251, git-cmd 469/469), which addresses the guard-push half. The commit changes no test and no generator, so the proposal's pin of the recommended spelling through the whole guard union is not shown; guard-git and guard-lifecycle-ready counts are still unstated.",
+      "evidence": [
+        "ef3278d58"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Add a test that runs the recommended commit spelling through the full guard union and state its count."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing; ef3278d58 widens a push-classifier admission, a security trade."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Confirm admitting commit/--trailer as non-push (Ruling 81 trade) versus changing the generator to -F."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since 76fe529b3 changes this item (keep-baseline rule); no counted GREEN is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Re-run the pin in the WSL Full Verify to get a counted GREEN."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "dacf773b6 only adds an 'Observed 2026-10-18' section (F-02 node reachability in the sandbox, F-05 parallel write_to_file, handover write); no commit since the base implements or tests those clauses. The AGY happy path and the Critic/Advisor/Verify routes are still incomplete.",
+      "evidence": [
+        "dacf773b6"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Preflight reporting whether node runs in the Agy sandbox, a no-parallel-writes rule in the Agy Goldfish template, and an admitted handover-write route."
+        },
+        {
+          "owner": "agent",
+          "what": "Agy Critic, Advisor and Verify routes or the recorded self-dispatch fallback."
+        },
+        {
+          "owner": "native-host",
+          "what": "A live Antigravity run must show the AGY happy path and the F-05 parallel-write race."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agy-el01-write-authorization-gap",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the EL-01 tripwire pin has no stated pass count and no authenticated role carrier exists on this host.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "An authenticated role carrier needs a real Antigravity host run."
+        },
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the EL-01 pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "153f85599 re-pins the topology pin (P4, P6) to the new refresh order, now 18/18 (was 17 pass, 1 skip), and 061e208f5 makes refresh validate before retiring the managed copy (5/5). Both change refresh behavior only; the spike S1-S6, the lock-version-mismatch preflight reason, the hook-wiring observer and the docs clauses are still uncovered.",
+      "evidence": [
+        "153f85599",
+        "061e208f5",
+        "ecc7b4409"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Spike S1-S6 on a real Antigravity host to measure load precedence."
+        },
+        {
+          "owner": "agent",
+          "what": "Preflight reason antigravity-lock-version-mismatch, foreign hook-wiring detection and the Antigravity docs clauses."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Choose topology option A or B after the spike."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "b21e9d14f (install-agy 18 of 18, 1 todo) lets the installer find its Git source from the invoking checkout, and ecc7b4409 states installed-plugin-attestation 10/10, attestation-host 11/11 (was 10/11) and inline-action 3/3 for the runner-view attestation. The acceptance still needs the native fresh-runner observation, and b21e9d14f says the first-start pin's AC3 failure predates it.",
+      "evidence": [
+        "b21e9d14f",
+        "ecc7b4409"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "A native fresh-runner Antigravity observation of first start without a manual repair step."
+        },
+        {
+          "owner": "agent",
+          "what": "Fix or dispose the first-start attestation pin's failing AC3 and its typed skips."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "061e208f5 (refresh host 15/15), 153f85599 and ecc7b4409 change the refresh order and the install source on CLI 1.4.2, not the version admission; the item's installed-host acceptance remains open.",
+      "evidence": [
+        "061e208f5",
+        "153f85599",
+        "ecc7b4409"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Re-run the actual Agy global update and first greenfield preflight on the installed local candidate."
+        },
+        {
+          "owner": "agent",
+          "what": "Pin the unknown-version-stays-blocked case and re-check the 1.2.13 case against the new refresh order."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; no pass counts are stated and the design-workflow-package-v2 case is skipped on win32.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the package-path pins on Linux to get counted GREEN and cover the win32-skipped case."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item. 8e0b276a9 (device rebind for plan approvals) concerns device-local authority, not HEAD-versus-candidate binding.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the core candidate-binding suites, typed skips on Windows, on Linux."
+        },
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the item's clauses."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "Baseline 384e73527 (5 tests, 4 pass, 1 host skip) stands for the original acceptance. 6a84c5a20 adds the devplan-lane pin (producer's materialize-architecture admitted, --input refused, node with extra arg refused) with no count; the dacf773b6 added perl-opaque clause is still a todo.",
+      "evidence": [
+        "6a84c5a20",
+        "dacf773b6"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Make the devplan lane classify perl and other interpreters as opaque (the todo in 6a84c5a20)."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "State a counted GREEN for the 6a84c5a20 pin in a WSL run."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since 76fe529b3 changes this item; baseline 6/6 + 18/18 GREEN stands. a5d6fbcd1 touches only the hook-refresh message.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "native-host",
+          "what": "Confirm the pre-push hook installs on a real installed host."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "a5d6fbcd1 makes each stale-hook refusal name one refresh (refresh-mandatory-hooks.mjs --root) for pre-commit, commit-msg and pre-push, with a revised pin and no stated count. That covers part of sharpened point 1 only; the non-ready preflight and confirmation refusal, and the model-role readback, are not changed; the real refresh route stays skip-covered.",
+      "evidence": [
+        "a5d6fbcd1",
+        "4e92f1430"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Make a stale mandatory hook make the preflight non-ready for the Elephant, with the one refresh action as nextAction."
+        },
+        {
+          "owner": "agent",
+          "what": "Make the preflight return the model-role bootstrap result as a required field, plus the two pins."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Replace the skip-covered real refresh route with a Linux run."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.bounded-reader-terminal-binding",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the fixture clause GREEN 11/11 stands, the real-course binding clause is uncovered.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the real-course binding clause."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Baseline a6641cce4 stands. The later greenfield entry commits (96118e134 pending-surface allowance, cd7e847f0 guard wiring, 1fa3fdbcb) concern greenfield features and do not state brownfield or deferred-adoption counts.",
+      "evidence": [
+        "a6641cce4"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State counted GREEN for the net-new-path pin and the sibling readiness case, and keep one library-owned entry rule that the guard calls."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the symlinked-artifact case on Linux; it fails with EPERM on Windows."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "Baseline stands. 5cbd2db3c changes only the checkpoint text for native-host dispatches (guard-dispatch-budget 125/127, 2 win32 skips) and states that no cap or turn limit changed, so it does not alter this item.",
+      "evidence": [
+        "5cbd2db3c"
+      ],
+      "open": [
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "State a counted GREEN for the item's pin in a WSL run."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.capability-inventory-checker-is-red-at-head",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "Baseline 5cc6b7006 and 71a2c0304 (AC-121 pin 17 of 17) stand; no commit since the base touches the inventory file. About 20 test files were added since, so the checker may be red again; I did not run it, so there is no concrete reason to lower.",
+      "evidence": [
+        "71a2c0304"
+      ],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Re-run the capability-inventory checker at the current HEAD; new suites since 76fe529b3 may be unregistered."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; native Windows qualification and the original acceptance mapping stay open.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Native Windows run of the npm launch normalization."
+        },
+        {
+          "owner": "agent",
+          "what": "Map the original acceptance to counted tests."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 fits this item; e9c68703b only drops attestation setup from the human terminal catalog and is not about admitting prescribed lifecycle verbs. The catalogue pin stays at 10 pass + 1 skip.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover continuity writes and replace the remaining skip."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.claude-design-readiness-cannot-start-on-windows",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the Codex readiness commits (7ad947159, 7fe00914b) concern Codex, not the Claude Windows install roots. The R4-9/R4-10 typed sub-reason clause is still absent.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the R4-9/R4-10 typed sub-reason clause and pin it."
+        },
+        {
+          "owner": "native-host",
+          "what": "Native Windows run of the Claude design readiness start."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; 1fa3fdbcb concerns the scaffold of a documents-only folder, not target selection. The plan-only pin leaves the platform matrix and real apply uncovered.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the platform matrix and the real apply path."
+        },
+        {
+          "owner": "native-host",
+          "what": "A real Claude greenfield apply must show no unselected Codex targets."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the RED mirror of da2958311 is not recorded and the Windows symlink failure is environmental.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the A9 case on Linux (Windows symlink failure is environmental) and record a RED mirror."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 changes the V-9, V-10, V-12 or V-13 clauses. Windows fixes 8869464c2 and 0b06f4092 are other items and the latter is explicitly UNVERIFIED. Baseline 3ed911a79 (124 tests, 117 pass, 1 skip, 6 unrelated GD failures) stands.",
+      "evidence": [
+        "3ed911a79"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Native Windows walk of the greenfield lifecycle and the happy-path skip."
+        },
+        {
+          "owner": "agent",
+          "what": "Run V-10 RED on the original code and settle V-12 and V-13."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Baseline 8d4b3613e and 1f1991be3 stand with no stated count. ef3278d58 admits proven non-push git shapes but is about push classification, not Windows in-repo reads. 3636e4332 records PF-17 re-observations of refused read shapes in related items.",
+      "evidence": [
+        "8d4b3613e",
+        "1f1991be3"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the bounded in-repo read pin."
+        },
+        {
+          "owner": "native-host",
+          "what": "Native Windows run of in-repo reads under the guard."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "01",
+      "itemId": "pipeline.codex-advisor-evidence-fails-after-host-update",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; 4 green cases stand, three skips and the installed replay remain.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Replay on an installed Codex host after a host update."
+        },
+        {
+          "owner": "agent",
+          "what": "Replace the three typed skips with running cases."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches the fresh-identity versus shared 0755 namespace refusal; 7fe00914b only states the advisor namespace still fails closed. Keep baseline.",
+      "evidence": [
+        "7fe00914b"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Fix and pin the fresh-identity composition so the shared parent 0755 versus private 0700 refusal is resolved."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the namespace fix is missing."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the pin under the WSL Full Verify."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-bootstrap-in-the-typed-next-action",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 fits this item; the inclusion clause stays held. Keep baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement and pin the inclusion clause so the typed next action carries the Codex bootstrap."
+        },
+        {
+          "owner": "native-host",
+          "what": "Confirm the typed next action on an installed Codex host."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-design-readiness-child-rejects-valid-review",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "7ad947159, b516d38ca, 7fe00914b and ad01f13a5 unblock managed Codex readiness launches (process root, cwd binding, receipt inventory; counts such as codex-advisor-execution 8/8), but the acceptance needs a live selected Codex/WSL run plus authenticated-route and tool-disable clauses that no commit qualifies. Keep 50.",
+      "evidence": [
+        "7ad947159",
+        "b516d38ca",
+        "7fe00914b"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the credential-free authenticated route, tool-disable and kill-recovery clauses with committed tests."
+        },
+        {
+          "owner": "native-host",
+          "what": "A live selected Codex/WSL readiness run that publishes a schema-valid receipt is missing."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-own-session-audit-export-missing",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "0ac30fb44 only added the P1-2 acceptance (self-determined session, scaling test) to the item; no implementation commit since 76fe529b3. Keep baseline.",
+      "evidence": [
+        "0ac30fb44"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the one repository-bound own-session export and its scaling test; the positive path is only typed skips."
+        },
+        {
+          "owner": "native-host",
+          "what": "Verify the export against a real Codex session store."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "7ad947159 (process root registered, host-store 1/6 to 6/6) and 7fe00914b (receipt admitted in the managed inventory, finalization 9/9) are launch and inventory fixes logged against this item, but they do not cover the output-custody points; the reader cap case is still Windows-skipped and point 6 stays open.",
+      "evidence": [
+        "7ad947159",
+        "7fe00914b"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Close the remaining output-custody point 6 and the Windows-skipped reader cap case with a counted test."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the reader cap case on Linux/WSL."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "b516d38ca fixes the managed Codex cwd binding that blocked required readiness runs (codex-advisor-execution 3/8 to 8/8), but the acceptance needs a real Codex/WSL run reaching a valid Advisor answer or governed unavailable exception; receipts, trail and the answered path stay open.",
+      "evidence": [
+        "b516d38ca"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Wire the answered and honest-unavailable receipt plus attempt-trail path through the sealed Advisor store."
+        },
+        {
+          "owner": "native-host",
+          "what": "A real Codex/WSL Feature greenfield run reaching final design-package validation is missing."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 changes the commit-grammar hint or skill guidance. Keep baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Update the skill and hint guidance and add a covering test; no counts exist yet."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 addresses path-order failures counting against the tool cap. Keep baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Fix and pin the path-order observed-again clauses so such failures do not count against the cap."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this proposal; the earlier e72521d25 note and pin stand without a stated count. Keep baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Make the completion-fd suites runnable as single files and state a counted result."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the suites as single files on Linux/WSL."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches the Windows concurrent-session warning. Keep baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Fix and pin the warning so it fires on native Windows; no counts exist yet."
+        },
+        {
+          "owner": "native-host",
+          "what": "Confirm the warning on a native Windows session."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "The baseline pin evidence (a0133eb26, 8 pass; 8e86eb900) is unchanged. cff00accd (pin) and 3c918b869 (forwards typed approval codes, transition suite 4/4) address the approval-cause naming of the same command, not the commit route, and revert nothing. Keep 75; cff00accd leaves repair clauses and the non-private State case open.",
+      "evidence": [
+        "a0133eb26",
+        "8e86eb900",
+        "3c918b869",
+        "cff00accd"
+      ],
+      "open": [
+        {
+          "owner": "critic",
+          "what": "Independent Critic confirmation of the 75 is missing."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Re-run the AC-140 pin and the transition suite under the WSL Full Verify."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No code commit touches this item; the fix log records only that PO decision D1 (GST33) is still open and no code change was made. Notes-persistence skip and live verification remain open.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "PO decision D1 on how a security review fits the dispatch budget guard is open."
+        },
+        {
+          "owner": "agent",
+          "what": "Cover the notes-persistence skip with a real assertion once D1 is decided."
+        },
+        {
+          "owner": "native-host",
+          "what": "Live security review under the dispatch budget guard on an installed host is missing."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "d621b2871 (close-feature held on required Critic evidence, new pin, no stated pass count) implements only the 0.7.0 added T3 acceptance; the original round-cap, delta-range binding and role-text clauses remain unimplemented and the cap number still conflicts with acceptance wording.",
+      "evidence": [
+        "d621b2871",
+        "351f38415"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement round counting, delta base/head binding and the role-contract text for the original acceptance."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Resolve the conflict between the cap number and the original acceptance wording."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the new close-gate pin under the WSL Full Verify and state a count."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of d621b2871 is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+      "stage": "25",
+      "baselineStage": "25",
+      "reason": "No commit since 76fe529b3 touches this item; analysis only. Keep baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the admitted command for random scratch names and pin it."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Decide whether this item is in 0.7.0 scope."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.critic-scratch-notes-write-is-refused-again",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches the Critic scratch notes write; skips and the open live check keep it at 50.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the typed skips with real assertions for the notes write."
+        },
+        {
+          "owner": "native-host",
+          "what": "Live Critic notes write on an installed host is missing."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "The only nearby commit, 9df31c1f5, is a test fixture step for the Claude intake capture in the onboarding consent case and does not touch the expiry clause or host capture; befb0eea3 baseline (10 pass, 11 skipped) stands.",
+      "evidence": [
+        "9df31c1f5"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the runner adapters for host capture."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the 11 Linux/WSL-only skipped cases."
+        },
+        {
+          "owner": "native-host",
+          "what": "End-to-end host capture on installed runners is missing."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "Baseline evidence 92796248b (AC-146 pin GREEN 1/1) and a35506ef0 stands. b4bb60a9d and cdfbea050 bind a consumer's first item delivery to a signed spec criterion, a neighbouring subject that does not revert it. Keep 75.",
+      "evidence": [
+        "92796248b",
+        "a35506ef0"
+      ],
+      "open": [
+        {
+          "owner": "critic",
+          "what": "Independent Critic confirmation of the 75 is missing."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Re-run the AC-146 pin under the WSL Full Verify."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.declared-system-skill-read-requires-human-override",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches it; the PO deferred the item past 0.7.0 (scheduled with AC-209) and six clauses remain typed skips.",
+      "evidence": [
+        "64ba2056e"
+      ],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "Item is deferred past 0.7.0 by PO decision; scope for the next candidate is a PO call."
+        },
+        {
+          "owner": "agent",
+          "what": "Replace the six typed-skip clauses with real assertions when released."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.denial-names-a-diagnosis-it-refuses",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; 6c3fa2d6c still states no pass count. Keep baseline.",
+      "evidence": [
+        "6c3fa2d6c"
+      ],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the DAA-/DWP- denial sweep under the WSL Full Verify to obtain a counted result."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-approval-validator-rejects-json-key-reordering",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the CLI signing clause stays a typed skip.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the CLI signing clause with a real assertion instead of a typed skip."
+        },
+        {
+          "owner": "po-signature",
+          "what": "The CLI signing clause needs a signature produced by the PO."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+      "stage": "25",
+      "baselineStage": "25",
+      "reason": "No commit since 76fe529b3 touches this item; the enforcement clause is only recorded. Keep baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "Decide whether the enforcement clause is in 0.7.0 scope."
+        },
+        {
+          "owner": "agent",
+          "what": "Implement and pin the enforcement clause."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 fixes the --run-v2 output collision, resume or revision-path gaps; 5098e6478 and a72489377 concern the delivery course and docs. Two skips still hold it at 50.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Fix the K5-9 collision, K5-11 resume and revision-path gaps and replace the two skips."
+        },
+        {
+          "owner": "native-host",
+          "what": "Advisor host fixture on native Windows (R4-8) is unproven."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-generator-repeats-large-source-material",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "38e1758a4 (design-input.md becomes a provenance record, AC-152 pin 8/8) removes the verbatim-copy half, but the measured before/after, host output budget, reviewer-understanding clauses and the hand-edit header contradiction stay open.",
+      "evidence": [
+        "38e1758a4",
+        "cd7d44eca"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Compact routine inspect responses and fix the 'do not hand-edit' header contradiction."
+        },
+        {
+          "owner": "native-host",
+          "what": "Measure host output budget and truncation on the same large input."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the provenance change is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-intake-generator-omits-question-answers",
+      "stage": "75",
+      "baselineStage": "50",
+      "reason": "38e1758a4 re-expresses the AC-153 pin under PO decision D11 (answers stay out of tracked files, held verbatim and in order in the git-ignored authoring copy) and states both pins green (8/8 and 7/7). The item has no backlog file, so coverage was judged from the commit and pin header only.",
+      "evidence": [
+        "38e1758a4"
+      ],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "Confirm the D11 re-expressed acceptance replaces the original 'answers appear in generated files' wording."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic confirmation of the 75 is missing."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Re-run the AC-153 pin under the WSL Full Verify."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "75"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-package-parent-metadata-false-drift",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; skips and the corpus link stay open. Keep baseline.",
+      "evidence": [
+        "9b86116b7"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the skipped clauses and the corpus link with real assertions."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the registered pin under the WSL Full Verify to obtain a counted result."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "a72489377 (docs) and 30ddc1f73 (receipt producer, 27/27, 17/17, 60/60) support the design course but do not make Advisor on-demand or merge Critic and readiness into one review, nor add the decision-continuity check; baseline skips and unpinned present-plan path remain.",
+      "evidence": [
+        "a72489377",
+        "30ddc1f73"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the one-review flow, decision-continuity check and fitness-model execution, and pin the present-plan path."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the 5 host-skipped cases on Linux/WSL."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-trailer-verifier-lost-after-closure",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the baseline AC-156 sweep (runs 8/8, 10/11, 7/7) stands and one item's proof cannot run on this host.",
+      "evidence": [
+        "ca1afa694",
+        "e7a3ae622",
+        "7ffc96a50"
+      ],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the proof that cannot run on the Windows host on Linux/WSL."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-workflow-package-omits-contract",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item; the E1 behavioral checks state no pass count and the other clauses remain text-only. Keep baseline.",
+      "evidence": [
+        "79d14c575",
+        "14cfd349b",
+        "8926f1286"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the remaining text-only clauses with behavioral checks."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the E1 freeze-order checks under the WSL Full Verify to obtain a counted result."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic confirmation is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "02",
+      "itemId": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "7fe00914b (design-workflow-package-v2 0/2 to 1/2) and d1a18efe2 (1/2 to 2/2, pairing fixed) repair the readiness fixture, but they are not a Windows run and the item is about Windows; baseline typed HOST-LIMITATION skips (6 pass, 2 skipped, due 2026-10-19) were not shown reversed.",
+      "evidence": [
+        "7fe00914b",
+        "d1a18efe2",
+        "77e130304"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Run design-workflow-package-v2 on a native Windows host to show the case executes there."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Confirm the 2/2 result under the WSL Full Verify."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.desktop-app-support-is-unverified",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches desktop-app support; doc-contract clauses stay green and the four live points remain typed skips, which do not qualify.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Run the four live desktop-app points on a real installed Claude desktop host."
+        },
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the doc-contract clauses in committed evidence."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No later commit changes the picture; a9aeb9d63 covers the acceptance points but states no counted GREEN.",
+      "evidence": [
+        "a9aeb9d63"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Run the coverage-map suite and record its counted GREEN result in a commit or evidence file."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-signature",
+          "what": "Any signature-bound protected patch the cases depend on needs the PO signature."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No later commit changes this item; 7b0712f39 adds the bounded-wait pin and RED mirror but states no counted GREEN. 5cbd2db3c touches the budget hook for host-commit text only (guard-dispatch-budget 125/127) and does not address the Windows lock.",
+      "evidence": [
+        "7b0712f39",
+        "5cbd2db3c"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Record a counted GREEN for the bounded-wait pin against the original acceptance."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the lock behaviour on a real Windows host."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "macOS stays held; Linux/WSL run still needed."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; the three clauses appear pinned but no counts are stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Run the three pinned clauses and record a counted GREEN."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Only dacf773b6 (a backlog fold-in) names it; the empty-log refusal is pinned but the measurement and fold-in parts remain.",
+      "evidence": [
+        "dacf773b6"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the remaining measurement and fold-in parts and record a counted GREEN."
+        },
+        {
+          "owner": "native-host",
+          "what": "Measure the log on a real host run."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No later commit changes this item; 418dd753a and 9e075f96d implement the owner claim but no pass count is given and the pin file's tracking was not confirmed.",
+      "evidence": [
+        "418dd753a",
+        "9e075f96d"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Confirm the OWN-7 pin file is tracked and record a counted GREEN."
+        },
+        {
+          "owner": "native-host",
+          "what": "Verify the owner claim on a real Windows host."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since the baseline changes the picture; both proposal clauses stay covered by 15 green cases with RED mirrors.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "critic",
+          "what": "Independent Critic batch review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; AC-166 maps to the committed 9/9 pin but the real gitleaks reproduction stays held.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Reproduce the finding with the real gitleaks binary on a Linux run."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; ea8fc5a0a and beb9142d2 state passing pins but no count is tied to this item's acceptance.",
+      "evidence": [
+        "ea8fc5a0a",
+        "beb9142d2"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Tie a counted GREEN to this item's acceptance clauses."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+      "stage": "25",
+      "baselineStage": "25",
+      "reason": "No commit since the baseline changes this item; b8a020ec3 adds a measurement script and pin with no counts, and real before/after numbers need host evidence.",
+      "evidence": [
+        "b8a020ec3"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Run the measurement pin and record counts."
+        },
+        {
+          "owner": "native-host",
+          "what": "Capture real before/after context numbers on a host session."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Decide the acceptable context-spend target."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        }
+      ],
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; 30da379bb and 68af587b5 add and register the receipt hook but registration was a held signature-bound patch.",
+      "evidence": [
+        "30da379bb",
+        "68af587b5"
+      ],
+      "open": [
+        {
+          "owner": "po-signature",
+          "what": "Signature-bound patch registering the SubagentStart receipt hook is held."
+        },
+        {
+          "owner": "native-host",
+          "what": "Prove the fresh-dispatch first write on a real host."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.evidence-artifacts-carry-no-commit-identity",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; the pin is committed but no counts are stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Run the committed pin and record a counted GREEN."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; bd92916c6 pins the encrypted-key route but states no counts and consumer verification stays open.",
+      "evidence": [
+        "bd92916c6"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Record a counted GREEN for the key-reuse pins."
+        },
+        {
+          "owner": "native-host",
+          "what": "Verify key reuse in a real consumer onboarding."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.feature-branch-push-admitted-without-signature-approval",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "629edbc77 adds four cases without counts and the broader clauses remain. ef3278d58 (guard-push 251/251) only admits proven non-push git commands and does not cover the approval lane.",
+      "evidence": [
+        "629edbc77",
+        "ef3278d58"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the broader acceptance clauses and record a counted GREEN."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.first-enrollment-enters-retirement-before-consent",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; one clause is covered only by a typed skip, which does not qualify.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the typed skip with a running test for the uncovered clause."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.foreign-worktree-closes-the-implementation-gate",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No later commit changes this item; d412a84b2 and follow-ups commit the typed cause and a two-worktree pin, but its one RED case stays red until a protected patch is applied and no count is stated.",
+      "evidence": [
+        "d412a84b2"
+      ],
+      "open": [
+        {
+          "owner": "po-signature",
+          "what": "Protected patch that turns the one RED case green needs the PO signature."
+        },
+        {
+          "owner": "agent",
+          "what": "Record a counted GREEN once the patch is applied."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "stage": "25",
+      "baselineStage": "25",
+      "reason": "No commit since the baseline changes this item; 17067dca4 and 0824e528e state no test results and admitting the export to governed agents needs a held guard patch.",
+      "evidence": [
+        "17067dca4",
+        "0824e528e"
+      ],
+      "open": [
+        {
+          "owner": "po-signature",
+          "what": "Held guard patch admitting the transcript export to governed agents needs the PO signature."
+        },
+        {
+          "owner": "agent",
+          "what": "Add tests for the continuity advisory and transcript export with counted results."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        }
+      ],
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.gh-delivery-classifier-is-not-wired",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since the baseline changes the picture; the committed pin covers the sole acceptance clause (gh pr merge guard-refused).",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "critic",
+          "what": "Independent Critic batch review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "a6e161526 adds the real-git run but states no count. 5a866354b routes one more site (doc-reader snapshot) through the shared null-device constant, but states no count, so no raise.",
+      "evidence": [
+        "a6e161526",
+        "5a866354b"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Run the null-device suite and record a counted GREEN."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the check on a real Git for Windows 2.56 host."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; new cases exist but one clause is covered only by a typed skip and no counts are stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the typed skip with a running test and record a counted GREEN."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "a5d6fbcd1 makes the stale-snapshot refusal name one refresh and updates the item's test, but states no pass count and the staleness decision is unchanged; the behavioural pin held behind a protected patch and the stale-admission clause remain unqualified.",
+      "evidence": [
+        "a5d6fbcd1",
+        "03ef96053",
+        "5360819d9"
+      ],
+      "open": [
+        {
+          "owner": "po-signature",
+          "what": "Protected patch for the held behavioural pin case needs the PO signature."
+        },
+        {
+          "owner": "agent",
+          "what": "Qualify the stale-admission clause and record a counted GREEN."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline qualifies this item; ef3278d58 touches guard-push (251/251) but concerns shell-marker commit admission, not env -S or editor bang.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Run the pin with its mirror check and record a counted GREEN."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.git-stash-list-classified-as-working-tree-write",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Only 3636e4332 (a backlog record) names it; the pin covers the Proposal but no counts or integration evidence exist.",
+      "evidence": [
+        "3636e4332"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Record a counted GREEN and integration evidence for the stash-list pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; the pin is committed but no counts or native evidence exist.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Record a counted GREEN for the suppression pin."
+        },
+        {
+          "owner": "native-host",
+          "what": "Verify suppression matching on a real Windows host."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; the real-scanner and batch clauses remain open and no counts are stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement and test the batch clause and record a counted GREEN."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the real-scanner clause with gitleaks on Linux."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; the CLI child-process pin is committed but no counts or native Windows run are evidenced.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Record a counted GREEN for the CLI child-process pin."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the ignore CLI on a real Windows host."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "The fix and RED-to-GREEN producer case are committed. 5cbd2db3c (guard-dispatch-budget 125/127, binding 11/11) only changes the host-commit budget text, not the closing ceremony, so the picture is unchanged.",
+      "evidence": [
+        "5cbd2db3c"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Verify the budget text with a consumer-run Goldfish."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Only 0ac30fb44 (a backlog fold-in) names it; the applied postimage has a GREEN pin without counts and the review and sync clauses are unverified.",
+      "evidence": [
+        "0ac30fb44"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Record a counted GREEN for the pin and cover the sync clause."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the module change is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "03",
+      "itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes this item; the template pin passes 7 but the commit labels AC-187 partial and consumer coverage is open.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Complete the partial AC-187 clause and record a counted GREEN."
+        },
+        {
+          "owner": "native-host",
+          "what": "Cover the consumer-side brief routes."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.governance-scope-rejects-readonly-host-git-control",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject; ef3278d58 concerns guard-push, not the governance scope. Keep baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the typed-skip pin points with host-independent cases and state a counted GREEN result."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the skipped pin points on the real host that exposes the read-only host git control."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes the intake-transition approval-policy path; the onboarding fixture commits only repair test fixtures. Historical-sequence and trust-anchor clauses stay uncovered.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Add a controlled replay of the historical intake sequence and a trust-anchor case with a counted GREEN result."
+        },
+        {
+          "owner": "native-host",
+          "what": "Reproduce the guard refusals in the three phases on a real Codex/WSL and Claude/Windows greenfield run."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+      "stageBaseline": "25",
+      "stage": "25",
+      "baselineStage": "25",
+      "reason": "No commit since the baseline touches this item; only a reconstructed acceptance draft exists.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "Confirm the reconstructed acceptance and whether the item stays in the 0.7.0 scope."
+        },
+        {
+          "owner": "agent",
+          "what": "Implement and pin the reproducible-public-evidence rule once the acceptance is confirmed."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.greenfield-design-course-cost-and-proportionality",
+      "stageBaseline": "25",
+      "stage": "25",
+      "baselineStage": "25",
+      "reason": "No commit since the baseline covers cost or proportionality; d8db9e034 bounds the delivery course size, a different subject. The telemetry clause stays a typed skip per the baseline.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "Decide whether the deferred telemetry clause leaves the acceptance or returns after 0.7.0."
+        },
+        {
+          "owner": "agent",
+          "what": "Implement the remaining cost and proportionality clauses with a counted GREEN pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.greenfield-machine-output-and-skill-budget",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes the output or skill-budget pin; the 14/14 pin from the baseline stands but the help-action clause is still not shown as covered.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Show the bounded read-only help action for guard denials as covered by a counted GREEN case."
+        },
+        {
+          "owner": "native-host",
+          "what": "Measure first-run and denial output bytes on the three installed runners."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.guard-override-request-digest-drifts-after-arming",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches the HGO digest path; the Windows counts from the baseline (33 pass, 2 skip) are not item-specific and no POSIX run is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the HGO suites on Linux and state an item-specific counted result."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "ef3278d58 proves plain git grep non-push and states guard-push.test.mjs 251/251, but the pin set has no --no-index case (Ruling 81 says it is not the trigger) and the exact refused shape is not isolated, so the original acceptance is not shown covered.",
+      "evidence": [
+        "ef3278d58"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Pin the exact refused git grep --no-index shape against a scratch JSON path and show it admitted."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.guard-push-refuses-read-only-git-without-push",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "ef3278d58 reports guard-push.test.mjs 251/251 and --version/version are pinned (T85a/b), but the nested-shell clause is still pinned as a refusal (T85d, accepted false positive) so the proposal's second clause is not met.",
+      "evidence": [
+        "ef3278d58"
+      ],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "Decide whether the nested bash -lc non-push git false positive stays accepted (Q12 option B) or is lifted."
+        },
+        {
+          "owner": "agent",
+          "what": "If lifted, implement and pin the nested-shell non-push admission."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline concerns the gitleaks prefix match; ef3278d58 is a different shape. No counted result for the gitleaks admit case exists.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for the gitleaks admit case and the still-refused ambiguous git forms."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+      "stageBaseline": "UNKNOWN",
+      "stage": "UNKNOWN",
+      "baselineStage": "UNKNOWN",
+      "reason": "Windows commits 8869464c2 (12/13, other suites still red) and 0b06f4092 (UNVERIFIED) do not map the original 60-failure guard-lifecycle-ready acceptance to a counted green result, so the picture is unchanged.",
+      "evidence": [
+        "8869464c2",
+        "0b06f4092"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Run guard-lifecycle-ready.test.mjs on native Windows and record the pass and fail counts against the 213/60 baseline."
+        },
+        {
+          "owner": "agent",
+          "what": "Classify any remaining failures (fixture, platform, defect) and fix the fixtures."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "UNKNOWN",
+      "readerStage": "UNKNOWN"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.handover-doc-committed-without-governance-classification",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches the OG-DOC-UNCLASSIFIED pin or hook; no pass count is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for the installed pre-commit hook pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes the heredoc receiver list; ef3278d58 explicitly keeps heredoc shapes refused and adds no receiver. No counts stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the classifier fix for the command-runner receivers after the pins and state a counted GREEN result."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Confirm the receiver list boundary beyond decision AF (xargs, at, ed, sqlite3, php, lua, awk -f)."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches the dead-owner audit lock; the Linux control stays skip-only.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the Linux control case instead of a skip and state a counted result."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the win32 shapes on native Windows and state a counted result."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.hgo-patch-preflight-before-signature",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes the stored-patch preflight; b664c310a and 724e9db87 state no pass count.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the HGO patch preflight cases and state a counted GREEN result."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-signature",
+          "what": "A signature-bound patch for protected files is still needed where the preflight changes them."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.hgo-stale-capability-shadows-current-authorization",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches HGO capability handling; the baseline Windows count has two link-case skips and no item-specific count.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the HGO file on Linux so the link cases execute and state an item-specific count."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "0b06f4092 changes the verify-evidence producer boundary on Windows and is stated UNVERIFIED; it does not address crash simulation or the recovery route.",
+      "evidence": [
+        "0b06f4092"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Add a crash-simulation case and show the reachable recovery route clearing the descriptor."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the recovery pins and the producer suite on Linux and state counts."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+      "stageBaseline": "25",
+      "stage": "25",
+      "baselineStage": "25",
+      "reason": "No commit since the baseline concerns dispatchless implementation; the only dispatch-related commits are fixes to dispatch binding and host commits, not review-coverage escape.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "Decide the acceptance and scope for dispatchless implementation coverage."
+        },
+        {
+          "owner": "agent",
+          "what": "Implement and pin the coverage check once the acceptance is set."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "25",
+      "readerStage": "25"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes the design (elephant) trailer admission; ef3278d58 covers parenthesised goldfish trailers only. No pass count for 8e7dce0f4 is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for the design trailer admission and its refused near-misses."
+        },
+        {
+          "owner": "native-host",
+          "what": "Check the installed example trailer against the installed git guard."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "813600b5a closes the never-liftable list over five new imports and updates the closure test, which addresses the red ratchet, but states no pass count and does not show clause 1 (all violations per run) as counted.",
+      "evidence": [
+        "813600b5a"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for the closure test and for the all-violations-in-one-report pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-signature",
+          "what": "The kernel list change needs the signed quality package or signature-bound patch."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "The only mapped commit 3636e4332 only records findings; no commit since the baseline changes the admission, and the uncovered clauses and the held skip remain.",
+      "evidence": [
+        "3636e4332"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the remaining uncovered clauses and release the held skip."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches lifecycle inspect; the 13 pass, 1 typed skip count from the baseline does not show the digest-reporting acceptance covered.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Pin the current plan and spec digest reporting and state a counted GREEN result."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the symlink case that skips on Windows under Linux."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes the read-scope pin; the native-hold skips and the held diagnostic-parity finding remain and no pass count is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Run the authenticated skill-catalog declaration cases on a real host instead of the typed native-hold skips."
+        },
+        {
+          "owner": "agent",
+          "what": "Resolve the held diagnostic-parity finding and state a counted result."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "a5d6fbcd1 changes only the hook-staleness refusal text, not the readiness rollback; the item's triage points to ddabe0ae3 with no pass count cited.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for the CHRB returned-refusal case."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing; the item closes after the 0.7.0 candidate host checklist."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.merge-commit-message-skips-conventional-type-check",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches the merge-commit message check; the pin maps to R1-R5 but no pass count is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for the R1-R5 pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.model-family-approval-with-automatic-version-upgrades",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "82cd86234 reports model-family-host-store failing 27 of 28 cases (MODEL-FAMILY-AUTHORITY-UNAVAILABLE) and MFMP003 still red, a host-cluster red that does not revert the fix but blocks 75; the installed-host clause stays a skip.",
+      "evidence": [
+        "82cd86234"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Fix the red model-family host cluster (host-store 27/28 and MFMP003) and state a counted GREEN result."
+        },
+        {
+          "owner": "native-host",
+          "what": "Prove installed-host acceptance on all three runners instead of the skip."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline maps the bootstrap acceptance to a counted GREEN; the Windows ancestor commits 8869464c2 and 0b06f4092 are about session-authority and verify producer, not the model-role bootstrap.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Run the model-role bootstrap on native Windows and state a counted GREEN result for the acceptance."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches the confirmation prompt; no green counts exist.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for the five pin points."
+        },
+        {
+          "owner": "native-host",
+          "what": "Check the prompt on the installed hosts."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.native-patch-rename-drops-protected-content-markers",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches native patch rename handling; clause 3 still needs the installed guard.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Run clause 3 against the installed guard on the native host."
+        },
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for clauses 1 and 2."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "04",
+      "itemId": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+      "stageBaseline": "50",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches the uninstall path; the six uninstall commits predate the base and no counted GREEN for the whole pin is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for the whole uninstall pin."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Decide the AC-109 carrier disposition."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject (8869464c2 and 0b06f4092 concern the registry and producer, not nul files). Baseline kept: both clauses covered but no counted pass result is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN result for both clauses."
+        },
+        {
+          "owner": "native-host",
+          "what": "Windows Node 24 run confirming no real nul file is created."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: only the structural observe call is pinned.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Pin the remaining clauses beyond the structural observe call."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: explicit override retention is still not shown.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Add a test showing explicit override retention."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 changes the matrix wall-time clause (fixture-isolation commits like ad326d4cd concern a different suite). Baseline kept: the wall-time skip remains.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Resolve the typed wall-time skip with a measured parallel matrix run."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Linux/WSL timing run of the matrix."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: criteria 1-3 pinned, criterion 4 deferred.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement and pin deferred criterion 4."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 states a counted green result for this item (d621b2871 and 765caa121 touch Critic close gate and finalizer, not the model-tier acceptance). Baseline kept: triage still lists open points.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Close the open triage points and state a counted green result for the acceptance."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Confirm scope of the remaining triage points."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since 76fe529b3 changes the picture. Baseline kept (clause coverage with negatives and RED mirror).",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Confirm the pin in the WSL Full Verify."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "dacf773b6 is docs-only: it folds an AGY serial-packages finding into the item, adding open scope; no counted green result and restart-liveness is not implemented. Baseline kept.",
+      "evidence": [
+        "dacf773b6"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the restart-liveness direction and address the serial-packages finding."
+        },
+        {
+          "owner": "agent",
+          "what": "State a counted result for the counter-lock and record-collision pins."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Decide scope for restart-liveness versus serial packages."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: the /etc/shadow clause remains a typed skip.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the typed skip for the /etc/shadow clause with a real test."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: real hook entrypoints pinned for git fixtures, non-git skipped.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Pin the non-git case now skipped."
+        },
+        {
+          "owner": "native-host",
+          "what": "Real installed-host run in a non-opted-in repository."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 states a counted result for this item (8e0b276a9 rebinds plan approval on another device, a different clause). Baseline kept: no counted result.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted pass result for the bullet 3 and 5 pins."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: all four bullets mapped but no counts.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State counted results for all four bullets."
+        },
+        {
+          "owner": "native-host",
+          "what": "Windows PowerShell run of the boundary."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: no clause can be shown qualified.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Add a test showing the git error reaches the preflight output."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since 76fe529b3 changes the picture. Baseline kept: 13 tests, 12 pass, 1 POSIX-only skip (29984e731, 31bd8c354).",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the POSIX-only skipped regression case on Linux."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: seam and NOT_SECURE refusal pinned, skip and missing counts remain.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Resolve the remaining typed skips and missing counts."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: 179240f81 pin (27 pass, one typed host skip), AC-232 has no public original and S1-S8 awaits PO release.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "po-decision",
+          "what": "Release the AC-232 reconstruction S1-S8."
+        },
+        {
+          "owner": "agent",
+          "what": "Drive the full onboarding route end to end."
+        },
+        {
+          "owner": "native-host",
+          "what": "Resolve the typed host skip in the 27-pass pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: no counted result stated for the A5-A7 pin and verify wiring.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted green result for the A5-A7 pin and verify wiring."
+        },
+        {
+          "owner": "po-signature",
+          "what": "Signature for the protected verify.mjs patch if not yet applied."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since 76fe529b3 changes the picture. Baseline kept: 105ed7b74 pin GREEN 7/7 with the fix a90869af9 in history.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Confirm the pin in the WSL Full Verify."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject (ef3278d58 admits non-push git commands with shell markers, a different clause with no count here). Baseline kept: no pass count for 5c8fb499d.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a pass count for the rebased git-cmd cases and marker pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+      "stage": "75",
+      "baselineStage": "75",
+      "reason": "No commit since 76fe529b3 changes the picture. Baseline kept: 19/19 GREEN pin.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Confirm the 19/19 pin in the WSL Full Verify."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "75",
+      "readerStage": "75"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: shapes pinned without counts.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State counted results for the pinned shapes."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: no count for the item.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Resolve the accepted-false-positive contradiction and state a count."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Confirm the false-positive acceptance."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: most original clauses still held.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the original clauses still held."
+        },
+        {
+          "owner": "native-host",
+          "what": "Per-runner denial text check on installed hosts."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: skips and lanes remain.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the remaining typed skips and lanes with tests."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.readiness-input-omits-current-advisor-observation",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: 6 green, 3 clauses are typed skips.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the three typed-skip clauses with tests."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: output classes pinned, native clause held.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Run the native clause on a real sandboxed host."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: only the typed-unsafe clause is pinned.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Pin the clauses beyond the typed-unsafe one."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 touches this item's subject. Baseline kept: route retired, surviving observer 5 green, 2 skips.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the two skips in the surviving observer."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "05",
+      "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "0ac30fb44 is docs-only and adds finding P1-1 (Goldfish given an Elephant action) to the item; no code or test change. Baseline kept: pinned 9/9, point 2b held.",
+      "evidence": [
+        "0ac30fb44"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement point 2b and address the P1-1 finding."
+        },
+        {
+          "owner": "native-host",
+          "what": "Per-runner preflight on installed hosts."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.scratch-has-no-retention-and-no-durability-check",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since 76fe529b3 implements the sanctioned sweep or the durability check; 39b2595ef only keeps the existing scratch custody advisory report-only on allowed pushes (PGSA04 pin, no count), which does not cover the Proposal.",
+      "evidence": [
+        "39b2595ef"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the sanctioned scratch sweep and the handover/push durability check from the Proposal, with counted pins."
+        },
+        {
+          "owner": "po-decision",
+          "what": "Triage decision is empty; the PO must accept the retention and durability scope."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the implementation is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline changes the picture; 968a77e75 pin has no stated pass count and the skips and native sweeps are unchanged.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the all-state pin covering the original acceptance."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the native-host sweeps now typed as skips (Windows, Codex, Claude, Antigravity)."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; the codemod-shape acceptance still has no counted result beyond the baseline redirect pins (809a798b4).",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Add and count a pin for the codemod shape that the acceptance names."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the guard change is missing."
+        },
+        {
+          "owner": "po-signature",
+          "what": "Guard-path change may need a signature-bound patch or signed quality package."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.security-scanner-failure-provenance",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; keep-baseline rule.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Finish implementation and add a counted GREEN pin for the scanner failure provenance acceptance."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; the pin maps the proposal but no counted GREEN is stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Run the pin and record a counted GREEN in a commit message or committed evidence."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.semgrep-offline-default-version-check",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; keep-baseline rule.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Provide a counted GREEN test for the offline default version check."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; keep-baseline rule.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Provide a counted GREEN test that partial-parsing warnings no longer fail the whole scan."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "The later Codex readiness commits (7ad947159, 7fe00914b, d1a18efe2) concern the managed Codex readiness host store, not this item's partial-readiness reason or its intermittent cleanup root cause; baseline picture stands.",
+      "evidence": [
+        "7ad947159",
+        "7fe00914b"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Cover the intermittent cleanup root cause (a81cae62f) and fix the pre-existing preflight failure."
+        },
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the partial-readiness cases."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Confirm the preflight suite in the WSL Full Verify."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; ef3278d58 changes guard-push for non-push git commands with shell markers, a different classifier concern.",
+      "evidence": [
+        "ef3278d58"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Record counted GREEN results for both covered clauses."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the classifier is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; 813600b5a only closes the never-liftable kernel list over five other modules and adds no fixture clause or counts for the shell grammar file.",
+      "evidence": [
+        "813600b5a"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Add the missing fixture clause and counted results for the shell grammar file placement."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the kernel-path change is missing."
+        },
+        {
+          "owner": "po-signature",
+          "what": "A kernel path change may need a signature-bound patch."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Baseline stands: 411b83a86 covers git (8/8) but the openssl clause is still evidenced only by portable controls; ace0f181c only fixes test fakes of openssl and is not the product spawn.",
+      "evidence": [
+        "ace0f181c"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Apply the trusted-absolute-path spawn to openssl and pin it with a counted GREEN."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the openssl spawn on native Windows."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; AC-257 is still marked partial.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Close the partial AC-257 and pin the disclosure scan time bound with a counted GREEN."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No later commit adds a counted GREEN covering the original acceptance; 8e0b276a9 (device rebind of an accepted-contract plan approval, Critic pending) is adjacent but not this item's ceremony acceptance.",
+      "evidence": [
+        "8e0b276a9"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Provide one counted GREEN covering the original acceptance across the seven earlier fixes."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run a live signing ceremony on the real hosts."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-signature",
+          "what": "Signed quality package or signature-bound patch for the guard changes is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Baseline stands; dbd497fcc and 4679f8a6d (6/6) only move test fixtures outside the checkout and do not add the native Windows route, which remains absent.",
+      "evidence": [
+        "dbd497fcc",
+        "4679f8a6d"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the typed skip with a pin of the agent-operable route."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the signed quality package route natively on Windows."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-signature",
+          "what": "A signed quality package for the route change is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No later commit touches design-workflow-signing-default.test.mjs; the fixture-root commits (4679f8a6d, dbd497fcc) fix other suites. Whether RC21C003 reversed-order is covered is still not shown beyond 087529609.",
+      "evidence": [
+        "4679f8a6d",
+        "dbd497fcc"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Show or add the RC21C003 strictly reversed member order case with a counted GREEN."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Run the five RC21C cases in the Linux Full Verify."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the suite on native Windows, where it failed at import."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.signing-prompt-prints-the-whole-review-package",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; the signing-prompt pin keeps a typed host skip (8 pass 1 skip, ab5fefbbc), which does not qualify that clause.",
+      "evidence": [
+        "ab5fefbbc"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Run the skipped host case of the signing-prompt pin on a real host."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.signing-toolchain-readiness",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; fc56a4d5f states 12 pass and 1 typed host skip (POSIX mode bits decoy case), which does not qualify that clause.",
+      "evidence": [
+        "fc56a4d5f"
+      ],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the contaminated-host decoy case under Linux or WSL so it executes instead of skipping."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; the AC-263 pin (3ec87cfc1) states no pass count.",
+      "evidence": [
+        "3ec87cfc1"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the AC-263 pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Fixes for the added acceptance exist (5098e6478 typed absent-course repair, NGHS21/22 and NGHR06 RED to GREEN; d8db9e034, fc4e55fa5, 3403d94d9, b4bb60a9d for consumer first item delivery) but no counted end-to-end scenario per runner with exactly two PO proofs is stated; the mapped commits are docs only.",
+      "evidence": [
+        "5098e6478",
+        "d8db9e034",
+        "3403d94d9",
+        "b4bb60a9d",
+        "351f38415"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Pin a design-approval output with no guard-override warning and plan-readiness proof of the delivery hand-off."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run one real greenfield per runner (Claude on Windows, Codex, Antigravity) to a pushed feature branch with exactly two PO proofs."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.transfer-redaction-alters-digest-bound-files",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; byte-exact carry is pinned but no counts are stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the byte-exact carry pin."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; the guard-admission clause is still missing.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement and pin the missing guard-admission clause."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; most cases are typed skips on this host.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the skipped cases against a /mnt drive checkout under WSL."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline extends the heredoc receiver list; ef3278d58 (guard-push 251/251, git-cmd 469/469) proves other non-push git shapes, not vim -es or busybox receivers, and the pin has no stated GREEN count.",
+      "evidence": [
+        "ef3278d58"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Record a counted GREEN for the Q12-T9 pin and the Q12-F7 receiver fix for vi/vim/ex and busybox applets."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review of the classifier change is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; guard fix and pins map the acceptance but no counts are stated.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the pins covering the acceptance."
+        },
+        {
+          "owner": "native-host",
+          "what": "Confirm the scratch write on a native Windows greenfield run."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "Baseline stands; 8869464c2 (12/13 on native Windows, D2 fixture moved off os.tmpdir) and 0b06f4092 (7/33 on Windows, UNVERIFIED) confirm the temp-root DACL problem persists and show no full-Verify effect.",
+      "evidence": [
+        "8869464c2",
+        "0b06f4092"
+      ],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Show the suite-wide effect in a full Verify; 8869464c2 and 0b06f4092 name WSL runs still pending."
+        },
+        {
+          "owner": "native-host",
+          "what": "Pin case D2 and session-cleanup-power stay red on native Windows; rerun there."
+        },
+        {
+          "owner": "agent",
+          "what": "Replace the POSIX typed skip in the pin with an executed case."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing (moved to the WSL Critic batch)."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; the driver, onboarding and installed-observation clauses are still held.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Implement the held driver and onboarding clauses with counted pins."
+        },
+        {
+          "owner": "native-host",
+          "what": "Observe the installed portable seed on native Windows."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; 04bc678d1 states no pass count and the skip and smoke runs remain.",
+      "evidence": [
+        "04bc678d1"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for pin case C2 and the fsync clause."
+        },
+        {
+          "owner": "native-host",
+          "what": "Run the pre-push installer smoke on native Windows."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; the parser is pinned but the real-process clauses skip.",
+      "evidence": [],
+      "open": [
+        {
+          "owner": "verify-wsl",
+          "what": "Run the real-process clauses that skip on this host under Linux."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    },
+    {
+      "part": "06",
+      "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+      "stage": "50",
+      "baselineStage": "50",
+      "reason": "No commit since the baseline touches this item; 128d7bd36 pins one case per clause with no stated pass count, and the later onboarding fixture commits (ad326d4cd, a3c9c7941) only repair other suites.",
+      "evidence": [
+        "128d7bd36"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "State a counted GREEN for the two-worktree pin covering each acceptance clause."
+        },
+        {
+          "owner": "critic",
+          "what": "Independent Critic review is missing."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance is missing."
+        }
+      ],
+      "readerBaselineStage": "50",
+      "readerStage": "50"
+    }
+  ]
+}

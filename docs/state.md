@@ -20,9 +20,15 @@ Read these three files first, in this order, before any other work:
    measurements, so they are built on and not rediscovered.
 
 **Claude WSL session, 2026-10-18:** local test candidates are stamped from real greenfield
-findings (PF-14, PF-19, PF-20, PF-23). PO decisions D5-D12 are in
+findings (PF-14, PF-19, PF-20, PF-23, PF-25). PO decisions D5-D15 are in
 [po-decisions-2026-10-18](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md).
-Full Verify, the Critic batch and PO acceptance are still open.
+Last pushed candidate: `15f9355d3` (PF-25 feature package registration, Antigravity runner
+view). On it, the PO's installer option 2 was refused `ATR-WIRING-OWNERSHIP-UNVERIFIABLE`:
+global hook wiring still pointed into the removed managed copy. Fixed in `c2817beda`.
+A read-only `prepare()` against the real configuration is now `prepared`, and a rehearsal
+with the real `agy` CLI in a throwaway home is `refreshed`. That fix is not yet stamped or
+pushed. The PO's real-project re-test of PF-25 is pending. Full Verify, the Critic batch and
+PO acceptance are still open.
 
 **WSL session, 2026-10-17:** the WSL clone was synced to the stamp commit `902f029c3`
 with a local fetch from the Windows checkout (fast-forward, no own commits lost). The
@@ -46,8 +52,8 @@ Claude continuation ledger (batches, collected patches, PO topics):
 
 The delivery scope remains 174 original backlog items, 37 ACs and four incident
 criteria. Nightwing, Batman and explicitly deferred work stay excluded.
-Current status (2026-10-17, HEAD `76fe529b3`): 7 at 25%, 151 at 50%, 15 at 75%, one
-unknown, zero accepted; index 50.86% — see
+Current status (2026-10-18, HEAD `98b6e5ca2`): 7 at 25%, 150 at 50%, 16 at 75%, one
+unknown, zero accepted; index 51.01% — see
 [delivery-status-current](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
 Every 75 still needs Critic confirmation. The figures below are the superseded 2026-10-11 matrix.
 [2026-10-11 matrix](../specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.md):

@@ -1,0 +1,931 @@
+{
+ "base": "76fe529b3",
+ "unmappedCommits": [
+  {
+   "sha": "4fc534daf",
+   "subject": "docs(sprint-alfred): record the current item status and the 0.7.0 cut as the only work list",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "55aa35fae",
+   "subject": "docs(sprint-alfred): blocker and major findings are still fixed under the 0.7.0 cut",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ec2407456",
+   "subject": "docs(sprint-alfred): stamp before the Critic; the Critic batch runs under WSL",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8869464c2",
+   "subject": "fix(pipeline-core): bound module-context ancestors at the plugin root and report an absent registry record as ENOENT on Windows",
+   "dispatch": [
+    "ALF-C-REGISTRY-ABSENT-WIN"
+   ]
+  },
+  {
+   "sha": "05011050c",
+   "subject": "docs(sprint-alfred): hand the 0.7.0 closing steps and open Windows findings to the WSL session",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "0b06f4092",
+   "subject": "fix(pipeline-core): register the git common dir before the producer records its Verify run on Windows",
+   "dispatch": [
+    "ALF-C-VEP-BOUNDARY"
+   ]
+  },
+  {
+   "sha": "d6f4d763e",
+   "subject": "docs(sprint-alfred): record the unverified producer boundary fix in the WSL handover",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "902f029c3",
+   "subject": "chore(pipeline-core): stamp the 0.7.0 Alfred local candidate for d6f4d76",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a715527aa",
+   "subject": "docs(state): record the WSL sync to the 0.7.0 stamp commit",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "76a2c02b5",
+   "subject": "chore(pipeline-state): fold the a715527aa checkpoint push-approval record",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "929387bad",
+   "subject": "docs(sprint-alfred): record the first WSL Full Verify observation of 76a2c02b5",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cc0f6dea1",
+   "subject": "docs(sprint-alfred): record the PO scope decision for the final 0.7.0 candidate",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "2937c6a9a",
+   "subject": "docs(sprint-alfred): record the PO Tier-0 exception for the approval rebind fix",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8e0b276a9",
+   "subject": "fix(pipeline-core): rebind an accepted-contract plan approval on another device",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d5c5e42e9",
+   "subject": "fix(backlog): repair item taxonomy, sprint fields and missing ledger entries",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "99ab82873",
+   "subject": "docs(adr): add the missing index rows for ADR-0086 and ADR-0087",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "69c4d0bd1",
+   "subject": "docs(enforcement): regenerate the hook table from the current manifests",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5098e6478",
+   "subject": "fix(pipeline-core): give an approved plan without a delivery course a typed repair route",
+   "dispatch": [
+    "ALF-W1B-DELIVERY-COURSE"
+   ]
+  },
+  {
+   "sha": "26631c1d6",
+   "subject": "fix(pipeline-core): stop the owned Codex host session when the post-ready readback fails",
+   "dispatch": [
+    "ALF-W2-CODEX-HOST-HANG"
+   ]
+  },
+  {
+   "sha": "3cc202e0e",
+   "subject": "docs(backlog): record that test fixtures inside the checkout write the real repository",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "703a94bfd",
+   "subject": "chore(backlog): record the open transition for the fixture incident item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "5a866354b",
+   "subject": "fix(pipeline-core): spell the doc-reader git null device through the shared constant",
+   "dispatch": [
+    "ALF-F4-NULL-DEVICE"
+   ]
+  },
+  {
+   "sha": "39b2595ef",
+   "subject": "fix(pipeline-core): keep the scratch custody advisory report-only on allowed pushes",
+   "dispatch": [
+    "ALF-F3-SCRATCH-CUSTODY"
+   ]
+  },
+  {
+   "sha": "813600b5a",
+   "subject": "fix(pipeline-core): close the never-liftable kernel list over its new imports",
+   "dispatch": [
+    "ALF-F1-KERNEL-CLOSURE"
+   ]
+  },
+  {
+   "sha": "e9c68703b",
+   "subject": "fix(pipeline-core): drop the agent-run attestation setup from the human terminal catalog",
+   "dispatch": [
+    "ALF-F2C-HTA-FINISH"
+   ]
+  },
+  {
+   "sha": "ef3278d58",
+   "subject": "fix(pipeline-core): admit proven non-push git commands that carry shell markers",
+   "dispatch": [
+    "ALF-F7-PUSH-READONLY-GIT"
+   ]
+  },
+  {
+   "sha": "b516d38ca",
+   "subject": "fix(pipeline-core): bind a managed Codex terminal's cwd to the repository roots",
+   "dispatch": [
+    "ALF-F6C-MANAGED-CWD-TESTS"
+   ]
+  },
+  {
+   "sha": "7ad947159",
+   "subject": "fix(pipeline-core): register the Codex readiness host store's process root",
+   "dispatch": [
+    "ALF-W2A-READINESS-ROOT"
+   ]
+  },
+  {
+   "sha": "ad01f13a5",
+   "subject": "fix(pipeline-core): classify post-terminal Codex finalization records in the managed inventory",
+   "dispatch": [
+    "ALF-W2B-SECOND-LAUNCH"
+   ]
+  },
+  {
+   "sha": "dbbe7dd73",
+   "subject": "docs(sprint-alfred): log the fixes toward the final 0.7.0 candidate per item",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "92721a1c5",
+   "subject": "test(pipeline-core): pin that a managed Codex launch from a foreign repository stays refused",
+   "dispatch": [
+    "ALF-W2C-READINESS-REPO-DRIFT"
+   ]
+  },
+  {
+   "sha": "7a91cf0c6",
+   "subject": "test(pipeline-core): give continuity-result and proof-gate fixtures their own repository",
+   "dispatch": [
+    "ALF-W3G2-RESULT-FIXTURE-REPOS"
+   ]
+  },
+  {
+   "sha": "4c797f9eb",
+   "subject": "test(pipeline-core): pin the retirement of the runner design-readiness bootstrap",
+   "dispatch": [
+    "ALF-W3G7-RETIRED-READINESS-BOOTSTRAP"
+   ]
+  },
+  {
+   "sha": "dbd497fcc",
+   "subject": "test(pipeline-core): keep signed quality package fixtures outside the checkout",
+   "dispatch": [
+    "ALF-W3G3-SIGNED-FIXTURE-ROOT"
+   ]
+  },
+  {
+   "sha": "85171fc40",
+   "subject": "test(pipeline-core): run four pipeline-state fixtures in their own repository",
+   "dispatch": [
+    "ALF-W3G1B-STATE-FIXTURE-REPOS"
+   ]
+  },
+  {
+   "sha": "ad326d4cd",
+   "subject": "test(pipeline-core): remove fixture causes from the onboarding-v3 suite",
+   "dispatch": [
+    "ALF-W3G6B-ONBOARDING-V3-FIXTURES"
+   ]
+  },
+  {
+   "sha": "7fe00914b",
+   "subject": "fix(pipeline-core): admit the readiness host receipt in the managed Codex inventory",
+   "dispatch": [
+    "ALF-W2F-READINESS-RECEIPT-INVENTORY"
+   ]
+  },
+  {
+   "sha": "bc7cb29ef",
+   "subject": "fix(pipeline-core): keep the state writer's own lock out of the rigor readback",
+   "dispatch": [
+    "ALF-W3G1E-RIGOR-LOCK-INPUT"
+   ]
+  },
+  {
+   "sha": "d1a18efe2",
+   "subject": "test(pipeline-core): launch the failure-path readiness from its own store's repository",
+   "dispatch": [
+    "ALF-W2G-READINESS-PAIRING-L128"
+   ]
+  },
+  {
+   "sha": "dd1314f7c",
+   "subject": "docs(pipeline-core): name the design package step in the seeded lifecycle guidance",
+   "dispatch": [
+    "ALF-W3G6C-ONBOARDING-DESIGN-SEQUENCE"
+   ]
+  },
+  {
+   "sha": "023fca221",
+   "subject": "test(pipeline-core): let the architecture design fixture reuse tracked source and an ADR directory",
+   "dispatch": [
+    "ALF-W3G6D-FIXTURE-SOURCE-ORDER"
+   ]
+  },
+  {
+   "sha": "a3c9c7941",
+   "subject": "test(pipeline-core): commit existing source before onboarding in the design-sequence cases",
+   "dispatch": [
+    "ALF-W3G6E-ONBOARDING-SOURCE-COMMITS"
+   ]
+  },
+  {
+   "sha": "fc4e55fa5",
+   "subject": "fix(pipeline-core): accept the rigor fields the state writer records in onboarding continuity",
+   "dispatch": [
+    "ALF-W3G1H-CLOSED-ENTRY-RIGOR-APPLY"
+   ]
+  },
+  {
+   "sha": "fa4c8ebf7",
+   "subject": "docs(sprint-alfred): log the second fix round and mark the local test checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "de8e884c1",
+   "subject": "test(pipeline-core): give the rebind-runner and close-collide fixtures their own repository",
+   "dispatch": [
+    "ALF-WB-P3-STATE-REMAINDER"
+   ]
+  },
+  {
+   "sha": "9df31c1f5",
+   "subject": "test(pipeline-core): run the Claude intake capture step before the design questions",
+   "dispatch": [
+    "ALF-WB-ONB-REVIEW-RECEIPT"
+   ]
+  },
+  {
+   "sha": "31ad4b406",
+   "subject": "docs(sprint-alfred): re-mark the local test checkpoint after two more test fixes",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "d8db9e034",
+   "subject": "fix(pipeline-core): give the delivery course one shared size bound and a typed refusal",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "617a6d4a0",
+   "subject": "docs(sprint-alfred): log the D3 slice-queue fix and the AGY finding triage",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "6a84c5a20",
+   "subject": "test(pipeline-core): pin that the devplan lane admits the producer's materialize step",
+   "dispatch": [
+    "ALF-W4-DEVPLAN-MATERIALIZE-PIN"
+   ]
+  },
+  {
+   "sha": "d621b2871",
+   "subject": "fix(pipeline-core): hold the feature close while its course lacks required Critic evidence",
+   "dispatch": [
+    "ALF-W3B-CRITIC-CLOSE-GATE"
+   ]
+  },
+  {
+   "sha": "a5d6fbcd1",
+   "subject": "fix(pipeline-core): name one refresh for every stale hook snapshot",
+   "dispatch": [
+    "ALF-W6-ONE-HOOK-REFRESH"
+   ]
+  },
+  {
+   "sha": "8ffca1cc6",
+   "subject": "docs(sprint-alfred): mark the third local test checkpoint",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "bd14c18d3",
+   "subject": "chore(pipeline): record the signed push approval for checkpoint 8ffca1cc6",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ace0f181c",
+   "subject": "test(pipeline-core): stop the fake openssl writing a pkey file into the checkout",
+   "dispatch": [
+    "ALF-B10A-STALE-TESTS"
+   ]
+  },
+  {
+   "sha": "d46f284d7",
+   "subject": "test(pipeline-core): realign three suites with retired product seams",
+   "dispatch": [
+    "ALF-B10C-STALE-TESTS"
+   ]
+  },
+  {
+   "sha": "4679f8a6d",
+   "subject": "test(pipeline-core): let two fixtures provision their own root outside the checkout",
+   "dispatch": [
+    "ALF-B1B2-FIXTURE-ROOTS"
+   ]
+  },
+  {
+   "sha": "1c51554dc",
+   "subject": "test(pipeline-core): give push-init a real approved lifecycle and settle PCF030",
+   "dispatch": [
+    "ALF-B1D-PUSHINIT-PCF030"
+   ]
+  },
+  {
+   "sha": "82cd86234",
+   "subject": "test(pipeline-core): give model-family prelaunch its own repository and registry",
+   "dispatch": [
+    "ALF-B1C2-SESSION-CATALOGUE"
+   ]
+  },
+  {
+   "sha": "497133c5b",
+   "subject": "test(pipeline-core): initialize the session-authority registry for the signed Critic route",
+   "dispatch": [
+    "ALF-B1C3-CRITIC-ROUTE-REGISTRY"
+   ]
+  },
+  {
+   "sha": "aa9bd0565",
+   "subject": "chore(pipeline-core): stamp the 0.7.0 Alfred local test candidate for 497133c",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e94ff153a",
+   "subject": "chore(pipeline): record the signed push approval for checkpoint aa9bd0565",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "b21e9d14f",
+   "subject": "fix(pipeline-core): let the Antigravity installer find its Git source from the invoking checkout",
+   "dispatch": [
+    "ALF-AGY1-INSTALLER-SOURCE"
+   ]
+  },
+  {
+   "sha": "cff00accd",
+   "subject": "test(pipeline-core): pin that configure-verify names the unmet approval condition",
+   "dispatch": [
+    "ALF-G1-CONFIGURE-VERIFY-CAUSE"
+   ]
+  },
+  {
+   "sha": "3c918b869",
+   "subject": "fix(pipeline-core): forward the typed approval refusal from configure-verify",
+   "dispatch": [
+    "ALF-G1B-CVCT-FORWARD-CODE"
+   ]
+  },
+  {
+   "sha": "60aca1a5d",
+   "subject": "fix(pipeline-core): name why a native Goldfish host commit did not complete",
+   "dispatch": [
+    "ALF-G2-HOST-COMMIT-ASYNC"
+   ]
+  },
+  {
+   "sha": "5cbd2db3c",
+   "subject": "fix(pipeline-core): stop telling a host-commit Goldfish to commit at its budget checkpoint",
+   "dispatch": [
+    "ALF-G2B2-BUDGET-TEXT-MODE"
+   ]
+  },
+  {
+   "sha": "192f128cd",
+   "subject": "fix(pipeline-core): admit the goldfish-deep role in the native host-commit receipt",
+   "dispatch": [
+    "ALF-G2C1B-DEEP-ROLE-RECEIPT"
+   ]
+  },
+  {
+   "sha": "331e8ace4",
+   "subject": "fix(pipeline-core): admit a background Claude Goldfish once its stop route is registered",
+   "dispatch": [
+    "ALF-G2C2A-BACKGROUND-PENDING-GATE"
+   ]
+  },
+  {
+   "sha": "072dab2ed",
+   "subject": "fix(pipeline-core): host-commit a background Claude Goldfish when it stops",
+   "dispatch": [
+    "ALF-G2C2B-SUBAGENT-STOP-FINALIZE"
+   ]
+  },
+  {
+   "sha": "30ddc1f73",
+   "subject": "feat(pipeline-core): produce design review receipts instead of hand-writing them",
+   "dispatch": [
+    "ALF-G4C-RECEIPT-PRODUCER-AND-PREDICATE"
+   ]
+  },
+  {
+   "sha": "fbd47d972",
+   "subject": "feat(pipeline-core): publish the item-check result next to the host dispatch record",
+   "dispatch": [
+    "ALF-G3A-HOST-CHECK-EVIDENCE"
+   ]
+  },
+  {
+   "sha": "096033a2f",
+   "subject": "test(pipeline-core): align the Critic batch and finalizer fixtures with current contracts",
+   "dispatch": [
+    "ALF-B3A-CRITIC-FINALIZE-FIXTURES"
+   ]
+  },
+  {
+   "sha": "765caa121",
+   "subject": "fix(pipeline-core): name the cause behind a generic Critic batch CGB-PHYSICAL",
+   "dispatch": [
+    "ALF-B3B-CRITIC-FINALIZER-RESIDUALS"
+   ]
+  },
+  {
+   "sha": "fe18f5627",
+   "subject": "feat(pipeline-core): export a consumed session Critic review as tracked evidence",
+   "dispatch": [
+    "ALF-G3B2-CRITIC-EVIDENCE-EXPORT"
+   ]
+  },
+  {
+   "sha": "b6a8dfbef",
+   "subject": "feat(pipeline-core): generate the native Goldfish dispatch binding from its sources",
+   "dispatch": [
+    "ALF-G5B-DISPATCH-BRIEFING-GENERATOR"
+   ]
+  },
+  {
+   "sha": "96118e134",
+   "subject": "feat(pipeline-core): decide when a greenfield feature's pending surfaces may enter implementation",
+   "dispatch": [
+    "ALF-H1-PF20-PENDING-FITNESS-ALLOWANCE"
+   ]
+  },
+  {
+   "sha": "1fa3fdbcb",
+   "subject": "fix(pipeline-core): give a new project whose folder holds only documents its greenfield scaffold",
+   "dispatch": [
+    "ALF-H2-PF19-GREENFIELD-SEED-CLASSIFICATION"
+   ]
+  },
+  {
+   "sha": "a72489377",
+   "subject": "docs(pipeline-core): name the design review dispatch route and the correction route after round 2",
+   "dispatch": [
+    "ALF-H3-DESIGN-REVIEW-ROUTE-DOCS"
+   ]
+  },
+  {
+   "sha": "38e1758a4",
+   "subject": "fix(pipeline-core): keep raw intake material out of tracked design files",
+   "dispatch": [
+    "ALF-H4-PF14-DESIGN-INPUT-PROVENANCE"
+   ]
+  },
+  {
+   "sha": "f1b458978",
+   "subject": "fix(pipeline-core): count a module's own ADR references as current architecture navigation",
+   "dispatch": [
+    "ALF-H5-PF20-ADR-REFERENCES-NAVIGATION"
+   ]
+  },
+  {
+   "sha": "cd7e847f0",
+   "subject": "fix(pipeline-core): wire the greenfield entry allowance, the receipt write refusal and background completion into the guards",
+   "dispatch": [
+    "quality-package-28b4ef1f16817f6ab7ec53c7a931e7eb20f653ef6d096cdea3d439a27e9d39d0"
+   ]
+  },
+  {
+   "sha": "e3fbb6fe3",
+   "subject": "chore(pipeline-core): stamp the 0.7.0 Alfred local test candidate for cd7e847",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "a417cafc8",
+   "subject": "chore(pipeline): record the signed push approval for checkpoint e3fbb6fe3",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "727884820",
+   "subject": "chore(backlog): reconcile the ledger for the ten items of the real greenfield run",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "061e208f5",
+   "subject": "fix(pipeline-core): validate the Antigravity source before retiring its managed copy",
+   "dispatch": [
+    "ALF-AGY2-AGENT-TOOLS-YAML-LIST"
+   ]
+  },
+  {
+   "sha": "153f85599",
+   "subject": "test(pipeline-core): pin one Antigravity refresh order in the planner and its tests",
+   "dispatch": [
+    "ALF-AGY3-REFRESH-ORDER-REPINS"
+   ]
+  },
+  {
+   "sha": "b4bb60a9d",
+   "subject": "fix(pipeline-core): bind a consumer's first item delivery to a signed spec criterion",
+   "dispatch": [
+    "ALF-PF23-CONSUMER-ITEM-BINDING"
+   ]
+  },
+  {
+   "sha": "9ce7b3c39",
+   "subject": "chore(pipeline-core): stamp the 0.7.0 Alfred local test candidate for b4bb60a",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "e6c2614f8",
+   "subject": "docs(backlog): record four findings from the Antigravity refresh and the PF-23 work",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "f866960d7",
+   "subject": "chore(backlog): reconcile the ledger for four new items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "8e50c2934",
+   "subject": "docs(state): record the PO decisions D5 to D12 of the 0.7.0 Alfred candidate",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "cdfbea050",
+   "subject": "fix(pipeline-core): bind an EARS bullet criterion with a compound id to the first item delivery",
+   "dispatch": [
+    "ALF-PF23C-EARS-LIST-CRITERIA-FINISH"
+   ]
+  },
+  {
+   "sha": "894fc383f",
+   "subject": "chore(pipeline-core): stamp the 0.7.0 Alfred local test candidate for cdfbea0",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "1493f0565",
+   "subject": "chore(pipeline): record the signed push approval for checkpoint 894fc383f",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "978618f3e",
+   "subject": "docs(state): record PO decision D13, the Antigravity model tier mapping",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "336bda37d",
+   "subject": "docs(backlog): record the approve-plan registration gap and the missing model route",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "56801d5b0",
+   "subject": "chore(backlog): reconcile the ledger for two new items",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "545903aa6",
+   "subject": "docs(state): record decision D14, the PF-25 repair route",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "72b0821db",
+   "subject": "docs(state): record decision D15, generated acceptance and result records",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "3403d94d9",
+   "subject": "fix(pipeline-core): register an approved consumer feature package so its first item dispatch is admitted",
+   "dispatch": [
+    "ALF-PF25B-CONSUMER-SHAPED-REGISTRATION"
+   ]
+  },
+  {
+   "sha": "be6268a40",
+   "subject": "docs(pipeline-core): warn that registered package files must not change after registration",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "ecc7b4409",
+   "subject": "fix(pipeline-core): install Antigravity from a generated runner view so the global refresh validates",
+   "dispatch": [
+    "ALF-AGY4C-RUNNER-VIEW-GREEN"
+   ]
+  },
+  {
+   "sha": "15f9355d3",
+   "subject": "chore(pipeline-core): stamp the 0.7.0 Alfred local test candidate for ecc7b44",
+   "dispatch": [
+    "stage-0"
+   ]
+  },
+  {
+   "sha": "98b6e5ca2",
+   "subject": "chore(pipeline): record the signed push approval for checkpoint 15f9355d3",
+   "dispatch": [
+    "stage-0"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "itemId": "pipeline.desktop-app-support-is-unverified",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline touches this item; the doc-contract clauses stay green and the four live points remain typed skips.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+   "stageBaseline": "50",
+   "reasonBaseline": "a9aeb9d63 adds a coverage map and cases for every point of the original acceptance (sequence, drift, replay, bindings), but its message states no counted GREEN result, so it cannot reach 75.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+   "stageBaseline": "50",
+   "reasonBaseline": "7b0712f39 adds the bounded-wait pin and a RED mirror mutant, closing the earlier mirror gap, but states no counted GREEN and macOS stays held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the three clauses appear pinned but no counts are stated.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the empty-log refusal is pinned but the measurement and fold-in parts remain.",
+   "mappedCommits": [
+    {
+     "sha": "dacf773b6",
+     "subject": "docs(backlog): fold the AGY WSL greenfield findings into existing Alfred items"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+   "stageBaseline": "50",
+   "reasonBaseline": "418dd753a and 9e075f96d implement the owner-claim acceptance on Windows and 9e075f96d states the OWN-7 pin turns green, but no pass count is given and the pin file's tracking was not confirmed.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.dispatch-records-land-under-specs-evidence",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since the baseline changes the picture; both proposal clauses stay covered by 15 green cases with RED mirrors.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; AC-166 maps to the committed 9/9 pin but the real gitleaks reproduction stays held.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "stageBaseline": "50",
+   "reasonBaseline": "ea8fc5a0a admits the preflight and hook actions in draft and beb9142d2 states passing pins (9/9, 11/11, 24 pass with one held skip) but does not tie a count to this item's acceptance.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+   "stageBaseline": "25",
+   "reasonBaseline": "b8a020ec3 adds a measurement script and a pin but states no counts and leaves real before/after numbers as host evidence; ea978bd0b is doc wording only.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+   "stageBaseline": "50",
+   "reasonBaseline": "30da379bb adds the SubagentStart receipt hook and 68af587b5 registers it, but registration was a held signature-bound patch and the fresh-dispatch first-write proof is still open.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.evidence-artifacts-carry-no-commit-identity",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the pin is committed but no counts are stated.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+   "stageBaseline": "50",
+   "reasonBaseline": "bd92916c6 pins the encrypted-key passphrase route and the unencrypted refusal, closing the AC-171 hold, but it states no counts and consumer verification stays open.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.feature-branch-push-admitted-without-signature-approval",
+   "stageBaseline": "50",
+   "reasonBaseline": "629edbc77 adds four cases keeping the approval-only lane out of main and topic branches, but states no counts and the broader clauses remain.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.first-enrollment-enters-retirement-before-consent",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; one clause is covered only by a typed skip, which does not qualify.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.foreign-worktree-closes-the-implementation-gate",
+   "stageBaseline": "50",
+   "reasonBaseline": "d412a84b2 and follow-ups (4076e2900, 3b1c2e269, ec3b97599, 0462d3f4c, ec9ea2d4f) commit the typed foreign-worktree cause and a two-worktree pin, but its one RED case stays red until a protected patch is applied and no count is stated.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+   "stageBaseline": "25",
+   "reasonBaseline": "17067dca4 and 0824e528e add the continuity advisory and transcript export but state no test results, and admitting the export to governed agents needs a held guard patch.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.gh-delivery-classifier-is-not-wired",
+   "stageBaseline": "75",
+   "reasonBaseline": "No commit since the baseline changes the picture; the committed pin covers the sole acceptance clause (gh pr merge guard-refused) and more.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+   "stageBaseline": "50",
+   "reasonBaseline": "a6e161526 adds a real-git run with GIT_NULL_DEVICE expecting exit 0 and a git seam, but states no count and the native Windows host check is still needed.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; new cases exist but one clause is covered only by a typed skip and no counts are stated.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+   "stageBaseline": "50",
+   "reasonBaseline": "03ef96053 keeps a stale pre-commit hook inert outside scope with installed-hook cases, and 5360819d9 adds typed staleHookSnapshots, but its behavioural pin case is held behind a protected patch and the stale-admission clause is unqualified.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the pin is committed with a mirror check but no pass counts.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.git-stash-list-classified-as-working-tree-write",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the pin covers the Proposal but no counts or integration evidence exist.",
+   "mappedCommits": [
+    {
+     "sha": "3636e4332",
+     "subject": "docs(backlog): record the medium and low findings of the real greenfield run"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the pin is committed but no counts or native evidence exist.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the real-scanner and batch clauses remain open and no counts are stated.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the CLI child-process pin is committed but no counts or native Windows run are evidenced.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the fix and RED-to-GREEN producer case are committed but consumer verification is open.",
+   "mappedCommits": []
+  },
+  {
+   "itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the applied postimage has a GREEN pin without counts and the review/sync clauses are unverified.",
+   "mappedCommits": [
+    {
+     "sha": "0ac30fb44",
+     "subject": "docs(backlog): fold the Codex WSL greenfield findings into existing Alfred items"
+    }
+   ]
+  },
+  {
+   "itemId": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+   "stageBaseline": "50",
+   "reasonBaseline": "No commit since the baseline changes this item; the template pin passes 7 but the commit labels AC-187 partial and consumer coverage is open.",
+   "mappedCommits": []
+  }
+ ]
+}
