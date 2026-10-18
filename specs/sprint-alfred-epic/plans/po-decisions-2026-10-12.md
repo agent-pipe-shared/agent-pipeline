@@ -297,3 +297,22 @@ PO decision (2026-10-18): fix what causes massive toil and slowdown as part of 0
 PO decision D4 (2026-10-18): the T3 Critic gate is scoped to the closing feature's delivery course. The PO granted Tier-0 and one override ceremony in case the gate has to sit in the protected `pipeline-state.mjs`. The write-time rigor check is withdrawn: rigor is set per change, and no per-project rigor source exists. `6a84c5a20` is the devplan materialize pin (F-01).
 
 Diagnostic Full WSL Verify at `617a6d4a0` (29 minutes, TMPDIR outside the checkout): 1042 suites, 161 red. These are the known Weg B groups (P1-P8), not a regression from today's commits. The run ended with `VERIFY-CANDIDATE-DRIFT` because `6a84c5a20` was committed during the run. It is not evidence for a candidate.
+
+Later on 2026-10-18:
+- `d621b2871`: the T3 Critic gate, feature-scoped in the close coordinator.
+- `a5d6fbcd1`: one refresh command for every stale hook snapshot.
+- Each red suite was re-run alone with the same plain-script spawn that Verify uses. 131 stay red, 8 time out, and 18 are green alone. The red ones cluster by cause: non-git fixtures, the retired `present-plan` form, Windows-only and attended-terminal cases, registry and hygiene work, and singletons.
+- The `measure-tofu-push-e2e` fake key writer leaves `pkey` in the checkout root. The leaked copies are quarantined in `scratch/`.
+
+PO decisions (2026-10-18):
+- Push this state as a checkpoint for local testing now, with the signature given immediately.
+- Repair every Windows-only, attended-terminal and permission-dependent case. None of them is counted as a host-typed skip.
+
+Checkpoint candidate for local testing: this commit. Still open for the final candidate:
+- the Weg B repair groups;
+- the signed package for protected paths (S1-S4, verify-suite registration, case-completion and capability inventory);
+- Full WSL Verify;
+- the Critic batch;
+- decisions D1 and D2;
+- the final stamp and plugin update;
+- PO acceptance.
