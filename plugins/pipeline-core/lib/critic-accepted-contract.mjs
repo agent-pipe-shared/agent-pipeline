@@ -15,6 +15,22 @@ export const ACCEPTED_DELIVERY_CONTRACT_SCHEMA = 'pipeline.accepted-delivery-con
 export const ACCEPTED_DELIVERY_CONTRACT_REFERENCE_SCHEMA = 'pipeline.accepted-delivery-contract-reference.v1';
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+/**
+ * The one acceptance-criterion id grammar; every site that names a criterion id uses it.
+ * Closed: the plain `AC-<n>` and the compound `AC-E<epic>-<story>-<nn>` (three numeric segments).
+ * The compound form is deliberately not a general `AC-` plus alphanumeric segments: with exactly three
+ * numeric segments no admitted id is a `-`-delimited prefix of another admitted id (a general form would
+ * admit `AC-E1-01` beside `AC-E1-01-09`), and the plain form cannot prefix a compound one because a
+ * compound segment starts with `E`. `{0,60}` keeps every admitted id within 64 characters.
+ * Unanchored source for embedding in a larger expression; match an id with `isCriterionId`, never by prefix.
+ */
+export const CRITERION_ID_SOURCE = 'AC-(?:[1-9][0-9]{0,60}|E[1-9][0-9]{0,3}-[0-9]{1,4}-[0-9]{1,4})';
+export const CRITERION_ID = new RegExp(`^${CRITERION_ID_SOURCE}$`, 'u');
+export const CRITERION_ID_MAX_LENGTH = 64;
+export const isCriterionId = value => typeof value === 'string' && value.length <= CRITERION_ID_MAX_LENGTH && CRITERION_ID.test(value);
+const BULLET_ITEM = new RegExp(`^[-+*] \\*\\*(${CRITERION_ID_SOURCE}):\\*\\* (\\S.*)$`, 'u');
+const NUMBERED_ITEM = new RegExp(`^([1-9][0-9]*)\\. \\*\\*(${CRITERION_ID_SOURCE}):\\*\\* (\\S.*)$`, 'u');
+const BULLET_CONTINUATION = /^(?: {2,}|\t)\S/u;
 const own = (v, keys) => v !== null && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v,k));
 const eq = (a,b) => canonical(a) === canonical(b);
 const hash = v => createHash('sha256').update(canonical(v)).digest('hex');
@@ -133,7 +149,7 @@ export function parseAcceptedCriticCriterion(input) {
     sourcePath: typeof locator?.sourcePath === 'string' && /^specs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/[A-Za-z0-9_./-]+$/u.test(locator.sourcePath)
       && !locator.sourcePath.split('/').some(part => part === '.' || part === '..' || part === '') ? locator.sourcePath : null,
     sourceSha256: typeof locator?.sourceSha256 === 'string' && SHA.test(locator.sourceSha256) ? locator.sourceSha256 : null,
-    criterionId: typeof locator?.criterionId === 'string' && /^AC-[1-9][0-9]*$/u.test(locator.criterionId) ? locator.criterionId : null,
+    criterionId: isCriterionId(locator?.criterionId) ? locator.criterionId : null,
     excerptSha256: typeof locator?.excerptSha256 === 'string' && SHA.test(locator.excerptSha256) ? locator.excerptSha256 : null});
   const binding = () => diagnostic('unsupported-or-ambiguous', 'CAC-CRITERION-BINDING');
   const unsupported = () => diagnostic('unsupported-or-ambiguous', 'CAC-CRITERION-UNSUPPORTED');
@@ -145,7 +161,7 @@ export function parseAcceptedCriticCriterion(input) {
       || locator.schema !== 'pipeline.critic-criterion-locator.v1' || !diagnostic('', '').sourcePath
       || typeof locator.sourceSha256 !== 'string' || !SHA.test(locator.sourceSha256)
       || typeof locator.excerptSha256 !== 'string' || !SHA.test(locator.excerptSha256)
-      || typeof locator.criterionId !== 'string' || !/^AC-[1-9][0-9]*$/u.test(locator.criterionId)
+      || !isCriterionId(locator.criterionId)
       || !Number.isSafeInteger(locator.startByte) || !Number.isSafeInteger(locator.endByte)
       || locator.startByte < 0 || locator.endByte > input.sourceBytes.byteLength
       || locator.endByte <= locator.startByte || locator.endByte - locator.startByte > 4096) return binding();
@@ -233,7 +249,7 @@ export function parseAcceptedCriticCriterion(input) {
       if (!table || !row) { table = null; continue; }
       const number = table.width === 2 ? row[0].value.match(/^(?:R-)?([1-9][0-9]*)$/u)?.[1] : null;
       const rowId = table.width === 3 ? row[0].value : (number ? `AC-${number}` : null);
-      if (rowId !== null && /^AC-[1-9][0-9]*$/u.test(rowId)) {
+      if (rowId !== null && isCriterionId(rowId)) {
         const cell = row[1]; rows.push({id:rowId,normative:table.normative,text:cell.value,
           startByte:line.byteOffset+Buffer.byteLength(text.slice(0,cell.start)),endByte:line.byteOffset+Buffer.byteLength(text.slice(0,cell.end)),
           ...(table.width === 2 ? {parserVersion:'markdown-acceptance-table-two-column.v1'} : {})});
@@ -251,6 +267,16 @@ export function parseAcceptedCriticCriterion(input) {
       const marker=text.match(/^ {0,3}(`{3,}|~{3,})(.*)$/u);
       if(clauseFence){markExcluded();if(marker&&marker[1][0]===clauseFence.char&&marker[1].length>=clauseFence.length&&marker[2].trim()==='')clauseFence=null;continue;}
       if(marker){markExcluded();clauseFence={char:marker[1][0],length:marker[1].length};continue;}
+      if(active?.kind==='bullet'){
+        // A bullet item's scope is its line plus the directly following indented continuation lines (sub-bullets or
+        // wrapped text). It ends at a blank line, a heading or the next top-level item; any other adjacent line may be a
+        // lazy continuation, so it invalidates the item instead of being trimmed away. Continuations are consumed here,
+        // before the four-space code-block rule below would drop them.
+        if(!text.trim()){active=null;continue;}
+        if(BULLET_CONTINUATION.test(text)){const end=text.trimEnd();active.text+='\n'+end;active.endByte=line.byteOffset+Buffer.byteLength(end);continue;}
+        if(!/^ {0,3}(?:#{1,6}\s|[-+*]\s|[0-9]+[.)]\s)/u.test(text))active.valid=false;
+        active=null;
+      }
       if(/^(?: {0,3}>| {4}|\t)/u.test(text)){markExcluded();continue;}
       const heading=text.match(/^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/u);
       if(heading){
@@ -258,16 +284,22 @@ export function parseAcceptedCriticCriterion(input) {
         active=null;
         while(clauseHeadings.length&&clauseHeadings.at(-1).level>=heading[1].length)clauseHeadings.pop();
         clauseHeadings.push({level:heading[1].length,text:heading[2]});
-        if(/^AC-[1-9][0-9]*$/u.test(heading[2])){
+        if(isCriterionId(heading[2])){
           active={id:heading[2],kind:'paragraph',level:heading[1].length,normative:normative(),valid:true,text:'',startByte:null,endByte:null,bodyEnded:false,parserVersion:'markdown-acceptance-heading-paragraph.v1'};rows.push(active);
         }
         continue;
       }
-      const item=text.match(/^([1-9][0-9]*)\. \*\*(AC-[1-9][0-9]*):\*\* (\S.*)$/u);
+      const item=text.match(NUMBERED_ITEM);
       if(item){
         if(active?.kind==='paragraph')active.valid=false;
         const start=text.length-item[3].length;
         active={id:item[2],kind:'numbered',normative:normative(),valid:true,text:item[3],startByte:line.byteOffset+Buffer.byteLength(text.slice(0,start)),endByte:line.byteOffset+Buffer.byteLength(text),parserVersion:'markdown-acceptance-numbered-item.v1'};rows.push(active);continue;
+      }
+      const bullet=text.match(BULLET_ITEM);
+      if(bullet){
+        if(active?.kind==='paragraph')active.valid=false;
+        const start=text.length-bullet[2].length,first=text.trimEnd();
+        active={id:bullet[1],kind:'bullet',normative:normative(),valid:true,text:first.slice(start),startByte:line.byteOffset+Buffer.byteLength(text.slice(0,start)),endByte:line.byteOffset+Buffer.byteLength(first),parserVersion:'markdown-acceptance-bullet-item.v1'};rows.push(active);continue;
       }
       if(!text.trim()){if(active?.kind==='paragraph'&&active.startByte!==null)active.bodyEnded=true;continue;}
       if(active?.kind==='numbered'){active.valid=false;continue;}
@@ -282,12 +314,17 @@ export function parseAcceptedCriticCriterion(input) {
     if (selected.length !== 1 || !selected[0].normative || selected[0].valid===false || selected[0].startByte !== locator.startByte || selected[0].endByte !== locator.endByte) return unsupported();
     parserVersion=selected[0].parserVersion??parserVersion;
     let criterion = selected[0].text;
-    if (criterion.includes('`') || /[“”"]/u.test(criterion)) {
+    // Inline markup is only a hazard for text that can speak about the critic: a code span, quote or stray
+    // emphasis marker can hide a negation or a second condition from the patterns below. A criterion that never
+    // names the critic cannot be (mis)read as a critic-pass criterion, so markup alone no longer refuses it.
+    // `_` and `*` count as delimiters here (so `_critic_` is vocabulary); `critical` is not.
+    const criticVocabulary = /(?<![A-Za-z0-9])critics?(?![A-Za-z0-9])/iu.test(criterion);
+    if (criticVocabulary && (criterion.includes('`') || /[“”"]/u.test(criterion))) {
       if (/\b(?:implementor|self[- ]verif)/iu.test(criterion)) return absent();
       return unsupported();
     }
     criterion = criterion.replace(/(\*\*|__)([^\n]+?)\1/gu,'$2').replace(/(\*|_)([^\n]+?)\1/gu,'$2');
-    if (/[*_]/u.test(criterion)) return unsupported();
+    if (criticVocabulary && /[*_]/u.test(criterion)) return unsupported();
     const normalized = criterion.toLowerCase().replace(/\s+/gu,' ').trim().replace(/\.$/u,'');
     const patterns = [
       /^(?:the|this(?: delivery)?) package must (?:receive|obtain) a (?:pass|passing) verdict from an independent critic before (?:acceptance|delivery)$/u,
@@ -322,7 +359,7 @@ export function readAcceptedCriticCriterion(input) {
       || value.sourcePath.split('/').some(part=>part === '.' || part === '..' || part === '')
       || typeof value.sourceSha256 !== 'string' || !SHA.test(value.sourceSha256)
       || typeof value.excerptSha256 !== 'string' || !SHA.test(value.excerptSha256)
-      || typeof value.criterionId !== 'string' || !/^AC-[1-9][0-9]*$/u.test(value.criterionId)
+      || !isCriterionId(value.criterionId)
       || !Number.isSafeInteger(value.startByte) || !Number.isSafeInteger(value.endByte)
       || value.startByte < 0 || value.endByte <= value.startByte || value.endByte > 1048576
       || value.endByte-value.startByte > 4096) return fail('CAC-CRITERION-BINDING');

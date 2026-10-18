@@ -21,8 +21,9 @@
  *   itemDelivery                     the acceptance criterion's own byte span, validated with the
  *                                    host's criterion parser. Two routes: this repository's own
  *                                    Alfred row (`--item` alone, id from the backlog item) or a
- *                                    consumer spec's plain `AC-<n>` (`--criterion`, any of three
- *                                    Markdown shapes, id `<feature>.<slug>`, no backlog item)
+ *                                    consumer spec's criterion id (`--criterion`, `AC-<n>` or the
+ *                                    compound `AC-E<epic>-<story>-<nn>`, found in the Markdown
+ *                                    shapes below, item id `<feature>.<slug>`, no backlog item)
  *
  * The generator calls no model, writes no file and runs no mutating git command. Judgment
  * fields (goal, context, DoD, forbidden, stop) stay hand-authored from the template.
@@ -39,7 +40,7 @@ import {
   validateItemDeliveryBriefing,
 } from "../lib/native-goldfish-host-return.mjs";
 import { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } from "../lib/agent-model-registry.mjs";
-import { parseAcceptedCriticCriterion } from "../lib/critic-accepted-contract.mjs";
+import { CRITERION_ID_SOURCE, isCriterionId, parseAcceptedCriticCriterion } from "../lib/critic-accepted-contract.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
@@ -63,11 +64,16 @@ const READ_ONLY_GIT = new Set(["rev-parse", "status"]);
 const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const SHA = /^[a-f0-9]{64}$/u;
 const ITEM_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const CRITERION_ID = /^AC-[1-9][0-9]*$/u;
 const MAX_CRITERION_BYTES = 4096;
+const CRITERION_ID_FORMS = "AC-<n> or AC-E<epic>-<story>-<nn>";
+// The bold bullet item (`- **<id>:** text`, marker `-`, `+` or `*`, at column 0) and the indented lines that continue it;
+// both mirror the host parser's `markdown-acceptance-bullet-item.v1` rendering exactly.
+const BOLD_BULLET = new RegExp(`^[-+*] \\*\\*(${CRITERION_ID_SOURCE}):\\*\\* (\\S.*)$`, "u");
+const BULLET_CONTINUATION = /^(?: {2,}|\t)\S/u;
 const CRITERION_SHAPES = "a Markdown table row whose first cell is exactly the id (criterion = the second cell), "
+  + "a bold bullet item `- **<id>:** text` with its indented sub-bullets or wrapped lines (criterion = the text after `:** ` through the last indented line), "
   + "a list item or paragraph beginning `AC-<n>:`, `**AC-<n>**` or `AC-<n> —` (criterion = the rest of that line or list item), "
-  + "or a heading naming the id (criterion = the following paragraph)";
+  + "or a heading that is exactly the id (criterion = the following paragraph)";
 const DEFAULT_AGENTS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "agents");
 
 /** A typed, caller-visible refusal; the code is always a DBG-* identifier. */
@@ -195,9 +201,11 @@ function tableCells(text) {
 }
 
 /**
- * Every place a consumer spec states criterion `id`, in the three supported Markdown shapes, with the
+ * Every place a consumer spec states criterion `id`, in the supported Markdown shapes, with the
  * exact byte span of the criterion text. Fenced code blocks are skipped. A consumer's ordinary
- * `AC-<n>` needs no Alfred wording and no backlog item.
+ * criterion id needs no Alfred wording and no backlog item. An id is only ever resolved by exact
+ * equality (a longer id that merely starts with it, a heading that merely mentions it and a table
+ * cell that merely references it are not occurrences); the host parser still has the last word.
  */
 function findCriterionOccurrences(sourceBytes, id) {
   const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(sourceBytes);
@@ -212,7 +220,6 @@ function findCriterionOccurrences(sourceBytes, id) {
     startByte: startLine.offset + Buffer.byteLength(startLine.text.slice(0, from)),
     endByte: endLine.offset + Buffer.byteLength(endLine.text.slice(0, to)),
   });
-  const bare = new RegExp(`(?<![A-Za-z0-9_-])${id}(?![0-9A-Za-z_])`, "u");
   const leading = new RegExp(`^(?<lead>[ \\t]*(?:>[ \\t]*)*(?<marker>(?:[-*+]|[0-9]{1,3}[.)])[ \\t]+)?)(?<open>\\*\\*|__)?${id}(?![0-9A-Za-z_])`, "u");
   const listMarker = /^\s*(?:[-*+]|[0-9]{1,3}[.)])[ \t]/u;
   const found = [];
@@ -231,7 +238,8 @@ function findCriterionOccurrences(sourceBytes, id) {
     }
     const heading = /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line.text);
     if (heading) {
-      if (!bare.test(heading[1])) continue;
+      // The host parser admits a heading only when it IS the id; a heading that merely mentions it is a reference.
+      if (heading[1].replace(/(?:\s+#+)?\s*$/u, "") !== id) continue;
       let first = index + 1;
       while (first < lines.length && lines[first].text.trim() === "") first++;
       if (first >= lines.length || /^\s*(?:#{1,6}[ \t]|`{3}|~{3}|\|)/u.test(lines[first].text)) continue;
@@ -239,6 +247,15 @@ function findCriterionOccurrences(sourceBytes, id) {
       while (last + 1 < lines.length && lines[last + 1].text.trim() !== "" && !/^\s*(?:#{1,6}[ \t]|`{3}|~{3})/u.test(lines[last + 1].text)) last++;
       const from = lines[first].text.length - lines[first].text.trimStart().length;
       found.push({ shape: "heading", ...span(lines[first], from, lines[last], lines[last].text.trimEnd().length) });
+      continue;
+    }
+    const bold = BOLD_BULLET.exec(line.text);
+    if (bold) {
+      // A bold bullet item owns the indented lines after it (sub-bullets, wrapped text): they are its scope, never separate statements.
+      let last = index;
+      while (last + 1 < lines.length && BULLET_CONTINUATION.test(lines[last + 1].text)) last++;
+      if (bold[1] === id) found.push({ shape: "bold bullet item", ...span(line, line.text.length - bold[2].length, lines[last], lines[last].text.trimEnd().length) });
+      index = last;
       continue;
     }
     const lead = leading.exec(line.text);
@@ -313,7 +330,7 @@ export function generateDispatchBinding(options, deps = {}) {
   const { dispatchId, item, agentType, modelId, check } = options;
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/u.test(dispatchId)) refuse("DBG-DISPATCH-ID", `dispatch id ${JSON.stringify(dispatchId)} must match [A-Za-z0-9][A-Za-z0-9._:-]{0,119}`);
   if (!/^[a-z0-9][a-z0-9-]{0,127}$/u.test(item)) refuse("DBG-ITEM-SLUG", `item slug ${JSON.stringify(item)} must be lowercase letters, digits and hyphens`);
-  if (options.criterion !== undefined && !CRITERION_ID.test(options.criterion)) refuse("DBG-CRITERION-ID", `criterion ${JSON.stringify(options.criterion)} must be AC-<n>`);
+  if (options.criterion !== undefined && !isCriterionId(options.criterion)) refuse("DBG-CRITERION-ID", `criterion ${JSON.stringify(options.criterion)} must be ${CRITERION_ID_FORMS}`);
   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);
   for (const path of [check, ...options.paths]) {
@@ -362,7 +379,7 @@ export function generateDispatchBinding(options, deps = {}) {
     if (rows.length === 0) refuse("DBG-AC-ROW-MISSING", `no 3-column acceptance row in ${specPath} names "${needle}" (item ${item})`);
     if (rows.length > 1) refuse("DBG-AC-ROW-AMBIGUOUS", `${rows.length} acceptance rows in ${specPath} name "${needle}" (item ${item})`);
     const [idCell, criterionCell, evidenceCell] = rows[0];
-    if (!/^AC-[1-9][0-9]*$/u.test(idCell.value)) refuse("DBG-AC-ROW-ID", `the row naming item ${item} has id cell ${JSON.stringify(idCell.value)}, not AC-<n>`);
+    if (!isCriterionId(idCell.value)) refuse("DBG-AC-ROW-ID", `the row naming item ${item} has id cell ${JSON.stringify(idCell.value)}, not ${CRITERION_ID_FORMS}`);
     locator = {
       schema: "pipeline.critic-criterion-locator.v1",
       sourcePath: specPath,

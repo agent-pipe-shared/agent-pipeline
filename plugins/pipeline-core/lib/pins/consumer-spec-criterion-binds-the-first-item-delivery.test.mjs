@@ -14,10 +14,12 @@
  *   A  `--criterion AC-<n>` binds a plain EARS criterion of a consumer spec, with the criterion's exact
  *      bytes as the locator, a derived `<feature>.<slug>` item id and no backlog item; missing and
  *      ambiguous criteria are typed refusals; the Alfred route is unchanged. The generator finds the
- *      criterion in three Markdown shapes, but `parseAcceptedCriticCriterion` (which the guard re-runs
+ *      criterion in several Markdown shapes, but `parseAcceptedCriticCriterion` (which the guard re-runs
  *      at admission, so it is authoritative) admits only: a `# | Criterion | Evidence` table row under
- *      an acceptance-criteria heading, an `### AC-<n>` heading with one plain paragraph, and a
- *      single-line `<k>. **AC-<n>:** text` item. Every other rendering is a typed refusal here.
+ *      an acceptance-criteria heading, a `### <id>` heading with one plain paragraph, a single-line
+ *      `<k>. **<id>:** text` item and a `- **<id>:** text` bullet item with its indented sub-bullets.
+ *      Every other rendering is a typed refusal here. `<id>` is `AC-<n>` or the closed compound
+ *      `AC-E<epic>-<story>-<nn>` (section D: an EARS list with compound ids, and the shared grammar).
  *   B  `rulesetSha` is only format-checked by the host, so an unavailable loaded identity falls back
  *      (installed identity, then the loaded plugin root's content hash) with a DBG-RULESET-FALLBACK
  *      warning, and is refused only when no source exists.
@@ -35,6 +37,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateItemDeliveryBriefing } from "../native-goldfish-host-return.mjs";
 import { parseAcceptedCriticCriterion } from "../critic-accepted-contract.mjs";
+// Namespaces, not named imports: a missing export must fail its own case, not the loading of this whole file.
+import * as hostReturn from "../native-goldfish-host-return.mjs";
+import * as contract from "../critic-accepted-contract.mjs";
 import { nativeContractFixtureParent } from "../test-item-approved-course-fixture.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -347,4 +352,191 @@ test("host-state source facts the briefing relies on stay in place", () => {
   assert.match(source, /spawnSync\(process\.execPath,\['--test',resolve\(root,check\.path\)\],\{cwd:before\.repository\.primaryRoot[^}]*timeout:60000/u);
   assert.match(source, /git',\['-C',physical,'show',`\$\{candidate\.commit\}:\$\{path\}`\]/u);
   assert.match(source, /itemDelivery\.checks\.some\(check=>changedPaths\.includes\(check\.path\)\)\)throw nativeManagedFault\('native-item-check-source-amendment-required'\)/u);
+});
+
+// D. An EARS list: bold bullet items with compound ids (`- **AC-E<epic>-<story>-<nn>:** text`), some with
+// indented sub-bullets, under a numbered "Acceptance criteria (EARS)" section. Every case drives the real modules.
+
+const E09 = "WHEN a visitor submits the order form, the system SHALL store the order with a timestamp.";
+const E10 = "WHEN the visitor opens the cart, the system SHALL list every selected product:";
+const E10_SUBS = ["  - the product name", "  - its unit price"];
+const E11 = "WHEN the stock is empty, the system SHALL hide the product.";
+const E_SHORT = "WHEN a visitor leaves the shop, the system SHALL clear the cart.";
+const E_LONG = "WHEN a visitor returns to the shop, the system SHALL restore the cart.";
+const E_TICKS = "WHEN the visitor presses `Pay`, the system SHALL charge the card.";
+const E_CURLY = "WHEN the visitor reads “Terms”, the system SHALL show the terms page.";
+const E_STRAIGHT = "WHEN the visitor reads \"Terms\", the system SHALL show the terms page.";
+const E_CRITIC_TICKS = "The package must receive a `pass` verdict from an independent critic before acceptance.";
+const E_CRITIC_IMPL = "The `implementor` may verify the work itself, and the critic review is advisory.";
+const E_SIGN_OUT = "WHEN the visitor signs out, the system SHALL end the session.";
+const EARS_SPEC = [
+  "# Shop app spec — EARS", "",
+  "## 15. Acceptance criteria (EARS)", "",
+  "### E1-01 Checkout (covers AC-E1-01-09)", "",
+  `- **AC-E1-01-09:** ${E09}`,
+  `- **AC-E1-01-10:** ${E10}`, ...E10_SUBS,
+  `- **AC-E1-01-11:** ${E11}`, "",
+  "### E1-02 Leaving", "",
+  `- **AC-E1-02-1:** ${E_SHORT}`,
+  `- **AC-E1-02-10:** ${E_LONG}`, "",
+  "### E1-03 Payment", "",
+  `- **AC-E1-03-01:** ${E_TICKS}`,
+  `- **AC-E1-03-02:** ${E_CURLY}`,
+  `- **AC-E1-03-03:** ${E_STRAIGHT}`, "",
+  "### E1-04 Numbered items", "",
+  `1. **AC-21:** ${E_CRITIC_TICKS}`, "",
+  `2. **AC-22:** ${E_CRITIC_IMPL}`, "",
+  `3. **AC-23:** ${E_TICKS}`, "",
+  "### E1-05 Wrapping", "",
+  "- **AC-E1-05-01:** WHEN the visitor changes the language, the system SHALL translate the shop,",
+  "keeping the running total visible.", "",
+  "| Story | Statement | Criteria |", "| --- | --- | --- |",
+  "| E1-01 | Checkout | AC-E1-01-04/06/09 |", "",
+  "## 16. Requirements", "",
+  `- **AC-E1-06-01:** ${E_SIGN_OUT}`, "",
+  "## 17. Acceptance criteria (extended)", "",
+  "### Examples", "",
+  `- **AC-E1-07-01:** ${E_SIGN_OUT}`, "",
+].join("\n");
+const ADMITTED = ["explicit-actual-independent-pass", "no-explicit-criterion"];
+
+async function bindEars(id, specText = EARS_SPEC) {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture(specText);
+  return { fx, result: runDispatchBriefing(argvOf(fx, id), depsOf(fx)) };
+}
+const parseLocator = (fx, locator) => parseAcceptedCriticCriterion({
+  sourceBytes: new Uint8Array(fx.specBytes), locator,
+  packageContext: { featureId: "shop-app", sourceBindings: [{ path: SPEC, sha256: sha(fx.specBytes), role: "spec" }] },
+});
+/** Generator, then the host's delivery validator and criterion parser on the exact byte range it produced. */
+async function bindAndCheck(id, expectedText, specText) {
+  const { fx, result } = await bindEars(id, specText);
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  const { itemDelivery } = result.binding;
+  assert.equal(validateItemDeliveryBriefing(itemDelivery).ok, true);
+  const locator = itemDelivery.criterionLocator;
+  assert.equal(locator.criterionId, id);
+  assert.equal(slice(fx, locator), expectedText, "the locator bytes are exactly the criterion text");
+  assert.equal(locator.excerptSha256, sha(fx.specBytes.subarray(locator.startByte, locator.endByte)));
+  const parsed = parseLocator(fx, locator);
+  assert.ok(ADMITTED.includes(parsed.status), JSON.stringify(parsed));
+  return { fx, result, itemDelivery, locator, parsed };
+}
+async function assertRefused(id, specText) {
+  const { result } = await bindEars(id, specText);
+  assert.equal(result.ok, false, JSON.stringify(result).slice(0, 300));
+  assert.equal(result.code, "DBG-CRITERION-REFUSED");
+  assert.ok(result.message.includes("CAC-CRITERION-UNSUPPORTED") && result.message.includes(id), result.message);
+  assert.equal(result.skeleton, undefined);
+}
+
+test("a compound id in the bold bullet rendering binds, and the host validator and parser accept the binding", async () => {
+  const { itemDelivery, parsed } = await bindAndCheck("AC-E1-01-09", E09);
+  assert.equal(itemDelivery.itemId, "shop-app.checkout-order");
+  assert.equal(parsed.parserVersion, "markdown-acceptance-bullet-item.v1");
+});
+
+test("a bullet with indented sub-bullets binds, and its excerpt covers the sub-bullets but not the next item", async () => {
+  const text = [E10, ...E10_SUBS].join("\n");
+  const { fx, locator, parsed } = await bindAndCheck("AC-E1-01-10", text);
+  assert.equal(parsed.parserVersion, "markdown-acceptance-bullet-item.v1");
+  assert.ok(slice(fx, locator).endsWith("its unit price") && !slice(fx, locator).includes("AC-E1-01-11"));
+  // The span is the whole item for the host: a locator trimmed to the first line, or stretched over the next item, is refused.
+  const firstLine = { ...locator, endByte: locator.startByte + Buffer.byteLength(E10) };
+  firstLine.excerptSha256 = sha(fx.specBytes.subarray(firstLine.startByte, firstLine.endByte));
+  assert.equal(ADMITTED.includes(parseLocator(fx, firstLine).status), false, "a trimmed locator must not be admitted");
+  // A tab also indents a continuation line.
+  const tabbed = ["# Shop app spec", "", "## Acceptance criteria", "", "- **AC-E1-01-09:** WHEN a visitor leaves, the system SHALL clear the cart:", "\t- the cart", ""].join("\n");
+  await bindAndCheck("AC-E1-01-09", "WHEN a visitor leaves, the system SHALL clear the cart:\n\t- the cart", tabbed);
+});
+
+test("a bullet followed by an unindented line is refused, because that line may be a lazy continuation", async () => {
+  await assertRefused("AC-E1-05-01");
+});
+
+test("backticks or quotes without the word critic give no-explicit-criterion, in the old and the new rendering", async () => {
+  for (const [id, text] of [["AC-E1-03-01", E_TICKS], ["AC-E1-03-02", E_CURLY], ["AC-E1-03-03", E_STRAIGHT], ["AC-23", E_TICKS]]) {
+    const { parsed } = await bindAndCheck(id, text);
+    assert.equal(parsed.status, "no-explicit-criterion", `${id}: ${JSON.stringify(parsed)}`);
+  }
+});
+
+test("backticks with the word critic keep the pre-change result: refused, or absent when it names the implementor", async () => {
+  await assertRefused("AC-21");
+  const { parsed } = await bindAndCheck("AC-22", E_CRITIC_IMPL);
+  assert.equal(parsed.status, "no-explicit-criterion");
+});
+
+test("a reference-only table cell and a heading that merely mentions an id do not make it ambiguous, and are not occurrences", async () => {
+  const { result } = await bindEars("AC-E1-01-09");
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  assert.notEqual(result.code, "DBG-CRITERION-AMBIGUOUS");
+  for (const referenced of ["AC-E1-01-04", "AC-E1-01-06"]) {
+    const missing = (await bindEars(referenced)).result;
+    assert.equal(missing.ok, false);
+    assert.equal(missing.code, "DBG-CRITERION-MISSING", `${referenced}: a cell that only references it is not a statement`);
+  }
+});
+
+test("a compound prefix id does not match: AC-E1-02-1 is not AC-E1-02-10, and a plain id is not a compound one", async () => {
+  const short = await bindAndCheck("AC-E1-02-1", E_SHORT);
+  const long = await bindAndCheck("AC-E1-02-10", E_LONG);
+  assert.notDeepEqual(short.locator, long.locator);
+  for (const absent of ["AC-E1-01-0", "AC-E1-02-100", "AC-1"]) {
+    const missing = (await bindEars(absent)).result;
+    assert.equal(missing.ok, false, absent);
+    assert.equal(missing.code, "DBG-CRITERION-MISSING", absent);
+  }
+  // The host parser resolves by exact id too: the shorter id with the longer item's bytes is not admitted.
+  const borrowed = { ...long.locator, criterionId: "AC-E1-02-1" };
+  assert.equal(ADMITTED.includes(parseLocator(long.fx, borrowed).status), false);
+  // An id outside the grammar is a typed refusal before the spec is read.
+  for (const bad of ["AC-E1-01", "AC-E0-01-01", "AC-E1-01-09-1", "AC-E1-001-09x"]) {
+    assert.equal((await bindEars(bad)).result.code, "DBG-CRITERION-ID", bad);
+  }
+});
+
+test("a bullet under an excluded heading is refused, and so is one under a plain Requirements heading", async () => {
+  await assertRefused("AC-E1-07-01");
+  await assertRefused("AC-E1-06-01");
+  // The same sentence under an admitted heading binds: the heading, not the text, decides.
+  await bindAndCheck("AC-E1-01-11", E11);
+});
+
+test("end to end: the generator on an EARS spec yields an itemDelivery the host validator and the host parser both accept for the real byte range", async () => {
+  const { fx, result } = await bindEars("AC-E1-01-10");
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  const { itemDelivery } = result.binding;
+  assert.equal(validateItemDeliveryBriefing(itemDelivery).ok, true);
+  const locator = itemDelivery.criterionLocator;
+  assert.equal(locator.sourcePath, SPEC);
+  assert.equal(locator.sourceSha256, sha(fx.specBytes));
+  const range = fx.specBytes.subarray(locator.startByte, locator.endByte);
+  assert.equal(locator.excerptSha256, sha(range));
+  assert.ok(range.byteLength > Buffer.byteLength(E10) && range.byteLength <= 4096);
+  const parsed = parseLocator(fx, locator);
+  assert.ok(ADMITTED.includes(parsed.status), JSON.stringify(parsed));
+  assert.equal(parsed.parserVersion, "markdown-acceptance-bullet-item.v1");
+  assert.deepEqual(itemDelivery.checks, [{ id: "shop-1-check", path: CHECK, dependencies: [CHECK, PATH_A] }]);
+  assert.equal(JSON.stringify((await bindEars("AC-E1-01-10")).result), JSON.stringify(result), "deterministic");
+});
+
+// E. One id grammar. The host-return validator keeps its own copy (it must not import the contract module, which
+// pulls pipeline-state and the proof modules into a hook-path validator), so the two are pinned equal here.
+
+test("the host-return id grammar is the contract's grammar: equal source strings, no import of the heavy module, same verdict on every id", async () => {
+  assert.equal(typeof contract.CRITERION_ID_SOURCE, "string");
+  assert.equal(hostReturn.HOST_CRITERION_ID_SOURCE, contract.CRITERION_ID_SOURCE);
+  const hostSource = readFileSync(join(HERE, "..", "native-goldfish-host-return.mjs"), "utf8");
+  assert.doesNotMatch(hostSource, /^\s*import[^\n]*critic-accepted-contract/mu, "host-return must stay a light module");
+  const { result } = await bindEars("AC-E1-01-09");
+  const base = result.binding.itemDelivery;
+  const ids = ["AC-1", "AC-27", "AC-E1-01-09", "AC-E12-3-4", `AC-${"9".repeat(61)}`, `AC-${"9".repeat(62)}`, "AC-0", "AC-01", "ac-1",
+    "AC-E1-01", "AC-E1-01-09-1", "AC-E0-01-01", "AC-E1-01-09 ", "AC-E1-01-09\n", "AC-E1-01-12345", "", "AC-", 5, null];
+  for (const id of ids) {
+    const verdict = hostReturn.validateItemDeliveryBriefing({ ...base, criterionLocator: { ...base.criterionLocator, criterionId: id } }).ok;
+    assert.equal(verdict, contract.isCriterionId(id), `host-return and the contract disagree on ${JSON.stringify(id)}`);
+  }
+  assert.equal(ids.filter((id) => contract.isCriterionId(id)).length, 5);
 });

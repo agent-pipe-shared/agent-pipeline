@@ -21,6 +21,17 @@ export const NATIVE_GOLDFISH_HOST_DIRECTIVE = "NATIVE HOST-COMMIT RULE: Do not r
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+/**
+ * The acceptance-criterion id grammar, `AC-<n>` or the closed compound `AC-E<epic>-<story>-<nn>`, at most 64 characters.
+ * It is the SAME literal source string as `CRITERION_ID_SOURCE` in `critic-accepted-contract.mjs`, copied rather than
+ * imported on purpose: that module pulls `scripts/pipeline-state.mjs` and the proof modules into this lightweight
+ * hook-path validator. A pin (consumer-spec-criterion-binds-the-first-item-delivery) asserts the two strings are equal,
+ * so they cannot drift apart.
+ */
+export const HOST_CRITERION_ID_SOURCE = 'AC-(?:[1-9][0-9]{0,60}|E[1-9][0-9]{0,3}-[0-9]{1,4}-[0-9]{1,4})';
+const CRITERION_ID = new RegExp(`^${HOST_CRITERION_ID_SOURCE}$`, 'u');
+const CRITERION_ID_MAX_LENGTH = 64;
+const isCriterionId = (value) => typeof value === 'string' && value.length <= CRITERION_ID_MAX_LENGTH && CRITERION_ID.test(value);
 const ROLE_TO_AGENT = Object.freeze({
   "pipeline-core:goldfish-implementor": "goldfish-implementor",
   "pipeline-core:goldfish-mechanic": "goldfish-mechanic",
@@ -161,7 +172,7 @@ export function validateItemDeliveryBriefing(value) {
     ||!ID.test(value.sliceId??'')||!ID.test(value.itemId??'')
     ||!exact(locator,['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
     ||locator.schema!=='pipeline.critic-criterion-locator.v1'||!normalizedPath(locator.sourcePath)
-    ||!SHA.test(locator.sourceSha256??'')||!SHA.test(locator.excerptSha256??'')||!/^AC-[1-9][0-9]*$/u.test(locator.criterionId??'')
+    ||!SHA.test(locator.sourceSha256??'')||!SHA.test(locator.excerptSha256??'')||!isCriterionId(locator.criterionId)
     ||!Number.isSafeInteger(locator.startByte)||!Number.isSafeInteger(locator.endByte)||locator.startByte<0||locator.endByte<=locator.startByte||locator.endByte-locator.startByte>4096
     ||!Array.isArray(value.checks)||value.checks.length<1||value.checks.length>16
     ||new Set(value.checks.map(check=>check.id)).size!==value.checks.length

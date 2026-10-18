@@ -75,14 +75,35 @@ one it refuses `SQ-DELIVERY-COURSE-ABSENT`. Generate it, never hand-write it:
 Its `skeleton` (or `block`) goes first in the dispatch prompt. `--criterion`
 reads the consumer's signed spec as is, with no spec edit and no backlog item.
 It is also the repair route for an already signed spec whose criterion uses an
-admitted rendering. The renderings are admitted under an "Acceptance
-criteria" or "Requirements" heading:
+admitted rendering. The criterion id is `AC-<n>` or the closed compound
+`AC-E<epic>-<story>-<nn>` (three numeric segments, at most 64 characters;
+`AC-E1-01` alone is not an id). A rendering is admitted only under a heading
+whose text names one of these, case-insensitively and as whole words (the
+`NORMATIVE_HEADING` vocabulary), at that level or any enclosing level, for
+example `## 15. Acceptance criteria (EARS)`:
+`Acceptance criteria`, `Acceptance requirements`, `Abnahmekriterien`,
+`Akzeptanzkriterien`, `Abnahmeanforderungen`.
+A plain `Requirements` heading is NOT admitted. A heading naming examples,
+notes or commentary (or `Beispiele`, `Hinweise`, `Anmerkungen`, `Kommentare`),
+at any enclosing level, excludes everything beneath it. The four admitted
+renderings:
 - a `| # | Criterion | Evidence |` table row;
-- a `### AC-<n>` heading followed by one plain paragraph;
-- a single line `<k>. **AC-<n>:** text`.
+- a `### <id>` heading followed by one plain paragraph;
+- a single line `<k>. **<id>:** text`;
+- a bullet `- **<id>:** text` (marker `-`, `+` or `*`, at column 0) whose scope is
+  that line plus the directly following lines indented by two or more spaces
+  or a tab (sub-bullets, wrapped text). The scope ends at a blank line, a
+  heading or the next top-level item; any other adjacent line makes it refused.
+The criterion text bound is that span (for a bullet: through its last indented
+line). A cell that merely references an id (`| ... | AC-E1-01-04/06/09 |`), a
+longer id that begins with the one asked for, or a heading that merely mentions
+it is not an occurrence of that id.
 Any other rendering is refused with `DBG-CRITERION-REFUSED`. A `DBG-RULESET-FALLBACK` warning is expected
 where no loaded identity exists. Check contract: the host runs
 `node --test <check>` (60 s) at the commit it makes, so the dispatch may author
 its check; the check and every `--path` must exist in that commit, and the check
-file is frozen afterwards. It must be `.test.mjs/.cjs/.js`; for a vitest/TS
-project, a small `.test.mjs` that spawns the project's runner on the real test.
+file is frozen afterwards. It must be `.test.mjs/.cjs/.js`. For a project with a
+`package.json` and a vitest/TS runner, a small `.test.mjs` may spawn the
+project's runner on the real test. For a project without a `package.json` yet,
+the first check is a plain `node:test` file that asserts the scaffold files
+exist, never a wrapper that spawns a package runner (there is none to spawn).
