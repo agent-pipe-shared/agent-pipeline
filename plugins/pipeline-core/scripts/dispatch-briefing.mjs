@@ -14,9 +14,15 @@
  *   effort + model alias             agents/<type>.md through lib/agent-model-registry.mjs
  *   model                            --model-id, checked against the alias's family
  *   tool budget                      min(tier cap, maxTurns - 15), the cap read from dispatch-policy
- *   rulesetSha                       the preflight's loaded content identity (no fallback)
- *   itemDelivery                     the acceptance row's own byte span, validated with the host's
- *                                    criterion parser, and the backlog item's own `id:`
+ *   rulesetSha                       the preflight's loaded content identity; when that is
+ *                                    unavailable, the installed identity, then the content hash of
+ *                                    the loaded plugin root (each fallback is a DBG-RULESET-FALLBACK
+ *                                    warning; the host only format-checks the value)
+ *   itemDelivery                     the acceptance criterion's own byte span, validated with the
+ *                                    host's criterion parser. Two routes: this repository's own
+ *                                    Alfred row (`--item` alone, id from the backlog item) or a
+ *                                    consumer spec's plain `AC-<n>` (`--criterion`, any of three
+ *                                    Markdown shapes, id `<feature>.<slug>`, no backlog item)
  *
  * The generator calls no model, writes no file and runs no mutating git command. Judgment
  * fields (goal, context, DoD, forbidden, stop) stay hand-authored from the template.
@@ -35,6 +41,7 @@ import {
 import { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } from "../lib/agent-model-registry.mjs";
 import { parseAcceptedCriticCriterion } from "../lib/critic-accepted-contract.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
+import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
@@ -48,7 +55,7 @@ const AGENT_TYPES = Object.freeze(["goldfish-implementor", "goldfish-mechanic", 
 const ACCEPTED_CRITERION_STATUSES = Object.freeze(["explicit-actual-independent-pass", "no-explicit-criterion"]);
 const SINGLE_FLAGS = Object.freeze({
   "--root": "root", "--dispatch-id": "dispatchId", "--item": "item", "--agent-type": "agentType",
-  "--model-id": "modelId", "--check": "check", "--spec": "spec",
+  "--model-id": "modelId", "--check": "check", "--spec": "spec", "--criterion": "criterion",
 });
 const REPEATED_FLAGS = Object.freeze({ "--path": "paths" });
 const REQUIRED_FLAGS = Object.freeze(["--dispatch-id", "--item", "--agent-type", "--model-id", "--check"]);
@@ -56,6 +63,11 @@ const READ_ONLY_GIT = new Set(["rev-parse", "status"]);
 const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const SHA = /^[a-f0-9]{64}$/u;
 const ITEM_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const CRITERION_ID = /^AC-[1-9][0-9]*$/u;
+const MAX_CRITERION_BYTES = 4096;
+const CRITERION_SHAPES = "a Markdown table row whose first cell is exactly the id (criterion = the second cell), "
+  + "a list item or paragraph beginning `AC-<n>:`, `**AC-<n>**` or `AC-<n> —` (criterion = the rest of that line or list item), "
+  + "or a heading naming the id (criterion = the following paragraph)";
 const DEFAULT_AGENTS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "agents");
 
 /** A typed, caller-visible refusal; the code is always a DBG-* identifier. */
@@ -164,6 +176,108 @@ function findCriterionRows(sourceBytes, needle) {
   return rows;
 }
 
+/** Cells of one Markdown table row (leading bar required, escaped bars kept); `from`/`to` index the line. */
+function tableCells(text) {
+  const bars = [];
+  for (let index = 0; index < text.length; index++) if (text[index] === "|" && text[index - 1] !== "\\") bars.push(index);
+  if (bars.length === 0 || text.slice(0, bars[0]).trim() !== "") return [];
+  const cells = [];
+  for (let column = 0; column < bars.length; column++) {
+    const start = bars[column] + 1;
+    const end = column + 1 < bars.length ? bars[column + 1] : text.length;
+    const segment = text.slice(start, end);
+    const value = segment.trim();
+    if (column + 1 === bars.length && value === "") break;
+    const from = start + (segment.length - segment.trimStart().length);
+    cells.push({ value, from, to: from + value.length });
+  }
+  return cells;
+}
+
+/**
+ * Every place a consumer spec states criterion `id`, in the three supported Markdown shapes, with the
+ * exact byte span of the criterion text. Fenced code blocks are skipped. A consumer's ordinary
+ * `AC-<n>` needs no Alfred wording and no backlog item.
+ */
+function findCriterionOccurrences(sourceBytes, id) {
+  const source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(sourceBytes);
+  const lines = [];
+  let byteOffset = 0;
+  for (const raw of source.split(/(?<=\n)/u)) {
+    const text = raw.replace(/\r?\n$/u, "");
+    lines.push({ text, offset: byteOffset });
+    byteOffset += Buffer.byteLength(raw);
+  }
+  const span = (startLine, from, endLine, to) => ({
+    startByte: startLine.offset + Buffer.byteLength(startLine.text.slice(0, from)),
+    endByte: endLine.offset + Buffer.byteLength(endLine.text.slice(0, to)),
+  });
+  const bare = new RegExp(`(?<![A-Za-z0-9_-])${id}(?![0-9A-Za-z_])`, "u");
+  const leading = new RegExp(`^(?<lead>[ \\t]*(?:>[ \\t]*)*(?<marker>(?:[-*+]|[0-9]{1,3}[.)])[ \\t]+)?)(?<open>\\*\\*|__)?${id}(?![0-9A-Za-z_])`, "u");
+  const listMarker = /^\s*(?:[-*+]|[0-9]{1,3}[.)])[ \t]/u;
+  const found = [];
+  let fence = null;
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const fenced = /^\s*(`{3,}|~{3,})/u.exec(line.text);
+    if (fenced) { fence = fence === null ? fenced[1][0] : fence === fenced[1][0] ? null : fence; continue; }
+    if (fence !== null) continue;
+    if (line.text.trimStart().startsWith("|")) {
+      const cells = tableCells(line.text);
+      if (cells.length >= 2 && cells[0].value === id && cells[1].value !== "") {
+        found.push({ shape: "table-row", ...span(line, cells[1].from, line, cells[1].to) });
+      }
+      continue;
+    }
+    const heading = /^ {0,3}#{1,6}[ \t]+(.*)$/u.exec(line.text);
+    if (heading) {
+      if (!bare.test(heading[1])) continue;
+      let first = index + 1;
+      while (first < lines.length && lines[first].text.trim() === "") first++;
+      if (first >= lines.length || /^\s*(?:#{1,6}[ \t]|`{3}|~{3}|\|)/u.test(lines[first].text)) continue;
+      let last = first;
+      while (last + 1 < lines.length && lines[last + 1].text.trim() !== "" && !/^\s*(?:#{1,6}[ \t]|`{3}|~{3})/u.test(lines[last + 1].text)) last++;
+      const from = lines[first].text.length - lines[first].text.trimStart().length;
+      found.push({ shape: "heading", ...span(lines[first], from, lines[last], lines[last].text.trimEnd().length) });
+      continue;
+    }
+    const lead = leading.exec(line.text);
+    if (!lead) continue;
+    let consumed = lead[0].length;
+    const take = (pattern) => {
+      const matched = pattern.exec(line.text.slice(consumed));
+      if (matched) consumed += matched[0].length;
+      return matched !== null;
+    };
+    let delimited = take(/^:/u);
+    if (lead.groups.open && take(lead.groups.open === "**" ? /^\*\*/u : /^__/u)) delimited = true;
+    if (take(/^[ \t]*(?:[:—–]|-(?=[ \t]))/u)) delimited = true;
+    if (!delimited) continue;
+    const rest = line.text.slice(consumed);
+    const from = consumed + (rest.length - rest.trimStart().length);
+    const to = line.text.trimEnd().length;
+    if (to <= from) continue;
+    let last = index;
+    if (lead.groups.marker) {
+      while (last + 1 < lines.length && /^(?: {2,}|\t)\S/u.test(lines[last + 1].text) && !listMarker.test(lines[last + 1].text)) last++;
+    }
+    found.push({ shape: "line", ...span(line, from, lines[last], lines[last].text.trimEnd().length) });
+  }
+  return found;
+}
+
+/** The host's own parser must accept the criterion text exactly as the existing Alfred route requires. */
+function requireAcceptedCriterion(specBytes, specPath, locator, describe) {
+  const criterion = parseAcceptedCriticCriterion({
+    sourceBytes: new Uint8Array(specBytes),
+    locator,
+    packageContext: { featureId: specPath.split("/")[1], sourceBindings: [{ path: specPath, sha256: locator.sourceSha256, role: "spec" }] },
+  });
+  if (!ACCEPTED_CRITERION_STATUSES.includes(criterion.status)) {
+    refuse("DBG-CRITERION-REFUSED", `the host criterion parser reports ${criterion.status} (${criterion.code}) for ${describe}`);
+  }
+}
+
 function toolBudgetFor(agentType, maxTurns) {
   const cap = /≤(\d+) tool uses/u.exec(dispatchBudgetLineForRole(agentType) ?? "");
   if (!cap) refuse("DBG-BUDGET-TIER", `no tool-budget tier cap is defined for ${agentType}`);
@@ -192,12 +306,14 @@ export function generateDispatchBinding(options, deps = {}) {
   const observePreflight = deps.observePreflight ?? observePipelineStartPreflight;
   const resolveBaseline = deps.resolveBaseline ?? resolveProtectedBaseline;
   const defaultSpecPath = deps.defaultSpecPath ?? defaultSpecPathFromState;
+  const snapshotPluginRoot = deps.snapshotPluginRoot ?? snapshotPhysicalPluginRoot;
   const agentsDir = deps.agentsDir ?? DEFAULT_AGENTS_DIR;
   const warnings = [];
 
   const { dispatchId, item, agentType, modelId, check } = options;
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/u.test(dispatchId)) refuse("DBG-DISPATCH-ID", `dispatch id ${JSON.stringify(dispatchId)} must match [A-Za-z0-9][A-Za-z0-9._:-]{0,119}`);
   if (!/^[a-z0-9][a-z0-9-]{0,127}$/u.test(item)) refuse("DBG-ITEM-SLUG", `item slug ${JSON.stringify(item)} must be lowercase letters, digits and hyphens`);
+  if (options.criterion !== undefined && !CRITERION_ID.test(options.criterion)) refuse("DBG-CRITERION-ID", `criterion ${JSON.stringify(options.criterion)} must be AC-<n>`);
   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);
   for (const path of [check, ...options.paths]) {
@@ -209,7 +325,7 @@ export function generateDispatchBinding(options, deps = {}) {
   let root;
   try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
 
-  // Original acceptance: the row, its byte span, and the backlog item it names.
+  // Original acceptance: the criterion, its byte span, and (Alfred route only) the backlog item it names.
   const specPath = options.spec ?? defaultSpecPath(root);
   if (typeof specPath !== "string" || specPath === "") refuse("DBG-SPEC-UNRESOLVED", "no --spec was given and the project authority state names no plan spec; pass --spec");
   if (!/^specs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/[A-Za-z0-9_./-]+$/u.test(specPath) || specPath.split("/").some((part) => part === "." || part === ".." || part === "")) {
@@ -217,39 +333,56 @@ export function generateDispatchBinding(options, deps = {}) {
   }
   const specBytes = readRepoFile(root, specPath);
   if (!specBytes || specBytes.byteLength < 1) refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not a readable regular file under --root`);
-  const needle = `Original Alfred item ${item} is delivered`;
-  let rows;
-  try { rows = findCriterionRows(specBytes, needle); } catch { refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not valid UTF-8`); }
-  if (rows.length === 0) refuse("DBG-AC-ROW-MISSING", `no 3-column acceptance row in ${specPath} names "${needle}" (item ${item})`);
-  if (rows.length > 1) refuse("DBG-AC-ROW-AMBIGUOUS", `${rows.length} acceptance rows in ${specPath} name "${needle}" (item ${item})`);
-  const [idCell, criterionCell, evidenceCell] = rows[0];
-  if (!/^AC-[1-9][0-9]*$/u.test(idCell.value)) refuse("DBG-AC-ROW-ID", `the row naming item ${item} has id cell ${JSON.stringify(idCell.value)}, not AC-<n>`);
-  const locator = {
-    schema: "pipeline.critic-criterion-locator.v1",
-    sourcePath: specPath,
-    sourceSha256: sha256(specBytes),
-    criterionId: idCell.value,
-    startByte: criterionCell.startByte,
-    endByte: criterionCell.endByte,
-    excerptSha256: sha256(specBytes.subarray(criterionCell.startByte, criterionCell.endByte)),
-  };
-  const criterion = parseAcceptedCriticCriterion({
-    sourceBytes: new Uint8Array(specBytes),
-    locator,
-    packageContext: { featureId: specPath.split("/")[1], sourceBindings: [{ path: specPath, sha256: locator.sourceSha256, role: "spec" }] },
-  });
-  if (!ACCEPTED_CRITERION_STATUSES.includes(criterion.status)) {
-    refuse("DBG-CRITERION-REFUSED", `the host criterion parser reports ${criterion.status} (${criterion.code}) for ${idCell.value} of item ${item}`);
-  }
-  const itemPath = /backlog\/items\/[A-Za-z0-9][A-Za-z0-9._-]*\.md/u.exec(evidenceCell.value)?.[0];
-  if (!itemPath) refuse("DBG-ITEM-EVIDENCE-MISSING", `the Evidence cell of ${idCell.value} names no backlog/items/*.md file (item ${item})`);
-  const itemBytes = readRepoFile(root, itemPath);
-  if (!itemBytes) refuse("DBG-ITEM-UNREADABLE", `backlog item ${itemPath} named by ${idCell.value} is not a readable regular file`);
-  const declaredId = parseAgentFrontmatter(itemBytes.toString("utf8")).id;
-  let itemId = declaredId;
-  if (typeof declaredId !== "string" || !ITEM_ID.test(declaredId)) {
-    itemId = `pipeline.${item}`;
-    warnings.push({ code: "DBG-ITEM-ID-FALLBACK", path: itemPath, message: `${itemPath} has no usable id: frontmatter; fell back to ${itemId}` });
+  let locator;
+  let itemId;
+  if (options.criterion !== undefined) {
+    // Generic route: a consumer's own `AC-<n>`; the item id is derived, no backlog item is involved.
+    let occurrences;
+    try { occurrences = findCriterionOccurrences(specBytes, options.criterion); } catch { refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not valid UTF-8`); }
+    if (occurrences.length === 0) refuse("DBG-CRITERION-MISSING", `${options.criterion} is not stated in ${specPath} in a supported shape: ${CRITERION_SHAPES}`);
+    if (occurrences.length > 1) refuse("DBG-CRITERION-AMBIGUOUS", `${occurrences.length} places in ${specPath} state ${options.criterion} (${occurrences.map((entry) => entry.shape).join(", ")}); exactly one is required`);
+    const [only] = occurrences;
+    if (only.endByte - only.startByte > MAX_CRITERION_BYTES) refuse("DBG-CRITERION-TOO-LONG", `${options.criterion} is ${only.endByte - only.startByte} bytes in ${specPath}; the locator span is limited to ${MAX_CRITERION_BYTES}`);
+    locator = {
+      schema: "pipeline.critic-criterion-locator.v1",
+      sourcePath: specPath,
+      sourceSha256: sha256(specBytes),
+      criterionId: options.criterion,
+      startByte: only.startByte,
+      endByte: only.endByte,
+      excerptSha256: sha256(specBytes.subarray(only.startByte, only.endByte)),
+    };
+    requireAcceptedCriterion(specBytes, specPath, locator, `${options.criterion} of item ${item}`);
+    itemId = `${specPath.split("/")[1]}.${item}`;
+    if (!ITEM_ID.test(itemId)) refuse("DBG-ITEM-ID", `derived item id ${JSON.stringify(itemId)} does not match ${ITEM_ID}`);
+  } else {
+    const needle = `Original Alfred item ${item} is delivered`;
+    let rows;
+    try { rows = findCriterionRows(specBytes, needle); } catch { refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not valid UTF-8`); }
+    if (rows.length === 0) refuse("DBG-AC-ROW-MISSING", `no 3-column acceptance row in ${specPath} names "${needle}" (item ${item})`);
+    if (rows.length > 1) refuse("DBG-AC-ROW-AMBIGUOUS", `${rows.length} acceptance rows in ${specPath} name "${needle}" (item ${item})`);
+    const [idCell, criterionCell, evidenceCell] = rows[0];
+    if (!/^AC-[1-9][0-9]*$/u.test(idCell.value)) refuse("DBG-AC-ROW-ID", `the row naming item ${item} has id cell ${JSON.stringify(idCell.value)}, not AC-<n>`);
+    locator = {
+      schema: "pipeline.critic-criterion-locator.v1",
+      sourcePath: specPath,
+      sourceSha256: sha256(specBytes),
+      criterionId: idCell.value,
+      startByte: criterionCell.startByte,
+      endByte: criterionCell.endByte,
+      excerptSha256: sha256(specBytes.subarray(criterionCell.startByte, criterionCell.endByte)),
+    };
+    requireAcceptedCriterion(specBytes, specPath, locator, `${idCell.value} of item ${item}`);
+    const itemPath = /backlog\/items\/[A-Za-z0-9][A-Za-z0-9._-]*\.md/u.exec(evidenceCell.value)?.[0];
+    if (!itemPath) refuse("DBG-ITEM-EVIDENCE-MISSING", `the Evidence cell of ${idCell.value} names no backlog/items/*.md file (item ${item})`);
+    const itemBytes = readRepoFile(root, itemPath);
+    if (!itemBytes) refuse("DBG-ITEM-UNREADABLE", `backlog item ${itemPath} named by ${idCell.value} is not a readable regular file`);
+    const declaredId = parseAgentFrontmatter(itemBytes.toString("utf8")).id;
+    itemId = declaredId;
+    if (typeof declaredId !== "string" || !ITEM_ID.test(declaredId)) {
+      itemId = `pipeline.${item}`;
+      warnings.push({ code: "DBG-ITEM-ID-FALLBACK", path: itemPath, message: `${itemPath} has no usable id: frontmatter; fell back to ${itemId}` });
+    }
   }
 
   // Agent definition: effort, model alias and the maxTurns cliff.
@@ -264,16 +397,39 @@ export function generateDispatchBinding(options, deps = {}) {
   if (!Number.isSafeInteger(maxTurns)) refuse("DBG-AGENT-UNRESOLVED", `agent definition ${agentType} declares no integer maxTurns`);
   const budget = toolBudgetFor(agentType, maxTurns);
 
-  // The loaded ruleset identity. No fallback value exists on purpose.
+  // The ruleset identity. The host only format-checks `rulesetSha` (64 hex) and copies it into its
+  // receipt and the dispatch record, so a lesser-but-real identity of the same kind is admissible when
+  // the loaded one is unavailable (it is, for a Claude local-development install: the preflight derives
+  // a loaded identity only from a self-application checkout, a verified receipt or a Codex registry
+  // binding). Order: loaded, installed, content hash of the loaded plugin root. Each fallback warns.
   let observation;
   let observationFault = null;
   try { observation = observePreflight({ cwd: root }); } catch (error) { observationFault = error?.code ?? "observer-threw"; }
   const identity = observation?.rulesetSource?.loadedIdentity;
   const identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
-  if (identityStatus !== "available" || typeof identity?.value !== "string" || !SHA.test(identity.value)) {
-    refuse("DBG-RULESET-UNAVAILABLE", `the loaded ruleset identity is not available (status: ${identityStatus}); the generator never substitutes a value`);
+  let rulesetSha = null;
+  let rulesetFallback = null;
+  if (identityStatus === "available" && typeof identity?.value === "string" && SHA.test(identity.value)) rulesetSha = identity.value;
+  else {
+    const installed = observation?.rulesetSource?.installedIdentity;
+    if (installed?.status === "available" && typeof installed.value === "string" && SHA.test(installed.value)) {
+      rulesetSha = installed.value;
+      rulesetFallback = "installedIdentity.value of the preflight ruleset source";
+    } else if (typeof observation?.pluginRoot === "string" && observation.pluginRoot !== "") {
+      try {
+        const snapshot = snapshotPluginRoot(observation.pluginRoot);
+        if (typeof snapshot?.contentSha256 === "string" && SHA.test(snapshot.contentSha256)) {
+          rulesetSha = snapshot.contentSha256;
+          rulesetFallback = "content hash of the loaded plugin root (snapshotPhysicalPluginRoot, lib/public-core-observation.mjs)";
+        }
+      } catch { /* no source exists: refused below */ }
+    }
+    if (rulesetFallback) warnings.push({ code: "DBG-RULESET-FALLBACK", source: rulesetFallback, message: `the loaded ruleset identity is ${identityStatus}; used the ${rulesetFallback}` });
   }
-  const rulesetVersion = observation.rulesetSource.selectedPlugin?.version;
+  if (rulesetSha === null) {
+    refuse("DBG-RULESET-UNAVAILABLE", `the loaded ruleset identity is not available (status: ${identityStatus}) and no installed identity or plugin-root content hash exists to fall back to`);
+  }
+  const rulesetVersion = observation.rulesetSource?.selectedPlugin?.version;
 
   // Candidate: HEAD of --root, read-only.
   let candidateCommit;
@@ -310,7 +466,7 @@ export function generateDispatchBinding(options, deps = {}) {
     agentType,
     model: modelId,
     effort: resolved.effort,
-    rulesetSha: identity.value,
+    rulesetSha,
     allowedPaths,
     criticDecision: {
       schema: "pipeline.critic-required-decision.v1",
@@ -332,7 +488,7 @@ export function generateDispatchBinding(options, deps = {}) {
 
   const block = `${BLOCK_OPEN}\n${JSON.stringify(binding)}\n${BLOCK_CLOSE}`;
   const field6 = [
-    `- Ruleset: ${rulesetVersion ? `\`${rulesetVersion}\` · ` : ""}content identity \`${identity.value}\`.`,
+    `- Ruleset: ${rulesetVersion ? `\`${rulesetVersion}\` · ` : ""}content identity \`${rulesetSha}\`${rulesetFallback ? ` (fallback: ${rulesetFallback})` : ""}.`,
     `- Model/effort: \`${modelId}\` / ${resolved.effort} (${agentType}; agent definition alias \`${resolved.model}\`).`,
     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
     `- **Tool budget (TB-09, hard cap):** ≤${budget.budget} tool uses (min(tier cap ${budget.tierCap}, maxTurns ${maxTurns} - 15)). 80 % checkpoint at about call ${budget.checkpoint}: stop editing and end the turn with an interim report naming what remains.`,

@@ -65,3 +65,24 @@ material choices and return results for acceptance. Ask only where
 alternatives materially change accepted scope, criteria, priority, risk,
 cost, an external or irreversible consequence, or configured decision gate.
 Never turn routine uncertainty into serial PO approvals.
+
+## First dispatch of an item-governed course
+
+The guard creates `slice-queue.json` itself from the first productive dispatch
+whose prompt opens with a generated binding carrying `itemDelivery`; without
+one it refuses `SQ-DELIVERY-COURSE-ABSENT`. Generate it, never hand-write it:
+`node <plugin-root>/scripts/dispatch-briefing.mjs binding --root <root> --dispatch-id <id> --item <slug> --criterion AC-<n> --agent-type <type> --model-id <model> --check <node test> --path <...>`
+Its `skeleton` (or `block`) goes first in the dispatch prompt. `--criterion`
+reads the consumer's signed spec as is, with no spec edit and no backlog item.
+It is also the repair route for an already signed spec whose criterion uses an
+admitted rendering. The renderings are admitted under an "Acceptance
+criteria" or "Requirements" heading:
+- a `| # | Criterion | Evidence |` table row;
+- a `### AC-<n>` heading followed by one plain paragraph;
+- a single line `<k>. **AC-<n>:** text`.
+Any other rendering is refused with `DBG-CRITERION-REFUSED`. A `DBG-RULESET-FALLBACK` warning is expected
+where no loaded identity exists. Check contract: the host runs
+`node --test <check>` (60 s) at the commit it makes, so the dispatch may author
+its check; the check and every `--path` must exist in that commit, and the check
+file is frozen afterwards. It must be `.test.mjs/.cjs/.js`; for a vitest/TS
+project, a small `.test.mjs` that spawns the project's runner on the real test.
