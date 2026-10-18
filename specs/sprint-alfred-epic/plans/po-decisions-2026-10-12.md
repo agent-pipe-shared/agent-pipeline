@@ -268,6 +268,8 @@ The delivery matrix (`delivery-status-current`) is remeasured once the code is s
 | `dd1314f7c` | brownfield-implementation-entry-demands-a-greenfield-design-block | seeded lifecycle guidance names the architecture design package before submit-plan |
 | `92721a1c5`, `7a91cf0c6`, `85171fc40`, `4c797f9eb`, `dbd497fcc`, `d1a18efe2`, `023fca221`, `ad326d4cd`, `a3c9c7941` | test fixtures | fixtures own their repository, keep temp roots outside the checkout, pin retirements and the foreign-repository refusal |
 
+Later on 2026-10-18: `de8e884c1` (rebind-runner and close-collide fixtures own their repository) and `9df31c1f5` (Claude intake capture step in the onboarding consent case). The first checkpoint preparation at `fa4c8ebf7` expired unsigned and was withdrawn; it is prepared again at the commit that adds this line.
+
 Checkpoint candidate for local testing (PO, 2026-10-18, "Weg A"): this state is pushed to `feat/sprint-alfred` without Full Verify, Critic batch or PO acceptance. Still open for the final candidate: Full WSL Verify, the remaining red groups (mostly minor), the Critic batch, decisions D1/D2, the signed quality package S1-S4, the final stamp and plugin update, and PO acceptance.
 
 Open PO decision D1 (GST33, critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard): see the session PO task list; no code change was made.
