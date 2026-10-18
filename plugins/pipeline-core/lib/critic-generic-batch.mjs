@@ -528,7 +528,14 @@ function reserveAdmission(input) {
 }
 function invoke(action) {
   try { return action(); }
-  catch (error) { if (error instanceof GenericCriticBatchError) throw error; fail("CGB-PHYSICAL"); }
+  catch (error) {
+    if (error instanceof GenericCriticBatchError) throw error;
+    // The returned code stays CGB-PHYSICAL for compatibility; `cause` names the original failure so a
+    // foreign error (fs errno, git, JSON) is not mistaken for a physical-layout refusal.
+    const refusal = new GenericCriticBatchError("CGB-PHYSICAL");
+    refusal.cause = typeof error?.code === "string" ? error.code : typeof error?.name === "string" ? error.name : "unknown";
+    throw refusal;
+  }
 }
 export function registerGenericCriticBatch(input) { return invoke(() => registerBatch(input)); }
 export function appendGenericCriticBatchCorrection(input) { return invoke(() => appendCorrection(input)); }

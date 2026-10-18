@@ -12,7 +12,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { consumeCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
-import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
+import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
 
 import {
   SESSION_CRITIC_ASSURANCE,
@@ -526,13 +526,14 @@ test("receipt validation is closed and refuses provider metadata", () => {
 test("closed CLI admits before verdict and finalizes only that durable packet", () => {
   const fx = fixture({ taskId: "ALF-CLI-HISTORY-01" });
   try {
-    writeFileSync(join(fx.root, "evidence", "finalize-request.json"), `${JSON.stringify(cliRequest(fx))}\n`);
-    const admission = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", "evidence/finalize-request.json"]);
+    // The CLI only reads physical scratch request files, and a non-feature review names its registered batch (v3).
+    const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
+    const admission = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]);
     assert.equal(admission.exitCode, 0);
     assert.equal(admission.output.schema, "pipeline.session-critic-prelaunch-admission.v1");
     assert.equal(admission.output.packetId, "6".repeat(32));
     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
-    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", "evidence/finalize-request.json"]);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
     assert.equal(result.exitCode, 0);
     assert.equal(result.output.status, "completed");
     assert.equal(result.output.receipt.session.id, "session-cli-1");
@@ -543,8 +544,9 @@ test("CLI refuses a valid returned verdict when no prelaunch admission exists", 
   const fx = fixture();
   try {
     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
-    writeFileSync(join(fx.root, "evidence", "finalize-request.json"), `${JSON.stringify(cliRequest(fx))}\n`);
-    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", "evidence/finalize-request.json"]);
+    // A physical scratch request gets past the request-file check; admission is looked up before any batch is consulted.
+    const requestPath = writeScratchRequest(fx, "finalize-request.json", cliRequest(fx));
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
     assert.equal(result.exitCode, 2);
     assert.equal(result.output.code, "SCF-PRELAUNCH-ADMISSION");
     assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "6".repeat(32))), false);
@@ -555,16 +557,33 @@ test("CLI closes argv/request vocabulary and reports typed exit-2 errors", () =>
   const fx = fixture();
   try {
     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
-    writeFileSync(join(fx.root, "evidence", "bad-request.json"), `${JSON.stringify({ ...cliRequest(fx), command: "extra" })}\n`);
-    for (const result of [
-      runSessionCriticFinalizerCli(["finalize", "--root", fx.root]),
-      runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", "evidence/bad-request.json"]),
-      runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", "../outside.json"]),
+    // The bad request must be a physical scratch file: anywhere else it is refused as a request file, not as a vocabulary violation.
+    const badRequest = writeScratchRequest(fx, "bad-request.json", { ...cliRequest(fx), command: "extra" });
+    for (const [result, code] of [
+      [runSessionCriticFinalizerCli(["finalize", "--root", fx.root]), "SCF-USAGE"],
+      [runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", badRequest]), "SCF-REQUEST"],
+      [runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", "../outside.json"]), "SCF-REQUEST-FILE"],
     ]) {
       assert.equal(result.exitCode, 2);
       assert.equal(result.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
       assert.equal(result.output.status, "rejected");
+      assert.equal(result.output.code, code);
     }
     assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets")), false);
   } finally { cleanup(fx); }
+});
+
+test("a foreign failure inside the generic batch keeps CGB-PHYSICAL and surfaces its original cause", () => {
+  const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-cause-"));
+  try {
+    const input = { controlRoot: join(root, "missing", "critic-packets"), packetId: "6".repeat(32),
+      batchRef: { batchId: "7".repeat(32), registrationSha256: "8".repeat(64) },
+      memberSha256: "9".repeat(64), preflightSha256: "a".repeat(64) };
+    // A control root whose parent does not exist makes the filesystem, not the batch, fail.
+    assert.throws(() => readReservedGenericCriticBatchAdmission(input),
+      (error) => error.name === "GenericCriticBatchError" && error.code === "CGB-PHYSICAL" && error.cause === "ENOENT");
+    // A refusal the batch itself raises is passed through untouched and carries no cause.
+    assert.throws(() => readReservedGenericCriticBatchAdmission({ controlRoot: input.controlRoot }),
+      (error) => error.name === "GenericCriticBatchError" && error.code === "CGB-SHAPE" && !Object.hasOwn(error, "cause"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
