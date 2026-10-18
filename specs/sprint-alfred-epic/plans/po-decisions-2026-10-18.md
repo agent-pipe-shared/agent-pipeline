@@ -17,6 +17,8 @@ text was not persisted when it was taken.
 | D13 | The Antigravity runner view maps the Claude model tiers of the agent files: `sonnet` and `haiku` become `flash`, `opus` becomes `pro`. | Antigravity global install |
 | D14 | PF-25 is repaired by a separate registration command (`scripts/register-feature-package.mjs`) that writes the feature package manifest, because `approve-plan` lives in the protected `pipeline-state.mjs`. The `approve-plan` call site follows through a signed package (backlog). | PF-25 |
 | D15 | When a consumer feature has no `acceptance.md` or `result.md`, the registration command generates them as Pipeline-owned, non-authoritative, immutable records: acceptance points to the approved Spec and its digest and adds no criterion; result records that implementation is in progress. Existing files are registered as found and never rewritten. | PF-25 |
+| D16 | The stamped candidate `cdf72aa2f` (Antigravity hook wiring fix) is not signed or pushed on its own. One bundled candidate carries it together with the PF-26 and PF-27 fixes. | next candidate |
+| D17 | GG-11 admits env templates (`.env.example`, `.env.sample`, `.env.template`, `.env.<x>.example`) and also env files under `tests/fixtures/`. Every other `.env*` file stays blocked. | PF-27 |
 
 D12 is an Elephant decision within accepted scope (PF-23 asked for a durable fix and a
 repair option; only a delivery-side widening is both). It changes the closed criterion
