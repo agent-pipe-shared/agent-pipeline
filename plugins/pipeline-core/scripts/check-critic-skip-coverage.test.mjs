@@ -557,6 +557,42 @@ test("each v3 dispatch may carry a structured skip decision", () => {
   assert.equal(result.skipRecordCount, 2);
 });
 
+test("taskIds scopes the evaluation to the records those ids own and names the uncovered required ones", () => {
+  const root = fixture({
+    "evidence/dispatch-record-A.json": json(v3("A", { criticRequired: required() })),
+    "evidence/dispatch-record-B.json": json(v3("B", { criticRequired: required() })),
+  });
+  const unscoped = evaluate(root);
+  assert.equal(unscoped.requiredRecordCount, 2);
+  assert.equal("requiredTaskIds" in unscoped, false, "without taskIds the result shape is unchanged");
+  const scoped = evaluate(root, undefined, { taskIds: ["B"] });
+  assert.equal(scoped.requiredRecordCount, 1);
+  assert.equal(scoped.applicableRecordCount, 1);
+  assert.deepEqual(scoped.requiredTaskIds, ["B"]);
+  assert.doesNotMatch(scoped.readFindings.join("\n"), /dispatch-record-A/u, "an out-of-scope record raises no finding");
+  const both = evaluate(root, undefined, { taskIds: new Set(["B", "A", "NOT-A-RECORD"]) });
+  assert.deepEqual(both.requiredTaskIds, ["A", "B"], "ids are sorted and any iterable is accepted");
+  const none = evaluate(root, undefined, { taskIds: [] });
+  assert.deepEqual(none.requiredTaskIds, []);
+  assert.equal(none.applicableRecordCount, 0);
+});
+
+test("taskIds reports a required record only until matching Critic evidence replaces it, and ownership is sliceId ?? taskId", () => {
+  const bytes = Buffer.from("Critic PASS for A\n");
+  const root = fixture({
+    "evidence/dispatch-record-A.json": json(v3("A", {
+      criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "A", candidateCommit: SHA, path: "evidence/critic-A.md", sha256: sha256(bytes) },
+    })),
+    "evidence/critic-A.md": bytes,
+    "evidence/dispatch-record-C.json": json({ ...v3("C", { criticRequired: required() }), sliceId: "S1" }),
+  });
+  const covered = evaluate(root, undefined, { taskIds: ["A"] });
+  assert.deepEqual(covered.requiredTaskIds, []);
+  assert.equal(covered.criticEvidenceRecordCount, 1);
+  assert.equal(evaluate(root, undefined, { taskIds: ["C"] }).applicableRecordCount, 0, "a record owned by its sliceId is not selected by its taskId");
+  assert.equal(evaluate(root, undefined, { taskIds: ["S1"] }).applicableRecordCount, 1, "a record is selected by its sliceId");
+});
+
 test("required disposition remains valid but blocks coverage until evidence replaces it", () => {
   const root = fixture({
     "evidence/dispatch-record-A.json": json(v3("A", { criticRequired: required() })),

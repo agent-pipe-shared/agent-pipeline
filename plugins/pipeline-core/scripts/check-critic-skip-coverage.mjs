@@ -666,8 +666,16 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
   let criticEvidenceRecordCount = 0;
   let reconciledLegacyRecordCount = 0;
   let administrativelyRetiredRecordCount = 0;
+  // Optional scope: only records belonging to one of these ids (`sliceId ?? taskId`) are evaluated.
+  // Without it behaviour and every count are unchanged. `requiredTaskIds` is only reported when scoped.
+  const scope = options.taskIds === undefined ? null : new Set(options.taskIds);
+  const requiredTaskIds = new Set();
   for (const entry of scan.records) {
     const { path, record } = entry;
+    if (scope !== null) {
+      const owner = typeof record?.sliceId === "string" ? record.sliceId : record?.taskId;
+      if (!scope.has(owner)) { usedAddenda.add(path); continue; }
+    }
     const retirement = abandoned.entriesByPath.get(path);
     if (retirement) {
       const retirementFinding = abandonedV3RecordFinding(entry, retirement);
@@ -721,7 +729,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
       if (addendum) {
         usedAddenda.add(path);
         const addendumFinding = resolvedCriticAddendumFinding(root, entry, addendum, options);
-        if (addendumFinding) { requiredRecordCount += 1; findings.push(addendumFinding); }
+        if (addendumFinding) { requiredRecordCount += 1; requiredTaskIds.add(record.taskId); findings.push(addendumFinding); }
         else criticEvidenceRecordCount += 1;
       } else {
         const portable = isV4 && record.runner === "antigravity"
@@ -733,6 +741,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
           criticEvidenceRecordCount += 1;
         } else {
           requiredRecordCount += 1;
+          requiredTaskIds.add(record.taskId);
           findings.push(portable && portable.code !== "agy-export-missing"
             ? `${path}: signed portable Agy export is invalid (${portable.code})`
             : `${path}: Critic is required by ${record.criticRequired.appliedRow}; task/candidate/digest-bound criticEvidence is missing`);
@@ -769,6 +778,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     reconciledLegacyRecordCount,
     administrativelyRetiredRecordCount,
     readFindings: findings,
+    ...(scope === null ? {} : { requiredTaskIds: [...requiredTaskIds].sort() }),
   };
 }
 

@@ -16,6 +16,8 @@ import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs"
 import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
 import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
+import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
 import {
   assertPrivateRegularFile,
   ensurePrivateDirectory,
@@ -381,6 +383,38 @@ function continuityCloseRequest(root, snapshot, path) {
   }
   return request;
 }
+/**
+ * A feature cannot reach `feature-close-prepared` while one of ITS OWN delivery-course dispatch records
+ * requires a Critic and has no matching Critic evidence (the evaluator's own decision, not a second one).
+ * Scope is the slice ids of the course beside the approved plan, the file resolveGovernedItemQueue reads;
+ * records of other or earlier features never block. No course file means nothing to scope and nothing to
+ * refuse. An unreadable, oversized, invalid or foreign course fails closed.
+ */
+function assertCourseCriticEvidence(root, feature) {
+  const directory = dirname(feature.planPath);
+  const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
+  let size;
+  try { size = lstatSync(join(root, coursePath)).size; }
+  catch (error) {
+    if (error?.code === "ENOENT") return;
+    fail("CLOSE-DELIVERY-COURSE-INVALID", "the feature's delivery course is unreadable; the Critic evidence gate fails closed");
+  }
+  let ids;
+  try {
+    if (size > SLICE_QUEUE_MAX_BYTES) throw new Error("delivery course exceeds the slice-queue size bound");
+    const course = readJsonFile(root, coursePath, "delivery course").value;
+    if (!validateSliceQueue(course).ok || course.feature !== feature.id) throw new Error("delivery course is invalid or belongs to another feature");
+    ids = course.slices.map((slice) => slice.id);
+  } catch {
+    fail("CLOSE-DELIVERY-COURSE-INVALID", "the feature's delivery course is invalid, oversized or belongs to another feature; the Critic evidence gate fails closed");
+  }
+  let coverage;
+  try { coverage = evaluateRepositoryCriticSkipCoverage({ root, taskIds: ids }); }
+  catch { fail("CLOSE-CRITIC-EVIDENCE-UNAVAILABLE", "Critic evidence coverage for the feature's delivery course could not be evaluated"); }
+  if (coverage.requiredTaskIds.length > 0) {
+    fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence; repair: run the Critic dispatch for each of them, bind its evidence to the dispatch record, then plan the transition again`);
+  }
+}
 async function transitionPlan(values) {
   const root = physicalRoot(values.root);
   if (!ID.test(values.lifecycle ?? "") || !COORDINATOR_PHASES.includes(values.phase)
@@ -438,6 +472,7 @@ async function transitionPlan(values) {
     const observed = authorityFromState(root, snapshot, { requireResult: true });
     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
+    assertCourseCriticEvidence(root, observed.feature);
     if (values.auditRequest !== undefined) {
       const request = auditRequest(root, values.auditRequest);
       if (!SHA256.test(values.criticVerifyLifecycle ?? "") || values.criticVerifyLifecycle !== request.value.criticVerifyLifecycleId) {
