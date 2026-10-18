@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -554,6 +556,46 @@ const cases = [
       leaveClaudeHookSessionOwner();assert.equal(nativeManagedCurrentOwner(repository).association.state,'unbound');
     } finally { leaveClaudeHookSessionOwner(); }
   })},
+
+  {id:'NGHS21',name:'approved feature without a slice queue reports a typed absent course naming the course writer, while an unsafe queue file still fails closed',run:()=>fixture(({root})=>{
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});
+    const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit selection'});
+    assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    mkdirSync(join(root,'.claude'));mkdirSync(join(root,'specs/unit'),{recursive:true});
+    writeFileSync(join(root,'.claude/pipeline.yaml'),'schema: pipeline.manifest.v0\n');
+    writeFileSync(join(root,'.claude/pipeline-state.json'),JSON.stringify({schema:'pipeline.state.v0',activeFeature:{id:'unit',planPath:'specs/unit/plan.md',phase:'implementation'},planApproved:true}));
+    const absent=resolveGovernedItemQueue({root});
+    assert.equal(absent.status,'refused');assert.equal(absent.code,'SQ-DELIVERY-COURSE-ABSENT');
+    assert.match(absent.repair,/prepareGovernedItemQueue/u);
+    symlinkSync(join(root,'nowhere.json'),join(root,'specs/unit/slice-queue.json'));
+    const unsafe=resolveGovernedItemQueue({root});
+    assert.equal(unsafe.status,'refused');assert.equal(unsafe.code,'SQ-DELIVERY-STATE-UNAVAILABLE');
+  })},
+
+  {id:'NGHS22',name:'accepted criterion parser binds numbered and R-n rows of a two-column table under a German acceptance heading and keeps fail-closed boundaries',run:()=>{
+    const critic='The package must receive a passing verdict from an independent critic before acceptance.';
+    const locate=(text,cell)=>{
+      const bytes=Buffer.from(text),start=bytes.indexOf(Buffer.from(cell));assert.ok(start>=0);
+      return {bytes,locator:{schema:'pipeline.critic-criterion-locator.v1',sourcePath:'specs/unit/spec.md',sourceSha256:createHash('sha256').update(bytes).digest('hex'),
+        criterionId:'',startByte:start,endByte:start+Buffer.byteLength(cell),excerptSha256:createHash('sha256').update(cell).digest('hex')}};
+    };
+    const parse=(text,cell,criterionId)=>{
+      const {bytes,locator}=locate(text,cell);
+      return parseAcceptedCriticCriterion({sourceBytes:bytes,locator:{...locator,criterionId},packageContext:{featureId:'unit',sourceBindings:[{path:'specs/unit/spec.md',sha256:locator.sourceSha256,role:'spec'}]}});
+    };
+    const german=`# Spezifikation\n\n## Abnahmekriterien\n\n| # | Kriterium |\n|---|---|\n| 1 | ${critic} |\n| R-2 | Die Anzeige ist lesbar. |\n`;
+    const numbered=parse(german,critic,'AC-1');
+    assert.equal(numbered.status,'explicit-actual-independent-pass',JSON.stringify(numbered));
+    const requirement=parse(german,'Die Anzeige ist lesbar.','AC-2');
+    assert.equal(requirement.status,'no-explicit-criterion',JSON.stringify(requirement));
+    // A non-normative heading, a duplicate numbering and a wrong locator never bind.
+    assert.equal(parse(german.replace('## Abnahmekriterien','## Beispiele'),critic,'AC-1').status,'unsupported-or-ambiguous');
+    assert.equal(parse(german.replace('| R-2 |','| R-1 |'),critic,'AC-1').status,'unsupported-or-ambiguous');
+    assert.equal(parse(german,critic,'AC-2').status,'unsupported-or-ambiguous');
+    // The existing English three-column form keeps working.
+    const english=`# Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | ${critic} | review |\n`;
+    assert.equal(parse(english,critic,'AC-1').status,'explicit-actual-independent-pass');
+  }},
 
 ];
 

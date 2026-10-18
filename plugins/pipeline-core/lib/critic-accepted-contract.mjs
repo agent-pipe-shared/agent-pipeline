@@ -175,7 +175,13 @@ export function parseAcceptedCriticCriterion(input) {
     for (const raw of source.split(/(?<=\n)/u)) {
       lines.push({text:raw.replace(/\r?\n$/u,''),byteOffset}); byteOffset += Buffer.byteLength(raw);
     }
-    const cells = text => {
+    // Normative and excluded heading vocabulary, shared by the table and the clause scanners below.
+    const NORMATIVE_HEADING = /\b(?:acceptance\s+(?:criteria|requirements)|abnahmekriterien|akzeptanzkriterien|abnahmeanforderungen)\b/iu;
+    const EXCLUDED_HEADING = /\b(?:examples?|notes?|commentary|beispiele?|hinweise?|anmerkung(?:en)?|kommentare?)\b/iu;
+    // Two-column acceptance table: a number cell, then a criterion cell. Rows `n` and `R-n` map to `AC-n`.
+    const TWO_COLUMN_NUMBER = /^(?:#|nr\.?|id)$/iu;
+    const TWO_COLUMN_CRITERION = /^(?:kriterium|kriterien|abnahmekriterium|anforderung|criterion|requirement)$/iu;
+    const cells = (text, width = 3) => {
       // Escaped pipes require a separate Markdown representation; never miscount their columns.
       if (text.includes('\\|')) return null;
       const separators = [...text.matchAll(/\|/gu)].map(match => match.index);
@@ -187,7 +193,7 @@ export function parseAcceptedCriticCriterion(input) {
         ends.push(separators[index]); limits.push(separators[index]+1);
       }
       ends.push(outerRight ? separators.at(-1) : text.length);
-      if (limits.length !== 3 || ends.length !== 3) return null;
+      if (limits.length !== width || ends.length !== width) return null;
       return limits.map((start,index) => {
         const raw = text.slice(start,ends[index]), leading = raw.length - raw.trimStart().length;
         const value = raw.trim(); return {value,start:start+leading,end:start+leading+value.length};
@@ -213,26 +219,32 @@ export function parseAcceptedCriticCriterion(input) {
         while (headings.length && headings.at(-1).level >= heading[1].length) headings.pop();
         headings.push({level:heading[1].length,text:heading[2]}); table = null; continue;
       }
-      const parts = cells(text);
-      if (parts && parts.map(cell=>cell.value).join('\0') === '#\0Criterion\0Evidence') {
-        const delimiter = cells(lines[index+1]?.text ?? '');
+      const parts = cells(text), pair = cells(text, 2);
+      const threeColumn = parts !== null && parts.map(cell=>cell.value).join('\0') === '#\0Criterion\0Evidence';
+      const twoColumn = !threeColumn && pair !== null && TWO_COLUMN_NUMBER.test(pair[0].value) && TWO_COLUMN_CRITERION.test(pair[1].value);
+      if (threeColumn || twoColumn) {
+        const width = threeColumn ? 3 : 2, delimiter = cells(lines[index+1]?.text ?? '', width);
         if (delimiter?.every(cell=>/^:?-{3,}:?$/u.test(cell.value))) {
-          table = {normative:headings.some(entry=>/\bacceptance\s+(?:criteria|requirements)\b/iu.test(entry.text))
-            && !headings.some(entry=>/\b(?:examples?|notes?|commentary)\b/iu.test(entry.text))}; index++; continue;
+          table = {width,normative:headings.some(entry=>NORMATIVE_HEADING.test(entry.text))
+            && !headings.some(entry=>EXCLUDED_HEADING.test(entry.text))}; index++; continue;
         }
       }
-      if (!table || !parts) { table = null; continue; }
-      if (/^AC-[1-9][0-9]*$/u.test(parts[0].value)) {
-        const cell = parts[1]; rows.push({id:parts[0].value,normative:table.normative,text:cell.value,
-          startByte:line.byteOffset+Buffer.byteLength(text.slice(0,cell.start)),endByte:line.byteOffset+Buffer.byteLength(text.slice(0,cell.end))});
+      const row = table ? cells(text, table.width) : null;
+      if (!table || !row) { table = null; continue; }
+      const number = table.width === 2 ? row[0].value.match(/^(?:R-)?([1-9][0-9]*)$/u)?.[1] : null;
+      const rowId = table.width === 3 ? row[0].value : (number ? `AC-${number}` : null);
+      if (rowId !== null && /^AC-[1-9][0-9]*$/u.test(rowId)) {
+        const cell = row[1]; rows.push({id:rowId,normative:table.normative,text:cell.value,
+          startByte:line.byteOffset+Buffer.byteLength(text.slice(0,cell.start)),endByte:line.byteOffset+Buffer.byteLength(text.slice(0,cell.end)),
+          ...(table.width === 2 ? {parserVersion:'markdown-acceptance-table-two-column.v1'} : {})});
       }
     }
     // Heading paragraphs and numbered AC items have separate, closed renderings.
     // Observe their whole structural scope; a locator cannot trim a second body
     // paragraph, continuation, excluded context or contradictory sentence away.
     const clauseHeadings = []; let clauseComment=false, clauseFence=null, active=null;
-    const normative = () => clauseHeadings.some(h=>/\bacceptance\s+(?:criteria|requirements)\b/iu.test(h.text))
-      && !clauseHeadings.some(h=>/\b(?:examples?|notes?|commentary)\b/iu.test(h.text));
+    const normative = () => clauseHeadings.some(h=>NORMATIVE_HEADING.test(h.text))
+      && !clauseHeadings.some(h=>EXCLUDED_HEADING.test(h.text));
     const markExcluded = () => { if(active)active.valid=false; };
     for(const line of lines){const text=line.text;
       if(clauseComment || text.includes('<!--')){markExcluded();if(text.includes('<!--'))clauseComment=true;if(text.includes('-->'))clauseComment=false;continue;}

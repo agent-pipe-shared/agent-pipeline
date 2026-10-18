@@ -7,7 +7,7 @@ import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
 import { NATIVE_GOLDFISH_BRIEFING_SCHEMA, NATIVE_GOLDFISH_CODEX_BRIEFING_SCHEMA, NATIVE_GOLDFISH_RETURN_SCHEMA,
   NATIVE_GOLDFISH_HOST_DIRECTIVE, observeClaudeGoldfishReturn, observeCodexGoldfishReturn, parseNativeGoldfishBriefing,
-  validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
+  validateNativeGoldfishFinal, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
 
 const SHA = (text) => createHash("sha256").update(text).digest("hex");
 const binding = { schema: NATIVE_GOLDFISH_BRIEFING_SCHEMA, dispatchId: "NATIVE-RETURN-1",
@@ -83,6 +83,16 @@ const cases = [
     assert.equal(observeCodexGoldfishReturn({ ...input, agent_type: "critic" }, codexPending).ok, false);
     assert.equal(observeCodexGoldfishReturn({ ...input, model: "other-model" }, codexPending).ok, false);
     assert.equal(observeCodexGoldfishReturn({ ...input, last_assistant_message: "partial" }, codexPending).ok, false);
+  }],
+  ["NGHR06 item delivery briefing admits .test.js check files next to .test.mjs and .test.cjs, nothing else", () => {
+    const locator = { schema: "pipeline.critic-criterion-locator.v1", sourcePath: "specs/unit/spec.md", sourceSha256: "a".repeat(64),
+      criterionId: "AC-1", startByte: 10, endByte: 20, excerptSha256: "b".repeat(64) };
+    const briefing = path => ({ schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-1", itemId: "AC-1", criterionLocator: locator,
+      checks: [{ id: "check-one", path, dependencies: ["src/change.js", path] }] });
+    for (const path of ["src/change.test.mjs", "src/change.test.cjs", "src/change.test.js"])
+      assert.equal(validateItemDeliveryBriefing(briefing(path)).ok, true, path);
+    for (const path of ["src/change.test.ts", "src/change.js", "src/change.test.json"])
+      assert.equal(validateItemDeliveryBriefing(briefing(path)).code, "NGHR-ITEM-DELIVERY-SHAPE", path);
   }],
 
 ];

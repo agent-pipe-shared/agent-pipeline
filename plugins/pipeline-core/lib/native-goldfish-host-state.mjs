@@ -798,7 +798,14 @@ export function resolveGovernedItemQueue({ root } = {}) {
     if (typeof plan !== "string" || !normalizeScope(plan).ok || plan.startsWith("/")) return refused("SQ-PLAN-PATH-INVALID");
     const path = resolve(physical, dirname(plan), "slice-queue.json");
     if (relative(physical, path).startsWith("..")) return refused("SQ-PLAN-PATH-INVALID");
-    const bytes = readBounded(path);
+    let bytes;
+    try { bytes = readBounded(path); }
+    catch (error) {
+      // Only a missing file is an absent course. An unsafe, drifting or unreadable file keeps failing closed below.
+      if (error?.code === "ENOENT") return { status: "refused", code: "SQ-DELIVERY-COURSE-ABSENT",
+        repair: "The approved feature has no delivery course yet: write its slice-queue.json through the governed course writer prepareGovernedItemQueue with the item delivery briefing (criterion locator and check paths) of the first item." };
+      throw error;
+    }
     const queue = parseStrictJson(bytes);
     if (queue.schema !== ITEM_QUEUE_SCHEMA) return refused("SQ-DELIVERY-MIGRATION-REQUIRED");
     const validated = validateSliceQueue(queue);

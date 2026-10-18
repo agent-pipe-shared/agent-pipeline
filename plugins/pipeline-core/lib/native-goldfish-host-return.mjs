@@ -166,7 +166,7 @@ export function validateItemDeliveryBriefing(value) {
     ||!Array.isArray(value.checks)||value.checks.length<1||value.checks.length>16
     ||new Set(value.checks.map(check=>check.id)).size!==value.checks.length
     ||value.checks.some(check=>!exact(check,['id','path','dependencies'])||!ID.test(check.id??'')||!normalizedPath(check.path)
-      ||!/(?:\.test\.mjs|\.test\.cjs)$/u.test(check.path)||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
+      ||!/\.test\.(?:mjs|cjs|js)$/u.test(check.path)||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
       ||!check.dependencies.every(normalizedPath)||new Set(check.dependencies).size!==check.dependencies.length))return fail('NGHR-ITEM-DELIVERY-SHAPE');
   return {ok:true,code:'NGHR-ITEM-DELIVERY-VALID'};
 }
