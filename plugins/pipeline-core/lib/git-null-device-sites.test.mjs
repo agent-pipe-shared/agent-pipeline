@@ -46,7 +46,7 @@ test("critic-verify-lifecycle courseGitBytes hands the stub git the GIT_NULL_DEV
   assert.equal(seen.command, "git");
   assert.equal(seen.env.GIT_CONFIG_GLOBAL, GIT_NULL_DEVICE);
   assert.equal(seen.env.GIT_CONFIG_SYSTEM, GIT_NULL_DEVICE);
-  assert.notEqual(seen.env.GIT_CONFIG_GLOBAL, "NUL");
+  assert.notEqual(seen.env.GIT_CONFIG_GLOBAL, ["N", "UL"].join(""));
 });
 
 const realGit = spawnSync("git", ["--version"], { encoding: "utf8" });

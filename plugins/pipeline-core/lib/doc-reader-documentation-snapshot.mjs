@@ -6,6 +6,7 @@ import {lstatSync,readFileSync,realpathSync} from 'node:fs';
 import {isAbsolute,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseStrictJson} from './governance-event.mjs';
+import {GIT_NULL_DEVICE} from './git-null-device.mjs';
 export const canonical=v=>Array.isArray(v)?`[${v.map(canonical).join(',')}]`:v!==null&&typeof v==='object'?`{${Object.keys(v).sort().map(k=>`${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`:JSON.stringify(v);
 export const hash=b=>createHash('sha256').update(b).digest('hex');
 export const same=(a,b)=>canonical(a)===canonical(b);
@@ -19,7 +20,7 @@ export const publicRef=r=>{exact(r,['path','sha256']);requireFact(safePath(r.pat
 export function physicalRoot(root){requireFact(typeof root==='string'&&isAbsolute(root)&&resolve(root)===root&&realpathSync.native(root)===root&&lstatSync(root).isDirectory(),'COURSE-STORE-UNAVAILABLE');return root;}
 export function physicalBytes(root,path,limit=262144){physicalRoot(root);requireFact(safePath(path),'COURSE-REQUEST-INVALID');let at=root;const parts=path.split('/');for(let i=0;i<parts.length;i++){at=join(at,parts[i]);const st=lstatSync(at);requireFact(!st.isSymbolicLink()&&realpathSync.native(at)===at&&(i===parts.length-1?st.isFile()&&st.nlink===1:st.isDirectory()),'COURSE-STORE-UNAVAILABLE');if(i===parts.length-1)requireFact(st.size<=limit,'COURSE-STORE-UNAVAILABLE');}const bytes=readFileSync(at);requireFact(bytes.length<=limit,'COURSE-STORE-UNAVAILABLE');return bytes;}
 export function jsonBytes(bytes){return parseStrictJson(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
-export function git(root,args,limit=4194304){physicalRoot(root);const p=spawnSync('git',['-C',root,...args],{encoding:null,timeout:10000,maxBuffer:limit,env:{...process.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:process.platform==='win32'?'NUL':'/dev/null'}});requireFact(!p.error&&p.status===0&&p.signal===null,'COURSE-INPUT-CHANGED');return p.stdout;}
+export function git(root,args,limit=4194304){physicalRoot(root);const p=spawnSync('git',['-C',root,...args],{encoding:null,timeout:10000,maxBuffer:limit,env:{...process.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:GIT_NULL_DEVICE}});requireFact(!p.error&&p.status===0&&p.signal===null,'COURSE-INPUT-CHANGED');return p.stdout;}
 export const gitText=(root,args)=>git(root,args).toString('utf8').trim();
 export function commitIdentity(root,commit){requireFact(oid(commit));requireFact(gitText(root,['rev-parse','--verify',`${commit}^{commit}`])===commit);const tree=gitText(root,['rev-parse','--verify',`${commit}^{tree}`]);requireFact(oid(tree));return tree;}
 export function blob(root,commit,path,limit=1048576){commitIdentity(root,commit);requireFact(safePath(path));const listing=gitText(root,['ls-tree',commit,'--',path]);requireFact(new RegExp(`^100(?:644|755) blob [a-f0-9]{40}\\t`).test(listing)&&listing.split('\t')[1]===path);const bytes=git(root,['cat-file','blob',`${commit}:${path}`],limit+1);requireFact(bytes.length<=limit);return bytes;}
