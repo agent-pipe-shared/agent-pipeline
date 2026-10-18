@@ -273,3 +273,12 @@ Later on 2026-10-18: `de8e884c1` (rebind-runner and close-collide fixtures own t
 Checkpoint candidate for local testing (PO, 2026-10-18, "Weg A"): this state is pushed to `feat/sprint-alfred` without Full Verify, Critic batch or PO acceptance. Still open for the final candidate: Full WSL Verify, the remaining red groups (mostly minor), the Critic batch, decisions D1/D2, the signed quality package S1-S4, the final stamp and plugin update, and PO acceptance.
 
 Open PO decision D1 (GST33, critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard): see the session PO task list; no code change was made.
+
+PO decision D3 (2026-10-18, Tier-0 fix by the Elephant): `d8db9e034` gives the delivery course one shared 16 MiB size bound (`SLICE_QUEUE_MAX_BYTES`) and a typed refusal, `SQ-DELIVERY-QUEUE-TOO-LARGE`. The course had reached 1,049,000 bytes against the old 1 MiB bound, and every dispatch failed with `SQ-DELIVERY-STATE-UNAVAILABLE`. NGHS passes 23/23 when the suite runs as a plain script. Under a `--test` parent, NGHS09 and NGHS13 fail because the nested runner inherits the parent's test context; the fix does not cause them. Dispatches pick the fix up only after the installed plugin copy is refreshed. Critic review pending.
+
+AGY WSL greenfield analysis (installed 0.6.2, PO-supplied 2026-10-18): `dacf773b6` files the five improvements onto existing Alfred items, each re-checked against 0.7.0.
+- Major and still open:
+  - T3: a required Critic is only reported at close-feature, not enforced. Rigor and risk are self-declared.
+  - F-03: there is no single PO command for the design approval.
+  - F-01: the lane pin is missing. The deadlock itself does not occur in 0.7.0.
+- Minor: F-02, F-04/F-05, F-06, and AGY parallel packages.
