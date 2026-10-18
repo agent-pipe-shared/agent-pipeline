@@ -91,6 +91,7 @@
 | pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
+| pipeline.architecture-continuity-advisory-shows-a-count-without-codes | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.architecture-deferral-records-no-net-new-baseline | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.architecture-design-errors-omit-field-paths | closed | defect | pipeline | none | 2026-09-27 | — | — |
 | pipeline.architecture-fitness-model-repeats-module-fields | closed | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
@@ -681,6 +682,7 @@
 | pipeline.read-blocks-and-misleading-denial-texts-across-runners | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.read-containment-removed-with-no-recorded-decision | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — the project-root containment check on read-only shell commands was added on 2026-08-29 to close a hole and removed wholesale on 2026-08-30. The removal is deliberate and undocumented outside its own commit message, and it silently invalidates a closed item's recorded remedy. |
 | pipeline.read-only-guard-admits-execution-and-output-options | open | defect | pipeline | alfred | 2026-09-30 | — | — |
+| pipeline.read-only-npm-registry-queries-have-no-admitted-route | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.read-scope-denial-code-accuracy-f3 | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — NVA-B-READCONTAIN-1's T1 Critic (round 1) finding F3, carried in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md but never given its own backlog/items/ entry. Filed now to close that tracking gap; the underlying behavior is unchanged and non-blocking (the command is still refused end-to-end, only the printed reason code is wrong). |
 | pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.read-scope-tilde-expansion-mismatch | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — while triaging NVA-B-READCONTAIN-1's closure, the Elephant independently checked whether the restored read-scope containment accounts for shell tilde expansion. It does not: the guard's parser never expands a leading `~` in a path-taking argument, so it evaluates the LITERAL string `~/.ssh/id_rsa` as a (nonexistent) path under the project root, while the actual shell expands `~` to the real home directory before the command ever runs. Confirmed live via evaluateLifecycleReadyGuard() directly (never via an executed Bash cat of a real credential path). |
@@ -698,6 +700,7 @@
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | closed | defect | pipeline | — | 2026-07-27 | — | — |
 | pipeline.recovery-preview-callback-attestation | closed | defect | pipeline | — | 2026-07-20 | 2026-07-27 | — |
 | pipeline.red-evidence-from-node-test-embeds-the-absolute-repository-path | closed | defect | pipeline | nova-b | 2026-09-02 | — | Nova B — reproduce-first RED evidence is required by briefings and by ADR-0063, and the standard way to capture it embeds a machine-specific absolute path that a hard rule forbids in commits. The fixup always arrives one commit too late, and history cannot be rewritten. |
+| pipeline.refused-read-flags-cost-goldfish-budget-and-are-not-listed-for-agents | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation | closed | workflow-improvement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | closed | defect | pipeline | none | 2026-08-27 | — | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
@@ -914,7 +917,7 @@
 
 ## Counts
 
-- open: 228
+- open: 231
 - in_progress: 0
 - closed: 664
 - rejected: 3

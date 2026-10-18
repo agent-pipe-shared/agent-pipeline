@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8cc5394f82c029b5ee6d5b203b3dd335d4fccc2c9926bfacc862684adae36287"
+    "transitionHead": "b435c0e4d3fbbfd70463e3b6135642c87bd76b344f91de6507c3bcdfb2153343"
   },
   "counts": {
-    "open": 228,
+    "open": 231,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -1129,6 +1129,16 @@
       "closureRepository": "self",
       "closureCommit": "c01dbf76199e249e2a7873b3558ff58ff2c76653",
       "closureEvidence": "backlog/items/2026-08-08-approved-but-not-implementing-refuses-every-write-and-asks-for-nothing.md"
+    },
+    {
+      "id": "pipeline.architecture-continuity-advisory-shows-a-count-without-codes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "real greenfield project report 2026-10-19 (PF-22)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.architecture-deferral-records-no-net-new-baseline",
@@ -8709,6 +8719,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.read-only-npm-registry-queries-have-no-admitted-route",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "real greenfield project report 2026-10-19 (PF-24)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.read-scope-denial-code-accuracy-f3",
       "status": "closed",
       "type": "defect",
@@ -8936,6 +8956,16 @@
       "closureRepository": "self",
       "closureCommit": "ddd356698f39bc3c4934ae97109290ba910b8385",
       "closureEvidence": "plugins/pipeline-core/scripts/capture-evidence.test.mjs"
+    },
+    {
+      "id": "pipeline.refused-read-flags-cost-goldfish-budget-and-are-not-listed-for-agents",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "real greenfield project report 2026-10-19 (PF-28)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation",
