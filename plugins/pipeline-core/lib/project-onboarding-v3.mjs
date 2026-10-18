@@ -918,6 +918,108 @@ function isAdoptableUnmanagedRoot(entries, root, fs) {
   });
 }
 
+// A real new project often starts in a folder that is not empty: the PO's concept
+// documents, a .gitignore, a first commit. That root is classified `existing-unmanaged`
+// (an adoptable non-empty root), and until PF19 the portable seed then applied WITHOUT the
+// greenfield architecture scaffold, so the intake route dead-ended later. The scaffold is
+// planned for such a root only when a bounded, read-only walk proves the folder holds no
+// code: no architecture/ entry, no AGENTS.md, no package/build manifest, no source file.
+// Every uncertainty (a bound, an unreadable path, a link) resolves to the existing-project
+// behaviour, and the plan says so out loud.
+export const GREENFIELD_WALK_BOUNDS = Object.freeze({ maxEntries: 1000, maxDepth: 12 });
+const GREENFIELD_MANIFEST_NAMES = new Set([
+  "package.json", "pyproject.toml", "requirements.txt", "go.mod", "cargo.toml", "pom.xml",
+  "build.gradle", "build.gradle.kts", "composer.json", "gemfile",
+]);
+const GREENFIELD_MANIFEST_SUFFIXES = Object.freeze([".csproj", ".sln"]);
+const GREENFIELD_SOURCE_EXTENSIONS = new Set(
+  "js mjs cjs ts tsx jsx py rb go rs java kt kts cs php swift c h cc cpp hpp m mm scala vue svelte sql sh ps1 dart lua".split(" "),
+);
+const GREENFIELD_NOT_PLANNED_EXPLANATIONS = Object.freeze({
+  "existing-architecture-entry": "an architecture entry already exists at the root",
+  "existing-agent-entry": "an AGENTS.md entry already exists at the root",
+  "package-or-build-manifest": "it is a package or build manifest, so the project already has code",
+  "source-code-file": "it is a source-code file, so the project already has code",
+  "unsupported-entry-type": "it is a symbolic link or special file, which the inspection never follows",
+  "walk-bound-exceeded": `the tree is larger than the bounded inspection (more than ${GREENFIELD_WALK_BOUNDS.maxEntries} entries or deeper than ${GREENFIELD_WALK_BOUNDS.maxDepth} levels)`,
+  "walk-incomplete": "part of the tree could not be read",
+});
+
+/**
+ * Pure. `walk` is `{ entries: [{ path, kind }], incomplete }` with `/`-separated
+ * root-relative paths, `kind` one of file|directory|symlink|other, and `incomplete`
+ * null|entries|depth|unreadable. Root-level collisions with the scaffold's own paths are
+ * reported first, then the first manifest/source/link in walk order, so the named path is
+ * deterministic.
+ */
+export function classifyGreenfieldWalk({ entries = [], incomplete = null } = {}) {
+  const blocked = (reason, path = null) => ({ status: "not-planned", reason, path });
+  const rootLevel = (lowerName) => entries.find((entry) => !entry.path.includes("/") && entry.path.toLowerCase() === lowerName);
+  const architecture = rootLevel("architecture");
+  if (architecture) return blocked("existing-architecture-entry", architecture.path);
+  const agents = rootLevel("agents.md");
+  if (agents) return blocked("existing-agent-entry", agents.path);
+  for (const entry of entries) {
+    if (entry.kind === "symlink" || entry.kind === "other") return blocked("unsupported-entry-type", entry.path);
+    if (entry.kind !== "file") continue;
+    const base = entry.path.slice(entry.path.lastIndexOf("/") + 1).toLowerCase();
+    if (GREENFIELD_MANIFEST_NAMES.has(base) || GREENFIELD_MANIFEST_SUFFIXES.some((suffix) => base.endsWith(suffix))) {
+      return blocked("package-or-build-manifest", entry.path);
+    }
+    const dot = base.lastIndexOf(".");
+    if (dot > 0 && GREENFIELD_SOURCE_EXTENSIONS.has(base.slice(dot + 1))) return blocked("source-code-file", entry.path);
+  }
+  if (incomplete === "unreadable") return blocked("walk-incomplete");
+  if (incomplete) return blocked("walk-bound-exceeded");
+  return { status: "planned", reason: "greenfield-equivalent-existing-root", path: null };
+}
+
+// Read-only and bounded: sorted names, `.git` skipped, nothing followed or opened.
+function observeGreenfieldWalk(root, fs) {
+  const { maxEntries, maxDepth } = GREENFIELD_WALK_BOUNDS;
+  const entries = [];
+  let incomplete = null;
+  const visit = (absolute, relative, depth) => {
+    let names;
+    try { names = fs.readdirSync(absolute).sort(); } catch { incomplete = "unreadable"; return; }
+    if (names.length > 0 && depth > maxDepth) { incomplete = "depth"; return; }
+    for (const name of names) {
+      if (name === ".git") continue;
+      if (entries.length >= maxEntries) { incomplete = "entries"; return; }
+      const path = relative === "" ? name : `${relative}/${name}`;
+      let info;
+      try { info = fs.lstatSync(join(absolute, name)); } catch { incomplete = "unreadable"; return; }
+      const kind = info.isSymbolicLink() ? "symlink" : info.isDirectory() ? "directory" : info.isFile() ? "file" : "other";
+      entries.push({ path, kind });
+      if (kind === "directory") {
+        visit(join(absolute, name), path, depth + 1);
+        if (incomplete) return;
+      }
+    }
+  };
+  visit(root, "", 1);
+  return { entries, incomplete };
+}
+
+// The closed `greenfieldScaffold` decision of a seed plan: { status, reason, path }.
+function greenfieldScaffoldDecision(status, root, fs) {
+  if (status === "fresh") return { status: "planned", reason: "fresh-root", path: null };
+  if (status === "fresh-host-managed") return { status: "planned", reason: "fresh-host-managed-root", path: null };
+  if (status === "existing-unmanaged") return classifyGreenfieldWalk(observeGreenfieldWalk(root, fs));
+  return { status: "not-planned", reason: "root-not-seedable", path: null };
+}
+
+function greenfieldScaffoldDiagnostics(decision) {
+  const explanation = GREENFIELD_NOT_PLANNED_EXPLANATIONS[decision.reason];
+  if (decision.status !== "not-planned" || explanation === undefined) return [];
+  return [diagnostic(
+    "$.greenfieldScaffold",
+    "greenfield_scaffold_not_planned",
+    `no greenfield architecture scaffold (architecture/map, AGENTS.md) will be written: ${decision.path === null ? "" : `${decision.path}: `}${explanation}`,
+    "this root is treated as an existing project; if it is actually a new project, move what is named here out of the root and run plan again",
+  )];
+}
+
 // The seeded runner is the identity the onboarding actually ran under, echoed
 // explicitly by every caller (ADR-0051/ADR-0057 R1). A literal fallback here
 // is exactly how a Claude consumer used to end up with a Codex project; the
@@ -5562,7 +5664,7 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
 
 export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, runner } = {}) {
   const fs = deps(overrides); const inspected = legacyInspection(rootDir, fs);
-  if (!["fresh", "fresh-host-managed", "existing-unmanaged"].includes(inspected.status)) return { schema: PLAN_SCHEMA, status: inspected.status, root: inspected.root, diagnostics: inspected.diagnostics, targets: [], requiresExplicitActivation: true };
+  if (!["fresh", "fresh-host-managed", "existing-unmanaged"].includes(inspected.status)) return { schema: PLAN_SCHEMA, status: inspected.status, root: inspected.root, diagnostics: inspected.diagnostics, targets: [], greenfieldScaffold: greenfieldScaffoldDecision(inspected.status, inspected.root, fs), requiresExplicitActivation: true };
   const hostManaged = inspected.status === "fresh-host-managed";
   const git = hostManaged ? { ok: true, version: null } : gitCapability(fs, inspected.root);
   if (!git.ok) return { schema: PLAN_SCHEMA, status: "unsupported", root: inspected.root, diagnostics: [diagnostic("$.git", "git_initial_branch_unsupported", git.reason, "install Git 2.28 or newer before activation")], targets: [], requiresExplicitActivation: true };
@@ -5575,9 +5677,15 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   // and it throws on a target that appeared during activation), so a project that
   // already owns a `.gitignore` is never touched -- it simply gets no such target.
   const seedsProjectIgnore = !(inspected.entries ?? []).includes(".gitignore");
-  const agentEntry = initialGreenfieldAgentEntryTarget(inspected.status);
+  // Both scaffold producers answer only to a fresh classification. An `existing-unmanaged`
+  // root that the bounded walk proves code-free is presented to them as `fresh`, so the
+  // bytes stay identical to what the PRD gate and the design inspection compare against.
+  const greenfieldScaffold = greenfieldScaffoldDecision(inspected.status, inspected.root, fs);
+  const greenfieldFromWalk = inspected.status === "existing-unmanaged" && greenfieldScaffold.status === "planned";
+  const scaffoldClassification = greenfieldFromWalk ? "fresh" : inspected.status;
+  const agentEntry = initialGreenfieldAgentEntryTarget(scaffoldClassification);
   const internal = [
-    ...initialGreenfieldMapTargets(inspected.status),
+    ...initialGreenfieldMapTargets(scaffoldClassification),
     ...(agentEntry ? [agentEntry] : []),
     ...[
       NEUTRAL_CALIBRATION,
@@ -5607,8 +5715,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     changed: true,
   }));
   const initializesGit = !hostManaged && !inspected.entries.includes(".git");
-  const plan = { schema: PLAN_SCHEMA, status: "ready", root: inspected.root, state: inspected.status, intentSha256: sha256(JSON.stringify(stable(intent))), git: hostManaged ? { mode: "host-managed", initialBranch: null, version: null, initializesGit: false } : { mode: "local", initialBranch: "main", version: git.version, initializesGit }, targets, changes: targets.map((target) => target.path), runnerPermissions: runnerPermissionsReadback({ root: inspected.root, runner, repository: { mode: hostManaged ? "host-managed" : "local" }, fs }), requiresExplicitActivation: true, activation: { command: "apply --activate", createsGitRepository: initializesGit, createsCommit: false } };
-  AUTHENTICATED.set(plan, { signature: JSON.stringify(plan), root: inspected.root, targets: internal, state: inspected.status, initializesGit, hostManaged, runner });
+  const plan = { schema: PLAN_SCHEMA, status: "ready", root: inspected.root, state: inspected.status, intentSha256: sha256(JSON.stringify(stable(intent))), git: hostManaged ? { mode: "host-managed", initialBranch: null, version: null, initializesGit: false } : { mode: "local", initialBranch: "main", version: git.version, initializesGit }, targets, changes: targets.map((target) => target.path), greenfieldScaffold, diagnostics: greenfieldScaffoldDiagnostics(greenfieldScaffold), runnerPermissions: runnerPermissionsReadback({ root: inspected.root, runner, repository: { mode: hostManaged ? "host-managed" : "local" }, fs }), requiresExplicitActivation: true, activation: { command: "apply --activate", createsGitRepository: initializesGit, createsCommit: false } };
+  AUTHENTICATED.set(plan, { signature: JSON.stringify(plan), root: inspected.root, targets: internal, state: inspected.status, initializesGit, hostManaged, runner, greenfieldFromWalk });
   return plan;
 }
 
@@ -6130,6 +6238,13 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     root = safeRoot(rootDir, fs);
     if (root !== state.root) throw new Error("apply root differs from authenticated onboarding plan root");
     ensurePreimage(root, state.state, fs);
+    // The scaffold of an `existing-unmanaged` root rests on its contents, which
+    // ensurePreimage does not look at: a source file added after planning must not
+    // receive a greenfield scaffold.
+    if (state.greenfieldFromWalk) {
+      const current = greenfieldScaffoldDecision("existing-unmanaged", root, fs);
+      if (current.status !== "planned") throw new Error(`root changed since planning (greenfield equivalence lost: ${current.reason}${current.path === null ? "" : ` at ${current.path}`})`);
+    }
     for (const target of state.targets) safePath(root, target.path, fs);
     const enrollmentHistory=observeOnboardingEnrollmentHistory({rootDir:root,repositoryCapability:state.hostManaged?"host-managed":"local",spawn:fs.spawnSync});
     if(state.initializesGit&&enrollmentHistory.retained)return {schema:PLAN_SCHEMA,status:"activation-required",root,diagnostics:[diagnostic("$.enrollment","retained_enrollment_history","retained history requires explicit Git-creation recovery before portable bootstrap","inspect the public onboarding recovery action")],nextAction:governanceEnrollmentRecoveryAction({rootDir:root,runner:state.runner})};
@@ -6477,7 +6592,10 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner, op
     if (!["portable-seed-required", "adoption-required"].includes(observed.status)) return observed;
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: observed.runner });
     if (plan.status !== "ready") return observed;
-    return { ...observed, nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "apply-portable-seed", "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], observed.runner, intent), true, true, SCHEMA, ["runtime-initialization-required", "restart-required", "kickoff-required", ...INTAKE_COORDINATOR_STATUSES]) };
+    // The seed plan's own statement that no greenfield scaffold will be written is
+    // surfaced here, where the PO reviews the plan before the digest-bound apply.
+    const scaffoldNotes = (plan.diagnostics ?? []).map((entry) => lifecycleDiagnostic(entry.path, entry.code, entry.message, entry.guidance));
+    return { ...observed, ...(scaffoldNotes.length > 0 ? { diagnostics: [...(observed.diagnostics ?? []), ...scaffoldNotes] } : {}), nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "apply-portable-seed", "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], observed.runner, intent), true, true, SCHEMA, ["runtime-initialization-required", "restart-required", "kickoff-required", ...INTAKE_COORDINATOR_STATUSES]) };
   }
   if (operation === "repair" && observed.status === "continuity-damaged") {
     const plan = planOnboardingContinuityRepair({
