@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b435c0e4d3fbbfd70463e3b6135642c87bd76b344f91de6507c3bcdfb2153343"
+    "transitionHead": "63d2c899a01f2b4d38deff448f5704b2e6f301a6a36a26b30cfff7165560022e"
   },
   "counts": {
-    "open": 231,
+    "open": 233,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -3179,6 +3179,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.design-course-phase-telemetry-is-not-recorded",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PO decision D25 (2026-10-18): the telemetry clause of greenfield-design-course-cost-and-proportionality leaves the 0.7.0 acceptance",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
       "status": "open",
       "type": "defect",
@@ -4831,6 +4841,16 @@
       "closureRepository": "self",
       "closureCommit": "02d8d1db47fb14555dc77b4d5b048fbbdbf814e0",
       "closureEvidence": "backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md"
+    },
+    {
+      "id": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "PO decision D21 (2026-10-18): moves after 0.7.0; the Alfred inventory had no public original for this item (AC-190)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.greenfield-design-course-cost-and-proportionality",

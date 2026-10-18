@@ -250,6 +250,7 @@
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-course-does-not-name-the-criterion-renderings-the-delivery-course-admits | open | defect | pipeline | none | 2026-10-18 | — | — |
+| pipeline.design-course-phase-telemetry-is-not-recorded | open | improvement | pipeline | none | 2026-10-19 | — | — |
 | pipeline.design-course-run-v2-refuses-its-own-documented-routes | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.design-course-telemetry-is-deferred | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.design-generator-repeats-large-source-material | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
@@ -383,6 +384,7 @@
 | pipeline.greenfield-approval-policy-applies-after-intake-transition | open | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.greenfield-ask-before-install-duty-ignored-live | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.greenfield-browser-evidence-is-not-portably-provisioned | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable. |
+| pipeline.greenfield-comparisons-need-reproducible-public-evidence | open | improvement | pipeline | none | 2026-10-19 | — | — |
 | pipeline.greenfield-design-course-cost-and-proportionality | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.greenfield-handover-claims-absent-supersession-marker | closed | defect | pipeline | none | 2026-09-27 | — | — |
 | pipeline.greenfield-machine-output-and-skill-budget | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | — |
@@ -917,7 +919,7 @@
 
 ## Counts
 
-- open: 231
+- open: 233
 - in_progress: 0
 - closed: 664
 - rejected: 3
