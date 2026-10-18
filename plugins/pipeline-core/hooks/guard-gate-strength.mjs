@@ -65,6 +65,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { designReviewReceiptWriteRefusal } from "../lib/design-review-receipt-write-guard.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { bootstrapBindingStagingAuthoringAdmitted } from "../lib/onboarding-staging-authoring.mjs";
@@ -552,6 +553,17 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
       matchedLivePluginRoot = roots.find((root) => insideLivePlugin(absolute, [root])) ?? null;
     }
   } catch { /* fall through to the path rules */ }
+
+  // ALF-G4C: a design review receipt is produced by scripts/design-review-receipt.mjs and never written by hand. Decided on the
+  // RESULTING content (lib/design-review-receipt-write-guard.mjs), so it holds for any target path or extension. It sits before
+  // the `matched === null` early exit, which otherwise ends the run for every ordinary path. Fails open; no human-override
+  // tail, because the only route is the producer command.
+  try {
+    const target = absolute ?? resolve(projectDir, filePath);
+    const currentContent = existsSync(target) ? readFileSync(target, "utf8") : "";
+    const refusal = designReviewReceiptWriteRefusal({ resultingContent: simulateGateStrengthWriteContent({ toolName, toolInput, currentContent }) });
+    if (refusal) { process.stderr.write(`BLOCKED (guard-gate-strength): ${refusal.code}: ${refusal.message}\n`); process.exit(2); }
+  } catch { /* fail open */ }
 
   if (matched === null) {
     try { matched = gateStrengthRuleFor(filePath, projectDir); } catch { process.exit(0); }

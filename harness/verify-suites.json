@@ -3484,6 +3484,78 @@
       "file": "plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs"
+    },
+    {
+      "name": "design-review-receipt-write-guard-tests",
+      "file": "plugins/pipeline-core/lib/design-review-receipt-write-guard.test.mjs",
+      "invariantPinned": "A write whose resulting content is a design review receipt is refused by the pure write predicate, decided on the content and never on the path or extension, and every other content fails open",
+      "nonOverlapNote": "Unique pure-predicate suite (ALF-G4C) for design-review-receipt-write-guard.mjs; the producer command and the guard-hook integration are separate suites"
+    },
+    {
+      "name": "design-review-receipt-producer-tests",
+      "file": "plugins/pipeline-core/scripts/design-review-receipt.test.mjs",
+      "invariantPinned": "The design review receipt producer takes the review time from the clock, the runner from the runtime signal and the reviewer model from the Critic agent definition, and no flag can supply any of them",
+      "nonOverlapNote": "Unique CLI producer suite (ALF-G4C); the receipt library contract is design-review-receipt-tests and the write refusal is design-review-receipt-write-guard-tests"
+    },
+    {
+      "name": "dispatch-briefing-binding-tests",
+      "file": "plugins/pipeline-core/scripts/dispatch-briefing.test.mjs",
+      "invariantPinned": "The native Goldfish binding generator derives every generated briefing field from its own source (spec acceptance row, backlog item, agent definition, git and protected baseline) in a throwaway fixture repository",
+      "nonOverlapNote": "Unique contract suite for scripts/dispatch-briefing.mjs binding; route-record handling keeps its own suite dispatch-briefing-route-record-tests"
+    },
+    {
+      "name": "pin-close-coordinator-refuses-a-required-critic-without-evidence-tests",
+      "file": "plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs",
+      "invariantPinned": "The close coordinator cannot reach feature-close-prepared while a delivery-course dispatch record of the same feature requires a Critic and carries no matching Critic evidence; records of other features never block",
+      "nonOverlapNote": "Unique regression pin (ALF-W3B-CRITIC-CLOSE-GATE) driving the real coordinator process in its own fixture repository"
+    },
+    {
+      "name": "pin-codex-readiness-process-root-registration-tests",
+      "file": "plugins/pipeline-core/lib/pins/codex-readiness-process-root-registration.test.mjs",
+      "invariantPinned": "The Codex readiness host store registers the process root it creates with the process journal and exposes exactly the path the registry returns, while an unregistered sibling stays refused",
+      "nonOverlapNote": "Unique regression pin for the readiness launch prerequisite of AC-134 (Linux only, like the store)"
+    },
+    {
+      "name": "pin-configure-verify-names-the-unmet-approval-condition-tests",
+      "file": "plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs",
+      "invariantPinned": "configure-verify reports the specific unmet approval condition instead of flattening every cause into CVCT-APPROVAL-UNAVAILABLE",
+      "nonOverlapNote": "Unique regression pin for AC-150 (ALF-G1-CONFIGURE-VERIFY-CAUSE); the calibration verify commit transition keeps its own suite"
+    },
+    {
+      "name": "pin-devplan-lane-admits-the-producer-materialize-step-tests",
+      "file": "plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs",
+      "invariantPinned": "The architecture materialization step the onboarding plan emits crosses the devplan shell lane while the lifecycle verdict blocks, and its retired spelling and opaque interpreter routes do not",
+      "nonOverlapNote": "Unique regression pin (ALF-W4-DEVPLAN-MATERIALIZE-PIN, AC-115) for the devplan shell lane"
+    },
+    {
+      "name": "pin-greenfield-implementation-entry-with-pending-verification-surfaces-tests",
+      "file": "plugins/pipeline-core/lib/pins/greenfield-implementation-entry-with-pending-verification-surfaces.test.mjs",
+      "invariantPinned": "greenfieldPendingFitnessAllowance allows implementation entry for a materialized greenfield tree whose only missing surfaces are its planned contracts and verification entry points and denies every unrelated finding",
+      "nonOverlapNote": "Unique pure-decision pin (ALF-H1-PF20-PENDING-FITNESS-ALLOWANCE, AC-127); the guard wiring is entry-gates-greenfield-pending-tests"
+    },
+    {
+      "name": "pin-greenfield-scaffold-on-a-non-empty-new-project-root-tests",
+      "file": "plugins/pipeline-core/lib/pins/greenfield-scaffold-on-a-non-empty-new-project-root.test.mjs",
+      "invariantPinned": "A new project root that only holds concept documents is treated as greenfield-equivalent and receives the greenfield architecture scaffold, while any architecture entry, AGENTS.md, package manifest or source file keeps the existing-project behaviour",
+      "nonOverlapNote": "Unique regression pin (ALF-H2-PF19, AC-127) for the portable seed classification of a non-empty new project root"
+    },
+    {
+      "name": "pin-greenfield-adr-references-keep-navigation-current-tests",
+      "file": "plugins/pipeline-core/lib/pins/greenfield-adr-references-keep-navigation-current.test.mjs",
+      "invariantPinned": "Architecture navigation currency treats a touched ADR path that a loaded module lists in adrReferences as current, while an uncited ADR, an architecture/ or schemas/ contract its owner omits, and mapStale stay stale",
+      "nonOverlapNote": "Unique real-tree regression pin (ALF-H5-PF20-ADR-REFERENCES-NAVIGATION, AC-127); the evaluator's class 7 unit cases stay in architecture-fitness-tests"
+    },
+    {
+      "name": "entry-gates-greenfield-pending-tests",
+      "file": "plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs",
+      "invariantPinned": "Through architectureFitnessAuthorityVerdict, set-phase implementation is allowed on a real materialized greenfield tree whose only missing surfaces are planned ones and is still denied with GUARD-ARCHITECTURE-FITNESS-NON-GREEN for a stray path or a stale map",
+      "nonOverlapNote": "Unique guard-wiring suite (ALF-H1-PF20, AC-127); the pure decision keeps its own pin"
+    },
+    {
+      "name": "guard-gate-strength-review-receipt-tests",
+      "file": "plugins/pipeline-core/hooks/guard-gate-strength-review-receipt.test.mjs",
+      "invariantPinned": "The gate-strength guard refuses a Write or Edit whose resulting content is a design review receipt, names the producer, plans no override, and lets ordinary JSON and source files through",
+      "nonOverlapNote": "Unique hook-level suite (ALF-G4C) spawning guard-gate-strength.mjs; guard-gate-strength.test.mjs keeps the path-rule coverage"
     }
   ]
 }

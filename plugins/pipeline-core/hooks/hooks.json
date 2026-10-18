@@ -140,9 +140,21 @@
         ]
       }
     ],
+    "SubagentStop": [
+      {
+        "$comment": "Explicit native Goldfish host-commit route, background completion: host-commit a marked background Task/Agent child when it stops. SubagentStop is correlated to the launch through the parent session subagent meta file (tool_use_id) and carries no resolved model; the receipt names that weaker assurance. Unmarked subagents are a silent no-op. Writes to stderr only and never blocks the stop.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
-        "$comment": "Explicit native Goldfish host-commit route: finalize only a single marked foreground Task/Agent after exact PostToolUse/model readback; unmarked and background Claude dispatches remain unchanged.",
+        "$comment": "Explicit native Goldfish host-commit route: finalize a marked foreground Task/Agent after exact PostToolUse/model readback; a marked background launch (async_launched) is a non-consuming no-op completed later by the SubagentStop entry; unmarked dispatches remain unchanged.",
         "matcher": "Task|Agent",
         "hooks": [
           {

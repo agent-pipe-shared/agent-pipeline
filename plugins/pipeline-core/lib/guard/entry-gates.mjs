@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { checkPlanningAdoptionDisposition } from "../../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness } from "../../scripts/architecture-fitness.mjs";
-import { architectureTouchedContracts, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
+import { architectureTouchedContracts, greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
 import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../../scripts/rigor-floor.mjs";
 import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
 import { ARCHITECTURE_ADOPTION_DENIAL_CODE, ARCHITECTURE_FITNESS_DENIAL_CODE, MINIMUM_RIGOR_ADVISORY_CODE, PIPELINE_STATE_SCRIPT } from "./constants.mjs";
@@ -184,6 +184,14 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
           });
           if (entry?.status === "ready") return null;
         }
+        // ALF-H1-PF20 (AC-127): a materialized greenfield tree is approved-scoped, never deferred, so the allowance above
+        // cannot cover it. The library decides whether the only non-green evaluator outcomes are the tree's own planned,
+        // not yet written contracts and verification entry points; any other finding, and navigation currency, still deny.
+        const pendingEntry = (dependencies.inspectArchitectureEntryReadinessFn ?? inspectArchitectureEntryReadiness)({
+          rootDir: root,
+          taskScope: scope,
+        });
+        if (greenfieldPendingFitnessAllowance({ readiness: pendingEntry, fitness }).allowed) return null;
       }
     } catch { /* unchanged denial below */ }
   }
