@@ -103,13 +103,22 @@ export async function spawnManagedCodexHost({ journalParent, executablePath, arg
       if (!closed) throw hostFault('host-stop-terminal-timeout');
     }
   }
-  try { await ready; }
-  catch (error) {
+  // Everything between "launcher reported ready" and "caller owns the handle"
+  // runs inside this one guard. The launcher clears its own startup timer at
+  // `ready`, so a throw after that point (for example the authority readback)
+  // would otherwise leave a live owned session with no bound and no owner: the
+  // caller never receives `stop`, the stdio/IPC handles stay referenced, and the
+  // controller process cannot exit. Stop the owned session, then surface the
+  // original typed failure.
+  let authorityInvocation;
+  try {
+    await ready;
+    authorityInvocation = observeManagedCodexAuthorityRunning({directory:journal.directory,child});
+  } catch (error) {
     try { await stop(); } catch { /* retain journal; restart recovery is mandatory */ }
-    error.journalDirectory = journal.directory;
+    try { error.journalDirectory = journal.directory; } catch { /* frozen or non-object error: journal stays discoverable by directory */ }
     throw error;
   }
-  const authorityInvocation = observeManagedCodexAuthorityRunning({directory:journal.directory,child});
   async function finish() {
     await terminal;
     const names = ['intent', 'launcher', 'admission', 'worker', 'child', 'exec-admission', 'execution', 'terminal'];

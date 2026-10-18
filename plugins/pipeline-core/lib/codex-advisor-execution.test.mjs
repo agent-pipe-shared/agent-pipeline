@@ -71,8 +71,29 @@ test('Durable single course finalizes actual managed failed turn without reset o
  const final=store.readCurrent();assert.equal(final.status,'reuse-terminal');assert.equal(final.outcome,'failed');assert.equal(store.reserveCycle({courseId:opened.courseId,initialContextSha256:designAdvisorValueSha256(initialContext)}).status,'reuse-terminal');assert.notEqual(store.reserveAttempt(reserved.token,{slot:1,routeStepSha256:slot.routeStepSha256,dispatch:f.args.dispatch,requestSha256:prepared.preparedRequest.requestSha256}).status,'attempt-reserved');
 });
 
+// Regression (ALF-W2-CODEX-HOST-HANG): a launch that fails AFTER the launcher reported ready used to
+// leave the owned session alive with no owner and no bound (the launcher clears its startup timer at
+// ready), so the stdio/IPC handles kept this process from ever exiting. Whatever the outcome, no
+// process of the owned host session may outlive the execution. Bounded: 10 s per session, then the
+// leak is cleaned up and the case fails instead of hanging the suite.
+import {readdirSync} from 'node:fs';
+import {readHostJournal,listOwnedSession} from './codex-host-process-journal.mjs';
+test('Advisor owned host session never outlives its execution, whatever the outcome',async t=>{
+ const f=advisorHostFixture(t);await run(f);
+ const root=join(f.root,'.git','agent-pipeline','advisor-codex',f.repoFingerprint,'processes'),entries=readdirSync(root).filter(name=>name.startsWith('codex-host-'));
+ assert.ok(entries.length>=1,'the execution must have attempted an owned host launch');
+ const leaked=[];
+ for(const name of entries){
+  const launcher=readHostJournal(join(root,name),'launcher');if(!launcher)continue;
+  const deadline=Date.now()+10_000;let members=listOwnedSession(launcher.value.process);
+  while(members.length&&Date.now()<deadline){await new Promise(resolve=>setTimeout(resolve,50));members=listOwnedSession(launcher.value.process);}
+  if(members.length){leaked.push(name);try{process.kill(-launcher.value.process.group,'SIGKILL');}catch{/* already gone */}}
+ }
+ assert.deepEqual(leaked,[],'an owned host session outlived its execution');
+});
+
 // Each original sibling callback is registered individually; no envelope case.
-if (completionCases.length !== 7) throw new Error("Required completion declared case count drift");
+if (completionCases.length !== 8) throw new Error("Required completion declared case count drift");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
