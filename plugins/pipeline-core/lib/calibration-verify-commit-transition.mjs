@@ -22,7 +22,8 @@ const SCHEMA = "pipeline.calibration-verify-commit-transition.v1";
 const MAX_BYTES = 1_048_576;
 const HELD = new WeakMap();
 const HEX = /^[a-f0-9]{64}$/u;
-const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
+const CODE = /^[A-Z][A-Z0-9-]{1,63}$/u;
+const OID =/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
 const fail = (code) => { const error = new Error(code); error.code = code; throw error; };
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const canonical = (value) => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -93,6 +94,7 @@ function repository(rootDir) {
 
 function approval(repo) {
   const value = observeCurrentPlanApprovalForCalibration({ rootDir: repo.root });
+  if (value && value.status === "unavailable" && typeof value.code === "string" && CODE.test(value.code)) fail(value.code);
   const keys = ["status", "rootDir", "statePath", "stateSha256", "stateRevision", "candidate", "submissionSha256", "approvalSha256", "authoritySha256", "approvalBasis", "sourceRefs"];
   if (!exactKeys(value, keys) || value.status !== "eligible" || value.rootDir !== repo.root
     || !HEX.test(value.stateSha256) || !HEX.test(value.submissionSha256) || !HEX.test(value.approvalSha256) || !HEX.test(value.authoritySha256)
@@ -194,7 +196,7 @@ function publish(repo, facts, phase) {
   const published = writePrivateFileNoReplaceAtomic(path, bytes);
   if (!published.created || !same(readRecord(repo, path), { schema: SCHEMA, phase, facts })) fail("CVCT-RECORD-CONFLICT");
 }
-const unavailable = (error) => ({ ok: false, code: typeof error?.code === "string" && /^[A-Z][A-Z0-9-]{1,63}$/u.test(error.code) ? error.code : "CVCT-UNAVAILABLE" });
+const unavailable = (error) => ({ ok: false, code: typeof error?.code === "string" && CODE.test(error.code) ? error.code : "CVCT-UNAVAILABLE" });
 
 export function prepareCalibrationVerifyCommitTransition({ rootDir, verifyCommand } = {}) {
   let held = null;
