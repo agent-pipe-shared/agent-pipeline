@@ -19,6 +19,7 @@ text was not persisted when it was taken.
 | D15 | When a consumer feature has no `acceptance.md` or `result.md`, the registration command generates them as Pipeline-owned, non-authoritative, immutable records: acceptance points to the approved Spec and its digest and adds no criterion; result records that implementation is in progress. Existing files are registered as found and never rewritten. | PF-25 |
 | D16 | The stamped candidate `cdf72aa2f` (Antigravity hook wiring fix) is not signed or pushed on its own. One bundled candidate carries it together with the PF-26 and PF-27 fixes. | next candidate |
 | D17 | GG-11 admits env templates (`.env.example`, `.env.sample`, `.env.template`, `.env.<x>.example`) and also env files under `tests/fixtures/`. Every other `.env*` file stays blocked. | PF-27 |
+| D18 | No further candidate is stamped or pushed until the PO calls for one. Until then the remaining scope of the 0.7.0 candidate is finished: PF-26, PF-27, the known red suites, Full Verify, the Critic batch and the open agent work in the delivery matrix. | whole candidate |
 
 D12 is an Elephant decision within accepted scope (PF-23 asked for a durable fix and a
 repair option; only a delivery-side widening is both). It changes the closed criterion
