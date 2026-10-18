@@ -40,6 +40,12 @@ function tempRoot(name) {
   mkdirSync(join(root, ".claude"), { recursive: true });
   const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
   assert.equal(git.status, 0, git.stderr);
+  const seeded = spawnSync(
+    "git",
+    ["-C", root, "-c", "user.name=Fixture Author", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-q", "-m", "fixture: initial commit"],
+    { encoding: "utf8", shell: false },
+  );
+  assert.equal(seeded.status, 0, seeded.stderr);
   const calibration = {
     project: "fixture",
     verify: "node verify.mjs",

@@ -5100,7 +5100,137 @@ check("planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding g
   assert.deepEqual(requests, [], "no signature request file may be written over an unfinished package");
 });
 
-assert.equal(cases.length, 301, "the complete onboarding continuity corpus must be registered before execution begins");
+// Rigor journal fields the State writer records on submit-plan and close-feature (pipeline-state.mjs:
+// top-level `rigorHistory`, `closedEntry.rigorObservationSha256`, `closedEntry.rigorVerifyRows`). The
+// shapes are the closed key sets returned by rigor-lifecycle.mjs collectRigorJournalEntry() and rigorVerifyRows().
+function rigorClosedState(mutate = () => {}) {
+  const hex = (character) => character.repeat(64);
+  const candidate = { commit: "1".repeat(40), tree: "2".repeat(40) };
+  const journalRow = (boundary, previousEntrySha256, entrySha256) => ({
+    schema: "pipeline.rigor-journal-entry.v1",
+    previousEntrySha256,
+    entrySha256,
+    body: {
+      featureId: "previous-feature",
+      planPath: "specs/previous/prd.md",
+      boundary,
+      observedAt: "2026-07-29T08:00:00.000Z",
+      candidate,
+      baselineCandidate: null,
+      inputs: {},
+      observation: {},
+      bindings: {},
+      fitnessProjection: null,
+    },
+  });
+  const verifyRow = (boundary, entrySha256) => ({
+    schema: "pipeline.rigor-verify-row.v1",
+    mode: "report-only",
+    featureId: "previous-feature",
+    boundary,
+    candidate,
+    entrySha256,
+    inputDigest: hex("b"),
+    retainedProfile: "feature",
+    disagreement: { selected: "feature", derived: "feature", agrees: true },
+    reauthorization: "not-required-by-floor",
+    promotionAuthority: "unavailable-no-threshold-promotion-granted",
+  });
+  const state = {
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T08:00:00.000Z",
+    rigorHistory: [journalRow("plan-submission", null, hex("a")), journalRow("pre-close", hex("a"), hex("c"))],
+    closedFeatures: [{
+      id: "previous-feature",
+      planPath: "specs/previous/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T08:00:00.000Z",
+      closedBy: "PO",
+      forCommit: null,
+      rigorObservationSha256: hex("c"),
+      rigorVerifyRows: [verifyRow("plan-submission", hex("a")), verifyRow("pre-close", hex("c"))],
+    }],
+  };
+  mutate(state);
+  return state;
+}
+
+function classifyRigorClosedState(name, mutate) {
+  const root = fixture(name);
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify(rigorClosedState(mutate), null, 2)}\n`);
+  return classifyOnboardingContinuity({ rootDir: root }).status;
+}
+
+check("a closed entry carrying the writer's rigor fields and journal is a valid feature re-entry boundary", () => {
+  assert.equal(classifyRigorClosedState("rigor-closed-valid"), "valid");
+  assert.equal(classifyRigorClosedState("rigor-closed-null-disagreement", (state) => {
+    state.closedFeatures[0].rigorVerifyRows[1].disagreement = null;
+    state.closedFeatures[0].rigorVerifyRows[1].candidate = null;
+    state.closedFeatures[0].rigorVerifyRows[1].reauthorization = "candidate-binding-unavailable";
+  }), "valid");
+  assert.equal(classifyRigorClosedState("rigor-closed-absent", (state) => {
+    delete state.rigorHistory;
+    delete state.closedFeatures[0].rigorObservationSha256;
+    delete state.closedFeatures[0].rigorVerifyRows;
+  }), "valid", "states written before the rigor journal stay valid");
+});
+
+check("a malformed rigorObservationSha256 on a closed entry is damaged", () => {
+  for (const [label, value] of [["short", "abc"], ["uppercase", "C".repeat(64)], ["number", 7], ["null", null]]) {
+    assert.equal(classifyRigorClosedState(`rigor-closed-bad-sha-${label}`, (state) => {
+      state.closedFeatures[0].rigorObservationSha256 = value;
+    }), "damaged", label);
+  }
+});
+
+check("an unknown key or a wrong value inside a closed entry's rigor verify row is damaged", () => {
+  const variants = {
+    "unknown-key": (row) => { row.extra = true; },
+    "missing-key": (row) => { delete row.inputDigest; },
+    "other-feature": (row) => { row.featureId = "another-feature"; },
+    "bad-boundary": (row) => { row.boundary = "post-close"; },
+    "bad-profile": (row) => { row.retainedProfile = "huge"; },
+    "bad-reauthorization": (row) => { row.reauthorization = "granted"; },
+    "bad-authority": (row) => { row.promotionAuthority = "granted"; },
+    "unknown-disagreement-key": (row) => { row.disagreement.extra = 1; },
+    "unknown-candidate-key": (row) => { row.candidate.extra = 1; },
+  };
+  for (const [label, mutateRow] of Object.entries(variants)) {
+    assert.equal(classifyRigorClosedState(`rigor-closed-row-${label}`, (state) => {
+      mutateRow(state.closedFeatures[0].rigorVerifyRows[1]);
+    }), "damaged", label);
+  }
+  assert.equal(classifyRigorClosedState("rigor-closed-rows-not-array", (state) => {
+    state.closedFeatures[0].rigorVerifyRows = {};
+  }), "damaged");
+});
+
+check("an unknown extra closed-entry key beside the rigor fields is damaged", () => {
+  assert.equal(classifyRigorClosedState("rigor-closed-extra-entry-key", (state) => {
+    state.closedFeatures[0].rigorUnknown = true;
+  }), "damaged");
+});
+
+check("a malformed top-level rigorHistory journal is damaged", () => {
+  const variants = {
+    "not-array": (state) => { state.rigorHistory = {}; },
+    "unknown-row-key": (state) => { state.rigorHistory[0].extra = true; },
+    "unknown-body-key": (state) => { state.rigorHistory[0].body.extra = true; },
+    "missing-body-key": (state) => { delete state.rigorHistory[0].body.bindings; },
+    "bad-schema": (state) => { state.rigorHistory[0].schema = "pipeline.rigor-journal-entry.v0"; },
+    "bad-entry-sha": (state) => { state.rigorHistory[0].entrySha256 = "abc"; },
+    "first-row-has-predecessor": (state) => { state.rigorHistory[0].previousEntrySha256 = "d".repeat(64); },
+    "broken-chain": (state) => { state.rigorHistory[1].previousEntrySha256 = null; },
+    "bad-boundary": (state) => { state.rigorHistory[1].body.boundary = "post-close"; },
+    "bad-candidate": (state) => { state.rigorHistory[1].body.candidate = { commit: "1".repeat(40), tree: "2".repeat(64) }; },
+  };
+  for (const [label, mutateState] of Object.entries(variants)) {
+    assert.equal(classifyRigorClosedState(`rigor-history-${label}`, mutateState), "damaged", label);
+  }
+});
+
+assert.equal(cases.length, 306, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -380,6 +380,7 @@ function validStateRepairRecords(state) {
   if (state.evidenceRepins !== undefined) {
     if (!Array.isArray(state.evidenceRepins) || !state.evidenceRepins.every(validEvidenceRepinEntry)) return false;
   }
+  if (!validRigorHistoryField(state)) return false;
   if (state.stateRepairs === undefined) return true;
   if (!Array.isArray(state.stateRepairs) || !state.stateRepairs.every(validStateRepairRecord)) return false;
   if (state.stateRepairs.length === 0) return true;
@@ -483,9 +484,98 @@ function validDiscardedTransitionState(root, state) {
   return true;
 }
 
+// Rigor journal fields the State writer records on submit-plan and close-feature
+// (top-level `rigorHistory`, `closedEntry.rigorObservationSha256`,
+// `closedEntry.rigorVerifyRows`). The literals below deliberately mirror the
+// writer's closed key sets instead of importing them: this module must not
+// import the writer side. Each shape is an exact-keys gate like its neighbours;
+// the journal's entrySha256 values are NOT recomputed here.
+const RIGOR_OID_RE = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+const RIGOR_FEATURE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$/u;
+const RIGOR_BOUNDARIES = new Set(["plan-submission", "pre-close"]);
+const RIGOR_PROFILES = new Set(["mini", "feature", "epic"]);
+const RIGOR_REAUTHORIZATIONS = new Set([
+  "selected-profile-unavailable",
+  "existing-profile-reauthorization-required-before-enforcing-promotion",
+  "not-required-by-floor",
+  "candidate-binding-unavailable",
+]);
+const RIGOR_VERIFY_ROW_KEYS = new Set([
+  "schema", "mode", "featureId", "boundary", "candidate", "entrySha256", "inputDigest",
+  "retainedProfile", "disagreement", "reauthorization", "promotionAuthority",
+]);
+const RIGOR_JOURNAL_ENTRY_KEYS = new Set(["schema", "previousEntrySha256", "entrySha256", "body"]);
+const RIGOR_JOURNAL_BODY_KEYS = new Set([
+  "featureId", "planPath", "boundary", "observedAt", "candidate", "baselineCandidate",
+  "inputs", "observation", "bindings", "fitnessProjection",
+]);
+const RIGOR_HISTORY_MAX_ENTRIES = 256;
+
+function validRigorCandidate(value) {
+  return exactKeys(value, new Set(["commit", "tree"]))
+    && typeof value.commit === "string" && RIGOR_OID_RE.test(value.commit)
+    && typeof value.tree === "string" && RIGOR_OID_RE.test(value.tree)
+    && value.commit.length === value.tree.length;
+}
+
+function validRigorVerifyRow(row, featureId) {
+  return exactKeys(row, RIGOR_VERIFY_ROW_KEYS)
+    && row.schema === "pipeline.rigor-verify-row.v1"
+    && row.mode === "report-only"
+    && row.featureId === featureId
+    && RIGOR_BOUNDARIES.has(row.boundary)
+    && (row.candidate === null || validRigorCandidate(row.candidate))
+    && typeof row.entrySha256 === "string" && SHA256_RE.test(row.entrySha256)
+    && typeof row.inputDigest === "string" && SHA256_RE.test(row.inputDigest)
+    && RIGOR_PROFILES.has(row.retainedProfile)
+    && (row.disagreement === null
+      || (exactKeys(row.disagreement, new Set(["selected", "derived", "agrees"]))
+        && typeof row.disagreement.agrees === "boolean"))
+    && RIGOR_REAUTHORIZATIONS.has(row.reauthorization)
+    && row.promotionAuthority === "unavailable-no-threshold-promotion-granted";
+}
+
+function validClosedEntryRigorFields(entry) {
+  if (!isObject(entry)) return false;
+  if (entry.rigorObservationSha256 !== undefined
+    && !(typeof entry.rigorObservationSha256 === "string" && SHA256_RE.test(entry.rigorObservationSha256))) return false;
+  if (entry.rigorVerifyRows !== undefined
+    && !(Array.isArray(entry.rigorVerifyRows)
+      && entry.rigorVerifyRows.every((row) => validRigorVerifyRow(row, entry.id)))) return false;
+  return true;
+}
+
+function validRigorHistoryField(state) {
+  if (!isObject(state)) return false;
+  if (state.rigorHistory === undefined) return true;
+  const history = state.rigorHistory;
+  if (!Array.isArray(history) || history.length > RIGOR_HISTORY_MAX_ENTRIES) return false;
+  let previous = null;
+  for (const row of history) {
+    if (!exactKeys(row, RIGOR_JOURNAL_ENTRY_KEYS)
+      || row.schema !== "pipeline.rigor-journal-entry.v1"
+      || row.previousEntrySha256 !== previous
+      || typeof row.entrySha256 !== "string" || !SHA256_RE.test(row.entrySha256)
+      || !exactKeys(row.body, RIGOR_JOURNAL_BODY_KEYS)) return false;
+    const body = row.body;
+    if (typeof body.featureId !== "string" || !RIGOR_FEATURE_ID_RE.test(body.featureId)
+      || typeof body.planPath !== "string"
+      || !RIGOR_BOUNDARIES.has(body.boundary)
+      || typeof body.observedAt !== "string" || !Number.isFinite(Date.parse(body.observedAt))
+      || !(body.candidate === null || validRigorCandidate(body.candidate))
+      || !(body.baselineCandidate === null || validRigorCandidate(body.baselineCandidate))
+      || !isObject(body.inputs) || !isObject(body.observation) || !isObject(body.bindings)
+      || !(body.fitnessProjection === null || isObject(body.fitnessProjection))) return false;
+    previous = row.entrySha256;
+  }
+  return true;
+}
+
 function closedEntryStaticShape(entry) {
   const baseKeys = new Set(["id", "planPath", "phaseAtClose", "closedAt", "closedBy", "forCommit"]);
   const expectedKeys = new Set(baseKeys);
+  if (entry?.rigorObservationSha256 !== undefined) expectedKeys.add("rigorObservationSha256");
+  if (entry?.rigorVerifyRows !== undefined) expectedKeys.add("rigorVerifyRows");
   if (entry?.planCancellation !== undefined) expectedKeys.add("planCancellation");
   if (entry?.planMixedStateRecovery !== undefined) expectedKeys.add("planMixedStateRecovery");
   if (entry?.architectureImpact !== undefined) expectedKeys.add("architectureImpact");
@@ -508,6 +598,7 @@ function closedEntryStaticShape(entry) {
     || !canonicalIsoTimestamp(entry.closedAt)
     || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
     || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
+  if (!validClosedEntryRigorFields(entry)) return false;
   try { safeRelativePath(entry.planPath, "closed feature plan"); } catch { return false; }
   if (entry.continuityClose !== undefined) {
     const close = entry.continuityClose;
