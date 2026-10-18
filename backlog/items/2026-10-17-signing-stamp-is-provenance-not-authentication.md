@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.signing-stamp-is-provenance-not-authentication
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-10-17

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "943c3818462c2fde55b54f6811ab7ea2d1709958d0fed10ecfa5c5622a1fd7f3"
+    "transitionHead": "56e4b5a024518233a08c540b7eba9b9f8dd37ae3476181d6244bc52afa554695"
   },
   "counts": {
-    "open": 195,
+    "open": 211,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -1109,6 +1109,16 @@
       "closureRepository": "self",
       "closureCommit": "c01dbf76199e249e2a7873b3558ff58ff2c76653",
       "closureEvidence": "backlog/items/2026-08-08-approved-but-not-implementing-refuses-every-write-and-asks-for-nothing.md"
+    },
+    {
+      "id": "pipeline.architecture-deferral-records-no-net-new-baseline",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision #14, 2026-10-16 (AC-119): recording the net-new baseline commit in the architecture deferral record is a backlog item after 0.7.0.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.architecture-design-errors-omit-field-paths",
@@ -2410,6 +2420,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
+      "id": "pipeline.commit-bound-signature-refuses-pipeline-source-paths",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-17",
+      "source": "Sprint Alfred Claude continuation 2026-10-17, Route A attempt for protected patches; PO decision 2026-10-17 (fix after 0.7.0).",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
       "status": "open",
       "type": "workflow-improvement",
@@ -2701,6 +2721,16 @@
       "closureRepository": "self",
       "closureCommit": "09f9a971f2b157c7ae09965a7c3bd1d41d5e4dcf",
       "closureEvidence": "plugins/pipeline-core/scripts/ruleset-freshness.test.mjs"
+    },
+    {
+      "id": "pipeline.correction-critic-reuses-the-full-review-context",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-12",
+      "source": "PO request 2026-10-12 (Claude × native Windows × own repo), after the T10 design review: a delta review on a two-file diff took about 15 minutes after a full review of the same object.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock",
@@ -3107,6 +3137,16 @@
       "source": "Live observation, Agent-Pipeline Claude/Windows session 2026-10-03/04 while walking the Alfred design course; confirmed in source.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.design-course-telemetry-is-deferred",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision 2026-10-16 #2 on pipeline.greenfield-design-course-cost-and-proportionality (AC-160)",
+      "deferred": true,
+      "sprint": "none"
     },
     {
       "id": "pipeline.design-generator-repeats-large-source-material",
@@ -3975,7 +4015,7 @@
       "owner": "pipeline",
       "created": "2026-10-03",
       "source": "0.7.0 three-runner greenfield analyses 2026-10-03: Codex report P0 (transcript reader), P1 (continuity digests), P2 (Verify null, audit index); Claude report §0/V-8; Antigravity report §2.3.",
-      "deferred": false,
+      "deferred": true,
       "sprint": "alfred"
     },
     {
@@ -4086,6 +4126,16 @@
       "closureRepository": "self",
       "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
       "closureEvidence": "backlog/items/2026-08-18-full-push-preflight-before-signature.md"
+    },
+    {
+      "id": "pipeline.full-verify-on-windows-takes-hours",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-17",
+      "source": "Sprint Alfred Claude continuation 2026-10-17, stopped candidate Full Verify on native Windows; PO decision 2026-10-17 (after the 0.7.0 local candidate).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.gate-should-not-demand-a-human-name",
@@ -4356,7 +4406,7 @@
       "owner": "pipeline",
       "created": "2026-10-03",
       "source": "Manual observation, Claude Code session on Windows, 2026-10-03, feat/sprint-alfred at a0d83ce78, lifecycle draft.",
-      "deferred": false,
+      "deferred": true,
       "sprint": "alfred"
     },
     {
@@ -4571,6 +4621,16 @@
       "closureRepository": "self",
       "closureCommit": "00bd47c1871f9d7c660735aecc2e6eb653e40737",
       "closureEvidence": "templates/prompts/goldfish-task.md"
+    },
+    {
+      "id": "pipeline.goldfish-quick-field-has-no-emitter",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision #27, 2026-10-16: an emitter/consumer for the Goldfish briefing 'quick' field is a backlog item after 0.7.0; the template field is the 0.7.0 delivery.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.governance-product-verify-suites-deregistered",
@@ -5799,6 +5859,16 @@
       "closureEvidence": "backlog/items/2026-08-18-intake-values-restart-resilient-immediately.md"
     },
     {
+      "id": "pipeline.interruption-receipts-adapter-tripwire-reaches-a-json-schema",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-17",
+      "source": "Sprint Alfred Claude continuation 2026-10-17, triage of interruption-receipts.test.mjs after fixture fix e06c3df08; PO decision 2026-10-17 (backlog, after 0.7.0).",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.invalid-channel-value-blocks-unrelated-alpha-ref-write",
       "status": "closed",
       "type": "defect",
@@ -5997,6 +6067,16 @@
       "closureRepository": "self",
       "closureCommit": "04e28774d8416904cccee5dd1fc561db4d2a86af",
       "closureEvidence": "plugins/pipeline-core/scripts/security-scan.test.mjs"
+    },
+    {
+      "id": "pipeline.licensing-outlook-states-a-zero-price-today",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision 2026-10-16 (licensing tile): before the 0.7.0 release, replace the vague 'future commercial use may require payment' outlook with an explicit 0 EUR price today, including internal use inside a commercial company; keep the option of different terms for future versions. Not part of the local Alfred candidate.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
@@ -6343,6 +6423,16 @@
       "source": "Explicit PO direction: approve new model types once; automatically select their latest version; retain old versions only on explicit PO request.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.model-role-bootstrap-ignores-version-bumps-within-a-family",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision #22, 2026-10-16: the model-role bootstrap should detect a newly available model of a known family and actively propose it; a version bump within a known family is apparently ignored.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
@@ -7257,6 +7347,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-push.test.mjs"
     },
     {
+      "id": "pipeline.pin-location-and-generator-for-user-repositories",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision 2026-10-16 (Alfred night session): criterion-bound regression tests become canon for 0.7.0 as documentation only; the product surface below is deferred because it needs design scope.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",
       "status": "closed",
       "type": "defect",
@@ -7611,6 +7711,16 @@
       "closureRepository": "self",
       "closureCommit": "ba56248120d58612353cc0dbe85e0fa6f84d1a70",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-po-human-approval-windows-posix-separator-fix-closure.md"
+    },
+    {
+      "id": "pipeline.po-human-approval-rethrow-has-no-consumer-pin",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-17",
+      "source": "Critic C6g1 DIFF 1, candidate C-B (specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/C6g1-diff-result.md); PO decision 2026-10-17 (backlog).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error",
@@ -9796,6 +9906,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.signing-stamp-is-provenance-not-authentication",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-17",
+      "source": "Critic C6g1 DIFF 1, candidate C-A (specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/C6g1-diff-result.md); PO decision 2026-10-17 (backlog).",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.signing-toolchain-readiness",
       "status": "open",
       "type": "workflow-improvement",
@@ -10765,6 +10885,26 @@
       "closureEvidence": "backlog/items/2026-08-02-unified-human-authorization-ux.md"
     },
     {
+      "id": "pipeline.unified-runner-launcher-for-empty-folders",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision #21, 2026-10-16: the unified empty-folder launcher pattern for every runner is a backlog item after 0.7.0 (Antigravity first now).",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
+      "id": "pipeline.universal-batch-scope-for-every-full-critic",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision #32, 2026-10-16: a universal 'batch scope required for every full Critic' duty with the needed fixture updates is a backlog item after 0.7.0; the re-critic marker goes into the Critic dispatch template now.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.universal-human-command-renderer",
       "status": "closed",
       "type": "workflow-improvement",
@@ -10790,6 +10930,16 @@
       "closureRepository": "self",
       "closureCommit": "ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a",
       "closureEvidence": "backlog/items/2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md"
+    },
+    {
+      "id": "pipeline.unverifiable-approval-should-degrade-to-advisory",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision #24 ('PO decision BI'), 2026-10-16: an approved feature whose approval can no longer be re-verified degrades to advisory instead of locking all execution; backlog item after 0.7.0.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.v1-trust-anchor-makes-signature-push-functionless",
@@ -10861,6 +11011,16 @@
       "closureRepository": "self",
       "closureCommit": "64069ea3121d2da1be68f5e3079191e6610debe4",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state.test.mjs"
+    },
+    {
+      "id": "pipeline.verify-does-not-run-the-observation-governance-checker",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-16",
+      "source": "PO decision 2026-10-16 (AC-198 D1 tile): hook-only governance classification of staged documents is accepted for 0.7.0; a Verify second line is a backlog item after 0.7.0. Evidence: ALF-C-P1-11B.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.verify-evidence-has-no-producer",

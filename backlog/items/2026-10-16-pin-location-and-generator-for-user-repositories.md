@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-10-16
 source: "PO decision 2026-10-16 (Alfred night session): criterion-bound regression tests become canon for 0.7.0 as documentation only; the product surface below is deferred because it needs design scope."
+sprint: none
 done_when: manual
 ---
 

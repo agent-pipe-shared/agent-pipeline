@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-10-16
 source: "PO decision 2026-10-16 #2 on pipeline.greenfield-design-course-cost-and-proportionality (AC-160)"
-sprint: post-0.7.0
+sprint: none
 done_when: manual
 ---
 

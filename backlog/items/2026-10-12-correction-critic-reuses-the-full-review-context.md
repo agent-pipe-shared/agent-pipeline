@@ -1,11 +1,12 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.correction-critic-reuses-the-full-review-context
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-10-12
 source: "PO request 2026-10-12 (Claude × native Windows × own repo), after the T10 design review: a delta review on a two-file diff took about 15 minutes after a full review of the same object."
+sprint: none
 done_when: manual
 ---
 

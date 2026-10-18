@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.licensing-outlook-states-a-zero-price-today
-type: documentation
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-16

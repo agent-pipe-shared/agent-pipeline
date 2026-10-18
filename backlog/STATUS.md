@@ -89,6 +89,7 @@
 | pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
+| pipeline.architecture-deferral-records-no-net-new-baseline | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.architecture-design-errors-omit-field-paths | closed | defect | pipeline | none | 2026-09-27 | — | — |
 | pipeline.architecture-fitness-model-repeats-module-fields | closed | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.architecture-materialization-requires-premature-code | closed | defect | pipeline | alfred | 2026-09-27 | — | — |
@@ -189,6 +190,7 @@
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | rejected | requirement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.commandpath-sibling-tilde-gap-and-test-pins | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — T1 Critic review of NVA-B-TILDEFIX-1 (PASS, 4 minor findings). F3: commandPath() in guard-lifecycle-ready.mjs still builds resolve(root, value) with no tilde reject, so a leading-~ argument still resolves as inside root wherever a caller trusts that result directly (named call sites: lines 2783, 2956, 2979, 2987) -- not proven exploitable, disclosed as such. F1: the cat-pipeline and git-pipeline lane tests added by NVA-B-TILDEFIX-1 assert only exitCode 2, not the specific denial code, unlike their single-command/rg siblings, so a future refactor could silently change which code those two lanes report with the suite still green. |
+| pipeline.commit-bound-signature-refuses-pipeline-source-paths | open | defect | pipeline | alfred | 2026-10-17 | — | — |
 | pipeline.commit-grammar-hint-still-requires-scratch-message-file | open | workflow-improvement | pipeline | alfred | 2026-09-29 | — | The commit parser already accepts repeated -m and Git --trailer, but the lifecycle grammar denial and commit skill still direct ordinary multi-paragraph commits through a scratch message file. |
 | pipeline.commit-guards-reject-safe-literal-multiline-messages | closed | defect | pipeline | nova-b | 2026-09-13 | 2026-09-30 | — |
 | pipeline.commit-producer-path-order-failures-count-against-the-tool-cap | open | defect | pipeline | alfred | 2026-10-05 | — | — |
@@ -211,6 +213,7 @@
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | closed | defect | pipeline | nova | 2026-08-28 | — | — |
+| pipeline.correction-critic-reuses-the-full-review-context | open | workflow-improvement | pipeline | none | 2026-10-12 | — | — |
 | pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock | closed | defect | pipeline | nova-b | 2026-09-12 | 2026-09-30 | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | closed | workflow-improvement | pipeline | alfred | 2026-08-24 | 2026-08-31 | — |
 | pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard | open | defect | pipeline | alfred | 2026-10-05 | — | — |
@@ -243,6 +246,7 @@
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-course-run-v2-refuses-its-own-documented-routes | open | defect | pipeline | alfred | 2026-10-04 | — | — |
+| pipeline.design-course-telemetry-is-deferred | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.design-generator-repeats-large-source-material | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-package-parent-metadata-false-drift | open | defect | pipeline | none | 2026-09-29 | — | — |
 | pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
@@ -321,6 +325,7 @@
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.fresh-worktree-indistinguishable-from-abandoned | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — a just-provisioned Agent-tool worktree satisfies every retirement condition identically to a genuinely abandoned one, so the retirement sweep cannot be wired into bootstrap until the two are distinguishable. |
 | pipeline.full-push-preflight-before-signature | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
+| pipeline.full-verify-on-windows-takes-hours | open | defect | pipeline | alfred | 2026-10-17 | — | — |
 | pipeline.gate-should-not-demand-a-human-name | closed | workflow-improvement | pipeline | nova-b | 2026-08-28 | — | Nova B — the encoding half is fixed; this is the design half that made the encoding fragile in the first place |
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -359,6 +364,7 @@
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | closed | workflow-improvement | pipeline | alfred | 2026-08-17 | — | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | — | 2026-08-18 | — | — |
+| pipeline.goldfish-quick-field-has-no-emitter | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.governance-scope-rejects-readonly-host-git-control | open | defect | pipeline | alfred | 2026-09-29 | — | — |
@@ -453,6 +459,7 @@
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | closed | defect | pipeline | — | 2026-08-24 | — | — |
 | pipeline.intake-values-restart-resilient-immediately | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
+| pipeline.interruption-receipts-adapter-tripwire-reaches-a-json-schema | open | defect | pipeline | alfred | 2026-10-17 | — | — |
 | pipeline.invalid-channel-value-blocks-unrelated-alpha-ref-write | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — cross-field coupling in the calibration reader: a broken pipelineUpdateChannel value makes the unrelated pipelineUpdateAlphaRef field unwritable, with a reason code that names the wrong field. |
 | pipeline.isrealpathedwithinboundary-file-boundary-uncaveated | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- T1 Critic review of NVA-B-GLRMINORS-1 (PASS, 2 minor findings), F2: the hardening for the transcript-file exact-match invariant (commit 571e67a8) lives only at its sole call site, isApprovedSingleCommandReadArg(). The exported isRealpathedWithinBoundary() primitive itself still admits any <file>/<nonexistent-child> candidate when handed a FILE-typed boundary, and its own doc comment still reasons only in directory-boundary terms -- a future caller reusing this primitive with a FILE boundary would silently reopen the exact shape NVA-B-GLRMINORS-1 just closed, with no warning at the primitive itself. |
 | pipeline.kernel-closure-check-masks-violations-after-the-first | open | defect | pipeline | alfred | 2026-10-05 | — | — |
@@ -468,6 +475,7 @@
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | closed | defect | pipeline | — | 2026-08-12 | — | — |
 | pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | closed | defect | pipeline | — | 2026-08-11 | 2026-08-25 | — |
+| pipeline.licensing-outlook-states-a-zero-price-today | open | defect | pipeline | none | 2026-10-16 | — | — |
 | pipeline.lifecycle-coordination-commands-refused-as-implementation-writes | open | defect | pipeline | alfred | 2026-10-03 | — | — |
 | pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | closed | defect | pipeline | nova-b | 2026-08-17 | — | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -495,6 +503,7 @@
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.model-family-approval-with-automatic-version-upgrades | open | workflow-improvement | pipeline | alfred | 2026-09-30 | — | — |
+| pipeline.model-role-bootstrap-ignores-version-bumps-within-a-family | open | defect | pipeline | none | 2026-10-16 | — | — |
 | pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows | open | defect | pipeline | alfred | 2026-10-08 | — | — |
 | pipeline.model-role-confirmation-prompt-obscures-required-digest | open | workflow-improvement | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -564,6 +573,7 @@
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.phoenix-merge-re-critic-minor-findings | closed | workflow-improvement | pipeline | nova | 2026-08-27 | — | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
+| pipeline.pin-location-and-generator-for-user-repositories | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed. |
 | pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in | open | defect | pipeline | alfred | 2026-09-28 | — | — |
@@ -591,6 +601,7 @@
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | — | 2026-07-25 | — | — |
 | pipeline.po-gate-worktree-authority | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows | closed | defect | pipeline | — | 2026-08-17 | — | — |
+| pipeline.po-human-approval-rethrow-has-no-consumer-pin | open | defect | pipeline | alfred | 2026-10-17 | — | — |
 | pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective against current code; confirmed still present, unfixed. |
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | — | 2026-08-10 | 2026-08-23 | — |
 | pipeline.po-key-trust-anchor-onboarding | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
@@ -758,6 +769,7 @@
 | pipeline.signing-default-test-fixture-root-escapes-the-repository | open | defect | pipeline | alfred | 2026-10-07 | 2026-10-20 | — |
 | pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.signing-prompt-prints-the-whole-review-package | open | defect | pipeline | alfred | 2026-10-04 | — | — |
+| pipeline.signing-stamp-is-provenance-not-authentication | open | workflow-improvement | pipeline | alfred | 2026-10-17 | — | — |
 | pipeline.signing-toolchain-readiness | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.skill-arguments-and-bootstrap-length | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
@@ -831,13 +843,17 @@
 | pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.unenforced-process-rules-vary-by-runner | closed | defect | pipeline | nova-b | 2026-08-28 | 2026-09-30 | Nova B |
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | — | 2026-08-02 | 2026-08-30 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
+| pipeline.unified-runner-launcher-for-empty-folders | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
+| pipeline.universal-batch-scope-for-every-full-critic | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.universal-human-command-renderer | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
+| pipeline.unverifiable-approval-should-degrade-to-advisory | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.v1-trust-anchor-makes-signature-push-functionless | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — critical: it makes gates.push_approval 'signature', the documented default and this repository's own setting, functionless. Stacks with the push-gate item; a consumer hits both. |
 | pipeline.vendored-dispatch-templates-drift-from-canon | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.verify-authorship-defaults-to-source-markers-not-behavior | closed | workflow-improvement | pipeline | — | 2026-08-10 | — | — |
 | pipeline.verify-cannot-rerun-fresh-at-unchanged-tree | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- there is no way to force a fresh full verify run at an unchanged tree. candidateIdentity() keys on HEAD^{tree} and, with allowCrossCandidateReuse false (verify.mjs's real call shape), every suite's prior receipt is reused. Consequence: repeat-run evidence at an unchanged HEAD is vacuous -- it re-reports cached results, so it can never surface a race, a flake, or an environment-dependent failure. Every 'ran it twice, green both times' claim made at an unchanged HEAD in this repository proves nothing. |
 | pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A -- happy-path deadlock, confirmed independently by 2 of 3 runners against the 2026-08-29 candidate (built ab0906d, stamped 0bf246d1) which already contained the 2026-08-11 verify-contract fix (674b1c0c). |
+| pipeline.verify-does-not-run-the-observation-governance-checker | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.verify-evidence-has-no-producer | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.verify-evidence-is-trusted-on-read-and-was-forged | open | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.verify-evidence-needs-an-explicit-strength-class | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — a syntax/offline fallback can be honest and useful, but must not be treated as equivalent to the browser behavior evidence a product or release criterion implies. |
@@ -881,7 +897,7 @@
 
 ## Counts
 
-- open: 195
+- open: 211
 - in_progress: 0
 - closed: 664
 - rejected: 3
