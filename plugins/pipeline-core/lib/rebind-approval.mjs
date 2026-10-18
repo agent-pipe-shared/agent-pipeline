@@ -28,8 +28,14 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { unlinkSync } from "node:fs";
 import { verifyFinalDesignWorkflowApproval } from "./architecture-design.mjs";
 import { ensurePrivateDirectory, writePrivateFileNoReplaceAtomic } from "./private-boundary.mjs";
+import { validatePoGateAuthorityForRepository, validatePoGateProfileForRepository } from "./po-gate-authority.mjs";
+import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, withOriginDeviceValues,
+  writePlanApprovalDeviceRebindReceipt } from "./plan-approval-device-rebind.mjs";
+import { observeCurrentPlanApprovalForCalibration, readAcceptedDeliveryContract } from "../scripts/pipeline-state.mjs";
 
 export const REBIND_APPROVAL_SCHEMA = "pipeline.rebind-approval.v1";
 export const REBIND_RECEIPT_SCHEMA = "pipeline.rebind-approval-receipt.v1";
@@ -56,7 +62,13 @@ const REPAIR = Object.freeze({
   "DWP-REBIND-RECEIPT-UNAVAILABLE": "The device-local verification receipt could not be written to private state; nothing was accepted.",
   "DWP-REBIND-ARGS": "rebind-approval accepts no arguments.",
   "DWP-REBIND-INTERNAL": "Rebind could not complete; nothing was accepted. Re-run once the checkout is quiet.",
+  "DWP-REBIND-AUTHORITY-UNAVAILABLE": "This checkout's PO gate authority or profile could not be derived. Repair the PO profile receipt (setup), then run rebind-approval again.",
+  "DWP-REBIND-DEVICE-CURRENT": "The approval already verifies on this device; no rebind is needed.",
+  "DWP-REBIND-AUTHORITY-CHANGED": "The approval binds authority values that differ here beyond the two device-local fields. Re-approve the plan on this checkout.",
+  "DWP-REBIND-PROFILE-CHANGED": "The PO profile on this checkout differs from the one the approval binds beyond the device-local fields. Restore the approved profile files, or re-approve.",
+  "DWP-REBIND-CONTRACT-UNVERIFIED": "The retained accepted contract or the calibration observer does not verify with the rebound device values; nothing was accepted.",
 });
+const ACCEPTED_CONTRACT_APPROVAL = "pipeline.plan-approval.v9";
 
 function refuse(code, extra = {}) {
   return { exit: 2, payload: { schema: REBIND_APPROVAL_SCHEMA, status: "refused", code,
@@ -154,6 +166,54 @@ function changedDigestPrerequisite(paths) {
 }
 
 /**
+ * R7-5 for an accepted-contract approval (pipeline.plan-approval.v9). Only the two device-local
+ * authority fields may differ; the PRD, Spec, profile content, retained contract, candidate and
+ * signature are verified by the unchanged readers, with the receipt in place. The receipt is
+ * removed again when they do not verify, so a refusal leaves no device-local trace.
+ */
+function rebindAcceptedContractApproval({ root, state, stateSha256, now }) {
+  const approval = state.planApproval;
+  const stored = approval.poGateAuthority;
+  const authority = validatePoGateAuthorityForRepository({ repoRoot: root }, { deviceRebind: false });
+  const profile = validatePoGateProfileForRepository({ repoRoot: root }, { deviceRebind: false });
+  if (!authority?.ok || !profile?.ok) return refuse("DWP-REBIND-AUTHORITY-UNAVAILABLE");
+  const current = authority.value;
+  if (JSON.stringify(stored) === JSON.stringify(current)) return refuse("DWP-REBIND-DEVICE-CURRENT");
+  if (!differsOnlyInDeviceFields(stored, current)) {
+    const changed = ["planSha256", "specSha256"].filter((key) => stored?.[key] !== current?.[key]);
+    if (changed.length > 0) {
+      const paths = changed.map((key) => (key === "planSha256" ? stored.planPath : stored.specPath));
+      return { exit: 2, payload: { schema: REBIND_APPROVAL_SCHEMA, status: "digest-set-changed", changedPaths: paths,
+        signaturesRequested: 0, attendedPrerequisite: changedDigestPrerequisite(paths) } };
+    }
+    return refuse("DWP-REBIND-AUTHORITY-CHANGED");
+  }
+  const receipt = createPlanApprovalDeviceRebindReceipt({ planApproval: approval, current,
+    envelopeSha256: approval.acceptedContract?.sha256, verifiedAt: now() });
+  if (!receipt) return refuse("DWP-REBIND-AUTHORITY-CHANGED");
+  if (sha256CanonicalJson(withOriginDeviceValues(profile.value, receipt)) !== state.planSubmission?.profileSha256) {
+    return refuse("DWP-REBIND-PROFILE-CHANGED");
+  }
+  const common = gitCommonDir(root);
+  if (common === null) return refuse("DWP-REBIND-RECEIPT-UNAVAILABLE");
+  let path;
+  try { path = writePlanApprovalDeviceRebindReceipt(common, receipt); }
+  catch { return refuse("DWP-REBIND-RECEIPT-UNAVAILABLE"); }
+  const contract = readAcceptedDeliveryContract({ dir: root, envelopePath: approval.acceptedContract.path });
+  const observed = observeCurrentPlanApprovalForCalibration({ rootDir: root });
+  const after = inspectFile(root, STATE_PATH, true);
+  const drift = after.state !== "present" || sha256(after.bytes) !== stateSha256;
+  if (!contract?.ok || observed?.status !== "eligible" || drift) {
+    try { unlinkSync(path); } catch { /* the readers stay fail-closed without a matching receipt */ }
+    if (drift) return refuse("DWP-REBIND-STATE-DRIFT");
+    return refuse("DWP-REBIND-CONTRACT-UNVERIFIED", { contractCode: contract?.code ?? null, observerCode: observed?.code ?? null });
+  }
+  return { exit: 0, payload: { schema: REBIND_APPROVAL_SCHEMA, status: "verified", featureId: state.activeFeature?.id ?? null,
+    approvalSchema: ACCEPTED_CONTRACT_APPROVAL, reboundFields: Object.keys(receipt.origin), signaturesRequested: 0,
+    stateChanged: false, receipt: { location: [...RECEIPT_DIRECTORY, path.split(/[\\/]/u).pop()].join("/") } } };
+}
+
+/**
  * @param {{dir: string, now?: () => string, deps?: object}} input
  * @returns {{exit: number, payload: object}} never logs; the caller prints the payload once.
  */
@@ -171,6 +231,9 @@ export function rebindApproval({ dir, now = () => new Date().toISOString(), deps
     const authority = approval?.poGateAuthority;
     const packagePath = approval?.designWorkflowPackagePath;
     const packageSha256 = approval?.designWorkflowPackageSha256;
+    if (state?.planApproved === true && approval?.schema === ACCEPTED_CONTRACT_APPROVAL && packagePath === undefined) {
+      return rebindAcceptedContractApproval({ root, state, stateSha256, now });
+    }
     if (state?.planApproved !== true || !authority || typeof authority !== "object"
       || !boundedRepoPath(authority.planPath) || !SHA256.test(authority.planSha256 ?? "")
       || !boundedRepoPath(authority.specPath) || !SHA256.test(authority.specSha256 ?? "")

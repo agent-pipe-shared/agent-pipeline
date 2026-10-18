@@ -36,6 +36,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 import { windowsDriveLetterIdentity, windowsNotationCandidate } from "./repository-path-identity.mjs";
 import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
+import { readPlanApprovalDeviceRebind, withOriginDeviceValues } from "./plan-approval-device-rebind.mjs";
 import {
   LEGACY_MANIFEST,
   LEGACY_STATE,
@@ -644,13 +645,16 @@ export function validatePoGateAuthorityForRepository({
   } catch {
     return fail("PO-GATE-AUTHORITY-UNAVAILABLE", "Repository topology or authority inputs are unavailable.", PROFILE_REPAIR);
   }
-  return validatePoGateAuthority({ ...topology, expectedPlanSha256, expectedSpecSha256 });
+  return validatePoGateAuthority({ ...topology, expectedPlanSha256, expectedSpecSha256, deviceRebind: deps.deviceRebind !== false });
 }
 
 /**
  * Validate only the machine-local PO profile receipt and its canonical primary
  * source/runtime projection. Feature state, PRDs and approval state are
- * deliberately outside this readback boundary.
+ * deliberately outside this readback boundary, with one exception: when a
+ * device-local rebind receipt (R7-5, lib/plan-approval-device-rebind.mjs) binds
+ * the current plan approval to this clone, the two device-local fields are
+ * reported with the approval's origin values, exactly as the full authority is.
  */
 export function validatePoGateProfileForRepository({ repoRoot } = {}, deps = {}) {
   let topology;
@@ -665,9 +669,37 @@ export function validatePoGateProfileForRepository({ repoRoot } = {}, deps = {})
   } catch {
     return fail("PO-PROFILE-AUTHORITY-UNAVAILABLE", "Repository topology or profile inputs are unavailable.", PROFILE_REPAIR);
   }
-  return profile.ok
-    ? { ok: true, code: "PO-PROFILE-AUTHORITY-VALID", value: profile.value }
-    : profile;
+  if (!profile.ok) return profile;
+  if (deps.deviceRebind !== false) {
+    const full = validatePoGateAuthority({ ...topology, deviceRebind: false });
+    const rebind = full.ok ? deviceRebindFor(profile.current, topology.gitCommonDir, full.value) : null;
+    if (rebind) return { ok: true, code: "PO-PROFILE-AUTHORITY-VALID", value: withOriginDeviceValues(profile.value, rebind) };
+  }
+  return { ok: true, code: "PO-PROFILE-AUTHORITY-VALID", value: profile.value };
+}
+
+/** The current plan approval of the authoritative State, or null. Read-only. */
+function activePlanApproval(repoRoot) {
+  try {
+    const authority = resolveProjectAuthorityPaths({ rootDir: repoRoot });
+    if (authority.status !== "ready") return null;
+    const raw = readPhysicalFile(repoRoot, authority.state ?? (authority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE));
+    const state = JSON.parse(decodeUtf8(raw));
+    return state?.planApproved === true && isPlainObject(state.planApproval) ? state.planApproval : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A device rebind receipt that binds the current approval to these freshly derived values, or null. */
+function deviceRebindFor(repoRoot, gitCommonDir, evidence) {
+  try {
+    const planApproval = activePlanApproval(repoRoot);
+    if (!planApproval) return null;
+    return readPlanApprovalDeviceRebind({ gitCommonDir: assertPhysicalDirectory(gitCommonDir), planApproval, current: evidence });
+  } catch {
+    return null;
+  }
 }
 
 function loadReceipt(gitCommonDir) {
@@ -937,6 +969,7 @@ export function validatePoGateAuthority({
   registeredWorktreeRoots,
   expectedPlanSha256 = undefined,
   expectedSpecSha256 = undefined,
+  deviceRebind = true,
 }) {
   const profile = validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, registeredWorktreeRoots });
   if (!profile.ok) return profile;
@@ -989,5 +1022,8 @@ export function validatePoGateAuthority({
     specPath: prd.specPath,
     specSha256: prd.specSha256,
   };
-  return { ok: true, code: "PO-GATE-AUTHORITY-VALID", value: evidence };
+  // R7-5: a verified device rebind reports the approval's origin device-local values; every
+  // other field above stays freshly derived from this checkout.
+  const rebind = deviceRebind ? deviceRebindFor(current, gitCommonDir, evidence) : null;
+  return { ok: true, code: "PO-GATE-AUTHORITY-VALID", value: rebind ? withOriginDeviceValues(evidence, rebind) : evidence };
 }

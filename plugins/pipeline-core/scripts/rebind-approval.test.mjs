@@ -82,6 +82,8 @@ import { validPlanSubmission, validPreviousCurrentPlanApproval } from "../lib/pl
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
+import { createPlanApprovalDeviceRebindReceipt, differsOnlyInDeviceFields, readPlanApprovalDeviceRebind,
+  withOriginDeviceValues, writePlanApprovalDeviceRebindReceipt } from "../lib/plan-approval-device-rebind.mjs";
 
 const ONBOARDING = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 const REBIND_SCHEMA = "pipeline.rebind-approval.v1";
@@ -356,4 +358,65 @@ test("inspect of an approval that cannot be verified on this checkout lists rebi
   assert.ok(verbs.includes("reopen-design"), `precondition: reopen-design is offered today (offered: ${verbs.join(",") || "none"}; status ${payload.status}; keys ${Object.keys(payload).join(",")}; nextAction ${JSON.stringify(payload.nextAction)?.slice(0, 900)}; diagnostics ${JSON.stringify(payload.diagnostics)?.slice(0, 1400)})`);
   assert.ok(verbs.includes("rebind-approval"), "rebind-approval is offered next to reopen-design, not only reopen-design");
   assert.deepEqual([...worktreeSnapshot(clone.dir)], [...before], "inspect remains read-only");
+});
+
+// R7-5 for an accepted-contract approval (plan-approval v9), PO decision 2026-10-17 (WSL session):
+// only the two device-local authority fields are re-bound, through a device-local receipt. These
+// cases pin the receipt contract every consumer relies on: it maps exactly this approval, exactly
+// its origin values and exactly this device's current values, and nothing else ever matches.
+const DR_STORED = Object.freeze({ schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: h("1"),
+  runtimeSha256: h("2"), receiptSha256: h("3"), repositoryFingerprint: h("4"), planPath: "specs/f/prd_f.md",
+  planSha256: h("5"), specPath: "specs/f/spec.md", specSha256: h("6") });
+const DR_CURRENT = Object.freeze({ ...DR_STORED, receiptSha256: h("7"), repositoryFingerprint: h("8") });
+const drApproval = (authority = DR_STORED, contract = h("9")) => ({ schema: "pipeline.plan-approval.v9",
+  poGateAuthority: { ...authority }, acceptedContract: { schema: "pipeline.accepted-delivery-contract-reference.v1", path: "x", sha256: contract } });
+function drCommon() {
+  const dir = mkdtempSync(join(tmpdir(), "device-rebind-"));
+  roots.push(dir);
+  return dir;
+}
+function drWritten(common, approval = drApproval()) {
+  const receipt = createPlanApprovalDeviceRebindReceipt({ planApproval: approval, current: DR_CURRENT, envelopeSha256: h("9"), verifiedAt: "2026-10-18T00:00:00.000Z" });
+  writePlanApprovalDeviceRebindReceipt(common, receipt);
+  return receipt;
+}
+
+test("R7-5d: only the two device-local fields may differ for a device rebind", () => {
+  assert.equal(differsOnlyInDeviceFields(DR_STORED, DR_CURRENT), true);
+  assert.equal(differsOnlyInDeviceFields(DR_STORED, { ...DR_CURRENT, planSha256: h("a") }), false, "a changed PRD digest is not device-local");
+  assert.equal(differsOnlyInDeviceFields(DR_STORED, { ...DR_CURRENT, sourceSha256: h("a") }), false, "a changed profile source is not device-local");
+  const { specPath, ...missing } = DR_CURRENT;
+  assert.equal(differsOnlyInDeviceFields(DR_STORED, missing), false, "a missing key never matches");
+  assert.equal(differsOnlyInDeviceFields(DR_STORED, null), false);
+  assert.equal(createPlanApprovalDeviceRebindReceipt({ planApproval: drApproval(), current: DR_STORED, envelopeSha256: h("9"), verifiedAt: "t" }), null,
+    "no receipt when nothing device-local differs");
+  assert.equal(createPlanApprovalDeviceRebindReceipt({ planApproval: drApproval(), current: { ...DR_CURRENT, specSha256: h("a") }, envelopeSha256: h("9"), verifiedAt: "t" }), null,
+    "no receipt when a bound digest differs");
+});
+
+test("R7-5e: a written device rebind maps exactly this approval to this device's values", () => {
+  const common = drCommon();
+  const receipt = drWritten(common);
+  assert.deepEqual(receipt.origin, { receiptSha256: h("3"), repositoryFingerprint: h("4") });
+  assert.deepEqual(receipt.device, { receiptSha256: h("7"), repositoryFingerprint: h("8") });
+  const rebind = readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(), current: DR_CURRENT });
+  assert.ok(rebind, "the exact receipt is honoured");
+  assert.deepEqual(withOriginDeviceValues(DR_CURRENT, rebind), DR_STORED, "consumers see the approval's stored values again");
+});
+
+test("R7-5f: a device rebind never matches another approval, device or tampered receipt", () => {
+  const common = drCommon();
+  assert.equal(readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(), current: DR_CURRENT }), null, "no receipt: unchanged refusal");
+  drWritten(common);
+  assert.equal(readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(DR_STORED, h("b")), current: DR_CURRENT }), null,
+    "another approval (different retained contract) does not match");
+  assert.equal(readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(), current: { ...DR_CURRENT, repositoryFingerprint: h("c") } }), null,
+    "a third clone does not match a receipt written for this one");
+  assert.equal(readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(), current: { ...DR_CURRENT, planSha256: h("d") } }), null,
+    "a changed PRD digest never matches, receipt or not");
+  const tampered = { ...createPlanApprovalDeviceRebindReceipt({ planApproval: drApproval(), current: DR_CURRENT, envelopeSha256: h("9"), verifiedAt: "t" }),
+    origin: { receiptSha256: h("e"), repositoryFingerprint: h("4") } };
+  writePlanApprovalDeviceRebindReceipt(common, tampered);
+  assert.equal(readPlanApprovalDeviceRebind({ gitCommonDir: common, planApproval: drApproval(), current: DR_CURRENT }), null,
+    "a receipt whose origin values differ from the approval's is ignored");
 });
