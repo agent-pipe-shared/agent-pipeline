@@ -1,6 +1,45 @@
 // SPDX-License-Identifier: SUL-1.0
 // Exact shipped dangerous union, independent of governance/conventions.
 import {stripQuotedSegments,normalizeGlobalGitOptions} from '../lib/git-cmd.mjs';
+// GG-11 / GG-15 staging matcher (PO decision D17). The original single regex is kept as the
+// gate, so the matcher can only ever NARROW what it blocked before: a command the old regex
+// let through is still let through. Once the gate matches, the `git add` path arguments are
+// parsed and the match is lifted only when every token that names a `.env` file is admitted
+// (env template, or any path under a segment-anchored tests/fixtures/ directory). A token
+// that names any other GG-11 target (secrets.yaml, SSH keys, .pem, .key) is never admitted,
+// wherever it sits. Anything unparseable falls back to the old verdict (block).
+const OTHER_SECRET_RE = /(?<![a-zA-Z0-9_])secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b/;
+const ENV_TEMPLATE_RE = /^\.env\.(?:example|sample|template)$|^\.env(?:\.[^./\\]+)+\.example$/;
+function envPathAdmitted(token) {
+  const segments = token.split(/[\\/]/);
+  if (segments.includes("..")) return false;
+  if (ENV_TEMPLATE_RE.test(segments[segments.length - 1])) return true;
+  for (let i = 0; i + 2 < segments.length; i++) {
+    if (segments[i] === "tests" && segments[i + 1] === "fixtures") return true;
+  }
+  return false;
+}
+function stagingMatcher(gate) {
+  return {
+    test(str) {
+      if (!gate.test(str)) return false;
+      let sensitive = false;
+      for (const m of str.matchAll(/\bgit\s+add\b([^|&;]*)/g)) {
+        for (const raw of m[1].split(/\s+/)) {
+          const token = raw.replace(/["']/g, "");
+          if (!token) continue;
+          if (OTHER_SECRET_RE.test(token)) return true;
+          if (token.includes(".env")) {
+            sensitive = true;
+            if (!envPathAdmitted(token)) return true;
+          }
+        }
+      }
+      return !sensitive;
+    },
+  };
+}
+
 export const UNION_BLOCKERS = [
   {
     id: "GG-01",
@@ -85,9 +124,11 @@ export const UNION_BLOCKERS = [
   {
     id: "GG-11",
     // Union of all three staging deny-lists. `.env` intentionally without trailing \b
-    // so .env.local/.env.production are caught (errs safe: .env.example too).
-    re: /\bgit\s+add\b[^|&;]*(\.env|(?<![a-zA-Z0-9_])secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b)/,
-    why: "Staging secrets/state (.env*, secrets.yaml, SSH keys, .pem/.key) — these never belong in a repo. secrets.yaml uses a negative-lookbehind boundary so fakesecrets.yaml (a real, intentional CI fixture) does not match by substring coincidence (GG-11, backlog item two-guards-block-an-unrelated-file-via-substring-name-matching).",
+    // so .env.local/.env.production are caught. PO decision D17 admits env templates
+    // (.env.example/.sample/.template/.<x>.example) and any path under tests/fixtures/ via
+    // stagingMatcher; every other target stays blocked.
+    re: stagingMatcher(/\bgit\s+add\b[^|&;]*(\.env|(?<![a-zA-Z0-9_])secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b)/),
+    why: "Staging secrets/state (.env*, secrets.yaml, SSH keys, .pem/.key) — these never belong in a repo. D17 admission: env templates (.env.example, .env.sample, .env.template, .env.<x>.example) and any path under a tests/fixtures/ directory may be staged; every other .env* file stays blocked, and secrets.yaml, SSH keys, .pem and .key stay blocked even under tests/fixtures/. secrets.yaml uses a negative-lookbehind boundary so fakesecrets.yaml (a real, intentional CI fixture) does not match by substring coincidence (GG-11, backlog item two-guards-block-an-unrelated-file-via-substring-name-matching).",
     origin: ".env: all three · secrets.yaml: <PROJECT_B> · SSH keys/.pem/.key: <PROJECT_C>",
   },
   {
@@ -160,8 +201,8 @@ export const RAW_BLOCKERS = [
   {
     id: "GG-15",
     // raw-string rule: git add with a quoted protected target (GG-11 list).
-    re: /\bgit\s+add\b[^|&;]*["'][^"']*(\.env|(?<![a-zA-Z0-9_])secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b)/,
-    why: "Raw-string rule: git add with a quoted protected target (GG-11 list) — quote-stripping alone would hide the staged secret. secrets.yaml boundary-anchored, same fix as GG-11.",
+    re: stagingMatcher(/\bgit\s+add\b[^|&;]*["'][^"']*(\.env|(?<![a-zA-Z0-9_])secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b)/),
+    why: "Raw-string rule: git add with a quoted protected target (GG-11 list, same D17 env-template/tests-fixtures admission) — quote-stripping alone would hide the staged secret. secrets.yaml boundary-anchored, same fix as GG-11.",
     origin: "quote-evasion hardening",
   },
   {
