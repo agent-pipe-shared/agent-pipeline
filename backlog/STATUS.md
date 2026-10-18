@@ -87,6 +87,7 @@
 | pipeline.approval-mechanisms-require-out-of-session-po-acts | deferred | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.approval-verification-demands-head-equals-candidate | open | defect | pipeline | alfred | 2026-10-08 | — | — |
 | pipeline.approve-announce-test-fixture-missing-present-plan-step | closed | defect | pipeline | nova | 2026-08-29 | — | — |
+| pipeline.approve-plan-does-not-register-the-accepted-delivery-contract-in-a-feature-package | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
@@ -519,6 +520,7 @@
 | pipeline.model-role-bootstrap-ignores-version-bumps-within-a-family | open | defect | pipeline | none | 2026-10-16 | — | — |
 | pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows | open | defect | pipeline | alfred | 2026-10-08 | — | — |
 | pipeline.model-role-confirmation-prompt-obscures-required-digest | open | workflow-improvement | pipeline | alfred | 2026-09-28 | — | — |
+| pipeline.model-role-dispatch-select-has-no-route-for-the-consumer-implementation-duties | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.mp22-orchestrator-self-implementation-has-no-enforcement | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
 | pipeline.multi-cli-efficiency-pilots | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-09-08 | — |
@@ -912,7 +914,7 @@
 
 ## Counts
 
-- open: 226
+- open: 228
 - in_progress: 0
 - closed: 664
 - rejected: 3

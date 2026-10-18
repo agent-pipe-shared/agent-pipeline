@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a7668515b50ee2e116f58089cae9242254567f7395b368c85dad542e0e791668"
+    "transitionHead": "8cc5394f82c029b5ee6d5b203b3dd335d4fccc2c9926bfacc862684adae36287"
   },
   "counts": {
-    "open": 226,
+    "open": 228,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -1081,6 +1081,16 @@
       "closureRepository": "self",
       "closureCommit": "dc53bd7922bf0492d1710fa812fcaa5e5c5b4a62",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs"
+    },
+    {
+      "id": "pipeline.approve-plan-does-not-register-the-accepted-delivery-contract-in-a-feature-package",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-25)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file",
@@ -6583,6 +6593,16 @@
       "source": "Attended PO model-role bootstrap: noninteractive Codex shell could not confirm; subsequent terminal input Confirm was rejected; exact displayed digest succeeded and installed bootstrap reused all seven receipts.",
       "deferred": false,
       "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.model-role-dispatch-select-has-no-route-for-the-consumer-implementation-duties",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-25 side finding)",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault",
