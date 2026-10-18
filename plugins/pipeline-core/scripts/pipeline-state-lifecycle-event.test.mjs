@@ -15,14 +15,24 @@
  * regression check.
  */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync as mkdtempPlain, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run, readState, statePath } from "./pipeline-state.mjs";
 import { computeContinuityFinalDigest } from "../lib/continuity-host-adapter.mjs";
 import { validateLifecycleGovernanceEvent } from "../lib/lifecycle-governance-events.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
+
+/** A fixture directory that is its own Git repository (the state writer resolves the enclosing one). */
+function mkdtempSync(prefix) {
+  const dir = mkdtempPlain(prefix);
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  execFileSync("git", ["-C", dir, "config", "user.name", "Fixture"]);
+  execFileSync("git", ["-C", dir, "config", "user.email", "fixture@example.invalid"]);
+  return dir;
+}
 
 const FEATURE = "feature-lifecycle";
 const NOW = () => "2026-08-17T00:00:00.000Z";

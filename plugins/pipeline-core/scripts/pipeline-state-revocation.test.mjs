@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,6 +55,9 @@ function legacyMixedState() {
 
 function fixture(state) {
   const root = mkdtempSync(join(tmpdir(), "pipeline-revocation-"));
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  execFileSync("git", ["-C", root, "config", "user.name", "Fixture"]);
+  execFileSync("git", ["-C", root, "config", "user.email", "fixture@example.invalid"]);
   mkdirSync(join(root, ".claude"));
   const path = join(root, ".claude", "pipeline-state.json");
   writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
