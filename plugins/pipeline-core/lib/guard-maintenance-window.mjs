@@ -813,6 +813,12 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/osv-owned-file-controls.mjs",
   "plugins/pipeline-core/scripts/osv-suite-source-controls.mjs",
   "plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs",
+  // closure repair ALF-F1 (GMWKC01): modules imported by kernel files that had drifted out of the list.
+  "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+  "plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
+  "plugins/pipeline-core/lib/dispatch-briefing-route-record.mjs",
+  "plugins/pipeline-core/lib/fanout-ledger.mjs",
+  "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

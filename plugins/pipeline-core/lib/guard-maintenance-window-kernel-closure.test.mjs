@@ -268,7 +268,15 @@ const DYNAMIC_IMPORT_EDGES = {
   // The sixth through eighth edges bind the signed quality package, then derive
   // the current plan lifecycle and its typed late-verify recovery eligibility.
   // The ninth edge is the precommit privacy scanner; it is a separate import.
+  // The generated hook also makes two builtin loads and three human-override loads
+  // (override library, override CLI, hardened private directory); builtins count
+  // toward call-site parity only.
   "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": [
+    "node:fs",
+    "node:crypto",
+    "../lib/human-guard-override.mjs",
+    "./guard-human-override.mjs",
+    "../lib/hardened-private-directory.mjs",
     "./check-private-identifiers.mjs",
     "../hooks/guard-gate-strength.mjs",
     "../lib/protected-test-paths.mjs",

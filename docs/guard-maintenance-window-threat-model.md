@@ -597,6 +597,19 @@ kernel authority, so a maintenance window cannot lift them:
 The interruption registry data file (`plugins/pipeline-core/config/interruption-registry.v1.json`)
 is also in the array; the doc token form does not cover a `config/` directory.
 
+Closure repair ALF-F1B adds five further modules reached through declared
+dynamic-import edges; each executes with kernel authority:
+`plugins/pipeline-core/hooks/guard-dispatch.mjs` (the dispatch guard, which
+decides whether a dispatch is admitted),
+`plugins/pipeline-core/lib/advisor-prohibition-binding.mjs` (binds the advisor
+prohibition to the dispatch it governs),
+`plugins/pipeline-core/lib/dispatch-briefing-route-record.mjs` (records the
+route a dispatch briefing was admitted through),
+`plugins/pipeline-core/lib/fanout-ledger.mjs` (the ledger that bounds and
+accounts for dispatch fan-out), and
+`plugins/pipeline-core/lib/plan-approval-device-rebind.mjs` (rebinds a plan
+approval to a device, so it decides what an approval still covers).
+
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.
 
