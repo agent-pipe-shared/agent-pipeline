@@ -41,6 +41,20 @@ was needed; capability evidence is not an Advisor answer.
    sources and the report from disk and stamps the review time, runner and
    reviewer model itself. Never write or edit a receipt by hand: a hand-written
    receipt is not admissible evidence.
+   Dispatching the design review: the `critic-review` skill is for implementation
+   batches (diff range, batch preflight) and does not fit uncommitted design
+   sources. Dispatch the agent type `pipeline-core:readiness-reviewer` instead.
+   Its briefing needs a line `Ruleset SHA: <sha>` (`ruleset-sha` or `=` also
+   read; without it `DISPATCH-NO-RULESET-SHA`) and any model-family token such
+   as `Requested route: claude-sonnet-5-5` (without it `DISPATCH-NO-MODEL`), and
+   none of the contamination phrases (claims-to-verify, hunt list, expected
+   verdict). Naming Opus additionally needs `Batch scope (MP-07):` and a
+   rationale line (`DISPATCH-OPUS-NO-BATCH-RATIONALE`). Then create the receipt.
+   After the delta round: if round 2 still reports open findings, correct the
+   sources with `reopen-design`, `submit-plan`, `present-plan`. The approval
+   then carries the change as `unreviewedSourceDelta`, which the PO signs
+   knowingly; there is no round 3. `DRR-SOURCE-DRIFT` with `nextRound: null` is
+   not a dead end here: `present-plan` does not use that check.
 3. Use the sanctioned source-binding and document-integration routes. Keep
    PRD/Spec markers current and commit the finalized sources, bound companions,
    review reports and receipts. Before presentation every bound path must be

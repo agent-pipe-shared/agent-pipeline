@@ -300,6 +300,11 @@ export function summarizeDesignReviewReceipt(input) {
  * forms pass. Any difference (digest, path, added, removed or absent companion) is
  * DRR-SOURCE-DRIFT; `nextRound` is 2 after an initial receipt and null after a delta (PO-Q2
  * option b leaves this module unchanged). Malformed input drifts rather than passes.
+ *
+ * Purpose: a strict "does this receipt still describe the current sources" check. It is NOT
+ * what `present-plan` uses: after a delta receipt, `createDesignApprovalBinding`
+ * (design-approval-binding.mjs) carries a later source change into the approval as
+ * `unreviewedSourceDelta` for the PO to sign knowingly, so `nextRound: null` is not a dead end.
  * @returns {{ ok: true } | { ok: false, code: "DRR-SOURCE-DRIFT", nextRound: 2 | null }}
  */
 export function checkDesignReviewReceiptSources(input) {
