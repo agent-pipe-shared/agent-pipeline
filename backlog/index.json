@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "56e4b5a024518233a08c540b7eba9b9f8dd37ae3476181d6244bc52afa554695"
+    "transitionHead": "5d711824e49f23cecf89fad93e61fdc1fe05ab1e0b1f8eb10a3bf20698cc14db"
   },
   "counts": {
-    "open": 211,
+    "open": 212,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -10152,6 +10152,16 @@
       "closureRepository": "self",
       "closureCommit": "e4d7539d5684f59f3f817670e8a52f70e06e8b3a",
       "closureEvidence": "backlog/evidence/2026-09-18-human-terminal-templates-closure.md"
+    },
+    {
+      "id": "pipeline.test-fixtures-inside-the-checkout-write-the-real-repository",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "WSL session 2026-10-18: second WSL Full Verify run with TMPDIR inside the checkout (scratch/test-tmp-verify2).",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route",
