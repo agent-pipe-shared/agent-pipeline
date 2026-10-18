@@ -244,3 +244,23 @@ Answers to structured questions; tile text in
   - Decision (PO, chat): a narrow Tier-0 exception to EL-01. The Elephant itself writes only the rebind fix: an existing approval is recognized on a new clone when every bound digest is equal and the approved candidate is an ancestor of HEAD; device-local fields are re-bound through a device-local receipt, never by rewriting the approval. It carries a RED/GREEN test and gets an independent Critic review. All other work stays Goldfish-dispatched.
   - Rejected: re-approving the same plan on WSL (unknown ceremony cost, defect stays), and continuing implementation in the Windows checkout.
 - **First WSL Full Verify (same session):** 192 of 1042 suites red, 157 of them red alone on Linux; see `specs/sprint-alfred-epic/evidence/wsl-verify-20261017/README.md`. Those reds are fixed under this scope before the final candidate.
+
+## Fix log toward the final candidate (2026-10-18, between matrix remeasures)
+
+The delivery matrix (`delivery-status-current`) is remeasured once the code is stable. Until then, this log records the fixes per item. Each entry is implementation-complete only: verify, the Critic batch and PO acceptance are still open for all of them.
+
+| Commit | Item | Effect |
+|---|---|---|
+| `8e0b276a9` | approval portability (Tier-0) | PO plan approval re-bound on a new clone through a device-local receipt |
+| `5098e6478` | sq-delivery-course repair | approved plan without a delivery course gets a typed repair route |
+| `26631c1d6` | codex host hang | owned Codex host session stops when the post-ready readback fails |
+| `5a866354b` | git-for-windows-2-56-rejects-git-config-global-nul | doc-reader uses the shared git null device |
+| `813600b5a` | kernel-closure-check-masks-violations-after-the-first | never-liftable kernel list closed over its imports |
+| `39b2595ef` | scratch-has-no-retention-and-no-durability-check | scratch custody advisory stays report-only on allowed pushes |
+| `e9c68703b` | agy-managed-copy-first-start-lacks-attestation | agent-run attestation setup leaves the human terminal catalog; interruption-promotion inventoried |
+| `ef3278d58` | guard-push-refuses-read-only-git-without-push | proven non-push git commands with shell markers admitted (Codex/Antigravity delegate to guard-push) |
+| `b516d38ca` | codex-wsl-required-advisor-has-no-completable-route | managed Codex terminal cwd bound to the repository roots |
+| `7ad947159` | codex-readiness-private-receipt-omits-output-custody | readiness host store registers its process root |
+| `ad01f13a5` | advisor-demand-reuse-has-no-design-course-bound | second managed Codex launch no longer refused by the first run's finalization record |
+
+Open PO decision D1 (GST33, critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard): see the session PO task list; no code change was made.
