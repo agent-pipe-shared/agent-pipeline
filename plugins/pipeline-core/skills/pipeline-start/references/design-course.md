@@ -34,7 +34,13 @@ was needed; capability evidence is not an Advisor answer.
    findings; if sources change, use at most one delta follow-up and bind the
    final receipt to the current sources. Do not add a separate readiness child
    that repeats the content review. Preserve the report and canonical review
-   receipt, including the receipt chain when a delta is used.
+   receipt, including the receipt chain when a delta is used. Produce each
+   receipt with `node <plugin-root>/scripts/design-review-receipt.mjs create`
+   (`--repo`, `--feature`, `--report`, `--prd`, `--spec`, `--out`; `--companion`,
+   `--previous` for the delta and `--open-finding` as needed). It reads the
+   sources and the report from disk and stamps the review time, runner and
+   reviewer model itself. Never write or edit a receipt by hand: a hand-written
+   receipt is not admissible evidence.
 3. Use the sanctioned source-binding and document-integration routes. Keep
    PRD/Spec markers current and commit the finalized sources, bound companions,
    review reports and receipts. Before presentation every bound path must be
