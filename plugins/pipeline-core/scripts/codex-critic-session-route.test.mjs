@@ -10,6 +10,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { canonical, createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
+import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
+import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation.mjs";
 import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
 import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-source.mjs";
@@ -50,6 +54,27 @@ async function signedCriticFixture(dutyId) {
   execFileSync("git", ["-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.invalid", "commit", "-qm", "synthetic candidate"], { cwd: root });
   const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   const candidateTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
+  // The session-authority registry only initializes over a repository that carries a manifest and a
+  // pipeline State with a continuity object (the same inputs the finalizer reference fixture writes).
+  mkdirSync(join(root, ".claude"), { recursive: true, mode: 0o700 });
+  writeFileSync(join(root, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const ref = path => ({ path, sha256: "a".repeat(64) });
+  const continuity = { schema: "pipeline.continuity.v0", featureId: "unit", revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+    authority: { prd: ref("specs/unit/prd.md"), spec: ref("specs/unit/spec.md"), result: null },
+    queueHead: { packageId: "unit-package", actionId: "critic-route-fixture", nextAction: "dispatch", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, closeTransition: null,
+    capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+  writeFileSync(join(root, ".claude/pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0",
+    activeFeature: { id: "unit", planPath: "specs/unit/prd.md", phase: "implementation" }, planApproved: true, continuity }), { mode: 0o600 });
+  const repository = inspectSignedDescriptorCustodyRepository(root);
+  // Controlled METHOD fixture: genuine Source requester custody for the registry-owned lifetimes, not provider-host proof.
+  const runtime = createControlledMethodRuntimeFixture({ repository,
+    fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/critic-route-owner"), sessionId: `critic-route-${dutyId}-owner` });
+  const registryPorts = createSessionAuthorityParticipantPorts({ repository });
+  for (const row of registryPorts) assert.doesNotThrow(() => row.port.readBaseline(), row.producerId);
+  const initialized = initializeSessionAuthorityRegistry({ repository }, registryPorts);
+  assert.equal(initialized.status, "initialized", JSON.stringify(initialized));
   const keyFor = invocationId => ({ runner, installationBindingSha256: sha("installation"), accountBindingSha256: sha("account"), sessionId: "critic-session", invocationId });
   async function actualS2OpaquePort({ models, key, familyId = "sol" }) {
   const rules = {};
@@ -188,7 +213,7 @@ function signedS4Authority(adapterContractSha256, familyId = "sol", selectedMode
       return { ok: true, value: observed };
     }
   } });
-  const activation = runtimeHost.store().activate();
+  const activation = runtime.run(() => runtimeHost.store().activate());
   assert.equal(activation.ok, true, activation.code);
   const entry = createModelFamilyInvocationEntry({ runtimeHost, routeSource });
   const identityHost = createModelFamilyDiscoveryHost({ clock: () => "2026-10-01T12:00:30.000Z", execution: ({ rawHostResult }) =>
@@ -203,13 +228,14 @@ function signedS4Authority(adapterContractSha256, familyId = "sol", selectedMode
       requested: { modelId: i.selectedModelId, effort: i.effort, evidenceSha256: sha("request") },
       configured: { modelId: i.selectedModelId, effort: i.effort, evidenceSha256: sha("configured"), assurance: "host-configured" },
       execution: { status: "succeeded", evidenceSha256: sha("exit-zero") } }) };
-  return { root, candidateCommit, candidateTree, entry, ports, route, admissionError: () => admissionError, launches: () => launches, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  return { root, candidateCommit, candidateTree, entry, ports, route, run: runtime.run, admissionError: () => admissionError, launches: () => launches, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
 test("signed ordinary and high-risk Critic use one native child and authentic S6 plus existing finalization", async () => {
   for (const dutyId of ["critic_normal", "critic_high_risk"]) {
     const f = await signedCriticFixture(dutyId);
-    try {
+    try { await f.run(async () => {
+      // Every registry-owned lifetime runs inside the controlled Source requester's authority context.
       const route = await resolveSessionCodexCriticRoute({ rootDir: f.root, candidateCommit: f.candidateCommit, dutyId,
         familyInvocationEntry: f.entry, familyExecutionPorts: f.ports, invocationId: `positive-${dutyId}`,
         resolveV3: () => { throw new Error("active family cannot resolve V3"); } });
@@ -236,7 +262,7 @@ test("signed ordinary and high-risk Critic use one native child and authentic S6
       assert.equal(f.launches(), 1);
       assert.equal((await launchHeldCriticFamilyRoute({ route, packet, nativeRequest: { model: route.model, effort: route.effort } })).code, "CRITIC-FAMILY-CONSUMED");
       assert.equal(f.launches(), 1);
-    } finally { f.cleanup(); }
+    }); } finally { f.cleanup(); }
   }
 });
 const candidateCommit = "a".repeat(40);
