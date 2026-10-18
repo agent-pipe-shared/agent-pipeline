@@ -92,3 +92,11 @@ in `scratch/summary-and-advisor-binding-preparation.evidence.json`; the actual
 producer run retains its earlier aggregate/guard hashes in
 `scratch/onboarding-summary-admission-evidence.md`. Direct CLI measurement alone
 does not prove installed-host admission. No productive integration occurred.
+
+## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-06)
+
+The generated PRD/spec drafts carry a "do not hand-edit" header while the reference requires
+elaborating them before binding; and each draft embedded the full source material verbatim
+(about 87 KB, so three copies in total). The verbatim-copy half is addressed by commit
+38e1758a4 (`design-input.md` is now a provenance record). The header contradiction
+("do not hand-edit" versus "elaborate before binding") remains open.

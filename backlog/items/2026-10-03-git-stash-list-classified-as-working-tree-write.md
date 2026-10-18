@@ -50,3 +50,11 @@ write lane. Add positive and negative tests.
 - **Rationale:** the PO chose to ship the 0.7.0 local test candidate without this guard classification change, not to drop it.
 - **Assignment (if accepted):** next sprint after 0.7.0; AC-181 is not counted against the 0.7.0 candidate.
 - **Date:** 2026-10-17
+
+## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-16)
+
+Same family, different command: in lifecycle `draft`, `guard-devplan` read the sed expression
+of `sed -i -e '<expr>' -e '<expr>' specs/<feature>/<file>.md` as the write target (reported as
+"File: s/^..."), and refused it with `GUARD-DEVPLAN-SHELL`. The real target was under `specs/`,
+where draft-phase writes are allowed. The workaround was the Edit tool; no override was used.
+The path detection of the `write-command` classifier misparses sed arguments.

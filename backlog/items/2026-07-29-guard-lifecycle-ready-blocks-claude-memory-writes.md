@@ -194,3 +194,11 @@ boundary.
 - **Rationale:** Nova's `guard-lifecycle-ready.mjs` now carries `claudeSessionMemoryDirectory()`/`isClaudeSessionMemoryWritePath()` (`:906-978`), wired into the write-admission path (`:2424-2443`) so a write strictly inside the session's own derived `.../memory/` directory is admitted outright (symlink-safe, via the same realpath walk `isProjectWritePath()` uses), while every other cross-repository write is still refused exactly as before. Nova's own inline comment cites "PO decision, 2026-08-08 — Option A" and names this exact backlog item by filename — so the decision this item's 2026-08-06 Triage searched for and couldn't find was made one day later (2026-08-08) and one repo away (Nova), as Option A, not Option B as originally cited. Phoenix's own `guard-lifecycle-ready.mjs` remains unchanged and still has no memory carve-out.
 - **Assignment (if the PO wants parity in Phoenix):** port Nova's `claudeSessionMemoryDirectory`/`isClaudeSessionMemoryWritePath` mechanism verbatim via a briefed dispatch against Phoenix's TP-protected `guard-lifecycle-ready.mjs` — not done automatically here, since Phoenix's own memory-write needs may differ.
 - **Date:** 2026-08-18
+
+## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-01)
+
+Re-observation; the item stays closed. In a real greenfield project, `guard-lifecycle-ready`
+refused a write into the agent-memory folder outside the repository while onboarding was in
+`bootstrap-binding-required` (before binding). Those files are not project state, so the PO's
+instructions could only be saved after binding. This is the pre-binding case: it suggests the
+memory-directory admission should also hold in the not-yet-bound lifecycle states.

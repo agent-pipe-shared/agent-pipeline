@@ -49,3 +49,11 @@ Then fix the `git … | head` case, including `<rev>:<path>` arguments.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-17)
+
+The closed shell grammar admits `git show HEAD:<path> | head -n 3` but refuses
+`git -C <repo> show HEAD:<path> --format= -- | head -n 3` as an "unapproved operator". Also
+refused in `draft`/`approved`: `rg -o --no-filename ...`, `rg -c "<pattern>" <file>` and
+`ls -la <path>` inside the project, while `rg -n ...` passes. The refusal message does not
+name the flag or operator that triggered it.

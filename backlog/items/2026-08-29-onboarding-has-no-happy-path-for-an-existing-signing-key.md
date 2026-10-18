@@ -56,3 +56,11 @@ including the 3 new tests this dispatch added.
 - **Rationale:** PO explicitly named this as blocking the happy path during the 2026-08-29
   greenfield-report review; distinct from the already-closed detection-side items.
 - **Date:** 2026-08-29
+
+## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-05)
+
+Re-observation; the item stays closed. In `signature` mode the first onboarding round reported
+`trustAnchor: "not-requested"` while readiness said "no trust anchor committed"; the PO was
+never asked whether a key already exists. After binding, `trustAnchorAvailability: present`
+appeared with no visible step in between. When and how an existing key is attached remained
+unclear to the PO.

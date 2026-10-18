@@ -56,3 +56,11 @@ Observed instances:
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-09)
+
+In lifecycle `draft`, a read-only check script under `scratch/` (validating the architecture
+block of a design source with `parseArchitectureDesign`) was refused as
+`opaque-script-execution`; only a human override was offered. Deterministic self-checks of
+design sources before `submit-plan` are therefore impossible for the agent. Guard path:
+`guard-devplan` via `guard-lifecycle-ready`.
