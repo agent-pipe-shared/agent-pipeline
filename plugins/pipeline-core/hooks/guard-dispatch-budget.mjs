@@ -256,9 +256,28 @@ function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
 }
 
-function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false, producerPath = null }) {
+// ALF-G2B2: the optional `commitMode` of a budget binding row (same literal as COMMIT_MODE_NATIVE_HOST in
+// lib/dispatch-budget-binding.mjs, the owner). Under it the Goldfish must NOT commit or write a dispatch record: the
+// host commits for it, so both texts below say to leave changes uncommitted and return the host-return JSON instead.
+// Text only -- no cap, turn limit or admission decision reads this. A Critic never takes the mode.
+const NATIVE_HOST_COMMIT_MODE = "native-host";
+const NATIVE_HOST_RETURN_SCHEMA = "pipeline.native-goldfish-host-return.v1";
+function isNativeHostMode(agentType, commitMode) {
+  return commitMode === NATIVE_HOST_COMMIT_MODE && !isCriticAgentType(agentType);
+}
+const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "blocked" and an interim report (done / remaining / next step) in its report field`;
+function nativeHostBlockedContinuation(remainingClosingCalls) {
+  return remainingClosingCalls > 0
+    ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
+      + "This dispatch runs in native host-commit mode: stop editing, leave all changes uncommitted, do not write a dispatch record, and run no git add or git commit (the host commits for you).\n"
+      + `Now ${NATIVE_HOST_RETURN_INSTRUCTION}.\n`
+    : `The closing allowance of ${CLOSING_ALLOWANCE} tool calls is exhausted. No further tool calls are permitted for this dispatch.\n`
+      + `Without another tool call, ${NATIVE_HOST_RETURN_INSTRUCTION}; leave all changes uncommitted and do not write a dispatch record.\n`;
+}
+
+function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false, producerPath = null, commitMode = null }) {
   const remainingClosingCalls = Math.max(0, workingCap + CLOSING_ALLOWANCE - count);
-  const continuation = remainingClosingCalls > 0
+  const continuation = isNativeHostMode(agentType, commitMode) ? nativeHostBlockedContinuation(remainingClosingCalls) : remainingClosingCalls > 0
     ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
       + `Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) \`git add\` your own paths, (3) \`git commit\` your own paths${closingNotesClause(agentType)}, plus the read-only commit-flow producer \`goldfish-commit-command-flow.mjs\` from the plugin scripts directory (it is counted like any closing call).\n`
       // TR-G-F4 (Ruling 150, Finding 1): a refusal that only says "from the plugin scripts directory" leaves the agent to guess
@@ -715,12 +734,14 @@ function readGrantedCalls(counterFilePath, agentId, dependencies) {
 }
 
 /** PreToolUse stdout whose `additionalContext` reaches the model on an `allow`; `permissionDecisionReason` would be user-only. */
-function checkpointNoticeStdout({ agentType, count, workingCap, remaining }) {
+function checkpointNoticeStdout({ agentType, count, workingCap, remaining, commitMode = null }) {
   const critic = isCriticAgentType(agentType);
   const calls = `${remaining} call${remaining === 1 ? "" : "s"}`;
   const steps = critic
     ? "(1) start no new review work; (2) write your interim notes (done / remaining / next step) into your own scratch/dispatch/critic-<id>/critic-notes.md; (3) end your turn with that hand-back."
-    : "(1) commit what is already green now (never a known-red regression); (2) write an interim report (done / remaining / next step) into your dispatch record, evidence/dispatch-record-<TASK_ID>.json (log + report); (3) end your turn with that hand-back.";
+    : isNativeHostMode(agentType, commitMode)
+      ? `(1) stop editing and leave all changes uncommitted (run no git add or git commit; the host commits for you); (2) do not write a dispatch record; (3) ${NATIVE_HOST_RETURN_INSTRUCTION}, then end your turn.`
+      : "(1) commit what is already green now (never a known-red regression); (2) write an interim report (done / remaining / next step) into your dispatch record, evidence/dispatch-record-<TASK_ID>.json (log + report); (3) end your turn with that hand-back.";
   const additionalContext = `DISPATCH-BUDGET-CHECKPOINT: ${calls} of your working budget remain after this call (counted call ${count} of ${workingCap}). `
     + "Do not start new work. Hand back to the dispatcher now: "
     + `${steps} `
@@ -1444,6 +1465,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
       stderr: "",
       stdout: checkpointNoticeStdout({
         agentType: identity.agentType, count: budget.nextCount, workingCap: budget.workingCap, remaining: checkpoint.remainingWorkingCalls,
+        commitMode: counter.commitMode,
       }),
     };
   }
@@ -1451,6 +1473,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
     agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls,
     workingCap: budget.workingCap, count: counter.count, smallRole: policyMaxTurns !== maxTurns,
     producerPath: join(resolveAgentPluginRoot(rootDir, dependencies), "scripts", COMMIT_FLOW_PRODUCER_SCRIPT),
+    commitMode: counter.commitMode,
   });
 }
 
@@ -1774,6 +1797,7 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
         const workingCap = Math.min(baseCalls, dispatchWorkingCap(maxTurns));
         const initialized = initializeBoundCounter(path, {
           agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls, workingCap,
+          ...(pending.binding.commitMode === NATIVE_HOST_COMMIT_MODE ? { commitMode: NATIVE_HOST_COMMIT_MODE } : {}),
         }, { ...pendingContext, binding: pending.binding }, options);
         if (initialized.status !== "prepared") {
           return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: initialized.code });

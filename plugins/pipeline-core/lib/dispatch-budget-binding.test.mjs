@@ -87,7 +87,73 @@ check("rejects conflicting role caps before publication", () => {
   } finally { rmSync(commonDir, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 8, "the complete dispatch budget binding corpus must register before execution");
+// ALF-G2B2: the optional per-row `commitMode` ("native-host" is the only admitted value; absent is the ordinary mode).
+const { createHash } = process.getBuiltinModule("node:crypto");
+const { mkdirSync, writeFileSync } = process.getBuiltinModule("node:fs");
+const MODE_ROW = { agentType: "pipeline-core:goldfish-deep", baseCalls: 40, maxTurns: 50, effectiveCap: 35 };
+const sha = (toolUseId) => createHash("sha256").update(toolUseId).digest("hex");
+const writePendingFile = (commonDir, toolUseId, record) => {
+  const dir = join(commonDir, "agent-pipeline", "dispatch-budget", "pending");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${sha(toolUseId)}.json`), `${JSON.stringify(record)}\n`, "utf8");
+};
+
+check("round-trips the optional native-host commit mode through publish, resolve and consume", () => {
+  const commonDir = mkdtempSync(join(tmpdir(), "dispatch-budget-binding-mode-"));
+  try {
+    const nativeRow = { ...MODE_ROW, commitMode: "native-host" };
+    assert.equal(persistPendingDispatchBudgetBindings({ commonDir, toolUseId: "toolu-mode-1", bindings: [nativeRow] }).code, "DBB-PENDING-BINDING-WRITTEN");
+    const resolved = resolvePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-mode-1", agentType: "pipeline-core:goldfish-deep" });
+    assert.equal(resolved.code, "DBB-PENDING-BINDING-RESOLVED");
+    assert.deepEqual(resolved.binding, { agentType: "goldfish-deep", baseCalls: 40, maxTurns: 50, effectiveCap: 35, commitMode: "native-host" });
+    assert.equal(persistPendingDispatchBudgetBindings({ commonDir, toolUseId: "toolu-mode-1", bindings: [MODE_ROW] }).code, "DBB-PENDING-BINDING-CONFLICT");
+    const { commitMode: dropped, ...withoutMode } = resolved.binding;
+    assert.equal(dropped, "native-host");
+    assert.equal(consumePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-mode-1", agentType: "goldfish-deep", binding: withoutMode }).code, "DBB-PENDING-BINDING-CONFLICT");
+    assert.equal(consumePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-mode-1", agentType: "goldfish-deep", binding: resolved.binding }).code, "DBB-PENDING-BINDING-CONSUMED");
+
+    assert.equal(persistPendingDispatchBudgetBindings({ commonDir, toolUseId: "toolu-mode-2", bindings: [MODE_ROW] }).code, "DBB-PENDING-BINDING-WRITTEN");
+    const plain = resolvePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-mode-2", agentType: "goldfish-deep" });
+    assert.equal(plain.code, "DBB-PENDING-BINDING-RESOLVED");
+    assert.equal(Object.hasOwn(plain.binding, "commitMode"), false);
+    assert.equal(consumePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-mode-2", agentType: "goldfish-deep", binding: { ...plain.binding, commitMode: "native-host" } }).code, "DBB-PENDING-BINDING-CONFLICT");
+    assert.equal(consumePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-mode-2", agentType: "goldfish-deep", binding: plain.binding }).code, "DBB-PENDING-BINDING-CONSUMED");
+  } finally { rmSync(commonDir, { recursive: true, force: true }); }
+});
+
+check("refuses any commit mode other than native-host, before publication and as a stored row", () => {
+  const commonDir = mkdtempSync(join(tmpdir(), "dispatch-budget-binding-foreign-"));
+  try {
+    for (const commitMode of ["host", "", null, true, 1, "Native-Host", "native-host ", {}]) {
+      assert.equal(persistPendingDispatchBudgetBindings({ commonDir, toolUseId: "toolu-foreign", bindings: [{ ...MODE_ROW, commitMode }] }).code, "DBB-PENDING-BINDING-INVALID", String(commitMode));
+    }
+    writePendingFile(commonDir, "toolu-stored", {
+      schema: "pipeline.pending-dispatch-budget-binding.v1", toolUseIdSha256: sha("toolu-stored"),
+      bindings: [{ agentType: "goldfish-deep", baseCalls: 40, maxTurns: 50, effectiveCap: 35, commitMode: "other" }],
+    });
+    assert.equal(resolvePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-stored", agentType: "goldfish-deep" }).code, "DBB-PENDING-BINDING-MALFORMED");
+    assert.equal(consumePendingDispatchBudgetBinding({
+      commonDir, toolUseId: "toolu-stored", agentType: "goldfish-deep", binding: { agentType: "goldfish-deep", baseCalls: 40, maxTurns: 50, effectiveCap: 35 },
+    }).code, "DBB-PENDING-BINDING-MALFORMED");
+  } finally { rmSync(commonDir, { recursive: true, force: true }); }
+});
+
+check("keeps a pending record written before the commit mode existed valid and unchanged", () => {
+  const commonDir = mkdtempSync(join(tmpdir(), "dispatch-budget-binding-legacy-"));
+  try {
+    writePendingFile(commonDir, "toolu-legacy", {
+      schema: "pipeline.pending-dispatch-budget-binding.v1", toolUseIdSha256: sha("toolu-legacy"),
+      bindings: [{ agentType: "goldfish-implementor", baseCalls: 40, maxTurns: 50, effectiveCap: 35 }],
+    });
+    const resolved = resolvePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-legacy", agentType: "goldfish-implementor" });
+    assert.equal(resolved.code, "DBB-PENDING-BINDING-RESOLVED");
+    assert.deepEqual(resolved.binding, { agentType: "goldfish-implementor", baseCalls: 40, maxTurns: 50, effectiveCap: 35 });
+    assert.equal(consumePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-legacy", agentType: "goldfish-implementor", binding: resolved.binding }).code, "DBB-PENDING-BINDING-CONSUMED");
+    assert.equal(resolvePendingDispatchBudgetBinding({ commonDir, toolUseId: "toolu-legacy", agentType: "goldfish-implementor" }).code, "DBB-PENDING-BINDING-MISSING");
+  } finally { rmSync(commonDir, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 11, "the complete dispatch budget binding corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

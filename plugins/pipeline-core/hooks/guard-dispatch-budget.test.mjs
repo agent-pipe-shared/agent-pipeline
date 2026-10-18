@@ -613,6 +613,118 @@ test("an implementor base cap of 40 is limited to the tier-safe cap of 35", () =
   assert.match(results[35].stderr, /min\(baseCalls=40, maxTurns=50/u);
 });
 
+// ALF-G2B2: the optional `commitMode: "native-host"` budget binding row changes only the TEXT of the two messages a
+// running Goldfish receives (the exhaustion refusal and the 80 % checkpoint notice); admission and caps are untouched.
+// The shared runner reports no stdout, so this block derives a sibling runner that also reports it.
+const STDOUT_RUNNER_PATH = join(runnerDir, "stdout-runner.mjs");
+const RUNNER_PUSH = "results.push({ exitCode: r.exitCode, stderr: r.stderr });";
+assert.ok(RUNNER_SOURCE.includes(RUNNER_PUSH));
+writeFileSync(STDOUT_RUNNER_PATH, RUNNER_SOURCE.replace(RUNNER_PUSH, "results.push({ exitCode: r.exitCode, stderr: r.stderr, stdout: r.stdout ?? '' });"));
+function runWithStdout(scenario) {
+  const b64 = Buffer.from(JSON.stringify(scenario), "utf8").toString("base64");
+  const res = spawnSync(process.execPath, [STDOUT_RUNNER_PATH, GUARD, b64], { input: "", encoding: "utf8", timeout: RUNNER_TIMEOUT_MS });
+  assert.equal(res.status, 0, `runner child exited ${res.status} -- stderr: ${(res.stderr ?? "").trim().slice(0, 500)}`);
+  const line = (res.stdout ?? "").split("\n").find((l) => l.startsWith("RESULT: "));
+  assert.ok(line, "runner did not print a RESULT line");
+  return JSON.parse(line.slice("RESULT: ".length));
+}
+const NATIVE_RETURN_SCHEMA = "pipeline.native-goldfish-host-return.v1";
+function modeFiles(commitMode) {
+  const files = boundImplementorFiles(20, 20);
+  files[pendingBindingPath("parent-tool-1")] = `${JSON.stringify({
+    schema: "pipeline.pending-dispatch-budget-binding.v1",
+    toolUseIdSha256: createHash("sha256").update("parent-tool-1").digest("hex"),
+    bindings: [{ agentType: "goldfish-implementor", baseCalls: 20, maxTurns: 50, effectiveCap: 20, ...(commitMode === undefined ? {} : { commitMode }) }],
+  })}\n`;
+  return files;
+}
+function modeRun(files, calls) {
+  const input = measuredSubagentPayload({ agent_type: "pipeline-core:goldfish-implementor" });
+  const { results } = runWithStdout({
+    rootDir: FAKE_ROOT, realBudgetBinding: true, files,
+    steps: [...Array.from({ length: calls }, () => ({ op: "guard", input })), { op: "constants" }, { op: "getFile", path: COUNTER_PATH }],
+  });
+  return { calls: results.slice(0, calls), constants: results[calls], counter: JSON.parse(results[calls + 1]) };
+}
+function defaultBlockedText({ DENIAL_CODE, CLOSING_ALLOWANCE, SAFETY_MARGIN }) {
+  const producer = join(FAKE_ROOT, "plugins", "pipeline-core", "scripts", "goldfish-commit-command-flow.mjs");
+  const writer = join(dirname(producer), "dispatch-record-write.mjs");
+  return `BLOCKED (guard-dispatch-budget, plugin pipeline-core): ${DENIAL_CODE}: this dispatch (pipeline-core:goldfish-implementor, agent abc123) has counted 21 tool-call attempts against a working cap of 20 (effective cap min(baseCalls=20, maxTurns=50 minus the fixed ${CLOSING_ALLOWANCE}-closing + ${SAFETY_MARGIN}-safety reserve)).\n`
+    + "The working budget is exhausted; 4 closing-call slots remain.\n"
+    + "Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) `git add` your own paths, (3) `git commit` your own paths, plus the read-only commit-flow producer `goldfish-commit-command-flow.mjs` from the plugin scripts directory (it is counted like any closing call).\n"
+    + `The only admitted spelling of the producer is \`node "${producer}" <args>\` -- exactly this absolute path below the plugin root this guard resolves. A relative spelling names a different program and stays refused; on win32 a bare (unquoted) token containing a backslash is refused too, so quote the path or write it with forward slashes.\n`
+    + `A validated terminal record can instead use the sanctioned public writer: \`node "${writer}" --repo-root "<absolute current physical repository>" --request "<literal repository-relative JSON>"\`. This one plain invocation uses the same counted closing allowance; it cannot update an existing record or grant host authorship. Checkpoint/internal host routes have no added CLI flags here.\n`
+    + "Stop working and emit the closing report when finished.\n";
+}
+const defaultCheckpointText = (count) => `DISPATCH-BUDGET-CHECKPOINT: ${20 - count} call${20 - count === 1 ? "" : "s"} of your working budget remain after this call (counted call ${count} of 20). `
+  + "Do not start new work. Hand back to the dispatcher now: "
+  + "(1) commit what is already green now (never a known-red regression); (2) write an interim report (done / remaining / next step) into your dispatch record, evidence/dispatch-record-<TASK_ID>.json (log + report); (3) end your turn with that hand-back. "
+  + "The dispatcher decides: grant more budget and continue you, or dispatch a follow-up that builds on your interim report. "
+  + "Do not spend the closing allowance on further work.";
+const checkpointContexts = (calls) => calls
+  .map((call, index) => ({ count: index + 1, stdout: call.stdout }))
+  .filter(({ stdout }) => stdout !== "")
+  .map(({ count, stdout }) => ({ count, context: JSON.parse(stdout).hookSpecificOutput.additionalContext }));
+
+test("ALF-G2B2: under native-host the exhaustion refusal names the host-commit return contract and none of the commit or dispatch-record acts", () => {
+  const { calls } = modeRun(modeFiles("native-host"), 21);
+  assert.equal(calls[20].exitCode, 2);
+  const text = calls[20].stderr;
+  assert.match(text, /working cap of 20/u);
+  assert.match(text, /The working budget is exhausted; 4 closing-call slots remain\./u);
+  assert.match(text, /stop editing/u);
+  assert.match(text, /leave all changes uncommitted/u);
+  assert.match(text, /do not write a dispatch record/u);
+  assert.ok(text.includes(NATIVE_RETURN_SCHEMA));
+  assert.match(text, /outcome: "blocked"/u);
+  assert.doesNotMatch(text, /only these acts are permitted/u);
+  assert.doesNotMatch(text, /goldfish-commit-command-flow/u);
+  assert.doesNotMatch(text, /sanctioned public writer/u);
+  assert.doesNotMatch(text, /write\/update evidence/u);
+});
+
+test("ALF-G2B2: without a commit mode the exhaustion refusal is byte-identical to the ordinary text", () => {
+  const { calls, constants } = modeRun(modeFiles(undefined), 21);
+  assert.equal(calls[20].exitCode, 2);
+  assert.equal(calls[20].stderr, defaultBlockedText(constants));
+});
+
+test("ALF-G2B2: the 80 % checkpoint notice branches on the commit mode and stays byte-identical outside it", () => {
+  const native = checkpointContexts(modeRun(modeFiles("native-host"), 20).calls);
+  assert.ok(native.length >= 1, "a budget-bearing child must receive a checkpoint notice");
+  for (const { context } of native) {
+    assert.match(context, /^DISPATCH-BUDGET-CHECKPOINT: /u);
+    assert.match(context, /stop editing/u);
+    assert.match(context, /leave all changes uncommitted/u);
+    assert.match(context, /do not write a dispatch record/u);
+    assert.ok(context.includes(NATIVE_RETURN_SCHEMA));
+    assert.match(context, /outcome: "blocked"/u);
+    assert.doesNotMatch(context, /commit what is already green/u);
+    assert.doesNotMatch(context, /evidence\/dispatch-record-<TASK_ID>/u);
+  }
+  const ordinary = checkpointContexts(modeRun(modeFiles(undefined), 20).calls);
+  assert.deepEqual(ordinary.map(({ count }) => count), native.map(({ count }) => count));
+  for (const { count, context } of ordinary) assert.equal(context, defaultCheckpointText(count));
+});
+
+test("ALF-G2B2: the counter seed carries commitMode only when the pending binding row does", () => {
+  assert.equal(modeRun(modeFiles("native-host"), 1).counter.commitMode, "native-host");
+  assert.equal(Object.hasOwn(modeRun(modeFiles(undefined), 1).counter, "commitMode"), false);
+});
+
+test("ALF-G2B2: a counter created before the field, or carrying a foreign mode, behaves as today", () => {
+  for (const extra of [{}, { commitMode: "bogus" }]) {
+    const files = modeFiles("native-host");
+    files[COUNTER_PATH] = `${JSON.stringify({
+      schema: "pipeline.dispatch-budget-counter.v1", agentId: "abc123", agentType: "pipeline-core:goldfish-implementor",
+      maxTurns: 50, baseCalls: 20, workingCap: 20, ...extra, count: 20,
+    }, null, 2)}\n`;
+    const { calls, constants } = modeRun(files, 1);
+    assert.equal(calls[0].exitCode, 2);
+    assert.equal(calls[0].stderr, defaultBlockedText(constants), JSON.stringify(extra));
+  }
+});
+
 test("a budget-bearing child with an attested parent tool id but no pending binding fails closed", () => {
   const files = boundImplementorFiles(20, 20);
   delete files[pendingBindingPath("parent-tool-1")];

@@ -122,6 +122,14 @@ function pendingPath(commonDir, toolUseId) {
   return join(commonDir, "agent-pipeline", "dispatch-budget", "pending", `${key}.json`);
 }
 
+/**
+ * The one optional row field. Absent means the ordinary commit mode; `"native-host"` marks a dispatch whose prompt
+ * carries a native host-commit binding, so the budget guard's texts tell that Goldfish to leave its changes
+ * uncommitted and return the host-return JSON instead of committing and writing a dispatch record. It changes text
+ * only: no cap, turn limit or admission check reads it. Any other value is malformed (fail closed).
+ */
+export const COMMIT_MODE_NATIVE_HOST = "native-host";
+
 function canonicalPendingRecord(toolUseId, bindings) {
   if (!Array.isArray(bindings) || bindings.length === 0) return null;
   const rows = [];
@@ -131,7 +139,12 @@ function canonicalPendingRecord(toolUseId, bindings) {
     const baseCalls = binding?.baseCalls;
     const effectiveCap = effectiveDispatchBaseCap(baseCalls, maxTurns);
     if (agentType === null || effectiveCap === null || binding?.effectiveCap !== effectiveCap) return null;
-    rows.push({ agentType, baseCalls, maxTurns, effectiveCap });
+    const row = { agentType, baseCalls, maxTurns, effectiveCap };
+    if (binding?.commitMode !== undefined) {
+      if (binding.commitMode !== COMMIT_MODE_NATIVE_HOST) return null;
+      row.commitMode = COMMIT_MODE_NATIVE_HOST;
+    }
+    rows.push(row);
   }
   rows.sort((a, b) => a.agentType.localeCompare(b.agentType) || a.baseCalls - b.baseCalls || a.maxTurns - b.maxTurns);
   const deduplicated = rows.filter((row, index) => index === 0 || JSON.stringify(row) !== JSON.stringify(rows[index - 1]));

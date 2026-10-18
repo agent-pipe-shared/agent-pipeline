@@ -783,13 +783,19 @@ if (isDirectInvocation(import.meta.url)) {
         process.exit(2);
       }
     }
+    // The v1 marker (moved above the budget binding; value unchanged). codexV2Marker and itemV3Marker are defined above.
+    const nativeMarker = "<!-- pipeline-native-goldfish-host-commit:v1";
+    const carriesHostCommitBinding = (dispatch) => dispatch.prompt.includes(nativeMarker) || dispatch.prompt.includes(codexV2Marker) || dispatch.prompt.includes(itemV3Marker);
     const budgetBindings = evaluated
       .filter(({ budget }) => budget.status === "prepared")
-      .map(({ dispatch, budget }) => ({
+      .map(({ dispatch, budget, policy }) => ({
         agentType: dispatch.subagentType,
         baseCalls: budget.baseCalls,
         maxTurns: budget.maxTurns,
         effectiveCap: budget.effectiveCap,
+        // A host-committed Goldfish must be told to leave its changes uncommitted, not to commit and write a record.
+        // Text mode only (never a cap or admission input); a Critic keeps its own notes-file hand-back.
+        ...(policy.role !== "critic" && carriesHostCommitBinding(dispatch) ? { commitMode: "native-host" } : {}),
       }));
     if (bindingCapableTool && budgetBindings.length > 0) {
       if (typeof toolUseId !== "string" || toolUseId.trim() === "") {
@@ -806,8 +812,7 @@ if (isDirectInvocation(import.meta.url)) {
         process.exit(2);
       }
     }
-    const nativeMarker = "<!-- pipeline-native-goldfish-host-commit:v1";
-    const markedNative = dispatches.filter((dispatch) => dispatch.prompt.includes(nativeMarker) || dispatch.prompt.includes(codexV2Marker) || dispatch.prompt.includes(itemV3Marker));
+    const markedNative = dispatches.filter(carriesHostCommitBinding);
     if (markedNative.length > 0) {
       const nativeRunner = ["Task", "Agent"].includes(input?.tool_name) ? "claude"
         : input?.tool_name === "spawn_agent" ? "codex" : null;
