@@ -10,6 +10,7 @@ import { fixtureAdoption } from "../scripts/architecture-adoption-test-fixture.m
 
 import {
   ARCHITECTURE_ENTRY_SCOPE,
+  greenfieldPendingFitnessAllowance,
   inspectArchitectureEntryReadiness,
   inspectPlanningDecisionApplicability,
   summarizePlanningDecisionApplicability,
@@ -351,4 +352,147 @@ test("an unavailable optional decision clock remains diagnostic", () => {
     new Date(Number.NaN));
   assert.equal(result.status, "unavailable");
   assert.equal(result.code, "ARCH-DECISION-CLOCK-UNAVAILABLE");
+});
+
+// ---- greenfieldPendingFitnessAllowance: pure decision, pure inputs (ALF-H1-PF20-PENDING-FITNESS-ALLOWANCE) ----
+const PF_IMPLEMENTATION = "src/app.mjs";
+const PF_ENTRY = "tests/app.test.mjs";
+const PF_CONTRACT = "docs/contract.md";
+const PF_CLASSES = [[1, "module-identity-ownership"], [2, "contract-presence-freshness"], [3, "dependency-direction-cycles"],
+  [4, "boundary-crossing"], [5, "authority-effect-ownership"], [6, "verification-locality"], [7, "navigation-currency"],
+  [8, "parallel-overlap"], [9, "profile-drift"], [10, "calibrated-friction-thresholds"]];
+const pfViolation = (ruleId, target) => ({ ruleId, module: "application", target, details: "fixture" });
+const pfFinding = (classId, ...violations) => ({ classId, propertyId: PF_CLASSES[classId - 1][1], outcome: "finding", violations });
+// The two unavailable shapes the real planning evaluator produces for a design-package greenfield tree.
+const pfProfileUnavailable = { classId: 9, propertyId: "profile-drift", outcome: "unavailable", violations: [],
+  details: "Valid approved-scoped authority is unavailable", evidence: { status: "unavailable" } };
+const pfCalibrationUnavailable = { classId: 10, propertyId: "calibrated-friction-thresholds", outcome: "unavailable", violations: [],
+  evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] } };
+function pfFitness(...overrides) {
+  const rows = PF_CLASSES.map(([classId, propertyId]) => ({ classId, propertyId, outcome: "pass", violations: [] }));
+  for (const row of [pfProfileUnavailable, pfCalibrationUnavailable, ...overrides]) rows[row.classId - 1] = row;
+  return { overallStatus: overrides.some((row) => row.outcome === "finding") ? "blocked" : "unavailable", outcomes: rows };
+}
+function pfReadiness(fitnessOverride = {}, topOverride = {}) {
+  return { status: "ready", code: null, fitness: { overallStatus: "deferred", blockingOverallStatus: "deferred",
+    source: "approved-design-package", planningSurface: { planPath: "specs/f/prd.md", paths: [PF_IMPLEMENTATION] },
+    pendingPhysicalSurfaces: [PF_IMPLEMENTATION, PF_ENTRY], ...fitnessOverride }, ...topOverride };
+}
+const pfDecide = (readiness, fitness) => greenfieldPendingFitnessAllowance({ readiness, fitness });
+const pfDeny = (code) => ({ allowed: false, code });
+
+test("pending allowance: a missing planned verification entry point that readiness lists as pending is allowed", () => {
+  const result = pfDecide(pfReadiness(), pfFitness(pfFinding(6, pfViolation("missing-verification-entry-point", PF_ENTRY))));
+  assert.deepEqual(result, { allowed: true, code: "PENDING-FITNESS-ALLOWED", pendingPhysicalSurfaces: [PF_IMPLEMENTATION, PF_ENTRY] });
+});
+
+test("pending allowance: missing, empty and stale-empty declared surfaces across classes 2 and 6 are allowed when all pending", () => {
+  const readiness = pfReadiness({ pendingPhysicalSurfaces: [PF_CONTRACT, PF_ENTRY, "tests/b.test.mjs"] });
+  const fitness = pfFitness(
+    pfFinding(2, pfViolation("missing-contract", PF_CONTRACT)),
+    pfFinding(6, pfViolation("missing-verification-entry-point", PF_ENTRY), pfViolation("empty-verification-entry-point", "tests/b.test.mjs")),
+  );
+  assert.equal(pfDecide(readiness, fitness).allowed, true);
+  const stale = pfFitness(pfFinding(2, pfViolation("stale-contract", PF_CONTRACT)));
+  assert.equal(pfDecide(readiness, stale).allowed, true);
+});
+
+test("pending allowance: no pending-class finding at all is allowed when readiness already approved the deferral", () => {
+  const result = pfDecide(pfReadiness(), pfFitness());
+  assert.equal(result.allowed, true);
+  assert.deepEqual(result.pendingPhysicalSurfaces, [PF_IMPLEMENTATION, PF_ENTRY]);
+});
+
+test("pending allowance: the returned pending list is a copy, and no input is mutated", () => {
+  const readiness = pfReadiness();
+  const fitness = pfFitness(pfFinding(6, pfViolation("missing-verification-entry-point", PF_ENTRY)));
+  const before = JSON.stringify({ readiness, fitness });
+  const result = pfDecide(readiness, fitness);
+  assert.notEqual(result.pendingPhysicalSurfaces, readiness.fitness.pendingPhysicalSurfaces);
+  assert.equal(JSON.stringify({ readiness, fitness }), before);
+});
+
+test("pending allowance: readiness that is not ready, not a design package, or not deferred is denied with its own code", () => {
+  const fitness = pfFitness(pfFinding(6, pfViolation("missing-verification-entry-point", PF_ENTRY)));
+  assert.deepEqual(pfDecide(pfReadiness({}, { status: "blocked" }), fitness), pfDeny("PENDING-FITNESS-READINESS-NOT-READY"));
+  assert.deepEqual(pfDecide(pfReadiness({ source: undefined }), fitness), pfDeny("PENDING-FITNESS-NOT-DESIGN-PACKAGE"));
+  assert.deepEqual(pfDecide(pfReadiness({ source: "adoption-deferral" }), fitness), pfDeny("PENDING-FITNESS-NOT-DESIGN-PACKAGE"));
+  for (const overallStatus of ["pass", "blocked", "unavailable", undefined]) {
+    assert.deepEqual(pfDecide(pfReadiness({ overallStatus }), fitness), pfDeny("PENDING-FITNESS-NOT-DEFERRED"), String(overallStatus));
+  }
+});
+
+test("pending allowance: an empty pending set denies even when the evaluator reports a missing entry point", () => {
+  const fitness = pfFitness(pfFinding(6, pfViolation("missing-verification-entry-point", PF_ENTRY)));
+  assert.deepEqual(pfDecide(pfReadiness({ pendingPhysicalSurfaces: [] }), fitness), pfDeny("PENDING-FITNESS-NO-PENDING-SURFACES"));
+});
+
+test("pending allowance: a finding of any other class denies, including classes whose id and property do not agree", () => {
+  const entry = pfViolation("missing-verification-entry-point", PF_ENTRY);
+  for (const classId of [1, 3, 4, 5, 8, 9, 10]) {
+    assert.deepEqual(pfDecide(pfReadiness(), pfFitness(pfFinding(6, entry), pfFinding(classId, pfViolation("x", PF_ENTRY)))),
+      pfDeny("PENDING-FITNESS-OTHER-CLASS"), `class ${classId}`);
+  }
+  const mismatched = { classId: 6, propertyId: "contract-presence-freshness", outcome: "finding", violations: [entry] };
+  assert.deepEqual(pfDecide(pfReadiness(), pfFitness(mismatched)), pfDeny("PENDING-FITNESS-OTHER-CLASS"));
+});
+
+test("pending allowance: only the two known report-only unavailable shapes are tolerated; any other non-pass outcome denies", () => {
+  const readiness = pfReadiness();
+  const other = (row) => pfDecide(readiness, pfFitness(row));
+  assert.deepEqual(other({ ...pfProfileUnavailable, details: "Governed profile unreadable" }), pfDeny("PENDING-FITNESS-OTHER-CLASS"));
+  assert.deepEqual(other({ ...pfCalibrationUnavailable, evidence: { status: "unavailable", required: ["measured-calibration"] } }), pfDeny("PENDING-FITNESS-OTHER-CLASS"));
+  assert.deepEqual(other({ classId: 3, propertyId: "dependency-direction-cycles", outcome: "unsupported", violations: [] }), pfDeny("PENDING-FITNESS-OTHER-CLASS"));
+  assert.deepEqual(other({ classId: 5, propertyId: "authority-effect-ownership", outcome: "unknown", violations: [] }), pfDeny("PENDING-FITNESS-OTHER-CLASS"));
+  assert.deepEqual(other({ classId: 6, propertyId: "verification-locality", outcome: "excepted", violations: [pfViolation("missing-verification-entry-point", PF_ENTRY)] }), pfDeny("PENDING-FITNESS-OTHER-CLASS"));
+  assert.deepEqual(other({ classId: 2, propertyId: "contract-presence-freshness", outcome: "unavailable", violations: [] }), pfDeny("PENDING-FITNESS-OTHER-CLASS"));
+});
+
+test("pending allowance: a violation target outside the pending set denies, including the zero-entry-point sentinel", () => {
+  const readiness = pfReadiness();
+  const finding = (...violations) => pfFitness(pfFinding(6, ...violations));
+  assert.deepEqual(pfDecide(readiness, finding(pfViolation("missing-verification-entry-point", "tests/other.test.mjs"))), pfDeny("PENDING-FITNESS-TARGET-NOT-PENDING"));
+  assert.deepEqual(pfDecide(readiness, finding(pfViolation("missing-verification-entry-point", "none"))), pfDeny("PENDING-FITNESS-TARGET-NOT-PENDING"));
+  assert.deepEqual(pfDecide(readiness, finding(pfViolation("missing-verification-entry-point", PF_ENTRY), pfViolation("missing-verification-entry-point", "tests/other.test.mjs"))),
+    pfDeny("PENDING-FITNESS-TARGET-NOT-PENDING"), "one covered and one uncovered violation");
+  assert.deepEqual(pfDecide(readiness, finding()), pfDeny("PENDING-FITNESS-TARGET-NOT-PENDING"), "a finding that names no target cannot be matched");
+  assert.deepEqual(pfDecide(readiness, finding({ ruleId: "missing-verification-entry-point", module: "application" })), pfDeny("PENDING-FITNESS-TARGET-NOT-PENDING"));
+  assert.deepEqual(pfDecide(pfReadiness({ pendingPhysicalSurfaces: [PF_IMPLEMENTATION] }), pfFitness(pfFinding(2, pfViolation("missing-contract", PF_CONTRACT)))),
+    pfDeny("PENDING-FITNESS-TARGET-NOT-PENDING"));
+});
+
+test("pending allowance: a defect that is not absence (unreadable surface) denies even on a pending target", () => {
+  assert.deepEqual(pfDecide(pfReadiness(), pfFitness(pfFinding(6, pfViolation("unreadable-verification-entry-point", PF_ENTRY)))), pfDeny("PENDING-FITNESS-UNEXPECTED-RULE"));
+  assert.deepEqual(pfDecide(pfReadiness({ pendingPhysicalSurfaces: [PF_CONTRACT] }), pfFitness(pfFinding(2, pfViolation("unreadable-contract", PF_CONTRACT)))), pfDeny("PENDING-FITNESS-UNEXPECTED-RULE"));
+});
+
+test("pending allowance: a navigation-currency finding is never allowed, because its violation names no stale contract", () => {
+  const entry = pfViolation("missing-verification-entry-point", PF_ENTRY);
+  const stale = pfFinding(7, { ruleId: "architecture-map-stale", module: "architecture", target: "architecture/map", details: "Navigation map stale" });
+  assert.deepEqual(pfDecide(pfReadiness(), pfFitness(pfFinding(6, entry), stale)), pfDeny("PENDING-FITNESS-NAVIGATION-UNPROVEN"));
+  const missingIndex = pfFinding(7, { ruleId: "missing-navigation-index", module: "architecture", target: "/x/architecture/map/index.md" });
+  assert.deepEqual(pfDecide(pfReadiness(), pfFitness(missingIndex)), pfDeny("PENDING-FITNESS-NAVIGATION-UNPROVEN"));
+  assert.deepEqual(pfDecide(pfReadiness({ pendingPhysicalSurfaces: ["architecture/map", PF_ENTRY] }), pfFitness(stale)),
+    pfDeny("PENDING-FITNESS-NAVIGATION-UNPROVEN"), "a pending set that happens to contain the constant map target does not prove the contract");
+});
+
+test("pending allowance: malformed input is denied as malformed and never throws", () => {
+  const good = pfFitness(pfFinding(6, pfViolation("missing-verification-entry-point", PF_ENTRY)));
+  const malformed = pfDeny("PENDING-FITNESS-INPUT-MALFORMED");
+  for (const input of [undefined, null, 7, "x", [], {}, { readiness: pfReadiness() }, { fitness: good }]) {
+    assert.deepEqual(greenfieldPendingFitnessAllowance(input), malformed, JSON.stringify(input));
+  }
+  assert.deepEqual(pfDecide(null, good), malformed);
+  assert.deepEqual(pfDecide({ status: "ready" }, good), malformed, "readiness without a fitness object");
+  assert.deepEqual(pfDecide(pfReadiness(), null), malformed);
+  assert.deepEqual(pfDecide(pfReadiness(), { outcomes: "nope" }), malformed);
+  assert.deepEqual(pfDecide(pfReadiness(), { outcomes: [null] }), malformed);
+  assert.deepEqual(pfDecide(pfReadiness(), { outcomes: [{ classId: 6, outcome: "finding", violations: [] }] }), malformed, "no propertyId");
+  assert.deepEqual(pfDecide(pfReadiness(), { outcomes: [{ classId: 6, propertyId: "verification-locality", outcome: "finding", violations: "x" }] }), malformed);
+  assert.deepEqual(pfDecide(pfReadiness({ pendingPhysicalSurfaces: "tests/x" }), good), malformed);
+  assert.deepEqual(pfDecide(pfReadiness({ pendingPhysicalSurfaces: [PF_ENTRY, 7] }), good), malformed);
+  assert.deepEqual(pfDecide(pfReadiness({ pendingPhysicalSurfaces: [PF_ENTRY, ""] }), good), malformed);
+  const hostile = { get status() { throw new Error("hostile getter"); } };
+  assert.deepEqual(pfDecide(hostile, good), malformed);
+  assert.deepEqual(pfDecide(pfReadiness(), { get outcomes() { throw new Error("hostile getter"); } }), malformed);
 });

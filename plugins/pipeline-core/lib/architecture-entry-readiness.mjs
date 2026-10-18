@@ -489,3 +489,148 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     nextAction: null,
   };
 }
+
+/** Closed set of codes `greenfieldPendingFitnessAllowance` can return; one per reason. */
+export const GREENFIELD_PENDING_FITNESS_CODES = Object.freeze({
+  ALLOWED: "PENDING-FITNESS-ALLOWED",
+  MALFORMED: "PENDING-FITNESS-INPUT-MALFORMED",
+  NOT_READY: "PENDING-FITNESS-READINESS-NOT-READY",
+  NOT_DESIGN_PACKAGE: "PENDING-FITNESS-NOT-DESIGN-PACKAGE",
+  NOT_DEFERRED: "PENDING-FITNESS-NOT-DEFERRED",
+  NO_PENDING_SURFACES: "PENDING-FITNESS-NO-PENDING-SURFACES",
+  OTHER_CLASS: "PENDING-FITNESS-OTHER-CLASS",
+  TARGET_NOT_PENDING: "PENDING-FITNESS-TARGET-NOT-PENDING",
+  UNEXPECTED_RULE: "PENDING-FITNESS-UNEXPECTED-RULE",
+  NAVIGATION_UNPROVEN: "PENDING-FITNESS-NAVIGATION-UNPROVEN",
+});
+
+// The two evaluator classes whose findings can be caused by a surface that the approved design declares but its
+// implementation owner has not written yet, with the only rules that mean "absent or empty" (exactly what
+// `pendingPhysicalSurfaces` measures in lib/architecture-design.mjs). `unreadable-*` is a defect, not absence.
+const PENDING_SURFACE_CLASSES = new Map([
+  [2, { propertyId: "contract-presence-freshness", rules: new Set(["missing-contract", "stale-contract"]) }],
+  [6, { propertyId: "verification-locality", rules: new Set(["missing-verification-entry-point", "empty-verification-entry-point"]) }],
+]);
+
+const isPlainObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
+// The two `unavailable` shapes a design-package greenfield tree always produces. These are the same shapes
+// `projectPlanningFitness` already treats as report-only (class 10 uncalibrated; class 9 without an adoption
+// snapshot, which a design package never carries); they are not findings and are not pending-caused.
+function isReportOnlyUnavailable(outcome) {
+  if (outcome.outcome !== "unavailable" || outcome.evidence?.status !== "unavailable") return false;
+  if (outcome.classId === 10 && outcome.propertyId === "calibrated-friction-thresholds") {
+    return Array.isArray(outcome.evidence.required)
+      && outcome.evidence.required.includes("measured-calibration")
+      && outcome.evidence.required.includes("explicit-threshold-promotion");
+  }
+  return outcome.classId === 9 && outcome.propertyId === "profile-drift"
+    && outcome.details === "Valid approved-scoped authority is unavailable";
+}
+
+function decideGreenfieldPendingFitness(input) {
+  const codes = GREENFIELD_PENDING_FITNESS_CODES;
+  const deny = (code) => ({ allowed: false, code });
+  const readiness = input?.readiness;
+  const fitness = input?.fitness;
+  if (!isPlainObject(readiness) || !isPlainObject(fitness) || !Array.isArray(fitness.outcomes)) return deny(codes.MALFORMED);
+  const outcomes = fitness.outcomes;
+  if (outcomes.some((row) => !isPlainObject(row) || !Number.isInteger(row.classId) || typeof row.propertyId !== "string"
+    || typeof row.outcome !== "string" || (row.violations !== undefined && !Array.isArray(row.violations)))) return deny(codes.MALFORMED);
+  if (readiness.status !== "ready") return deny(codes.NOT_READY);
+  const entry = readiness.fitness;
+  if (!isPlainObject(entry)) return deny(codes.MALFORMED);
+  if (entry.source !== "approved-design-package") return deny(codes.NOT_DESIGN_PACKAGE);
+  if (entry.overallStatus !== "deferred") return deny(codes.NOT_DEFERRED);
+  const pending = entry.pendingPhysicalSurfaces;
+  if (!Array.isArray(pending) || pending.some((name) => typeof name !== "string" || name === "")) return deny(codes.MALFORMED);
+  if (pending.length === 0) return deny(codes.NO_PENDING_SURFACES);
+  const pendingSet = new Set(pending);
+  for (const row of outcomes) {
+    if (row.outcome === "pass" || isReportOnlyUnavailable(row)) continue;
+    if (row.outcome !== "finding") return deny(codes.OTHER_CLASS);
+    if (row.classId === 7 && row.propertyId === "navigation-currency") return deny(codes.NAVIGATION_UNPROVEN);
+    const kind = PENDING_SURFACE_CLASSES.get(row.classId);
+    if (kind === undefined || kind.propertyId !== row.propertyId) return deny(codes.OTHER_CLASS);
+    const violations = row.violations ?? [];
+    if (violations.length === 0) return deny(codes.TARGET_NOT_PENDING);
+    for (const violation of violations) {
+      if (!isPlainObject(violation) || typeof violation.target !== "string" || !pendingSet.has(violation.target)) {
+        return deny(codes.TARGET_NOT_PENDING);
+      }
+      if (!kind.rules.has(violation.ruleId)) return deny(codes.UNEXPECTED_RULE);
+    }
+  }
+  return { allowed: true, code: codes.ALLOWED, pendingPhysicalSurfaces: [...pending] };
+}
+
+/**
+ * Pure decision: may a greenfield tree whose only missing surfaces are its own planned contracts and
+ * verification entry points enter implementation although the planning-mode fitness evaluator is not green?
+ *
+ * Why it exists. After approve-plan and a successful materialize-architecture, `inspectArchitectureEntryReadiness`
+ * answers `ready` with `fitness: { overallStatus: "deferred", source: "approved-design-package",
+ * pendingPhysicalSurfaces }` (a deferral, never a fitness PASS). The guard's planning-mode evaluator, however,
+ * reports every declared-but-unwritten entry point (class 6) and contract (class 2) as a finding, and test files
+ * cannot be written before implementation is entered. The guard's only readiness-based allowance requires the
+ * adoption disposition `deferred`; this tree's disposition is `approved-scoped`.
+ *
+ * Inputs (both already computed by the caller; nothing is read, nothing is thrown):
+ * - `readiness`: the result of `inspectArchitectureEntryReadiness({ rootDir, taskScope })`.
+ * - `fitness`:   the result of `evaluateArchitectureFitness` in planning mode for the same root (the guard's own
+ *                `architectureFitnessAuthorityVerdict` result).
+ *
+ * Returns `{ allowed: true, code, pendingPhysicalSurfaces }` ONLY when ALL hold:
+ * 1. readiness `status === "ready"`, `fitness.source === "approved-design-package"`,
+ *    `fitness.overallStatus === "deferred"` and `fitness.pendingPhysicalSurfaces` is non-empty; and
+ * 2. every non-`pass` evaluator outcome is either
+ *    - a `finding` of class 6 `verification-locality` (rules missing/empty-verification-entry-point) or class 2
+ *      `contract-presence-freshness` (rules missing/stale-contract) whose every `violations[].target` is exactly one of
+ *      the pending surfaces, or
+ *    - one of the two known report-only `unavailable` shapes: class 10 uncalibrated friction thresholds and class 9
+ *      profile drift without an adoption snapshot (the shapes `projectPlanningFitness` already treats as report-only).
+ * Otherwise `{ allowed: false, code }`, one distinct `GREENFIELD_PENDING_FITNESS_CODES` value per reason.
+ *
+ * What is matched on: `outcome.classId` + `outcome.propertyId` (both must agree), `violation.ruleId` and
+ * `violation.target`. Class 2 targets are the declared contract string and class 6 targets the declared entry
+ * path; `"none"` (a module declaring zero entry points) is never pending and so always denies. The predicate
+ * deliberately does not read `evidence.remedyComparisons`, which planning mode appends.
+ *
+ * Class 7 `navigation-currency` is NEVER allowed: its violation is a constant `{ ruleId: "architecture-map-stale",
+ * target: "architecture/map" }` (scripts/architecture-fitness.mjs evaluateNavigationCurrency) and does not name the
+ * stale touched contract, so "each stale contract is itself pending" cannot be proven from these inputs. A real
+ * pending-only tree does not trigger it (its touched contracts are already in the owning module's
+ * `publicContracts`); a tree that does trigger it has genuine map staleness. Allowing it would require the
+ * evaluator to name the contract, which is outside this function.
+ *
+ * SINGLE INTENDED CALL SITE (protected change, mechanical): `architectureFitnessAuthorityVerdict` in
+ * lib/guard/entry-gates.mjs, next to the existing deferred-adoption allowance, inside the same try block and
+ * after `const scope = ...` is validated. The existing allowance is conditioned on `adoption.disposition ===
+ * "deferred"`; this one must sit OUTSIDE that condition because a design-package tree is `approved-scoped`:
+ *
+ *   // import { greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
+ *   const pendingEntry = (dependencies.inspectArchitectureEntryReadinessFn ?? inspectArchitectureEntryReadiness)({
+ *     rootDir: root,
+ *     taskScope: scope,
+ *   });
+ *   if (greenfieldPendingFitnessAllowance({ readiness: pendingEntry, fitness }).allowed) return null;
+ *
+ * i.e. three statements, placed immediately after the `if (adoption?.ok === true && adoption.disposition ===
+ * "deferred") { ... }` block and still inside `if (typeof scope === "string" && scope.trim() !== "")`, with the
+ * `fitness` variable already computed above (the guard's own planning-mode result, identical to the inputs the pin
+ * lib/pins/greenfield-implementation-entry-with-pending-verification-surfaces.test.mjs uses). Any throw is caught by
+ * the existing `catch { /* unchanged denial below *\/ }`, so a failure keeps the denial.
+ *
+ * The call must stay INSIDE the guard's standing `fitness.overallStatus !== "unavailable" && !== "unknown"` condition
+ * (entry-gates ~172-175); do not relax it. Consequence, stated so it is not mistaken for end-to-end admission: a tree
+ * whose evaluator yields only report-only unavailable classes (no class 2/6 finding, so overallStatus `unavailable`)
+ * is allowed by THIS predicate but is still denied by that standing policy. The case this unblocks is the one with a
+ * planned entry point missing: a class 6 finding makes overallStatus `blocked`, which reaches the call.
+ */
+export function greenfieldPendingFitnessAllowance(input) {
+  try {
+    return decideGreenfieldPendingFitness(input);
+  } catch {
+    return { allowed: false, code: GREENFIELD_PENDING_FITNESS_CODES.MALFORMED };
+  }
+}
