@@ -87,8 +87,14 @@ export function materializeArchitectureDesignFixture({
   if (!existsSync(plan)) throw new Error(`plan fixture is missing: ${planPath}`);
   const currentPlan = readFileSync(plan, "utf8");
   if (!currentPlan.includes(sourcePath)) writeFileSync(plan, `${currentPlan.trimEnd()}\n\nImplementation surface: \`${sourcePath}\`.\n`, "utf8");
-  if (!existsSync(resolve(root, sourcePath))) write(root, sourcePath, "export const ready = true;\n");
-  const createdAgentEntry = !existsSync(resolve(root, "AGENTS.md"));
+  // Existing project source is committed before the Pipeline's hooks apply; a
+  // source path that is already tracked is neither rewritten nor staged with
+  // the design commit (the devplan policy refuses source in a draft phase).
+  const sourceAlreadyTracked = spawnSync("git", ["-C", root, "ls-files", "--error-unmatch", "--", sourcePath], { encoding: "utf8" }).status === 0;
+  if (!sourceAlreadyTracked && !existsSync(resolve(root, sourcePath))) write(root, sourcePath, "export const ready = true;\n");
+  // The decision-continuity reader requires the ADR directory to exist (an empty one is a valid "no decisions" state).
+  mkdirSync(resolve(root, "docs", "adr"), { recursive: true });
+  const createdAgentEntry =!existsSync(resolve(root, "AGENTS.md"));
   if (createdAgentEntry) {
     const entry = initialGreenfieldAgentEntryTarget("fresh");
     write(root, entry.path, entry.bytes);
@@ -132,7 +138,7 @@ export function materializeArchitectureDesignFixture({
   // commits a protected proof-policy mutation.  The physical design artifacts
   // still get a real candidate commit, while the actual signature is verified
   // against the temporary policy bytes for this isolated fixture.
-  git(root, ["add", "--", "architecture", ...(createdAgentEntry ? ["AGENTS.md"] : []), sourcePath, planPath]);
+  git(root, ["add", "--", "architecture", ...(createdAgentEntry ? ["AGENTS.md"] : []), ...(sourceAlreadyTracked ? [] : [sourcePath]), planPath]);
   commitIfStaged(root, "test fixture architecture design");
 
   const scope = decisionScope ?? [
