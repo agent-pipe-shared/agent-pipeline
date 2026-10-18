@@ -166,6 +166,23 @@ test("AC-6: every rendered command is a runner-neutral, platform-neutral argv ar
   }
 });
 
+test("AC-9: CAC-REGISTRATION-INVALID names the registration writer, and that code is really emitted by the reader", () => {
+  const map = buildRepairMap({ rootDir: ROOT });
+  const row = map.rows.find((candidate) => candidate.code === "CAC-REGISTRATION-INVALID");
+  assert.ok(row, "the accepted-contract registration refusal must have a row");
+  assert.equal(row.liftable, "narrower-recovery");
+  assert.equal(row.by, "this-session-agent");
+  assert.equal(row.command.length, 1);
+  assert.equal(row.command[0].executable, process.execPath);
+  const [script, ...rest] = row.command[0].argv;
+  assert.deepEqual(rest, ["--root", ROOT]);
+  assert.ok(script.endsWith("register-feature-package.mjs") && existsSync(script), "the named writer must be a shipped script");
+  assert.match(row.reason, /commit the manifest/iu);
+  assert.match(row.reason, /binding afterwards/u);
+  const reader = readFileSync(join(PLUGIN_ROOT, "scripts", "pipeline-state.mjs"), "utf8");
+  assert.ok(reader.includes('code:"CAC-REGISTRATION-INVALID"'), "the code must still be emitted by readAcceptedDeliveryContract");
+});
+
 test("AC-8: the emitted map validates against its own schema's required/enum shape", () => {
   const schema = JSON.parse(readFileSync(join(PLUGIN_ROOT, "scripts", "repair-map.schema.json"), "utf8"));
   const map = buildRepairMap({ rootDir: ROOT });

@@ -68,6 +68,25 @@ Never turn routine uncertainty into serial PO approvals.
 
 ## First dispatch of an item-governed course
 
+Register the approved plan before the first binding. `approve-plan` writes the
+accepted delivery contract envelope, and the dispatch is admitted only when
+`specs/<feature>/lifecycle.json` registers it (else `CAC-REGISTRATION-INVALID`):
+`node <plugin-root>/scripts/register-feature-package.mjs --root <root>`. It reads the
+feature and the envelope from the project authority State, writes the manifest once
+(validated, never overwritten) and prints the paths to commit as `commitPaths`.
+The package topology requires an `acceptance.md` and a `result.md` for an approved
+feature and no design step writes them, so the command creates a missing one itself
+(Pipeline-owned, `authority: false`, immutable: an acceptance pointer to the approved
+Spec's path and digest that adds no criterion, and a result record that says
+implementation is in progress and is not acceptance) and registers an existing one
+as found, never rewritten. Order: commit everything in `commitPaths` first (the
+manifest, any generated file, and the envelope when it is untracked), then generate
+the binding below; a binding generated before that commit carries a stale candidate.
+The result also names the manifest's `rigor` and its `rigorSource`
+(`profile-mapping`, a judgment call from the plan's profile). It refuses with a typed
+`FPR-*` code, for example `FPR-ARTIFACT-MISSING` when the plan's PRD or Spec does not
+exist (the command never invents those).
+
 The guard creates `slice-queue.json` itself from the first productive dispatch
 whose prompt opens with a generated binding carrying `itemDelivery`; without
 one it refuses `SQ-DELIVERY-COURSE-ABSENT`. Generate it, never hand-write it:

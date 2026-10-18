@@ -247,6 +247,22 @@ export function structuralRows({ rootDir, pluginRoot }) {
         + `against a representative kernel path -- observed ${JSON.stringify(kernelHit)}); no Guard Maintenance `
         + "Window, however scoped or freshly signed, can ever cover it.",
     },
+    {
+      // Not a guard refusal: the accepted-contract reader's own typed code. A consumer's first item-governed
+      // dispatch hits it because no manifest registers the approved plan's envelope. The writer is read from
+      // the same module that emits the registration, never typed as a second rule here.
+      code: "CAC-REGISTRATION-INVALID",
+      liftable: "narrower-recovery",
+      by: "this-session-agent",
+      command: [{ executable: process.execPath, argv: [join(pluginRoot, "scripts", "register-feature-package.mjs"), "--root", rootDir] }],
+      reason: "the approved plan's accepted-contract envelope is not registered in specs/<feature>/lifecycle.json "
+        + "(readAcceptedDeliveryContract resolves it through that validated manifest). register-feature-package.mjs writes the "
+        + "manifest exactly once, validated, and never overwrites an existing one; it also creates a missing acceptance pointer and "
+        + "result record (Pipeline-owned, non-authoritative) and registers existing ones as found. Then commit the manifest "
+        + "(plus any generated acceptance or result file in commitPaths, and the envelope when untracked) FIRST and generate dispatch-briefing.mjs binding afterwards: a binding "
+        + "generated before the commit carries a stale candidate. An agent in this session can execute it; a refusal it returns "
+        + "(FPR-*) names the missing artifact or conflict.",
+    },
   ];
 }
 
@@ -280,7 +296,8 @@ export function buildRepairMap({ rootDir, pluginRoot = PLUGIN_ROOT } = {}) {
     schema: SCHEMA,
     generatedAt: new Date().toISOString(),
     enumerationSource: "plugins/pipeline-core/lib/human-guard-override.mjs:eligibility() (live-extracted) "
-      + "+ two named structural rows (GUARD-LIFECYCLE-NOT-READY central route, GS-6 kernel-path)",
+      + "+ three named structural rows (GUARD-LIFECYCLE-NOT-READY central route, GS-6 kernel-path, "
+      + "CAC-REGISTRATION-INVALID accepted-contract registration)",
     knownEligibilityCodes: codes,
     uncoveredEligibilityCodes: uncovered,
     rows,
