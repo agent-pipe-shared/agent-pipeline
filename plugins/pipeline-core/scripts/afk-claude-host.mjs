@@ -158,6 +158,14 @@ function loadPrepared(root, requestId, { platform = process.platform, assessWind
   return value;
 }
 
+// `tools` is documented as a comma-separated string or a YAML list. The shipped definition is the YAML flow sequence
+// because Antigravity's loader rejects the string form; both spellings must yield the same member list.
+function parseToolsValue(raw) {
+  const value = raw.trim();
+  const inner = value.startsWith("[") && value.endsWith("]") ? value.slice(1, -1) : value;
+  return inner.split(",").map((member) => member.trim());
+}
+
 export function validateClaudeWorkerDefinition(bytes) {
   let text;
   try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { return false; }
@@ -168,7 +176,7 @@ export function validateClaudeWorkerDefinition(bytes) {
   const frontmatter = lines.slice(1, end);
   const toolLines = frontmatter.filter((line) => /^tools:/u.test(line));
   if (toolLines.length !== 1) return false;
-  const tools = toolLines[0].slice("tools:".length).split(",").map((value) => value.trim());
+  const tools = parseToolsValue(toolLines[0].slice("tools:".length));
   if (tools.length !== SUPPORTED_TOOLS.length
     || new Set(tools).size !== tools.length
     || JSON.stringify([...tools].sort()) !== JSON.stringify(SUPPORTED_TOOLS)) return false;

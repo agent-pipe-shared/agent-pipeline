@@ -4,7 +4,7 @@ description: "Agent-Pipeline Goldfish (implementor tier, effort medium - THE STA
 model: sonnet
 effort: medium
 maxTurns: 50
-tools: Read, Edit, Write, Grep, Glob, Bash
+tools: [Read, Edit, Write, Grep, Glob, Bash]
 # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
 #   pipeline learns via the versioned operating model, not via agent memory.
 # Worktree isolation is deliberately NOT hardcoded here: the Elephant enables it per dispatch

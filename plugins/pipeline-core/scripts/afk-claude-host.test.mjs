@@ -115,11 +115,23 @@ async function prepared(overrides = {}) {
 test("agent definition exposes exactly Read, Grep and Glob without hidden capability fields", () => {
   assert.equal(validateClaudeWorkerDefinition(DEFINITION), true);
   assert.equal(validateClaudeWorkerDefinition(Buffer.from(DEFINITION.toString().replace(
-    "tools: Read, Grep, Glob", "tools: Read, Grep, Glob, Bash",
+    "tools: [Read, Grep, Glob]", "tools: [Read, Grep, Glob, Bash]",
   ))), false);
   assert.equal(validateClaudeWorkerDefinition(Buffer.from(DEFINITION.toString().replace(
     "maxTurns: 20", "maxTurns: 20\nmemory: project",
   ))), false);
+});
+
+test("the YAML flow sequence and the comma string spell the same exact tool set", () => {
+  const shipped = DEFINITION.toString();
+  assert.ok(shipped.includes("tools: [Read, Grep, Glob]"), "the shipped definition spells tools as a YAML flow sequence");
+  const withTools = (spelling) => Buffer.from(shipped.replace("tools: [Read, Grep, Glob]", `tools: ${spelling}`));
+  for (const spelling of ["[Read, Grep, Glob]", "[Glob, Grep, Read]", "Read, Grep, Glob", "Glob, Grep, Read"]) {
+    assert.equal(validateClaudeWorkerDefinition(withTools(spelling)), true, spelling);
+  }
+  for (const spelling of ["[Read, Grep]", "[Read, Grep, Glob, Bash]", "[Read, Grep, Glob, Glob]", "[Read, Grep, Glob", "Read, Grep, Glob]", "[[Read, Grep, Glob]]", "[]", "Read, Grep", "Read, Grep, Glob, Bash"]) {
+    assert.equal(validateClaudeWorkerDefinition(withTools(spelling)), false, spelling);
+  }
 });
 
 test("prepare validates receipt, exact definition digest and observed private ref before storage", async () => {

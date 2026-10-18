@@ -104,7 +104,8 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    const other=scope==='global'?'workspace':'global';
    if(observation.registries[other].entries.some(e=>e.status==='observed'&&e.root!==observation.source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
    if((retire||install||hooks.some(h=>h.scope==='global'&&h.changes)||scope==='global')&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');
-   const actions=[];if(retire)actions.push({kind:'cli',argv:Object.freeze(['plugin','uninstall',NAME])});if(install)actions.push({kind:'cli',argv:Object.freeze(['plugin','validate',observation.source.root])},{kind:'cli',argv:Object.freeze(['plugin','install',observation.source.root])});
+   // A replaced managed copy is retired only after the source validates, so the plan validates first and again before the install.
+   const validation=()=>({kind:'cli',argv:Object.freeze(['plugin','validate',observation.source.root])}),actions=[];if(retire&&install)actions.push(validation());if(retire)actions.push({kind:'cli',argv:Object.freeze(['plugin','uninstall',NAME])});if(install)actions.push(validation(),{kind:'cli',argv:Object.freeze(['plugin','install',observation.source.root])});
    for(const h of hooks)if(h.changes)actions.push({kind:'owned-wiring-rebind',scope:h.scope,path:h.path,sha256:h.sha256,changes:h.changes,preserveForeignBytes:true});
    for(const selected of globalChangeApproved?[scope,other]:[scope]){const r=observation.registries[selected],owned=r.entries.filter(e=>e.status==='observed');if(selected!==scope&&!owned.length)continue;if(owned.length!==1||owned[0].root!==observation.source.root)actions.push({kind:'owned-registry-rebind',scope:selected,path:r.path,sha256:r.sha256,preserveForeignBytes:true});}
    const plan=Object.freeze({schema:'pipeline.antigravity-refresh-plan.v2',status:'prepared',scope,globalChangeApproved,sourceRoot:observation.source.root,sourceContentSha256:observation.source.content.sha256,observationSha256:antigravityTopologySha256(observation),actions:Object.freeze(actions.map(Object.freeze)),requiresFreshExecutingSession:true});plans.set(plan,plan.observationSha256);return plan;
@@ -137,13 +138,16 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
    const initialImport=read(join(configRoot,'config','import_manifest.json'));
    const foreignImports=initialImport.value?.imports?.filter(e=>e?.name!==NAME)??[];
    const foreignImportKeys=Object.fromEntries(Object.entries(initialImport.value??{}).filter(([key])=>key!=='imports'));
-   function cli(argv,label){recheck();changed=true;const r=invoke(Object.freeze([...argv]));if(r?.status!=='ok')throw Error('ATR-CLI-FAILED');completed.push(label);observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);if(observation.source.content?.sha256!==source.content.sha256)throw Error('ATR-SOURCE-DRIFT');
+   // mutates=false marks a read-only CLI step (validate): its failure changed nothing, so the result stays "refused". A null label keeps a preflight out of `completed`.
+   function cli(argv,label,mutates=true){recheck();if(mutates)changed=true;const r=invoke(Object.freeze([...argv]));if(r?.status!=='ok')throw Error('ATR-CLI-FAILED');if(label!==null)completed.push(label);observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);if(observation.source.content?.sha256!==source.content.sha256)throw Error('ATR-SOURCE-DRIFT');
     if(Object.entries(observation.registries).some(([key,r])=>r.sha256!==registryDigests[key]))throw Error('ATR-CLI-REGISTRY-DRIFT');
     const now=read(join(configRoot,'config','import_manifest.json'));
     if(antigravityTopologySha256(now.value?.imports?.filter(e=>e?.name!==NAME)??[])!==antigravityTopologySha256(foreignImports)||Object.entries(foreignImportKeys).some(([key,value])=>!Object.hasOwn(now.value??{},key)||antigravityTopologySha256(now.value[key])!==antigravityTopologySha256(value)))throw Error('ATR-CLI-FOREIGN-IMPORT-DRIFT');
    }
+   // Validate before anything is retired: a source the CLI rejects must leave the existing managed copy untouched.
+   if(retire&&install)cli(['plugin','validate',source.root],null,false);
    if(retire){cli(['plugin','uninstall',NAME],'uninstall');if(observation.managed.candidates.length||observation.importState.entries.length)throw Error('ATR-UNINSTALL-READBACK');}
-   if(install){cli(['plugin','validate',source.root],'validate');cli(['plugin','install',source.root],'install');const copy=observation.managed.candidates[0];if(observation.managed.candidates.length!==1||observation.importState.entries.length!==1||copy.content.sha256!==source.content.sha256)throw Error('ATR-INSTALL-READBACK');}
+   if(install){cli(['plugin','validate',source.root],'validate',false);cli(['plugin','install',source.root],'install');const copy=observation.managed.candidates[0];if(observation.managed.candidates.length!==1||observation.importState.entries.length!==1||copy.content.sha256!==source.content.sha256)throw Error('ATR-INSTALL-READBACK');}
    for(const hook of hookPlans)if(hook.changes){recheck();changed=true;write(hook.path,hook.nextBytes,hook.sha256);completed.push('wiring-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
    // The owning CLI may create new hook metadata. Independently classify and
    // bind it after lifecycle; a stale/unknown new command cannot become success.

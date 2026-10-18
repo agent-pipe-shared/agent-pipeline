@@ -4,7 +4,7 @@ description: "Agent-Pipeline Goldfish (deep tier, effort xhigh) - fresh-context 
 model: sonnet
 effort: xhigh
 maxTurns: 80
-tools: Read, Edit, Write, Grep, Glob, Bash
+tools: [Read, Edit, Write, Grep, Glob, Bash]
 # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
 #   pipeline learns via the versioned operating model, not via agent memory.
 # Worktree isolation is deliberately NOT hardcoded here: the Elephant enables it per dispatch

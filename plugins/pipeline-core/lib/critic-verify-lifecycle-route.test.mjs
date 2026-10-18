@@ -95,7 +95,8 @@ test("R4-T0-10 regression: the fallback Advisor agent definition grants no write
   const text = readFileSync(new URL("../agents/consult-advisor.md", import.meta.url), "utf8");
   const match = /^tools:\s*(.+)$/mu.exec(text);
   assert.ok(match, "consult-advisor.md must declare a tools allowlist");
-  const tools = match[1].split(",").map((tool) => tool.trim()).filter(Boolean);
+  const listed = match[1].trim();
+  const tools = (/^\[(.*)\]$/u.exec(listed)?.[1] ?? listed).split(",").map((tool) => tool.trim()).filter(Boolean);
   assert.deepEqual(tools.filter((tool) => !["Read", "Grep", "Glob"].includes(tool)), [], "only read-only tools may be granted");
 });
 

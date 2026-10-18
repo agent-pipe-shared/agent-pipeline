@@ -3,7 +3,7 @@ name: consult-advisor
 description: "Demand- and consent-gated fresh read-only advisor. Codex may use the selected-sandbox route only where the host route admits it; WSL is typed unavailable before export or launch. Claude retains the registered Read/Grep/Glob consult fallback. Exactly one concrete question/reason, fresh context, no bootstrap invocation, memory, mutation, gate decision or auto-application."
 effort: max
 maxTurns: 10
-tools: Read, Grep, Glob
+tools: [Read, Grep, Glob]
 # Claude hard read-only: Write/Edit/Bash are absent by construction. The exact
 # selected Codex payload adds Bash without granting a generic host shell.
 # NO memory: memory would add inherited context and mutation capability.

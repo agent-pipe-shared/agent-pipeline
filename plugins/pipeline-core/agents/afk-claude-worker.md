@@ -4,7 +4,7 @@ description: "Capability-bounded AFK analysis worker. Receives one closed reques
 model: sonnet
 effort: high
 maxTurns: 20
-tools: Read, Grep, Glob
+tools: [Read, Grep, Glob]
 # Deliberately no Bash, PowerShell, Edit, Write, Web, MCP, memory or delegation.
 ---
 

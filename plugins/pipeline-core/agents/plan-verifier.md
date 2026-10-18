@@ -4,7 +4,7 @@ description: "Verifies an implementation diff against the approved plan artifact
 model: sonnet
 effort: high
 maxTurns: 15
-tools: Read, Grep, Glob, Bash
+tools: [Read, Grep, Glob, Bash]
 # READ-ONLY: no Write/Edit in `tools`; NO `memory` field (mirrors critic.md) — memory would
 #   auto-activate persistent write surfaces and break the read-only guarantee this agent exists for.
 # Bash is contractually restricted to read-only git (diff/log/show) — the tools field cannot scope

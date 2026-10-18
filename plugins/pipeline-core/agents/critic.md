@@ -4,7 +4,7 @@ description: "Agent-Pipeline Critic - independent read-only reviewer in a fresh 
 model: sonnet
 effort: max
 maxTurns: 65
-tools: Read, Grep, Glob, Bash, Write, Edit
+tools: [Read, Grep, Glob, Bash, Write, Edit]
 # READ-ONLY toward the repository: Write/Edit are in `tools` for ONE file only, the Critic's own
 #   scratch/dispatch/critic-<id>/critic-notes.md (CR-06-D). A `tools` list cannot confine a path, so
 #   guard-dispatch-budget refuses every other Write/Edit/NotebookEdit with DISPATCH-BUDGET-CRITIC-WRITE-CONFINED

@@ -157,8 +157,9 @@ test("C4/A1: the shipped template's step 0 precedes the first write and forbids 
 const GAP_TITLE = "C5/A1: template step 0 is executable with the Goldfish role's own tools";
 function step0Executable(templateText, agentText) {
   const { body } = step0Section(templateText);
-  const tools = /^tools:\s*(.+)$/mu.exec(agentText)?.[1] ?? "";
-  const hasSkill = /\bSkill\b/u.test(tools);
+  const listed = (/^tools:\s*(.+)$/mu.exec(agentText)?.[1] ?? "").trim();
+  const tools = (/^\[(.*)\]$/u.exec(listed)?.[1] ?? listed).split(",").map((tool) => tool.trim());
+  const hasSkill = tools.includes("Skill");
   const namesPlainRoute = /pipeline-start-preflight\.mjs/u.test(body);
   return hasSkill || namesPlainRoute;
 }
@@ -172,6 +173,9 @@ test("C5 discriminator: the executability predicate can pass and can fail (scrat
   assert.equal(step0Executable(template, "tools: Read, Bash"), true);
   assert.equal(step0Executable(bare, "tools: Read, Skill, Bash"), true);
   assert.equal(step0Executable(bare, "tools: Read, Edit, Write, Grep, Glob, Bash"), false);
+  assert.equal(step0Executable(template, "tools: [Read, Bash]"), true);
+  assert.equal(step0Executable(bare, "tools: [Read, Skill, Bash]"), true);
+  assert.equal(step0Executable(bare, "tools: [Read, Edit, Write, Grep, Glob, Bash]"), false);
 });
 
 const HOOK_SCRIPT = join(REPO, "plugins", "pipeline-core", "hooks", "subagent-start-receipt.mjs");
