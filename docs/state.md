@@ -19,6 +19,11 @@ Read these three files first, in this order, before any other work:
    the closing steps in order, the Critic scope, and the open Windows findings with their
    measurements, so they are built on and not rediscovered.
 
+**Claude WSL session, 2026-10-18:** local test candidates are stamped from real greenfield
+findings (PF-14, PF-19, PF-20, PF-23). PO decisions D5-D12 are in
+[po-decisions-2026-10-18](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md).
+Full Verify, the Critic batch and PO acceptance are still open.
+
 **WSL session, 2026-10-17:** the WSL clone was synced to the stamp commit `902f029c3`
 with a local fetch from the Windows checkout (fast-forward, no own commits lost). The
 installed plugin matches that source (`d6f4d76`). The branch is checkpoint-pushed so a
