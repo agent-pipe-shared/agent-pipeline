@@ -383,7 +383,7 @@ function seedManagedCopy(seams, { configRoot, workspaceRoot, snapshotRoot, agy, 
   assert.equal(result.status, 'refreshed', `seeding the managed copy through the real host failed: ${result.reason ?? ''}`);
 }
 
-test('AM-14: refresh uses the snapshot - uninstall, validate <snapshot>, install <snapshot> in order; receipt bound to the Git source; fixture config root only', async () => {
+test('AM-14: refresh uses the snapshot - validate <snapshot>, uninstall, validate <snapshot>, install <snapshot> in order; receipt bound to the Git source; fixture config root only', async () => {
   const seams = await loadSeams();
   const mod = await load();
   const home = makeHome();
@@ -406,7 +406,7 @@ test('AM-14: refresh uses the snapshot - uninstall, validate <snapshot>, install
   assert.notEqual(snap.snapshotSha256, v1.snapshotSha256);
   assert.equal(snap.root, join(root, `plugin-${snap.snapshotSha256}`));
   const issued = agy.calls.slice(seededCalls);
-  assert.deepEqual(issued.filter((argv) => argv[0] !== '--version'), [['plugin', 'uninstall', AGY_NAME], ['plugin', 'validate', snap.root], ['plugin', 'install', snap.root]]);
+  assert.deepEqual(issued.filter((argv) => argv[0] !== '--version'), [['plugin', 'validate', snap.root], ['plugin', 'uninstall', AGY_NAME], ['plugin', 'validate', snap.root], ['plugin', 'install', snap.root]]);
   assert.equal(issued.flat().includes(git2), false, 'the Git source is attested, never handed to agy');
   const managedDigest = digestOf(readFileSync(join(agy.managedRoot, 'snapshot.json')));
   assert.equal(managedDigest, snap.snapshotSha256, 'the managed copy is the snapshot');

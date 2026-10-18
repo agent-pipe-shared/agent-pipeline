@@ -34,7 +34,7 @@ test('sealed fixture refresh converges managed/import/global/workspace/wiring an
  const f=fixture(t),wire=join(f.configRoot,'config','external-hooks.json');f.put(wire,{hooks:[{type:'command',command:'node "'+join(f.old,'hooks','antigravity-start-hint.mjs')+'"'},{type:'command',command:'foreign-check --safe'}],foreign:{keep:true}});
  f.put(f.local,{entries:[{path:f.old},{path:f.foreign,enabled:false}],custom:'workspace'});
  const host=createAntigravityRefreshHost(f.args),r=host.refresh();assert.equal(r.status,'refreshed',JSON.stringify(r));assert.equal(r.requiresFreshExecutingSession,true);
- assert.deepEqual(f.calls.map(a=>a[1]),[undefined,'uninstall','validate','install']);
+ assert.deepEqual(f.calls.map(a=>a[1]),[undefined,'validate','uninstall','validate','install']);
  const imported=JSON.parse(readFileSync(f.imports));assert.equal(imported.preserved,'import-key');assert(imported.imports.some(e=>e.name==='foreign-plugin'));
  const global=JSON.parse(readFileSync(f.global));assert.deepEqual(global.custom,{keep:true});assert.deepEqual(global.entries[1],{path:f.foreign,enabled:false});
  const local=JSON.parse(readFileSync(f.local));assert.equal(local.custom,'workspace');assert.deepEqual(local.entries,[{path:f.foreign,enabled:false},{path:f.approvedSourceRoot}]);
@@ -71,7 +71,7 @@ test('empty workspace binds an existing matching managed copy and attests its ex
  assert.equal(observeAntigravityPluginTopology(aliased.args).registries.workspace.status,'unavailable');
 });
 test('CLI interruption stops after actual partial uninstall; new explicit invocation recovers without hand-editing import metadata',t=>{
- const f=fixture(t);f.setFailure('install');const r=createAntigravityRefreshHost(f.args).refresh();assert.equal(r.status,'partial');assert.deepEqual(r.completed,['uninstall','validate']);assert(!existsSync(f.old));assert.equal(f.calls.length,4);
+ const f=fixture(t);f.setFailure('install');const r=createAntigravityRefreshHost(f.args).refresh();assert.equal(r.status,'partial');assert.deepEqual(r.completed,['uninstall','validate']);assert(!existsSync(f.old));assert.equal(f.calls.length,5);
  f.setFailure(null);assert.equal(createAntigravityRefreshHost(f.args).refresh().status,'refreshed');
 });
 test('lying CLI success cannot replace physical managed-copy readback or attestation',t=>{
@@ -101,7 +101,7 @@ test('observed Antigravity 1.2.13 admits the same bounded plugin refresh route',
  for(const cliVersion of ['1.2.11','1.1.99','0.99.99','unobserved'])assert.equal(planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion}).reason,'AT-CLI-CAPABILITY-UNOBSERVED');
  const result=createAntigravityRefreshHost(f.args).refresh();
  assert.equal(result.status,'refreshed',JSON.stringify(result));
- assert.deepEqual(f.calls.map(argv=>argv[1]),[undefined,'uninstall','validate','install']);
+ assert.deepEqual(f.calls.map(argv=>argv[1]),[undefined,'validate','uninstall','validate','install']);
 });
 test('Antigravity 1.2.13 stale managed copy is refresh-required and the plan replaces it, never reports current',t=>{
  const f=fixture(t,'1.2.13'),loadedArgs={loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot};
@@ -111,9 +111,12 @@ test('Antigravity 1.2.13 stale managed copy is refresh-required and the plan rep
  const wired=observeAntigravityLoadedTopologyWithWiring(loadedArgs);assert.notEqual(wired.status,'current');
  const observation=observeAntigravityPluginTopology(f.args),plan=planAntigravityTopologyRefresh({observation,scope:'global',globalChangeApproved:true,cliVersion:'1.2.13'});
  assert.equal(plan.status,'prepared',JSON.stringify(plan));assert.notEqual(plan.status,'metadata-current');
- assert.deepEqual(plan.actions.filter(a=>a.kind==='cli').map(a=>a.argv[1]),['uninstall','validate','install']);
+ assert.deepEqual(plan.actions.filter(a=>a.kind==='cli').map(a=>a.argv[1]),['validate','uninstall','validate','install']);
+ // The host prepare() on an identically shaped fixture lists the same CLI order as the metadata planner (a second fixture keeps this fixture's recorded calls untouched).
+ const prepared=createAntigravityRefreshHost(fixture(t,'1.2.13').args).prepare();assert.equal(prepared.status,'prepared',JSON.stringify(prepared));
+ assert.deepEqual(prepared.actions.filter(a=>a.kind==='cli').map(a=>a.argv[1]),plan.actions.filter(a=>a.kind==='cli').map(a=>a.argv[1]));
  const result=createAntigravityRefreshHost(f.args).refresh();assert.equal(result.status,'refreshed',JSON.stringify(result));
- assert.deepEqual(f.calls.map(argv=>argv[1]),[undefined,'uninstall','validate','install']);
+ assert.deepEqual(f.calls.map(argv=>argv[1]),[undefined,'validate','uninstall','validate','install']);
  const replaced=readFileSync(join(f.old,'hooks','antigravity-start-hint.mjs'),'utf8');assert.doesNotMatch(replaced,/stale/);assert.match(replaced,/current/);
  const after=observeAntigravityLoadedTopology(loadedArgs);assert.equal(after.status,'current',JSON.stringify(after));assert.equal(after.managedContentMismatch,false);
 });
@@ -136,7 +139,7 @@ test('actual incident hooks.json surfaces and newly CLI-created wiring converge 
 });
 test('CLI foreign registry/import drift is terminal partial failure, no subsequent compensation or receipt',t=>{
  const f=fixture(t);f.setAfterAction(argv=>{if(argv[1]==='uninstall')f.put(f.global,{entries:[{path:f.approvedSourceRoot}],custom:{keep:false}});});
- let r=createAntigravityRefreshHost(f.args).refresh();assert.equal(r.reason,'ATR-CLI-REGISTRY-DRIFT');assert.deepEqual(r.completed,['uninstall']);assert.equal(f.calls.length,2);
+ let r=createAntigravityRefreshHost(f.args).refresh();assert.equal(r.reason,'ATR-CLI-REGISTRY-DRIFT');assert.deepEqual(r.completed,['uninstall']);assert.equal(f.calls.length,3);
  const g=fixture(t);g.setAfterAction(argv=>{if(argv[1]==='install')g.put(g.imports,{imports:[{name:'agent-pipeline-core'}],preserved:'import-key'});});
  r=createAntigravityRefreshHost(g.args).refresh();assert.equal(r.reason,'ATR-CLI-FOREIGN-IMPORT-DRIFT');assert.equal(r.status,'partial');
 });

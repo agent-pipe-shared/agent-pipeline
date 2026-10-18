@@ -122,6 +122,8 @@ export function planAntigravityTopologyRefresh({observation,scope,globalChangeAp
   if((needsManaged||(scope==='workspace'&&old))&&!globalChangeApproved)return held('AT-GLOBAL-CHANGE-REQUIRES-EXPLICIT-SCOPE');
   const actions=[];
   if(needsManaged||(scope==='workspace'&&old)){
+    // A replaced managed copy is retired only after the source validates, so the plan validates first and again before the install (same order as the host prepare()).
+    if(old&&scope==='global')actions.push({kind:'cli',argv:['plugin','validate',desired.root]});
     if(old)actions.push({kind:'cli',argv:['plugin','uninstall',binding.pluginName]});
     if(scope==='global')actions.push({kind:'cli',argv:['plugin','validate',desired.root]},{kind:'cli',argv:['plugin','install',desired.root]});
   }

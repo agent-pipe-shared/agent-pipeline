@@ -142,7 +142,7 @@ test("P4 incident refresh uses agy's own lifecycle in order, preserves foreign e
   const host = createAntigravityRefreshHost(f.args), r = host.refresh();
   assert.equal(r.status, "refreshed", JSON.stringify(r));
   assert.equal(r.requiresFreshExecutingSession, true);
-  assert.deepEqual(f.calls.map((a) => a[1]), [undefined, "uninstall", "validate", "install"], "uninstall -> validate -> install, never raw deletion");
+  assert.deepEqual(f.calls.map((a) => a[1]), [undefined, "validate", "uninstall", "validate", "install"], "validate -> uninstall -> validate -> install, never raw deletion");
   const o = topo(f);
   assert.equal(o.managed.candidates.length, 1);
   assert.equal(o.managed.candidates[0].content.sha256, o.source.content.sha256, "readback: managed copy equals approved source");
@@ -206,7 +206,7 @@ test("P4 CLI failure mid-lifecycle stops with partial state reported and nothing
   const r = createAntigravityRefreshHost(f.args).refresh();
   assert.equal(r.status, "partial");
   assert.deepEqual(r.completed, ["uninstall", "validate"]);
-  assert.equal(f.calls.length, 4, "no further CLI calls or compensation after the failure");
+  assert.equal(f.calls.length, 5, "no further CLI calls or compensation after the failure");
   assert.deepEqual(readFileSync(f.global), globalBefore); assert.deepEqual(readFileSync(f.local), localBefore);
   assert.equal(existsSync(f.foreign), true);
   f.setFailure(null);
@@ -299,7 +299,7 @@ test("P6 verdict imported-snapshot-only: no registered plugin, loaded topology u
   assert.equal(loaded.status, "unavailable"); assert.equal(loaded.reason, "AT-TOPOLOGY-UNVERIFIABLE", "snapshot with no registered plugin has no unambiguous source");
   const plan = createAntigravityRefreshHost(f.args).prepare();
   assert.equal(plan.status, "prepared", JSON.stringify(plan));
-  assert.deepEqual(kinds(plan), ["uninstall", "validate", "install", "owned-registry-rebind"]);
+  assert.deepEqual(kinds(plan), ["validate", "uninstall", "validate", "install", "owned-registry-rebind"]);
   const noApproval = createAntigravityRefreshHost({ ...f.args, globalChangeApproved: false }).prepare();
   assert.equal(noApproval.status, "refused"); assert.equal(noApproval.reason, "ATR-GLOBAL-SCOPE");
 });
@@ -310,7 +310,7 @@ test("P6 verdict both, snapshot shadows registered plugin: refresh-required and 
   assert.equal(loaded.status, "refresh-required"); assert.equal(loaded.managedContentMismatch, true);
   const plan = createAntigravityRefreshHost(f.args).prepare();
   assert.equal(plan.status, "prepared", JSON.stringify(plan));
-  assert.deepEqual(kinds(plan), ["uninstall", "validate", "install"]);
+  assert.deepEqual(kinds(plan), ["validate", "uninstall", "validate", "install"]);
   const noApproval = createAntigravityRefreshHost({ ...f.args, globalChangeApproved: false }).prepare();
   assert.equal(noApproval.status, "refused"); assert.equal(noApproval.reason, "ATR-GLOBAL-SCOPE", "stale shadow never retired without explicit approval");
 });
