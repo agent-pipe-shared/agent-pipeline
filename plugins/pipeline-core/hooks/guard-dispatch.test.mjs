@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -869,7 +869,128 @@ manualCheck("GD60 allow  a marked Claude dispatch that is NOT item-governed is u
   }
 });
 
-assert.equal(cases.length, 61, "the complete dispatch guard corpus must register before execution");
+// GD61-GD65 -- ALF-G2C2A-BACKGROUND-PENDING-GATE: an explicit `run_in_background: true` is admitted past the foreground
+// check ONLY while the Claude SubagentStop completion route is registered. The guard derives that fact from the
+// hooks/hooks.json that sits beside the running module (never from cwd, the project or an environment switch). GD58/GD60
+// above run the real guard and keep their expectations because the real hooks.json carries no SubagentStop entry yet.
+// The seam for the registered/unregistered variants is the module-location rule itself: a throwaway plugin-shaped
+// directory holding a COPY of the guard (its `./` sibling and `../lib` symlinked, so every import still resolves to the real
+// code), so the copy's import.meta.url -- and therefore the hooks.json it reads -- is the only thing that differs.
+const SUBAGENT_STOP_COMMAND = 'node "${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner claude';
+const hooksWith = (event, command, type = "command") => JSON.stringify({ hooks: { [event]: [{ hooks: [{ type, command, timeout: 300 }] }] } });
+const REGISTERED_HOOKS = hooksWith("SubagentStop", SUBAGENT_STOP_COMMAND);
+const guardCopies = new Map();
+function guardCopyWithHooks(label, hooksJsonText) {
+  if (guardCopies.has(label)) return guardCopies.get(label);
+  const parent = join(repoRoot, "scratch");
+  mkdirSync(parent, { recursive: true });
+  const dir = realpathSync(mkdtempSync(join(parent, "guard-dispatch-copy-")));
+  process.once("exit", () => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, "hooks"));
+  copyFileSync(GUARD, join(dir, "hooks", "guard-dispatch.mjs"));
+  symlinkSync(join(dirname(GUARD), "guard-dispatch-budget.mjs"), join(dir, "hooks", "guard-dispatch-budget.mjs"));
+  symlinkSync(join(dirname(GUARD), "..", "lib"), join(dir, "lib"));
+  if (hooksJsonText !== null) writeFileSync(join(dir, "hooks", "hooks.json"), hooksJsonText);
+  const guard = join(dir, "hooks", "guard-dispatch.mjs");
+  guardCopies.set(label, guard);
+  return guard;
+}
+function runAtGuard(guard, payload, root, env = {}) {
+  const res = spawnSync(process.execPath, [guard], {
+    input: JSON.stringify(payload), encoding: "utf8", env: { ...process.env, ...env, CLAUDE_PROJECT_DIR: root },
+  });
+  return { code: res.status, stderr: res.stderr ?? "" };
+}
+const CANDIDATE_WARNING = "WARNING (guard-dispatch): native host-commit preparation failed (NGHS-CANDIDATE-MISMATCH);";
+
+manualCheck("GD61 block  REGISTERED: an item-governed marked Claude dispatch with an explicit run_in_background: true passes the foreground check and stops at the candidate check", () => {
+  const { root, parent } = itemBackgroundRepo();
+  const guard = guardCopyWithHooks("registered", REGISTERED_HOOKS);
+  const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd61", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.ok(!stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the background launch -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
+  assert.ok(stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.deepEqual(pendingNativeStates(root), []);
+});
+
+manualCheck("GD62 allow  REGISTERED: a marked Claude dispatch that is NOT item-governed no longer warns with the foreground code for an explicit run_in_background: true", () => {
+  const { root, parent } = itemBackgroundRepo(false);
+  const guard = guardCopyWithHooks("registered", REGISTERED_HOOKS);
+  const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd62", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.equal(code, ALLOW, stderr.trim().slice(0, 300));
+  assert.ok(!stderr.includes(FOREGROUND_CODE), `stderr must not carry the foreground code -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.ok(stderr.includes(CANDIDATE_WARNING), `stderr missing the next-step WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.ok(!stderr.includes("BLOCKED"), stderr.slice(0, 300));
+});
+
+manualCheck("GD63 allow  REGISTERED: a MISSING run_in_background key is still the background-only fallback (the registration never admits an absent key)", () => {
+  const { root, parent } = itemBackgroundRepo();
+  const guard = guardCopyWithHooks("registered", REGISTERED_HOOKS);
+  const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd63", {}), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.equal(code, ALLOW, stderr.trim().slice(0, 300));
+  assert.ok(stderr.includes(FOREGROUND_WARNING), `stderr missing the background-only WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.ok(!stderr.includes("BLOCKED"), stderr.slice(0, 300));
+});
+
+manualCheck("GD64 an unreadable, malformed or non-matching hooks.json fails closed to today's behaviour for an explicit run_in_background: true", () => {
+  const variants = [
+    ["malformed JSON", "{not json"],
+    ["no hooks.json beside the module", null],
+    ["SubagentStop registered for the codex runner only", hooksWith("SubagentStop", SUBAGENT_STOP_COMMAND.replace("claude", "codex"))],
+    ["completion route registered under PostToolUse only", hooksWith("PostToolUse", SUBAGENT_STOP_COMMAND)],
+  ];
+  for (const [label, text] of variants) {
+    const guard = guardCopyWithHooks(`unregistered-${label}`, text);
+    const governed = itemBackgroundRepo();
+    const blocked = runAtGuard(guard, markedGoldfishDispatch(governed.root, `gd64-item-${label.replace(/\W+/gu, "-")}`, { run_in_background: true }), governed.root, { GIT_CEILING_DIRECTORIES: governed.parent });
+    assert.equal(blocked.code, BLOCK, `${label} (item-governed): ${blocked.stderr.trim().slice(0, 300)}`);
+    assert.ok(blocked.stderr.includes(`BLOCKED (guard-dispatch): ${FOREGROUND_CODE}`), `${label} (item-governed): stderr missing the typed BLOCKED code -- got ${JSON.stringify(blocked.stderr.slice(0, 300))}`);
+    const loose = itemBackgroundRepo(false);
+    const warned = runAtGuard(guard, markedGoldfishDispatch(loose.root, `gd64-plain-${label.replace(/\W+/gu, "-")}`, { run_in_background: true }), loose.root, { GIT_CEILING_DIRECTORIES: loose.parent });
+    assert.equal(warned.code, ALLOW, `${label} (not item-governed): ${warned.stderr.trim().slice(0, 300)}`);
+    assert.ok(warned.stderr.includes(FOREGROUND_WARNING), `${label} (not item-governed): stderr missing the WARNING -- got ${JSON.stringify(warned.stderr.slice(0, 300))}`);
+  }
+});
+
+manualCheck("GD65 the registration fact is one exported function: the real hooks/hooks.json reads to a boolean and fixture files are judged exactly", () => {
+  const dir = realpathSync(mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-registration-")));
+  try {
+    const otherGroup = { hooks: [{ type: "command", command: "node other.mjs" }] };
+    const fixtures = [
+      ["registered", REGISTERED_HOOKS, true],
+      ["registered beside an unrelated group", JSON.stringify({ hooks: { SubagentStop: [otherGroup, { hooks: [{ type: "command", command: SUBAGENT_STOP_COMMAND }] }] } }), true],
+      ["malformed", "{not json", false],
+      ["empty object", "{}", false],
+      ["array root", "[]", false],
+      ["codex runner only", hooksWith("SubagentStop", SUBAGENT_STOP_COMMAND.replace("claude", "codex")), false],
+      ["runner value only starts with claude", hooksWith("SubagentStop", `${SUBAGENT_STOP_COMMAND}-extra`), false],
+      ["other script", hooksWith("SubagentStop", 'node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs" --runner claude'), false],
+      ["PostToolUse only", hooksWith("PostToolUse", SUBAGENT_STOP_COMMAND), false],
+      ["non-command hook type", hooksWith("SubagentStop", SUBAGENT_STOP_COMMAND, "prompt"), false],
+    ];
+    const files = fixtures.map(([, text], index) => { const file = join(dir, `fixture-${index}.json`); writeFileSync(file, text); return file; });
+    files.push(join(dir, "does-not-exist.json"));
+    const realHooks = join(dirname(GUARD), "hooks.json");
+    assert.ok(existsSync(realHooks), "the real hooks/hooks.json must exist beside the guard");
+    const runnerPath = join(dir, "registration-check.mjs");
+    writeFileSync(runnerPath, [
+      "const [guardHref, realHooks, ...files] = process.argv.slice(2);",
+      "const { claudeSubagentStopCompletionRegistered: registered } = await import(guardHref);",
+      "process.stdout.write(JSON.stringify({ byDefault: registered(), real: registered({ hooksJsonPath: realHooks }), files: files.map((hooksJsonPath) => registered({ hooksJsonPath })) }));",
+    ].join("\n"));
+    const res = spawnSync(process.execPath, [runnerPath, pathToFileURL(GUARD).href, realHooks, ...files], { input: "", encoding: "utf8", timeout: 10000 });
+    assert.equal(res.status, 0, `runner exit ${res.status} -- ${(res.stderr ?? "").trim().slice(0, 300)}`);
+    const out = JSON.parse(res.stdout);
+    assert.equal(typeof out.byDefault, "boolean", "the default read of the real hooks/hooks.json must yield a boolean");
+    assert.equal(out.real, out.byDefault, "the default read and an explicit read of the real hooks/hooks.json must agree");
+    assert.deepEqual(out.files, [...fixtures.map(([, , expected]) => expected), false],
+      `fixture verdicts differ -- ${JSON.stringify(fixtures.map(([label], index) => [label, out.files[index]]))}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+assert.equal(cases.length, 66, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -141,7 +141,11 @@ function toolFields(runner, input) {
 }
 
 /** Capture a closed pre-launch binding; unmarked dispatches are intentionally untouched. */
-export function prepareNativeGoldfishHostState({ root, runner, input } = {}, dependencies = {}) {
+export const NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE = "subagent-stop";
+// `subagentStopCompletionRegistered` is the caller's explicit fact that the Claude `SubagentStop` completion route is
+// registered in the running plugin's hooks. Only the strict boolean `true` is that fact: absent, `false` and every
+// non-boolean value leave an explicit background launch refused exactly as before.
+export function prepareNativeGoldfishHostState({ root, runner, input, subagentStopCompletionRegistered } = {}, dependencies = {}) {
   if (!safeRunner(runner)) return fail("NGHS-RUNNER");
   const fields = toolFields(runner, input);
   if (!fields || !safeCorrelation(fields.correlation) || !ID.test(fields.sessionId ?? "")) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
@@ -149,7 +153,10 @@ export function prepareNativeGoldfishHostState({ root, runner, input } = {}, dep
   if (typeof fields.prompt !== "string" || !hostMarkers.some((marker) => fields.prompt.includes(marker))) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
   const parsed = parseNativeGoldfishBriefing(fields.prompt);
   if (!parsed.ok) return fail(parsed.code);
-  if (runner === "claude" && fields.runInBackground !== false) return fail("NGHS-CLAUDE-FOREGROUND-REQUIRED");
+  // A background launch is admitted only when the caller states the SubagentStop completion route is registered, so a
+  // pending state is never written for a dispatch nothing would complete. A missing run_in_background key never qualifies.
+  const backgroundCompletion = runner === "claude" && fields.runInBackground === true && subagentStopCompletionRegistered === true;
+  if (runner === "claude" && fields.runInBackground !== false && !backgroundCompletion) return fail("NGHS-CLAUDE-FOREGROUND-REQUIRED");
   const binding = parsed.binding;
   const deliveryQueue = binding.itemDelivery
     ? prepareGovernedItemQueue({root:root??input.cwd??process.cwd(),itemDelivery:binding.itemDelivery,
@@ -192,6 +199,7 @@ export function prepareNativeGoldfishHostState({ root, runner, input } = {}, dep
     binding, root: physicalRoot, commonDir, resultPath, baseline: captured?.baseline ?? null,
     createdAtMs: (dependencies.nowEpochMs ?? Date.now)(),
     ...(delivery ? { delivery } : {}),
+    ...(backgroundCompletion ? { completionRoute: NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE } : {}),
   };
   let stored;
   try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state); }

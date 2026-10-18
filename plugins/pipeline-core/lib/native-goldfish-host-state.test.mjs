@@ -615,6 +615,49 @@ const cases = [
     assert.match(oversized.repair,/slice-queue size bound/u);
   })},
 
+  { id: "NGHS24", name: "an explicit Claude run_in_background: true is admitted only with the strictly-boolean SubagentStop completion-route fact; every other launch is unchanged", run: () => fixture(({ root, commit, tree, dependencies }) => {
+    const commonDir = join(root, ".git");
+    const stateDirectory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
+    const pendingFiles = () => existsSync(stateDirectory) ? readdirSync(stateDirectory).filter((name) => name.startsWith("pending-")) : [];
+    const deps = { ...dependencies, nowEpochMs: () => 1_700_000_000_000 };
+    const binding = makeBinding({ dispatchId: "TASK-BG-1", commit, tree });
+    const launch = (session, toolUseId, background) => {
+      const input = toolInput("claude", { root, session, toolUseId, binding });
+      if (background === undefined) delete input.tool_input.run_in_background; else input.tool_input.run_in_background = background;
+      return input;
+    };
+    // Explicit background without the fact, or with anything but the boolean true, is refused exactly as before and writes nothing.
+    const unregistered = [["absent", undefined], ["false", false], ["string true", "true"], ["number one", 1], ["null", null], ["object", {}], ["array", [true]]];
+    for (const [label, fact] of unregistered) {
+      const options = fact === undefined ? {} : { subagentStopCompletionRegistered: fact };
+      const refused = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch(`s-${label.replace(/\W+/gu, "-")}`, `t-${label.replace(/\W+/gu, "-")}`, true), ...options }, deps);
+      assert.equal(refused.ok, false, `${label}: ${JSON.stringify(refused)}`);
+      assert.equal(refused.code, "NGHS-CLAUDE-FOREGROUND-REQUIRED", label);
+    }
+    assert.deepEqual(pendingFiles(), [], "a refused background launch must leave no pending state");
+    // A missing run_in_background key stays refused even when the completion route is registered (NGHS02 unchanged).
+    const keyless = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch("s-keyless", "t-keyless", undefined), subagentStopCompletionRegistered: true }, deps);
+    assert.equal(keyless.code, "NGHS-CLAUDE-FOREGROUND-REQUIRED");
+    assert.deepEqual(pendingFiles(), []);
+    // Explicit background plus the registered fact is admitted and records the one exact discriminator.
+    const admitted = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch("s-bg", "t-bg", true), subagentStopCompletionRegistered: true }, deps);
+    assert.equal(admitted.ok, true, JSON.stringify(admitted));
+    assert.equal(pendingFiles().length, 1);
+    const readback = readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: "s-bg", correlationId: "t-bg" });
+    assert.equal(readback.ok, true, readback.code);
+    assert.equal(readback.state.completionRoute, "subagent-stop");
+    assert.equal(readback.state.binding.dispatchId, binding.dispatchId);
+    // Foreground pending state is byte-identical whether or not the fact is passed: no discriminator, no other drift.
+    const plain = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch("s-fg-a", "t-fg-a", false) }, deps);
+    const withFact = prepareNativeGoldfishHostState({ root, runner: "claude", input: launch("s-fg-b", "t-fg-b", false), subagentStopCompletionRegistered: true }, deps);
+    assert.equal(plain.ok, true, plain.code); assert.equal(withFact.ok, true, withFact.code);
+    const read = (session, tool) => readNativeGoldfishPending({ commonDir, runner: "claude", sessionId: session, correlationId: tool }).state;
+    const first = read("s-fg-a", "t-fg-a"), second = read("s-fg-b", "t-fg-b");
+    assert.equal(Object.hasOwn(first, "completionRoute"), false);
+    assert.equal(Object.hasOwn(second, "completionRoute"), false);
+    assert.equal(JSON.stringify({ ...second, sessionId: first.sessionId, toolUseId: first.toolUseId }), JSON.stringify(first));
+  }) },
+
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

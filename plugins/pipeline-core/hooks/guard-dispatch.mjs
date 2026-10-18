@@ -67,6 +67,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   persistPendingAdvisorProhibitionBindings,
@@ -146,6 +147,32 @@ export function extractAntigravityDispatches(subagents) {
 // A caller's prompt cannot turn a writable Goldfish capability into read-only.
 export function requiresGovernedItemAdmission(policy) {
   return policy?.role === "goldfish";
+}
+
+// ---------------------------------------------------------------------------------------------
+// Completion-route registration fact for a background Claude Goldfish launch (ALF-G2C2A-BACKGROUND-PENDING-GATE).
+// A background pending state is only worth writing while something will complete it, and that is the Claude
+// `SubagentStop` hook running `hooks/native-goldfish-host.mjs --runner claude`. The fact is read from the hooks.json
+// that sits beside THIS module (never cwd, the project or an environment switch), so it describes the plugin code that is
+// actually running. Any read or parse failure, or any other shape, is `false`: the gate then behaves as it always did.
+// Exported without side effects (importing this module never runs the hook body; isDirectInvocation gate below).
+export function claudeSubagentStopCompletionRegistered({
+  hooksJsonPath = fileURLToPath(new URL("./hooks.json", import.meta.url)),
+  readText = (path) => readFileSync(path, "utf8"),
+} = {}) {
+  try {
+    const groups = JSON.parse(readText(hooksJsonPath))?.hooks?.SubagentStop;
+    if (!Array.isArray(groups)) return false;
+    return groups.some((group) => Array.isArray(group?.hooks) && group.hooks.some((hook) => {
+      if (hook?.type !== "command" || typeof hook.command !== "string") return false;
+      const tokens = hook.command.split(/\s+/u).map((token) => token.replace(/^["']+|["']+$/gu, ""));
+      const script = tokens.findIndex((token) => token === "hooks/native-goldfish-host.mjs" || token.endsWith("/hooks/native-goldfish-host.mjs"));
+      const runnerFlag = tokens.indexOf("--runner", script + 1);
+      return script >= 0 && runnerFlag > script && tokens[runnerFlag + 1] === "claude";
+    }));
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -820,13 +847,18 @@ if (isDirectInvocation(import.meta.url)) {
         process.stderr.write("WARNING (guard-dispatch): marked native host-commit route is not a single direct Claude Task or Codex spawn_agent; child changes will not be host-committed.\n");
       } else {
         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
-        const prepared = prepareNativeGoldfishHostState({ root: rootDir, runner: nativeRunner, input });
+        const prepared = prepareNativeGoldfishHostState({
+          root: rootDir, runner: nativeRunner, input,
+          subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
+        });
         if (!prepared.ok) {
           // Claude runtimes without a run_in_background parameter cannot launch in the foreground;
           // item admission and the budget binding already ran, so fall back to an uncommitted child.
-          // That fallback is for a runtime that carries NO such key at all: NGHS-CLAUDE-FOREGROUND-REQUIRED
-          // also fires for an explicit run_in_background: true, a runtime that does have the parameter and
-          // chose to launch in the background, and that stays BLOCKED for an item-governed dispatch.
+          // That fallback is for a runtime that carries NO such key at all. An explicit run_in_background: true is a
+          // runtime that does have the parameter and chose to launch in the background: it is admitted only while
+          // the Claude SubagentStop completion route is registered (claudeSubagentStopCompletionRegistered, read from
+          // the hooks.json beside this module). Unregistered (or unreadable), NGHS-CLAUDE-FOREGROUND-REQUIRED
+          // also fires for it, and that stays BLOCKED for an item-governed dispatch and warns otherwise.
           const claudeBackgroundOnly = nativeRunner === "claude" && prepared.code === "NGHS-CLAUDE-FOREGROUND-REQUIRED"
             && !Object.hasOwn(toolInput, "run_in_background");
           if (markedV2.length > 0 || (itemGovernanceRequired && !claudeBackgroundOnly)) {
