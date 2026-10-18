@@ -6,22 +6,27 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { consumeCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
+import { canonicalJson, consumeCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
 
 import {
   SESSION_CRITIC_ASSURANCE,
   SESSION_CRITIC_CLI_ERROR_SCHEMA,
+  SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA,
+  SESSION_CRITIC_EXPORT_REQUEST_SCHEMA,
+  SESSION_CRITIC_EXPORT_RESULT_SCHEMA,
   SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA,
   SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA,
   SESSION_CRITIC_RECEIPT_SCHEMA,
   SessionCriticFinalizerError,
   admitSessionCriticReview,
+  exportSessionCriticEvidence,
   finalizeSessionCriticReview,
   runSessionCriticFinalizerCli,
   validateSessionCriticReceipt,
@@ -586,4 +591,165 @@ test("a foreign failure inside the generic batch keeps CGB-PHYSICAL and surfaces
     assert.throws(() => readReservedGenericCriticBatchAdmission({ controlRoot: input.controlRoot }),
       (error) => error.name === "GenericCriticBatchError" && error.code === "CGB-SHAPE" && !Object.hasOwn(error, "cause"));
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// Evidence export. The Critic's notes live in ignored scratch/ and its receipt in the git-private journal, so
+// neither outlives the session; `export` publishes both as tracked project evidence. Every case below reaches
+// its consumed packet through the product's own admit -> finalize route.
+const EXPORT_FILES = Object.freeze(["receipt.json", "report.md", "index.json"]);
+function sha(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+function criticNotes(fx, text = "# Critic notes\n\nNo findings.\n", name = "critic-notes.md") {
+  mkdirSync(join(fx.root, "scratch"), { recursive: true });
+  writeFileSync(join(fx.root, "scratch", name), text);
+  return `scratch/${name}`;
+}
+function exportOptions(fx, packetId, overrides = {}) {
+  return { root: fx.root, packetId, reportPath: "scratch/critic-notes.md", outDir: `specs/alpha/evidence/critic/${packetId}`, ...overrides };
+}
+function refused(action, code) {
+  assert.throws(action, (error) => error instanceof SessionCriticFinalizerError && error.code === code, code);
+}
+function journalReceiptBody(fx, packetId) {
+  return JSON.parse(readFileSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId, "receipt.json"), "utf8")).body;
+}
+
+test("export publishes a consumed review as receipt, report and index with matching hashes", () => {
+  const fx = fixture();
+  try {
+    const packetId = "1".repeat(32);
+    assert.equal(finalizeSessionCriticReview(preadmitted(fx, { packetId })).status, "completed");
+    const notes = "# Critic notes\n\nNo findings.\n";
+    criticNotes(fx, notes);
+    const options = exportOptions(fx, packetId);
+    const result = exportSessionCriticEvidence(options);
+    assert.equal(result.schema, SESSION_CRITIC_EXPORT_RESULT_SCHEMA);
+    assert.equal(result.status, "exported");
+    assert.equal(result.outDir, options.outDir);
+    assert.deepEqual(result.paths, EXPORT_FILES.map((name) => `${options.outDir}/${name}`));
+    assert.deepEqual(readdirSync(join(fx.root, options.outDir)).sort(), [...EXPORT_FILES].sort());
+    const receiptBytes = readFileSync(join(fx.root, options.outDir, "receipt.json"), "utf8");
+    assert.equal(receiptBytes, canonicalJson(journalReceiptBody(fx, packetId)), "the receipt is the journal record body, byte for byte");
+    assert.equal(validateSessionCriticReceipt(JSON.parse(receiptBytes)).packetId, packetId);
+    const reportBytes = readFileSync(join(fx.root, options.outDir, "report.md"));
+    assert.equal(reportBytes.toString("utf8"), notes);
+    const indexBytes = readFileSync(join(fx.root, options.outDir, "index.json"));
+    const index = JSON.parse(indexBytes.toString("utf8"));
+    assert.deepEqual(Object.keys(index).sort(), ["candidate", "findingCount", "packetId", "receiptSha256", "reportSha256", "reviewPass", "schema"]);
+    assert.deepEqual(index, {
+      schema: SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA, packetId, candidate: { commit: fx.candidate, tree: fx.tree },
+      receiptSha256: sha(receiptBytes), reportSha256: sha(reportBytes), reviewPass: true, findingCount: 0,
+    });
+    assert.equal(result.receiptSha256, index.receiptSha256);
+    assert.equal(result.reportSha256, index.reportSha256);
+    assert.equal(result.indexSha256, sha(indexBytes));
+    // The journal is only read, and a second export of the same review is refused instead of overwriting.
+    assert.equal(canonicalJson(journalReceiptBody(fx, packetId)), receiptBytes);
+    refused(() => exportSessionCriticEvidence(options), "SCF-EXPORT-EXISTS");
+    assert.equal(readFileSync(join(fx.root, options.outDir, "report.md"), "utf8"), notes);
+  } finally { cleanup(fx); }
+});
+
+test("a failing review exports too, with reviewPass false and its finding count", () => {
+  const fx = fixture();
+  try {
+    const packetId = "2".repeat(32);
+    const finding = { gap: "missing edge", risk: "failure", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
+    const done = finalizeSessionCriticReview(preadmitted(fx, { packetId, verdict: verdict({ findings: [finding], pass: false }) }));
+    assert.equal(done.status, "completed");
+    assert.equal(done.receipt.reviewPass, false);
+    criticNotes(fx, "# Critic notes\n\nOne minor finding.\n");
+    const options = exportOptions(fx, packetId);
+    exportSessionCriticEvidence(options);
+    const index = JSON.parse(readFileSync(join(fx.root, options.outDir, "index.json"), "utf8"));
+    assert.equal(index.reviewPass, false);
+    assert.equal(index.findingCount, 1);
+    const receipt = JSON.parse(readFileSync(join(fx.root, options.outDir, "receipt.json"), "utf8"));
+    assert.equal(receipt.reviewPass, false);
+    assert.equal(sha(readFileSync(join(fx.root, options.outDir, "receipt.json"))), index.receiptSha256);
+  } finally { cleanup(fx); }
+});
+
+test("export refuses an unconsumed packet, an unsafe destination and an unusable report without publishing", () => {
+  const fx = fixture();
+  try {
+    const packetId = "3".repeat(32);
+    const request = preadmitted(fx, { packetId });
+    criticNotes(fx);
+    // Claimed but never finalized, and a packet that was never admitted: neither has a consumed receipt.
+    refused(() => exportSessionCriticEvidence(exportOptions(fx, packetId)), "SCF-EXPORT-UNCONSUMED");
+    refused(() => exportSessionCriticEvidence(exportOptions(fx, "9".repeat(32))), "SCF-EXPORT-UNCONSUMED");
+    assert.equal(finalizeSessionCriticReview(request).status, "completed");
+    for (const outDir of [
+      `evidence/critic/${packetId}`, `specs/alpha/evidence/critic/${"4".repeat(32)}`, "specs/alpha/evidence/critic",
+      `specs/alpha/evidence/critic/${packetId}/`, `specs/../evidence/critic/${packetId}`,
+      `specs/a b/evidence/critic/${packetId}`, `/tmp/specs/alpha/evidence/critic/${packetId}`,
+    ]) refused(() => exportSessionCriticEvidence(exportOptions(fx, packetId, { outDir })), "SCF-EXPORT-PATH");
+    for (const reportPath of ["../notes.md", "scratch/../notes.md", "/etc/hostname", ".git/HEAD", "scratch/", "./scratch/critic-notes.md"]) {
+      refused(() => exportSessionCriticEvidence(exportOptions(fx, packetId, { reportPath })), "SCF-EXPORT-PATH");
+    }
+    refused(() => exportSessionCriticEvidence(exportOptions(fx, packetId, { reportPath: "scratch/absent.md" })), "SCF-EXPORT-REPORT-MISSING");
+    refused(() => exportSessionCriticEvidence(exportOptions(fx, packetId, { reportPath: criticNotes(fx, "", "empty.md") })), "SCF-EXPORT-REPORT-MISSING");
+    let linked = false;
+    try {
+      symlinkSync(join(fx.root, "scratch", "critic-notes.md"), join(fx.root, "scratch", "link.md"));
+      symlinkSync(join(fx.root, "evidence"), join(fx.root, "specs", "linked"));
+      linked = true;
+    } catch { /* a host that may not create symlinks cannot create the hazard either */ }
+    if (linked) {
+      refused(() => exportSessionCriticEvidence(exportOptions(fx, packetId, { reportPath: "scratch/link.md" })), "SCF-EXPORT-PATH");
+      refused(() => exportSessionCriticEvidence(exportOptions(fx, packetId, { outDir: `specs/linked/evidence/critic/${packetId}` })), "SCF-EXPORT-PATH");
+    }
+    assert.equal(existsSync(join(fx.root, "specs", "alpha")), false);
+    assert.equal(existsSync(join(fx.root, "evidence", "critic")), false);
+    const options = exportOptions(fx, packetId);
+    mkdirSync(join(fx.root, options.outDir), { recursive: true });
+    refused(() => exportSessionCriticEvidence(options), "SCF-EXPORT-EXISTS");
+    assert.deepEqual(readdirSync(join(fx.root, options.outDir)), []);
+  } finally { cleanup(fx); }
+});
+
+test("the export verb runs from a scratch request with no git on PATH and closes its request vocabulary", () => {
+  const fx = fixture();
+  try {
+    const packetId = "5".repeat(32);
+    assert.equal(finalizeSessionCriticReview(preadmitted(fx, { packetId })).status, "completed");
+    const reportPath = criticNotes(fx);
+    const outDir = `specs/beta/evidence/critic/${packetId}`;
+    const good = { schema: SESSION_CRITIC_EXPORT_REQUEST_SCHEMA, packetId, reportPath, outDir };
+    const requestPath = writeScratchRequest(fx, "export-request.json", good);
+    // A child with an empty PATH: any git invocation on the export route would fail it rather than pass unnoticed.
+    const script = fileURLToPath(new URL("./session-critic-finalizer.mjs", import.meta.url));
+    const child = spawnSync(process.execPath, [script, "export", "--root", fx.root, "--request", requestPath],
+      { encoding: "utf8", env: { ...process.env, PATH: "" } });
+    assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
+    const output = JSON.parse(child.stdout);
+    assert.equal(output.schema, SESSION_CRITIC_EXPORT_RESULT_SCHEMA);
+    assert.equal(output.status, "exported");
+    assert.equal(output.packetId, packetId);
+    assert.deepEqual(readdirSync(join(fx.root, outDir)).sort(), [...EXPORT_FILES].sort());
+    assert.equal(readFileSync(join(fx.root, outDir, "receipt.json"), "utf8"), canonicalJson(journalReceiptBody(fx, packetId)));
+    const unwritten = `specs/beta/evidence/critic/${"6".repeat(32)}`;
+    for (const [request, code] of [
+      [{ ...good, extra: 1 }, "SCF-EXPORT-REQUEST"],
+      [{ schema: good.schema, packetId, reportPath }, "SCF-EXPORT-REQUEST"],
+      [{ ...good, schema: "pipeline.session-critic-export-request.v2" }, "SCF-EXPORT-REQUEST"],
+      [{ ...good, packetId: "NOT-A-PACKET" }, "SCF-EXPORT-REQUEST"],
+      [{ ...good, reportPath: 7 }, "SCF-EXPORT-REQUEST"],
+      [{ ...good, outDir: unwritten }, "SCF-EXPORT-PATH"],
+      [good, "SCF-EXPORT-EXISTS"],
+    ]) {
+      const path = writeScratchRequest(fx, "bad-export-request.json", request);
+      const result = runSessionCriticFinalizerCli(["export", "--root", fx.root, "--request", path]);
+      assert.equal(result.exitCode, 2, code);
+      assert.equal(result.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
+      assert.equal(result.output.status, "rejected");
+      assert.equal(result.output.code, code);
+    }
+    for (const [argv, code] of [
+      [["export", "--root", fx.root], "SCF-EXPORT-USAGE"],
+      [["export", "--root", fx.root, "--request", "../outside.json"], "SCF-EXPORT-REQUEST-FILE"],
+      [["exportx", "--root", fx.root, "--request", requestPath], "SCF-USAGE"],
+    ]) assert.equal(runSessionCriticFinalizerCli(argv).output.code, code);
+    assert.equal(existsSync(join(fx.root, unwritten)), false);
+  } finally { cleanup(fx); }
 });

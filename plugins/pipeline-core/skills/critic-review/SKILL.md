@@ -83,6 +83,24 @@ A rejected prelaunch admission is a coordinator defect, not Critic work: do
 not spawn a child or substitute prose/evidence. A returned verdict without
 the exact prelaunch admission cannot mint a passing receipt.
 
+The Critic stays read-only toward tracked files: its report lives in ignored
+`scratch/` and its receipt in the git-private journal, so neither survives as
+project evidence. After a consumed `finalize`, the Coordinator exports them:
+
+```bash
+node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" export --root "$PWD" --request scratch/session-critic-export-request.json
+```
+
+The request is closed `pipeline.session-critic-export-request.v1` JSON with
+exactly `schema`, `packetId`, `reportPath` (the Critic's repository-relative
+notes file) and `outDir`, which must be `specs/<segment>/evidence/critic/<packetId>`.
+`export` reads only a consumed packet's receipt and the report, creates `outDir`
+exclusively (an existing one is refused) and writes `receipt.json`, `report.md`
+and `index.json`; it runs no git and stages nothing. A review with findings
+exports too (`reviewPass: false` in the index). The Coordinator commits those
+three files with the reviewed change or the next lifecycle commit. A refusal
+exits 2 with a typed `SCF-EXPORT-*` code.
+
 **Opt-in named-requirement admission:** a feature Spec may place
 `<spec-basename>.requirements.json` beside itself. When present, the preflight
 reads that closed map and all targets from the exact candidate tree, requires

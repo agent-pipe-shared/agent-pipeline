@@ -4,7 +4,7 @@ import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-laun
 /** Durable, runner-neutral acceptance boundary for the ordinary fresh-session Critic. */
 
 import { randomBytes } from "node:crypto";
-import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync } from "node:fs";
+import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { isPhysicalScratchTarget } from "../lib/physical-scratch-boundary.mjs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +35,7 @@ import {
   inspectClaimedSessionAdmission,
   prepareCandidatePacket,
   publishClaimedSessionAdmission,
+  readConsumedCandidateReceipt,
   recordCandidateResult,
   sha256,
 } from "./critic-packet-preflight.mjs";
@@ -50,12 +51,16 @@ export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finaliza
 export const SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
 export const GENERIC_BATCH_REGISTRATION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-registration-request.v2";
 export const GENERIC_BATCH_CORRECTION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-correction-request.v2";
+export const SESSION_CRITIC_EXPORT_REQUEST_SCHEMA = "pipeline.session-critic-export-request.v1";
+export const SESSION_CRITIC_EXPORT_RESULT_SCHEMA = "pipeline.session-critic-export.v1";
+export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
 export const SESSION_CRITIC_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
 const CLI_HELP = [
   "Usage: session-critic-finalizer.mjs admit --root <repository-root> --request <repo-relative request.json>",
   "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json>",
   "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
+  "Usage: session-critic-finalizer.mjs export --root <repository-root> --request <repo-relative scratch request.json>",
   "       session-critic-finalizer.mjs --help",
   "",
   "Admit and claim before the fresh Critic starts; finalize only the same preclaimed packet after return.",
@@ -556,9 +561,146 @@ export function finalizeSessionCriticReview(options, deps = {}) {
   });
 }
 
+const EXPORT_REQUEST_KEYS = Object.freeze(["schema", "packetId", "reportPath", "outDir"]);
+const EXPORT_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
+const EXPORT_MAX_REPORT_BYTES = 1024 * 1024;
+
+/** The git common directory read from the filesystem alone; the export route never runs git. */
+function commonDirWithoutGit(root) {
+  try {
+    const dotGit = join(root, ".git");
+    const info = lstatSync(dotGit);
+    if (info.isSymbolicLink()) return null;
+    if (info.isDirectory()) return realpathSync(dotGit);
+    if (!info.isFile() || info.size > 4096) return null;
+    const pointer = /^gitdir: (.+)$/mu.exec(readFileSync(dotGit, "utf8"));
+    if (pointer === null) return null;
+    const gitDir = resolve(root, pointer[1].trim());
+    let common = gitDir;
+    try {
+      const declared = readFileSync(join(gitDir, "commondir"), "utf8").trim();
+      if (declared.length > 0) common = resolve(gitDir, declared);
+    } catch { /* a gitdir without commondir is its own common directory */ }
+    return realpathSync(common);
+  } catch { return null; }
+}
+function exportRelative(value, code) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 256 || value.trim() !== value
+    || value.includes("\\") || value.includes("\0") || isAbsolute(value) || value.startsWith("./") || value.endsWith("/")
+    || value.split("/").some((part) => part === "" || part === "." || part === "..")) fail(code);
+  return value;
+}
+/** `specs/<segment>/evidence/critic/<packetId>`; no existing ancestor may be a symlink. */
+function exportOutDir(root, packetId, value) {
+  exportRelative(value, "SCF-EXPORT-PATH");
+  const parts = value.split("/");
+  if (parts.length !== 5 || parts[0] !== "specs" || !EXPORT_SEGMENT.test(parts[1]) || parts[1].includes("..")
+    || parts[2] !== "evidence" || parts[3] !== "critic" || parts[4] !== packetId) fail("SCF-EXPORT-PATH");
+  let cursor = root;
+  for (const part of parts.slice(0, 4)) {
+    cursor = join(cursor, part);
+    let info;
+    try { info = lstatSync(cursor); }
+    catch (error) { if (error?.code === "ENOENT") break; fail("SCF-EXPORT-PATH"); }
+    if (info.isSymbolicLink() || !info.isDirectory()) fail("SCF-EXPORT-PATH");
+  }
+  return resolve(root, value);
+}
+function exportReportBytes(root, value) {
+  exportRelative(value, "SCF-EXPORT-PATH");
+  if (value.split("/")[0] === ".git") fail("SCF-EXPORT-PATH");
+  let bytes;
+  try {
+    const fd = openSync(repoPath(root, value, "SCF-EXPORT-PATH"), constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    try {
+      const info = fstatSync(fd);
+      if (!info.isFile() || info.size > EXPORT_MAX_REPORT_BYTES) fail("SCF-EXPORT-PATH");
+      bytes = readFileSync(fd);
+    } finally { closeSync(fd); }
+  } catch (error) {
+    if (error instanceof SessionCriticFinalizerError) throw error;
+    fail("SCF-EXPORT-REPORT-MISSING");
+  }
+  if (bytes.length === 0) fail("SCF-EXPORT-REPORT-MISSING");
+  return bytes;
+}
+
+/**
+ * Export one consumed session Critic review as tracked project evidence. The Critic
+ * stays read-only: this reads the private journal and the report, then creates `outDir`
+ * exclusively with receipt.json, report.md and index.json. It stages and commits nothing.
+ */
+export function exportSessionCriticEvidence({ root: rootInput, packetId, reportPath, outDir }, deps = {}) {
+  const root = realpathSync(resolve(rootInput));
+  if (!PACKET_ID.test(packetId ?? "")) fail("SCF-EXPORT-REQUEST");
+  const target = exportOutDir(root, packetId, outDir);
+  const report = exportReportBytes(root, reportPath);
+  const common = commonDirWithoutGit(root);
+  if (common === null) fail("SCF-EXPORT-UNCONSUMED");
+  let consumedReview;
+  try {
+    consumedReview = (deps.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt)({
+      controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId });
+  } catch { fail("SCF-EXPORT-UNCONSUMED"); }
+  const { packet, receipt } = consumedReview ?? {};
+  try { validateSessionCriticReceipt(receipt); } catch { fail("SCF-EXPORT-UNCONSUMED"); }
+  // Same binding the Verify lifecycle demands, minus its pass gate: a review with findings is evidence too.
+  if (!record(packet) || packet.packetId !== packetId || receipt.packetId !== packetId
+    || receipt.packetDigest !== sha256(canonicalJson(packet))
+    || packet.candidate?.base !== receipt.candidate.base || packet.candidate?.commit !== receipt.candidate.commit
+    || packet.candidate?.tree !== receipt.candidate.tree || packet.diff?.base !== receipt.reviewRange.base
+    || packet.diff?.commit !== receipt.reviewRange.commit
+    || packet.diff?.sha256 !== receipt.reviewRange.diffSha256) fail("SCF-EXPORT-UNCONSUMED");
+  const receiptBytes = Buffer.from(canonicalJson(receipt), "utf8");
+  const index = {
+    schema: SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA,
+    packetId,
+    candidate: { commit: receipt.candidate.commit, tree: receipt.candidate.tree },
+    receiptSha256: sha256(receiptBytes),
+    reportSha256: sha256(report),
+    reviewPass: receipt.reviewPass,
+    findingCount: receipt.findingCount,
+  };
+  const indexBytes = Buffer.from(canonicalJson(index), "utf8");
+  const files = [["receipt.json", receiptBytes], ["report.md", report], ["index.json", indexBytes]];
+  try { mkdirSync(resolve(target, ".."), { recursive: true }); } catch { fail("SCF-EXPORT-WRITE"); }
+  try { mkdirSync(target); }
+  catch (error) { fail(error?.code === "EEXIST" ? "SCF-EXPORT-EXISTS" : "SCF-EXPORT-WRITE"); }
+  try {
+    for (const [name, bytes] of files) writeFileSync(join(target, name), bytes, { flag: "wx", mode: 0o644 });
+  } catch {
+    try { rmSync(target, { recursive: true, force: true }); } catch { /* the directory is ours alone; best effort */ }
+    fail("SCF-EXPORT-WRITE");
+  }
+  return Object.freeze({
+    schema: SESSION_CRITIC_EXPORT_RESULT_SCHEMA,
+    status: "exported",
+    packetId,
+    outDir,
+    paths: files.map(([name]) => `${outDir}/${name}`),
+    receiptSha256: index.receiptSha256,
+    reportSha256: index.reportSha256,
+    indexSha256: sha256(indexBytes),
+  });
+}
+
+/** The additive `export` verb: its own usage and request vocabulary, so the other verbs' dispatch stays untouched. */
+function runSessionCriticExportCli(argv, deps) {
+  if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-EXPORT-USAGE");
+  const root = realpathSync(resolve(argv[2]));
+  let raw;
+  try { raw = readPhysicalRequest(root, argv[4]); } catch { fail("SCF-EXPORT-REQUEST-FILE"); }
+  if (!exact(raw, EXPORT_REQUEST_KEYS) || raw.schema !== SESSION_CRITIC_EXPORT_REQUEST_SCHEMA
+    || !PACKET_ID.test(raw.packetId ?? "") || typeof raw.reportPath !== "string"
+    || typeof raw.outDir !== "string") fail("SCF-EXPORT-REQUEST");
+  return Object.freeze({ exitCode: 0, output: exportSessionCriticEvidence({
+    root, packetId: raw.packetId, reportPath: raw.reportPath, outDir: raw.outDir }, deps) });
+}
+
 /** Closed CLI adapter. The request and verdict stay as bounded local files. */
 export function runSessionCriticFinalizerCli(argv, deps = {}) {
   try {
+    if (Array.isArray(argv) && argv[0] === "export") return runSessionCriticExportCli(argv, deps);
     if (!Array.isArray(argv) || argv.length !== 5 || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
     const root = realpathSync(resolve(argv[2]));
     const raw = readPhysicalRequest(root, argv[4]);
