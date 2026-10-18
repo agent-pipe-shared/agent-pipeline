@@ -49,7 +49,8 @@ const criticDecision = { schema: "pipeline.critic-required-decision.v1",
   trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false,
     diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" };
 
-function fixture(run, runner = "claude", adapterVersion = 1) {
+// Claude binding effort mirrors the agent definition (owner: agents/<name>.md frontmatter): goldfish-deep declares xhigh, the others medium.
+function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor") {
   const root=fixtureRoot("native-goldfish-host-finalizer-"); const commonDir=join(root,".git");
   const git=(...args)=>execFileSync("git",["-C",root,...args],{encoding:"utf8"}).trim();
   const facts={commits:0,publishedRecord:null,lastCommit:null};
@@ -63,8 +64,8 @@ function fixture(run, runner = "claude", adapterVersion = 1) {
     const runtime=sourceRuntime(root);
     return runtime.run(()=> {
       const binding={schema:adapterVersion===2?"pipeline.native-goldfish-host-briefing.v2":"pipeline.native-goldfish-host-briefing.v1",dispatchId:`NGHF-${runner.toUpperCase()}-1`,
-        candidateCommit:git("rev-parse","HEAD"),candidateTree:git("rev-parse","HEAD^{tree}"),runner,role:"pipeline-core:goldfish-implementor",
-        ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:"goldfish-implementor"}),model:runner==="claude"?"sonnet":"gpt-6-luna",effort:runner==="claude"?"medium":"high",rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
+        candidateCommit:git("rev-parse","HEAD"),candidateTree:git("rev-parse","HEAD^{tree}"),runner,role:`pipeline-core:${agentName}`,
+        ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:agentName}),model:runner==="claude"?"sonnet":"gpt-6-luna",effort:runner==="claude"?(agentName==="goldfish-deep"?"xhigh":"medium"):"high",rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
       const prompt=`Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v${adapterVersion}\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
       const input=runner==="claude"?{cwd:root,session_id:"session-claude",hook_event_name:"PreToolUse",tool_name:"Agent",tool_use_id:"tool-claude",tool_input:{subagent_type:binding.role,prompt,run_in_background:false}}
         :{cwd:root,session_id:"session-codex",hook_event_name:"PreToolUse",tool_name:"spawn_agent",tool_use_id:"tool-codex",tool_input:{agent_type:binding.nativeAgentType??binding.agentType,message:prompt}};
@@ -95,6 +96,21 @@ const cases = [
     assert.equal(facts.commits, 1);
     assert.match(nativeGoldfishHookMessage(result), /host commit verified/u);
   }) },
+  { id: "NGHF01-DEEP", name: "Claude valid PostToolUse return for a goldfish-deep binding commits and publishes a host-observed v4 record", run: () => fixture(({ root, binding, dependencies, facts }) => {
+    const text = JSON.stringify({ schema: NATIVE_GOLDFISH_RETURN_SCHEMA, dispatchId: binding.dispatchId,
+      candidateCommit: binding.candidateCommit, outcome: "succeeded", report: "Implemented and verified; independent review pending.",
+      changedPaths: ["src/change.mjs"] });
+    const input = { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
+      tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
+      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model],
+        content: [{ type: "text", text }] } };
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    assert.equal(binding.role, "pipeline-core:goldfish-deep");
+    assert.equal(result.status, "authored-commit-recorded", result.code);
+    assert.equal(result.commit, facts.lastCommit);
+    assert.equal(facts.publishedRecord.agentType, "goldfish-deep");
+    assert.equal(facts.commits, 1);
+  }, "claude", 1, "goldfish-deep") },
   { id: "NGHF01-P3", name: "Claude PostToolUse without pending state names the exact reason and the orchestrator route, not the bare code", run: () => fixture(({ root, binding, dependencies, facts }) => {
     const marked = `x\n<!-- pipeline-native-goldfish-host-commit:v1\n${JSON.stringify(binding)}\n-->`;
     const launch = (tool_response, run_in_background) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",

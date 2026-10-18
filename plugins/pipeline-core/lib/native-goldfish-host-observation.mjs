@@ -65,7 +65,7 @@ export function validateNativeGoldfishHostObservation(receipt, { record = null, 
     || !OID.test(subject.candidateCommit ?? "") || !OID.test(subject.candidateTree ?? "")
     || !OID.test(subject.commit ?? "") || subject.commit === subject.candidateCommit
     || (!shared&&subject.parent !== subject.candidateCommit) || !OID.test(subject.parent??"") || !OID.test(subject.tree ?? "")
-    || typeof subject.role !== "string" || !["pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"].includes(subject.role)
+    || typeof subject.role !== "string" || !["pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic", "pipeline-core:goldfish-deep"].includes(subject.role) /* role set owned by ROLE_TO_AGENT in native-goldfish-host-return.mjs; keep identical */
     || typeof subject.model !== "string" || subject.model.length === 0
     || typeof subject.effort !== "string" || subject.effort.length === 0
     || !SHA.test(subject.rulesetSha ?? "") || !Array.isArray(subject.allowedPaths)
