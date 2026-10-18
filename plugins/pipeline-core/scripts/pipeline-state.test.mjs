@@ -2236,6 +2236,11 @@ function closeCollideFixture({
   priorClosedFeatures = [],
 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "closecollide-"));
+  // Own Git root so the state writer never resolves the enclosing checkout.
+  const initialized = spawnSync("git", ["init", "-q", "-b", "main", dir], { encoding: "utf8" });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  spawnSync("git", ["-C", dir, "config", "user.name", "Fixture Author"], { encoding: "utf8" });
+  spawnSync("git", ["-C", dir, "config", "user.email", "fixture@example.invalid"], { encoding: "utf8" });
   mkdirSync(join(dir, "project"), { recursive: true });
   mkdirSync(join(dir, "specs"), { recursive: true });
   mkdirSync(join(dir, "evidence"), { recursive: true });

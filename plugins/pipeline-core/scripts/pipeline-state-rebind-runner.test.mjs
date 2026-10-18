@@ -27,9 +27,16 @@ import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
-function enrollFixtureGovernance(root) {
+function initFixtureRepo(root) {
   const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
   if (initialized.status !== 0) throw new Error("fixture git init failed: " + initialized.stderr);
+  spawnSync("git", ["-C", root, "config", "user.name", "Fixture Author"], { encoding: "utf8" });
+  spawnSync("git", ["-C", root, "config", "user.email", "fixture@example.invalid"], { encoding: "utf8" });
+  const seeded = spawnSync("git", ["-C", root, "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-q", "-m", "fixture: initial commit"], { encoding: "utf8" });
+  if (seeded.status !== 0) throw new Error("fixture initial commit failed: " + seeded.stderr);
+}
+function enrollFixtureGovernance(root) {
+  initFixtureRepo(root);
   const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
   const inactive = controller.observe({ rootDir: root });
   if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture scope was not initially inactive");
@@ -73,6 +80,7 @@ function invoke(argv, deps) {
 /** Mirrors harness/scripts/pipeline-state.test.mjs's seedPoAuthorityRebind fixture shape. */
 function fixture(name) {
   const dir = mkdtempSync(join(tmpdir(), `pipeline-rebind-runner-${name}-`)); roots.push(dir);
+  initFixtureRepo(dir);
   const featureDir = join(dir, "specs", "runner-shaped");
   mkdirSync(featureDir, { recursive: true });
   mkdirSync(dirname(statePath(dir)), { recursive: true });
@@ -283,8 +291,10 @@ test("inspect exposes one typed PO approval action after submit and presentation
     const runnerDeps = { ...f.deps, ...pkg.deps, env: runnerEnv(runner), readHumanApprovalMode: () => null };
     // This is runner/action rendering coverage. The separate feature-package
     // suite owns the stronger epic/feature review and signature path.
-    assert.equal(invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], runnerDeps).status, 0);
-    assert.equal(invoke(["present-plan", "--by", "coordinator", "--design-workflow-package", pkg.packagePath], runnerDeps).status, 0);
+    const submittedForApproval = invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], runnerDeps);
+    assert.equal(submittedForApproval.status, 0, submittedForApproval.err);
+    const presentedForApproval = invoke(["present-plan", "--by", "coordinator", "--design-workflow-package", pkg.packagePath], runnerDeps);
+    assert.equal(presentedForApproval.status, 0, presentedForApproval.err);
     const presented = JSON.parse(readFileSync(statePath(f.dir), "utf8"));
     const inspected = invoke(["inspect"], runnerDeps);
     assert.equal(inspected.status, 0, inspected.err);
@@ -320,6 +330,7 @@ test("inspect exposes one typed PO approval action after submit and presentation
  */
 function fixtureV4(name) {
   const dir = mkdtempSync(join(tmpdir(), `pipeline-rebind-runner-v4-${name}-`)); roots.push(dir);
+  initFixtureRepo(dir);
   const featureDir = join(dir, "specs", "runner-v4-shaped");
   mkdirSync(featureDir, { recursive: true });
   mkdirSync(dirname(statePath(dir)), { recursive: true });
