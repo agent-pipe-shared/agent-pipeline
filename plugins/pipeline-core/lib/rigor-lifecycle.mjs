@@ -2,7 +2,7 @@
 /** Report-only observations owned by the sanctioned State transaction. */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { closeSync, fstatSync, lstatSync, openSync, readFileSync, realpathSync, readdirSync, constants } from "node:fs";
+import { closeSync, existsSync, fstatSync, lstatSync, openSync, readFileSync, realpathSync, readdirSync, constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deriveMinimumRigor, deriveLifecycleRigorObservation, inferInputsFromRepo, normalizeInputs } from "../scripts/rigor-floor.mjs";
@@ -10,7 +10,7 @@ import { resolveProtectedBaseline } from "./protected-baseline.mjs";
 import { deriveArchitecturePlanningSurface } from "./architecture-entry-readiness.mjs";
 import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
 import { generateInterruptionReport } from "../scripts/report-interruptions.mjs";
-import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath, resolveProjectAuthorityPaths } from "./project-authority.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
 
 export const RIGOR_JOURNAL_SCHEMA = "pipeline.rigor-journal-entry.v1";
@@ -111,6 +111,23 @@ function observation(body, previous) {
     reauthorization: "candidate-binding-unavailable", promotionAuthority: "unavailable-no-threshold-promotion-granted" };
 }
 
+/**
+ * The State writer's own continuity lock, relative to `root`: the State file path
+ * plus ".lock", exactly as scripts/pipeline-state.mjs statePath() and
+ * continuityLockPath() form it. The writer is protected and is mirrored here, not
+ * imported. The writer creates the lock between this module's two collects of one
+ * transaction, so the lock is the writer's own act and not evidence about the
+ * work. Null when the path cannot be derived: the lock then stays visible.
+ */
+function stateContinuityLockPath(root) {
+  try {
+    const authority = resolveProjectAuthorityPaths({ rootDir: root });
+    const state = authority.status === "ready" ? authority.state
+      : (existsSync(join(root, NEUTRAL_STATE)) || !existsSync(join(root, LEGACY_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+    return typeof state === "string" && state !== "" ? `${state}.lock` : null;
+  } catch { return null; }
+}
+
 /** Collect actual owner ports. Injection is only a focused qualification seam. */
 export function collectRigorJournalEntry({ rootDir, state, boundary, selectedProfile, observedAt }, deps = {}) {
   const root = resolve(rootDir), featureId = state.activeFeature?.id, planPath = state.activeFeature?.planPath;
@@ -134,7 +151,8 @@ export function collectRigorJournalEntry({ rootDir, state, boundary, selectedPro
     }
     return run(file, args, options);
   };
-  const inputs = (deps.inferInputs ?? inferInputsFromRepo)(root, { execFileSyncFn: againstBaseline });
+  const inputs = (deps.inferInputs ?? inferInputsFromRepo)(root, { execFileSyncFn: againstBaseline,
+    continuityLockPath: stateContinuityLockPath(root) });
   inputs.selectedProfile = Object.hasOwn(RANK, selectedProfile) ? envelope(selectedProfile, "available", "pipeline.state.v0:selectedProfile") : absent("pipeline.state.v0:selectedProfile");
   const bindings = { protected: null, architectureProfile: null, fitnessModel: null, architectureBaseline: null, architectureMap: null,
     interruptionSnapshot: null, candidateStable: false, baselineAncestry: "unavailable" };

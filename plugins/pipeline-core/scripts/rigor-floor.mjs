@@ -501,8 +501,15 @@ export function deriveMinimumRigor(inputs, policy = null) {
 
 /**
  * Infer inputs from working tree if no inputs file is supplied.
+ *
+ * `continuityLockPath` names ONE untracked path, relative to `root`, that is not
+ * evidence: the State writer's own continuity lock, which the writer creates
+ * between its first and second collect of one transaction. It is compared with
+ * `===` against the untracked listing, never as a pattern, and only the
+ * untracked listing is filtered, so a tracked change at that path still counts.
+ * Absent, nothing is exempt.
  */
-export function inferInputsFromRepo(root, { execFileSyncFn = execFileSync } = {}) {
+export function inferInputsFromRepo(root, { execFileSyncFn = execFileSync, continuityLockPath = null } = {}) {
   // A failed Git read is unknown evidence, never an empty working tree. Keep
   // ambient GIT_* overrides from redirecting the observation to another repo.
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
@@ -526,7 +533,9 @@ export function inferInputsFromRepo(root, { execFileSyncFn = execFileSync } = {}
   let untrackedPaths = null;
   try {
     const changed = pathsFromNul(git(["diff", "--name-only", "-z", "HEAD"]));
-    untrackedPaths = pathsFromNul(git(["ls-files", "--others", "--exclude-standard", "-z"]));
+    const untracked = pathsFromNul(git(["ls-files", "--others", "--exclude-standard", "-z"]));
+    untrackedPaths = typeof continuityLockPath === "string" && continuityLockPath !== ""
+      ? untracked.filter((name) => name !== continuityLockPath) : untracked;
     actualPaths = [...new Set([...changed, ...untrackedPaths])].sort();
   } catch { /* unknown, not empty */ }
 

@@ -62,6 +62,43 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
     } });
     assert.deepEqual(deletionOnly.diffStats, { value: { files: 1, lines: 4 }, status: "available", sourceContract: "git.diff-stat" });
   });
+  test("The State writer's own continuity lock is not a rigor input, and only that exact path is exempt", () => {
+    const LOCK = "project/pipeline-state.json.lock";
+    const observe = (untracked, options = {}) => {
+      const calls = [];
+      const inputs = inferInputsFromRepo(REPO_ROOT, { ...options, execFileSyncFn(_command, argv) {
+        calls.push(argv.slice(3).join(" "));
+        if (argv[3] === "diff" && argv[4] === "--name-only") return Buffer.from("src/changed.mjs\0");
+        if (argv[3] === "ls-files") return untracked.length === 0 ? Buffer.alloc(0) : Buffer.from(`${untracked.join("\0")}\0`);
+        if (argv[3] === "diff" && argv[4] === "--shortstat") return Buffer.from(" 1 file changed, 3 insertions(+), 1 deletion(-)\n");
+        throw new Error("unexpected Git command");
+      } });
+      return { inputs, calls };
+    };
+    // The lock appears between the first and the second collect of one State write
+    // (it is created by the write that compares them): it must not change the inputs.
+    const without = observe([], { continuityLockPath: LOCK });
+    const withLock = observe([LOCK], { continuityLockPath: LOCK });
+    assert.deepEqual(withLock.inputs, without.inputs, "the writer's own lock must not enter the inputs");
+    assert.deepEqual(withLock.calls, without.calls, "the same Git observations are made with and without the lock");
+    assert.deepEqual(withLock.inputs.actualPaths.value, ["src/changed.mjs"]);
+    assert.equal(withLock.inputs.diffStats.status, "available", "the lock must not mask the line count either");
+    // Anything that is not exactly that path stays an input and keeps the line count unknown.
+    const lookalikes = observe([`${LOCK}.other`, "other.lock"], { continuityLockPath: LOCK });
+    assert.deepEqual(lookalikes.inputs.actualPaths.value, ["other.lock", `${LOCK}.other`, "src/changed.mjs"]);
+    assert.equal(lookalikes.inputs.diffStats.status, "unknown");
+    // Without an explicit lock path nothing is exempt: the lock is an ordinary untracked file.
+    const unnamed = observe([LOCK]);
+    assert.deepEqual(unnamed.inputs.actualPaths.value, [LOCK, "src/changed.mjs"]);
+    // A tracked change at that path is still a change: only the untracked listing is filtered.
+    const tracked = inferInputsFromRepo(REPO_ROOT, { continuityLockPath: LOCK, execFileSyncFn(_command, argv) {
+      if (argv[3] === "diff" && argv[4] === "--name-only") return Buffer.from(`${LOCK}\0`);
+      if (argv[3] === "ls-files") return Buffer.alloc(0);
+      if (argv[3] === "diff" && argv[4] === "--shortstat") return Buffer.from(" 1 file changed, 1 insertion(+)\n");
+      throw new Error("unexpected Git command");
+    } });
+    assert.deepEqual(tracked.actualPaths.value, [LOCK]);
+  });
   // Fixture 1: Identical normalized inputs produce identical floor & inputDigest (pinned test)
   test("1. Identical normalized inputs produce identical floor & inputDigest (pinned test)", () => {
     const inputA = {
