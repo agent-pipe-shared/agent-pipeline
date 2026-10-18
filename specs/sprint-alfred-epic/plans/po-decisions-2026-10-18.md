@@ -14,6 +14,8 @@ text was not persisted when it was taken.
 | D11 | `design-input.md` is a provenance record; raw material stays in an ignored authoring copy. | PF-14 |
 | D12 | The delivery course accepts the criterion renderings a signed consumer spec actually uses: EARS bullet items and compound ids such as `AC-E1-01-09`. The design course naming the admitted renderings before signature is a backlog item, not the repair. | PF-23 |
 
+| D13 | The Antigravity runner view maps the Claude model tiers of the agent files: `sonnet` and `haiku` become `flash`, `opus` becomes `pro`. | Antigravity global install |
+
 D12 is an Elephant decision within accepted scope (PF-23 asked for a durable fix and a
 repair option; only a delivery-side widening is both). It changes the closed criterion
 grammar the course writer reads, so it is part of the next Critic batch.
