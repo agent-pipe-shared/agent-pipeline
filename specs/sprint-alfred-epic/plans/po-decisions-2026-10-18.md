@@ -15,6 +15,7 @@ text was not persisted when it was taken.
 | D12 | The delivery course accepts the criterion renderings a signed consumer spec actually uses: EARS bullet items and compound ids such as `AC-E1-01-09`. The design course naming the admitted renderings before signature is a backlog item, not the repair. | PF-23 |
 
 | D13 | The Antigravity runner view maps the Claude model tiers of the agent files: `sonnet` and `haiku` become `flash`, `opus` becomes `pro`. | Antigravity global install |
+| D14 | PF-25 is repaired by a separate registration command (`scripts/register-feature-package.mjs`) that writes the feature package manifest, because `approve-plan` lives in the protected `pipeline-state.mjs`. The `approve-plan` call site follows through a signed package (backlog). | PF-25 |
 
 D12 is an Elephant decision within accepted scope (PF-23 asked for a durable fix and a
 repair option; only a delivery-side widening is both). It changes the closed criterion
