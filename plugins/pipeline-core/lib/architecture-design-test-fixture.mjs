@@ -35,7 +35,7 @@ function commitIfStaged(root, message) {
   const staged = spawnSync("git", ["-C", root, "diff", "--cached", "--quiet"], { encoding: "utf8" });
   if (staged.status === 0) return false;
   if (staged.status !== 1) throw new Error(staged.stderr || staged.error?.message || "architecture fixture staged-diff check failed");
-  git(root, ["commit", "-m", message, "-m", "AI-Assisted: true\nDispatch: architecture-design-fixture (goldfish)"]);
+  git(root, ["commit", "-m", message, "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
   return true;
 }
 

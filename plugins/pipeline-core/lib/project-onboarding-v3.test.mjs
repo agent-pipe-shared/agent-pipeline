@@ -2161,6 +2161,8 @@ test("V4 authority drift reopens the historical approval instead of rebinding it
     try { return { exit: invoke(), stdout }; } finally { console.log = log; }
   };
   try {
+    // The state-authority route requires a real Git work tree (WT-GIT-FAILED otherwise).
+    hostGit(path, ["init", "--initial-branch=main"]);
     mkdirSync(join(path, "project"), { recursive: true });
     const featureDir = join(path, "specs", "v4-drift"); mkdirSync(featureDir, { recursive: true });
     const planPath = "specs/v4-drift/prd_v4.md"; const specPath = "specs/v4-drift/spec.md";
@@ -6258,11 +6260,14 @@ test("a project that already owns a pre-push hook is never overwritten by onboar
 // same generated hook fires correctly in isolation.
 test("the hook onboarding installs actually fires: blocks a push the gate would refuse, allows one it would admit", () => {
   const path = root();
+  const hostStateRoot = mkdtempSync(join(temporaryBase(), "project onboarding v3 host state-"));
   try {
     hostGit(path, ["init", "--initial-branch=main"]);
     // This fixture deliberately replaces the portable manifest to isolate the
     // hook gate. Establish explicit enrollment before that projection changes.
-    const enrollment = createGovernanceScopeController({ hostStateRoot: join(path, "unused-host") });
+    // The host state root lives outside the fixture repository so the
+    // controller's host-state proof file is never staged by the fixture commit.
+    const enrollment = createGovernanceScopeController({ hostStateRoot });
     const enrollmentPlan = enrollment.planDecision({ rootDir: path, decision: "enroll", by: "disposable-hook-fixture" });
     assert.equal(enrollment.applyDecision(enrollmentPlan, { activate: true, planSha256: enrollmentPlan.planSha256 }).state, "active");
     assert.equal(existsSync(join(path, "project", "pipeline-state.json")), false);
@@ -6291,7 +6296,7 @@ test("the hook onboarding installs actually fires: blocks a push the gate would 
     writeFileSync(join(path, "evidence", "verify-latest.json"), JSON.stringify({ exitCode: 0, commit }));
     const allowed = spawnSync(hookPath, ["origin", "https://example.invalid/repo.git"], { cwd: path, input: stdin, encoding: "utf8", timeout: 15000 });
     assert.equal(allowed.status, 0, `expected the installed hook to allow; stderr=${allowed.stderr}`);
-  } finally { dispose(path); }
+  } finally { dispose(path); dispose(hostStateRoot); }
 });
 
 // IGNORESEED-2 (2026-08-28 backlog:
@@ -9252,8 +9257,8 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
       "the generated PRD carries the architecture authoring aid before its content digest is bound");
     assert.match(genPlan.targets.spec.content, /## Acceptance criteria[\s\S]*## Traceability/u,
       "the generated Spec carries acceptance and traceability sections before its content digest is bound");
-    assert.equal(digest(genPlan.targets.prd.content), genPlan.targets.prd.afterSha256);
-    assert.equal(digest(genPlan.targets.spec.content), genPlan.targets.spec.afterSha256);
+    assert.equal(createHash("sha256").update(genPlan.targets.prd.content).digest("hex"), genPlan.targets.prd.afterSha256);
+    assert.equal(createHash("sha256").update(genPlan.targets.spec.content).digest("hex"), genPlan.targets.spec.afterSha256);
     const genApplied = applyOnboardingIntakeGenerate({
       rootDir: path, repositoryCapability: "local", expectedPlanSha256: genPlan.planSha256, activate: true,
       deps: { spawn: fakeGit, prepareBoundDesignLineEndings: () => ({ ok: true, code: "FIXTURE-LINE-ENDINGS-READY" }) },
