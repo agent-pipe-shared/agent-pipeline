@@ -73,9 +73,7 @@ await check("controller configuration is closed and fixed to the 12-hour lease",
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-const controllerContract = process.platform === "linux"
-  ? "controller sends startup ACK, accepts only an exact commit tuple, and uses fixed argv"
-  : "controller reports the Linux-only host-power capability as unavailable";
+const controllerContract = "controller refuses every runtime dependency override with SP-CONTROLLER before spawning";
 
 await check(controllerContract, async () => {
   const root = mkdtempSync(join(tmpdir(), "session-power-controller-"));
@@ -85,28 +83,18 @@ await check(controllerContract, async () => {
   child.kill = () => true;
   let spawned = null;
   try {
-    if (process.platform !== "linux") {
-      await assert.rejects(runController(config(root), pipe, { identityForPid, spawnChild() { throw new Error("must not spawn a Linux controller"); } }), /platform is unavailable/u);
-      return;
-    }
-    const running = runController(config(root), pipe, {
-      identityForPid,
-      spawnChild(command, args, options) { spawned = { command, args, options }; return child; },
-      now: () => new Date("2026-07-19T12:00:00.000Z"),
-    });
-    while (pipe.frames().length === 0) await new Promise((resolve) => setTimeout(resolve, 1));
-    const ack = pipe.frames()[0];
-    assert.equal(ack.type, "startup-ack");
-    assert.equal(ack.activationNonce, A);
-    assert.equal(ack.childPid, 4242);
-    assert.equal(spawned.command, "/usr/bin/systemd-inhibit");
-    assert.equal(spawned.options.shell, false);
-    assert.deepEqual(spawned.args.slice(0, 4), ["--what=idle:sleep", "--mode=block", "--who=agent-pipeline", "--why=active-pipeline-session"]);
-    assert.equal(spawned.args.at(-1), "43200");
-    pipe.receive({ type: "commit", activationNonce: ack.activationNonce, controllerPid: ack.controllerPid, controllerStart: ack.controllerStart, controllerExecutableSha256: ack.controllerExecutableSha256, childPid: ack.childPid, childStart: ack.childStart, childExecutableSha256: ack.childExecutableSha256, handleId: ack.handleId });
-    const live = await running;
-    assert.equal(pipe.frames()[1].type, "committed-ack");
-    await live.shutdown();
+    // The product deliberately removed the runtime dependency seam: any non-empty deps is refused
+    // before any spawn, identity probe or pipe frame, on every platform.
+    await assert.rejects(
+      runController(config(root), pipe, {
+        identityForPid,
+        spawnChild(command, args, options) { spawned = { command, args, options }; return child; },
+        now: () => new Date("2026-07-19T12:00:00.000Z"),
+      }),
+      (error) => error.code === "SP-CONTROLLER" && /dependency overrides are unavailable/u.test(error.message),
+    );
+    assert.equal(spawned, null);
+    assert.equal(pipe.frames().length, 0);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

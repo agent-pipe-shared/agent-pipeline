@@ -10,7 +10,8 @@ import {canonicalJson} from './codex-sandbox-compatibility.mjs';
 import {parseStrictJson} from './governance-event.mjs';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const proposed=fs.readFileSync(new URL('./codex-host-process-journal.mjs',import.meta.url),'utf8');
-const reader=proposed.slice(proposed.indexOf('export function readHostJournal('),proposed.indexOf('export function createHostJournal(')).replace('export function','function');
+const readerStart=proposed.indexOf('export function readHostJournal(');
+const reader=proposed.slice(readerStart,proposed.indexOf('\nexport function',readerStart+1)).replace('export function','function');
 assert.ok(reader.startsWith('function readHostJournal('));
 function load(overrides={}) {
   const deps={...fs,dirname:undefined,join,parseStrictJson,canonicalJson,Buffer,
