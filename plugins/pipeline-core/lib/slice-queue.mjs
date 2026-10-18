@@ -79,7 +79,10 @@ export const DEFAULT_CRITICAL_PATH_PATTERNS = Object.freeze([
 ]);
 
 const MINUTE_MS = 60_000;
-const MAX_QUEUE_BYTES = 1024 * 1024;
+// One bound for every reader and writer of a delivery course. Each admitted item adds a slice and the
+// queue only grows during a feature, so 1 MiB was reached in practice (583 slices).
+export const SLICE_QUEUE_MAX_BYTES = 16 * 1024 * 1024;
+const MAX_QUEUE_BYTES = SLICE_QUEUE_MAX_BYTES;
 const MAX_SCOPE_LENGTH = 512;
 const MAX_ALTERNATIVES = 64;
 const GLOB_CHARS = /[*?[]/u;
@@ -818,7 +821,7 @@ export function loadSliceQueue(path, options = {}) {
     if (error?.code === "ENOENT") return { ...base, status: "absent" };
     return invalid(`slice queue is unreadable (${error?.code ?? "error"})`);
   }
-  if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_QUEUE_BYTES) return invalid("slice queue is not text or exceeds 1 MiB");
+  if (typeof text !== "string" || Buffer.byteLength(text, "utf8") > MAX_QUEUE_BYTES) return invalid("slice queue is not text or exceeds the slice-queue size bound");
   let mtimeMs = null;
   try {
     const value = (options.mtimeMs ?? ((target) => statSync(target).mtimeMs))(path);

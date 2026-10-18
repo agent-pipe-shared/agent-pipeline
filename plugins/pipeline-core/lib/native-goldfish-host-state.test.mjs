@@ -19,7 +19,7 @@ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit } from "./agy-ho
 import { withSourceOwnedNativeConcurrentCommit, inspectSourceOwnedNativeConcurrentAuthority } from "./native-goldfish-host-state.mjs";
 import { requiresGovernedItemAdmission } from "../hooks/guard-dispatch.mjs";
 import { qualifyNativeGoldfishHookDelivery } from "../hooks/native-goldfish-host.mjs";
-import { readyAndLive } from "./slice-queue.mjs";
+import { readyAndLive, SLICE_QUEUE_MAX_BYTES } from "./slice-queue.mjs";
 import { runCli, writeQueueAtomic } from "../scripts/slice-queue.mjs";
 import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finalizer.mjs";
 import { createAgyAuthorityJournalOwner } from "./agy-host-observed-store.mjs";
@@ -596,6 +596,24 @@ const cases = [
     const english=`# Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | ${critic} | review |\n`;
     assert.equal(parse(english,critic,'AC-1').status,'explicit-actual-independent-pass');
   }},
+
+  {id:'NGHS23',name:'a delivery course larger than 1 MiB stays readable, and one beyond the shared slice-queue bound is refused with its own typed code',run:()=>fixture(({root})=>{
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});
+    const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit selection'});
+    assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    mkdirSync(join(root,'.claude'));mkdirSync(join(root,'specs/unit'),{recursive:true});
+    writeFileSync(join(root,'.claude/pipeline.yaml'),'schema: pipeline.manifest.v0\n');
+    writeFileSync(join(root,'.claude/pipeline-state.json'),JSON.stringify({schema:'pipeline.state.v0',activeFeature:{id:'unit',planPath:'specs/unit/plan.md',phase:'implementation'},planApproved:true}));
+    const queuePath=join(root,'specs/unit/slice-queue.json');
+    const body=JSON.stringify({schema:'pipeline.slice-queue.v2',feature:'unit',slices:[]});
+    writeFileSync(queuePath,`{${' '.repeat(1024*1024+4096)}${body.slice(1)}`,{mode:0o600});
+    const large=resolveGovernedItemQueue({root});
+    assert.equal(large.status,'required',JSON.stringify(large));
+    writeFileSync(queuePath,`{${' '.repeat(SLICE_QUEUE_MAX_BYTES)}${body.slice(1)}`,{mode:0o600});
+    const oversized=resolveGovernedItemQueue({root});
+    assert.equal(oversized.status,'refused');assert.equal(oversized.code,'SQ-DELIVERY-QUEUE-TOO-LARGE');
+    assert.match(oversized.repair,/slice-queue size bound/u);
+  })},
 
 ];
 

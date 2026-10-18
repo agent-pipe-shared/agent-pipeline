@@ -24,7 +24,7 @@ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
 import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
 import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
-import { ITEM_QUEUE_SCHEMA, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
+import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
 import { isSafeTaskId } from "./dispatch-record.mjs";
 
 export const NATIVE_GOLDFISH_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v1";
@@ -779,7 +779,9 @@ export function resolveGovernedItemQueue({ root } = {}) {
     if (authority.status !== "ready") return refused("SQ-AUTHORITY-UNAVAILABLE");
     const readBounded = path => {
       const info = lstatSync(path);
-      if (!info.isFile() || info.isSymbolicLink() || info.size > 1024 * 1024 || realpathSync(path) !== path) throw new Error("unsafe");
+      if (info.isFile() && !info.isSymbolicLink() && info.size > SLICE_QUEUE_MAX_BYTES)
+        throw Object.assign(new Error("too large"), { code: "SQ-DELIVERY-QUEUE-TOO-LARGE" });
+      if (!info.isFile() || info.isSymbolicLink() || realpathSync(path) !== path) throw new Error("unsafe");
       const fd=openSync(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0));
       try {
         const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),current=lstatSync(path);
@@ -812,7 +814,11 @@ export function resolveGovernedItemQueue({ root } = {}) {
     if (!validated.ok || queue.feature !== state.activeFeature.id) return refused("SQ-DELIVERY-QUEUE-INVALID");
     return { status: "required", code: "SQ-DELIVERY-REQUIRED", path: relative(physical, path).replaceAll("\\", "/"),
       sha256: createHash("sha256").update(bytes).digest("hex"), queue, normalized: validated.queue };
-  } catch { return refused("SQ-DELIVERY-STATE-UNAVAILABLE"); }
+  } catch (error) {
+    if (error?.code === "SQ-DELIVERY-QUEUE-TOO-LARGE") return { status: "refused", code: error.code,
+      repair: "The delivery course or State file exceeds the slice-queue size bound; it is not truncated or edited by hand. Report it to the PO for a governed compaction." };
+    return refused("SQ-DELIVERY-STATE-UNAVAILABLE");
+  }
 }
 
 
@@ -921,7 +927,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const path=resolve(physical,dirname(state.activeFeature.planPath),'slice-queue.json');
       if(relative(physical,path).startsWith('..')||realpathSync(dirname(path))!==dirname(path))throw nativeManagedFault('item-course-queue-path');
       let preimage=null,raw;
-      try{const info=lstatSync(path);if(info.isSymbolicLink()||!info.isFile()||info.size>1024*1024)throw nativeManagedFault('item-course-queue-unsafe');preimage=readFileSync(path);raw=parseStrictJson(preimage);}catch(error){if(error.code!=='ENOENT')throw error;raw={schema:ITEM_QUEUE_SCHEMA,feature:state.activeFeature.id,slices:[]};}
+      try{const info=lstatSync(path);if(info.isSymbolicLink()||!info.isFile()||info.size>SLICE_QUEUE_MAX_BYTES)throw nativeManagedFault('item-course-queue-unsafe');preimage=readFileSync(path);raw=parseStrictJson(preimage);}catch(error){if(error.code!=='ENOENT')throw error;raw={schema:ITEM_QUEUE_SCHEMA,feature:state.activeFeature.id,slices:[]};}
       if(!validateSliceQueue(raw).ok||raw.feature!==state.activeFeature.id)throw nativeManagedFault('item-course-queue-invalid');
       const legacy=raw.schema==='pipeline.slice-queue.v1';
       if(legacy){
@@ -957,6 +963,8 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
         ||nativeManagedDigest(nativeManagedCurrentOwner(repository).association)!==nativeManagedDigest(current.association))throw nativeManagedFault('item-course-approval-cas');
       if(preimage?digest(readFileSync(path))!==digest(preimage):(()=>{try{lstatSync(path);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}})())throw nativeManagedFault('item-course-queue-cas');
       const bytes=Buffer.from(JSON.stringify(raw,null,2)+'\n'),temp=join(dirname(path),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);
+      // Never publish a course that its own readers would refuse.
+      if(bytes.length>SLICE_QUEUE_MAX_BYTES)throw Object.assign(new Error('prepared delivery course exceeds the slice-queue size bound'),{code:'SQ-DELIVERY-QUEUE-TOO-LARGE'});
       let fd;
       try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const written=writeSync(fd,bytes,offset,bytes.length-offset);if(written<=0)throw nativeManagedFault('item-course-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,path);}
       finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
