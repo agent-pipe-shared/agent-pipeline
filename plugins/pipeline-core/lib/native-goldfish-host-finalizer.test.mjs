@@ -95,6 +95,25 @@ const cases = [
     assert.equal(facts.commits, 1);
     assert.match(nativeGoldfishHookMessage(result), /host commit verified/u);
   }) },
+  { id: "NGHF01-P3", name: "Claude PostToolUse without pending state names the exact reason and the orchestrator route, not the bare code", run: () => fixture(({ root, binding, dependencies, facts }) => {
+    const marked = `x\n<!-- pipeline-native-goldfish-host-commit:v1\n${JSON.stringify(binding)}\n-->`;
+    const launch = (tool_response, run_in_background) => ({ hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
+      tool_use_id: "tool-never-prepared", tool_input: { subagent_type: binding.role, prompt: marked, run_in_background }, tool_response });
+    const background = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: launch({ status: "async_launched", agentId: "agent-bg" }, true) }, dependencies);
+    assert.equal(background.code, "NGHF-PENDING-UNAVAILABLE");
+    assert.equal(background.reason, "async-launch");
+    const backgroundMessage = nativeGoldfishHookMessage(background);
+    assert.match(backgroundMessage, /\(NGHF-PENDING-UNAVAILABLE\)/u);
+    assert.match(backgroundMessage, /background/u);
+    assert.match(backgroundMessage, /Dispatch: <dispatchId> \(goldfish\)/u);
+    assert.match(backgroundMessage, /dispatch-record-write\.mjs/u);
+    const unprepared = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: launch({ status: "completed" }, false) }, dependencies);
+    assert.equal(unprepared.code, "NGHF-PENDING-UNAVAILABLE");
+    assert.equal(unprepared.reason, "no-pending");
+    assert.match(nativeGoldfishHookMessage(unprepared), /no pending host-commit state was prepared/u);
+    assert.match(nativeGoldfishHookMessage(unprepared), /dispatch-record-write\.mjs/u);
+    assert.equal(facts.commits, 0);
+  }) },
   { id: "NGHF02", name: "Codex result model drift is rejected before the host commit call", run: () => fixture(({ root, binding, dependencies, facts }) => {
     const stop = { hook_event_name: "SubagentStop", session_id: "session-codex", agent_id: "agent-1",
       agent_type: binding.nativeAgentType ?? binding.agentType, model: "unresolved-model", last_assistant_message: "{}" };

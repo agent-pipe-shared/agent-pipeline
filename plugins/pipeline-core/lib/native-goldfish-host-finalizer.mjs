@@ -91,7 +91,12 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
     if (!pending.ok) {
       const marked = typeof input.tool_input?.prompt === "string"
         && /<!-- pipeline-native-goldfish-host-commit:v[123](?:\s|$)/u.test(input.tool_input.prompt);
-      return marked ? fail("NGHF-PENDING-UNAVAILABLE") : fail("NGHF-NOT-APPLICABLE", "not-applicable");
+      // The exact reason, so the hook message can name it: a background launch (async_launched or an explicit
+      // run_in_background true) never reaches a final PostToolUse return, whereas every other missing-state case
+      // means the pre-launch preparation did not write pending state (its PreToolUse WARNING names the code).
+      const asyncLaunch = input.tool_response?.status === "async_launched" || input.tool_input?.run_in_background === true;
+      return marked ? { ...fail("NGHF-PENDING-UNAVAILABLE"), reason: asyncLaunch ? "async-launch" : "no-pending" }
+        : fail("NGHF-NOT-APPLICABLE", "not-applicable");
     }
     observation = observeClaudeGoldfishReturn(input, pending.state);
   } else if (runner === "codex" && input.hook_event_name === "SubagentStop") {
