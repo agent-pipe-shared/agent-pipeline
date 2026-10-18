@@ -19,8 +19,8 @@ import { inspectGitHookSourceSnapshot, publishGitHookRuntimeSnapshot } from "../
 import { checkCloneProvisioning } from "../../scripts/check-clone-provisioning.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { HOOK_SNAPSHOT_STALE_CODE, assessHookCurrentness } from "../hook-currentness.mjs";
-import { applyInstall as applyCommitMsg, planInstall as planCommitMsg, renderImpl } from "../../scripts/commit-msg-hook-install.mjs";
-import { applyInstall as applyPreCommit, planInstall as planPreCommit } from "../../scripts/pre-commit-hook-install.mjs";
+import { applyInstall as applyCommitMsg, planInstall as planCommitMsg, renderImpl, renderImpl as renderCommitMsgImpl } from "../../scripts/commit-msg-hook-install.mjs";
+import { applyInstall as applyPreCommit, planInstall as planPreCommit, renderImpl as renderPreCommitImpl } from "../../scripts/pre-commit-hook-install.mjs";
 import { isForbiddenCrossRepositoryMutation } from "../../hooks/guard-lifecycle-ready.mjs";
 
 const REPO = resolve(import.meta.dirname, "..", "..", "..", "..");
@@ -248,14 +248,16 @@ function installedHookWorld(t, { consumer, enroll = true }) {
   };
 }
 
-const refreshCommands = (stderr) => [...stderr.matchAll(/node "([^"\r\n]+)" --install/gu)].map((match) => match[1]);
+// ALF-W6-ONE-HOOK-REFRESH: the refusal names the ONE command that refreshes every mandatory hook, with the repository root.
+const refreshCommands = (stderr) => [...stderr.matchAll(/node "([^"\r\n]+refresh-mandatory-hooks\.mjs)" --root "([^"\r\n]+)"/gu)].map((match) => ({ script: match[1], root: match[2] }));
 
 function assertStaleRefusal(world, installer, refused, headBefore) {
   assert.notEqual(refused.status, 0, `a stale snapshot must refuse the commit (stdout: ${refused.stdout})`);
   assert.match(refused.stderr, new RegExp(HOOK_SNAPSHOT_STALE_CODE, "u"), refused.stderr);
   const commands = refreshCommands(refused.stderr);
   assert.equal(commands.length, 1, `the refusal names exactly one refresh command (stderr: ${refused.stderr})`);
-  assert.equal(resolve(commands[0]), resolve(world.pluginRoot, "scripts", installer), "the command is the installer's own, in the plugin the hook was installed from");
+  assert.equal(resolve(commands[0].script), resolve(world.pluginRoot, "scripts", "refresh-mandatory-hooks.mjs"), `the command refreshes all hooks (not only ${installer}), in the plugin the hook was installed from`);
+  assert.equal(resolve(commands[0].root), resolve(world.project), "the command carries the repository root");
   assert.equal(world.head(), headBefore, "a refused commit leaves HEAD untouched");
   return commands[0];
 }
@@ -274,6 +276,22 @@ for (const [hookName, hook] of Object.entries(HOOKS)) {
   });
 }
 
+test("AC-179 (one refresh for all hooks): the rendered refusal of both hooks names refresh-mandatory-hooks.mjs --root with the repository root; without a root it falls back to the installer's own command", () => {
+  const lib = join(PLUGIN, "lib"), root = join(REPO, "scratch", "one-refresh-root");
+  const refusalCommand = (rendered) => JSON.parse(rendered.match(/const SNAPSHOT_REFRESH_COMMAND = (".*");/u)[1]);
+  const snapshotLib = "/state/runtime-" + "a".repeat(64) + "/lib";
+  const withRoot = {
+    "commit-msg": renderCommitMsgImpl(snapshotLib, lib, root),
+    "pre-commit": renderPreCommitImpl({ pluginLibDir: snapshotLib, pluginHooksDir: "/h", pluginScriptsDir: "/s", sourcePluginLibDir: lib, rootDir: root }),
+  };
+  for (const [name, rendered] of Object.entries(withRoot)) {
+    assert.equal(refusalCommand(rendered), `node "${resolve(PLUGIN, "scripts", "refresh-mandatory-hooks.mjs")}" --root "${resolve(root)}"`, name);
+    assert.match(rendered, /HOOK-SNAPSHOT-STALE/u, name);
+  }
+  assert.equal(refusalCommand(renderCommitMsgImpl(snapshotLib, lib)), `node "${resolve(PLUGIN, "scripts", "commit-msg-hook-install.mjs")}" --install`);
+  assert.equal(refusalCommand(renderPreCommitImpl({ pluginLibDir: snapshotLib, pluginHooksDir: "/h", pluginScriptsDir: "/s", sourcePluginLibDir: lib })), `node "${resolve(PLUGIN, "scripts", "pre-commit-hook-install.mjs")}" --install`);
+});
+
 test("AC-179 (consumer layout): with the plugin installed outside the project, staleness binds to the installed plugin and the printed refresh command repairs it", { timeout: INSTALLED_HOOK_TEST_TIMEOUT_MS }, (t) => {
   const world = installedHookWorld(t, { consumer: true });
   const hook = HOOKS["commit-msg"];
@@ -285,10 +303,11 @@ test("AC-179 (consumer layout): with the plugin installed outside the project, s
   assert.equal(hook.plan(world.project, world.pluginRoot).updateRequired, true, "the installed plugin's change is detected");
   const headBefore = world.head();
   const command = assertStaleRefusal(world, hook.installer, world.commit(), headBefore);
-  assert.ok(relative(world.project, command).startsWith(".."), "the refresh command points at the installed plugin, not into the project");
-  const refreshed = spawnSync(process.execPath, [command, "--install"], { cwd: world.project, env: world.env, encoding: "utf8", timeout: INSTALLED_HOOK_TEST_TIMEOUT_MS });
-  assert.equal(refreshed.status, 0, `the printed command refreshes the snapshot (stderr: ${refreshed.stderr})`);
-  assert.equal(JSON.parse(refreshed.stdout).status, "upgraded");
+  assert.ok(relative(world.project, command.script).startsWith(".."), "the refresh command points at the installed plugin, not into the project");
+  const refreshed = spawnSync(process.execPath, [command.script, "--root", command.root], { cwd: world.project, env: world.env, encoding: "utf8", timeout: INSTALLED_HOOK_TEST_TIMEOUT_MS });
+  const refreshReport = JSON.parse(refreshed.stdout.trim().split(/\r?\n/u).at(-1));
+  assert.equal(refreshReport.schema, "pipeline.mandatory-hook-refresh.v1", `the printed command refreshes the snapshot (stderr: ${refreshed.stderr})`);
+  assert.equal(Object.fromEntries(refreshReport.results.map((entry) => [entry.id, entry.status]))["commit-msg-hook"], "refreshed", JSON.stringify(refreshReport));
   assert.equal(hook.plan(world.project, world.pluginRoot).updateRequired, false, "the refreshed snapshot is current again");
   const retried = world.commit();
   assert.equal(retried.status, 0, `the refreshed hook admits the retried commit (stderr: ${retried.stderr})`);

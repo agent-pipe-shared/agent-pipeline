@@ -262,9 +262,9 @@ export function renderShim(implAbsPath) {
  * full scope/fail-closed contract. Kept as one exported render function (never copied inline at
  * each call site) so the installed hook's content stays byte-identical to whatever
  * `pre-commit-hook-install.test.mjs` exercises. */
-export function renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir, sourcePluginLibDir }) {
+export function renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir, sourcePluginLibDir, rootDir }) {
   const lib = JSON.stringify(pluginLibDir);
-  const staleCheck = renderSnapshotStaleCheck({ sourcePluginLibDir, installerName: "pre-commit-hook-install.mjs" });
+  const staleCheck = renderSnapshotStaleCheck({ sourcePluginLibDir, installerName: "pre-commit-hook-install.mjs", rootDir });
   const hooksDir = JSON.stringify(pluginHooksDir);
   const scriptsDir = JSON.stringify(pluginScriptsDir);
   return `#!/usr/bin/env node
@@ -1220,7 +1220,7 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR, p
   pluginHooksDir = join(runtimeSnapshot.root, "hooks");
   pluginScriptsDir = join(runtimeSnapshot.root, "scripts");
   const impl = implPath(commonDir);
-  const implContent = decorateInstalledImpl(renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir, sourcePluginLibDir }), pluginLibDir, runtimeSnapshot.deadline);
+  const implContent = decorateInstalledImpl(renderImpl({ pluginLibDir, pluginHooksDir, pluginScriptsDir, sourcePluginLibDir, rootDir }), pluginLibDir, runtimeSnapshot.deadline);
   const shimContent = renderShim(impl);
 
   ensureHardenedPrivateDirectory(commonDir, snapshotState);

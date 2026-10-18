@@ -61,13 +61,18 @@ export const HOOK_SNAPSHOT_STALE_CODE = "HOOK-SNAPSHOT-STALE";
  * defines `snapshotIsStale()` (true = already refused, the caller returns). With no source
  * library directory (or one that no longer exists) nothing can be compared and the hook behaves
  * exactly as before; with a source that exists, an unassessable comparison is stale (fail closed).
- * The one refresh command is the installer's own `--install`.
+ * The one refresh command refreshes every mandatory hook (`refresh-mandatory-hooks.mjs --root
+ * <repository root>`) when the repository root is known at render time; without a root it falls
+ * back to the installer's own `--install`.
  */
-export function renderSnapshotStaleCheck({ sourcePluginLibDir, installerName }) {
+export function renderSnapshotStaleCheck({ sourcePluginLibDir, installerName, rootDir }) {
   const source = typeof sourcePluginLibDir === "string" ? JSON.stringify(sourcePluginLibDir) : "null";
-  const command = typeof sourcePluginLibDir === "string"
-    ? JSON.stringify(`node "${resolve(sourcePluginLibDir, "..", "scripts", installerName)}" --install`)
-    : "null";
+  const scriptsDir = typeof sourcePluginLibDir === "string" ? resolve(sourcePluginLibDir, "..", "scripts") : null;
+  const command = scriptsDir === null
+    ? "null"
+    : JSON.stringify(typeof rootDir === "string" && rootDir !== ""
+      ? `node "${resolve(scriptsDir, "refresh-mandatory-hooks.mjs")}" --root "${resolve(rootDir)}"`
+      : `node "${resolve(scriptsDir, installerName)}" --install`);
   return `const SOURCE_PLUGIN_LIB_DIR = ${source};
 const SNAPSHOT_REFRESH_COMMAND = ${command};
 
