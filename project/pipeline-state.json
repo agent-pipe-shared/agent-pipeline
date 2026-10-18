@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-10-18T12:57:10.592Z",
+  "updatedAt": "2026-10-18T13:54:11.244Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -64,22 +64,22 @@
   "pushApproval": {
     "lastApproved": {
       "approvedBy": "PO",
-      "approvedAt": "2026-10-18T12:57:10.592Z",
-      "forCommit": "8ffca1cc65b3f89b17637d3875b217b8cd96f7e5",
+      "approvedAt": "2026-10-18T13:54:11.244Z",
+      "forCommit": "aa9bd0565395fbb17b4a92b2d1236140091bd311",
       "criticalProof": {
-        "proofSha256": "be3cf340afa64ba4e2f56d0ddc38c4131883442dd9c7f5742796fb297f7fbd36",
-        "intentSha256": "00f7778b33485239bde4c9b3a93e4eb0be16e1917245711bc127cb3c62a3c2e5",
+        "proofSha256": "d86d8f1644dbe1ad57d0371baa153532bd7ddf067db4d37b9ae94c32c1500f3c",
+        "intentSha256": "b14bcfbc402d8cdb4e305e21f634643908f7af5df04131d5f82d213badedb900",
         "action": {
           "kind": "push",
-          "subjectSha256": "bf9121c92397ab3071de62bd1186e36e6171d8a0db23e927529f6084601ad26c",
-          "expiresAt": "2026-10-18T13:44:11.412Z"
+          "subjectSha256": "5ec830d89097e4150269f2ba89532b7c7cabbecfb655d3aeeaf883afb6d0c1e2",
+          "expiresAt": "2026-10-18T14:53:03.806Z"
         },
         "proof": {
           "schema": "pipeline.po-approval-proof.v1",
-          "intentSha256": "00f7778b33485239bde4c9b3a93e4eb0be16e1917245711bc127cb3c62a3c2e5",
+          "intentSha256": "b14bcfbc402d8cdb4e305e21f634643908f7af5df04131d5f82d213badedb900",
           "keyReference": "local-po-key",
           "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
-          "signatureBase64": "LTEieSbH8gLRWrkPD0AAvXgyiZy9+LJhKwBWbFKZvSzJSViHGm2/2CKXonaeJ1Jxv9dIB9xb3OUAPPOngDF5CA=="
+          "signatureBase64": "63nq39Zx69RGuztmCPvoKPNKrm3VnL0QnN0pcBhc3zF+7/6Uv4ugPKrSU7U0dCDUuKIAOloI+RVo51U0NpD7Bg=="
         }
       },
       "remote": "origin",
@@ -201,6 +201,11 @@
       "proofSha256": "be3cf340afa64ba4e2f56d0ddc38c4131883442dd9c7f5742796fb297f7fbd36",
       "kind": "push",
       "consumedAt": "2026-10-18T12:57:10.592Z"
+    },
+    {
+      "proofSha256": "d86d8f1644dbe1ad57d0371baa153532bd7ddf067db4d37b9ae94c32c1500f3c",
+      "kind": "push",
+      "consumedAt": "2026-10-18T13:54:11.244Z"
     }
   ],
   "phoenixEpicHistory": {
