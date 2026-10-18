@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { afterEach, test } from "node:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -22,8 +23,14 @@ function invoke(root, argv) {
   finally { console.log = log; console.error = error; }
 }
 
+// The fixture owns its repository, so it can never resolve an enclosing one.
+function initRepo(dir) {
+  const git = (...args) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
+  git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+}
+
 function fixture(name) {
-  const root = mkdtempSync(join(tmpdir(), `pipeline-result-rebind-${name}-`)); roots.push(root);
+  const root = mkdtempSync(join(tmpdir(), `pipeline-result-rebind-${name}-`)); roots.push(root); initRepo(root);
   const feature = join(root, "specs", "feature"); mkdirSync(join(root, ".claude")); mkdirSync(feature, { recursive: true });
   const spec = Buffer.from("# Spec\n", "utf8"); const specSha256 = hash(spec);
   const prd = Buffer.from(`<!-- technical-spec-sha256: ${specSha256} -->\n# PRD\n`, "utf8"); const prdSha256 = hash(prd);

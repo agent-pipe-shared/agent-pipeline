@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { afterEach, test } from "node:test";
 import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -33,8 +34,14 @@ function state(overrides = {}) {
   };
 }
 
+// The fixture owns its repository, so it can never resolve an enclosing one.
+function initRepo(dir) {
+  const git = (...args) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
+  git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+}
+
 function fixture(name = "case") {
-  const root = mkdtempSync(join(tmpdir(), `pipeline-result-bootstrap-${name}-`)); roots.push(root);
+  const root = mkdtempSync(join(tmpdir(), `pipeline-result-bootstrap-${name}-`)); roots.push(root); initRepo(root);
   mkdirSync(join(root, ".claude")); mkdirSync(join(root, "specs", "feature"), { recursive: true });
   writeFileSync(join(root, "specs/feature/prd_feature.md"), "prd\n"); writeFileSync(join(root, "specs/feature/spec.md"), "spec\n");
   const historical = Buffer.from("# Feature result\n\nExisting canonical Markdown must survive intact.\n", "utf8");

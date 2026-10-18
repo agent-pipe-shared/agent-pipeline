@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   linkSync,
@@ -137,9 +138,18 @@ function approvedImplementation() {
   return { ...implementation.state, updatedAt: "2026-07-31T11:15:00.000Z" };
 }
 
+// The fixture owns its repository, so it can never resolve an enclosing one.
+function initRepo(dir) {
+  const git = (...args) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
+  git("init", "-q");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+}
+
 function fixture(name = "case") {
   const root = mkdtempSync(join(tmpdir(), `pipeline-result-close-${name}-`));
   roots.push(root);
+  initRepo(root);
   mkdirSync(join(root, ".claude"), { recursive: true });
   mkdirSync(join(root, "specs", "feature"), { recursive: true });
   const state = approvedImplementation();

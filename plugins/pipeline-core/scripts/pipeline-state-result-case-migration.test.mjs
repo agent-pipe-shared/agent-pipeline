@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { afterEach, test } from "node:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -15,8 +16,10 @@ const h = (x) => x.repeat(64);
 const canonical = (v) => v === null || typeof v !== "object" ? JSON.stringify(v) : Array.isArray(v) ? `[${v.map(canonical).join(",")}]` : `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(",")}}`;
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 function invoke(root, argv, deps = {}) { const out = []; const err = []; const log = console.log; const error = console.error; console.log = (...x) => out.push(x.join(" ")); console.error = (...x) => err.push(x.join(" ")); try { return { status: run(argv, { dir: root, now: () => NOW, gitCommonDir: () => ({ ok: true, path: join(root, ".git-common") }), ...deps }), out: out.join("\n"), err: err.join("\n") }; } finally { console.log = log; console.error = error; } }
+// The fixture owns its repository, so it can never resolve an enclosing one.
+function initRepo(dir) { const git = (...args) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" }); git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid"); }
 function fixture(name) {
-  const root = mkdtempSync(join(tmpdir(), `pipeline-case-migration-${name}-`)); roots.push(root); const dir = join(root, "specs", "feature"); mkdirSync(join(root, ".claude")); mkdirSync(join(root, ".git-common")); mkdirSync(dir, { recursive: true });
+  const root = mkdtempSync(join(tmpdir(), `pipeline-case-migration-${name}-`)); roots.push(root); initRepo(root); const dir = join(root, "specs", "feature"); mkdirSync(join(root, ".claude")); mkdirSync(join(root, ".git-common")); mkdirSync(dir, { recursive: true });
   const spec = Buffer.from("# Spec\n"); const specSha256 = sha(spec); const prd = Buffer.from(`<!-- technical-spec-sha256: ${specSha256} -->\n# PRD\n`); const prdSha256 = sha(prd); const lower = Buffer.from("# historical lower\n"); const upper = Buffer.from("# canonical upper\n");
   writeFileSync(join(dir, "spec.md"), spec); writeFileSync(join(dir, "prd_feature.md"), prd); writeFileSync(join(dir, "result.md"), lower); writeFileSync(join(dir, "Result.md"), upper);
   const authority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: h("1"), runtimeSha256: h("2"), receiptSha256: h("3"), repositoryFingerprint: h("4"), planPath: "specs/feature/prd_feature.md", planSha256: prdSha256, specPath: "specs/feature/spec.md", specSha256 };

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -10,6 +11,10 @@ import { run } from "./pipeline-state.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "critical-proof-gate-"));
 const external = mkdtempSync(join(tmpdir(), "critical-proof-external-"));
+// The fixture owns its repository, so it can never resolve an enclosing one.
+const fixtureGit = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+fixtureGit("init", "-q"); fixtureGit("config", "user.name", "Fixture"); fixtureGit("config", "user.email", "fixture@example.invalid");
+assert.equal(realpathSync(fixtureGit("rev-parse", "--show-toplevel").trim()), realpathSync(root), "fixture root must be its own repository, not an enclosing one");
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
 const specSha256 = createHash("sha256").update("spec").digest("hex");
