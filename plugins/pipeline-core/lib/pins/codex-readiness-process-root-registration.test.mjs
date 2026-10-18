@@ -65,3 +65,22 @@ test('an unregistered sibling process root is still refused, by the journal and 
       binding: journalFields(fixture).binding}), {code: 'host-process-root-unregistered'}, sibling);
   }
 });
+
+// The production readiness host launches from a directory it creates inside the registered processes directory,
+// that is, inside the Git common directory. Repository inspection from there must resolve the registered repository.
+test('a managed journal whose cwd lies inside the registered processes directory is accepted', linuxOnly, t => {
+  const fixture = repositoryFixture(t);
+  const inputDirectory = realpathSync(mkdtempSync(join(fixture.store.processRoot, 'input-')));
+  const receiptId = 'drh_' + 'b'.repeat(32);
+  const journal = createHostJournal(fixture.store.processRoot, {...journalFields(fixture), cwd: inputDirectory}, {receiptId});
+  assert.equal(readHostJournal(journal.directory, 'intent').value.cwd, inputDirectory);
+});
+
+test('a managed journal whose cwd lies in a different repository is still refused as repository drift', linuxOnly, t => {
+  const fixture = repositoryFixture(t), other = repositoryFixture(t);
+  const foreignInput = realpathSync(mkdtempSync(join(other.store.processRoot, 'input-')));
+  for (const cwd of [other.root, foreignInput, other.topology.gitCommonDir]) {
+    assert.throws(() => createHostJournal(fixture.store.processRoot, {...journalFields(fixture), cwd}),
+      {code: 'host-process-repository-drift'}, cwd);
+  }
+});
