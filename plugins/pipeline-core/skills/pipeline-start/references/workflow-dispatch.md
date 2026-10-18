@@ -224,6 +224,20 @@ fails immediately — it needs the plugin prefix: `'pipeline-core:goldfish-imple
 2026-08-18: a two-agent parallel dispatch failed outright on the first
 attempt with bare names before this was known.
 
+## The binding and field 6 come from the generator, not from memory
+
+For a native-host-commit Goldfish dispatch, Agent tool and Workflow `agent()` alike, generate the
+binding block and the pre-filled field 6 with the read-only
+`node <plugin-root>/scripts/dispatch-briefing.mjs binding --root . --dispatch-id <ID> --item <backlog-slug> --agent-type <goldfish-implementor|goldfish-mechanic|goldfish-deep> --model-id <full model id> --check <test path> --path <write path> [--spec <spec path>]`
+instead of keying them. Its JSON carries `block`, `binding`, `skeleton` and `warnings`: effort and
+tool budget come from the agent definition, the ruleset identity from the preflight (a typed
+`DBG-RULESET-UNAVAILABLE` refusal, never a guess), the candidate commit/tree, acceptance-row byte
+span and backlog item id from the repository. Paste `skeleton` and hand-author only the judgment
+fields (goal, context files, DoD, forbidden, stop) from `templates/prompts/goldfish-task.md`; never
+quote the binding's opening marker in briefing prose, because a second occurrence makes the whole
+briefing unparseable. Read `warnings` before dispatching (`DBG-PROTECTED-PATH` names the baseline
+rule a write path hits). In a Workflow script the `agentType` still needs the `pipeline-core:` prefix.
+
 ## Fixing a persisted script: re-invoke with inline `script`, never `Edit` the persisted file
 
 Every `Workflow` call persists its script to a file under
