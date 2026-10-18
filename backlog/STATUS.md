@@ -80,6 +80,7 @@
 | pipeline.antigravity-1-2-13-blocks-managed-refresh | open | defect | pipeline | alfred | 2026-09-29 | — | — |
 | pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths | closed | defect | pipeline | — | 2026-08-23 | 2026-08-30 | — |
 | pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root | closed | defect | pipeline | — | 2026-08-23 | — | — |
+| pipeline.antigravity-rejects-the-claude-model-tiers-in-shared-agent-files | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.antigravity-sandbox-containment-push-escape-route-unclosed | closed | defect | pipeline | — | 2026-08-23 | — | — |
 | pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.approval-bound-design-package-lives-in-an-ignored-directory | open | defect | pipeline | alfred | 2026-10-06 | — | — |
@@ -246,6 +247,7 @@
 | pipeline.denial-names-a-diagnosis-it-refuses | open | defect | pipeline | alfred | 2026-10-08 | — | — |
 | pipeline.design-approval-validator-rejects-json-key-reordering | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.design-bootstrap-verify-state-contradicts-deferred-contract | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
+| pipeline.design-course-does-not-name-the-criterion-renderings-the-delivery-course-admits | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.design-course-run-v2-refuses-its-own-documented-routes | open | defect | pipeline | alfred | 2026-10-04 | — | — |
 | pipeline.design-course-telemetry-is-deferred | open | workflow-improvement | pipeline | none | 2026-10-16 | — | — |
 | pipeline.design-generator-repeats-large-source-material | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
@@ -365,6 +367,7 @@
 | pipeline.gmw-precommit-kernel-precedence-diverges | closed | defect | pipeline | nova-b | 2026-09-12 | — | — |
 | pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | closed | workflow-improvement | pipeline | — | 2026-08-16 | — | — |
+| pipeline.goldfish-allowed-paths-naming-derived-backlog-views-are-refused-without-a-diagnostic | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.goldfish-budgets-omit-the-closing-ceremony | open | workflow-improvement | pipeline | alfred | 2026-10-09 | 2026-10-31 | — |
 | pipeline.goldfish-bugfix-module-conflicts-with-qg-04 | open | defect | pipeline | alfred | 2026-10-06 | — | — |
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | closed | workflow-improvement | pipeline | alfred | 2026-08-17 | — | — |
@@ -492,6 +495,7 @@
 | pipeline.lifecycle-inspect-omits-current-plan-spec-digests | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.lifecycle-read-scope-blocks-host-declared-system-skill | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.loaded-ruleset-identity-is-unavailable-for-claude-local-dev-and-consumers | open | defect | pipeline | none | 2026-10-18 | — | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.long-dispatches-truncate-before-emitting-their-report | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
@@ -908,7 +912,7 @@
 
 ## Counts
 
-- open: 222
+- open: 226
 - in_progress: 0
 - closed: 664
 - rejected: 3

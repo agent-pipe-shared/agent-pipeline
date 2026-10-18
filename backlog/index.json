@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6f1bef71ab4eb1b7d35cd88f02680696064165f901dafd1fb720c1da0dd93652"
+    "transitionHead": "a7668515b50ee2e116f58089cae9242254567f7395b368c85dad542e0e791668"
   },
   "counts": {
-    "open": 222,
+    "open": 226,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -1001,6 +1001,16 @@
       "closureRepository": "self",
       "closureCommit": "2b6680edb65771858e46826013c63c98d717fe12",
       "closureEvidence": "backlog/items/2026-08-23-antigravity-plugin-registration-points-one-level-above-the-plugin-root.md"
+    },
+    {
+      "id": "pipeline.antigravity-rejects-the-claude-model-tiers-in-shared-agent-files",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "PO Antigravity topology refresh on CLI 1.4.2, 2026-10-18",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.antigravity-sandbox-containment-push-escape-route-unclosed",
@@ -3139,6 +3149,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.design-course-does-not-name-the-criterion-renderings-the-delivery-course-admits",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "real greenfield project report 2026-10-18 (PF-23 diagnosis)",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
       "status": "open",
       "type": "defect",
@@ -4619,6 +4639,16 @@
       "closureRepository": "self",
       "closureCommit": "b273a1a055bae1e29f7489d232d0c83dff05c7ed",
       "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+    },
+    {
+      "id": "pipeline.goldfish-allowed-paths-naming-derived-backlog-views-are-refused-without-a-diagnostic",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "Alfred self-application, backlog dispatches BL1-BL4, 2026-10-18",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
@@ -6257,6 +6287,16 @@
       "closureRepository": "self",
       "closureCommit": "85efcceb95375d062940cb31df2e384caa913c02",
       "closureEvidence": "backlog/items/2026-08-07-live-plugin-root-undefended-in-the-shell-lane.md"
+    },
+    {
+      "id": "pipeline.loaded-ruleset-identity-is-unavailable-for-claude-local-dev-and-consumers",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-18",
+      "source": "PF-23 binding generator work, 2026-10-18",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
