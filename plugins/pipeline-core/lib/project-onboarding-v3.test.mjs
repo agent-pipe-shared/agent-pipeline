@@ -9409,6 +9409,20 @@ for (const runner of ["claude", "codex", "antigravity"]) {
         ["<PO_INTAKE_PROFILE>", "feature"],
       ]));
 
+      if (runner === "claude") {
+        // The Claude runner captures its material in a separate step after
+        // consent; with no native text-turn reference, the returned
+        // existing-file action takes the scratch intake file and its digest.
+        const capture = inspectProjectOnboardingV3({ rootDir: path, runner, deps: intakeDeps }).nextAction;
+        assert.equal(capture.kind, "collect-input");
+        assert.equal(capture.input.name, "textTurnRef");
+        const intakeFile = readFileSync(join(path, "scratch", "onboarding-intake.txt"));
+        invokeReturned({ applyAction: capture.existingFileApplyAction }, new Map([
+          ["<existing-repository-file>", "scratch/onboarding-intake.txt"],
+          ["<sha256-of-existing-file>", sha256(intakeFile)],
+        ]));
+      }
+
       if (runner === "codex") {
         const runtime = planProjectOnboardingLifecycleV4({rootDir: path, deps: intakeDeps, operation: "runtime", runner});
         const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
