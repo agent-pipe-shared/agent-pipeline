@@ -298,6 +298,20 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       assert.equal(staleCheckpoint.stalenessDebt[0].type, "architecture-map-stale");
     });
 
+    it("Class 7: a touched path that a module lists in adrReferences is current; an unreferenced ADR or a non-ADR contract is still stale (AC-18, AC-127)", () => {
+      const adrInventory = [
+        { id: "documentation", ownedPaths: ["docs/adr/**"], publicContracts: ["docs/contracts/documentation.md"], adrReferences: [] },
+        { id: "app", ownedPaths: ["src/**"], publicContracts: [], adrReferences: ["docs/adr/0004-tenancy-model.md"] },
+        { id: "platform", ownedPaths: ["schemas/**"], publicContracts: [], adrReferences: [] }
+      ];
+      const navigation = (touchedContracts) => evaluateNavigationCurrency({ rootDir: REPO_ROOT, inventory: adrInventory, touchedContracts });
+      assert.equal(navigation(["docs/adr/0004-tenancy-model.md", "docs/adr/"]).outcome, OUTCOME_PASS);
+      assert.equal(navigation(["docs/contracts/documentation.md"]).outcome, OUTCOME_PASS);
+      assert.equal(navigation(["docs/adr/0099-x.md"]).outcome, OUTCOME_FINDING);
+      assert.equal(navigation(["schemas/y.json"]).outcome, OUTCOME_FINDING);
+      assert.equal(navigation(["docs/adr/0004-tenancy-model.md", "schemas/y.json"]).violations[0].ruleId, "architecture-map-stale");
+    });
+
     it("Class 8: parallel-overlap checks concurrent write surfaces", () => {
       const disjoint = evaluateParallelOverlap({
         concurrentDispatches: [

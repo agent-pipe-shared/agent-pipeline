@@ -616,8 +616,26 @@ export function evaluateNavigationCurrency({ rootDir, inventory, candidatePaths 
 
   let isStale = Boolean(mapStale);
 
+  // A module's own ADR references are navigable by the map's declaration: the concept file already names
+  // the ADR, so a touched ADR path that any loaded module lists in adrReferences is current, and a touched
+  // docs/adr/ prefix (a trailing "/" or a "*") is current once at least one module lists a reference under
+  // it. AC-18 currency covers contracts; it is not widened here, so an architecture/ or schemas/ path, or a
+  // docs/adr/ file nobody references, is still checked against its owning module's publicContracts.
+  const moduleList = Array.isArray(inventory) ? inventory : (inventory?.modules || []);
+  const normalizeRef = (value) => String(value).replace(/\\/g, "/").replace(/^\.\//u, "");
+  const adrReferences = new Set(moduleList.flatMap((mod) => mod.adrReferences || []).map(normalizeRef));
+  const adrReferenceCovers = (touched) => {
+    const target = normalizeRef(touched);
+    if (adrReferences.has(target)) return true;
+    if (!target.startsWith("docs/adr/") || !(target.endsWith("/") || target.includes("*"))) return false;
+    const star = target.indexOf("*");
+    const prefix = star === -1 ? target : target.slice(0, star);
+    return [...adrReferences].some((reference) => reference.startsWith(prefix));
+  };
+
   // Check if any touched contract is missing from concept files
   for (const tc of touchedContracts) {
+    if (adrReferenceCovers(tc)) continue;
     const owningMod = resolveModuleForPath(tc, inventory);
     if (owningMod && !(owningMod.publicContracts || []).includes(tc)) {
       isStale = true;
