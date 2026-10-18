@@ -11,7 +11,7 @@ function test(name, run) {
 }
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+import {mkdirSync,mkdtempSync,readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {advisorHostFixture} from './codex-advisor-host.fixture.mjs';
@@ -39,6 +39,9 @@ test('genuine initial consultation survives an advised committed revision and fr
  if(process.platform==='win32'){t.skip('HOST-LIMITATION: win32: readinessFixture needs the linux-only codex-design-readiness-host-store (CRHS-INPUT). Owner Coordinator, due 2026-10-19 (needs a Linux or WSL-native run where session authority resolves); run via WSL: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs"');return;}
  assert.ok(readFileSync(new URL('../schemas/pipeline.design-workflow-package.v2.json',import.meta.url)).equals(readFileSync(new URL('../../../schemas/pipeline.design-workflow-package.v2.json',import.meta.url))),'Source and root package schemas must remain byte-identical');
  const f=advisorHostFixture(t),readinessProcess=readinessFixture(t);
+ // The launch directory must lie inside the store's own repository (host-process-repository-drift) but outside the scanned managed namespaces.
+ const readinessInputs=join(f.root,'.git','agent-pipeline','design-readiness-inputs',f.repoFingerprint);mkdirSync(readinessInputs,{recursive:true,mode:0o700});
+ const readinessInput=mkdtempSync(join(readinessInputs,'input-'));writeFileSync(join(readinessInput,'app-server'),readFileSync(join(readinessProcess.input,'app-server')));
  const consultation=await coordinateInitialDesignAdvisory({repoRoot:f.root,featureId:'advisor-feature',authoringDispatchId:'elephant-author',sources:f.sources,reason:'risk-review',profile:'feature',dispatch:f.args.dispatch,route:f.route,hostExecution:f.execution});
  assert.equal(consultation.ok,true,JSON.stringify(consultation));
  const git=args=>execFileSync('git',['-C',f.root,...args],{encoding:'utf8',timeout:10000}).trim();
@@ -58,7 +61,7 @@ test('genuine initial consultation survives an advised committed revision and fr
  const preparation={schema:'pipeline.design-readiness-preparation.v2',featureId:'advisor-feature',authoringDispatchId:'elephant-author',candidate:finalCandidate,sources:final.sources,advisor:{status:'answered',runner:'codex',profile:'feature',route:f.route,initialContext:initialRef,courseBinding:consultation.courseBinding,consultation:consultation.consultation,hostReceipt:consultation.hostReceipt,receipt:receiptRef,report:reportRef,disposition,revisions:[revision]},createdAt:new Date().toISOString()};
  publish('preparation.json',canonicalJson(preparation));
  const prepared=readDesignReadinessPreparationFromRepository({repoRoot:f.root,packagePath:'evidence/preparation.json',trustedAdvisorExecutablePath:process.execPath});assert.equal(prepared.ok,true,JSON.stringify(prepared));
- const ready=await runCodexToolFreeDesignReadiness({repoRoot:f.root,repoFingerprint:f.repoFingerprint,codexPath:process.execPath,store:f.store,dispatchId:'final-readiness',candidate:finalCandidate,sources:final.sources,route:finalRoute,inputDirectory:readinessProcess.input,advisorObservation:prepared.advisorObservation,
+ const ready=await runCodexToolFreeDesignReadiness({repoRoot:f.root,repoFingerprint:f.repoFingerprint,codexPath:process.execPath,store:f.store,dispatchId:'final-readiness',candidate:finalCandidate,sources:final.sources,route:finalRoute,inputDirectory:readinessInput,advisorObservation:prepared.advisorObservation,
   invokeHost:input=>{assert.ok(input.prompt.includes(canonicalJson(prepared.advisorObservation)));assert.equal(input.readinessAdvisorObservation.report.answer,consultation.report.answer);assert.deepEqual(input.readinessAdvisorObservation.advisor.disposition,disposition);return runIsolatedStructuredHost(input);},readCandidate:()=>observeAdvisorCandidate(f.root),readCommittedSource:(_root,commit,path)=>Buffer.from(execFileSync('git',['-C',f.root,'show',`${commit}:${path}`],{timeout:10000}))});
  assert.equal(ready.status,'reviewed',JSON.stringify(ready));
  const readyRef=publish('readiness.json',canonicalJson(ready.report));
@@ -166,6 +169,9 @@ test('the v2 package reader accepts a genuine initial-consultation package at th
  if(process.platform==='win32'){t.skip('HOST-LIMITATION: win32: readinessFixture needs the linux-only codex-design-readiness-host-store (CRHS-INPUT). Owner Coordinator, due 2026-10-19 (needs a Linux or WSL-native run where session authority resolves); run via WSL: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs"');return;}
  for(const layout of ['evidence','specs/advisor-feature/evidence/design-course']){
   const f=advisorHostFixture(t),readinessProcess=readinessFixture(t);
+ // The launch directory must lie inside the store's own repository (host-process-repository-drift) but outside the scanned managed namespaces.
+ const readinessInputs=join(f.root,'.git','agent-pipeline','design-readiness-inputs',f.repoFingerprint);mkdirSync(readinessInputs,{recursive:true,mode:0o700});
+ const readinessInput=mkdtempSync(join(readinessInputs,'input-'));writeFileSync(join(readinessInput,'app-server'),readFileSync(join(readinessProcess.input,'app-server')));
   const consultation=await coordinateInitialDesignAdvisory({repoRoot:f.root,featureId:'advisor-feature',authoringDispatchId:'elephant-author',sources:f.sources,reason:'risk-review',profile:'feature',dispatch:f.args.dispatch,route:f.route,hostExecution:f.execution});
   assert.equal(consultation.ok,true,`${layout}: ${JSON.stringify(consultation)}`);
   const git=args=>execFileSync('git',['-C',f.root,...args],{encoding:'utf8',timeout:10000}).trim();
@@ -185,7 +191,7 @@ test('the v2 package reader accepts a genuine initial-consultation package at th
   const preparation={schema:'pipeline.design-readiness-preparation.v2',featureId:'advisor-feature',authoringDispatchId:'elephant-author',candidate:finalCandidate,sources:final.sources,advisor:{status:'answered',runner:'codex',profile:'feature',route:f.route,initialContext:initialRef,courseBinding:consultation.courseBinding,consultation:consultation.consultation,hostReceipt:consultation.hostReceipt,receipt:receiptRef,report:reportRef,disposition,revisions:[revision]},createdAt:new Date().toISOString()};
   publish('preparation.json',canonicalJson(preparation));
   const prepared=readDesignReadinessPreparationFromRepository({repoRoot:f.root,packagePath:`${layout}/preparation.json`,trustedAdvisorExecutablePath:process.execPath});assert.equal(prepared.ok,true,`${layout}: ${JSON.stringify(prepared)}`);
-  const ready=await runCodexToolFreeDesignReadiness({repoRoot:f.root,repoFingerprint:f.repoFingerprint,codexPath:process.execPath,store:f.store,dispatchId:'final-readiness',candidate:finalCandidate,sources:final.sources,route:finalRoute,inputDirectory:readinessProcess.input,advisorObservation:prepared.advisorObservation,
+  const ready=await runCodexToolFreeDesignReadiness({repoRoot:f.root,repoFingerprint:f.repoFingerprint,codexPath:process.execPath,store:f.store,dispatchId:'final-readiness',candidate:finalCandidate,sources:final.sources,route:finalRoute,inputDirectory:readinessInput,advisorObservation:prepared.advisorObservation,
    invokeHost:input=>{assert.ok(input.prompt.includes(canonicalJson(prepared.advisorObservation)));assert.equal(input.readinessAdvisorObservation.report.answer,consultation.report.answer);assert.deepEqual(input.readinessAdvisorObservation.advisor.disposition,disposition);return runIsolatedStructuredHost(input);},readCandidate:()=>observeAdvisorCandidate(f.root),readCommittedSource:(_root,commit,path)=>Buffer.from(execFileSync('git',['-C',f.root,'show',`${commit}:${path}`],{timeout:10000}))});
   assert.equal(ready.status,'reviewed',`${layout}: ${JSON.stringify(ready)}`);
   const readyRef=publish('readiness.json',canonicalJson(ready.report));

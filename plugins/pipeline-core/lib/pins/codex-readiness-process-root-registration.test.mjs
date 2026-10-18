@@ -7,12 +7,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync, mkdirSync, realpathSync, rmSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, realpathSync, rmSync, unlinkSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {resolvePoGateRepositoryTopology, derivePoGateRepositoryFingerprint} from '../po-gate-authority.mjs';
 import {createCodexDesignReadinessHostStore} from '../codex-design-readiness-host-store.mjs';
-import {createHostJournal, hostDigest, journalExecutable, readHostJournal, registerCodexHostProcessRoot} from '../codex-host-process-journal.mjs';
+import {createHostJournal, createManagedCodexAuthorityProducerPort, hostDigest, journalExecutable, readHostJournal, registerCodexHostProcessRoot} from '../codex-host-process-journal.mjs';
+import {readNativeManagedInventory} from '../native-managed-authority-support.mjs';
+import {inspectSignedDescriptorCustodyRepository} from '../worktree-lifecycle.mjs';
 import {spawnManagedCodexHost} from '../codex-host-process-supervisor.mjs';
 
 const linuxOnly = {skip: process.platform !== 'linux' && 'the readiness host store is Linux-only'};
@@ -83,4 +85,63 @@ test('a managed journal whose cwd lies in a different repository is still refuse
     assert.throws(() => createHostJournal(fixture.store.processRoot, {...journalFields(fixture), cwd}),
       {code: 'host-process-repository-drift'}, cwd);
   }
+});
+
+// A complete readiness run leaves its private receipt in <fingerprint>/receipts/, next to processes/. The managed
+// inventory used to refuse that file as an unknown managed entry, so the NEXT managed launch in the same repository
+// ended in SDC-AUTHORITY-UNAVAILABLE. The receipt is admitted by exact path shape and exact identity; it stays part of
+// the namespace membership, but it is not an operation journal entry.
+const receiptSchema = 'pipeline.codex-readiness-host-receipt.v2';
+const reasonOf = run => { try { run(); } catch (error) { return error.reason; } return null; };
+function receiptFixture(t) {
+  const fixture = repositoryFixture(t);
+  const receiptId = 'drh_' + 'd'.repeat(32);
+  const directory = join(dirname(fixture.store.processRoot), 'receipts');
+  const record = {schema: receiptSchema, receiptId, runner: 'codex', repoFingerprint: fixture.repoFingerprint};
+  return {...fixture, receiptId, directory, record, path: join(directory, receiptId + '.json'),
+    repository: inspectSignedDescriptorCustodyRepository(fixture.root)};
+}
+const writeRecord = (file, value) => writeFileSync(file, JSON.stringify(value), {mode: 0o600});
+
+test('a readiness receipt left by a complete run does not refuse the next managed launch', linuxOnly, t => {
+  const f = receiptFixture(t);
+  assert.equal(reasonOf(() => readNativeManagedInventory(f.repository, 'managed-codex')), null);
+  writeRecord(f.path, f.record);
+  assert.equal(reasonOf(() => readNativeManagedInventory(f.repository, 'managed-codex')), null);
+  assert.equal(reasonOf(() => createManagedCodexAuthorityProducerPort({repository: f.repository}).readBaseline()), null);
+  const readiness = readNativeManagedInventory(f.repository, 'managed-codex').find(scan => scan.membership.namespaceId === 'design-readiness-processes');
+  assert.equal(readiness.membership.entryCount, 1, 'the receipt stays part of the physical membership; it is classified, not skipped');
+  assert.equal(readiness.entries.length, 0, 'the receipt is not an operation journal entry');
+});
+
+test('a receipt-named file with another schema or identity, and an unknown name in receipts/, are still refused', linuxOnly, t => {
+  const f = receiptFixture(t);
+  const refused = [
+    ['another schema', f.path, {...f.record, schema: 'pipeline.codex-readiness-finalization.v1'}, 'native-managed-managed-schema'],
+    ['another receipt id inside', f.path, {...f.record, receiptId: 'drh_' + 'e'.repeat(32)}, 'native-managed-managed-schema'],
+    ['another repository fingerprint inside', f.path, {...f.record, repoFingerprint: h('f')}, 'native-managed-managed-schema'],
+    ['an unknown name', join(f.directory, 'notes.json'), f.record, 'native-managed-unknown-managed-entry'],
+    ['a receipt name that is not an id', join(f.directory, 'receipt.json'), f.record, 'native-managed-unknown-managed-entry'],
+    ['an id of the wrong length', join(f.directory, 'drh_' + 'd'.repeat(31) + '.json'), f.record, 'native-managed-unknown-managed-entry'],
+  ];
+  for (const [label, file, value, reason] of refused) {
+    writeRecord(file, value);
+    assert.equal(reasonOf(() => readNativeManagedInventory(f.repository, 'managed-codex')), reason, label);
+    unlinkSync(file);
+    assert.equal(reasonOf(() => readNativeManagedInventory(f.repository, 'managed-codex')), null, label + ' (removed)');
+  }
+});
+
+test('the receipt shape is admitted only in the readiness namespace, under the fingerprint directory itself', linuxOnly, t => {
+  const f = receiptFixture(t);
+  const namespaces = dirname(dirname(f.store.processRoot));
+  const advisorReceipts = join(dirname(namespaces), 'advisor-codex', f.repoFingerprint, 'receipts');
+  mkdirSync(advisorReceipts, {recursive: true, mode: 0o700});
+  writeRecord(join(advisorReceipts, f.receiptId + '.json'), f.record);
+  assert.equal(reasonOf(() => readNativeManagedInventory(f.repository, 'managed-codex')), 'native-managed-unknown-managed-entry', 'advisor namespace');
+  unlinkSync(join(advisorReceipts, f.receiptId + '.json'));
+  const nested = join(f.directory, 'nested');
+  mkdirSync(nested, {mode: 0o700});
+  writeRecord(join(nested, f.receiptId + '.json'), f.record);
+  assert.equal(reasonOf(() => readNativeManagedInventory(f.repository, 'managed-codex')), 'native-managed-unknown-managed-entry', 'nested below receipts');
 });

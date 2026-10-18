@@ -46,11 +46,17 @@ export function readNativeManagedSource(namespaceId, filePath) {
 }
 /** True for a post-terminal custody record: published after the operation was released, so it is not part of the authority fact set once the terminal journal is closed. */
 export const nativeManagedPostTerminalRecord = relativePath => /\/(advisor|readiness)-finalization\.json$/.test(relativePath);
+/** The readiness host store publishes its private receipt next to processes/ after every complete run: <fingerprint>/receipts/<receipt id>.json. */
+const readinessReceiptPath = /^([a-f0-9]{64})\/receipts\/(drh_[a-f0-9]{32})\.json$/;
+const readinessNamespaceId = 'design-readiness-processes';
 export function readNativeManagedInventory(repository, domain) {
   nativeManagedRepository(repository);
   const roots = domain === 'native-goldfish' ? [['native-goldfish-host-commit', join(repository.commonDir, 'agent-pipeline/run/native-goldfish-host-commit')]]
-    : [['design-readiness-processes', join(repository.commonDir, 'agent-pipeline/design-readiness-codex')], ['advisor-processes', join(repository.commonDir, 'agent-pipeline/advisor-codex')]];
-  return roots.map(([namespaceId, rootPath]) => readAuthorityNamespace({ namespaceId, rootPath, classifyEntry: ({ relativePath, value }) => {
+    : [[readinessNamespaceId, join(repository.commonDir, 'agent-pipeline/design-readiness-codex')], ['advisor-processes', join(repository.commonDir, 'agent-pipeline/advisor-codex')]];
+  // A readiness receipt is classified below and stays in the namespace membership, but it is not an operation journal entry:
+  // the journal scan groups entries by directory and requires every group to hold an intent, which receipts/ never does.
+  const withoutReceiptEntries = (namespaceId, scan) => namespaceId === readinessNamespaceId ? { ...scan, entries: scan.entries.filter(entry => !readinessReceiptPath.test(entry.relativePath)) } : scan;
+  return roots.map(([namespaceId, rootPath]) => withoutReceiptEntries(namespaceId, readAuthorityNamespace({ namespaceId, rootPath, classifyEntry: ({ relativePath, value }) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw nativeManagedFault('native-managed-invalid-record');
     if (domain === 'native-goldfish') {
       if (!/^(pending-(claude|codex)-[a-f0-9]{64}|agent-codex-[a-f0-9]{64}|observation-(claude|codex)-[a-f0-9]{64}|authority-owner-[a-f0-9]{64}|authority-terminal-[a-f0-9]{64}|authority-check-[a-f0-9]{64}|authority-scope-[a-f0-9]{64}-[1-9][0-9]{0,3}|authority-recheck-[a-f0-9]{64}-[1-9][0-9]{0,3}|authority-integration-[a-f0-9]{64}|authority-checkpoint-[a-f0-9]{64}-[1-9][0-9]{0,3})\.json$/.test(relativePath)) throw nativeManagedFault('native-managed-unknown-native-entry');
@@ -65,6 +71,10 @@ export function readNativeManagedInventory(repository, domain) {
         || relativePath.startsWith('authority-checkpoint-') && value.schema !== 'pipeline.native-goldfish-item-checkpoint.v1') throw nativeManagedFault('native-managed-native-schema');
       if(relativePath.startsWith('authority-owner-')&&value.schema!=='pipeline.native-goldfish-authority-owner.v1')throw nativeManagedFault('native-managed-native-owner-schema');
       if(relativePath.startsWith('observation-')&&!validateNativeGoldfishHostObservation(value))throw nativeManagedFault('native-managed-native-observation-shape');
+    } else if (namespaceId === readinessNamespaceId && readinessReceiptPath.test(relativePath)) {
+      // Exact shape only: the path pattern above, this schema, and an identity that matches the path it was found at.
+      const [, fingerprint, receiptId] = readinessReceiptPath.exec(relativePath);
+      if (value.schema !== 'pipeline.codex-readiness-host-receipt.v2' || value.receiptId !== receiptId || value.repoFingerprint !== fingerprint) throw nativeManagedFault('native-managed-managed-schema');
     } else {
       // The two finalization names are the controller's post-terminal records: the host publishes them into
       // the journal directory after finish() has released the operation (codex-isolated-structured-host.mjs).
@@ -80,7 +90,7 @@ export function readNativeManagedInventory(repository, domain) {
       if(![].concat(schemas[name]??[]).includes(value.schema))throw nativeManagedFault('native-managed-managed-schema');
     }
     return value;
-  } }));
+  } })));
 }
 export function nativeManagedAssociation(value){
   if(!value||Object.keys(value).sort().join(',')!=='state,target')throw nativeManagedFault('native-managed-association-shape');
