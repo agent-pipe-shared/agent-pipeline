@@ -32,6 +32,14 @@ contention shape, but there it is a typed `SDC-LOCK-HELD` that a caller can retr
 `lib/model-family-host-store.test.mjs` MFHS028: the spawned concurrent writers retry
 on `SDC-LOCK-HELD registry-lock-held` (E29), then die on `unowned-retained-member`.
 
+`lib/model-family-host-store.test.mjs` MFHS023 (E31): the competing parent and child
+writers fail in two further ways, both with the bounded lock retry in place. (i) There
+is an untyped `ENOENT` from `lstat` of an `authority-lifetimes/<sha>.json` file in
+`readAuthoritySourceFile`, via `observe`/`effectTransition`, when one process removes a
+lifetime that the other is reading. (ii) The registry lock is held longer than a 1 s retry
+window. Cause (i) is not even a typed refusal: a concurrent reader crashes on another
+process's cleanup.
+
 ## Open
 
 - Reachability in the shipped default chain has not been measured. It is unknown whether
