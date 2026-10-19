@@ -840,6 +840,25 @@ const cases = [
     assert.deepEqual(row.dependsOn,['ITEM-AC-1'],'the successor really depends on the commit-integrated slice');
   })},
 
+  { id: "NGHS32", name: "an override journal grown past one MiB does not block item dispatch; an oversized non-journal file is refused naming file, size and bound (PF-51)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const hgo=join(repository.commonDir,'agent-pipeline/human-guard-overrides');
+    mkdirSync(hgo,{recursive:true,mode:0o700});chmodSync(hgo,0o700);
+    writeFileSync(join(hgo,'command-offers.jsonl'),`${JSON.stringify({schema:'fixture.offer',padding:'x'.repeat(1000)})}\n`.repeat(1600),{mode:0o600});
+    const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+    const dispatch=(dispatchId,toolUseId)=>{const binding={...makeBinding({dispatchId,commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
+      const input=toolInput('claude',{root,session:'native-session-one',toolUseId,binding});
+      input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
+      return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));};
+    const prepared=dispatch('DELIVER-AC-1','native-tool-one');
+    assert.equal(prepared.ok,true,JSON.stringify(prepared));
+    mkdirSync(join(hgo,'plans'),{mode:0o700});writeFileSync(join(hgo,'plans/oversized.json'),'x'.repeat(1048577),{mode:0o600});
+    const refused=dispatch('DELIVER-AC-1B','native-tool-two');
+    assert.equal(refused.ok,false);assert.match(JSON.stringify(refused),/hgo:source-size-bound plans\/oversized\.json 1048577 bytes exceeds 1048576/u);
+  })},
+
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

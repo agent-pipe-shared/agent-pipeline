@@ -10,7 +10,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -381,6 +381,28 @@ test("R-AC-08: the production writer appends to its own journal file without rew
     assert.equal(grown.length, 2);
     assert.equal(grown[0], after[0]);
     assert.equal(JSON.parse(grown[1]).occurredAtEpochMs, NOW + 1000);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("PF-51: a full journal is moved aside and retained at the next offer, and the new journal holds only that offer", () => {
+  const root = fixture();
+  try {
+    const record = (nowMs) => recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Read",
+      toolInput: { file_path: CANARY }, denials: denial, nowMs });
+    assert.equal(record(NOW).code, "HGO-EXTERNAL-ADAPTER-BOUNDARY");
+    const path = journalPath(root), first = readFileSync(path, "utf8");
+    writeFileSync(path, first.repeat(Math.ceil(262144 / first.length) + 1), { mode: 0o600 });
+    const full = readFileSync(path, "utf8");
+    assert.equal(record(NOW + 1000).code, "HGO-EXTERNAL-ADAPTER-BOUNDARY");
+    const current = readFileSync(path, "utf8").split("\n").filter(Boolean);
+    assert.equal(current.length, 1);
+    assert.equal(JSON.parse(current[0]).occurredAtEpochMs, NOW + 1000);
+    const archive = join(realpathSync(root), ".git", "agent-pipeline", "human-guard-override-journal-archive");
+    const archived = readdirSync(archive);
+    assert.equal(archived.length, 1);
+    assert.equal(readFileSync(join(archive, archived[0]), "utf8"), full, "the full journal is retained byte for byte");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

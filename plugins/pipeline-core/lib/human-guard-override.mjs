@@ -3157,12 +3157,21 @@ function appendAudit(paths, event) {
 // and `writeAtomic`'s rename is atomic. The readback below then verifies OUR OWN
 // line, so a concurrent writer can never be mistaken for a successful append.
 // ---------------------------------------------------------------------------------
+const COMMAND_OFFER_JOURNAL_ROTATE_BYTES = 262144;
 function appendCommandOfferJournal(event, { paths } = {}) {
   const path = paths.commandOffers;
   let prior = Buffer.alloc(0);
   if (existsSync(path)) {
     safePrivateFile(path);
     prior = readFileSync(path);
+  }
+  // Nothing reads this journal back beyond its own last line, so a full one is
+  // moved aside, outside the authority namespace, and retained (PF-51).
+  if (prior.length >= COMMAND_OFFER_JOURNAL_ROTATE_BYTES) {
+    const archive = join(dirname(paths.base), "human-guard-override-journal-archive");
+    mkdirSync(archive, { recursive: true, mode: 0o700 });
+    renameSync(path, join(archive, `command-offers-${Date.now()}-${sha(prior).slice(0, 12)}.jsonl`));
+    prior = Buffer.alloc(0);
   }
   const line = Buffer.from(`${JSON.stringify(event)}\n`, "utf8");
   writeAtomic(path, Buffer.concat([prior, line]));
@@ -6030,6 +6039,19 @@ function hgoAuthorityScopePresent(repository, path) {
   }
   return true;
 }
+const HGO_AUTHORITY_SOURCE_BOUND = 1048576, HGO_AUTHORITY_JOURNAL_BOUND = 67108864, HGO_AUTHORITY_INVENTORY_BOUND = 16777216;
+const HGO_AUTHORITY_JOURNALS = Object.freeze(["audit.jsonl", "command-offers.jsonl"]);
+const HGO_SWEEP_REPAIR = "remove expired requests with: node <plugin-root>/scripts/guard-human-override.mjs sweep-requests --repo <absolute-root>";
+function hgoAuthorityShownPath(local) {
+  return local.replace(/\\/gu, "/").replace(/^agent-pipeline\/human-guard-overrides\//u, "");
+}
+function hgoAuthorityJournal(local) { return HGO_AUTHORITY_JOURNALS.includes(hgoAuthorityShownPath(local)); }
+function hgoAuthorityBoundRepair(shown) {
+  if (shown === "command-offers.jsonl") return "the journal rotates aside at the next guard denial; retry after one";
+  if (shown === "audit.jsonl") return "the authenticated audit ledger cannot be rotated yet (backlog item hgo-audit-ledger-segment-checkpoint); report it";
+  if (shown.startsWith("requests/")) return HGO_SWEEP_REPAIR;
+  return "this file is not written by the Pipeline at this size; move it out of the override namespace";
+}
 function hgoAuthorityPhysical(repository, path, namespaceId) {
   const local = relative(repository.commonDir, path);
   if (local.startsWith("..") || isAbsolute(local)) hgoAuthorityFailure("hgo:outside-common-directory");
@@ -6038,9 +6060,14 @@ function hgoAuthorityPhysical(repository, path, namespaceId) {
     cursor = join(cursor, part);
     if (lstatSync(cursor).isSymbolicLink()) hgoAuthorityFailure("hgo:symlink-component");
   }
-  const before = safePrivateFile(path);
-  if (before.size > 1048576 || (typeof process.getuid === "function" && before.uid !== process.getuid())) {
-    hgoAuthorityFailure("hgo:source-bound-or-owner");
+  const before = safePrivateFile(path), shown = hgoAuthorityShownPath(local);
+  if (typeof process.getuid === "function" && before.uid !== process.getuid()) {
+    hgoAuthorityFailure(`hgo:source-owner ${shown} is not owned by the current user; restore its ownership`);
+  }
+  // The two append-only journals grow with every denial (PF-51); they get their own bound.
+  const bound = hgoAuthorityJournal(local) ? HGO_AUTHORITY_JOURNAL_BOUND : HGO_AUTHORITY_SOURCE_BOUND;
+  if (before.size > bound) {
+    hgoAuthorityFailure(`hgo:source-size-bound ${shown} ${before.size} bytes exceeds ${bound}; ${hgoAuthorityBoundRepair(shown)}`);
   }
   let bytes, after;
   const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
@@ -6070,7 +6097,10 @@ function hgoAuthorityInventory(repository) {
   let count = 0, total = 0;
   function file(path, namespaceId) {
     const observed = hgoAuthorityPhysical(repository, path, namespaceId);
-    if (++count > 4096 || (total += observed.bytes.length) > 16777216) hgoAuthorityFailure("hgo:inventory-bound");
+    if (!hgoAuthorityJournal(relative(repository.commonDir, path))) total += observed.bytes.length;
+    if (++count > 4096 || total > HGO_AUTHORITY_INVENTORY_BOUND) {
+      hgoAuthorityFailure(`hgo:inventory-bound ${count} files (bound 4096), ${total} bytes outside the journals (bound ${HGO_AUTHORITY_INVENTORY_BOUND}); ${HGO_SWEEP_REPAIR}`);
+    }
     groups.get(namespaceId).push(observed);
   }
   function directory(path, namespaceId, depth = 0) {
