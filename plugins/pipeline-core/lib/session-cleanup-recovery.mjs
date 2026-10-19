@@ -974,6 +974,8 @@ export function planSessionCleanupRecovery({
         ?? ((root, options = {}) => listActiveSessionDescriptors(root, {
           ...options,
           loadSessionDescriptorFn: loadOnce,
+          // PF-50: a Claude hook identity anchor is not a cleanup session.
+          excludeClaudeHookIdentity: true,
         })),
     ),
     inspectSessionRetirementFn: deps.inspectSessionRetirementFn

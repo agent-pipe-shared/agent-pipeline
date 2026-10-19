@@ -930,11 +930,24 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
     const loaded = loadListedSessionDescriptor(repo.primaryRoot, sessionId, options);
     // Retired by its owner between the directory read and this load: absent, not an error.
     if (loaded === null) return [];
+    if (options.excludeClaudeHookIdentity === true && isClaudeHookIdentityDescriptor(repo, loaded)) return [];
     return [{
       sessionId: loaded.sessionId,
       descriptorSha256: loaded.descriptorSha256,
     }];
   });
+}
+
+/**
+ * PF-50: the identity anchor a Claude hook process creates for its own session (claude-hook-session-owner.mjs,
+ * id `claude-<session_id>`, no owner process by design) is not a cleanup session: it has no cleanup manifest,
+ * holds no resource and grants nothing by itself. Cleanup recovery and session start skip it instead of planning
+ * a continuity bind for it that no hook-less process can ever perform. Any other descriptor is unaffected.
+ */
+const CLAUDE_HOOK_IDENTITY_ID = /^claude-[A-Za-z0-9][A-Za-z0-9-]{7,71}$/u;
+export function isClaudeHookIdentityDescriptor(repo, loaded) {
+  return CLAUDE_HOOK_IDENTITY_ID.test(loaded?.sessionId ?? "") && loaded.descriptorSchema === SESSION_DESCRIPTOR_SCHEMA
+    && loaded.ownerRuntime === null && !existsSync(cleanupManifestPath(repo, loaded.sessionId));
 }
 
 /**

@@ -280,6 +280,25 @@ test("bind-orphan auto-executes without confirmation, backs up onboarding privat
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("a Claude hook identity anchor is not a cleanup orphan: no bind-orphan is planned for it and it is kept (PF-50)", () => {
+  const root = fixture("hook-identity");
+  try {
+    const anchor = startSessionDescriptor(root, { sessionId: "claude-0123456789abcdef", ownerRuntime: null });
+    const plan = planSessionCleanupRecovery({ rootDir: root });
+    assert.notEqual(plan.recovery, "bind-orphan", JSON.stringify(plan));
+    assert.notEqual(plan.status, "ready", JSON.stringify(plan));
+    assert.deepEqual(listActiveSessionDescriptors(root), [
+      { sessionId: anchor.sessionId, descriptorSha256: anchor.descriptorSha256 },
+    ], "the anchor itself is untouched and still listed for everyone else");
+    // A non-hook descriptor beside it is still planned exactly as before.
+    const orphan = startSessionDescriptor(root, { sessionId: "session-recovery-bind-orphan" });
+    const again = planSessionCleanupRecovery({ rootDir: root });
+    assert.equal(again.recovery, "bind-orphan");
+    assert.equal(again.status, "ready");
+    assert.ok(JSON.stringify(again).includes(orphan.sessionId));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("retire-orphans auto-executes without confirmation, backs up each retired descriptor first, and clears the exact orphan set", () => {
   const root = fixture("retire-orphans");
   try {
