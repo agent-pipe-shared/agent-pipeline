@@ -1297,7 +1297,8 @@ export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,sli
       if(run(['merge-base','--is-ancestor',slice.delivery.baseCommit,sha.trim()]).status===0)direct.add(slice.id);
     }
   }
-  const superseded=live.filter(row=>!direct.has(row.id)&&live.some(next=>next.id!==row.id&&direct.has(next.id)&&(next.dependsOn??[]).includes(row.id)
+  // Only a `ready` predecessor can be a stopped attempt; held, deferred or blocked slices keep their hold.
+  const superseded=live.filter(row=>!direct.has(row.id)&&row.state==='ready'&&live.some(next=>next.id!==row.id&&direct.has(next.id)&&(next.dependsOn??[]).includes(row.id)
     &&typeof row.delivery.itemId==='string'&&next.delivery.itemId===row.delivery.itemId)).map(row=>row.id);
   return [...direct,...superseded];
 }

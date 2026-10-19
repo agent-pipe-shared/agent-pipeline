@@ -675,6 +675,16 @@ const cases = [
     commitFile("src/unrelated.mjs", "u1\n", "AI-Assisted: true\nDispatch: S-D (goldfish)\nCommit-Act: orchestrator");
     commitFile("src/e.mjs", "e1\n", "AI-Assisted: true\nDispatch: S-E (goldfish)\nCommit-Act: orchestrator");
     const afterE = git("rev-parse", "HEAD");
+    commitFile("src/h.mjs", "h1\n", "AI-Assisted: true\nDispatch: S-H1 (goldfish)\nDispatch: S-H2 (goldfish)\nDispatch: S-UNRELATED-BASE (goldfish)\nCommit-Act: orchestrator");
+    commitFile("src/x.mjs", "x1\n", "AI-Assisted: true\nDispatch: S-CANCELLED (goldfish)\nDispatch: S-CRITIC (goldfish)\nCommit-Act: orchestrator");
+    git("checkout", "-q", "-b", "unrelated", base);
+    const unrelated = commitFile("src/unrelated-base.mjs", "r1\n");
+    git("checkout", "-q", "-");
+    git("checkout", "-q", "-b", "merged");
+    commitFile("src/m-side.mjs", "m0\n");
+    git("checkout", "-q", "-");
+    commitFile("src/m-main.mjs", "m1\n");
+    git("merge", "-q", "--no-ff", "merged", "-m", "fixture merge", "-m", "Dispatch: S-M (goldfish)\nCommit-Act: orchestrator");
     git("checkout", "-q", "-b", "side");
     commitFile("src/f.mjs", "f1\n", "AI-Assisted: true\nDispatch: S-F (goldfish)\nCommit-Act: orchestrator");
     git("checkout", "-q", "-");
@@ -691,16 +701,28 @@ const cases = [
       slice("STOPPED", ["src/a.mjs"], { delivery: { itemId: "item-S-A", criteria: ["AC-1"], baseCommit: base } }),
       slice("STOPPED-OTHER-ITEM", ["src/a.mjs"]),
       slice("STOPPED-NO-SUCCESSOR", ["src/b.mjs"], { delivery: { itemId: "item-S-B", criteria: ["AC-1"], baseCommit: base } }),
+      slice("S-H1", ["src/h.mjs"]),
+      slice("S-H2", ["src/h.mjs"]),
+      slice("S-CANCELLED", ["src/x.mjs"], { state: "cancelled", holdReason: "fixture" }),
+      slice("S-CRITIC", ["src/x.mjs"], { tier: "critic" }),
+      slice("S-UNRELATED-BASE", ["src/h.mjs"], { delivery: { itemId: "item-S-UNRELATED-BASE", criteria: ["AC-1"], baseCommit: unrelated } }),
+      slice("S-M", ["src/m-side.mjs", "src/m-main.mjs"]),
+      slice("HELD-PREDECESSOR", ["src/a.mjs"], { state: "hold-po", holdReason: "fixture", delivery: { itemId: "item-S-A", criteria: ["AC-1"], baseCommit: base } }),
     ];
-    slices[0].dependsOn = ["STOPPED", "STOPPED-OTHER-ITEM"];
+    slices[0].dependsOn = ["STOPPED", "STOPPED-OTHER-ITEM", "HELD-PREDECESSOR"];
     slices[1].dependsOn = ["STOPPED-NO-SUCCESSOR"];
     const integrated = readOrchestratorCommitIntegratedSlices({ root, candidateCommit: candidate, slices });
-    assert.deepEqual([...integrated].sort(), ["S-A", "STOPPED"], JSON.stringify(integrated));
+    assert.deepEqual([...integrated].sort(), ["S-A", "S-H1", "S-H2", "STOPPED"], JSON.stringify(integrated));
     // S-B lacks Commit-Act, S-C's commit names another slice, S-D's commit misses its write scope,
-    // S-E's commit predates its base, S-F's commit is not reachable from the candidate, S-G's base is unknown.
-    // STOPPED-OTHER-ITEM has a different item; STOPPED-NO-SUCCESSOR's same-item successor S-B is not integrated.
+    // S-E's commit is its own base (not strictly after it), S-F's commit is not reachable from the candidate,
+    // S-G's base is unknown, S-UNRELATED-BASE's base is not an ancestor of the qualifying commit,
+    // S-CANCELLED and S-CRITIC are never released, and the merge commit naming S-M does not count.
+    // Several Dispatch trailers on one commit release each named slice (S-H1, S-H2).
+    // STOPPED-OTHER-ITEM has a different item; STOPPED-NO-SUCCESSOR's same-item successor S-B is not integrated;
+    // HELD-PREDECESSOR is not `ready`, so a same-item successor does not supersede it.
     assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: base, slices }), [], "nothing after the base is visible from the base itself");
-    assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: "not-a-commit", slices }), [], "an unreadable candidate releases nothing and does not throw");
+    assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: "not-a-commit", slices }), [], "a malformed candidate releases nothing and does not throw");
+    assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: "f".repeat(40), slices }), [], "a git fault on an absent candidate releases nothing and does not throw");
   }) },
 
 ];
