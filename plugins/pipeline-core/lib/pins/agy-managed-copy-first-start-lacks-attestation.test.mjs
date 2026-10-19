@@ -183,6 +183,12 @@ function preflightFor(f) {
 
 test("AC3: real installer receipt lets the first preflight in an empty non-Git project pass attestation", HOST_LIMITATION, (t) => {
   const f = build(t, "first-start");
+  // The real receipt writer and verifier resolve their directory from the operator home; point HOME at the
+  // fixture home so no receipt or locator can reach the real ~/.gemini (same seam as the global-refresh pin).
+  const realHome = homedir();
+  const originalHome = process.env.HOME;
+  process.env.HOME = join(f.base, "home");
+  t.after(() => { if (originalHome === undefined) delete process.env.HOME; else process.env.HOME = originalHome; });
   const result = refreshAntigravityInstallation(refreshOptions(f), { runCli: f.runCli });
   assert.equal(result.status, "refreshed", JSON.stringify(result));
   const receipts = readdirSync(join(f.configRoot, "agent-pipeline", "installed-plugin-attestations"));
@@ -195,7 +201,7 @@ test("AC3: real installer receipt lets the first preflight in an empty non-Git p
   // AC4: no source or operator identifiers enter the evidence the run emits.
   const emitted = JSON.stringify({ result, attestation: preflight.installedPluginAttestation });
   assert.equal(emitted.includes(f.sourcePluginRoot), false, "source path must not appear in emitted evidence");
-  assert.equal(emitted.includes(homedir()), false, "operator home must not appear in emitted evidence");
+  assert.equal(emitted.includes(realHome), false, "operator home must not appear in emitted evidence");
 });
 
 /** Reproduce the reported state: a managed copy is installed, but no receipt was ever written. */
