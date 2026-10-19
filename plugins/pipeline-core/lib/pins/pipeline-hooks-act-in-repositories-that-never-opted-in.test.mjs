@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { privateMkdtemp, privateTempRoot } from "../test-private-tmp.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const pluginRoot = resolve(here, "../..");
@@ -138,11 +139,17 @@ test("AC-226 point 2 (non-git folder under a governed ancestor): scope resolves 
   assert.equal(call(dir, "guard-lifecycle-ready.mjs", { tool_name: "Write", tool_input: { file_path: "a.txt" } }).status, 2);
 });
 
-// Pure non-git inert case needs a folder outside any governed ancestor (OS temp), which the host brief forbids here.
-const NONGIT_SKIP = "HOST-LIMIT-NONGIT-FIXTURE-OUTSIDE-GOVERNED-ANCESTOR: owner Coordinator, due 2026-10-19, rerun on Linux/WSL with an out-of-tree fixture root";
-test("AC-226 point 2 (non-git folder): hooks stay inert and quiet in a plain directory", { skip: process.env.PIPELINE_PIN_NONGIT_ROOT ? false : NONGIT_SKIP }, (t) => {
-  const base = resolve(process.env.PIPELINE_PIN_NONGIT_ROOT);
-  const dir = mkdtempSync(join(base, "never-opted-in-nongit-"));
+// Pure non-git inert case needs a folder outside any governed ancestor. The default root is the repository's own
+// private temp helper (test-private-tmp.mjs, fail-closed: it refuses a root under a git working tree), never the
+// checkout or its parent. PIPELINE_PIN_NONGIT_ROOT overrides it. It skips (typed) only if the chosen root itself
+// sits under a git working tree.
+const nongitOverride = process.env.PIPELINE_PIN_NONGIT_ROOT ? resolve(process.env.PIPELINE_PIN_NONGIT_ROOT) : null;
+const underGit = (p) => { for (let d = p; ; d = resolve(d, "..")) { if (existsSync(join(d, ".git"))) return true; if (resolve(d, "..") === d) return false; } };
+let nongitBase = nongitOverride;
+if (nongitBase === null) { try { nongitBase = privateTempRoot(); } catch { nongitBase = null; } }
+const NONGIT_SKIP = "HOST-LIMIT-NONGIT-FIXTURE-OUTSIDE-GOVERNED-ANCESTOR: owner Coordinator, due 2026-10-19, the chosen non-git fixture root sits under a git working tree (set PIPELINE_PIN_NONGIT_ROOT)";
+test("AC-226 point 2 (non-git folder): hooks stay inert and quiet in a plain directory", { skip: nongitBase === null || underGit(nongitBase) ? NONGIT_SKIP : false }, (t) => {
+  const dir = nongitOverride !== null ? mkdtempSync(join(nongitOverride, "never-opted-in-nongit-")) : privateMkdtemp("never-opted-in-nongit-");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const before = tree(dir);
   for (const name of ["guard-dispatch-budget.mjs", "guard-lifecycle-ready.mjs", "staleness-check.mjs", "antigravity-pretool-guard.mjs"]) {
