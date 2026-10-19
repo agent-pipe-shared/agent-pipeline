@@ -66,6 +66,21 @@ copied from the source reports, and the source reports themselves stay local.
 - Antigravity installer option 2 (global topology refresh) ran `refreshed` on both PO machines on 2026-10-19: once on the previous build and once on the interim install d4b1a2796. This is the PO re-test that c2817be's stamp listed as pending. New finding from that run: its workspace-registry-rebind rewrites the tracked `.agents/plugins.json` to an absolute machine path. That edit is not committed and is left as the PO's install made it. It needs a backlog item (an installer must not write a machine path into a tracked file).
 - `hooks/guard-dispatch.test.mjs` GD22, GD26 and GD27 (incomplete briefing; the real critic-review.md and goldfish-task.md templates, filled, are dispatchable) were red at 38b3b8a65 with and without the 203a53687 template change. Fixed in 66aacfc2e (Dispatch ALF-B28-GD2, 66/66; RED baseline 63/66). They did not read the real checkout; the hook resolves CLAUDE_PROJECT_DIR, which is the fixture. The causes were two fixture defects: the enrolled fixture lacked project authority files (SQ-AUTHORITY-UNAVAILABLE masked the briefing finding), and GD8 filled an Opus model with no MP-07 rationale. Critic batch and PO acceptance are pending. Backlog observation (protected guard, not a 0.7.0 fix): guard-dispatch runs item admission before role preflight even when policy findings already exist, which hides the briefing finding. AC-260 binding note: the item's original acceptance concerns `design-workflow-signing-default.test.mjs`, already addressed by 32169fca8, 89d8446be and 087529609. This repair is a separate red-test fix bound to the same row.
 - D27 dependency admission (Q5 (a) as D40, interpretation D40a): implementation complete in 8ee52639f (Elephant, one-time EL-01 exception). Evidence: native-goldfish-host-state 25/25, RED first in `scratch/d40/red.txt`, A/B clone proof `scratch/d40/d40-ab-summary.txt`. A read-only check against the real queue releases 632 of 738 slices, including all 11 dependencies of the pending C7 D30 dispatch. ALF-B30-CODEXPG stays held on ALF-F7B-PRETOOL-PARITY (Q6). Still pending: the Critic review (running), PO ratification of D40a, an interim stamp, and the PO install. The installed build d4b1a2796 does not carry it yet. Update: the Critic passed 8ee52639f with five minor findings; F1 and F4 are fixed in c830bd742, F2 and F3 stay open; D40a was ratified by the PO; interim stamp 0605def03 (`0.7.0+<runner>.20261019134448.c830bd7`) is pushed to the feature branch as a checkpoint (no Verify or Critic evidence implied). The close-route half of D27 (accepting the trailer record in place of a dispatch record) is not built yet.
+- Priority-0 consumer blockers (D44-D48), status 2026-10-19:
+
+  | Report | Fix | Status |
+  |---|---|---|
+  | PF-47, PF-48 | D44 | Implementation complete, pushed in an interim stamp; Critic delta then correction review PASS with minor findings. |
+  | PF-44, PF-45 | D45 | Implementation complete, pushed in an interim stamp (2b7dccf); Critic correction review PASS with minor findings. |
+  | PF-49, PF-50 | D46 | Implementation complete, pushed (677f8ec); Critic review partial (budget), no blocker or major found, F1-F4 minor, recorded in `backlog/items/2026-10-19-registry-source-migration-gaps-after-a-plugin-update.md`. |
+  | PF-51 (override journals over 1 MiB block every item dispatch, no repair route; found by this repository's first live item dispatch) | D47 | Implementation complete, not yet stamped. Proof: NGHS32, the rotation case in `guard-handoff-offer.test.mjs`. Audit-ledger rotation is open (`backlog/items/2026-10-19-hgo-audit-ledger-segment-checkpoint.md`). |
+  | PF-52 (a plugin update leaves the catalogue unclosable, `catalogue-source-closure`, in every session) | D48 | Implementation complete, not yet stamped. Proof: NGHS33, in fixture only. The PO's repository is the first live run. |
+
+  Common pending items:
+  - a live item dispatch on the new build;
+  - a Critic review of D47/D48;
+  - Full Verify;
+  - PO acceptance.
 
 ## Correction
 
