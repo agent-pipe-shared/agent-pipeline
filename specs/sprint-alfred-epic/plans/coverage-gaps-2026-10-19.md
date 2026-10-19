@@ -61,7 +61,7 @@ copied from the source reports, and the source reports themselves stay local.
 - No Full Verify PASS on any host, no Critic batch, and no PO acceptance yet (stage 100 = 0).
 - Two records disagree on AC-175: E10 narrows it, while the batch table says closed-by-decision. E10 is later and governs.
 - D9's text was never persisted.
-- `hooks/guard-dispatch.test.mjs` GD22, GD26 and GD27 (incomplete briefing; the real critic-review.md and goldfish-task.md templates, filled, are dispatchable) are red at 38b3b8a65 with and without the 203a53687 template change. Cause not yet measured.
+- `hooks/guard-dispatch.test.mjs` GD22, GD26 and GD27 (incomplete briefing; the real critic-review.md and goldfish-task.md templates, filled, are dispatchable) were red at 38b3b8a65 with and without the 203a53687 template change. Fixed in 66aacfc2e (Dispatch ALF-B28-GD2, 66/66; RED baseline 63/66). They did not read the real checkout; the hook resolves CLAUDE_PROJECT_DIR, which is the fixture. The causes were two fixture defects: the enrolled fixture lacked project authority files (SQ-AUTHORITY-UNAVAILABLE masked the briefing finding), and GD8 filled an Opus model with no MP-07 rationale. Critic batch and PO acceptance are pending. Backlog observation (protected guard, not a 0.7.0 fix): guard-dispatch runs item admission before role preflight even when policy findings already exist, which hides the briefing finding. AC-260 binding note: the item's original acceptance concerns `design-workflow-signing-default.test.mjs`, already addressed by 32169fca8, 89d8446be and 087529609. This repair is a separate red-test fix bound to the same row.
 
 ## Correction
 
