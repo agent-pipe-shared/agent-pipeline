@@ -53,18 +53,30 @@ const bindingRepo = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-bindin
 execFileSync("git", ["init", "-q"], { cwd: bindingRepo });
 mkdirSync(join(bindingRepo, ".claude"), { recursive: true });
 recordConsentGiven({ rootDir: bindingRepo });
+// The fixture is an ENROLLED project that says so explicitly: it carries the project authority files the production
+// resolver reads (resolveProjectAuthorityPaths) with no active feature and no slice queue, i.e. enrolled but NOT item
+// governed. Consent alone is not enough: without these two files the resolver finds no authority and refuses every
+// productive Goldfish dispatch SQ-AUTHORITY-UNAVAILABLE before the briefing is even judged (GD4 never reached
+// DISPATCH-INCOMPLETE-BRIEFING and GD9 was refused as a governed-item failure). Same shape as itemBackgroundRepo(false).
+writeFileSync(join(bindingRepo, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+writeFileSync(join(bindingRepo, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
 assert.equal(observeGovernanceScope({ rootDir: bindingRepo }).requiresEnforcement, true,
   "guard fixture must be admitted through canonical governance enrollment");
+assert.equal(resolveGovernedItemQueue({ root: bindingRepo }).status, "not-applicable",
+  "the shared guard fixture must be enrolled but not item-governed, or GD4/GD9 would test the governed-admission branch instead");
 process.once("exit", () => rmSync(bindingRepo, { recursive: true, force: true }));
 
-function filledTemplateBody(relativePath) {
+// `modelId`/`effort` default to the Design-tier values this helper always used. A Critic dispatch that selects Opus is
+// admitted only with an MP-07 batch scope AND a critical-architecture/security rationale (dispatch-policy), so a case that
+// fills the Critic template overrides these with the implement-tier model rather than inventing a rationale line.
+function filledTemplateBody(relativePath, { modelId = "claude-opus-5", effort = "max" } = {}) {
   const raw = readFileSync(join(repoRoot, relativePath), "utf8");
   const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
   const markerIndex = raw.indexOf(marker);
   assert.ok(markerIndex >= 0, `${relativePath}: copy marker not found -- template shape changed`);
   let body = raw.slice(markerIndex + marker.length);
-  body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-opus-5");
-  body = body.replace(/\{\{EFFORT\}\}/g, "max");
+  body = body.replace(/\{\{MODEL_ID\}\}/g, modelId);
+  body = body.replace(/\{\{EFFORT\}\}/g, effort);
   body = body.replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium");
   body = body.replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses");
   body = body.replace(/\{\{[^{}]*\}\}/g, "FILLED");
@@ -356,7 +368,8 @@ check("GD7 allow  a dispatch with no subagent type", { tool_input: { prompt: "an
 check("GD8 the real critic-review.md template, filled, is dispatchable", {
   tool_use_id: "gd8",
   tool_name: "Task",
-  tool_input: { subagent_type: "pipeline-core:critic", prompt: filledTemplateBody("templates/prompts/critic-review.md") },
+  // Mirrors dispatch-policy.test.mjs DP11: a filled Critic template at the implement-tier model needs no Opus rationale.
+  tool_input: { subagent_type: "pipeline-core:critic", prompt: filledTemplateBody("templates/prompts/critic-review.md", { modelId: "claude-sonnet-5", effort: "max" }) },
 }, ALLOW);
 
 check("GD9 the real goldfish-task.md template, filled, is dispatchable", {
