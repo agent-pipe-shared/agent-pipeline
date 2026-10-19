@@ -743,6 +743,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/design-approval-binding.mjs",
   "plugins/pipeline-core/lib/design-consistency-check.mjs",
   "plugins/pipeline-core/lib/design-review-receipt.mjs",
+  // GMWKC01: imported by the kernel file hooks/guard-gate-strength.mjs.
+  "plugins/pipeline-core/lib/design-review-receipt-write-guard.mjs",
   "plugins/pipeline-core/lib/rebind-approval.mjs",
   "plugins/pipeline-core/lib/retired-design-codes.mjs",
   // closure repair ALF-C-P3-01D: modules reached from kernel roots

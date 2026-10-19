@@ -517,7 +517,8 @@ and the installed-plugin anchors for the same reason as the dependencies above.
 
 The approved design-flow closure additionally protects, in kernel-array order,
 `lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`,
-`lib/design-review-receipt.mjs`, `lib/rebind-approval.mjs`, and
+`lib/design-review-receipt.mjs`, `lib/design-review-receipt-write-guard.mjs`
+(imported by `hooks/guard-gate-strength.mjs`), `lib/rebind-approval.mjs`, and
 `lib/retired-design-codes.mjs`. The imported binding, consistency and receipt
 modules validate the approval subject, current source digests, review chain and
 complete open-finding set. The imported legacy rebind module rechecks bound
