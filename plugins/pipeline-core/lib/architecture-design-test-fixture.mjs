@@ -2,7 +2,7 @@
 
 /** Test-only real architecture-design materialization for lifecycle fixtures. */
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -39,6 +39,25 @@ function commitIfStaged(root, message) {
   return true;
 }
 
+// One ephemeral signer per repository root. A fixture that materializes the
+// design package more than once for the SAME repository (the reopened-design
+// handover loop) must not append a fresh anchor on every call: the anchor is
+// never committed (see materializeArchitectureDesignFixture), so each extra
+// call left the working-tree proof policy different from the policy committed at
+// the review candidate, and the production accepted-contract reader refuses a
+// plan approval whose policy bytes drifted from its candidate
+// (CAC-SOURCE-UNAVAILABLE at approve-plan). Reuse is conditional on the signer's
+// anchor still being present in the CURRENT policy; any other state falls through
+// to a fresh anchor, which is the behavior every single-call caller has always had.
+const EPHEMERAL_SIGNERS = new Map();
+
+function policyTrustAnchors(policy) {
+  return [
+    ...(Array.isArray(policy.trustAnchors) ? policy.trustAnchors : []),
+    ...(policy.trustAnchor ? [policy.trustAnchor] : []),
+  ];
+}
+
 function addEphemeralSignatureAnchor(root, decisionRef) {
   const policyPath = resolve(root, "project/critical-human-proof.json");
   if (!existsSync(policyPath)) throw new Error("architecture design fixture requires an existing critical proof policy in signature mode");
@@ -48,6 +67,11 @@ function addEphemeralSignatureAnchor(root, decisionRef) {
     "pipeline.critical-human-proof-policy.v2",
     "pipeline.critical-human-proof-policy.v3",
   ].includes(policy.schema)) throw new Error("architecture design fixture requires a supported critical proof policy in signature mode");
+  const rootKey = realpathSync(root);
+  const earlier = EPHEMERAL_SIGNERS.get(rootKey);
+  if (earlier && policyTrustAnchors(policy).some((entry) => entry?.keyReference === earlier.keyReference && entry?.publicKeySha256 === earlier.publicKeySha256)) {
+    return { keyReference: earlier.keyReference, publicKeyPem: earlier.publicKeyPem, privateKey: earlier.privateKey };
+  }
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
   const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
   const keyReference = `architecture-design-fixture-${createHash("sha256").update(decisionRef).digest("hex").slice(0, 16)}`;
@@ -58,6 +82,7 @@ function addEphemeralSignatureAnchor(root, decisionRef) {
   if (policy.schema === "pipeline.critical-human-proof-policy.v3") policy.trustAnchors = [...(policy.trustAnchors ?? []), anchor];
   else policy.trustAnchor = anchor;
   writeFileSync(policyPath, `${JSON.stringify(policy, null, 2)}\n`, "utf8");
+  EPHEMERAL_SIGNERS.set(rootKey, { keyReference, publicKeyPem, privateKey, publicKeySha256: anchor.publicKeySha256 });
   return { keyReference, publicKeyPem, privateKey };
 }
 

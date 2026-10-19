@@ -577,26 +577,43 @@ function materializeDesignReviewReceiptFixture({ rootDir, featureId, planPath, s
   assert.equal(created.ok, true, `fixture review receipt refused: ${created.code}`);
   put(receiptPath, Buffer.from(created.bytes).toString("utf8"));
 
-  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
-  const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
-  const keyReference = `design-review-fixture-${featureId}-${round}`;
-  // The anchor is ADDED to the project's trust-anchor set through the policy's
-  // own confirmation function, never assigned over it. The architecture design
-  // fixture that ran before this one has already anchored the key that signed
-  // the adoption disposition; a v1/v2 policy holds one `trustAnchor`, so
-  // overwriting it here invalidated that disposition (PO-APPROVAL-PROOF-INVALID,
-  // surfaced as ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED at set-phase
-  // implementation). confirmTrustAnchorKey lifts the document to v3, keeps the
-  // earlier anchor and appends this one.
-  const anchored = confirmTrustAnchorKey(rootDir, { keyReference, publicKey: publicKeyPem });
-  assert.equal(anchored.ok, true, `fixture trust anchor refused: ${anchored.code}`);
-  DESIGN_REVIEW_FIXTURE_SIGNERS.set(rootDir, { keyReference, publicKeyPem, privateKey });
+  // The project is anchored ONCE per repository: the first round generates the
+  // signing key, adds its public anchor and commits the policy; every later round
+  // of the same repository reuses that key and anchor, so the policy bytes of a
+  // later round never change. This matters because the pre-commit hook the
+  // onboarding installed protects project/critical-human-proof.json (GS-2): its
+  // only admitted first-commit shape is the initial anchoring, and any later
+  // staged change to the file is refused with no consumed human-guard-override
+  // (a fixture must never seed or consume one). A second `confirmTrustAnchorKey`
+  // per round used to re-modify the already-committed policy and made the second
+  // review commit fail.
+  const earlierSigner = DESIGN_REVIEW_FIXTURE_SIGNERS.get(rootDir);
+  if (!earlierSigner) {
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
+    const keyReference = `design-review-fixture-${featureId}-${round}`;
+    // The anchor is ADDED to the project's trust-anchor set through the policy's
+    // own confirmation function, never assigned over it. The architecture design
+    // fixture that ran before this one has already anchored the key that signed
+    // the adoption disposition; a v1/v2 policy holds one `trustAnchor`, so
+    // overwriting it here invalidated that disposition (PO-APPROVAL-PROOF-INVALID,
+    // surfaced as ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED at set-phase
+    // implementation). confirmTrustAnchorKey lifts the document to v3, keeps the
+    // earlier anchor and appends this one.
+    const anchored = confirmTrustAnchorKey(rootDir, { keyReference, publicKey: publicKeyPem });
+    assert.equal(anchored.ok, true, `fixture trust anchor refused: ${anchored.code}`);
+    DESIGN_REVIEW_FIXTURE_SIGNERS.set(rootDir, { keyReference, publicKeyPem, privateKey });
+  }
 
   // Tracked and clean is the route's own precondition (ADR-0085): commit the
-  // final sources, the report, the receipt and the anchored proof policy so the
-  // candidate HEAD carries exactly the bytes the receipt and the policy binding
-  // name. The trailer block satisfies the commit-msg hook onboarding installed.
-  hostGit(rootDir, ["add", "--", planPath, specPath, ...companionPaths, reportPath, receiptPath, "project/critical-human-proof.json"]);
+  // final sources, the report, the receipt and, on the anchoring round, the
+  // anchored proof policy so the candidate HEAD carries exactly the bytes the
+  // receipt and the policy binding name. A later round stages no policy path: the
+  // anchor it signs with is already committed, and the only difference left in
+  // the working tree is the architecture design fixture's own test-private
+  // adoption anchor, which that fixture documents as never committed. The trailer
+  // block satisfies the commit-msg hook onboarding installed.
+  hostGit(rootDir, ["add", "--", planPath, specPath, ...companionPaths, reportPath, receiptPath, ...(earlierSigner ? [] : ["project/critical-human-proof.json"])]);
   hostGit(rootDir, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit",
     "-m", `design review fixture ${featureId} ${round}`, "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
   return receiptPath;
