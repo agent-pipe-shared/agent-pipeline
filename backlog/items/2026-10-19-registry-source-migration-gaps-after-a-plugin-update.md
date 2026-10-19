@@ -34,6 +34,13 @@ gaps remain.
   can be skipped, though: when a producer port cannot be created at migration time, the
   rebind stays unchecked. A fresh start also loses the old release records, so a native
   pending reservation of the same item can then collide (`item-delivery-owner-collision`).
+- **The rebind faults on a live repository.** On this repository, at 18:04 UTC on
+  2026-10-19, the rebind of catalogue f8edc0e216e5 faulted with
+  `SDC-AUTHORITY-CAS: onboarding-continuity:namespace-drift`. The migration kept the old
+  catalogue and fell back to fresh (retained `-partial`). The rebind keeps each stored
+  baseline, so any change to the onboarding-continuity namespace since the old catalogue
+  makes it fault. Such changes include sessions, cleanup bindings and old bindings. Fresh
+  mode then loses the old release records.
 - **No migration at preflight.** A preflight or `claude --resume` does not migrate. The first
   dispatch, readiness read or denial does.
 - **PF-50 reach (Critic F1).** The Claude hook identity anchor is skipped by cleanup recovery
