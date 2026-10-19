@@ -23,6 +23,13 @@ owner (`session-authority-domain-owner.mjs`) refuses an effect that is still hel
 (`domain-transition-partial-effect-retained`). `model-family-invocation.mjs` maps it to
 `MODEL-FAMILY-NATIVE-REQUEST-REFUSED`.
 
+**E33 correction (2026-10-19, measured by ALF-B13-WEDGE):** the refusal is not harmless. The
+throw leaves `agent-pipeline/session-authority/registry.lock` on disk (retain-before-unlink in
+`withSessionAuthorityBoundary`), and every later registry boundary refuses with
+`registry-lock-held`. No recovery path exists. The missing-port case reached this as well, until
+E33 hoisted the port check out of the lifecycle. A retained lock needs a sanctioned recovery
+as part of this item.
+
 The defect is latent. The production default chain never supplies the native admission
 port, so admission stops synchronously at `MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED` before any
 await, and launch is unreachable without an issued admission (MFAN measurement and
