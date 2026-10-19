@@ -109,9 +109,13 @@ function nowIso(now = new Date()) {
 }
 
 function gitEnvironment(env = process.env) {
+  // GIT_CEILING_DIRECTORIES is forwarded when set (AC-260, PO decision D32): it is Git's own documented bound on the
+  // upward repository search, so a git-less directory below a ceiling never resolves to a repository above it. It only
+  // narrows discovery (Git never excludes the start directory itself); callers that do not set it get the same
+  // environment as before.
   const allowed = [
     "PATH", "SystemRoot", "SYSTEMROOT", "WINDIR", "TMP", "TEMP", "TMPDIR",
-    "LANG", "LC_ALL", "LC_CTYPE",
+    "LANG", "LC_ALL", "LC_CTYPE", "GIT_CEILING_DIRECTORIES",
   ];
   const result = {};
   for (const key of allowed) if (typeof env[key] === "string") result[key] = env[key];

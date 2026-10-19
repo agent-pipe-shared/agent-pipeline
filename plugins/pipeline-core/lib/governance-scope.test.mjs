@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {chmodSync,existsSync,linkSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,renameSync,rmSync,statSync,symlinkSync,truncateSync,writeFileSync} from 'node:fs';
 import {tmpdir, devNull} from 'node:os';
-import {join,dirname} from 'node:path';
+import {join,dirname,delimiter} from 'node:path';
 import {createGovernanceScopeController,readGovernanceEnrollmentRetirement,governanceEnrollmentRecoveryAction} from './governance-scope.mjs';
 import {realpathSync} from 'node:fs';
 import {FixtureIsolationError,assertFixtureIsolated,createFixtureBase,discoverEnclosingRepository,guardController,isInside} from './test-fixture-isolation.mjs';
@@ -64,9 +64,14 @@ async function fixtureEscapeRegression(t){
  for(const [label,make] of [['OS temp dir, TMPDIR inside a checkout',()=>createFixtureBase('gs-escape-')],['repo-scratch leaf of a checkout',()=>createFixtureBase('gs-escape-',{location:'repo-scratch',repoBase:outer})]]){
   const made=make();t.after(()=>made.release());assert.ok(isInside(outer,made.physicalBase),label+': the base must lie inside the throwaway checkout');
   const root=join(made.base,'repo'),host=join(made.base,'host-store');mkdirSync(root);const raw=createGovernanceScopeController({hostStateRoot:host});
-  // Control: production discovery (an allow-listed Git environment, so the ceiling variable does not reach it) really resolves the git-less fixture to the enclosing checkout.
-  assert.equal(raw.observe({rootDir:root}).root,outer,label+': production discovery must resolve the git-less fixture to the enclosing checkout');
-  const plan=raw.planDecision({rootDir:root,decision:'decline',by:'Fixture human answer'});assert.equal(plan.root,outer,label+': the plan must target the enclosing checkout');
+  // Control (AC-260, D32): production Git discovery honours the GIT_CEILING_DIRECTORIES that createFixtureBase published, so the git-less fixture below that ceiling resolves to NO repository: the controller refuses it with the typed GS-GIT-UNAVAILABLE and never reports, plans for or writes to the enclosing checkout.
+  assert.ok(String(process.env.GIT_CEILING_DIRECTORIES??'').split(delimiter).includes(made.physicalBase),label+': the fixture base must be a published Git ceiling');
+  const observed=raw.observe({rootDir:root});assert.notEqual(observed.root,outer,label+': production discovery must not resolve the git-less fixture to the enclosing checkout');assert.equal(observed.repositoryKind,'unavailable',label+': below a ceiling production sees no repository');assert.ok(observed.diagnostics.includes('GS-GIT-UNAVAILABLE'),label+': the refusal is typed');
+  assert.throws(()=>raw.planDecision({rootDir:root,decision:'decline',by:'Fixture human answer'}),error=>error.code==='GS-GIT-UNAVAILABLE'&&error.topologyDiagnostic.gitReportsNotRepository===true,label+': production itself refuses to plan below a ceiling');
+  // Injected escape: a caller whose environment carries no ceiling still resolves the same fixture to the enclosing checkout. That is the escape the containment assertion below exists to refuse, so the controls that prove it stay.
+  const publishedCeiling=process.env.GIT_CEILING_DIRECTORIES;delete process.env.GIT_CEILING_DIRECTORIES;let plan;
+  try{assert.equal(raw.observe({rootDir:root}).root,outer,label+': without a ceiling production discovery resolves the git-less fixture to the enclosing checkout');plan=raw.planDecision({rootDir:root,decision:'decline',by:'Fixture human answer'});assert.equal(plan.root,outer,label+': without a ceiling the plan targets the enclosing checkout');}
+  finally{if(publishedCeiling===undefined)delete process.env.GIT_CEILING_DIRECTORIES;else process.env.GIT_CEILING_DIRECTORIES=publishedCeiling;}
   assert.throws(()=>assertFixtureIsolated(root),escaped(label));
   assert.throws(()=>decide(raw,root,'decline'),escaped(label+' decide'));
   const guarded=guardController(raw);

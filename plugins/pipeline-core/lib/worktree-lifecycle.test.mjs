@@ -9,6 +9,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -1359,6 +1360,78 @@ check("D0-TO03 discoverRepository forwards its options.timeout down to every git
   assert.equal(repo.primaryRoot, resolve(primary));
   assert.ok(seenTimeouts.length > 0);
   assert.ok(seenTimeouts.every((t) => t === 5000));
+});
+
+// ---- ALF-B26-CEILING (AC-260, PO decision D32): the child Git environment honours GIT_CEILING_DIRECTORIES ----
+// gitEnvironment() is an allow-list. The ceiling used to be dropped from it, so a git-less directory below a
+// ceiling still resolved to the repository above that ceiling in production (the live incident behind AC-260), while a
+// test process that had published a ceiling believed it was protected. Forwarding it is Git's own documented semantics:
+// Git stops its upward search at the listed directories, never excludes the start directory itself, and a caller
+// that does not set the variable gets a byte-identical environment. Each check passes the variable through
+// `options.env`, so no check mutates this process's own environment.
+
+function ceilingFixture() {
+  const { primary } = repoFixture();
+  const gitless = join(primary, "scratch", "gitless");
+  mkdirSync(gitless, { recursive: true });
+  return { primary: realpathSync(primary), scratch: realpathSync(join(primary, "scratch")), gitless: realpathSync(gitless) };
+}
+
+function ceilingEnv(ceiling) {
+  const { GIT_CEILING_DIRECTORIES: _ambient, ...rest } = process.env;
+  return ceiling === undefined ? rest : { ...rest, GIT_CEILING_DIRECTORIES: ceiling };
+}
+
+function recordingSpawn(seenEnvs) {
+  return (command, args, options) => {
+    seenEnvs.push(options.env);
+    return spawnSync(command, args, options);
+  };
+}
+
+check("D0-CEIL-01 a git-less directory below GIT_CEILING_DIRECTORIES never resolves to the repository above the ceiling", () => {
+  const { scratch, gitless } = ceilingFixture();
+  const seenEnvs = [];
+  // Typed refusal (Git exit 128, the existing WT-GIT-FAILED code), never the enclosing checkout.
+  assert.throws(
+    () => discoverRepository(gitless, { env: ceilingEnv(scratch), spawn: recordingSpawn(seenEnvs) }),
+    (error) => error instanceof WorktreeLifecycleError && error.code === "WT-GIT-FAILED" && /not a git repository/.test(error.message),
+  );
+  assert.ok(seenEnvs.length > 0 && seenEnvs.every((env) => env.GIT_CEILING_DIRECTORIES === scratch));
+  // The same typed refusal through runGit directly, the primitive every discovery goes through.
+  assertLifecycleError(() => runGit(gitless, ["rev-parse", "--git-dir"], { env: ceilingEnv(scratch) }), "WT-GIT-FAILED");
+});
+
+check("D0-CEIL-02 without the variable discovery is unchanged: the enclosing checkout is found, no ceiling reaches Git and the fixed GIT_* values stay", () => {
+  const { primary, gitless } = ceilingFixture();
+  const seenEnvs = [];
+  const repo = discoverRepository(gitless, { env: ceilingEnv(undefined), spawn: recordingSpawn(seenEnvs) });
+  assert.equal(repo.primaryRoot, primary);
+  assert.ok(seenEnvs.length > 0);
+  for (const env of seenEnvs) {
+    assert.equal(Object.hasOwn(env, "GIT_CEILING_DIRECTORIES"), false);
+    assert.equal(env.GIT_CONFIG_NOSYSTEM, "1");
+    assert.equal(env.GIT_CONFIG_GLOBAL, GIT_NULL_DEVICE);
+    assert.equal(env.GIT_TERMINAL_PROMPT, "0");
+    assert.equal(env.LC_ALL, "C");
+  }
+});
+
+check("D0-CEIL-03 a repository below the ceiling, and a repository whose root is itself the ceiling, are still found", () => {
+  const { primary, scratch } = ceilingFixture();
+  const inner = join(scratch, "inner");
+  mkdirSync(join(inner, "sub"), { recursive: true });
+  git(inner, ["init", "--initial-branch=main"]);
+  const physicalInner = realpathSync(inner);
+  assert.equal(discoverRepository(inner, { env: ceilingEnv(scratch) }).primaryRoot, physicalInner);
+  assert.equal(discoverRepository(join(inner, "sub"), { env: ceilingEnv(scratch) }).primaryRoot, physicalInner);
+  // Git never excludes the start directory itself: a repository root equal to the ceiling is found from that root.
+  assert.equal(discoverRepository(primary, { env: ceilingEnv(primary) }).primaryRoot, primary);
+});
+
+check("D0-CEIL-04 a ceiling at the repository root refuses a subdirectory start (Git's own semantics, now visible to production)", () => {
+  const { primary, scratch } = ceilingFixture();
+  assertLifecycleError(() => discoverRepository(scratch, { env: ceilingEnv(primary) }), "WT-GIT-FAILED");
 });
 
 check("D0-TMP-IGN listActiveSessionDescriptors ignores abandoned atomic write temporary files", () => {
