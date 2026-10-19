@@ -514,8 +514,9 @@ check("unprovable delta impact is downgraded to full rather than silently narrow
   copy.review_economy.path_invariant_map = { "known/path.mjs": ["invariant-known"] };
   copy.review_economy.path_invariant_map_sha256 = sha256Canonical(copy.review_economy.path_invariant_map);
   copy.review_economy.coordinator_impact_confirmed = true;
-  assert.equal(admitCriticReview(copy).mode, "full");
-  assert.equal(admitCriticReview(copy).admissionCode, "RE-DELTA-FALLBACK-UNKNOWN-PATH");
+  // QG-04: deliberate newer verdict. d02409a8a (QG-13) replaced the full-review
+  // fallback with a refusal: an unprovable delta is rejected, never rerun as full.
+  assert.throws(() => admitCriticReview(copy), /RE-DELTA-UNKNOWN-PATH/);
 });
 
 const requestPath = join(root, "request.json");
@@ -920,7 +921,10 @@ check("later full admission cannot bypass exact correction-range reconciliation"
     repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: control,
     dispatchStatePath: join(control, "state.json"), requestPath: laterFullRequestPath,
     preparedPath: join(control, "prepared.json"), reviewRoot: join(control, "review"), observers,
-  }), /correction commits/);
+  // QG-04: deliberate newer verdict. d02409a8a (QG-13): a follow-up round must
+  // be a delta over the correction diff; a full rerun is refused at admission,
+  // before correction-range reconciliation (still asserted by the delta case above).
+  }), /RE-FOLLOWUP-DELTA-REQUIRED/);
 });
 check("configured fsmonitor cannot run before the protected baseline", () => {
   assert.equal(existsSync(join(privateObserver, "ignored", "fsmonitor.txt")), false);
@@ -3028,6 +3032,14 @@ async function signedPreparedCriticFixture(dutyId, root, childRoot) {
   const runner = "codex", taskRoute = `duty.${dutyId}`;
   const routeSource = registeredModelFamilyTaskRoutes();
   const route = routeSource.taskRoutes.find(value => value.runner === runner && value.taskRoute === taskRoute);
+  // AC-212: modelAuthorityOwner() caches one owner per repository for the whole process and that owner's live map keeps every op it
+  // reserved, so a fixture that reused the shared candidate repository inherited the previous fixture's ops (their lifetime files
+  // removed by cleanup -> activate() failed with domain-source-input) while a leftover lifetime blocks the registry initialization.
+  // Each fixture therefore works in its own copy of the candidate repository (same HEAD, so the commit and tree match request.json).
+  const sourceRoot = root;
+  root = mkdtempSync(join(tmpdir(), "codex-critic-host-family-fixture-"));
+  cpSync(sourceRoot, root, { recursive: true, verbatimSymlinks: true });
+  rmSync(join(root, ".git", "agent-pipeline"), { recursive: true, force: true });
   const commonDir = join(root, ".git");
   mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
   // AC-212: the host's lifetimes reserve their members in the session-authority registry, so the checkout carries an initialized one.
@@ -3175,8 +3187,10 @@ function signedS4Authority(adapterContractSha256, familyId = "sol", selectedMode
       return { ok: true, value: observed };
     }
   } });
-  const activation = runtimeHost.store().activate();
-  assert.equal(activation.ok, true, activation.code);
+  let activation;
+  try { activation = runtimeHost.store().activate(); }
+  catch (error) { throw new Error(`${dutyId}: activation threw ${error.code}/${error.reason}`, { cause: error }); }
+  assert.equal(activation.ok, true, `${dutyId}: ${activation.code}`);
   const entry = createModelFamilyInvocationEntry({ runtimeHost, routeSource });
   const identityHost = createModelFamilyDiscoveryHost({ clock: () => "2026-10-01T12:00:30.000Z", execution: ({ rawHostResult }) =>
     observed && discoveryDigest(rawHostResult) === discoveryDigest(observed) ? pass("ACTUAL_SYNTHETIC_CHILD_IDENTITY", {
@@ -3190,12 +3204,13 @@ function signedS4Authority(adapterContractSha256, familyId = "sol", selectedMode
       requested: { modelId: i.selectedModelId, effort: i.effort, evidenceSha256: sha("request") },
       configured: { modelId: i.selectedModelId, effort: i.effort, evidenceSha256: sha("configured"), assurance: "host-configured" },
       execution: { status: "succeeded", evidenceSha256: sha("exit-zero") } }) };
-  return { root, candidateCommit, candidateTree, entry, ports, route, setDriver: value => { nativeDriver = value; }, setReturn: value => { hostReturn = structuredClone(value); }, admissionError: () => admissionError, launches: () => launches, cleanup: () => rmSync(join(commonDir, "agent-pipeline"), { recursive: true, force: true }) };
+  return { root, candidateCommit, candidateTree, entry, ports, route, setDriver: value => { nativeDriver = value; }, setReturn: value => { hostReturn = structuredClone(value); }, admissionError: () => admissionError, launches: () => launches, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 await checkAsync("active native PREPARE retains original private signed route and rejects copied context before finalization", async () => {
  for (const dutyId of ["critic_high_risk", "critic_normal"]) {
   const f = await signedPreparedCriticFixture(dutyId, repo, root);
   try {
+   const repo = f.root; // the fixture's own copy of the candidate repository
    const familyRequest = { ...request, trigger_row: dutyId === "critic_high_risk" ? "T1" : "T2" };
    const p = join(root, `family-${dutyId}-request.json`); writeJson(p, familyRequest);
    const output = await prepareNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root, observers,
@@ -3238,6 +3253,7 @@ await checkAsync("both genuine prepared duties invoke the actual native consumer
  for (const dutyId of ["critic_high_risk","critic_normal"]) {
   const f=await signedPreparedCriticFixture(dutyId,repo,root);
   try {
+   const repo=f.root; // the fixture's own copy of the candidate repository
    const prefix=join(root,`consumer-${dutyId}`),p=`${prefix}-request.json`;
    const exportContext={provider:"OpenAI",service:"synthetic-native-family-fixture",hostGate:"additional-check-required",providerGate:"not-observed",observedEndpoint:null};
    writeJson(p,{...request,trigger_row:dutyId==="critic_high_risk"?"T1":"T2"});
