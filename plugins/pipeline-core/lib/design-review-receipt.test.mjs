@@ -19,6 +19,9 @@ import {
   parseDesignReviewReceipt,
   summarizeDesignReviewReceipt,
 } from "./design-review-receipt.mjs";
+// AC-155: the decision-continuity exports are reached through the namespace so a missing export fails the
+// affected case (typeof check) instead of failing the whole file at link time.
+import * as receiptLib from "./design-review-receipt.mjs";
 
 // ---------------------------------------------------------------- fixture F
 
@@ -808,4 +811,98 @@ test("U2-19: the module imports only node:crypto and canonical from po-approval-
   assert.doesNotMatch(source, /\bimport\s*\(/u, "no dynamic import");
   assert.doesNotMatch(source, /\brequire\s*\(/u, "no require");
   assert.doesNotMatch(source, /^\s*import\s+["']/mu, "no side-effect import");
+});
+
+// ------------------------------------------------------------------ AC-155: foundational decision continuity
+// The single design review assesses each foundational Spec decision: before it can PASS, every declared decision
+// carries an ADR reference, a register reference or a recorded non-significance reason. The receipt schema is NOT
+// extended (v1 keys stay closed); the evidence lives in the Spec, whose digest the receipt already binds.
+
+const decisionSpec = (lines) => Buffer.from(
+  ["# Spec", "", "## Foundational decisions", "", ...lines, "", "## Requirements", "", "- DEC-99: outside the section, never counted", ""].join("\n"),
+  "utf8",
+);
+const specInput = (bytes, over = {}) => ({
+  featureId: FEATURE,
+  previous: null,
+  sources: { ...clone(SOURCES_1), spec: { path: SPEC_PATH, sha256: sha(bytes) } },
+  reviewer: clone(REVIEWER),
+  report: clone(REPORT_1),
+  openFindingIds: [],
+  reviewedAt: REVIEWED_AT,
+  specBytes: bytes,
+  ...over,
+});
+const TRACED = decisionSpec([
+  "- DEC-01: Persist state in SQLite. ADR: ADR-0007",
+  "- DEC-02: Retry a failed job three times. Register: D12",
+  "- DEC-03: Name the log file app.log. Not significant: a local naming choice that is trivially reversible",
+]);
+const UNTRACED = decisionSpec([
+  "- DEC-01: Persist state in SQLite.",
+  "- DEC-02: Retry a failed job three times. Register: TBD",
+  "- DEC-03: Name the log file app.log. Not significant: a local naming choice that is trivially reversible",
+]);
+
+test("AC-155-1: assessSpecDecisionContinuity resolves an ADR reference, a register reference and a non-significance reason", () => {
+  assert.equal(typeof receiptLib.assessSpecDecisionContinuity, "function");
+  const result = receiptLib.assessSpecDecisionContinuity(TRACED);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.declared, 3);
+  assert.deepStrictEqual(result.decisions.map((entry) => [entry.id, entry.trace]), [["DEC-01", "adr"], ["DEC-02", "register"], ["DEC-03", "non-significant"]]);
+});
+
+test("AC-155-2: every declared decision without a usable trace is named; placeholders and short reasons do not count", () => {
+  assert.equal(typeof receiptLib.assessSpecDecisionContinuity, "function");
+  const result = receiptLib.assessSpecDecisionContinuity(decisionSpec([
+    "- DEC-01: Persist state in SQLite.",
+    "- DEC-02: Retry three times. Register: TBD",
+    "- DEC-03: Name the log file. Not significant: n/a",
+    "- DEC-04: Pick a port. Not significant: short",
+    "- DEC-05: Cache results. ADR: ADR-",
+    "- DEC-06: Queue jobs. ADR: ADR-0011",
+  ]));
+  assert.deepStrictEqual([result.ok, result.code, result.declared], [false, "DRR-DECISION-TRACE", 6]);
+  assert.deepStrictEqual(result.unresolved, ["DEC-01", "DEC-02", "DEC-03", "DEC-04", "DEC-05"]);
+});
+
+test("AC-155-3: a Spec that declares no decisions section behaves as before; an entry without an id is named by position and may continue on an indented line", () => {
+  assert.equal(typeof receiptLib.assessSpecDecisionContinuity, "function");
+  assert.deepStrictEqual(receiptLib.assessSpecDecisionContinuity(Buffer.from("# Spec\n\nNo decisions are declared here.\n")), { ok: true, declared: 0, decisions: [] });
+  const continued = receiptLib.assessSpecDecisionContinuity(decisionSpec(["- Use a queue for background jobs", "  ADR: ADR-0021"]));
+  assert.equal(continued.ok, true, JSON.stringify(continued));
+  assert.deepStrictEqual(continued.decisions.map((entry) => entry.id), ["#1"]);
+  assert.deepStrictEqual(receiptLib.assessSpecDecisionContinuity(decisionSpec(["- Use a queue for background jobs"])).unresolved, ["#1"]);
+});
+
+test("AC-155-4: input that is not decodable Spec bytes is DRR-SPEC-BYTES", () => {
+  assert.equal(typeof receiptLib.assessSpecDecisionContinuity, "function");
+  assert.deepStrictEqual(receiptLib.assessSpecDecisionContinuity(Uint8Array.of(0xff, 0xfe, 0x41)), refuse("DRR-SPEC-BYTES"));
+  assert.deepStrictEqual(receiptLib.assessSpecDecisionContinuity("# Spec"), refuse("DRR-SPEC-BYTES"));
+});
+
+test("AC-155-5: createDesignReviewReceipt refuses a PASS while a declared decision is unresolved, and names it", () => {
+  const refused = createDesignReviewReceipt(specInput(UNTRACED));
+  assert.deepStrictEqual([refused.ok, refused.code, refused.unresolved], [false, "DRR-DECISION-TRACE", ["DEC-01", "DEC-02"]]);
+});
+
+test("AC-155-6: a fully traced Spec passes, and the receipt keeps its closed v1 shape", () => {
+  const created = createDesignReviewReceipt(specInput(TRACED));
+  assert.equal(created.ok, true, JSON.stringify(created));
+  assert.equal(created.receipt.verdict, "pass");
+  assert.deepStrictEqual(Object.keys(created.receipt).sort(), RECEIPT_KEYS);
+  assert.equal(parseDesignReviewReceipt(created.bytes).ok, true);
+});
+
+test("AC-155-7: the refusal applies to a PASS only; a receipt that records open findings is still produced, so the gap can be a finding", () => {
+  const created = createDesignReviewReceipt(specInput(UNTRACED, { openFindingIds: ["F-DECISION-TRACE"] }));
+  assert.equal(created.ok, true, JSON.stringify(created));
+  assert.equal(created.receipt.verdict, "open-findings");
+});
+
+test("AC-155-8: Spec bytes that are not the bound Spec are refused (DRR-SPEC-BYTES); omitting them leaves the receipt route unchanged", () => {
+  assert.deepStrictEqual(createDesignReviewReceipt(specInput(TRACED, { specBytes: Buffer.from("another spec") })), refuse("DRR-SPEC-BYTES"));
+  const { specBytes, ...withoutBytes } = specInput(UNTRACED);
+  assert.equal(specBytes instanceof Uint8Array, true);
+  assert.equal(createDesignReviewReceipt(withoutBytes).ok, true);
 });

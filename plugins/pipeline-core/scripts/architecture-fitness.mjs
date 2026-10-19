@@ -889,6 +889,83 @@ export function enforceAntiFragmentation(candidateModulesOrChanges = []) {
   return violations;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// AC-155: a materialized fitness model is executed as a candidate check at the implementation boundary, and a model
+// that never ran is reported unqualified instead of being counted as qualified. This is the unprotected side: the
+// inspector reads the model FILE (loadFitnessModel returns a synthesized default that cannot tell "absent" from
+// "present"), the qualifier is pure, and `--qualify` runs the evaluation and prints the typed result. Calling it
+// from the implementation-boundary guard is a separate, protected change.
+
+export const FITNESS_MODEL_RELATIVE_PATH = "architecture/fitness-model.json";
+export const SCHEMA_FITNESS_QUALIFICATION = "pipeline.fitness-qualification.v1";
+/** Evaluation modes that count as the implementation boundary; a planning or dispatch run does not. */
+export const FITNESS_BOUNDARY_MODES = Object.freeze(["candidate", "pre-close", "push", "ci"]);
+const COMMIT_SHA = /^[a-f0-9]{40}$/u;
+
+/** Whether the model file is materialized (exists) and readable (a JSON object), from the file itself. */
+export function inspectFitnessModelMaterialization(rootDir = DEFAULT_ROOT) {
+  const modelPath = path.join(rootDir, FITNESS_MODEL_RELATIVE_PATH);
+  const absent = { materialized: false, readable: false, path: FITNESS_MODEL_RELATIVE_PATH };
+  let stat;
+  try {
+    stat = fs.lstatSync(modelPath);
+  } catch {
+    return absent;
+  }
+  const present = { materialized: true, readable: false, path: FITNESS_MODEL_RELATIVE_PATH };
+  if (!stat.isFile()) return present;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(modelPath, "utf8"));
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? { ...present, readable: true } : present;
+  } catch {
+    return present;
+  }
+}
+
+const qualificationOutcome = (status, code, extra = {}) => ({
+  schema: SCHEMA_FITNESS_QUALIFICATION, status, code, countedAsQualified: status === "qualified", ...extra,
+});
+
+/**
+ * Pure qualifier. `run` is `{ candidateCommit, evidence }` as produced by whoever executed the model, or null when
+ * it never ran. Qualified only when a readable model has evidence of the right schema, from an implementation-boundary
+ * mode, bound to THIS candidate commit, with a passing (or excepted) overall status. Everything else is reported with
+ * a typed code and `countedAsQualified: false`; a model that is not materialized claims nothing (`not-applicable`).
+ */
+export function qualifyFitnessModelRun({ materialization, run = null, candidateCommit = null } = {}) {
+  if (materialization?.materialized !== true) return qualificationOutcome("not-applicable", "FITNESS-MODEL-NOT-MATERIALIZED");
+  if (materialization.readable !== true) return qualificationOutcome("unqualified", "FITNESS-MODEL-UNREADABLE");
+  const evidence = run?.evidence;
+  if (evidence === null || typeof evidence !== "object" || evidence.schema !== SCHEMA_FITNESS_EVIDENCE) {
+    return qualificationOutcome("unqualified", "FITNESS-MODEL-NEVER-RAN");
+  }
+  if (!FITNESS_BOUNDARY_MODES.includes(evidence.evaluationMode)) {
+    return qualificationOutcome("unqualified", "FITNESS-MODEL-NOT-RUN-AT-BOUNDARY", { evaluationMode: evidence.evaluationMode ?? null });
+  }
+  if (typeof candidateCommit !== "string" || !COMMIT_SHA.test(candidateCommit) || run.candidateCommit !== candidateCommit) {
+    return qualificationOutcome("unqualified", "FITNESS-MODEL-RUN-NOT-BOUND-TO-CANDIDATE");
+  }
+  if (evidence.overallStatus !== OUTCOME_PASS && evidence.overallStatus !== OUTCOME_EXCEPTED) {
+    return qualificationOutcome("unqualified", "FITNESS-MODEL-RAN-NOT-PASSING", { overallStatus: evidence.overallStatus ?? null });
+  }
+  return qualificationOutcome("qualified", "FITNESS-MODEL-QUALIFIED", { evaluationMode: evidence.evaluationMode, candidateCommit });
+}
+
+/** Execute a materialized model as a candidate check and qualify the result. `evaluate` is injectable for tests. */
+export function runFitnessQualification({ rootDir = DEFAULT_ROOT, mode = "candidate", candidateCommit = null, now = new Date(), evaluate = evaluateArchitectureFitness } = {}) {
+  const materialization = inspectFitnessModelMaterialization(rootDir);
+  if (!materialization.materialized || !materialization.readable) {
+    return { ...qualifyFitnessModelRun({ materialization, run: null, candidateCommit }), materialization };
+  }
+  let run;
+  try {
+    run = { candidateCommit, evidence: evaluate({ rootDir, mode, now }) };
+  } catch {
+    return { ...qualificationOutcome("unqualified", "FITNESS-MODEL-EVALUATION-FAILED"), materialization };
+  }
+  return { ...qualifyFitnessModelRun({ materialization, run, candidateCommit }), materialization };
+}
+
 /**
  * Main evaluation entry point: evaluates architecture fitness across all 10 property classes.
  */
@@ -1109,6 +1186,8 @@ function runCli() {
   let check = false;
   let json = false;
   let checkpoint = false;
+  let qualify = false;
+  let commit = null;
   const diffPaths = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -1122,11 +1201,23 @@ function runCli() {
       json = true;
     } else if (args[i] === "--checkpoint") {
       checkpoint = true;
+    } else if (args[i] === "--qualify") {
+      qualify = true;
+    } else if (args[i] === "--commit" && args[i + 1]) {
+      commit = args[++i];
     } else if (args[i] === "--diff" && args[i + 1]) {
       while (i + 1 < args.length && !args[i + 1].startsWith("--")) {
         diffPaths.push(args[++i]);
       }
     }
+  }
+
+  // AC-155: execute a materialized model as a candidate check and report whether it qualified for --commit.
+  if (qualify) {
+    const qualification = runFitnessQualification({ rootDir, mode, candidateCommit: commit });
+    console.log(JSON.stringify(qualification));
+    process.exitCode = qualification.status === "qualified" || qualification.status === "not-applicable" ? 0 : 1;
+    return;
   }
 
   const result = evaluateArchitectureFitness({

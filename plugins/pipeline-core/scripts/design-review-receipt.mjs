@@ -171,10 +171,12 @@ export function createReceiptFromDisk(input, deps = {}) {
   if (!output.ok) return output;
 
   const sources = {};
+  let specBytes = null;
   for (const [key, role, path] of [["prd", "PRD", request.prdPath], ["spec", "Spec", request.specPath]]) {
     const read = readBound(repoReal, path, role);
     if (!read.ok) return read;
     sources[key] = { path, sha256: sha256Of(read.bytes) };
+    if (key === "spec") specBytes = read.bytes;
   }
   sources.companions = [];
   for (const path of companionPaths) {
@@ -206,8 +208,16 @@ export function createReceiptFromDisk(input, deps = {}) {
     report: { path: request.reportPath, sha256: sha256Of(reportRead.bytes) },
     openFindingIds,
     reviewedAt: clock.toISOString(),
+    specBytes,
   });
-  if (!created.ok) return refuse(created.code, `design review receipt refused: ${created.code}`);
+  if (!created.ok) {
+    // AC-155: a PASS is refused while a declared foundational Spec decision has no ADR/register reference and no
+    // recorded non-significance reason; the library names the unresolved decisions.
+    if (created.code === "DRR-DECISION-TRACE") {
+      return refuse(created.code, `design review receipt refused: DRR-DECISION-TRACE: foundational Spec decision(s) without an ADR/register reference or a recorded non-significance reason: ${created.unresolved.join(", ")}. Under the "Foundational decisions" heading give each entry "ADR: ADR-NNNN", "Register: <id>" or "Not significant: <reason>".`);
+    }
+    return refuse(created.code, `design review receipt refused: ${created.code}`);
+  }
 
   try {
     writeFileSync(output.absolute, created.bytes, { flag: "wx" });

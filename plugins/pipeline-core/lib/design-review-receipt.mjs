@@ -196,6 +196,102 @@ export function parseDesignReviewReceipt(bytes) {
   return { ok: true, receipt: value, sha256: sha256Of(bytes) };
 }
 
+// ----------------------------------------------------------------------------- decision continuity (AC-155)
+//
+// The single design review also assesses each FOUNDATIONAL decision of the Spec for significance: before a receipt
+// can PASS, every declared decision carries an ADR reference, a register reference, or a recorded non-significance
+// reason. The receipt schema is unchanged (its keys stay closed); the evidence lives in the Spec, whose digest the
+// receipt already binds. There is no extra gate and no extra stage.
+//
+// Grammar (design latitude, closed): a Markdown heading of level 2-6 whose text is exactly "Foundational decisions";
+// its section runs to the next heading of the same or a higher level. Each top-level list item (`- ` or `* ` in
+// column 0) is one decision; indented lines continue it. The id is the first token when it has the shape
+// `DEC-01`, otherwise the entry is named by position (`#1`). An entry is traced by ANY of:
+//   `ADR: ADR-0007` (or `ADR: docs/adr/0007-title.md`), `Register: <id>`, or `Not significant: <reason>` where the
+// reason is at least 12 characters and not a placeholder. Placeholders (TBD, TODO, n/a, none, ...) never trace.
+// A Spec with no such section declares nothing and behaves exactly as before; a decision that is never declared is
+// not detected here (the review report is where an undeclared one is raised).
+
+const DECISION_HEADING = /^(#{2,6})[ \t]+foundational decisions[ \t]*#*[ \t]*$/iu;
+const MARKDOWN_HEADING = /^(#{1,6})[ \t]+\S/u;
+const CODE_FENCE = /^(?:```|~~~)/u;
+const DECISION_ENTRY = /^[-*][ \t]+(\S.*)$/u;
+const DECISION_ID = /^(?:\*\*|`)?([A-Z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+)(?:\*\*|`)?[:.)]?(?=\s|$)/u;
+const TRACE_ADR = /\bADR:[ \t]*(ADR-\d{3,4}\b|docs\/adr\/[A-Za-z0-9._-]+\.md\b)/iu;
+const TRACE_REGISTER = /\bRegister:[ \t]*([A-Za-z0-9][A-Za-z0-9._#:/-]{1,119})/iu;
+const TRACE_NON_SIGNIFICANT = /\bNot significant:[ \t]*(\S.*)$/iu;
+const TRACE_PLACEHOLDER = /^(?:tbd|tba|todo|n\/a|na|none|pending|unknown|-+|\?+)\.?$/iu;
+const MIN_NON_SIGNIFICANCE_REASON = 12;
+
+/** The text of every declared decision entry, in document order. */
+function declaredDecisionTexts(text) {
+  let level = 0;
+  let fenced = false;
+  let current = null;
+  const entries = [];
+  for (const line of text.split(/\r?\n/u)) {
+    if (CODE_FENCE.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    const heading = MARKDOWN_HEADING.exec(line);
+    if (heading !== null) {
+      current = null;
+      if (DECISION_HEADING.test(line)) level = heading[1].length;
+      else if (level > 0 && heading[1].length <= level) level = 0;
+      continue;
+    }
+    if (level === 0) continue;
+    const entry = DECISION_ENTRY.exec(line);
+    if (entry !== null) {
+      current = [entry[1].trim()];
+      entries.push(current);
+    } else if (current !== null && /^[ \t]+\S/u.test(line)) {
+      current.push(line.trim());
+    } else if (line.trim() !== "") {
+      current = null;
+    }
+  }
+  return entries.map((parts) => parts.join(" "));
+}
+
+/** The trace of one decision entry, or `{ trace: null }` when it has none that counts. */
+function decisionTrace(text) {
+  const adr = TRACE_ADR.exec(text);
+  if (adr !== null) return { trace: "adr", ref: adr[1] };
+  const register = TRACE_REGISTER.exec(text);
+  if (register !== null && !TRACE_PLACEHOLDER.test(register[1])) return { trace: "register", ref: register[1] };
+  const reason = TRACE_NON_SIGNIFICANT.exec(text);
+  const value = reason === null ? "" : reason[1].trim();
+  if (value.length >= MIN_NON_SIGNIFICANCE_REASON && !TRACE_PLACEHOLDER.test(value)) return { trace: "non-significant", ref: value };
+  return { trace: null, ref: null };
+}
+
+/**
+ * Assess the foundational decisions a Spec declares. `ok: true` when every declared decision is traced (also when
+ * none is declared); otherwise `DRR-DECISION-TRACE` with the ids of the unresolved decisions. Bytes that are not
+ * valid UTF-8 are `DRR-SPEC-BYTES`.
+ * @param {Uint8Array} specBytes
+ * @returns {{ ok: true, declared: number, decisions: object[] } | { ok: false, code: string, declared?: number, decisions?: object[], unresolved?: string[] }}
+ */
+export function assessSpecDecisionContinuity(specBytes) {
+  if (!(specBytes instanceof Uint8Array)) return refuse("DRR-SPEC-BYTES");
+  let text;
+  try {
+    text = DECODER.decode(specBytes);
+  } catch {
+    return refuse("DRR-SPEC-BYTES");
+  }
+  const decisions = declaredDecisionTexts(text).map((entry, index) => {
+    const id = DECISION_ID.exec(entry);
+    return { id: id === null ? `#${index + 1}` : id[1], ...decisionTrace(entry) };
+  });
+  const unresolved = decisions.filter((decision) => decision.trace === null).map((decision) => decision.id);
+  if (unresolved.length > 0) return { ok: false, code: "DRR-DECISION-TRACE", declared: decisions.length, decisions, unresolved };
+  return { ok: true, declared: decisions.length, decisions };
+}
+
 /**
  * Build a receipt and its canonical bytes. Sorts finding IDs and companions (code-unit order),
  * rejects duplicates, derives the verdict. `previous: null` makes an initial receipt;
@@ -242,6 +338,17 @@ export function createDesignReviewReceipt(input) {
     round = DELTA_ROUND;
     previousReceiptPath = previous.path;
     previousReceiptSha256 = parsed.sha256;
+  }
+
+  // AC-155: when the caller supplies the Spec bytes (the producer always does), a PASS needs every declared
+  // foundational decision traced. A receipt that records open findings is still produced, so the gap can be a finding.
+  const specBytes = input.specBytes;
+  if (specBytes !== undefined) {
+    if (!(specBytes instanceof Uint8Array) || sha256Of(specBytes) !== normalized.spec.sha256) return refuse("DRR-SPEC-BYTES");
+    if (ids.length === 0) {
+      const continuity = assessSpecDecisionContinuity(specBytes);
+      if (!continuity.ok) return continuity.code === "DRR-DECISION-TRACE" ? { ok: false, code: continuity.code, unresolved: continuity.unresolved } : refuse(continuity.code);
+    }
   }
 
   const receipt = {
