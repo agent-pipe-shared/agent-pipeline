@@ -223,7 +223,7 @@ check("R11 block  add id_ed25519", "git add .ssh/id_ed25519", BLOCK);
 check("R11 block  add .pem", "git add certs/server.pem", BLOCK);
 check("R11 block  add .key", "git add certs/private.key", BLOCK);
 check("R11 allow  add normal files", "git add README.md src/app.js", ALLOW);
-check("R11 block  add .env.example (documented errs-safe overblock)", "git add .env.example", BLOCK);
+check("R11 allow  add .env.example (D17: a template file, not a secret)", "git add .env.example", ALLOW);
 
 // ---- Rule 12: recursive rm on .git / /config (<PROJECT_B> + <PROJECT_C>) ---------------------------------
 check("R12 block  rm -rf .git", "rm -rf .git", BLOCK);
