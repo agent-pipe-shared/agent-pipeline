@@ -13,12 +13,23 @@
  * (E) and stays a typed skip.
  */
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { existsSync, readFileSync } from "node:fs";
+import { after, test } from "node:test";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { run } from "../../scripts/pipeline-state.mjs";
+import { readState, run } from "../../scripts/pipeline-state.mjs";
+import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
+import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
+import { createGovernanceScopeController } from "../governance-scope.mjs";
 import { applyOnboardingIntakeConsent } from "../onboarding-continuity.mjs";
+import { NEUTRAL_MANIFEST } from "../project-authority.mjs";
+import * as po from "../po-gate-authority.mjs";
+import { hardenWindowsPrivateDirectory } from "../windows-private-state.mjs";
+import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../windows-owned-authority-backend.mjs";
 
 const PLUGIN = fileURLToPath(new URL("../../", import.meta.url));
 const SPEC = fileURLToPath(new URL("../../../../specs/sprint-alfred-epic/spec.md", import.meta.url));
@@ -147,6 +158,168 @@ test("RED mirror: an extra per-feature ceremony inside the happy-path scenario c
   const twoPush = [{ id: "A", pushes: 2, oneTime: [], expectPerFeature: 2 }];
   const list = interactionsFor(INVENTORY, twoPush[0]);
   assert.notEqual(list.filter((e) => e.class === PER_FEATURE).length, twoPush[0].expectPerFeature);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// AC-264 design-approval PO output (ALF-B10-AC264). The item's added acceptance (2026-10-18, F-03): every rendered next
+// action hands the PO the `--request` form for a design approval, never the bare `--intent-sha256` form, and the design
+// approval PO output carries no guard-override warning. The `--intent-sha256` form is the one whose disclosure falls back to
+// "no recorded request resolves for this digest ... guard-lift/guard-override authorization" (compactSigningDisclosure).
+// The fixture reaches the real `present-plan --review-receipt` through the public step sequence in the DEFAULT approval mode
+// (signature), a trimmed port of consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs `buildConsumer`; the sign
+// command is then driven through the real `sign-intent --request` route with an encrypted fixture key (the approach of
+// scripts/design-workflow-signing-default.test.mjs). Assertions avoid the bare phrase "guard override" on the disclosure:
+// the source's own purpose line states "It is not push, release, publication or a guard override" as a negation.
+// ---------------------------------------------------------------------------------------------------------------------
+const DESIGN_AT = "2026-10-10T10:00:00.000Z";
+const DESIGN_REPO_ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
+const DESIGN_PASSPHRASE = "synthetic-fixture-passphrase-not-a-secret";
+const DESIGN_ARCHITECTURE = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield", disposition: { decision: "approved-scoped", scope: ["specs/", "architecture/", "src/", "tests/"], rationale: "Synthetic scoped method fixture; no new material decision" }, modules: [{ id: "unit", responsibility: "Own synthetic unit", nonResponsibilities: ["No external authority"], ownedPaths: ["src/**", "tests/**"], publicContracts: ["src/index.mjs"], allowedDependencies: [], authorityEffects: [], verificationEntryPoints: ["tests/unit.test.mjs"], adrReferences: [] }], implementationSurface: ["src/index.mjs"], fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "synthetic-unit", revision: 1, allowedBoundaryCrossings: [], antiFragmentationPolicy: { decision: "bounded" } } };
+const designDigest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const designCeilingBefore = process.env.GIT_CEILING_DIRECTORIES;
+let designWork = null;
+let designPresentationRun = null;
+after(() => {
+  if (designWork === null) return;
+  if (designCeilingBefore === undefined) delete process.env.GIT_CEILING_DIRECTORIES; else process.env.GIT_CEILING_DIRECTORIES = designCeilingBefore;
+  rmSync(designWork, { recursive: true, force: true, maxRetries: 3 });
+});
+
+function buildDefaultModeDesignPresentation() {
+  const scratch = join(DESIGN_REPO_ROOT, "scratch");
+  mkdirSync(scratch, { recursive: true });
+  designWork = realpathSync(mkdtempSync(join(scratch, "tri-design-approval-")));
+  const root = join(designWork, "repo"), keys = join(designWork, "keys");
+  mkdirSync(root); mkdirSync(keys, { mode: 0o700 });
+  process.env.GIT_CEILING_DIRECTORIES = designWork;
+  const env = { ...process.env, GIT_CEILING_DIRECTORIES: designWork };
+  const gitOk = (...args) => { const out = spawnSync("git", args, { cwd: root, encoding: "utf8", timeout: 60000, env }); assert.equal(out.status, 0, `SETUP git ${args[0]}: ${out.stderr}`); return out.stdout.trim(); };
+  const write = (path, bytes) => { const target = join(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, bytes); };
+  const read = (path) => readFileSync(join(root, path));
+  const writeJson = (path, value) => write(path, `${JSON.stringify(value, null, 2)}\n`);
+  const lifecycle = (argv) => {
+    const logs = [];
+    const old = { log: console.log, error: console.error, warn: console.warn };
+    for (const name of Object.keys(old)) console[name] = (...args) => { logs.push(args.map(String).join(" ")); };
+    let status;
+    try { status = run(argv, { dir: root, now: () => DESIGN_AT }); } finally { Object.assign(console, old); }
+    assert.equal(status, 0, `SETUP ${argv[0]}: ${logs.join("\n")}`);
+    return logs.join("\n");
+  };
+  const feature = "e2e", plan = "specs/e2e/prd_e2e.md", spec = "specs/e2e/spec.md", companions = ["specs/e2e/design.md", "specs/e2e/traceability.md"];
+  const reportPath = "specs/e2e/review/design-review-1.md", receiptPath = "specs/e2e/review/design-review-receipt-1.json";
+  gitOk("init", "-q", "-b", "main");
+  gitOk("config", "user.email", "goldfish@example.invalid");
+  gitOk("config", "user.name", "Goldfish");
+  gitOk("config", "core.autocrlf", "false");
+  assert.equal(realpathSync(root), root);
+  write("README.md", "Synthetic design-approval output fixture\n");
+  write(".gitignore", "scratch/\nproject/pipeline-state.json\n.claude/pipeline-state.json\n");
+  const baseline = { schema: "pipeline.project.v1", project: "design-approval-fixture", verify: "node -e \"process.exit(1)\"", autonomy: "gated", handover: "docs/state.md" };
+  for (const twin of ["project/pipeline.json", ".claude/pipeline.json"]) writeJson(twin, baseline);
+  gitOk("add", "--", "README.md", ".gitignore", "project/pipeline.json", ".claude/pipeline.json");
+  gitOk("commit", "-q", "-m", "seed baseline verification");
+  const governance = createGovernanceScopeController({ hostStateRoot: join(designWork, "host-state") });
+  const enrollment = governance.planDecision({ rootDir: root, decision: "enroll", by: "design-approval-fixture" });
+  assert.equal(governance.applyDecision(enrollment, { activate: true, planSha256: enrollment.planSha256 }).state, "active", "SETUP real governance decision");
+  // No `gates:` block: the DEFAULT approval mode (signature) is what the PO meets on a fresh project.
+  write("pipeline.user.yaml", "schema: pipeline.user.v1\nlanguage:\n  human_facing: de\n  agent_facing: en\n");
+  gitOk("add", "--", "pipeline.user.yaml");
+  gitOk("commit", "-q", "-m", "default approval mode");
+  write(".claude/pipeline.yaml", "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: de\n");
+  write(NEUTRAL_MANIFEST, read(".claude/pipeline.yaml"));
+  for (const target of initialGreenfieldMapTargets("fresh")) write(target.path, target.bytes);
+  const pointer = initialGreenfieldAgentEntryTarget("fresh");
+  write(pointer.path, pointer.bytes);
+  write("docs/adr/.gitkeep", "");
+  write(spec, "# Synthetic Test Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | The package must receive a PASS verdict from an independent Critic before acceptance. | Synthetic candidate-bound review |\n");
+  write(plan, `${po.PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${po.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${designDigest(read(spec))} -->\n# Synthetic Test PRD\nImplementation surface: \`src/index.mjs\`.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(DESIGN_ARCHITECTURE)}\n\`\`\`\n`);
+  write(companions[0], "# Synthetic Design\n");
+  write(companions[1], "| ID | Evidence |\n| --- | --- |\n");
+  write(reportPath, "# Synthetic method review\nVerdict: pass.\n");
+  const common = join(root, ".git");
+  const profile = po.createPoGateProfileReceipt({ repositoryFingerprint: po.derivePoGateRepositoryFingerprint({ gitCommonDir: common, primaryRoot: root }), primaryRoot: root, sourceBytes: read("pipeline.user.yaml"), runtimeBytes: read(".claude/pipeline.yaml"), updatedAt: DESIGN_AT });
+  const profilePath = resolve(po.poGateProfileReceiptPath(common));
+  if (process.platform === "win32") {
+    createWindowsOwnedAuthorityDirectory({ path: join(common, "agent-pipeline") });
+    createWindowsOwnedAuthorityDirectory({ path: dirname(profilePath) });
+    createWindowsOwnedAuthorityExclusiveFile({ path: profilePath, bytes: Buffer.from(po.serializePoGateProfileReceipt(profile)) });
+  } else {
+    mkdirSync(dirname(profilePath), { recursive: true, mode: 0o700 });
+    writeFileSync(profilePath, po.serializePoGateProfileReceipt(profile), { mode: 0o600 });
+  }
+  const source = (path) => ({ path, sha256: designDigest(read(path)) });
+  const review = createDesignReviewReceipt({ featureId: feature, previous: null, sources: { prd: source(plan), spec: source(spec), companions: companions.map(source) }, reviewer: { runner: "claude", model: "claude-opus-4" }, report: source(reportPath), openFindingIds: [], reviewedAt: DESIGN_AT });
+  assert.ok(review.ok, `SETUP actual review producer: ${review.code}`);
+  write(receiptPath, Buffer.from(review.bytes));
+  // The PO key: encrypted, so production prints the disclosure and asks for no typed confirmation (the passphrase seam answers OpenSSL).
+  const pair = generateKeyPairSync("ed25519");
+  const publicKey = pair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const trustPolicy = { keyReference: "synthetic-design-approval-key", publicKeySha256: designDigest(publicKey) };
+  writeFileSync(join(keys, "po-private.pem"), pair.privateKey.export({ type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase: DESIGN_PASSPHRASE }), { mode: 0o600 });
+  writeFileSync(join(keys, "po-public.pem"), publicKey);
+  writeFileSync(join(keys, "trust-policy.json"), JSON.stringify({ ...trustPolicy, humanName: "Synthetic Test Operator" }));
+  writeJson("project/critical-human-proof.json", { schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: trustPolicy.keyReference, publicKeySha256: trustPolicy.publicKeySha256 }] });
+  gitOk("add", "--", plan, spec, ...companions, reportPath, receiptPath, "project/critical-human-proof.json", "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", "docs/adr/.gitkeep", NEUTRAL_MANIFEST);
+  gitOk("commit", "-q", "-m", "finished design");
+  if (process.platform === "win32") {
+    const hardened = hardenWindowsPrivateDirectory(join(root, "project"));
+    assert.equal(hardened.status, "secure", `SETUP harden the State parent: ${JSON.stringify(hardened)}`);
+  }
+  lifecycle(["set-feature", "--id", feature, "--plan-path", plan]);
+  const continuity = { schema: "pipeline.continuity.v0", featureId: feature, revision: 0, runtime: { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null }, authority: { prd: source(plan), spec: source(spec), result: null }, queueHead: { packageId: "initial-planning", actionId: "review-plan", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+  writeJson("continuity-init-request.json", continuity);
+  lifecycle(["continuity-init", "--expected-revision", "absent", "--request-file", "continuity-init-request.json", "--lock-token", "design-approval-fixture-token"]);
+  lifecycle(["submit-plan", "--by", "synthetic-author", "--profile", "feature"]);
+  const presentOut = lifecycle(["present-plan", "--by", "synthetic-presenter", "--review-receipt", receiptPath]);
+  const observed = readState(root);
+  assert.equal(observed.status, "ok");
+  const requestRel = observed.state.planPresentation.designApprovalRequestPath;
+  assert.equal(typeof requestRel, "string", "present-plan records the design approval request path");
+  return { root, keys, presentOut, requestRel, request: JSON.parse(read(requestRel).toString("utf8")), candidate: gitOk("rev-parse", "HEAD") };
+}
+const designPresentation = () => (designPresentationRun ??= buildDefaultModeDesignPresentation());
+
+test("AC-264: the default-mode present-plan hands the PO exactly one sign-intent command, in the absolute --request form, with no guard-override wording", () => {
+  const f = designPresentation();
+  const lines = f.presentOut.split(/\r?\n/u).filter((line) => /sign-intent/u.test(line));
+  assert.equal(lines.length, 1, `exactly one line names sign-intent; output: ${f.presentOut}`);
+  const requestFlag = /--request\s+"([^"]+)"/u.exec(lines[0]);
+  assert.ok(requestFlag, `the sign command carries --request "<path>": ${lines[0]}`);
+  assert.ok(isAbsolute(requestFlag[1]), "the --request path is absolute");
+  assert.equal(requestFlag[1], resolve(f.root, f.requestRel), "it names the request file present-plan recorded");
+  assert.ok(existsSync(requestFlag[1]), "the named request file exists");
+  assert.match(lines[0], /--repo-root\s+"[^"]+"/u, "the repository is named absolutely too, so a paste works from any directory");
+  assert.equal(f.request.schema, "pipeline.design-approval-request.v1");
+  assert.doesNotMatch(f.presentOut, /--intent-sha256/u, "the bare digest form is never handed to the PO for a design approval");
+  assert.doesNotMatch(f.presentOut, /HGO-|no recorded request resolves|guard[- ]override/iu, "the present-plan output carries no guard-override code or warning");
+});
+
+test("AC-264: signing through that command discloses the design purpose: no HGO- code, no unresolved-request fallback, no typed confirmation", () => {
+  const f = designPresentation();
+  const withPassphrase = (args) => (args[0] === "pkeyutl" && args.includes("-sign") ? [...args, "-passin", "env:PIPELINE_SYNTHETIC_FIXTURE_PASSPHRASE"] : args);
+  const prompts = [], written = [], realWrite = process.stdout.write;
+  process.env.PIPELINE_SYNTHETIC_FIXTURE_PASSPHRASE = DESIGN_PASSPHRASE;
+  process.stdout.write = (chunk) => { written.push(String(chunk)); return true; };
+  let result;
+  try {
+    result = runHumanApproval(["sign-intent", "--repo-root", f.root, "--directory", f.keys, "--request", resolve(f.root, f.requestRel)],
+      { isTTY: true, readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; }, spawn: (_name, args, options) => spawnOpenssl(withPassphrase(args), options, {}) });
+  } finally { process.stdout.write = realWrite; delete process.env.PIPELINE_SYNTHETIC_FIXTURE_PASSPHRASE; }
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const disclosure = written.join("");
+  assert.equal(prompts.length, 0, "an encrypted key asks the PO for no typed confirmation: the one command is the whole ceremony");
+  assert.match(disclosure, /action: approve the exact reviewed design-to-implementation plan decision/u);
+  assert.ok(disclosure.includes(f.request.bindingSha256), "the disclosure names the design binding digest");
+  assert.ok(disclosure.includes(f.candidate), "the disclosure names the candidate commit");
+  assert.doesNotMatch(disclosure, /HGO-/u, "no guard-override (HGO-) code reaches the PO");
+  assert.doesNotMatch(disclosure, /no recorded request resolves|purpose unavailable/u, "the unresolved-request fallback is never shown for a design approval");
+});
+
+test("RED mirror: the bare --intent-sha256 form (no resolvable request) discloses the guard-override fallback this pin forbids", () => {
+  const fallback = compactSigningDisclosure({ intentSha256: "a".repeat(64), record: null }).join("\n");
+  assert.match(fallback, /no recorded request resolves for this digest/u);
+  assert.match(fallback, /guard-lift\/guard-override authorization/u);
 });
 
 test("E: per-runner end-to-end greenfield scenario (Claude Windows, Codex, Antigravity) reaches a pushed branch with exactly two PO proofs and zero guard overrides",
