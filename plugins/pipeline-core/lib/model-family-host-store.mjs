@@ -1076,7 +1076,17 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
     if (!authorityLifecycle || !isModelAuthorityLifecycleOwned(authorityLifecycle,rootDir)) return fail('MODEL-FAMILY-AUTHORITY-UNAVAILABLE');
     return authorityLifecycle.run(identity, operation);
   };
-  const admitNativeRequest = (input) => ownedLifetime({receiptSha256:input?.invocation?.receipt?.receiptSha256??null,kind:'native-admission'},()=>admitNativeRequestUnregistered(input));
+  const admitNativeRequest = (input) => {
+    // E33: a missing native admission port is refused here, synchronously, BEFORE the authority lifecycle is entered.
+    // admitNativeRequestUnregistered is async, so even its early refusal is a thenable, which the lifecycle treats as a
+    // retained domain transition and leaves session-authority/registry.lock behind. The frozen-handle check keeps its
+    // place ahead of the port check, as in the admission body; the in-body checks stay. The present-port path is unchanged.
+    if (typeof trustedSources.admitNativeRequest !== 'function') {
+      if (!input?.invocation || !frozenHandles.has(input.invocation)) return fail('MODEL-FAMILY-PRELAUNCH-BINDING');
+      return fail('MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED');
+    }
+    return ownedLifetime({receiptSha256:input?.invocation?.receipt?.receiptSha256??null,kind:'native-admission'},()=>admitNativeRequestUnregistered(input));
+  };
   const launch = (input) => {if(modelLaunched.get(input?.invocation)?.closed)return fail('MODEL-FAMILY-OWNER-CONTEXT-CLOSED');return ownedLifetime({receiptSha256:input?.invocation?.receipt?.receiptSha256??null,kind:'launch'},()=>{
     const handle=authorityLifecycle.currentHandle(), result=launchUnregistered(input);
     const remember=value=>{if(input?.invocation&&frozenHandles.has(input.invocation))modelLaunched.set(input.invocation,{handle,returned:value?.ok===true,native:input.nativeRequestCapability!==undefined,closed:false});return value;};

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, linkSync, symlinkSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, linkSync, symlinkSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { join, resolve } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
@@ -1061,6 +1061,42 @@ test("real process contention serializes same-key replay and different invocatio
       if (sameInvocation) assert.equal(results.filter((item) => item.code === "MODEL-FAMILY-REPLAY").length, 1);
     } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
   }
+});
+
+// E33 (specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md): a native admission whose trusted sources carry no
+// admitNativeRequest port refuses SYNCHRONOUSLY with MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED, before the authority lifecycle is
+// entered. Before the fix the async admission body returned a thenable even for that early refusal, the lifecycle threw
+// SDC-LOCK-HELD domain-transition-partial-effect-retained and left session-authority/registry.lock behind, so every later
+// prepare in the repository refused with registry-lock-held. The case owns a throwaway fixture that is always deleted: a
+// retained lock cannot be recovered in-process. The present-port path is the E24 item and is not asserted here.
+test("a native admission without an admitNativeRequest port refuses synchronously and leaves the registry usable", () => {
+  const f = fixture();
+  try {
+    activate(f);
+    assert.equal(typeof f.source.admitNativeRequest, "undefined", "premise: no native admission port is supplied");
+    const lockPath = join(f.root, "session-authority", "registry.lock");
+    const prepared = invoke(f, key("e33-missing-port"));
+    assert.equal(prepared.ok, true, prepared.code);
+    assert.equal(existsSync(lockPath), false, "premise: no registry lock before the admission");
+    const request = { schema: "pipeline.synthetic-main-request.v1", purpose: "profile-main",
+      runner: "codex", sessionId: "session-1", invocationId: "e33-missing-port",
+      taskRoute: route.taskRoute, selectedModelId: prepared.value.receipt.selectedModelId,
+      effort: prepared.value.receipt.effort, payload: { model: prepared.value.receipt.selectedModelId } };
+    // Deliberately not awaited: a thenable here would be the defect, and `result.ok` would then read as undefined.
+    let result;
+    assert.doesNotThrow(() => { result = f.controller.admitNativeRequest({ invocation: prepared.value, request }); });
+    assert.equal(typeof result?.then, "undefined", "the refusal is a plain object, not a thenable");
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED");
+    assert.equal(existsSync(lockPath), false, "the refusal leaves no registry lock behind");
+    // The frozen-handle check still precedes the port check, exactly as in the admission body.
+    assert.equal(f.controller.admitNativeRequest({ invocation: {}, request }).code, "MODEL-FAMILY-PRELAUNCH-BINDING");
+    assert.equal(f.controller.admitNativeRequest().code, "MODEL-FAMILY-PRELAUNCH-BINDING");
+    assert.equal(existsSync(lockPath), false, "the binding refusals leave no registry lock behind either");
+    const second = invoke(f, key("e33-second-prepare"));
+    assert.equal(second.ok, true, second.code);
+    assert.equal(existsSync(lockPath), false, "a following prepare completes and releases the registry lock");
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
