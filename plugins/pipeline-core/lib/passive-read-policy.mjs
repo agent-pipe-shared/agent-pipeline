@@ -51,6 +51,27 @@ function userVisibleHostPath(path, homeDir) {
     .some((root) => within(root, path));
 }
 
+// Runtime skill instruction trees under the home directory. A skill file is a runtime authority,
+// so it is reachable only by its own physical name, never through an alias that merely resolves
+// into the tree (ALF-B8-AC147: a project-local alias to the skill tree stays refused).
+const HOST_SKILL_TREE_HOME_PATHS = Object.freeze([".codex/skills"]);
+
+// True when the NAME is outside every host skill tree but its physical resolution is inside one.
+// A name that is itself inside the tree (including through a linked home directory) is not an
+// alias; links elsewhere keep their existing lane.
+function resolvesIntoSkillTreeThroughAlias(homeDir, lexical, physical, realpath) {
+  for (const relativeRoot of HOST_SKILL_TREE_HOME_PATHS) {
+    const lexicalRoot = resolve(homeDir, relativeRoot);
+    let physicalRoot = lexicalRoot;
+    try { physicalRoot = realpath(lexicalRoot); }
+    catch { /* an unresolvable tree root cannot be proven to host this target; the target's own readback decides */ }
+    if (!within(physicalRoot, physical) && !within(lexicalRoot, physical)) continue;
+    if (within(lexicalRoot, lexical) || within(physicalRoot, lexical)) continue;
+    return true;
+  }
+  return false;
+}
+
 // A recursive search can encounter files the command did not name. Match the
 // default rg inventory (including its ignore rules); the admitting grammar
 // rejects options that re-enable hidden/ignored content. A bounded filesystem
@@ -215,6 +236,9 @@ export function isAllowedPassiveReadTarget(raw, {
       : lexical === path && physical === path);
   if (!inProject && inAdditional && raw.split(/[\\/]/u).includes("..")) return false;
   if (!inProject && !inAdditional) {
+    // A name outside the host skill tree that resolves into it (for example a project-local
+    // alias) is not the skill file's own name, so the host-visible fallback must not admit it.
+    if (resolvesIntoSkillTreeThroughAlias(homeDir, lexical, physical, realpath)) return false;
     if (!identities.every((identity) => userVisibleHostPath(identity, homeDir))) return false;
     try {
       const observed = stat(candidate);

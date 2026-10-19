@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -171,4 +171,45 @@ test("an external user report remains readable while key material and aliases ar
       ? report[0].toUpperCase() + report.slice(1) : report[0].toLowerCase() + report.slice(1);
     assert.equal(isAllowedPassiveReadTarget(alternateCase, context), true);
   }
+});
+
+// ALF-B8-AC147 (A2c / P3c): a skill file is a runtime authority reachable only by its own name. A
+// name outside the host skill tree that merely resolves into it (a project-local alias) is
+// refused; the same file by its own physical name, and links to other host files, keep their lanes.
+// The control reads prove the fixture is honest, so each refusal is the alias rule and nothing else.
+test("an alias that resolves into the host skill tree is refused while the skill's own name and other links keep their lanes", (t) => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), "passive-skill-alias-")));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const root = join(fixture, "repo"), home = join(fixture, "home"), elsewhere = join(fixture, "elsewhere");
+  const skillDir = join(home, ".codex", "skills", ".system", "skill-creator");
+  for (const directory of [root, elsewhere, skillDir]) mkdirSync(directory, { recursive: true });
+  const skillFile = join(skillDir, "SKILL.md");
+  writeFileSync(skillFile, "# skill-creator\n");
+  const plain = join(elsewhere, "report.md");
+  writeFileSync(plain, "an ordinary host file\n");
+  const dirType = process.platform === "win32" ? "junction" : "dir";
+  const context = { rootDir: root, homeDir: home, recursive: true,
+    machinePlaneRead: () => ({ status: "absent" }), repoKeyDirectory: () => ({ status: "absent" }) };
+  assert.equal(isAllowedPassiveReadTarget(skillFile, context), true, "control: the skill file by its own physical name");
+  assert.equal(isAllowedPassiveReadTarget(plain, context), true, "control: an ordinary host file");
+  const projectAlias = join(root, "skill-alias");
+  symlinkSync(skillDir, projectAlias, dirType);
+  assert.equal(isAllowedPassiveReadTarget(join(projectAlias, "SKILL.md"), context), false, "absolute spelling through a project alias");
+  assert.equal(isAllowedPassiveReadTarget("skill-alias/SKILL.md", context), false, "project-relative spelling through a project alias");
+  const hostAlias = join(elsewhere, "skill-alias");
+  symlinkSync(skillDir, hostAlias, dirType);
+  assert.equal(isAllowedPassiveReadTarget(join(hostAlias, "SKILL.md"), context), false, "an alias outside the project is not the skill's own name either");
+  if (process.platform !== "win32") {
+    symlinkSync(skillFile, join(root, "skill-file-link.md"));
+    assert.equal(isAllowedPassiveReadTarget("skill-file-link.md", context), false, "a file link that resolves to the skill file");
+  }
+  // Other links are outside this rule, and a linked home directory is not an alias of its own tree.
+  if (process.platform !== "win32") {
+    symlinkSync(plain, join(root, "plain-link.md"));
+    assert.equal(isAllowedPassiveReadTarget("plain-link.md", context), true, "a link to an ordinary host file keeps its lane");
+  }
+  const linkedHome = join(fixture, "linked-home");
+  symlinkSync(home, linkedHome, dirType);
+  assert.equal(isAllowedPassiveReadTarget(join(linkedHome, ".codex", "skills", ".system", "skill-creator", "SKILL.md"),
+    { ...context, homeDir: linkedHome }), true, "the skill file under a linked home directory is its own name");
 });
