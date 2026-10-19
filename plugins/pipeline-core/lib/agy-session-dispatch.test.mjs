@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -16,7 +15,7 @@ import { inspectAgyHostObservedLocalReadback, withAgyFamilyLocalReadback } from 
 import { readAgyHostObservedReceipt } from "./agy-host-observed-store.mjs";
 import { resolveModelRoleSession } from "./model-role-session.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
-import { buildSignatureIntent, createAgyFamilyConsentAuthority, digest as canonicalDigest, familyConsentAssignment } from "./agy-session-authority.mjs";
+import { buildSignatureIntent, consentSubject as legacyConsentSubject, createAgyFamilyConsentAuthority, digest as canonicalDigest, familyConsentAssignment } from "./agy-session-authority.mjs";
 import { verifyModelFamilyAuthority } from "./model-family-authority.mjs";
 import { createModelFamilyHostController, createModelFamilyHostAuthorityLifecycle, readHeldModelFamilyInvocation } from "./model-family-host-store.mjs";
 import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
@@ -392,10 +391,40 @@ test("a missing optional role receipt preserves only the valid consent-bound V3 
   assert.equal(damagedAuthority.launcherCalls, 0);
 });
 
+// AC-212 (ALF-B12-AGY): the legacy dispatch path (dispatchAgySession without a family authority) is no longer a bare function over
+// an inline consent object. It loads the STORED v1 consent record for the session, validates it against the session descriptor and
+// the configured human-approval mode, and begins a source-owned dispatch lifetime in the session-authority registry before it
+// invokes the native process (agy-session-dispatch.mjs, authorityLifetime). The positive fixture therefore mirrors the chain
+// familyFixture builds, in the legacy v1 chat-attributed shape: a session descriptor plus controlled-unit-method carrier created
+// BEFORE the registry initializes, the stored consent written at 0600 BEFORE the registry initializes (the registry adopts it as
+// an unbound legacy member; written afterwards it is an unregistered authority fact), and a registry over the checkout. Kept as its
+// own small helper rather than folded into familyFixture, whose v2 signature subject and family authority do not apply here.
+function storeLegacyConsent(root) {
+  const custody = inspectSignedDescriptorCustodyRepository(root);
+  mkdirSync(join(custody.commonDir, "agent-pipeline"), { mode: 0o700, recursive: true });
+  const runtime = createControlledMethodRuntimeFixture({ repository: custody, fixtureRoot: join(custody.commonDir, "agent-pipeline/controlled-method-fixtures/agy-legacy-dispatch-owner"), sessionId: session.id });
+  const carried = inspectSourceOwnedRequesterInvocation({ repository: custody, currentInvocationHandle: runtime.currentInvocationHandle, runtimePort: runtime.runtimePort });
+  const repository = { primaryRoot: custody.primaryRoot, commonDir: custody.commonDir }, boundSession = { id: session.id, descriptorSha256: carried.currentRequester.descriptorSha256 };
+  const model = "gemini-3.8-flash-high", decisionNonce = "synthetic-legacy-dispatch-consent", expiresAtMs = 9_999_999_999;
+  const subject = legacyConsentSubject({ repository, session: boundSession, model, roles: [packet().role], allowedPaths: ["input.txt"], scope: "scope-1", fallbackPolicy: "none", expiresAtMs, decisionNonce });
+  const stored = { schema: AGY_SESSION_CONSENT_SCHEMA, status: "approved", decisionId: decisionNonce, mode: "chat", session: boundSession, provider: "google", model, roles: subject.roles, allowedPaths: subject.allowedPaths, subject, subjectSha256: canonicalDigest(subject), intent: null, proof: null, attribution: { mode: "chat-attributed-unattested", decisionReference: "synthetic-fixture-chat-approval" }, approvedAtMs: 1, expiresAtMs };
+  mkdirSync(join(repository.commonDir, "agent-pipeline/run/agy-session-consent"), { recursive: true, mode: 0o700 });
+  // The authority store refuses any stored consent file that is not exactly 0o600 (AGY-AUTHORITY-PRIVATE-PATH), as in familyFixture.
+  writeFileSync(join(repository.commonDir, "agent-pipeline/run/agy-session-consent", session.id + ".json"), JSON.stringify(stored), { mode: 0o600 });
+  prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true });
+  // The inline consent the caller presents names the stored record (decisionId and subjectSha256); the dispatch compares both exactly.
+  return { runtime, approved: consent({ decisionId: stored.decisionId, subjectSha256: stored.subjectSha256 }) };
+}
+
 test("same-session consent permits a bounded positive fixture dispatch and exclusive result", async () => {
-  const root = mkdtempSync(join(tmpdir(), "agy-session-dispatch-"));
+  // The authority walk refuses a group/world-writable ancestor such as a shared /tmp, so the checkout lives beneath the owned
+  // checkout's scratch/ (nativeContractFixtureParent), the convention familyFixture and the native fixtures use.
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "agy-session-dispatch-"));
   const agy = join(root, "agy-mock");
   writeFileSync(join(root, "input.txt"), "input\n");
+  // The stored consent is chat-attributed, so the committed pipeline.user.yaml must select gates.human_approval: chat
+  // (readApprovalModeKey trusts only bytes identical to HEAD's).
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  human_approval: chat\nlanguage:\n  human_facing: en\n  agent_facing: en\n");
   mkdirSync(join(root, "results"));
   writeFileSync(agy, "#!/usr/bin/env node\nconst mode = process.env.AGY_MODE; if (mode === 'auth') { console.error('Please login'); process.exit(1); } if (mode === 'quota') { console.error('quota exhausted'); process.exit(2); } if (mode === 'timeout') { setTimeout(() => {}, 5000); } else if (mode === 'malformed') console.log('not-json'); else if (mode === 'mismatch') console.log(JSON.stringify({status:'SUCCESS',response:'ok',model:'gemini-other'})); else if (mode === 'unknown') console.log(JSON.stringify({status:'SUCCESS',response:'ok'})); else if (mode === 'structured') { const args=process.argv; const json_schema=JSON.parse(args[args.indexOf('--json-schema')+1]); const structured_output={schema:'pipeline.agy-final-return.v1',dispatchId:process.env.AGY_DISPATCH_ID,candidateCommit:process.env.AGY_CANDIDATE_COMMIT,outcome:'succeeded',report:'done',changedPaths:['input.txt']}; console.log(JSON.stringify({conversation_id:'structured-one',status:'SUCCESS',response:JSON.stringify(structured_output),structured_output,json_schema,model:'gemini-3.8-flash-high'})); } else console.log(JSON.stringify({status:'SUCCESS',response:'ok',model:'gemini-3.8-flash-high'}));\n");
   chmodSync(agy, 0o755);
@@ -403,29 +432,33 @@ test("same-session consent permits a bounded positive fixture dispatch and exclu
     execFileSync("git", ["init", "-q"], { cwd: root });
     execFileSync("git", ["config", "user.email", "agy@example.invalid"], { cwd: root });
     execFileSync("git", ["config", "user.name", "Agy fixture"], { cwd: root });
-    execFileSync("git", ["add", "input.txt"], { cwd: root });
+    execFileSync("git", ["add", "input.txt", "pipeline.user.yaml"], { cwd: root });
     execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: root });
     const candidate = { commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), tree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim() };
-    const result = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/result.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate }), nowEpochMs: 2 });
+    // AC-212 (ALF-B12-AGY): every dispatch below runs inside the controlled-unit-method carrier (runtime.run), the same source-owned
+    // requester the family dispatch tests use; the legacy path takes no explicit carrier and reads the ambient one.
+    const { runtime, approved } = storeLegacyConsent(root);
+    const dispatch = (input) => runtime.run(() => dispatchAgySession(input));
+    const result = await dispatch({ ...authority, root, resultRoot: root, resultPath: "results/result.json", session, consent: approved, requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate }), nowEpochMs: 2 });
     assert.equal(result.status, "completed-undelivered", JSON.stringify(result));
     assert.equal(result.code, "AGY-SESSION-FINAL-UNDELIVERED");
     assert.equal(result.observed.model, "gemini-3.8-flash-high");
     assert.equal(existsSync(join(root, "results/result.json")), true);
     assert.equal(result.result.sha256, hash(readFileSync(join(root, "results/result.json"))));
-    const replay = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/result.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-dispatch-2" }), nowEpochMs: 2 });
+    const replay = await dispatch({ ...authority, root, resultRoot: root, resultPath: "results/result.json", session, consent: approved, requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-dispatch-2" }), nowEpochMs: 2 });
     assert.equal(replay.code, "AGY-SESSION-RESULT-COLLISION");
     assert.match(readFileSync(join(root, "results/result.json"), "utf8"), /gemini-3\.8-flash-high/u);
-    const secondTask = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/second.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("different-task-input"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-dispatch-3" }), nowEpochMs: 2 });
+    const secondTask = await dispatch({ ...authority, root, resultRoot: root, resultPath: "results/second.json", session, consent: approved, requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("different-task-input"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-dispatch-3" }), nowEpochMs: 2 });
     assert.equal(secondTask.status, "completed-undelivered");
-    const structured = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/structured.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-structured" }), env: { ...process.env, AGY_MODE: "structured", AGY_DISPATCH_ID: "agy-structured", AGY_CANDIDATE_COMMIT: candidate.commit }, requireStructuredFinal: true, nowEpochMs: 2 });
+    const structured = await dispatch({ ...authority, root, resultRoot: root, resultPath: "results/structured.json", session, consent: approved, requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-structured" }), env: { ...process.env, AGY_MODE: "structured", AGY_DISPATCH_ID: "agy-structured", AGY_CANDIDATE_COMMIT: candidate.commit }, requireStructuredFinal: true, nowEpochMs: 2 });
     assert.equal(structured.status, "final-pending-host-commit", JSON.stringify(structured));
     assert.equal(structured.final.reportSha256, hash("done"));
     assert.deepEqual(structured.final.changedPaths, ["input.txt"]);
-    const unknown = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/unknown.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, env: { ...process.env, AGY_MODE: "unknown" }, packet: packet({ candidate, dispatchId: "agy-unknown" }), requireObservedModel: true, nowEpochMs: 2 });
+    const unknown = await dispatch({ ...authority, root, resultRoot: root, resultPath: "results/unknown.json", session, consent: approved, requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, env: { ...process.env, AGY_MODE: "unknown" }, packet: packet({ candidate, dispatchId: "agy-unknown" }), requireObservedModel: true, nowEpochMs: 2 });
     assert.equal(unknown.code, "AGY-SESSION-MODEL-UNOBSERVED");
     assert.equal(unknown.result, null);
     for (const [mode, code] of [["auth", "AGY-AUTH-REQUIRED"], ["quota", "AGY-NONZERO-EXIT"], ["timeout", "AGY-TIMEOUT"], ["malformed", "AGY-OUTPUT-MALFORMED"], ["mismatch", "AGY-MODEL-MISMATCH"]]) {
-      const failure = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: `results/${mode}.json`, session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, env: { ...process.env, AGY_MODE: mode }, packet: packet({ candidate, dispatchId: `agy-${mode}` }), timeoutMs: mode === "timeout" ? 50 : 1_000, nowEpochMs: 2 });
+      const failure = await dispatch({ ...authority, root, resultRoot: root, resultPath: `results/${mode}.json`, session, consent: approved, requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, env: { ...process.env, AGY_MODE: mode }, packet: packet({ candidate, dispatchId: `agy-${mode}` }), timeoutMs: mode === "timeout" ? 50 : 1_000, nowEpochMs: 2 });
       assert.equal(failure.status, "unavailable");
       assert.equal(failure.code, code);
       assert.equal(failure.result, null);
