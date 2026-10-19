@@ -10,11 +10,20 @@
  *   P2 the returned action is executable in the phase that returns it (guard admits it filled);
  *   P3 a replay of the answered action exits 0 with a matching readback, never `no-progress`
  *      and never a ready-but-exit-1; a conflicting replay is a typed refusal that writes nothing;
- *   P4 the historical sequence cannot be replayed from here (item Triage: unconfirmed); the pin
- *      verifies the CURRENT sequence instead: answers land while the intake checkpoint is still
- *      absent and do not manufacture intake consent;
+ *   P4 answers land while the intake checkpoint is still absent and do not manufacture intake consent;
  *   P5 every published pendingAsks[].applyAction, in every phase this fixture walks (fresh,
- *      signature-answered, chat-answered), is admitted by the guard once filled, or is withheld.
+ *      signature-answered, chat-answered), is admitted by the guard once filled, or is withheld;
+ *   P6 the historical sequence (PO selects signature while pipeline.user.yaml still says chat; the
+ *      returned policy action refused; a later driver call reporting no-progress/exit 1 despite a
+ *      signature readback) is replayed on the current product through the real publisher's first
+ *      pendingAsks[].applyAction: it does not reproduce. The fresh seed already says signature, so
+ *      the chat precondition is written into the fixture before the answer (the matrix above never
+ *      flips chat -> signature). The one reproducible refusal cause is an action without its
+ *      `--language` pair, which the guard and the CLI both reject.
+ * Residue not replayable here: a `ready` lifecycle readback that still publishes a command whose
+ * execution changes nothing would make the driver stop as `no-progress` (exit 1) with a matching
+ * signature readback. Reaching `ready` needs intake consent and a signing trust anchor, which this
+ * pin deliberately never grants (P4), so that variant is classified, not claimed.
  * Negative controls prove the assertion helpers can fail. Nothing under test is mocked; the only
  * seams are `main`'s documented `drive` injection (control case) and a fixture homedir override.
  */
@@ -155,6 +164,78 @@ const MATRIX = [["claude", "signature"], ["claude", "chat"], ["codex", "signatur
     });
   }
 }
+
+// P6: controlled replay of the historical fresh-intake sequence on the Codex runner: signature is selected while
+// pipeline.user.yaml still says chat, through the real publisher's first action, the real guard and the real CLI.
+test("codex: P6 replay - signature selected while pipeline.user.yaml says chat is admitted, exits 0 with a matching readback, and later driver calls never stall", () => {
+  const { root, home, env, first } = fresh("codex");
+  // Precondition of the historical sequence: the user file still says chat (the fresh seed says signature).
+  writeFileSync(sourcePath(root), sourceOf(root).replace(/(human_approval|push_approval):\s*"?signature"?/gu, '$1: "chat"'));
+  assert.equal(parseYaml(sourceOf(root)).gates.human_approval, "chat", "fixture precondition: human_approval says chat");
+  assert.equal(parseYaml(sourceOf(root)).gates.push_approval, "chat", "fixture precondition: push_approval says chat");
+  assert.throws(() => assertAnswerRecorded(root, "signature"), /ENOENT|carries the answered mode/u, "before the answer, signature is not recorded");
+  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: "local" }).status, "absent");
+
+  // The returned policy action is executable in the intake phase that returns it (guard admits it filled).
+  const ask = firstAction(first);
+  assert.ok(ask, `first round published an action: ${first.outcome}`);
+  const argv = fillFirst(ask, "signature");
+  const flagValue = (flag) => argv[argv.indexOf(flag) + 1];
+  assert.equal(isSanctionedLifecycleCommand(quote([ask.applyAction.executable, ...argv]), root), true);
+  // The one refusal cause that does reproduce: the same action without its language pair is no executable action.
+  const languageAt = argv.indexOf("--language");
+  assert.ok(languageAt > 0, "the published first-round action carries --language");
+  const withoutLanguage = argv.filter((_, index) => index !== languageAt && index !== languageAt + 1);
+  assert.equal(isSanctionedLifecycleCommand(quote([ask.applyAction.executable, ...withoutLanguage]), root), false);
+  let refusedOut = ""; let refusedErr = "";
+  assert.equal(main(withoutLanguage.slice(1), { env, write: (text) => { refusedOut += text; }, writeError: (text) => { refusedErr += text; }, drive: () => assert.fail("a refused answer must not drive") }), 2);
+  assert.match(refusedErr, /initial answers require --language/u);
+  assert.equal(refusedOut, "");
+  assert.equal(parseYaml(sourceOf(root)).gates.push_approval, "chat", "the refused answer wrote nothing");
+  assert.equal(existsSync(receiptPath(root)), false, "the refused answer left no receipt");
+
+  // The admitted answer exits 0 with a matching readback (chat -> signature) and is never classified no-progress.
+  const answered = runCli(argv, env);
+  assert.equal(answered.exit, 0, answered.out);
+  assert.equal(answered.json.initialAnswers.ok, true);
+  assert.equal(answered.json.initialAnswers.code, "INITIAL-ANSWERS-APPLIED");
+  assert.equal(answered.json.initialAnswers.pushApprovalPreference, "signature");
+  assert.notEqual(answered.json.outcome, "no-progress");
+  assertAnswerRecorded(root, "signature");
+  assertNoSecondAsk(answered.json);
+  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: "local" }).status, "absent");
+
+  // Later bare driver calls (the historical ready-but-exit-1 position): each exits 0, none stalls, readback unchanged,
+  // and the separate trust-anchor ask they publish is admitted by the guard once filled.
+  const laterArgv = [argv[0], "--root", flagValue("--root"), "--runner", flagValue("--runner")];
+  assert.equal(isSanctionedLifecycleCommand(quote([ask.applyAction.executable, ...laterArgv]), root), true);
+  const sourceBytes = readFileSync(sourcePath(root));
+  const receiptBytes = readFileSync(receiptPath(root));
+  let anchorAsks = 0;
+  for (const call of [1, 2]) {
+    const later = runCli(laterArgv, env);
+    assert.equal(later.exit, 0, `later driver call ${call}: ${later.out}`);
+    assert.notEqual(later.json.outcome, "no-progress", `later driver call ${call} stalled`);
+    assert.equal(later.json.initialAnswers, undefined, "a bare driver call applies no answers");
+    assert.deepEqual(readFileSync(sourcePath(root)), sourceBytes, `later driver call ${call} rewrote the user file`);
+    assert.deepEqual(readFileSync(receiptPath(root)), receiptBytes, `later driver call ${call} rewrote the receipt`);
+    assertAnswerRecorded(root, "signature");
+    assertNoSecondAsk(later.json);
+    for (const action of publishedActions(later.json).filter((entry) => entry.applyAction.argv.includes("--trust-anchor-mode"))) {
+      anchorAsks += 1;
+      for (const [anchorMode, directory, name, key] of ANCHOR_SHAPES(home)) {
+        const answers = new Map([["<existing|new>", anchorMode], ["<absolute external key directory>", directory],
+          ["<human attribution>", name], ["<absolute existing key path|none>", key]]);
+        const filled = action.applyAction.argv.map((value) => answers.get(value) ?? value);
+        assert.equal(filled.some((value) => /^<.*>$/u.test(value)), false, `unfilled placeholder in ${JSON.stringify(action.applyAction.argv)}`);
+        assert.equal(isSanctionedLifecycleCommand(quote([action.applyAction.executable, ...filled]), root), true,
+          `later driver call ${call}/${anchorMode}: published anchor action refused by the guard`);
+      }
+    }
+  }
+  assert.ok(anchorAsks >= 2, "each later driver call publishes the separate trust-anchor ask (or it must be withheld with a typed recovery)");
+  assert.equal(existsSync(join(root, "specs")), false, "no plan/spec artifact exists before the intake decision");
+});
 
 // P5: every published applyAction is admitted in the phase that publishes it (fresh, signature-answered, chat-answered).
 const ANCHOR_SHAPES = (home) => [
