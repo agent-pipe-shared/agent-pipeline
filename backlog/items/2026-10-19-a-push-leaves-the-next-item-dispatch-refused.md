@@ -35,6 +35,16 @@ itself wrote both:
 
 The refusal names neither the dirty paths nor the repair.
 
+## Progress (2026-10-19, PF-55, not yet reviewed)
+
+- Done: the refusal names each dirty tracked path (up to 20) and its repair. For
+  `pipeline-state.json` the repair is a one-file commit of the folded record once the approved
+  push has landed; when HEAD is no longer the binding's candidate, it says to regenerate the
+  binding (`baselineFault`, NGHS37, pin case (vi)).
+- Done: the refused dispatch leaves no reserved registry member and no queue row behind (E36).
+- Open: a push followed by an item dispatch with no other change is still refused until the
+  record is committed. The first acceptance bullet below is not met.
+
 ## Acceptance
 
 - A push, followed by an item dispatch with no other change, is admitted. Either the
