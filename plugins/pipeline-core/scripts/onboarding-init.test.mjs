@@ -1245,11 +1245,23 @@ test("signature anchor reuses a key already at the canonical directory path with
       ? `${canonicalKey[0].toLowerCase()}${canonicalKey.slice(1)}`.replaceAll("\\", "/")
       : canonicalKey;
     const keyBytes = readFileSync(canonicalKey);
+    // QG-04 (examiner change, AC-189 / E16): the bootstrap's default `runSetup` spawns the po-human-approval CLI
+    // as a child, and that child -- with the key already at the canonical path, so no `--existing-key` -- takes the
+    // reuse branch and re-derives the public key from the passphrase-protected fixture key through
+    // `openssl pkey -in po-private.pem -pubout`. A spawned child has no way to carry `-passin`, so that openssl sat
+    // blocked on a read of the inherited stdin (measured: state S, wait channel unix_stream_read_gen, and still
+    // blocked past 120 s under --test-timeout=40000, so the run gave no assertion output). This case's claim is
+    // what happens AFTER that human step -- the key is reused, never copied or replaced -- so the human step is
+    // the one thing replaced: the same existing `runSetup` parameter, the same in-process `inProcessSetup` idiom
+    // the key cells above use. The reuse branch of setup still runs unchanged. No production seam is added, and
+    // every assertion below is kept as it was.
+    const setupFailures = [];
     const applied = applyTrustAnchorBootstrap({
       rootDir: root, mode: "existing", directory, humanName: "Existing PO",
-      existingKey: suppliedKey, env,
+      existingKey: suppliedKey, env, runSetup: inProcessSetup(home, setupFailures),
     });
-    assert.deepEqual(applied, { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode: "existing" });
+    assert.deepEqual(applied, { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode: "existing" },
+      setupFailures.length > 0 ? setupFailures.map((error) => error.message).join("; ") : undefined);
     assert.deepEqual(readFileSync(canonicalKey), keyBytes, "reuse never copies or overwrites the private key");
     assert.equal(JSON.parse(readFileSync(join(root, "project", "critical-human-proof.json"), "utf8")).trustAnchors.length, 1);
   } finally {
