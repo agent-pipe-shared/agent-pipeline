@@ -6,7 +6,7 @@
  * 3.2, 3.5, 3.9, 3.10 and 6 (row "S4 CLI").
  *
  *   slice-queue.mjs <verb> [<id> [<dep>]] --queue <path> [flags]
- *   verbs: validate | next | add | defer | hold | depend | pause | reap | finish | report
+ *   verbs: validate | next | add | defer | hold | depend | cancel | pause | reap | finish | report
  *
  * `--queue` is explicit outside an approved course. Within a governed approved
  * course it resolves to the active feature directory, matching authenticated admission. Stdout is ONE JSON document;
@@ -32,7 +32,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, statSync, lstatSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness } from "../lib/native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, observeGovernedItemIntegrationReadiness, cancelUnstartedGovernedItemSlice } from "../lib/native-goldfish-host-state.mjs";
 import { nativeManagedCurrentOwner } from "../lib/native-managed-authority-support.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
@@ -71,6 +71,7 @@ const VERBS = {
   defer: { positional: 1, flags: [...COMMON, ...LEDGER, "reason"], repeatable: [] },
   hold: { positional: 1, flags: [...COMMON, ...LEDGER, "po-question", "external-reason"], repeatable: [] },
   depend: { positional: 2, flags: [...COMMON], repeatable: [] },
+  cancel: { positional: 1, flags: [...COMMON, "reason"], repeatable: [] },
   pause: { positional: 0, flags: [...COMMON, ...LEDGER, "by", "reason", "until"], repeatable: [] },
   reap: { positional: 1, flags: [...COMMON, ...LEDGER, "reason"], repeatable: [] },
   finish: { positional: 1, flags: [...COMMON, ...LEDGER, "how"], repeatable: [] },
@@ -361,6 +362,30 @@ function verbDepend({ positional, flags }) {
   return commit(path, raw, { sliceId: id, dependsOn: entry.dependsOn });
 }
 
+// PF-45: a never-started slice is cancelled and every slice waiting on it is released. An item queue goes
+// through the authenticated course writer; a plain queue is edited like the other declarations.
+function verbCancel({ positional, flags }) {
+  const reason = requireText(flags, "reason", "cancel");
+  const path = resolve(flags.queue);
+  const loaded = loadRaw(path);
+  if (loaded.status !== "valid") throw invalidQueue(loaded);
+  if (loaded.raw.schema === "pipeline.slice-queue.v2") {
+    const governed = resolveGovernedItemQueue({ root: process.cwd() });
+    if (governed.status !== "required" || resolve(process.cwd(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
+    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason });
+    if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0] });
+    return { sliceId: result.sliceId, state: "cancelled", released: result.released };
+  }
+  const raw = structuredClone(loaded.raw);
+  const entry = findSlice(raw, positional[0]);
+  if (entry.state === "cancelled") throw new CliError("SQ-ITEM-CANCEL-ALREADY", EXIT.INVALID, `slice ${entry.id} is already cancelled`);
+  entry.state = "cancelled";
+  entry.holdReason = reason;
+  const released = [];
+  for (const other of raw.slices) if ((other.dependsOn ?? []).includes(entry.id)) { other.dependsOn = other.dependsOn.filter((id) => id !== entry.id); released.push(other.id); }
+  return commit(path, raw, { sliceId: entry.id, state: "cancelled", released });
+}
+
 function verbPause({ flags }) {
   const by = flags.by;
   if (by !== "po" && by !== "elephant") throw usage("pause: --by must be po or elephant");
@@ -440,7 +465,7 @@ function verbReport({ flags }) {
   return { queue: { feature: loaded.queue.feature, size: loaded.queue.slices.length, counts: status.counts, ready: status.ready.length }, ledger };
 }
 
-const HANDLERS = { validate: verbValidate, next: verbNext, add: verbAdd, defer: verbDefer, hold: verbHold, depend: verbDepend, pause: verbPause, reap: verbReap, finish: verbFinish, report: verbReport };
+const HANDLERS = { validate: verbValidate, next: verbNext, add: verbAdd, defer: verbDefer, hold: verbHold, depend: verbDepend, cancel: verbCancel, pause: verbPause, reap: verbReap, finish: verbFinish, report: verbReport };
 
 /** Runs the CLI; returns `{ exit, output }` (never throws, never writes). */
 export function runCli(argv) {

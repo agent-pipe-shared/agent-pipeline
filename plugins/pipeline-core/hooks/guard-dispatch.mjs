@@ -762,7 +762,8 @@ if (isDirectInvocation(import.meta.url)) {
       const detail = unsupported
         ? "Use the authenticated native item admission; this transport has no qualified item reservation adapter."
         : [governed.reason ? `Reason: ${clean(governed.reason)}.` : "", governed.repair ? `Repair: ${clean(governed.repair)}` : ""].filter(Boolean).join(" ")
-          || "Use the authenticated native item admission; this transport has no qualified item reservation adapter.";
+          // Critic F1: a refused queue never evaluated the transport, so it is never blamed for it.
+          || `Reason: the governed item queue refused the preparation (${governed.code}); no further cause was reported.`;
       process.stderr.write(`BLOCKED (guard-dispatch): ${unsupported ? "SQ-NATIVE-ITEM-ADMISSION-REQUIRED" : governed.code}: ${detail}\n`);
       process.exit(2);
     }
@@ -878,7 +879,10 @@ if (isDirectInvocation(import.meta.url)) {
             const reasonText = typeof prepared.reason === "string" && prepared.reason.trim() !== ""
               ? ` Reason: ${prepared.reason.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 240)}`
               : "";
-            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}\n`);
+            const repairText = typeof prepared.repair === "string" && prepared.repair.trim() !== ""
+              ? ` Repair: ${prepared.repair.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 360)}`
+              : "";
+            process.stderr.write(`BLOCKED (guard-dispatch): ${prepared.code}: version 2 native host binding failed before launch.${reasonText}${repairText}\n`);
             process.exit(2);
           }
           // The dispatch continues with no pending state: leave the typed code where this launch's PostToolUse can name it

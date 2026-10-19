@@ -184,6 +184,23 @@ check("defer / hold / depend: usage errors exit 2, unknown ids exit 4, a depende
   assert.ok(readFileSync(path).equals(before));
 });
 
+check("cancel: a cancelled slice stops holding the slices that waited on it (PF-45)", () => {
+  const dir = sandbox();
+  const path = writeQueue(dir, [slice("A", ["a.mjs"]), slice("B", ["b.mjs"], { dependsOn: ["A"] }), slice("C", ["c.mjs"], { dependsOn: ["A", "B"] })]);
+  assert.equal(cli(dir, ["cancel", "A", "--queue", REL]).status, 2, "cancel needs --reason");
+  assert.equal(cli(dir, ["cancel", "NOPE", "--queue", REL, "--reason", "x"]).status, 4);
+  const cancelled = cli(dir, ["cancel", "A", "--queue", REL, "--reason", "never started"]);
+  assert.equal(cancelled.status, 0, cancelled.stdout + cancelled.stderr);
+  assert.deepEqual(cancelled.json.released, ["B", "C"]);
+  const byId = Object.fromEntries(JSON.parse(readFileSync(path, "utf8")).slices.map((item) => [item.id, item]));
+  assert.equal(byId.A.state, "cancelled");
+  assert.equal(byId.A.holdReason, "never started");
+  assert.deepEqual(byId.B.dependsOn, []);
+  assert.deepEqual(byId.C.dependsOn, ["B"]);
+  assert.deepEqual(cli(dir, ["next", "--queue", REL, "--now", NOW]).json.ready, ["B"]);
+  assert.equal(cli(dir, ["cancel", "A", "--queue", REL, "--reason", "again"]).status, 3, "an already cancelled slice is refused");
+});
+
 check("pause: records a hashed pause event, refuses a window over 4 hours and a missing session", () => {
   const dir = sandbox();
   writeQueue(dir, [slice("A", ["a.mjs"])]);
@@ -263,7 +280,7 @@ check("usage: an unknown verb, a missing --queue and an unknown flag exit 2 with
   }
 });
 
-assert.equal(cases.length, 14, "the complete CLI corpus must be registered before execution begins");
+assert.equal(cases.length, 15, "the complete CLI corpus must be registered before execution begins");
 process.on("exit", () => {
   for (const dir of sandboxes) rmSync(dir, { recursive: true, force: true });
 });

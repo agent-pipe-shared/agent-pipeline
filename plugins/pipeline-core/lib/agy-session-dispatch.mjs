@@ -94,7 +94,7 @@ function beginDispatchLifetime({ root, sessionId, descriptorSha256, packet, purp
       || packet?.candidate?.commit !== repository.candidate.commit || packet?.candidate?.tree !== repository.candidate.tree) authorityFailure("AGY-SESSION-REQUESTER-CAS");
     let itemDelivery = null;
     if (IMPLEMENTATION_ROLES.has(packet.role)) {
-      if(itemBriefing){const prepared=prepareGovernedItemQueue({root,itemDelivery:itemBriefing,candidate:repository.candidate,writeScope:packet.requiredPaths});if(prepared.status==='refused')authorityFailure(prepared.code);}
+      if(itemBriefing){const prepared=prepareGovernedItemQueue({root,itemDelivery:itemBriefing,candidate:repository.candidate,writeScope:packet.requiredPaths});if(prepared.status==='refused')throw Object.assign(new Error(prepared.code),{code:prepared.code,reason:prepared.reason,repair:prepared.repair});}
       const governed=resolveGovernedItemQueue({root});
       if(governed.status==='refused')authorityFailure(governed.code);
       if(governed.status==='required') {

@@ -11,7 +11,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { bindNativeCodexStart, prepareNativeGoldfishHostState,
   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
-import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason } from "./native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason, cancelUnstartedGovernedItemSlice } from "./native-goldfish-host-state.mjs";
 import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
@@ -773,6 +773,54 @@ const cases = [
     assert.match(heldDependencyReason(["WAIT", "MISSING"], slices), /WAIT \(state hold-po\); MISSING \(not in the queue\)/u);
     assert.match(heldDependencyReason(["OPEN", "GONE", "REVIEW", "WAIT", "MISSING"], slices), /; and 2 more$/u);
   } },
+
+  { id: "NGHS29", name: "a held dependency refuses before the queue is written; a never-started slice is cancelled and stops holding, a started one is refused (PF-45)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
+    assert.equal(prepare('ITEM-AC-1').status,'required');
+    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
+    const held=prepare('ITEM-AC-2');
+    assert.equal(held.code,'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',JSON.stringify(held));assert.match(held.reason,/held on ITEM-AC-1 .*the queue was not written$/u);assert.match(held.repair,/slice-queue\.mjs cancel <slice id>/u);
+    assert.equal(readFileSync(queuePath,'utf8'),before,'a held dependency leaves the queue untouched');
+    const cancel=(sliceId,reason='never started')=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason}));
+    assert.equal(cancel('ITEM-AC-1','').code,'SQ-ITEM-CANCEL-INPUT');assert.equal(cancel('NOPE').code,'SQ-NOT-FOUND');
+    const cancelled=cancel('ITEM-AC-1');assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.deepEqual(cancelled.released,[]);
+    assert.equal(cancel('ITEM-AC-1').code,'SQ-ITEM-CANCEL-ALREADY');
+    assert.equal(prepare('ITEM-AC-2').status,'required','the successor is admitted once its never-started predecessor is cancelled');
+    const rows=JSON.parse(readFileSync(queuePath,'utf8')).slices;
+    assert.equal(rows.find(row=>row.id==='ITEM-AC-1').state,'cancelled');assert.deepEqual(rows.find(row=>row.id==='ITEM-AC-2').dependsOn,[]);
+    // A slice with a native dispatch state was started: it is not cancelled with this verb.
+    const binding={...makeBinding({dispatchId:'DELIVER-AC-2',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery:delivery('ITEM-AC-2')};
+    const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});
+    input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-2\nWrite scope: src/change.mjs\n';
+    assert.equal(runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input})).ok,true);
+    assert.equal(cancel('ITEM-AC-2').code,'SQ-ITEM-CANCEL-STARTED');
+  })},
+
+  { id: "NGHS30", name: "fragments of an interrupted registry initialization are moved aside and the first dispatch still initializes; every queue refusal names its cause and repair (Critic F1-F3)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const registry=join(repository.commonDir,'agent-pipeline/session-authority');
+    mkdirSync(join(registry,'producers'),{recursive:true,mode:0o700});chmodSync(registry,0o700);writeFileSync(join(registry,'producers/stale.json'),'{}',{mode:0o600});
+    const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+    const binding={...makeBinding({dispatchId:'DELIVER-AC-1',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
+    const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});
+    input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
+    const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));assert.equal(prepared.ok,true,JSON.stringify(prepared));
+    assert.equal(existsSync(join(registry,'catalogue.json')),true);assert.equal(existsSync(join(registry,'producers/stale.json')),false);
+    const aside=readdirSync(join(repository.commonDir,'agent-pipeline/session-authority-abandoned'));
+    assert.equal(aside.length,1);assert.equal(existsSync(join(repository.commonDir,'agent-pipeline/session-authority-abandoned',aside[0],'producers/stale.json')),true,'the fragment is retained, not deleted');
+    const scope=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['elsewhere.mjs']}));
+    assert.equal(scope.code,'SQ-ITEM-SCOPE-INVALID');assert.match(scope.reason,/not a dependency of the item check/u);assert.match(scope.repair,/dispatch-briefing\.mjs binding/u);
+    const invalid=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:{...itemDelivery,pass:true},candidate:original.candidate,writeScope:['src/change.mjs']}));
+    assert.equal(invalid.code,'SQ-ITEM-BINDING-INVALID');assert.match(invalid.repair,/regenerate the binding/u);
+    const otherItem=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:{...itemDelivery,itemId:'AC-OTHER'},candidate:original.candidate,writeScope:['src/change.mjs']}));
+    assert.equal(otherItem.code,'SQ-ITEM-BINDING-DRIFT',JSON.stringify(otherItem));assert.match(otherItem.reason,/in item/u);assert.match(otherItem.repair,/choose a new slice id/u);
+  })},
 
 ];
 

@@ -189,7 +189,7 @@ export function prepareNativeGoldfishHostState({ root, runner, input, subagentSt
     ? prepareGovernedItemQueue({root:root??input.cwd??process.cwd(),itemDelivery:binding.itemDelivery,
       candidate:{commit:binding.candidateCommit,tree:binding.candidateTree},writeScope:binding.allowedPaths})
     : resolveGovernedItemQueue({ root: root ?? input.cwd ?? process.cwd() });
-  if (deliveryQueue.status === "refused") return fail(deliveryQueue.code);
+  if (deliveryQueue.status === "refused") return { ...fail(deliveryQueue.code), ...(deliveryQueue.reason ? { reason: deliveryQueue.reason } : {}), ...(deliveryQueue.repair ? { repair: deliveryQueue.repair } : {}) };
   let delivery;
   if (deliveryQueue.status === "required") {
     const named = parseDispatchSlice(fields.prompt);
@@ -690,7 +690,7 @@ function publishNativeAuthorityState(commonDir,name,state){
     // D44: no production route created the session-authority registry, so the first governed item
     // dispatch in a real repository creates it here (idempotent), then continues on the registry path.
     const initialized=initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
-    if(!['initialized','already-initialized'].includes(initialized.status)||!nativeManagedRegistryPresent(repository))throw nativeManagedFault('item-delivery-registry-initialization-failed');
+    if(!['initialized','already-initialized'].includes(initialized.status)||!nativeManagedRegistryPresent(repository))throw nativeManagedFault(`item-delivery-registry-initialization-failed (${initialized.reason??initialized.status})`);
   }
   const owner=nativeAuthorityOwner(repository),current=nativeManagedCurrentOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
   const handle=Object.freeze({}),operation={handle,name,association:current.association,
@@ -972,19 +972,24 @@ export function orderAndCoverAdmittedSlice(raw,sliceId,baseCommit) {
  * checks before any lifecycle write under the existing authority lock. */
 export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope}={}) {
   try {
-    if(!validateItemDeliveryBriefing(itemDelivery).ok)return {status:'refused',code:'SQ-ITEM-BINDING-INVALID'};
+    // Critic F1 (PF-47): every refusal names its cause and the repair, so the guard never falls back to a transport text.
+    const regenerate='regenerate the binding at the current HEAD with dispatch-briefing.mjs binding and paste its block unchanged';
+    if(!validateItemDeliveryBriefing(itemDelivery).ok)return {status:'refused',code:'SQ-ITEM-BINDING-INVALID',reason:'the binding block carries no valid item delivery briefing',repair:regenerate};
     const physical=realpathSync(resolve(root));
     if(!observeGovernanceScope({rootDir:physical}).requiresEnforcement)return {status:'not-applicable',code:'SQ-NO-GOVERNANCE'};
     const repository=inspectSignedDescriptorCustodyRepository(physical);
     if(nativeManagedDigest(candidate)!==nativeManagedDigest(repository.candidate)
-      &&!candidateAdvancedDisjointly(physical,candidate,repository,[...(Array.isArray(writeScope)?writeScope:[]),...itemDelivery.checks.flatMap(check=>[check.path,...check.dependencies])]))return {status:'refused',code:'SQ-ITEM-CANDIDATE-DRIFT'};
-    if(!Array.isArray(writeScope)||!writeScope.length||writeScope.some(path=>!normalizeScope(path).ok||!itemDelivery.checks.some(check=>check.dependencies.includes(path))))return {status:'refused',code:'SQ-ITEM-SCOPE-INVALID'};
+      &&!candidateAdvancedDisjointly(physical,candidate,repository,[...(Array.isArray(writeScope)?writeScope:[]),...itemDelivery.checks.flatMap(check=>[check.path,...check.dependencies])]))
+      return {status:'refused',code:'SQ-ITEM-CANDIDATE-DRIFT',reason:`the binding names candidate ${String(candidate?.commit).slice(0,12)}, HEAD is ${String(repository.candidate?.commit).slice(0,12)}, and the commits between touch its paths`,repair:regenerate};
+    if(!Array.isArray(writeScope)||!writeScope.length||writeScope.some(path=>!normalizeScope(path).ok||!itemDelivery.checks.some(check=>check.dependencies.includes(path))))
+      return {status:'refused',code:'SQ-ITEM-SCOPE-INVALID',reason:'an allowed path is missing, not repository-relative, or not a dependency of the item check',repair:regenerate};
     return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
       entered.value=true;
       const current=nativeManagedCurrentOwner(repository);
       if(current.association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
       const approval=observeCurrentPlanApprovalForCalibration({rootDir:physical});
-      if(approval.status!=='eligible')return {status:'refused',code:approval.code};
+      if(approval.status!=='eligible')return {status:'refused',code:approval.code,reason:`the current plan approval is ${approval.status} (${approval.code})`,
+        repair:approval.repair??'the item course needs an eligible PO plan approval of the current PRD and spec; read pipeline-state.mjs inspect'};
       const paths=resolveProjectAuthorityPaths({rootDir:physical});
       if(paths.status!=='ready')throw nativeManagedFault('item-course-authority-unavailable');
       const stateBytes=readFileSync(join(physical,paths.state)),state=parseStrictJson(stateBytes);
@@ -1027,7 +1032,9 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
           const differs=[existing.state!=='ready'?`state ${existing.state}`:null,nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope)?'write scope':null,
             existing.delivery?.itemId!==itemDelivery.itemId?'item':null,nativeManagedDigest(existing.delivery?.criteria)!==nativeManagedDigest([locator.criterionId])?'criterion':null].filter(Boolean);
           return {status:'refused',code:'SQ-ITEM-BINDING-DRIFT',reason:`the binding for ${existing.id} differs from its queue row in ${differs.join(', ')||'its delivery binding'}`,
-            repair:existing.state==='ready'?`rebind with exactly the queue row's write scope (one --path each): ${(existing.writeScope??[]).join(', ')}`:`slice ${existing.id} is ${existing.state}; it cannot be rebound`};
+            repair:existing.state!=='ready'?`slice ${existing.id} is ${existing.state}; it cannot be rebound: choose a new slice id`
+              :differs.includes('item')||differs.includes('criterion')?`slice ${existing.id} belongs to another item or criterion; choose a new slice id (--dispatch-id)`
+              :`rebind with exactly the queue row's write scope (one --path each): ${(existing.writeScope??[]).join(', ')}`};
         }
         return resolveGovernedItemQueue({root:physical});
       }
@@ -1035,21 +1042,71 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
       orderAndCoverAdmittedSlice(raw,itemDelivery.sliceId,candidate.commit);
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-prepared-queue-invalid');
+      // A held dependency refuses before the queue is written, so a refused dispatch leaves the tree as it was.
+      // Readiness is read only when there is a dependency (as the admission does); when it is not observable,
+      // the later admission check decides exactly as before.
+      const dependsOn=raw.slices.find(row=>row.id===itemDelivery.sliceId).dependsOn??[];
+      const readiness=dependsOn.length?observeGovernedItemIntegrationReadiness({root:physical}):null;
+      const held=readiness?.status==='observed'?dependsOn.filter(id=>!readiness.integrated.includes(id)):[];
+      if(held.length>0)return {status:'refused',code:'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',reason:`${heldDependencyReason(held,raw.slices)}; the queue was not written`,
+        repair:`a never-started dependency is released with: node <plugin-root>/scripts/slice-queue.mjs cancel <slice id> --reason "<why>"; a started one needs its "Dispatch: <slice id> (goldfish)" commit`};
       // Approval, requester, candidate and preimage are checked again immediately
       // before publishing a fresh inode. Existing linked bytes remain unchanged.
       const after=observeCurrentPlanApprovalForCalibration({rootDir:physical});
       if(after.status!=='eligible'||after.approvalSha256!==approval.approvalSha256||after.stateSha256!==approval.stateSha256
         ||nativeManagedDigest(nativeManagedCurrentOwner(repository).association)!==nativeManagedDigest(current.association))throw nativeManagedFault('item-course-approval-cas');
-      if(preimage?digest(readFileSync(path))!==digest(preimage):(()=>{try{lstatSync(path);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}})())throw nativeManagedFault('item-course-queue-cas');
-      const bytes=Buffer.from(JSON.stringify(raw,null,2)+'\n'),temp=join(dirname(path),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);
-      // Never publish a course that its own readers would refuse.
-      if(bytes.length>SLICE_QUEUE_MAX_BYTES)throw Object.assign(new Error('prepared delivery course exceeds the slice-queue size bound'),{code:'SQ-DELIVERY-QUEUE-TOO-LARGE'});
-      let fd;
-      try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const written=writeSync(fd,bytes,offset,bytes.length-offset);if(written<=0)throw nativeManagedFault('item-course-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,path);}
-      finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
+      writeGovernedQueue(path,preimage,raw);
       return resolveGovernedItemQueue({root:physical});
     }));
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-COURSE-UNAVAILABLE',reason:error.reason??error.message};}
+}
+
+/** Publishes a governed item queue as a fresh inode by rename, after the preimage compare-and-swap. */
+function writeGovernedQueue(path,preimage,raw) {
+  if(preimage?digest(readFileSync(path))!==digest(preimage):(()=>{try{lstatSync(path);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}})())throw nativeManagedFault('item-course-queue-cas');
+  const bytes=Buffer.from(JSON.stringify(raw,null,2)+'\n'),temp=join(dirname(path),`.slice-queue.${randomBytes(16).toString('hex')}.tmp`);
+  // Never publish a course that its own readers would refuse.
+  if(bytes.length>SLICE_QUEUE_MAX_BYTES)throw Object.assign(new Error('prepared delivery course exceeds the slice-queue size bound'),{code:'SQ-DELIVERY-QUEUE-TOO-LARGE'});
+  let fd;
+  try{fd=openSync(temp,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);let offset=0;while(offset<bytes.length){const written=writeSync(fd,bytes,offset,bytes.length-offset);if(written<=0)throw nativeManagedFault('item-course-queue-write');offset+=written;}fsyncSync(fd);closeSync(fd);fd=undefined;renameSync(temp,path);}
+  finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
+}
+
+/** PF-45: cancels a never-started slice of the governed item queue and releases the slices that wait on it.
+ * Never started means no native dispatch state names the slice and no "Dispatch: <slice> (goldfish)" commit
+ * after its base touches its write scope. Its id is removed from every dependsOn: nothing of it will be
+ * delivered, so nothing may wait on it. The shared critic and an already cancelled slice are refused. */
+export function cancelUnstartedGovernedItemSlice({root,sliceId,reason}={}) {
+  try {
+    if(typeof sliceId!=='string'||!ID.test(sliceId))return {status:'refused',code:'SQ-ITEM-CANCEL-INPUT',reason:'the slice id is not a queue slice id'};
+    if(typeof reason!=='string'||!reason.trim()||reason.length>500||/[\u0000-\u001f\u007f]/u.test(reason))return {status:'refused',code:'SQ-ITEM-CANCEL-INPUT',reason:'--reason needs one line of at most 500 characters'};
+    const physical=realpathSync(resolve(root));
+    const governed=resolveGovernedItemQueue({root:physical});
+    if(governed.status!=='required')return governed.status==='refused'?governed:{status:'refused',code:'SQ-ITEM-CANCEL-NO-COURSE',reason:'no governed item queue exists for the approved feature'};
+    const repository=inspectSignedDescriptorCustodyRepository(physical),path=resolve(physical,governed.path);
+    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
+      entered.value=true;
+      if(nativeManagedCurrentOwner(repository).association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
+      const preimage=readFileSync(path),raw=parseStrictJson(preimage);
+      if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-queue-invalid');
+      const row=raw.slices.find(entry=>entry.id===sliceId);
+      if(!row)return {status:'refused',code:'SQ-NOT-FOUND',reason:`no slice ${sliceId} in ${governed.path}`};
+      if(row.state==='cancelled')return {status:'refused',code:'SQ-ITEM-CANCEL-ALREADY',reason:`slice ${sliceId} is already cancelled`};
+      if(row.tier==='critic')return {status:'refused',code:'SQ-ITEM-CANCEL-CRITIC',reason:`slice ${sliceId} is the shared critic slice; it is not cancelled with this verb`};
+      let native=[];
+      try{native=readNativeManagedInventory(repository,'native-goldfish')[0].entries;}catch(error){if(error?.code!=='ENOENT'&&!sessionAuthorityRegistryAbsent(error))throw error;}
+      if(native.some(entry=>entry.relativePath.startsWith('pending-')&&entry.value?.delivery?.sliceId===sliceId))
+        return {status:'refused',code:'SQ-ITEM-CANCEL-STARTED',reason:`slice ${sliceId} has a native dispatch state; it was started and is finished through its own delivery`};
+      if(readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:[row]}).includes(sliceId))
+        return {status:'refused',code:'SQ-ITEM-CANCEL-STARTED',reason:`slice ${sliceId} already has a "Dispatch: ${sliceId} (goldfish)" commit; it counts as integrated and needs no cancel`};
+      row.state='cancelled';row.holdReason=reason.trim();
+      const released=[];
+      for(const other of raw.slices)if((other.dependsOn??[]).includes(sliceId)){other.dependsOn=other.dependsOn.filter(id=>id!==sliceId);released.push(other.id);}
+      if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-cancelled-queue-invalid');
+      writeGovernedQueue(path,preimage,raw);
+      return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,released,queuePath:governed.path};
+    }));
+  }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-CANCEL-UNAVAILABLE',reason:error.reason??error.message};}
 }
 
 const governedCheckHandles=new WeakMap();
