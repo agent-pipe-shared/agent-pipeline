@@ -167,14 +167,14 @@ test("preflight gates mandatory local hooks and keeps pre-push advisory", () => 
       { id: "pre-push-hook", status: prePush },
     ],
   });
-  const required = preflight({ cwd, checkCloneProvisioningFn: () => provisioning("install", "install") });
+  const required = preflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd, checkCloneProvisioningFn: () => provisioning("install", "install") });
   assert.equal(required.status, "hook-provisioning-required");
   assert.equal(required.nextAction.argv[0], join(required.pluginRoot, "scripts", "clone-hook-readiness.mjs"));
   assert.equal(required.nextAction.requiresConfirmation, true);
-  const blocked = preflight({ cwd, checkCloneProvisioningFn: () => provisioning("foreign-owner", "current") });
+  const blocked = preflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd, checkCloneProvisioningFn: () => provisioning("foreign-owner", "current") });
   assert.equal(blocked.status, "hook-provisioning-blocked");
   assert.equal(blocked.nextAction, null);
-  const optionalPush = preflight({ cwd, checkCloneProvisioningFn: () => provisioning("current", "current", "decline") });
+  const optionalPush = preflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd, checkCloneProvisioningFn: () => provisioning("current", "current", "decline") });
   assert.equal(optionalPush.status, "ready");
 });
 
