@@ -10,6 +10,7 @@ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
 import { cancelUnstartedGovernedItemSlice, prepareGovernedItemQueue, prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
 import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
+import { run as runState } from "./pipeline-state.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
@@ -129,6 +130,26 @@ const cases = [
       assert.equal(fromHook.descriptorSha256, fromShell.descriptorSha256, "the hook and the shell resolve one descriptor");
       assert.equal(fromHook.ownerNonceSha256, fromShell.ownerNonceSha256, "so one association");
     } finally { leaveClaudeHookSessionOwner(); process.chdir(cwd); }
+  }) },
+  { id: "SAR06", name: "a State route the companion has not adopted runs while a catalogue exists and nothing is in flight; an unreadable State producer refuses naming the repair (PF-54, D52 (2))", run: () => fixture(({ root }) => {
+    const { repository } = course(root);
+    assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
+    const state = (...argv) => {
+      const lines = [], saved = { log: console.log, error: console.error, warn: console.warn };
+      for (const key of Object.keys(saved)) console[key] = (...args) => { lines.push(args.map(String).join(" ")); };
+      let status;
+      try { status = runState(argv, { dir: root }); } finally { Object.assign(console, saved); }
+      return { status, text: lines.join("\n") };
+    };
+    const subject = () => state("prepare-push-subject", "--by", "Synthetic fixture", "--remote", "origin", "--destination", "refs/heads/main");
+    const admitted = subject();
+    assert.doesNotMatch(admitted.text, /State authority route unavailable/u, admitted.text);
+    assert.match(admitted.text, /prepare-push-subject/u, "the route itself answered");
+    writeFileSync(join(repository.commonDir, "agent-pipeline/session-authority/producers/onboarding-continuity.json"), "{");
+    const refused = subject();
+    assert.equal(refused.status, 2);
+    assert.match(refused.text, /State authority route unavailable \(SDC-AUTHORITY-UNAVAILABLE: state-producer-unreadable\)/u, refused.text);
+    assert.match(refused.text, /Repair: node \S+session-authority-repair\.mjs inspect --root /u, refused.text);
   }) },
 ];
 
