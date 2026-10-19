@@ -18,5 +18,12 @@ exact change and why no agent can make it. Updated as entries are added or done.
 |---|---|---|
 | T1 | Look in your real `~/.gemini/agent-pipeline/installed-plugin-attestations/` for `.json` / `.source.json` files that name a `scratch/agy-p18-02-first-start-*` path, and delete those by hand. | On 2026-10-19 the AC-111 pin was run once before its fix (2a51b7cdb). That run executed the real receipt writer against the real HOME. Agents may not read or change the real home, so only you can check. Every later run is confined to the fixture home. |
 
+## PO decisions to take (collected, no action until decided)
+
+| # | Question | Facts | Options |
+|---|---|---|---|
+| Q1 | How are the Alfred background Goldfish dispatches recorded for close? | No `dispatch-record-*.json` exists for any `ALF-*` dispatch since 2026-10-09. A background Agent call never leaves the pending host observation that `dispatch-record-write.mjs` needs: every launch hook reports `NGHF-PENDING-UNAVAILABLE`. Each commit carries `Dispatch: <id> (goldfish)` and `Commit-Act: orchestrator`, and the orchestrator verified each one with a counted run. The close coordinator's Critic-evidence check is scoped by dispatch records. | (a) Accept the trailer plus the orchestrator's counted run as the authorship record for this sprint, and give the close route a typed path for it (code change, Critic). (b) Re-run the remaining dispatches in the foreground, which writes records but serialises the work. (c) Write records retroactively. That is not possible without host observations and would be fabricated, so it is not recommended. |
+| Q2 | A test run wrote into this checkout's live HGO ledger. | On 2026-10-19, one ALF-B4-HGO run with TMPDIR inside the checkout wrote one request and one `denied` audit entry under `.git/agent-pipeline/human-guard-overrides/`. Agents may not touch `.git`. Every later run uses a TMPDIR outside the checkout. | Keep the entry as a harmless audit trace, or remove it by hand. |
+
 Not a ceremony, but also waiting on the PO: a new candidate is stamped and pushed only when
 the PO calls for one (D18).
