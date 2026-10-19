@@ -32,6 +32,13 @@ text was not persisted when it was taken.
 | D28 (2026-10-19, Q2) | The one request and `denied` audit entry a test run wrote into this checkout's live HGO ledger stay as a harmless audit trace. | HGO ledger |
 | D29 (2026-10-19, Q3 b) | The catalog-bound half of AC-147/209 is required in 0.7.0. It needs a Codex-host session that builds and proves the authenticated catalog carrier, then a signed ceremony on `lib/guard/read-scope.mjs`. This reverses the split proposed in E28. | AC-147, AC-209 |
 | D30 (2026-10-19, Q4 b) | AC-264's plan-readiness hand-off clause is required in 0.7.0: a design spike, then a signed ceremony on the protected `scripts/pipeline-state.mjs`. | AC-264 |
+| D31 (2026-10-19, G6) | An approved Spec that is edited gets a pre-edit warning, a typed self-revert route that restores the approval, and a Spec amendment route that is approved on its own without reopening the design course. A part that needs the protected `scripts/pipeline-state.mjs` goes through a signed ceremony. | AC-115, Claude P1-6 |
+| D32 (2026-10-19, test base) | Test fixtures keep living inside the repository (`scratch/test-tmp/` through `lib/test-tmpdir.mjs`), because a base outside the repository brings back write-guard refusals and unknown host layouts. They are secured instead: a fixture must be its own repository or be refused before any write (containment assertion and tripwire), and production Git discovery must honour the fixture ceiling. This replaces the "runner refuses a TMPDIR inside a checkout" fix shape. | fixture-escape blockers |
+
+The PO also confirmed for G7 that one Goldfish keeps writing both the tests and the
+implementation of an item (item-owned EGM, independence from execution and a fresh Critic),
+and that the order matters: tests first, then implementation. The exact enforcement is
+proposed in the next decision block.
 
 D12 is an Elephant decision within accepted scope (PF-23 asked for a durable fix and a
 repair option; only a delivery-side widening is both). It changes the closed criterion
