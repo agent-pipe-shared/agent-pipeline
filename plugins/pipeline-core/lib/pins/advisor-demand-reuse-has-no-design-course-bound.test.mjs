@@ -20,9 +20,9 @@
  * modules carrying the defect, selected through the two env overrides below; production is
  * never edited.
  *
- * Host limitation (K7): the coordinator export-consent case needs the managed-process fixture
- * and the file-mode case needs POSIX mode bits; both are skipped on native Windows, owner
- * Coordinator, due 2026-10-19, for the Linux/WSL run.
+ * Host limitation (K7): the file-mode case needs POSIX mode bits and the two managed-launch cases
+ * need the managed-process fixture; they are skipped on native Windows, owner Coordinator, due
+ * 2026-10-19, for the Linux/WSL run. The export-consent case runs on every host.
  */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -325,20 +325,50 @@ test("A6: the course initial context needs actual provenance and does not mint a
   } finally { f.close(); }
 });
 
-test("A6: export consent denial leaves the course consumed with zero attempts (coordinator, managed-process fixture)", { skip: WIN ? HOST_LIMITATION + "; coordinator fixture CRHS-INPUT on win32" : false }, async t => {
-  const { advisorHostFixture } = await import(pathToFileURL(join(lib, "codex-advisor-host.fixture.mjs")).href);
+// Runs on every host: no managed child process and no Linux-only readiness host store are needed,
+// because a denial after the course opened is decided by the sealed admission seam alone. The
+// first export decision belongs to the pre-course source-metadata gate (a denial there refuses
+// without opening a course); the second belongs to the post-course initial admission, which is the
+// path that must consume the course with zero attempts.
+test("A6: export consent denial leaves the course consumed with zero attempts (coordinator, sealed admission seam)", async () => {
+  const { execFileSync } = await import("node:child_process");
+  const { createHash } = await import("node:crypto");
   const { coordinateInitialDesignAdvisory } = await import(pathToFileURL(join(lib, "design-advisory-coordinator-v2.mjs")).href);
   const { createCodexAdvisorExecution } = await import(pathToFileURL(join(lib, "codex-advisor-execution.mjs")).href);
-  const args = f => ({ repoRoot: f.root, featureId: "advisor-feature", authoringDispatchId: "elephant-author", sources: f.sources, reason: "risk-review", profile: "feature", dispatch: f.args.dispatch, route: f.route, hostExecution: f.execution });
-  const g = advisorHostFixture(t), admission = { ...g.admission, admitHostExport: () => ({ decision: "denied" }) };
-  const exec = createCodexAdvisorExecution({ repoRoot: g.root, trustedExecutablePath: process.execPath, inputDirectory: g.input, admission });
-  const denied = await coordinateInitialDesignAdvisory({ ...args(g), hostExecution: exec });
-  assert.equal(denied.status, "unavailable-pending-final-approval");
-  assert.equal(denied.course.outcome, "permission-denied");
-  assert.equal(denied.course.attempts.length, 0);
-  assert.equal(denied.failureEvidence.childStarted, false);
-  const again = await coordinateInitialDesignAdvisory({ ...args(g), hostExecution: createCodexAdvisorExecution({ repoRoot: g.root, trustedExecutablePath: process.execPath, inputDirectory: g.input, admission: g.admission }) });
-  assert.equal(again.code, "DAC2-COURSE-ALREADY-EXISTS");
+  mkdirSync(repoScratch, { recursive: true });
+  const root = realpathSync(mkdtempSync(join(repoScratch, "advisor-consent-pin-")));
+  try {
+    const git = a => execFileSync("git", a, { cwd: root, timeout: 10000, stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
+    git(["init", "--quiet"]); git(["config", "user.email", "fixture@example.invalid"]); git(["config", "user.name", "Synthetic fixture"]);
+    const sources = Object.fromEntries(SOURCE_NAMES.map(n => {
+      const content = `Synthetic ${n} document.\n`; writeFileSync(join(root, `${n}.md`), content);
+      return [n, { path: `${n}.md`, sha256: createHash("sha256").update(content).digest("hex") }];
+    }));
+    writeFileSync(join(root, "pipeline.user.yaml"), "advisor_export:\n  consent: approved\n");
+    git(["add", ...SOURCE_NAMES.map(n => `${n}.md`)]); git(["commit", "--quiet", "-m", "Synthetic sources"]);
+    const commit = git(["rev-parse", "HEAD"]), tree = git(["rev-parse", "HEAD^{tree}"]);
+    const dispatch = { dispatchId: "advisor-fixture", queueRevision: 0, candidateCommit: commit, candidateTree: tree };
+    const route = { model: "fixture-model", effort: "high", sourceSha256: "b".repeat(64), candidateCommit: commit };
+    const admissionWith = exportDecisions => {
+      const calls = { export: 0 };
+      return { calls, admission: { requireReady: () => ({ status: "ready" }), observeCurrentMetadata: m => m, observeRegisteredRoute: m => m.route,
+        admitHostExport: () => ({ decision: exportDecisions[Math.min(calls.export++, exportDecisions.length - 1)] }) } };
+    };
+    const execute = admission => coordinateInitialDesignAdvisory({ repoRoot: root, featureId: "advisor-feature", authoringDispatchId: "elephant-author", sources, reason: "risk-review", profile: "feature", dispatch, route,
+      hostExecution: createCodexAdvisorExecution({ repoRoot: root, trustedExecutablePath: process.execPath, inputDirectory: root, admission }) });
+    const deny = admissionWith(["approved", "denied"]);
+    const denied = await execute(deny.admission);
+    assert.equal(denied.status, "unavailable-pending-final-approval", JSON.stringify(denied));
+    assert.equal(deny.calls.export, 2);
+    assert.equal(denied.course.outcome, "permission-denied");
+    assert.equal(denied.course.attempts.length, 0);
+    assert.equal(denied.failureEvidence.childStarted, false);
+    assert.equal(denied.failureEvidence.inputSubmitted, false);
+    assert.equal(denied.failureEvidence.attemptCount, 0);
+    // the consumed course is not reopened by a later, fully consenting attempt
+    const again = await execute(admissionWith(["approved"]).admission);
+    assert.equal(again.code, "DAC2-COURSE-ALREADY-EXISTS");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("A5: file-mode drift of private course metadata fails closed (needs POSIX mode bits)", { skip: WIN ? HOST_LIMITATION + "; chmod mode bits unavailable on win32" : false }, async () => {
