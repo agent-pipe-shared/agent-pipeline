@@ -198,9 +198,44 @@ test("AC-270 P4: the helper imports only the existing adapter (no second policy)
   assert.ok(suites.includes("plugins/pipeline-core/lib/test-private-tmp.test.mjs"), "the helper's own contract suite stays registered");
 });
 
-test("AC-270 host-limitation: POSIX branch hardens with chmod 0700 (mode bits)", { skip: POSIX_ONLY }, () => {
-  const report = runScenario(HELPER_URL);
-  assert.equal(report.rootCode, null);
+// Child scenario for the POSIX branch: no Windows adapter observation exists off win32, so it reports mode bits instead.
+const POSIX_SCENARIO = [
+  'import { statSync, writeFileSync } from "node:fs";',
+  'import { join } from "node:path";',
+  "const helper = await import(process.argv[1]);",
+  "const root = helper.privateTempRoot();",
+  "const child = helper.privateMkdtemp('pin-posix-child-');",
+  "const file = join(child, 'f.txt');",
+  "writeFileSync(file, 'x');",
+  "const out = { root, child, rootMode: statSync(root).mode & 0o777, childIsDir: statSync(child).isDirectory(), childInsideRoot: child.startsWith(root), fileSize: statSync(file).size };",
+  'process.stdout.write(JSON.stringify(out) + "\\n");',
+].join("\n");
+
+test("AC-270 POSIX branch hardens with chmod 0700 (mode bits), executed unconditionally on POSIX", { skip: POSIX_ONLY }, () => {
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", POSIX_SCENARIO, HELPER_URL], {
+    encoding: "utf8", timeout: 180_000, shell: false, windowsHide: true,
+  });
+  assert.equal(result.error, undefined, `child must start: ${result.error?.message}`);
+  assert.equal(result.status, 0, `child must exit 0 (status=${result.status}): ${result.stderr}`);
+  const lines = result.stdout.trim().split(/\r?\n/);
+  const report = JSON.parse(lines[lines.length - 1]);
+  assert.equal(report.rootMode, 0o700, "the private root is owner-only (0700)");
+  assert.equal(report.childIsDir, true);
+  assert.equal(report.childInsideRoot, true, "privateMkdtemp places the child inside the private root");
+  assert.equal(report.fileSize, 1);
+});
+
+// ---- P2 (any host): the helper contract against a simulated Windows observation --------------------------------------
+// An owner-only, non-inheriting DACL observation (what the helper's hardening produces) is rated secure by the
+// UNCHANGED evaluator for root, child and file; the inherited os.tmpdir() shape (extra principals) is not.
+
+test("AC-270 P2 (simulated observation): owner-only observations of root, child dir and file are rated secure; an inherited os-temp shape is not", () => {
+  for (const kind of ["root", "child dir", "file"]) {
+    assert.equal(evaluateWindowsPrivateState(observation(["HOST\\Tester"])).status, "secure", `${kind}: owner-only DACL is secure`);
+  }
+  const inherited = evaluateWindowsPrivateState(observation(["HOST\\Tester", "NT AUTHORITY\\SYSTEM", "BUILTIN\\Users"]));
+  assert.equal(inherited.status, "insecure", "the inherited os.tmpdir() DACL shape stays insecure (P1 premise, no policy change)");
+  assert.match(inherited.reason, /non-owner principal/);
 });
 
 // ---- P6 (win32): retention-parent check is platform-correct (ALF-C-P22-06H) ---------------------------------------------
