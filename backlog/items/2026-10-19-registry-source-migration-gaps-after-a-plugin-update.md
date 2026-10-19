@@ -29,6 +29,11 @@ gaps remain.
   readers in `codex-host-process-journal.mjs` and `onboarding-continuity.mjs` (the AFK
   physical check) read the catalogue without entering a boundary. Until a boundary entry has
   migrated a stale catalogue, they still refuse it.
+- **The rebind keeps the stored baselines.** The rebind is checked against every producer's
+  `reconcile`, and if the check fails the migration falls back to a fresh start. The check
+  can be skipped, though: when a producer port cannot be created at migration time, the
+  rebind stays unchecked. A fresh start also loses the old release records, so a native
+  pending reservation of the same item can then collide (`item-delivery-owner-collision`).
 - **No migration at preflight.** A preflight or `claude --resume` does not migrate. The first
   dispatch, readiness read or denial does.
 - **PF-50 reach (Critic F1).** The Claude hook identity anchor is skipped by cleanup recovery

@@ -170,6 +170,11 @@ function rebindSourceUpdatedRegistry(repo,catalogue,aside,expected){
   const value={...catalogue,participants:expected,participantSetSha256,producers:rows.map(row=>({producerId:row.participant.producerId,producerRef:row.record.ref,producerGeneration:row.record.value.generation}))};
   const state={catalogue:{value,ref:publish(repo,cataloguePath,value)},rows};
   for(const t of targets.values())refreshCertificates(repo,state,t);
+  // A version that derives a producer baseline differently would fail namespace-drift at the next
+  // read, so the rebind is checked against the producers themselves; a fault falls back to fresh.
+  let ports=null;
+  try{ports=definitions.map(def=>({producerId:def[0],port:def[1][`create${def[2]}AuthorityProducerPort`]({repository:repo})}));}catch{ports=null;}
+  if(ports)stateRead(repo,portsFor(repo,ports));
   return true;
 }
 function migrateSourceUpdatedCatalogue(repo){
