@@ -13,7 +13,7 @@ const mode=path=>lstatSync(path).mode&0o777;
 function bindingContext(repoFingerprint,onFingerprint=()=>{}){return {get repoFingerprint(){onFingerprint();return repoFingerprint;},dispatchId:'synthetic',candidate:{commit:'c'.repeat(40),tree:'d'.repeat(40)},sources:{},route:{},requestSha256:'e'.repeat(64),reportSha256:'f'.repeat(64)};}
 test('Readiness shared parent: actual sanctioned GUID mint leaves0755 shared parent and private descendants unchanged',async t=>{
  const {common,root}=sharedFixture(t),repoFingerprint=await readLocalRepositoryFingerprint({repositoryRoot:root}),shared=join(common,'agent-pipeline'),binding=join(shared,'governance-events','repository-binding.json'),before=readFileSync(binding);
- assert.equal(mode(shared),0o755);const store=createCodexDesignReadinessHostStore({gitCommonDir:common,repoFingerprint});
+ assert.equal(mode(shared),0o700);chmodSync(shared,0o755);assert.equal(mode(shared),0o755);const store=createCodexDesignReadinessHostStore({gitCommonDir:common,repoFingerprint});
  assert.equal(mode(shared),0o755);assert.equal(mode(dirname(dirname(store.processRoot))),0o700);assert.equal(mode(dirname(store.processRoot)),0o700);assert.equal(mode(store.processRoot),0o700);assert.equal(mode(join(dirname(store.processRoot),'receipts')),0o700);
  assert.deepEqual(readFileSync(binding),before);let evaluated=0;assert.equal(store.readForBinding(ID,bindingContext(repoFingerprint,()=>evaluated++)),null);assert.equal(evaluated,1);
 });
