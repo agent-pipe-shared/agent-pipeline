@@ -1,5 +1,6 @@
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
-import { withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
+import { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
 // SPDX-License-Identifier: SUL-1.0
@@ -40,6 +41,20 @@ const MAX_BYTES = 128 * 1024;
 const SUBDIRS = ["agent-pipeline", "run", "native-goldfish-host-commit"];
 
 function fail(code) { return { ok: false, code }; }
+// Names each held dependency with the cause that actually holds it (Critic F1): only a deliverable,
+// non-cancelled slice can be released by a "Dispatch: <slice> (goldfish)" commit.
+export function heldDependencyReason(held, slices) {
+  const why = id => {
+    const row = slices.find(entry => entry.id === id);
+    if (!row) return `${id} (not in the queue)`;
+    if (row.state === "cancelled") return `${id} (cancelled; a dependency on a cancelled slice keeps holding)`;
+    if (row.tier === "critic") return `${id} (critic slice)`;
+    if (!/^[0-9a-f]{40}$/u.test(row.delivery?.baseCommit ?? "")) return `${id} (no delivery base; not deliverable by commit evidence)`;
+    if (row.state !== "ready") return `${id} (state ${row.state})`;
+    return `${id} (no "Dispatch: ${id} (goldfish)" commit after its base touches its write scope)`;
+  };
+  return `held on ${held.slice(0, 3).map(why).join("; ")}${held.length > 3 ? `; and ${held.length - 3} more` : ""}`;
+}
 // PF-42: a refusal names the exact line shape the briefing needs, so the caller does not have to guess it.
 function itemNotReadyReason(named, item) {
   if (named.sliceId === null) return "the briefing names no single slice: field 6 (dispatch metadata) needs exactly one line `- Slice: <slice id>` and one line `- Write scope: <path>, <path>` matching the queue row";
@@ -184,7 +199,7 @@ export function prepareNativeGoldfishHostState({ root, runner, input, subagentSt
     if(item.dependsOn.length>0){const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
       if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`};
       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
-      if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`held on ${held.slice(0,4).join(', ')}${held.length>4?` and ${held.length-4} more`:''}: no commit with a "Dispatch: <slice> (goldfish)" trailer after that slice's base touches its write scope`};}
+      if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices)};}
     if (item.delivery.baseCommit !== binding.candidateCommit) return fail("NGHS-ITEM-BASE-MISMATCH");
     // Native adapters currently carry literal file paths. A glob/prefix queue
     // requires a separately admitted concrete path amendment; do not guess it.
@@ -671,8 +686,11 @@ function publishNativeAuthorityState(commonDir,name,state){
   const repository=inspectSignedDescriptorCustodyRepository(state.root);
   if(repository.commonDir!==commonDir)throw nativeManagedFault('native-authority-common-drift');
   if(!nativeManagedRegistryPresent(repository)) {
-    if(state.delivery)throw nativeManagedFault('item-delivery-registry-required');
-    return writeExclusive(commonDir,name,state);
+    if(!state.delivery)return writeExclusive(commonDir,name,state);
+    // D44: no production route created the session-authority registry, so the first governed item
+    // dispatch in a real repository creates it here (idempotent), then continues on the registry path.
+    const initialized=initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+    if(!['initialized','already-initialized'].includes(initialized.status)||!nativeManagedRegistryPresent(repository))throw nativeManagedFault('item-delivery-registry-initialization-failed');
   }
   const owner=nativeAuthorityOwner(repository),current=nativeManagedCurrentOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
   const handle=Object.freeze({}),operation={handle,name,association:current.association,
@@ -1004,7 +1022,13 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const canRebindReady=existing&&existing.state==='ready'&&existing.delivery?.status!=='unbound-legacy'&&existing.delivery?.itemId===itemDelivery.itemId
         &&nativeManagedDigest(existing.delivery?.criteria)===nativeManagedDigest([locator.criterionId])&&nativeManagedDigest(existing.writeScope)===nativeManagedDigest(writeScope);
       if(existing?.delivery?.status!=='unbound-legacy'&&existing&&!canRebindLegacy&&!canRebindReady){
-        if(nativeManagedDigest(existing.delivery)!==nativeManagedDigest(delivery)||nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope))throw nativeManagedFault('item-course-existing-binding-drift');
+        if(nativeManagedDigest(existing.delivery)!==nativeManagedDigest(delivery)||nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope)){
+          // PF-47: nothing was written; name the queue row the binding must match instead of a generic authority fault.
+          const differs=[existing.state!=='ready'?`state ${existing.state}`:null,nativeManagedDigest(existing.writeScope)!==nativeManagedDigest(writeScope)?'write scope':null,
+            existing.delivery?.itemId!==itemDelivery.itemId?'item':null,nativeManagedDigest(existing.delivery?.criteria)!==nativeManagedDigest([locator.criterionId])?'criterion':null].filter(Boolean);
+          return {status:'refused',code:'SQ-ITEM-BINDING-DRIFT',reason:`the binding for ${existing.id} differs from its queue row in ${differs.join(', ')||'its delivery binding'}`,
+            repair:existing.state==='ready'?`rebind with exactly the queue row's write scope (one --path each): ${(existing.writeScope??[]).join(', ')}`:`slice ${existing.id} is ${existing.state}; it cannot be rebound`};
+        }
         return resolveGovernedItemQueue({root:physical});
       }
       if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];}

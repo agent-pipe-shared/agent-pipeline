@@ -11,7 +11,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { bindNativeCodexStart, prepareNativeGoldfishHostState,
   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
-import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort } from "./native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort, heldDependencyReason } from "./native-goldfish-host-state.mjs";
 import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
@@ -741,6 +741,38 @@ const cases = [
     assert.equal(sessionAuthorityRegistryAbsent(Object.assign(new Error("EACCES"), { code: "EACCES", path: thrown.path })), false, "an unreadable catalogue is a fault");
     assert.equal(sessionAuthorityRegistryAbsent(null), false);
   }) },
+
+  { id: "NGHS27", name: "a governed item dispatch in a repository whose session-authority registry was never created initializes it once and is admitted; readiness is then observed (D44)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    assert.equal(existsSync(join(repository.commonDir,'agent-pipeline/session-authority/catalogue.json')),false,'the fixture starts without a registry, like a real repository');
+    const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+    const binding={...makeBinding({dispatchId:'DELIVER-AC-1',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
+    const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});
+    input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
+    const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));assert.equal(prepared.ok,true,JSON.stringify(prepared));
+    assert.equal(existsSync(join(repository.commonDir,'agent-pipeline/session-authority/catalogue.json')),true,'the first governed dispatch created the registry');
+    const observed=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));assert.equal(observed.status,'observed',JSON.stringify(observed));assert.equal(observed.nativeRegistry,'read');
+    // PF-47: a rebinding whose write scope differs from the queue row is refused with that cause and the exact repair.
+    const queuePath=join(root,'specs/unit/slice-queue.json'),before=readFileSync(queuePath,'utf8');
+    const drift=runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery,candidate:original.candidate,writeScope:['src/change.mjs','src/change.test.mjs']}));
+    assert.equal(drift.status,'refused',JSON.stringify(drift));assert.equal(drift.code,'SQ-ITEM-BINDING-DRIFT',JSON.stringify(drift));
+    assert.match(drift.reason,/ITEM-AC-1 differs from its queue row in write scope/u);assert.match(drift.repair,/: src\/change\.mjs$/u);
+    assert.equal(readFileSync(queuePath,'utf8'),before,'a refused rebinding leaves the queue untouched');
+  })},
+
+  { id: "NGHS28", name: "a held-dependency refusal names the actual cause per dependency (Critic F1)", run: () => {
+    const base = "a".repeat(40);
+    const slices = [{ id: "OPEN", state: "ready", tier: "implementor", delivery: { baseCommit: base } }, { id: "GONE", state: "cancelled", tier: "implementor", delivery: { baseCommit: base } },
+      { id: "REVIEW", state: "ready", tier: "critic", delivery: {} }, { id: "WAIT", state: "hold-po", tier: "implementor", delivery: { baseCommit: base } }];
+    const reason = heldDependencyReason(["OPEN", "GONE", "REVIEW"], slices);
+    assert.match(reason, /OPEN \(no "Dispatch: OPEN \(goldfish\)" commit/u);
+    assert.match(reason, /GONE \(cancelled/u);
+    assert.match(reason, /REVIEW \(critic slice\)/u);
+    assert.match(heldDependencyReason(["WAIT", "MISSING"], slices), /WAIT \(state hold-po\); MISSING \(not in the queue\)/u);
+    assert.match(heldDependencyReason(["OPEN", "GONE", "REVIEW", "WAIT", "MISSING"], slices), /; and 2 more$/u);
+  } },
 
 ];
 
