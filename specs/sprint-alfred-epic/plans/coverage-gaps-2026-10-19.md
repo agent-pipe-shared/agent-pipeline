@@ -48,7 +48,7 @@ copied from the source reports, and the source reports themselves stay local.
 - `codex-signed-candidate-worktree-admission` (accepted for the next local candidate; no delivery found)
 - `owned-gitignore-without-evidence-breaks-every-item-governed-host-commit` (open defect in the PF-26 flow)
 - `test-fixtures-inside-the-checkout-write-the-real-repository` (partial 4679f8a6d, dbd497fcc; tripwire clause unverified)
-- `restricted-governance-put-re-hardens-the-root-on-every-write` (in this candidate, D36: assess a secure root, repair an insecure one as today)
+- `restricted-governance-put-re-hardens-the-root-on-every-write` (after 0.7.0, D37 amends D36: no AC row, behaviour already correct)
 - `licensing-outlook-states-a-zero-price-today` (in this candidate, D36; final wording is the PO's)
 - `machine-wide-key-directory-resolution`, `typed-plugin-update-next-action`,
   `model-role-bootstrap-ignores-version-bumps-within-a-family`,
