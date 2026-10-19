@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
@@ -14,7 +15,10 @@ import { registeredModelFamilyTaskRoutes } from "./model-family-route-source.mjs
 import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
 import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
 import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
-import { prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+import { initializeSessionAuthorityRegistry } from "./session-authority-registry.mjs";
+import { nativeContractFixtureParent } from "./test-item-approved-course-fixture.mjs";
 
 const sha =(value) => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
 const runner = "codex";
@@ -224,12 +228,35 @@ async function realS4EntryFixture(initialModels, { familyId = "sol", selectedMod
   // (model-family-runtime-host.mjs store(): authorityRepositoryFromRoot(cwd).commonDir must equal the resolved common dir)
   // and reserves every lifetime in the initialized session-authority registry, under a Source requester context. A plain
   // temp directory is neither a repository nor a registry, so the fixture is a real checkout with an initialized registry
-  // and a controlled-method requester, the same shape model-family-main-prelaunch.test.mjs already uses.
-  const registry = prepareSessionAuthorityRegistryFixture({ prefix: "mfi-real-s4-" });
-  const repoDir = registry.repoDir;
-  const commonDir = registry.repository.commonDir;
-  const runtime = createControlledMethodRuntimeFixture({ repository: registry.repository,
+  // and a controlled-method requester, the same shape model-family-main-prelaunch.test.mjs already uses. ORDER MATTERS:
+  // the controlled-method runtime writes its requester descriptors into the checkout, and the registry initializes over
+  // the descriptors it finds. Initializing first (the shared prepareSessionAuthorityRegistryFixture helper does) leaves the
+  // later descriptors outside the registry baseline, so the first reservation refuses with
+  // SDC-AUTHORITY-CAS native-goldfish:namespace-drift. The runtime is therefore created BEFORE the registry initializes.
+  // The authority walk refuses a group/world-writable ancestor (a shared /tmp), so the checkout lives beneath the owned
+  // checkout's scratch/ (nativeContractFixtureParent), the same convention the native-goldfish fixtures use.
+  const repoDir = mkdtempSync(join(nativeContractFixtureParent(), "mfi-real-s4-"));
+  execFileSync("git", ["init", "-q"], { cwd: repoDir, stdio: "ignore" });
+  mkdirSync(join(repoDir, ".claude"), { recursive: true, mode: 0o700 });
+  writeFileSync(join(repoDir, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const stateRef = (path) => ({ path, sha256: "a".repeat(64) });
+  const continuity = { schema: "pipeline.continuity.v0", featureId: "unit", revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+    authority: { prd: stateRef("specs/unit/prd.md"), spec: stateRef("specs/unit/spec.md"), result: null },
+    queueHead: { packageId: "unit-package", actionId: "mfi-real-s4-fixture", nextAction: "dispatch", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, closeTransition: null,
+    capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+  writeFileSync(join(repoDir, ".claude/pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0",
+    activeFeature: { id: "unit", planPath: "specs/unit/prd.md", phase: "design" }, planApproved: false, continuity }), { mode: 0o600 });
+  const repository = inspectSignedDescriptorCustodyRepository(repoDir);
+  const commonDir = repository.commonDir;
+  mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
+  const runtime = createControlledMethodRuntimeFixture({ repository,
     fixtureRoot: join(commonDir, "agent-pipeline/controlled-method-fixtures/mfi-owner"), sessionId: "mfi-owner" });
+  const ports = createSessionAuthorityParticipantPorts({ repository });
+  for (const row of ports) assert.doesNotThrow(() => row.port.readBaseline(), row.producerId);
+  const initialized = initializeSessionAuthorityRegistry({ repository }, ports);
+  assert.equal(initialized.status, "initialized", JSON.stringify(initialized));
   let models = initialModels;
   let captureCount = 0;
   let admissionCount = 0;

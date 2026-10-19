@@ -10,6 +10,7 @@ const cases = [];
 function test(name, run) { cases.push({ id: `MFH${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
 import { canonicalizeJson } from "./governance-event.mjs";
 import { createModelFamilyRuntimeHost, observeModelFamilyActivation } from "./model-family-runtime-host.mjs";
+import { nativeContractFixtureParent } from "./test-item-approved-course-fixture.mjs";
 
 const noopSources = {
   readAuthorityInputs: () => ({ ok: false, code: "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED" }),
@@ -52,17 +53,24 @@ test("missing fixed store is physically inactive and observation creates no acti
 });
 
 test("valid activation marker is observed only with readable S4 state", () => {
-  const commonDir = mkdtempSync(join(tmpdir(), "family-runtime-active-"));
+  // Reading S4 state goes through store(), which binds the host store to the REAL Git authority repository
+  // (authorityRepositoryFromRoot(cwd).commonDir must equal the resolved common dir) and walks its ancestors; a bare
+  // temp directory is neither (the failure was swallowed into MODEL-FAMILY-STATE-UNCERTAIN at observeActivation).
+  // The checkout therefore lives beneath the owned checkout's scratch/ (nativeContractFixtureParent), because the
+  // authority walk refuses a group/world-writable ancestor such as a shared /tmp.
+  const repoDir = mkdtempSync(join(nativeContractFixtureParent(), "family-runtime-active-"));
   try {
+    execFileSync("git", ["init", "-q"], { cwd: repoDir, stdio: "ignore" });
+    const commonDir = join(repoDir, ".git");
     writeActiveState(commonDir);
-    const host = createModelFamilyRuntimeHost({ cwd: commonDir, resolveCommonDir: () => commonDir,
+    const host = createModelFamilyRuntimeHost({ cwd: repoDir, resolveCommonDir: () => commonDir,
       trustedSources: noopSources });
     const result = host.observeActivation();
     assert.equal(result.ok, true, result.code);
     assert.equal(result.status, "active");
     assert.equal(result.authoritySha256, authoritySha256);
     assert.equal(result.stateGeneration, 0);
-  } finally { rmSync(commonDir, { recursive: true, force: true }); }
+  } finally { rmSync(repoDir, { recursive: true, force: true }); }
 });
 
 test("corrupt marker, lost active state and symlink parent return uncertainty rather than inactive", () => {
