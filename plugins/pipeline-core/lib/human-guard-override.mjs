@@ -4972,9 +4972,23 @@ function consumeHumanGuardOverrideCore({
       let nativeTargetDrift = false;
       if (capability.schema === NATIVE_CAPABILITY_SCHEMA) {
         try {
-          const reclassified = eligibility(repo.root, toolName, toolInput, { selectedAuthorSourceRoot: capability.authorSourceRoot });
-          if (!reclassified.eligible || canonical(reclassified.paths) !== canonical(capability.eligiblePaths)
-            || !(reclassified.mode === "standard" || reclassified.authorCandidate === true)) nativeTargetDrift = true;
+          // ALF-B6-HGO: the tool call is reclassified from the SAME vantage point
+          // recordHumanGuardDenial() classified it from. Under the cross-repository class that
+          // is the coordinating session's own root, not the bound target repository: against
+          // the target the identical absolute paths read as an in-root patch with relative
+          // paths and could never equal the recorded set. Every other class keeps the bound
+          // root. The kind must also be the recorded kind, not merely any admissible kind: a
+          // standard capability needs a standard reclassification of its recorded command
+          // class, an author-repair capability needs the fully resolved author-repair
+          // reclassification over its own bound source root.
+          const reclassified = eligibility(
+            capability.commandClass === "cross-repository-target" ? physicalRoot(rootDir) : repo.root,
+            toolName, toolInput, { selectedAuthorSourceRoot: capability.authorSourceRoot });
+          const sameKind = capability.mode === "pipeline-author-repair"
+            ? reclassified.mode === "pipeline-author-repair" && reclassified.sourceRoot === capability.authorSourceRoot
+            : reclassified.mode === "standard"
+              && (reclassified.commandClass ?? "exact-project-action") === capability.commandClass;
+          if (!reclassified.eligible || canonical(reclassified.paths) !== canonical(capability.eligiblePaths) || !sameKind) nativeTargetDrift = true;
           assertNativeTargets(repo.root, capability);
         } catch { nativeTargetDrift = true; }
       }

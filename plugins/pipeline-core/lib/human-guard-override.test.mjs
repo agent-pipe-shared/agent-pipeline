@@ -727,7 +727,10 @@ test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact m
 test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() stays unresolved for a digest that matches no stored request", () => {
   const root = fixtureSignature();
   try {
-    const stored = prepareSignedArming(root, { toolName: "Write", toolInput: { file_path: "notes.md", content: "unrelated\n" }, denials: denial });
+    // ALF-B6-HGO (QG-04): prepareSignedArming() defaults nowMs to the epoch, while prepareHumanGuardOverrideForSignature()
+    // below reads the real clock, so an epoch-stamped request reads as expired and the index is never published.
+    // Stamp the request with the real clock exactly as the resolve case above does; the claim is unchanged.
+    const stored = prepareSignedArming(root, { toolName: "Write", toolInput: { file_path: "notes.md", content: "unrelated\n" }, denials: denial, nowMs: Date.now() });
     // ALF-B5-HGO (QG-04, E22): publish the stored request's disclosure index (see the resolve case above), so the
     // store is genuinely non-empty and the unknown digest is unresolved because it is unknown, not because nothing is indexed.
     prepareHumanGuardOverrideForSignature({
@@ -4769,16 +4772,19 @@ test("HGO multi-file apply binds one complete external-repository path set and f
       expected,
       "path-set binding stays canonical even when patch sections are reordered",
     );
-    // ALF-B4-HGO (QG-04): a different tool input against an armed NATIVE capability now gets the newer
-    // typed verdict (replan / HGO-DRIFT, the same verdict the SIGDISCLOSE-1 F6 native case receives)
-    // instead of a bare "absent". The claim is unchanged: the reordered text is refused and consumes
+    // ALF-B6-HGO (QG-04): the earlier ALF-B4-HGO retarget of this verdict to replan / HGO-DRIFT recorded a
+    // defect, not a contract: the consume-time reclassification read the bound target root, found the
+    // recorded absolute path set missing, and reported drift for EVERY input, the exact bound one included.
+    // With the reclassification taken from the recording vantage point the reordered text no longer drifts;
+    // it is refused on its tool-input digest alone, the typed verdict NOVA-HGOELIG-3 pins for a different
+    // command (replan / HGO-INPUT-MISMATCH, not a bare "absent"). The refusal is unchanged and consumes
     // nothing -- the exact bound input still consumes just below.
     const reorderedConsume = consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
       toolInput: reorderedInput, denials: denial, nowMs: 3500,
     });
     assert.equal(reorderedConsume.status, "replan", "the exact tool-input digest must reject reordered patch text");
-    assert.equal(reorderedConsume.code, "HGO-DRIFT");
+    assert.equal(reorderedConsume.code, "HGO-INPUT-MISMATCH");
     const boundConsume = consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
       toolInput: boundInput, denials: denial, nowMs: 4000,
