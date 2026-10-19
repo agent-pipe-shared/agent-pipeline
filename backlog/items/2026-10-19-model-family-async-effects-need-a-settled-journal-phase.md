@@ -56,6 +56,10 @@ error as the cause in the registry boundary's finally block.
 - These red cases turn green with a counted result and no assertion weakened:
   - MFI012 and MFI013 (`model-family-invocation.test.mjs`);
   - MFMP003 (`model-family-main-prelaunch.test.mjs`);
+  - CADH001 (`scripts/codex-design-advisor-host.test.mjs`) and the readiness-host case
+    "active readiness carries immutable prompt through real signed S4/S2/S5 and accepts only S6
+    actual identity" (`scripts/codex-design-readiness-host.test.mjs`) (E32; both measured by
+    ALF-B12-MFX as `domain-transition-partial-effect-retained` after admission);
   - MFHS002 to MFHS008 (`model-family-host-store.test.mjs`);
   - CCH136 (`codex-critic-host.test.mjs`).
 - A refusal case keeps proving that an effect still held when the lifecycle closes is
