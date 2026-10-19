@@ -2911,3 +2911,134 @@ for (const startingLifecycle of ['approved', 'implementing']) {
   console.log(`PASS ${startingLifecycle} choice reopens real design and invalidates exact approval; chained change`);
 }
 console.log('PROFILE R3 focused regressions complete.');
+
+// ---------------------------------------------------------------------------------------------------------------
+// AC-264 / D30 (ALF-B27-D30): plan readiness proves the delivery hand-off BEFORE the PO approves the plan.
+// R1-R6 drive lib/plan-handoff-readiness.mjs directly. The submit-plan / present-plan call sites live in the
+// protected scripts/pipeline-state.mjs and land through a signed ceremony; this block pins the unprotected
+// inspection those call sites invoke. Namespace imports and per-case isolation: a missing export fails its own
+// case (and is listed by name) instead of aborting the loading of this whole file.
+// ---------------------------------------------------------------------------------------------------------------
+const handoff = await import("../lib/plan-handoff-readiness.mjs");
+const acceptedContract = await import("../lib/critic-accepted-contract.mjs");
+const { createGovernanceScopeController } = await import("../lib/governance-scope.mjs");
+const HANDOFF_SPEC = "specs/handoff-fixture/spec.md";
+const HANDOFF_TABLE = [
+  "| Nr. | Kriterium |", "| --- | --- |",
+  "| 1 | Das System speichert jede Bestellung mit Zeitstempel. |",
+  "| R-2 | Das System zeigt den Warenkorb mit allen gewählten Produkten an. |",
+];
+const handoffSpec = (...extra) => ["# Spezifikation Bestell-App", "", "## Abnahmekriterien", "", ...HANDOFF_TABLE, "", ...extra, ""].join("\n");
+const handoffFailures = [];
+
+function handoffFixture({ governed = true, specText = handoffSpec(), gitignore = "", files = {} } = {}) {
+  const root = mktempProjectDir();
+  const hostBase = mkdtempSync(join(tmpdir(), "d30-handoff-host-"));
+  mkdirSync(join(root, "specs", "handoff-fixture"), { recursive: true });
+  writeFileSync(join(root, ".gitignore"), gitignore);
+  writeFileSync(join(root, HANDOFF_SPEC), specText);
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(join(root, path, ".."), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
+  const staged = spawnSync("git", ["add", "--", ".gitignore", HANDOFF_SPEC, ...Object.keys(files)], { cwd: root, encoding: "utf8" });
+  assert.equal(staged.status, 0, `SETUP git add: ${staged.stderr}`);
+  if (governed) {
+    const governance = createGovernanceScopeController({ hostStateRoot: join(hostBase, "state") });
+    const decision = governance.planDecision({ rootDir: root, decision: "enroll", by: "d30-handoff-fixture" });
+    assert.equal(governance.applyDecision(decision, { activate: true, planSha256: decision.planSha256 }).state, "active", "SETUP governance enrollment");
+  }
+  const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const inspect = (over = {}, deps) => {
+    assert.equal(typeof handoff.inspectPlanDeliveryHandoff, "function", "lib/plan-handoff-readiness.mjs must export inspectPlanDeliveryHandoff");
+    return handoff.inspectPlanDeliveryHandoff({ rootDir: root, specPath: HANDOFF_SPEC, expectedSpecSha256: sha(readFileSync(join(root, HANDOFF_SPEC))), ...over }, deps);
+  };
+  return { root, sha, inspect, cleanup: () => { rmSync(root, { recursive: true, force: true }); rmSync(hostBase, { recursive: true, force: true }); } };
+}
+
+function handoffCase(name, body) {
+  try { body(); console.log(`PASS ${name}`); } catch (error) { handoffFailures.push(name); console.error(`FAIL ${name}: ${error?.message ?? error}`); }
+}
+
+function withHandoffFixture(options, body) {
+  const fixture = handoffFixture(options);
+  try { body(fixture); } finally { fixture.cleanup(); }
+}
+
+handoffCase("R1 an ungoverned project is skipped before the Spec is even read (PLR-NO-GOVERNANCE)", () => {
+  withHandoffFixture({ governed: false, specText: "# Spec without any criterion\n" }, (fixture) => {
+    const result = fixture.inspect();
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.skipped, true);
+    assert.equal(result.code, "PLR-NO-GOVERNANCE");
+  });
+});
+
+handoffCase("R2 a governed Spec with n / R-n German table rows and .test.js checks is ready; absent greenfield checks are admitted", () => {
+  const spec = handoffSpec("## Prüfungen", "", "- tests/orders.test.js (vorhanden)", "- tests/neu.test.js (noch nicht vorhanden)");
+  withHandoffFixture({ specText: spec, files: { "tests/orders.test.js": "// present\n" } }, (fixture) => {
+    const result = fixture.inspect();
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.code, "PLR-HANDOFF-READY");
+    assert.deepEqual(result.admittedCriteria, ["AC-1", "AC-2"]);
+    assert.deepEqual(result.checks, [{ path: "tests/neu.test.js", state: "absent" }, { path: "tests/orders.test.js", state: "present" }]);
+  });
+});
+
+handoffCase("R3 a governed Spec with no admitted criterion row is refused (PLR-HANDOFF-NO-CRITERION)", () => {
+  for (const specText of ["# Spezifikation\n\nKeine Kriterien hier.\n", ["# Spezifikation", "", "## Beispiele", "", ...HANDOFF_TABLE, ""].join("\n")]) {
+    withHandoffFixture({ specText }, (fixture) => {
+      const result = fixture.inspect();
+      assert.equal(result.ok, false, JSON.stringify(result));
+      assert.equal(result.code, "PLR-HANDOFF-NO-CRITERION");
+    });
+  }
+});
+
+handoffCase("R4 an unreadable, drifted, symlinked or non-UTF-8 Spec is refused (PLR-HANDOFF-SPEC-UNREADABLE)", () => {
+  withHandoffFixture({}, (fixture) => {
+    const code = (over) => fixture.inspect(over).code;
+    assert.equal(code({ specPath: "specs/handoff-fixture/missing.md" }), "PLR-HANDOFF-SPEC-UNREADABLE");
+    assert.equal(code({ expectedSpecSha256: "0".repeat(64) }), "PLR-HANDOFF-SPEC-UNREADABLE");
+    assert.equal(code({ specPath: "docs/outside-specs.md" }), "PLR-HANDOFF-SPEC-UNREADABLE");
+    symlinkSync("spec.md", join(fixture.root, "specs/handoff-fixture/link.md"));
+    assert.equal(code({ specPath: "specs/handoff-fixture/link.md" }), "PLR-HANDOFF-SPEC-UNREADABLE");
+    const invalid = Buffer.from([0xff, 0xfe, 0x41, 0x0a]);
+    writeFileSync(join(fixture.root, "specs/handoff-fixture/bad.md"), invalid);
+    assert.equal(code({ specPath: "specs/handoff-fixture/bad.md", expectedSpecSha256: fixture.sha(invalid) }), "PLR-HANDOFF-SPEC-UNREADABLE");
+  });
+});
+
+handoffCase("R5 a check path that cannot be delivered is refused: bad shape (UNADMITTED) and git-ignored (NOT-TRACKABLE)", () => {
+  withHandoffFixture({ specText: handoffSpec("- tests/../escape.test.js") }, (fixture) => {
+    assert.equal(fixture.inspect().code, "PLR-HANDOFF-CHECK-UNADMITTED");
+  });
+  withHandoffFixture({ specText: handoffSpec("- scratch/gate.test.js"), gitignore: "scratch/\n" }, (fixture) => {
+    const result = fixture.inspect();
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PLR-HANDOFF-CHECK-NOT-TRACKABLE");
+  });
+});
+
+handoffCase("R6 the inspection fails closed, and the criterion scan is exported by the host parser module", () => {
+  withHandoffFixture({}, (fixture) => {
+    assert.equal(fixture.inspect({}, { observeScope: () => { throw new Error("injected observation fault"); } }).code, "PLR-HANDOFF-UNAVAILABLE");
+    assert.equal(fixture.inspect({}, { observeScope: () => ({ requiresEnforcement: "yes" }) }).code, "PLR-HANDOFF-UNAVAILABLE", "only a literal boolean decides the gate");
+    assert.equal(fixture.inspect({ rootDir: undefined }).code, "PLR-HANDOFF-UNAVAILABLE");
+  });
+  assert.equal(typeof acceptedContract.scanAcceptedCriterionRows, "function", "critic-accepted-contract.mjs must export scanAcceptedCriterionRows");
+  const text = handoffSpec();
+  const rows = acceptedContract.scanAcceptedCriterionRows(text);
+  assert.deepEqual(rows.map((row) => [row.id, row.normative, row.parserVersion]),
+    [["AC-1", true, "markdown-acceptance-table-two-column.v1"], ["AC-2", true, "markdown-acceptance-table-two-column.v1"]]);
+  const bytes = Buffer.from(text);
+  const [row] = rows;
+  const parsed = acceptedContract.parseAcceptedCriticCriterion({ sourceBytes: new Uint8Array(bytes),
+    locator: { schema: "pipeline.critic-criterion-locator.v1", sourcePath: HANDOFF_SPEC, sourceSha256: createHash("sha256").update(bytes).digest("hex"), criterionId: row.id,
+      startByte: row.startByte, endByte: row.endByte, excerptSha256: createHash("sha256").update(bytes.subarray(row.startByte, row.endByte)).digest("hex") },
+    packageContext: { featureId: "handoff-fixture", sourceBindings: [{ path: HANDOFF_SPEC, sha256: createHash("sha256").update(bytes).digest("hex"), role: "spec" }] } });
+  assert.equal(parsed.status, "no-explicit-criterion", JSON.stringify(parsed));
+});
+
+assert.deepEqual(handoffFailures, [], `AC-264 plan-readiness hand-off cases failed: ${handoffFailures.join(" | ")}`);
+console.log("AC-264 plan-readiness hand-off R1-R6 complete.");

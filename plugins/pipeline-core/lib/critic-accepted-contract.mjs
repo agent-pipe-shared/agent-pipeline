@@ -141,52 +141,14 @@ export function commitAcceptedContractCapture({capture,persistEnvelope,publishSt
   } catch { return {...no(retained ? 'CAC-CAPTURE-PUBLICATION' : 'CAC-CAPTURE-READBACK'),committed:false,envelopeRetained:retained}; }
 }
 
-/** Pure original-byte interpretation only. Locators and parser success confer no authority. */
-export function parseAcceptedCriticCriterion(input) {
-  let parserVersion = 'markdown-acceptance-table.v1';
-  const locator = input?.locator;
-  const diagnostic = (status, code) => ({status, code, parserVersion,
-    sourcePath: typeof locator?.sourcePath === 'string' && /^specs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/[A-Za-z0-9_./-]+$/u.test(locator.sourcePath)
-      && !locator.sourcePath.split('/').some(part => part === '.' || part === '..' || part === '') ? locator.sourcePath : null,
-    sourceSha256: typeof locator?.sourceSha256 === 'string' && SHA.test(locator.sourceSha256) ? locator.sourceSha256 : null,
-    criterionId: isCriterionId(locator?.criterionId) ? locator.criterionId : null,
-    excerptSha256: typeof locator?.excerptSha256 === 'string' && SHA.test(locator.excerptSha256) ? locator.excerptSha256 : null});
-  const binding = () => diagnostic('unsupported-or-ambiguous', 'CAC-CRITERION-BINDING');
-  const unsupported = () => diagnostic('unsupported-or-ambiguous', 'CAC-CRITERION-UNSUPPORTED');
-  const absent = () => diagnostic('no-explicit-criterion', 'CAC-CRITERION-NOT-EXPLICIT');
-  try {
-    if (!own(input, ['sourceBytes','locator','packageContext']) || !(input.sourceBytes instanceof Uint8Array)
-      || input.sourceBytes.byteLength < 1 || input.sourceBytes.byteLength > 1048576
-      || !own(locator, ['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
-      || locator.schema !== 'pipeline.critic-criterion-locator.v1' || !diagnostic('', '').sourcePath
-      || typeof locator.sourceSha256 !== 'string' || !SHA.test(locator.sourceSha256)
-      || typeof locator.excerptSha256 !== 'string' || !SHA.test(locator.excerptSha256)
-      || !isCriterionId(locator.criterionId)
-      || !Number.isSafeInteger(locator.startByte) || !Number.isSafeInteger(locator.endByte)
-      || locator.startByte < 0 || locator.endByte > input.sourceBytes.byteLength
-      || locator.endByte <= locator.startByte || locator.endByte - locator.startByte > 4096) return binding();
-    const context = input.packageContext;
-    if (!own(context, ['featureId','sourceBindings']) || typeof context.featureId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(context.featureId)
-      || !Array.isArray(context.sourceBindings) || context.sourceBindings.length < 1 || context.sourceBindings.length > 16) return binding();
-    const prefix = `specs/${context.featureId}/`, seen = new Set();
-    for (const entry of context.sourceBindings) {
-      if (!own(entry, ['path','sha256','role']) || typeof entry.path !== 'string' || !entry.path.startsWith(prefix)
-        || !/^specs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/[A-Za-z0-9_./-]+$/u.test(entry.path)
-        || entry.path.split('/').some(part => part === '.' || part === '..' || part === '')
-        || typeof entry.sha256 !== 'string' || !SHA.test(entry.sha256) || !['prd','spec','companion'].includes(entry.role) || seen.has(entry.path)) return binding();
-      seen.add(entry.path);
-    }
-    const matched = context.sourceBindings.filter(entry => entry.path === locator.sourcePath && entry.sha256 === locator.sourceSha256);
-    if (matched.length !== 1 || !locator.sourcePath.startsWith(prefix)) return binding();
-    const bytes = Buffer.from(input.sourceBytes), byteHash = value => createHash('sha256').update(value).digest('hex');
-    if (byteHash(bytes) !== locator.sourceSha256) return binding();
-    const decoder = new TextDecoder('utf-8', {fatal:true,ignoreBOM:true});
-    const source = decoder.decode(bytes);
-    // Independently decode both boundaries, so rehashed split UTF-8 cannot masquerade as a cell.
-    decoder.decode(bytes.subarray(0,locator.startByte));
-    const excerpt = bytes.subarray(locator.startByte,locator.endByte);
-    decoder.decode(excerpt); decoder.decode(bytes.subarray(locator.endByte));
-    if (byteHash(excerpt) !== locator.excerptSha256) return binding();
+/**
+ * The ordered criterion-row scan of the host parser, exported unchanged so other readers (plan-readiness
+ * hand-off, lib/plan-handoff-readiness.mjs) see exactly the rows `parseAcceptedCriticCriterion` selects from.
+ * Pure and byte-offset exact: `source` is the strictly decoded Spec text; each row carries `id`, `normative`,
+ * `text`, `startByte`, `endByte` and (where the shape has one) `valid` and `parserVersion`. A row is a candidate,
+ * never an acceptance: only the parser's later checks decide whether a locator on it is supported.
+ */
+export function scanAcceptedCriterionRows(source) {
     const lines = []; let byteOffset = 0;
     for (const raw of source.split(/(?<=\n)/u)) {
       lines.push({text:raw.replace(/\r?\n$/u,''),byteOffset}); byteOffset += Buffer.byteLength(raw);
@@ -310,6 +272,56 @@ export function parseAcceptedCriticCriterion(input) {
         active.endByte=line.byteOffset+Buffer.byteLength(text);
       }
     }
+    return rows;
+}
+
+/** Pure original-byte interpretation only. Locators and parser success confer no authority. */
+export function parseAcceptedCriticCriterion(input) {
+  let parserVersion = 'markdown-acceptance-table.v1';
+  const locator = input?.locator;
+  const diagnostic = (status, code) => ({status, code, parserVersion,
+    sourcePath: typeof locator?.sourcePath === 'string' && /^specs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/[A-Za-z0-9_./-]+$/u.test(locator.sourcePath)
+      && !locator.sourcePath.split('/').some(part => part === '.' || part === '..' || part === '') ? locator.sourcePath : null,
+    sourceSha256: typeof locator?.sourceSha256 === 'string' && SHA.test(locator.sourceSha256) ? locator.sourceSha256 : null,
+    criterionId: isCriterionId(locator?.criterionId) ? locator.criterionId : null,
+    excerptSha256: typeof locator?.excerptSha256 === 'string' && SHA.test(locator.excerptSha256) ? locator.excerptSha256 : null});
+  const binding = () => diagnostic('unsupported-or-ambiguous', 'CAC-CRITERION-BINDING');
+  const unsupported = () => diagnostic('unsupported-or-ambiguous', 'CAC-CRITERION-UNSUPPORTED');
+  const absent = () => diagnostic('no-explicit-criterion', 'CAC-CRITERION-NOT-EXPLICIT');
+  try {
+    if (!own(input, ['sourceBytes','locator','packageContext']) || !(input.sourceBytes instanceof Uint8Array)
+      || input.sourceBytes.byteLength < 1 || input.sourceBytes.byteLength > 1048576
+      || !own(locator, ['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
+      || locator.schema !== 'pipeline.critic-criterion-locator.v1' || !diagnostic('', '').sourcePath
+      || typeof locator.sourceSha256 !== 'string' || !SHA.test(locator.sourceSha256)
+      || typeof locator.excerptSha256 !== 'string' || !SHA.test(locator.excerptSha256)
+      || !isCriterionId(locator.criterionId)
+      || !Number.isSafeInteger(locator.startByte) || !Number.isSafeInteger(locator.endByte)
+      || locator.startByte < 0 || locator.endByte > input.sourceBytes.byteLength
+      || locator.endByte <= locator.startByte || locator.endByte - locator.startByte > 4096) return binding();
+    const context = input.packageContext;
+    if (!own(context, ['featureId','sourceBindings']) || typeof context.featureId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(context.featureId)
+      || !Array.isArray(context.sourceBindings) || context.sourceBindings.length < 1 || context.sourceBindings.length > 16) return binding();
+    const prefix = `specs/${context.featureId}/`, seen = new Set();
+    for (const entry of context.sourceBindings) {
+      if (!own(entry, ['path','sha256','role']) || typeof entry.path !== 'string' || !entry.path.startsWith(prefix)
+        || !/^specs\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/[A-Za-z0-9_./-]+$/u.test(entry.path)
+        || entry.path.split('/').some(part => part === '.' || part === '..' || part === '')
+        || typeof entry.sha256 !== 'string' || !SHA.test(entry.sha256) || !['prd','spec','companion'].includes(entry.role) || seen.has(entry.path)) return binding();
+      seen.add(entry.path);
+    }
+    const matched = context.sourceBindings.filter(entry => entry.path === locator.sourcePath && entry.sha256 === locator.sourceSha256);
+    if (matched.length !== 1 || !locator.sourcePath.startsWith(prefix)) return binding();
+    const bytes = Buffer.from(input.sourceBytes), byteHash = value => createHash('sha256').update(value).digest('hex');
+    if (byteHash(bytes) !== locator.sourceSha256) return binding();
+    const decoder = new TextDecoder('utf-8', {fatal:true,ignoreBOM:true});
+    const source = decoder.decode(bytes);
+    // Independently decode both boundaries, so rehashed split UTF-8 cannot masquerade as a cell.
+    decoder.decode(bytes.subarray(0,locator.startByte));
+    const excerpt = bytes.subarray(locator.startByte,locator.endByte);
+    decoder.decode(excerpt); decoder.decode(bytes.subarray(locator.endByte));
+    if (byteHash(excerpt) !== locator.excerptSha256) return binding();
+    const rows = scanAcceptedCriterionRows(source);
     const selected = rows.filter(row=>row.id === locator.criterionId);
     if (selected.length !== 1 || !selected[0].normative || selected[0].valid===false || selected[0].startByte !== locator.startByte || selected[0].endByte !== locator.endByte) return unsupported();
     parserVersion=selected[0].parserVersion??parserVersion;
