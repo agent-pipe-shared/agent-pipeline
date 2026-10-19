@@ -252,6 +252,16 @@ function deny(status = "partial") {
   );
 }
 
+// AC-197 group A/B (QG-04 justification, bounded to the call-counting cases that use it): the guard
+// reads session readiness through readSessionReadinessWithBoundedReread() (ALF-C-PARWORK-M3), which
+// re-reads exactly once, after a 500 ms wait, when and only when the first observation is
+// lifecycleStatus "partial". A call-counting case whose claim is "readiness is consulted once per
+// write/Bash call" must therefore deny with a status that is not "partial"; the call-count
+// assertions in those cases are unchanged (no relaxation), and the "partial" re-read itself is
+// pinned by the sleepSyncFn-driven cases of the product's own suite. "continuity-damaged" is a
+// controlling non-ready status that opens no lane these cases' inputs touch.
+const NON_PARTIAL_DENIAL_STATUS = "continuity-damaged";
+
 test("ordinary non-governed repositories remain untouched and never inspect lifecycle", () => {
   const path = root();
   let calls = 0;
@@ -274,7 +284,7 @@ test("inactive repositories remain silent for session writes and Bash; valid con
         : toolName === "Bash"
           ? { tool_name: toolName, session_id: "session-positive", tool_input: { command: "printf unchanged" } }
           : { tool_name: toolName, session_id: "session-positive", tool_input: { file_path: "src/game.js" } };
-      const dependencies = { projectDir: path, requireProjectOnboardingReadyFn() { calls += 1; deny(); } };
+      const dependencies = { projectDir: path, requireProjectOnboardingReadyFn() { calls += 1; deny(NON_PARTIAL_DENIAL_STATUS); } };
       assert.deepEqual(evaluateLifecycleReadyGuard(input, dependencies), { exitCode: 0, stderr: "" }, toolName);
       assert.equal(calls, 0, toolName);
       markGovernedFixture(path);
@@ -304,7 +314,7 @@ test("bare invalid source, calibration, lock, runtime and consent markers stay i
           calls += 1;
           assert.equal(rootDir, path);
           assert.equal(intent, "session");
-          deny();
+          deny(NON_PARTIAL_DENIAL_STATUS);
         },
       };
       assert.deepEqual(evaluateLifecycleReadyGuard(edit(), dependencies), { exitCode: 0, stderr: "" }, marker);
@@ -364,7 +374,7 @@ test("evaluateLifecycleReadyGuard threads its own dependencies into governanceMa
       },
       requireProjectOnboardingReadyFn() {
         calls += 1;
-        deny();
+        deny(NON_PARTIAL_DENIAL_STATUS);
       },
     });
     // The pre-fix bug never reached this call: the stale `GOVERNANCE_MARKERS` identifier
@@ -3300,8 +3310,13 @@ test("GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivatio
     // hand-maintained array carried at the moment it was replaced. A future entry may
     // legitimately extend it, but never by accident -- this assertion has to be edited
     // deliberately alongside the table.
+    // AC-197 group H (QG-04 justification, bounded to this one list): the table gained the
+    // read-only `plan-existing-trust-anchor` entry (automatedArgvShape "lifecycle", mutates:
+    // false) in scripts/project-onboarding-v3.mjs, so the frozen list gains exactly that one name,
+    // edited deliberately as this comment demands. Nothing else in the set moved, and the
+    // admission loops below still prove the guard really admits each derived name.
     assert.deepEqual([...derived].sort(), [
-      "bootstrap-bind-plan", "intake-generate-plan", "intake-spec-marker-plan", "plan", "plan-enrollment-git-creation", "plan-manifest-repair", "plan-partial-authority",
+      "bootstrap-bind-plan", "intake-generate-plan", "intake-spec-marker-plan", "plan", "plan-enrollment-git-creation", "plan-existing-trust-anchor", "plan-manifest-repair", "plan-partial-authority",
       "plan-readback", "plan-reinstall", "plan-repair", "plan-runtime", "plan-source-recovery",
     ]);
     // Every derived name really is admitted by the real guard in the bare lifecycleArgv
@@ -3913,6 +3928,10 @@ test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is a
     markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const sampleValues = {
+      // AC-197 group C (QG-04 justification): the table declared `materialize-existing-trust-anchor`
+      // (requiredValue --root, --plan-sha256; required --activate), and this test's own guard
+      // ("must cover every declared mutating subcommand") demands its sample values.
+      "materialize-existing-trust-anchor": { "--plan-sha256": "e".repeat(64) },
       "intake-consent-apply": {
         "--git-author-name": "PO Name", "--git-author-email": "po@example.com",
         "--language": "en", "--profile": "feature",
@@ -3955,6 +3974,8 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
     markGovernedFixture(path);
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const sampleValues = {
+      // AC-197 group C (QG-04 justification): same declared-subcommand coverage as the AC-3 table above.
+      "materialize-existing-trust-anchor": { "--plan-sha256": "e".repeat(64) },
       "intake-consent-apply": { "--language": "en", "--profile": "feature" },
       "intake-capture-apply": { "--text": "requirement material" },
       "intake-design-questions-apply": {
@@ -5146,7 +5167,7 @@ test("every in-root Edit or Write requires readiness while outside targets stop 
           projectDir: path,
           requireProjectOnboardingReadyFn() {
             calls += 1;
-            deny();
+            deny(NON_PARTIAL_DENIAL_STATUS);
           },
         });
         assert.equal(result.exitCode, 2, `${toolInput().tool_name}: ${filePath}`);
@@ -10813,11 +10834,11 @@ test("SIGNED-AGENT basename admission retains lifecycle denial", () => {
     const script=realpathSync(fileURLToPath(new URL("../scripts/quality-package-materializer.mjs",import.meta.url)));
     const command=[process.execPath,script,path,join(path,"intent.json"),join(path,"proof.json"),join(path,"project/critical-human-proof.json"),"verify"].map(w=>JSON.stringify(w)).join(" ");
     let called=0;
-    const result=evaluateLifecycleReadyGuard({tool_name:"Bash",tool_input:{command}}, {projectDir:path,requireProjectOnboardingReadyFn(){called++;deny("partial");}});
+    const result=evaluateLifecycleReadyGuard({tool_name:"Bash",tool_input:{command}}, {projectDir:path,requireProjectOnboardingReadyFn(){called++;deny(NON_PARTIAL_DENIAL_STATUS);}});
     assert.equal(called,1,"readiness still enforced");
     assert.equal(result.exitCode,2);
     assert.doesNotMatch(result.stderr,/GUARD-GATE-STRENGTH-SHELL/u);
-    assert.match(result.stderr,/partial/u);
+    assert.match(result.stderr,new RegExp(NON_PARTIAL_DENIAL_STATUS,"u"));
     for (const mode of ["verify", "apply", "authorize-commit"]) {
       const readyCommand=command.replace('"verify"',JSON.stringify(mode));
       const ready=evaluateLifecycleReadyGuard({tool_name:"Bash",tool_input:{command:readyCommand}}, {projectDir:path,requireProjectOnboardingReadyFn:readyStub});
