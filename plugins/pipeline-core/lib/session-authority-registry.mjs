@@ -114,7 +114,7 @@ export function createSessionAuthorityMethodStageObserver({onStage}){if(typeof o
 export function withSessionAuthorityMethodStages({observer},callback){if(!stageBrands.has(observer)||typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','unbranded-stage-observer');return stageContext.run(observer,callback);}
 function stage(name,record,memberRef,releaseRef=null){const observer=stageContext.getStore();if(observer)observer.onStage(freeze({stage:name,producerId:record.producerId,memberId:record.memberId,memberGeneration:record.memberGeneration,memberRef,releaseRef}));}
 
-export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}privateDirectories(repo,`${ROOT}/registry.lock`);const path=`${ROOT}/registry.lock`,abs=safePath(repo,path),bytes=Buffer.from(canonical({schema:'pipeline.session-authority-lock.v1',repositorySha256:repoDigest(repo),nonce:randomBytes(32).toString('hex')}));let fd,nativeLock;try{if(process.platform==='win32')nativeLock=nativeLockCreate(abs,bytes);else fd=openSync(abs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}catch{fail('SDC-LOCK-HELD','registry-lock-held');}if(process.platform!=='win32'){try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}}const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return boundaryContext.run(data,()=>{migrateSourceUpdatedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;});}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
+export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}privateDirectories(repo,`${ROOT}/registry.lock`);const path=`${ROOT}/registry.lock`,abs=safePath(repo,path),bytes=Buffer.from(canonical({schema:'pipeline.session-authority-lock.v1',repositorySha256:repoDigest(repo),nonce:randomBytes(32).toString('hex')}));let fd,nativeLock;try{if(process.platform==='win32')nativeLock=nativeLockCreate(abs,bytes);else fd=openSync(abs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}catch{fail('SDC-LOCK-HELD','registry-lock-held');}if(process.platform!=='win32'){try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}}const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;});}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
 function boundary(token){const found=boundaryBrands.get(token);if(!found||boundaryContext.getStore()?.token!==token)fail('SDC-AUTHORITY-UNAVAILABLE','expired-boundary');repository(found.repository);return found.repository;}
 
 function participant(def){const [producerId,,prefix,kinds,namespaceIds,paths]=def;const sourcePaths=paths.map(path=>`plugins/pipeline-core/${path}`).sort();const sources=sourcePaths.map(path=>{const abs=fileURLToPath(new URL(`../${path.slice('plugins/pipeline-core/'.length)}`,import.meta.url));const s=lstatSync(abs);if(!s.isFile()||s.isSymbolicLink())fail('SDC-AUTHORITY-UNAVAILABLE',`${producerId}:source-file`);return {path,sha256:hash(process.platform==='win32'?nativeSourceRead(abs,SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes).bytes:readFileSync(abs))};});return freeze({producerId,kinds:[...kinds],sourcePaths,sourceSha256:digest(sources),namespaceIds:[...namespaceIds]});}
@@ -174,8 +174,50 @@ function rebindSourceUpdatedRegistry(repo,catalogue,aside,expected){
   // read, so the rebind is checked against the producers themselves; a fault falls back to fresh.
   let ports=null;
   try{ports=definitions.map(def=>({producerId:def[0],port:def[1][`create${def[2]}AuthorityProducerPort`]({repository:repo})}));}catch{ports=null;}
-  if(ports)stateRead(repo,portsFor(repo,ports));
-  return true;
+  // PF-55: a namespace that changed while the old version held it is healed exactly as at a boundary entry.
+  if(!ports)return {healed:[]};
+  const read=portsFor(repo,ports),healed=healDrift(repo,stateRead(repo,read,{reconcile:false}));
+  stateRead(repo,read);
+  return {healed};
+}
+// PF-55 (D51 (1), PO decision): a producer namespace that changed outside the registry no longer
+// makes the registry unreadable for good. Ordinary causes are a commit, push-prepare's fold, a git
+// checkout of a bound file, or an expired capability. While no bound member of that producer is
+// armed or running, the live namespace becomes its new baseline, and a marker under
+// session-authority-abandoned retains the prior producer record. A bound armed or running member
+// keeps the strict namespace-drift refusal, because its operation was admitted on the old
+// namespace. A producer whose reconcile throws is left for the operation's own read to report.
+const HEAL_IN_FLIGHT=new Set(['armed','running']);
+function healDrift(repo,state){
+  const plans=[];
+  state.rows.forEach((row,i)=>{
+    let current;
+    try{current=memberships(row.port.reconcile({producerRecord:freeze(structuredClone(row.record.value)),memberRecords:freeze(row.members.map(m=>m.value)),releaseRecords:freeze(row.members.filter(m=>m.release).map(m=>m.release.value))}),row.participant);}catch{return;}
+    if(equal(current,row.record.value.baseline))return;
+    if(row.members.some(m=>m.value.association.state==='bound'&&HEAL_IN_FLIGHT.has(m.value.phase)))return;
+    const namespaces=[...new Set(current.filter(n=>!row.record.value.baseline.some(b=>equal(b,n))).map(n=>n.namespaceId))];
+    plans.push({index:i,current,namespaces,prior:row.record.value});
+  });
+  for(const plan of plans)saveProducer(repo,state,plan.index,{...state.rows[plan.index].record.value,baseline:plan.current,lastTransitionSha256:digest({healedBaseline:plan.current})});
+  if(plans.length)refreshCertificates(repo,state);
+  return plans.map(plan=>({producerId:plan.prior.producerId,namespaces:plan.namespaces,prior:plan.prior}));
+}
+function writeHealMarker(repo,healed,cause){
+  const dir=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-drift-heal`;
+  try{
+    privateDirectories(repo,`${dir}/marker`);
+    for(const row of healed)writeFileSync(safePath(repo,`${dir}/${row.producerId}.json`),canonical(row.prior),{mode:0o600,flag:'wx'});
+    writeFileSync(safePath(repo,`${dir}/heal.json`),canonical({schema:'pipeline.session-authority-drift-heal.v1',cause,healed:healed.map(row=>({producerId:row.producerId,namespaces:row.namespaces})),healedAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});
+  }catch{}
+}
+function healDriftedCatalogue(repo){
+  if(!existsSync(safePath(repo,cataloguePath)))return null;
+  let state;
+  try{state=stateRead(repo,portsFor(repo,definitions.map(def=>({producerId:def[0],port:def[1][`create${def[2]}AuthorityProducerPort`]({repository:repo})}))),{reconcile:false});}catch{return null;}
+  let healed;
+  try{healed=healDrift(repo,state);}catch{return null;}
+  if(healed.length)writeHealMarker(repo,healed,'a producer namespace changed outside the registry while none of its bound members was armed or running');
+  return healed;
 }
 function migrateSourceUpdatedCatalogue(repo){
   if(!existsSync(safePath(repo,cataloguePath)))return null;
@@ -187,7 +229,7 @@ function migrateSourceUpdatedCatalogue(repo){
   const aside=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-source-update-${old}`;
   moveRegistryAside(repo,aside);
   let mode='fresh',cause='the producer structure changed, so the registry starts fresh';
-  try{if(rebindSourceUpdatedRegistry(repo,catalogue,aside,expected)){mode='rebound';cause='a producer source digest changed; records rebound and read back';}}
+  try{const rebound=rebindSourceUpdatedRegistry(repo,catalogue,aside,expected);if(rebound){mode='rebound';cause=`a producer source digest changed; records rebound and read back${rebound.healed.length?`; drift healed in ${rebound.healed.map(row=>`${row.producerId} (${row.namespaces.join(', ')})`).join(', ')}`:''}`;}}
   catch(error){moveRegistryAside(repo,`${aside}-partial`);cause=`the rebind faulted (${error?.code??'error'}: ${String(error?.reason??error?.message??'').slice(0,200)}), so the registry starts fresh; the partial rebind is retained in ${aside.split('/').pop()}-partial`;}
   // Critic F9: the retained directory names what happened; forensics never depend on re-reading the old catalogue.
   try{writeFileSync(safePath(repo,`${aside}/migration.json`),canonical({schema:'pipeline.session-authority-source-migration.v1',oldParticipantSetSha256:catalogue.participantSetSha256??null,installedParticipantSetSha256:digest(expected),mode,cause,migratedAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{}

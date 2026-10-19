@@ -939,6 +939,38 @@ const cases = [
     assert.notEqual(JSON.parse(readFileSync(cataloguePath,'utf8')).participantSetSha256,value.participantSetSha256,'a fresh catalogue of the installed sources');
   })},
 
+  { id: "NGHS36", name: "a state file rewritten outside the registry, as push-prepare's fold does, is healed and the dispatch runs; a changed namespace under an armed bound member stays refused (PF-55, D51)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
+    // Another writer's bytes for the same state, as a fold, a git checkout or an older route leave them.
+    const statePath=join(root,'.claude/pipeline-state.json'),before=readFileSync(statePath,'utf8');
+    writeFileSync(statePath,`${JSON.stringify(JSON.parse(before))}\n`);assert.notEqual(readFileSync(statePath,'utf8'),before);
+    const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+    const binding={...makeBinding({dispatchId:'DELIVER-AC-1',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
+    const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});
+    input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
+    const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));
+    assert.equal(prepared.ok,true,JSON.stringify(prepared));
+    const abandoned=join(repository.commonDir,'agent-pipeline/session-authority-abandoned');
+    const heals=()=>existsSync(abandoned)?readdirSync(abandoned).filter(name=>name.endsWith('-drift-heal')).sort():[];
+    assert.equal(heals().length,1);
+    const marker=JSON.parse(readFileSync(join(abandoned,heals()[0],'heal.json'),'utf8'));
+    assert.ok(marker.healed.some(row=>row.producerId==='onboarding-continuity'&&row.namespaces.includes('selected-state')),JSON.stringify(marker));
+    assert.equal(existsSync(join(abandoned,heals()[0],'onboarding-continuity.json')),true,'the prior producer record is retained');
+    // Healing is per producer: the dispatch's armed native member does not hold back the state file's producers.
+    writeFileSync(statePath,`${readFileSync(statePath,'utf8').trimEnd()}\n\n`);
+    const readiness=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));
+    assert.equal(readiness.status,'observed',JSON.stringify(readiness));assert.equal(heals().length,2);
+    // A namespace that changed under its own armed bound member is never healed.
+    const pending=[];const walk=dir=>{for(const entry of readdirSync(dir,{withFileTypes:true})){const path=join(dir,entry.name);if(entry.isDirectory())walk(path);else if(entry.name.startsWith('pending-'))pending.push(path);}};walk(join(repository.commonDir,'agent-pipeline'));
+    assert.equal(pending.length,1,JSON.stringify(pending));writeFileSync(pending[0],`${readFileSync(pending[0],'utf8')} `);
+    const refused=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));
+    assert.equal(refused.status,'refused',JSON.stringify(refused));
+    assert.equal(heals().every(name=>!JSON.parse(readFileSync(join(abandoned,name,'heal.json'),'utf8')).healed.some(row=>row.producerId==='native-goldfish')),true);
+  })},
+
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
