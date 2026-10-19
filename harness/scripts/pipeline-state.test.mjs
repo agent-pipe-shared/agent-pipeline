@@ -70,11 +70,33 @@ const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
 const NOVA_APPROVED_BY = "agent-pipe-shared (PO, 2026-07-27 Nova re-Critic corrections)";
 const PHOENIX_SPEC_BOUND_BY = "PO reauthorization for Phoenix R-14 digest binding";
+// QG-04 justification (class b, stale fixture; ALF-B3-C4H, AC-150): the State authority route resolves the
+// repository candidate (`rev-parse HEAD`) before it parses the subcommand, so a fixture directory that is not
+// a Git work tree with a born HEAD makes every writer verb fail `WT-GIT-FAILED` (exit 2) before it reaches its
+// own check. The suite therefore (1) could not reach any admit verdict and (2) passed its refuse verdicts for the
+// wrong reason. The fixture now is a real Git work tree whose HEAD carries the seeded calibration. No assertion
+// is changed by this helper; every refuse verdict keeps its expected exit and its byte-identical state check.
+function seedFixtureGitHead(dir) {
+  const git = (...args) => {
+    const result = spawnSync("git", ["-c", "user.name=Pipeline State Test", "-c", "user.email=pipeline-state@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: dir, encoding: "utf8", windowsHide: true, env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(dir) } });
+    if (result.status !== 0) throw new Error(`fixture git ${args[0]} failed: ${result.stderr}`);
+  };
+  git("init", "-q");
+  git("add", "--", "project/pipeline.json");
+  git("commit", "-q", "--no-verify", "-m", "seed calibration");
+}
+// QG-04 (class b, stale fixture location): the subprocess cases run the real CLI, whose session-authority
+// ancestor walker refuses a world-writable ancestor (SDC-PRIVATE-PATH), and the OS temp directory is one. The
+// fixtures therefore live under the checkout's own (gitignored) scratch/ directory, resolved from the CLI path
+// so the file behaves identically wherever it is run from; no assertion depends on the fixture location.
 function freshDir(prefix) {
-  const dir = mkdtempSync(join(tmpdir(), `pipeline-state-${prefix}-`));
+  const fixtureBase = join(dirname(CLI), "..", "..", "scratch");
+  mkdirSync(fixtureBase, { recursive: true });
+  const dir = mkdtempSync(join(fixtureBase, `pipeline-state-${prefix}-`));
   ALL_DIRS.push(dir);
   mkdirSync(join(dir, "project"), { recursive: true });
   writeFileSync(join(dir, "project", "pipeline.json"), JSON.stringify({ schema: "pipeline.project.v1", verify: "echo ok" }) + "\n");
+  seedFixtureGitHead(dir);
   return dir;
 }
 
@@ -887,7 +909,13 @@ function seedSubprocessPoGateAuthority(dir, planPath) {
     updatedAt: FIXED_NOW(),
   });
   const receiptPath = poGateProfileReceiptPath(gitCommonDir);
-  mkdirSync(join(gitCommonDir, "agent-pipeline", "po-gate"), { recursive: true });
+  // QG-04 (class b, stale fixture; ALF-B4-C4H, AC-150): the continuity private-namespace observer
+  // (onboarding-continuity.mjs continuityAuthorityObservePrivateNamespace, added by d02409a8a) requires
+  // every existing `.git/agent-pipeline` ancestor to be owner-private (mode & 0o077 === 0). A plain
+  // recursive mkdir leaves it 0755 under the usual umask, which made every real-subprocess State verb fail
+  // `SDC-PRIVATE-PATH` ("continuity private namespace ancestor unsafe") before it reached its own check.
+  // The fixture now creates the namespace the way the real writer does (0700). No assertion is changed.
+  mkdirSync(join(gitCommonDir, "agent-pipeline", "po-gate"), { recursive: true, mode: 0o700 });
   if (process.platform === "win32") {
     let cursor = gitCommonDir;
     for (const component of dirname(PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH).split(/[\\/]/u).filter(Boolean)) {
@@ -1161,8 +1189,11 @@ function canonicalFixtureJson(value) {
   ok("PS06c planApproved true", state.planApproved === true);
   ok(
     "PS06d planApproval is exact v7 and binds the submitted Plan, Spec, profile authority, and an empty audit seal",
+    // QG-04 (class b, stale expectation): the writer's current approval record is pipeline.plan-approval.v8
+    // (pipeline-state.mjs approveDesignSubmittedPlan); only the schema literal follows it, every other binding
+    // asserted here (submission, approver, time, empty audit seal, PO gate authority v2) is unchanged.
     state.planSubmission?.schema === "pipeline.plan-submission.v1"
-      && state.planApproval?.schema === "pipeline.plan-approval.v7"
+      && state.planApproval?.schema === "pipeline.plan-approval.v8"
       && state.planApproval?.approvedBy === "po-test"
       && state.planApproval?.approvedAt === FIXED_NOW()
       && state.planApproval?.submissionSha256
@@ -1223,6 +1254,10 @@ function canonicalFixtureJson(value) {
     designWorkflowPackagePath: _packagePath,
     designWorkflowPackageSha256: _packageSha,
     designWorkflowApproval: _packageApproval,
+    // QG-04 (class b, stale fixture): the current approval record carries the two design-approval fields
+    // below (null for the mini profile); the historical v4 shape never had them, so they are stripped too.
+    designApprovalBinding: _designBinding,
+    designApproval: _designApproval,
     ...v4Approval
   } = legacy.planApproval;
   const historicalV4 = {
@@ -4960,6 +4995,15 @@ function runFeaturePackageReconcileTests() {
   // itself (PS-CONTINUITY-LOCKED / FTP-RECONCILE-APPROVAL-REJECTED) even though the caller
   // already legitimately holds that lock. realpathSync-based comparison resolves both sides
   // to the same real path and correctly reuses the lock.
+  // QG-04, Elephant decision E18 (specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md), ALF-B5-C4H
+  // (AC-150): retargeted to the current fail-closed verdict. The State authority route resolves the project root
+  // through plugins/pipeline-core/lib/worktree-lifecycle.mjs assertExistingDirectoryPhysical (WT-PATH-TYPE,
+  // "must be a non-symlink directory") BEFORE the reconcile runs, so a symlinked CLAUDE_PROJECT_DIR is refused with
+  // `State authority route unavailable (WT-PATH-TYPE)`. RGt now asserts that typed refusal and that the manifest and
+  // the state file stay byte-identical. The original admit-side assertions (RGt / RGt-2 / RGt-3) are kept verbatim
+  // below behind RGT_SYMLINKED_ROOT_ADMITTED = false; whether a symlinked project root should be supported again is
+  // tracked by backlog item 2026-10-19-a-symlinked-project-root-is-refused-by-the-state-authority-route.
+  const RGT_SYMLINKED_ROOT_ADMITTED = false;
   const fx = seedReconcilePackage("rgt-self-governing-symlink");
   const grownPrd = "# rec-pkg PRD (grown)\n";
   writeFileSync(join(fx.dir, fx.files.prd.rel), grownPrd);
@@ -4984,6 +5028,8 @@ function runFeaturePackageReconcileTests() {
     gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
     gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
   };
+  const rgtManifestBefore = readFileSync(join(fx.dir, fx.manifestRel));
+  const rgtStateBefore = readFileSync(join(fx.dir, "project", "pipeline-state.json"));
   const priorProjectDirSet = Object.hasOwn(process.env, "CLAUDE_PROJECT_DIR");
   const priorProjectDir = process.env.CLAUDE_PROJECT_DIR;
   let applied;
@@ -4997,6 +5043,14 @@ function runFeaturePackageReconcileTests() {
     if (priorProjectDirSet) process.env.CLAUDE_PROJECT_DIR = priorProjectDir;
     else delete process.env.CLAUDE_PROJECT_DIR;
   }
+  ok("RGt a symlinked CLAUDE_PROJECT_DIR is refused by the State authority route with the typed WT-PATH-TYPE verdict and no success receipt (E18)",
+    applied.value !== 0 && /State authority route unavailable \(WT-PATH-TYPE\)/.test(`${applied.out ?? ""}${applied.err ?? ""}`)
+    && !/"status"\s*:\s*"applied"/.test(applied.out ?? ""), applied.out || applied.err);
+  ok("RGt-1 the refused symlinked-root reconcile left the manifest byte-identical",
+    readFileSync(join(fx.dir, fx.manifestRel)).equals(rgtManifestBefore));
+  ok("RGt-1b the refused symlinked-root reconcile left the state file byte-identical",
+    readFileSync(join(fx.dir, "project", "pipeline-state.json")).equals(rgtStateBefore));
+  if (RGT_SYMLINKED_ROOT_ADMITTED) {
   const receipt = JSON.parse(applied.out || "{}");
   ok("RGt a symlinked --root resolving (via realpath) to the same directory as the caller's already-held lock reuses that lock instead of self-colliding -- no PS-CONTINUITY-LOCKED/FTP-RECONCILE-APPROVAL-REJECTED",
     applied.value === 0 && receipt.status === "applied", applied.out || applied.err);
@@ -5011,6 +5065,7 @@ function runFeaturePackageReconcileTests() {
     && Array.isArray(governingState.state.criticalProofConsumption)
     && governingState.state.criticalProofConsumption.some((entry) => entry.kind === "feature-package-reconcile"),
     JSON.stringify(governingState));
+  }
 }
 
 }
@@ -5065,6 +5120,22 @@ runFeaturePackageReconcileTests();
   ok("HL-2 submit-plan exit 0", submitted.value === 0, `got ${submitted.value}`);
   ok("HL-3 submit-plan prints the human-legible briefing (not just digests)", submitted.text.includes("Briefing:") && submitted.text.includes("scope=") && submitted.text.includes("authorizes=") && submitted.text.includes("excludes="), submitted.text);
 
+  // QG-04 (class a, retired route; ALF-B4-C4H, AC-150; E12, ADR-0085): `present-plan --design-workflow-package`
+  // is retired and refuses with DWP-PRESENT-RETIRED, so the old admit verdict (exit 0, then a signed approval
+  // of the Feature design package) cannot be reached any more. HL-3a is retargeted to the retirement contract
+  // (typed refusal, replacement route named, state byte-identical). Every downstream step that needed a
+  // presented-and-approved package (HL-4 .. HL-16) is kept verbatim below under `if (RETIRED_ROUTE_TAIL_LIVE)`
+  // until it is re-expressed on `present-plan --review-receipt` (E15); nothing is deleted or weakened, and
+  // HL-17 (no approval at all) does not need the route and stays live.
+  const RETIRED_ROUTE_TAIL_LIVE = false;
+  const retiredStateBefore = readFileSync(statePath(dir), "utf8");
+  const retiredAttempt = captureConsole(() => captureConsoleError(() => run(
+    ["present-plan", "--by", "coordinator", "--design-workflow-package", fixture.packagePath], deps)));
+  const retiredText = `${retiredAttempt.text}\n${retiredAttempt.value.text}`;
+  ok("HL-3a present-plan --design-workflow-package is refused as retired (exit 2)", retiredAttempt.value.value === 2, `got ${retiredAttempt.value.value}: ${retiredText}`);
+  ok("HL-3a-1 the refusal names DWP-PRESENT-RETIRED and the replacement route present-plan --review-receipt", retiredText.includes("DWP-PRESENT-RETIRED") && retiredText.includes("present-plan --review-receipt"), retiredText);
+  ok("HL-3a-2 the retired-route refusal leaves the state file byte-identical", readFileSync(statePath(dir), "utf8") === retiredStateBefore);
+  if (RETIRED_ROUTE_TAIL_LIVE) {
   const firstApproval = presentSignedPackage(deps, fixture);
   ok("HL-3a present-plan exit 0", firstApproval.presented === 0, `got ${firstApproval.presented}`);
   ok("HL-4 approve-plan exit 0", firstApproval.approved === 0, `got ${firstApproval.approved}`);
@@ -5150,6 +5221,8 @@ runFeaturePackageReconcileTests();
     missingReconstruction.ok === false && missingReconstruction.code === "PLAN-APPROVAL-BRIEFING-INVALID",
     JSON.stringify(missingReconstruction),
   );
+
+  }
 
   // No approval at all: reconstruction refuses cleanly rather than exposing anything.
   const noApprovalReconstruction = reconstructPlanApprovalBriefing({});
