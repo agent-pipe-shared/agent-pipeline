@@ -18,7 +18,8 @@ import { resolveModelRoleSession } from "./model-role-session.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
 import { buildSignatureIntent, createAgyFamilyConsentAuthority, digest as canonicalDigest, familyConsentAssignment } from "./agy-session-authority.mjs";
 import { verifyModelFamilyAuthority } from "./model-family-authority.mjs";
-import { createModelFamilyHostController, readHeldModelFamilyInvocation } from "./model-family-host-store.mjs";
+import { createModelFamilyHostController, createModelFamilyHostAuthorityLifecycle, readHeldModelFamilyInvocation } from "./model-family-host-store.mjs";
+import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
 import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
 import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
 import { createAntigravityFamilyAdapter } from "./model-family-antigravity-adapter.mjs";
@@ -31,7 +32,10 @@ const consent = (overrides = {}) => ({ schema: AGY_SESSION_CONSENT_SCHEMA, statu
 const packet = (overrides = {}) => ({ schema: ROLE_DISPATCH_REQUEST_SCHEMA, dispatchId: "agy-dispatch-1", transport: "antigravity", role: "pipeline-core:goldfish-implementor", prompt: "## Briefing\n### 1. Goal\nImplement the bounded task.\n### 2. Context files\n- input.txt\n### 3. DoD checks\n- Return a bounded result.\n### 4. Forbidden\n- No unrelated changes.\n### 5. Stop conditions\n- Required input unavailable.\n### 6. Dispatch-Metadata\nModel: gemini-3.8-flash-high; effort high; Ruleset-SHA: local-test.\n- **Tool budget (hard cap, first-class field):** <=40 tool uses.", candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, requiredPaths: ["input.txt"], requiredPathSha256: { "input.txt": hash("input\n") }, resultDestination: { kind: "return" }, ...overrides });
 
 function familyFixture(nativeRole, { adapterContractSha256 = hash("adapter"), scope = { dispatchId: "agy-dispatch-1", purpose: "implementation" } } = {}) {
-  const root = mkdtempSync(join(tmpdir(), "agy-family-dispatch-"));
+  // AC-212 (ALF-B7-MFF): the host store reserves every lifetime in the session-authority registry, and the authority walk
+  // refuses a group/world-writable ancestor such as a shared /tmp, so the checkout lives beneath the owned checkout's
+  // scratch/ (nativeContractFixtureParent), the convention model-family-host-store.test.mjs and the native fixtures use.
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "agy-family-dispatch-"));
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["config", "user.name", "Synthetic"], { cwd: root });
   execFileSync("git", ["config", "user.email", "synthetic@example.invalid"], { cwd: root });
@@ -66,7 +70,14 @@ function familyFixture(nativeRole, { adapterContractSha256 = hash("adapter"), sc
       return { discoveryHost: { readDiscovery: h => h === handle ? { ok: true, code: "DISCOVERY_READ", value: discovery } : { ok: false, code: "HANDLE" } }, discoveryHandle: handle, context };
     },
   };
-  const controller = createModelFamilyHostController({ rootDir: join(repository.commonDir, "agent-pipeline"), clock: () => now, trustedSources: sources });
+  // AC-212 (ALF-B7-MFF): the host controller refuses with MODEL-FAMILY-AUTHORITY-UNAVAILABLE without an owned authority
+  // lifecycle (model-family-host-store.mjs ownedLifetime), so the fixture is a production-shaped initialized registry plus
+  // the lifecycle, as in model-family-host-store.test.mjs. ORDER MATTERS: the session descriptor above is written BEFORE
+  // the registry initializes (descriptors written afterwards drift the namespace, SDC-AUTHORITY-CAS; see d92874a11).
+  // excludeFromStatus keeps the fixture checkout reporting a clean `git status` (the two helper inputs are never tracked).
+  const registry = prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true });
+  const authorityLifecycle = createModelFamilyHostAuthorityLifecycle({ repository: registry.repository });
+  const controller = createModelFamilyHostController({ rootDir: join(repository.commonDir, "agent-pipeline"), clock: () => now, trustedSources: sources, authorityLifecycle });
   const activated = controller.activate(); assert.equal(activated.ok, true, activated.code);
   const consentSubject = { schema: "pipeline.agy-session-consent-subject.v2", repository, session: boundSession, runner: "antigravity", provider: "google", familyAuthoritySha256: verified.value.authoritySha256, assignments: verified.value.assignments.map(familyConsentAssignment), roles: [nativeRole], allowedPaths: ["input.txt"], scope, fallbackPolicy: "none", expiresAtMs: expires, decisionNonce: "synthetic-dispatch-consent" };
   const intent = buildSignatureIntent({ featureId: "fixture", planSha256: hash("plan"), specSha256: hash("spec"), candidate, subjectSha256: canonicalDigest(consentSubject), policyRevision: "agy-session-family-v2" });
