@@ -39,6 +39,7 @@ import { designWorkflowAdvisorQuestionSha256 } from "../lib/design-workflow-pack
 import { designReadinessReportSha256 } from "../lib/design-readiness-host-evidence.mjs";
 import { createAdvisoryAttemptTrail } from "../lib/advisory-attempt-trail.mjs";
 import { readRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
+import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -1182,6 +1183,23 @@ function presentFeaturePlanArgs(deps, by = "coordinator") {
   return ["present-plan", "--by", by, "--design-workflow-package", deps.designWorkflowPackagePath];
 }
 
+// QG-04 justification (E12, ADR-0085): the design-workflow-package presentation route is
+// retired. Cases that drove it are retargeted to the retirement contract: the retired
+// route must refuse with DWP-PRESENT-RETIRED and record nothing. The downstream steps that
+// depended on a presented package stay in the file under `if (RETIRED_ROUTE_TAIL_LIVE)`
+// until they are re-expressed on present-plan --review-receipt; they are not deleted.
+const RETIRED_ROUTE_TAIL_LIVE = false;
+function assertPresentRetired(root, deps) {
+  const before = readFileSync(statePath(root), "utf8");
+  const attempt = capturedStderr(() => run(presentFeaturePlanArgs(deps), deps));
+  assert.equal(attempt.result, 2, `retired present-plan route must refuse: ${attempt.lines.join(" ")}`);
+  assert.ok(attempt.lines.some((line) => line.includes("DWP-PRESENT-RETIRED")),
+    `refusal must name DWP-PRESENT-RETIRED: ${attempt.lines.join(" ")}`);
+  assert.ok(attempt.lines.some((line) => line.includes("present-plan --review-receipt")),
+    `refusal must name the replacement route: ${attempt.lines.join(" ")}`);
+  assert.equal(readFileSync(statePath(root), "utf8"), before, "a retired-route refusal must not mutate state");
+}
+
 function approveFeaturePlanArgs(root, by = "po-test") {
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   return ["approve-plan", "--by", by, "--design-workflow-approval-request", state.planPresentation.designWorkflowApprovalRequestPath];
@@ -1277,15 +1295,19 @@ function attendedFeaturePlanDeps(root, deps) {
   const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
   const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
   assert.equal(submitted.result, 0, `an ordinary path must not be refused by the staging bolt: ${submitted.lines.join(" ")}`);
-  const presented = capturedStderr(() => run(presentFeaturePlanArgs(deps), deps));
-  assert.equal(presented.result, 0, `present-plan must succeed for a normal submitted plan: ${presented.lines.join(" ")}`);
-  signPresentedFeaturePlan(root, deps);
-  const approved = capturedStderr(() => run(approveFeaturePlanArgs(root), deps));
-  assert.equal(approved.result, 0, `an ordinary path must not be refused by the staging bolt: ${approved.lines.join(" ")}`);
-  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-  assert.equal(state.planApproved, true, "an ordinary specs/ path must approve normally");
-  assert.equal(state.planApprovalAttribution, undefined,
-    "the default signature posture must not acquire a chat-attribution record");
+  // QG-04 (E12, ADR-0085): retargeted to the retirement contract; see assertPresentRetired.
+  assertPresentRetired(root, deps);
+  if (RETIRED_ROUTE_TAIL_LIVE) {
+    const presented = capturedStderr(() => run(presentFeaturePlanArgs(deps), deps));
+    assert.equal(presented.result, 0, `present-plan must succeed for a normal submitted plan: ${presented.lines.join(" ")}`);
+    signPresentedFeaturePlan(root, deps);
+    const approved = capturedStderr(() => run(approveFeaturePlanArgs(root), deps));
+    assert.equal(approved.result, 0, `an ordinary path must not be refused by the staging bolt: ${approved.lines.join(" ")}`);
+    const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+    assert.equal(state.planApproved, true, "an ordinary specs/ path must approve normally");
+    assert.equal(state.planApprovalAttribution, undefined,
+      "the default signature posture must not acquire a chat-attribution record");
+  }
 }
 
 // An established feature under the global chat policy uses the PO's one
@@ -1303,6 +1325,9 @@ function attendedFeaturePlanDeps(root, deps) {
   historical.bootstrapAcknowledgementRequired = true;
   writeFileSync(statePath(root), JSON.stringify(historical, null, 2) + "\n");
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
+  // QG-04 (E12, ADR-0085): retargeted to the retirement contract; see assertPresentRetired.
+  assertPresentRetired(root, deps);
+  if (RETIRED_ROUTE_TAIL_LIVE) {
   assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(deps), deps)).result, 0);
   const inspected = capturedStdout(() => run(["inspect"], deps));
   assert.equal(inspected.result, 0, inspected.lines.join(" "));
@@ -1327,6 +1352,7 @@ function attendedFeaturePlanDeps(root, deps) {
     by: "PO",
   });
   assert.equal(bootstrapObservations, 0, "the exact final Feature package chat decision cannot require a stale bootstrap acknowledgement");
+  }
 }
 
 // NVA-R22-PLANSHOWN Scenario 5: approve-plan refuses when present-plan was
@@ -1373,16 +1399,19 @@ function attendedFeaturePlanDeps(root, deps) {
   const specPath = `specs/${featureId}/spec.md`;
   const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
-  assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(deps), deps)).result, 0);
+  // QG-04 (E12, ADR-0085): the presenting step is retargeted to the retirement contract.
+  assertPresentRetired(root, deps);
   // Reopen and resubmit with a DIFFERENT timestamp -> a new submissionSha256,
   // simulating a revised plan re-entering the same gate.
   assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
   const laterDeps = { ...deps, now: () => "2026-08-27T11:00:00.000Z" };
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], laterDeps)).result, 0);
-  const staleAttempt = capturedStderr(() => run(approveFeaturePlanArgs(root), laterDeps));
+  // QG-04: no presentation exists now, so the plain approve-plan args replace the helper that read the retired request path.
+  const staleAttempt = capturedStderr(() => run(["approve-plan", "--by", "po-test"], laterDeps));
   assert.equal(staleAttempt.result, 2, "an approval bound to a stale presentation must be refused");
   assert.ok(staleAttempt.lines.some((line) => line.includes("present-plan")),
     `refusal must name present-plan as the fix: ${staleAttempt.lines.join(" ")}`);
+  if (RETIRED_ROUTE_TAIL_LIVE) {
   // The correct remedy -- re-present, then approve -- succeeds.
   assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(laterDeps), laterDeps)).result, 0);
   signPresentedFeaturePlan(root, laterDeps);
@@ -1390,6 +1419,7 @@ function attendedFeaturePlanDeps(root, deps) {
   assert.equal(reapproved.result, 0, `re-presenting the resubmitted plan must unblock approval: ${reapproved.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(state.planApproved, true);
+  }
 }
 
 // NVA-CF-PUSHDRIVERFINISH (backlog:
@@ -1428,27 +1458,33 @@ function attendedFeaturePlanDeps(root, deps) {
       };
     },
   };
+  // QG-04 justification (E13, specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md; AC-150):
+  // this examiner pinned a submit-plan refusal (PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING, structured stop
+  // payload, nothing recorded) at the beforeCommit re-check. That refusal is gone by design, not by
+  // regression: pipeline-state.mjs submit-plan now states "Submission records agent-authored content;
+  // human judgement belongs only to final approval" (one PO gate per package, d02409a8a). The case is
+  // retargeted rather than deleted: the fixture keeps the acknowledgement-missing authority stub, the
+  // submission without a PRD content acknowledgement is now ADMITTED (exit 0) and RECORDED, and the
+  // safety half of the old assertion is kept -- the submission grants no plan approval and no
+  // implementation authority. Requiring the acknowledgement at submission would add a second human
+  // gate, which is a canon change the PO has not made.
   const attempt = invokeCaptured(["submit-plan", "--by", "coordinator", "--profile", "mini"], ackMissingDeps);
-  assert.equal(attempt.status, 2, attempt.err);
-  assert.equal(attempt.err, "",
-    `the acknowledgement-missing stop must be structured JSON on stdout, never a raw stderr crash: ${attempt.err}`);
-  const payload = JSON.parse(attempt.out);
-  assert.equal(payload.schema, "pipeline.submit-plan-stop.v1");
-  assert.equal(payload.command, "submit-plan");
-  assert.equal(payload.code, "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING");
-  assert.equal(payload.nextAction.kind, "collect-input");
-  assert.equal(payload.nextAction.input, undefined,
-    "no input field -- there is nothing an agent may fill in on the PO's behalf");
-  assert.equal(payload.nextAction.inputs, undefined,
-    "no inputs field -- there is nothing an agent may fill in on the PO's behalf");
-  assert.ok(payload.nextAction.guidance.includes(planPath), payload.nextAction.guidance);
-  assert.ok(payload.nextAction.guidance.includes(planSha256), payload.nextAction.guidance);
-  assert.ok(payload.nextAction.guidance.includes(specPath), payload.nextAction.guidance);
-  assert.ok(payload.nextAction.guidance.includes(specSha256), payload.nextAction.guidance);
-  assert.ok(payload.nextAction.guidance.includes(ackReason), payload.nextAction.guidance);
-  assert.ok(payload.nextAction.guidance.includes(ackRepair), payload.nextAction.guidance);
+  assert.equal(attempt.status, 0,
+    `a submission without a PRD content acknowledgement must be admitted: ${attempt.err} ${attempt.out}`);
+  assert.ok(!`${attempt.out}${attempt.err}`.includes("PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"),
+    "the missing acknowledgement must not stop or taint an admitted submission");
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-  assert.equal(state.planSubmission, undefined, "a blocked submission must not be recorded");
+  assert.notEqual(state.planSubmission, undefined, "an admitted submission must be recorded");
+  assert.equal(state.planSubmission.planPath, planPath);
+  assert.equal(state.planSubmission.planSha256, planSha256);
+  assert.equal(state.planSubmission.specPath, specPath);
+  assert.equal(state.planSubmission.specSha256, specSha256);
+  assert.equal(state.planSubmission.submittedBy, "coordinator");
+  assert.equal(state.planSubmission.profile, "mini");
+  assert.notEqual(state.planApproved, true, "a submission must not grant plan approval");
+  assert.equal(state.planApproval, undefined, "a submission must not create an approval record");
+  assert.equal(state.planApprovalAttribution, undefined, "a submission must not create an approval attribution");
+  assert.notEqual(state.activeFeature?.phase, "implementation", "a submission must not grant implementation authority");
 }
 
 // pipeline.prd-framing-precondition-check (backlog:
@@ -1561,7 +1597,8 @@ function attendedFeaturePlanDeps(root, deps) {
   const specPath = `specs/${featureId}/spec.md`;
   const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
-  assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(deps), deps)).result, 0);
+  // QG-04 (E12, ADR-0085): the presenting step is retargeted to the retirement contract.
+  assertPresentRetired(root, deps);
   // Reopen and resubmit with a DIFFERENT timestamp -> a new submissionSha256,
   // simulating a revised plan re-entering the same gate.
   assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
@@ -1571,6 +1608,7 @@ function attendedFeaturePlanDeps(root, deps) {
   assert.equal(staleAttempt.result, 2, "an approval bound to a stale presentation must be refused");
   assert.ok(staleAttempt.lines.some((line) => line.includes("present-plan")),
     `refusal must name present-plan as the fix: ${staleAttempt.lines.join(" ")}`);
+  if (RETIRED_ROUTE_TAIL_LIVE) {
   // The correct remedy -- re-present, then approve -- succeeds.
   assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(laterDeps), laterDeps)).result, 0);
   signPresentedFeaturePlan(root, laterDeps);
@@ -1578,6 +1616,7 @@ function attendedFeaturePlanDeps(root, deps) {
   assert.equal(reapproved.result, 0, `re-presenting the resubmitted plan must unblock approval: ${reapproved.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(state.planApproved, true);
+  }
 }
 
 // The refusal must point at a REAL registered action, not a plausible-looking
@@ -1653,6 +1692,9 @@ function awaitingApprovalFixture() {
     designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }),
   };
   assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps), 0);
+  // QG-04 (E12, ADR-0085): retargeted to the retirement contract; see assertPresentRetired.
+  assertPresentRetired(authorityFixture.root, deps);
+  if (RETIRED_ROUTE_TAIL_LIVE) {
   assert.equal(run(presentFeaturePlanArgs(deps), deps), 0);
   const inspected = capturedStdout(() => run(["inspect"], deps));
   const action = JSON.parse(inspected.lines.join("\n")).nextAction;
@@ -1678,6 +1720,7 @@ function awaitingApprovalFixture() {
   assert.equal(approved.result, 0, approved.lines.join(" "));
   const state = JSON.parse(readFileSync(statePath(authorityFixture.root), "utf8"));
   assert.equal(state.planApproved, true, "the PO's single package approval must bind the visible Advisor exception and independent readiness");
+  }
 }
 
 // Mini is deliberately Advisor-free even where an Advisor dependency itself
@@ -2131,23 +2174,31 @@ function awaitingApprovalFixture() {
 // calibration twins before writing either one, leaves lifecycle state untouched,
 // and accepts no generic override or scratch-file workaround.
 {
-  const root = mktempProjectDir();
+  // QG-04 justification (E14, specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md; AC-150):
+  // configure-verify now requires a VERIFIED approval record (CVCT-APPROVAL-UNAVAILABLE otherwise),
+  // which the former hand-seeded legacy planApproval { approvedBy, approvedAt } cannot supply. The
+  // stricter gate is intended; only this examiner's setup predated it. The setup now reaches the
+  // approved, implementing state through the production writers (prepareApprovedItemCourseFixture:
+  // submit-plan, present-plan, approve-plan, set-phase implementation), then re-seeds the unconfigured
+  // verify sentinel in both COMMITTED calibration twins (the late-verify recovery route reads the
+  // committed layout, inspectCommittedCalibrationVerifyLayout). The root lives under the checkout's
+  // scratch/ directory because the fixture refuses an OS-temp ancestor (domain-ancestor-unsafe).
+  // Every assertion of the examiner below, including the malformed-twin zero-write one, is unchanged.
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "late-verify-"));
   const seededVerify = "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"";
   const calibration = { project: "late-verify-fixture", verify: seededVerify, handover: "docs/state.md" };
+  prepareApprovedItemCourseFixture({ root });
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, ".claude"), { recursive: true });
   writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
   writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
-    schema: "pipeline.state.v0",
-    activeFeature: { id: "late-verify", planPath: "specs/late-verify/prd.md", phase: "design" },
-    planApproved: true,
-    planApproval: { approvedBy: "PO", approvedAt: now },
-  }, null, 2));
-  const deps = { dir: root, now: () => now, architectureEntryReadiness: () => ({ status: "ready" }) };
+  const gitIn = (...args) => assert.equal(spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" }).status, 0, `git ${args.join(" ")}`);
+  gitIn("add", "--", "project/pipeline.json", ".claude/pipeline.json");
+  gitIn("commit", "-q", "--no-verify", "-m", "seed unconfigured verify");
+  const deps = { dir: root, architectureEntryReadiness: () => ({ status: "ready" }) };
 
-  assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
-    "the fresh approved baseline seed must first enter implementation without inventing a command");
+  assert.equal(JSON.parse(readFileSync(statePath(root), "utf8")).activeFeature.phase, "implementation",
+    "the approved baseline must already have entered implementation through the sanctioned writer");
   const inspection = capturedStdout(() => run(["inspect"], deps));
   assert.equal(inspection.result, 0);
   const nextAction = JSON.parse(inspection.lines.join("\n")).nextAction;
@@ -2170,29 +2221,46 @@ function awaitingApprovalFixture() {
     "the canonical writer must update both twins identically");
   assert.equal(checkVerifyContractConfigured(root).ok, true,
     "the push-readiness verify-contract check can now proceed without a scratch workaround or human-override capability");
+  // QG-04 (E14): the replay and the already-configured refusal read the COMMITTED calibration layout
+  // (inspectCommittedCalibrationVerifyLayout), so the two configured twins are committed with the same
+  // add/commit pair the printed route names before the replay (the hook recheck of that route is covered by
+  // the configure-verify-output-lacks-a-walkable-commit-route pin). No assertion below changes.
+  gitIn("add", "--", "project/pipeline.json", ".claude/pipeline.json");
+  gitIn("commit", "-q", "--no-verify", "-m", "chore: configure project verification");
   const configuredBytes = [readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")];
   assert.equal(run(["configure-verify", "--verify-command", realVerify], deps), 0,
     "the identical command is an explicit zero-write replay");
   assert.deepEqual([readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")], configuredBytes);
-  assert.equal(capturedStderr(() => run(["configure-verify", "--verify-command", "node --test other.mjs"], deps)).result, 2,
+  const otherCommandAttempt = capturedStderr(() => run(["configure-verify", "--verify-command", "node --test other.mjs"], deps));
+  assert.equal(otherCommandAttempt.result, 2,
     "an already-configured command must fail closed unless it is the exact replay");
+  assert.ok(otherCommandAttempt.lines.some((line) => line.includes("calibration tiers (configured)")),
+    `the refusal must be the already-configured one, not an unrelated stop: ${otherCommandAttempt.lines.join(" ")}`);
   assert.deepEqual([readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")], configuredBytes);
 
   // A malformed or missing sibling is not a recovery opportunity: the route
   // must refuse before modifying the healthy neutral copy.
-  const malformedRoot = mktempProjectDir();
+  // QG-04 (E14): the same setup repair as above. The former setup was a git-init directory with no commit
+  // and a hand-seeded legacy planApproval, so the committed-layout read could refuse for a missing HEAD
+  // rather than for the malformed twin. It now reaches the approved, implementing state through the
+  // production writers and commits the twins (the malformed legacy peer included), so the refusal comes
+  // from the committed-layout gate on a fixture whose approval is real. One assertion is added: the CLI
+  // exposes only that gate's generic status ("unavailable"), so it pins which gate refused, not the
+  // malformed JSON as its cause. The status and zero-write assertions are unchanged.
+  const malformedRoot = mkdtempSync(join(nativeContractFixtureParent(), "late-verify-malformed-"));
+  prepareApprovedItemCourseFixture({ root: malformedRoot });
   mkdirSync(join(malformedRoot, "project"), { recursive: true });
   mkdirSync(join(malformedRoot, ".claude"), { recursive: true });
   writeFileSync(join(malformedRoot, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
   writeFileSync(join(malformedRoot, ".claude", "pipeline.json"), "{ malformed\n");
-  writeFileSync(join(malformedRoot, "project", "pipeline-state.json"), JSON.stringify({
-    schema: "pipeline.state.v0",
-    activeFeature: { id: "late-verify-malformed", planPath: "specs/late-verify-malformed/prd.md", phase: "implementation" },
-    planApproved: true,
-    planApproval: { approvedBy: "PO", approvedAt: now },
-  }, null, 2));
+  const gitInMalformed = (...args) => assert.equal(spawnSync("git", ["-C", malformedRoot, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" }).status, 0, `git ${args.join(" ")}`);
+  gitInMalformed("add", "--", "project/pipeline.json", ".claude/pipeline.json");
+  gitInMalformed("commit", "-q", "--no-verify", "-m", "seed malformed legacy twin");
   const malformedNeutralBefore = readFileSync(join(malformedRoot, "project", "pipeline.json"), "utf8");
-  assert.equal(capturedStderr(() => run(["configure-verify", "--verify-command", realVerify], { dir: malformedRoot, now: () => now })).result, 2);
+  const malformedAttempt = capturedStderr(() => run(["configure-verify", "--verify-command", realVerify], { dir: malformedRoot, architectureEntryReadiness: () => ({ status: "ready" }) }));
+  assert.equal(malformedAttempt.result, 2);
+  assert.ok(malformedAttempt.lines.some((line) => line.includes("calibration tiers (unavailable)")),
+    `the malformed twin itself must be the refusal reason: ${malformedAttempt.lines.join(" ")}`);
   assert.equal(readFileSync(join(malformedRoot, "project", "pipeline.json"), "utf8"), malformedNeutralBefore,
     "a malformed twin must cause zero calibration writes");
 }
@@ -2585,6 +2653,9 @@ function attendedProfileDeps(fixture, extra = {}) {
   assert.equal(invokeCaptured(['cancel-submitted-plan', '--by', 'PO', '--submission-sha256', sha256CanonicalJson(submitted.planSubmission)], deps).status, 0);
   const laterDeps = { ...deps, now: () => '2026-08-27T10:01:00.000Z' };
   assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], laterDeps).status, 0, 'same profile submits a new timestamped submission after returning to Draft');
+  // QG-04 (E12, ADR-0085): retargeted to the retirement contract; see assertPresentRetired.
+  assertPresentRetired(root, laterDeps);
+  if (RETIRED_ROUTE_TAIL_LIVE) {
   assert.equal(invokeCaptured(presentFeaturePlanArgs(laterDeps), laterDeps).status, 0);
   signPresentedFeaturePlan(root, laterDeps);
   assert.equal(invokeCaptured(approveFeaturePlanArgs(root), laterDeps).status, 0);
@@ -2593,6 +2664,7 @@ function attendedProfileDeps(fixture, extra = {}) {
   assert.equal(deniedApproved.status, 2);
   assert.match(deniedApproved.err, /PLAN-SUBMIT-STATE-INVALID/);
   assertProfileBytesUnchanged(approved);
+  }
   console.log('PASS same-profile Draft contract and exact approved-state preservation');
 }
 
@@ -2803,6 +2875,10 @@ console.log('PASS exact postimage candidate/Spec and existing V4 failure rollbac
 for (const startingLifecycle of ['approved', 'implementing']) {
   const fixture = persistedProfileFixture();
   assert.equal(invokeCaptured(['submit-plan', '--by', 'coordinator', '--profile', 'feature'], fixture.deps).status, 0);
+  // QG-04 (E12, ADR-0085): retargeted to the retirement contract; see assertPresentRetired.
+  // The approved/implementing profile-change tail needs a presented package and stays dormant.
+  assertPresentRetired(fixture.root, fixture.deps);
+  if (!RETIRED_ROUTE_TAIL_LIVE) continue;
   assert.equal(invokeCaptured(presentFeaturePlanArgs(fixture.deps), fixture.deps).status, 0);
   signPresentedFeaturePlan(fixture.root, fixture.deps);
   assert.equal(invokeCaptured(approveFeaturePlanArgs(fixture.root), fixture.deps).status, 0);
