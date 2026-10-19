@@ -56,6 +56,7 @@ error as the cause in the registry boundary's finally block.
 - These red cases turn green with a counted result and no assertion weakened:
   - MFI012 and MFI013 (`model-family-invocation.test.mjs`);
   - MFMP003 (`model-family-main-prelaunch.test.mjs`);
-  - MFHS002 and MFHS005 to MFHS008 (`model-family-host-store.test.mjs`).
+  - MFHS002 to MFHS008 (`model-family-host-store.test.mjs`);
+  - CCH136 (`codex-critic-host.test.mjs`).
 - A refusal case keeps proving that an effect still held when the lifecycle closes is
   refused.
