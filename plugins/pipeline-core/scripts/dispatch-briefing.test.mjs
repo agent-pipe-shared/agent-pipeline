@@ -224,6 +224,17 @@ test("the skeleton prefills field 6 and leaves judgment fields as placeholders",
   assert.ok(!/\{\{(?:RULESET|MODEL|TIER|TOOL_BUDGET)/u.test(field6));
 });
 
+test("the skeleton names the slice and write scope the item admission reads (PF-42)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { parseDispatchSlice } = await import("../lib/dispatch-policy.mjs");
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const named = parseDispatchSlice(result.skeleton);
+  assert.equal(named.sliceId, result.binding.itemDelivery.sliceId);
+  assert.deepEqual(named.writeScope, result.binding.allowedPaths);
+});
+
 const REFUSALS = [
   ["a missing acceptance row names the slug", { "--item": "absent-slug" }, [], {}, "DBG-AC-ROW-MISSING", "absent-slug"],
   ["an unknown agent type", { "--agent-type": "goldfish-wizard" }, [], {}, "DBG-AGENT-TYPE-UNKNOWN", "goldfish-wizard"],

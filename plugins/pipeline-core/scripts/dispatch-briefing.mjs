@@ -41,7 +41,7 @@ import {
 } from "../lib/native-goldfish-host-return.mjs";
 import { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } from "../lib/agent-model-registry.mjs";
 import { CRITERION_ID_SOURCE, isCriterionId, parseAcceptedCriticCriterion } from "../lib/critic-accepted-contract.mjs";
-import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
+import { dispatchBudgetLineForRole, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
 import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
@@ -508,6 +508,9 @@ export function generateDispatchBinding(options, deps = {}) {
     `- Ruleset: ${rulesetVersion ? `\`${rulesetVersion}\` · ` : ""}content identity \`${rulesetSha}\`${rulesetFallback ? ` (fallback: ${rulesetFallback})` : ""}.`,
     `- Model/effort: \`${modelId}\` / ${resolved.effort} (${agentType}; agent definition alias \`${resolved.model}\`).`,
     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
+    // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
+    `- Slice: ${dispatchId}`,
+    `- Write scope: ${allowedPaths.join(", ")}`,
     `- **Tool budget (TB-09, hard cap):** ≤${budget.budget} tool uses (min(tier cap ${budget.tierCap}, maxTurns ${maxTurns} - 15)). 80 % checkpoint at about call ${budget.checkpoint}: stop editing and end the turn with an interim report naming what remains.`,
   ];
   const skeleton = [
@@ -528,6 +531,8 @@ export function generateDispatchBinding(options, deps = {}) {
   const { criticDecision: _decision, ...parsedRest } = parsed.binding;
   const { criticDecision: _own, ...ownRest } = binding;
   if (JSON.stringify(parsedRest) !== JSON.stringify(ownRest)) refuse("DBG-SELFCHECK-PARSE", "the host parser read back a different binding than was generated");
+  const named = parseDispatchSlice(skeleton);
+  if (named.sliceId !== dispatchId || JSON.stringify(named.writeScope) !== JSON.stringify([...allowedPaths])) refuse("DBG-SELFCHECK-SLICE", "the admission parser reads a different slice or write scope from the generated skeleton");
 
   return { schema: DISPATCH_BINDING_SCHEMA, ok: true, block, binding, skeleton, warnings };
 }
