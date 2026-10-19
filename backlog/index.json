@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "22dc0918e90d63d2b0e132aaaa6b44fb04f01dfb1489c17652ed456db07ca224"
+    "transitionHead": "1276888af256a99d8affb165f03f1f36c0b5b8e3ec72b6a17e1d68af3b9a6c94"
   },
   "counts": {
-    "open": 236,
+    "open": 237,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -381,6 +381,16 @@
       "source": "Live observation, 2026-08-27: the PO caught a stale cachebuster in plugin.json after a block of work that included wiring a new PreToolUse hook; nothing in Verify compares the stamp against HEAD. Corrected in ruleset a49cd41a.",
       "deferred": false,
       "sprint": "nightwing"
+    },
+    {
+      "id": "pipeline.a-symlinked-project-root-is-refused-by-the-state-authority-route",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "Elephant decision E18 (2026-10-19): the RGt block of harness/scripts/pipeline-state.test.mjs, ceremony C4 c-3",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published",
