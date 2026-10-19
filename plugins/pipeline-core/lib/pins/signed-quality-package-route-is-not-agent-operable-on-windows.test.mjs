@@ -139,6 +139,45 @@ test("P2: on native Windows backslash path words are admitted only as their exac
     } finally { cleanup(item); }
   });
 
+// The executed counterpart of the typed-skipped native test above: it drives the REAL lane through the injected `platform`
+// seam. The node executable word is a synthetic native-Windows path (backslashes and a space) injected as the trusted execPath, so
+// the win32 rendering gate is exercised end to end on any host. Every other word stays this host's canonical path: the physical-file
+// half of the lane (realpath, link count, path grammar) is bound to the running host and has no seam, so native `D:\` root/intent/
+// proof/policy words are admitted only on a real win32 host -- that variant remains the separately named native-host obligation.
+test("P2: through the injected win32 platform seam a backslash-bearing word is admitted only as its exact canonical rendering, on any host", () => {
+  const item = fixture();
+  try {
+    const winNode = "C:\\Program Files\\nodejs\\node.exe";
+    const win32 = { platform: "win32", processExecPath: winNode };
+    const linux = { platform: "linux", processExecPath: winNode };
+    const rest = [MATERIALIZER, item.root, item.intentPath, item.proofPath, item.policyPath, "prepare-commit"];
+    const render = (words, quote) => words.map(quote).join(" ");
+    const single = render([winNode, ...rest], (w) => `'${w}'`);
+    const doubled = render([winNode, ...rest], (w) => JSON.stringify(w));
+    const admits = (command, dependencies) => signedQualityPackageCommandAdmission(command, item.root, dependencies);
+    assert.equal(admits(single, win32), true, "single-quoted backslash word");
+    assert.equal(admits(doubled, win32), true, "double-quoted, doubled backslashes");
+    assert.equal(admits(single, linux), false, "the same command stays refused off win32");
+    assert.equal(admits(doubled, linux), false, "double-quoted form stays refused off win32");
+    assert.equal(admits(single, { processExecPath: winNode }), process.platform === "win32", "the host platform decides when no platform is injected");
+    // Non-canonical renderings are refused even though a POSIX-dialect parse may yield the same words.
+    assert.equal(admits(render([winNode, ...rest], (w) => `"${w}"`), win32), false, "double-quoted without doubled backslashes");
+    assert.equal(admits(`${single}\\`, win32), false, "trailing backslash");
+    assert.equal(admits(single.replace(`'${winNode}'`, winNode), win32), false, "unquoted native path");
+    assert.equal(admits(single.replace(winNode, "C:\\Other\\node.exe"), win32), false, "a node word that is not the trusted execPath");
+    // Path spelling of the interpreter: `node.exe` is a direct name on win32 only.
+    const bareExe = render(["node.exe", ...rest], (w) => `'${w}'`);
+    assert.equal(admits(bareExe, { platform: "win32" }), true, "node.exe is admitted on win32");
+    assert.equal(admits(bareExe, { platform: "linux" }), false, "node.exe is not a direct node name off win32");
+    // Every other metacharacter stays refused on win32 too.
+    for (const meta of ["$", "`", ";", "&", "|", "<", ">", "\n", "\r"]) {
+      assert.equal(admits(`${single} ${meta} echo x`, win32), false, JSON.stringify(meta));
+    }
+    const mirrorBlanketRefusal = (command) => !/[\\$`;&|<>\r\n]/u.test(command); // scratch mirror of the former lane: any backslash refused
+    assert.equal(mirrorBlanketRefusal(single), false, "RED: the former blanket backslash refusal can never admit this command");
+  } finally { cleanup(item); }
+});
+
 // ---- P3 path spelling, mode bits, nlink ----------------------------------------------------------------------------
 test("P3: Git-reported and Node-resolved spellings of one directory compare by physical identity (RED: string compare fails)", () => {
   const item = fixture();

@@ -17,7 +17,10 @@ process.on("exit", () => { try { rmSync(FIXTURE_TMP, { recursive: true, force: t
 function fixture() {
   const root = mkdtempSync(join(FIXTURE_TMP, "signed-quality-package-"));
   git(root, ["init", "-q"]); git(root, ["config", "user.email", "test@example.invalid"]); git(root, ["config", "user.name", "Test"]);
-  const keys = generateKeyPairSync("ed25519"); const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
+  // The product builds its isolated checkout under <root>/scratch (as the real repository, which ignores scratch/); a fixture that does
+  // not ignore it reports that checkout as untracked and every applyToMain call ends in QUALITY-PACKAGE-BASE-DRIFT.
+  writeFileSync(join(root, ".gitignore"), "scratch/\n"); git(root, ["add", ".gitignore"]);
+  const keys =generateKeyPairSync("ed25519"); const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
   writeFileSync(join(root, "subject.txt"), "before\n");
   mkdirSync(join(root, "project"));
   writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "test-key", publicKeySha256: sha(publicKey) }] }));
@@ -310,7 +313,8 @@ function hf11Repo(label) {
   const root = mkdtempSync(join(FIXTURE_TMP, `hf11-${label}-`));
   git(root, ["init", "-q"]);
   for (const [key, value] of [["user.email", "test@example.invalid"], ["user.name", "Test"], ["core.autocrlf", "false"], ["commit.gpgsign", "false"]]) git(root, ["config", key, value]);
-  const keys = generateKeyPairSync("ed25519"); const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
+  writeFileSync(join(root, ".gitignore"), "scratch/\n"); git(root, ["add", ".gitignore"]); // see fixture(): applyToMain needs an ignored scratch/
+  const keys =generateKeyPairSync("ed25519"); const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
   writeFileSync(join(root, "subject.txt"), "before\n");
   mkdirSync(join(root, "project"));
   writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "test-key", publicKeySha256: sha(publicKey) }] }));
