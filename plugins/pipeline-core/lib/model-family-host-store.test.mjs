@@ -802,6 +802,16 @@ test("freshly signed authority successor CAS preserves watermarks and held recei
   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
+// QG-04 (E29 (2), AC-212): on state the test itself tampered with, the source now fails closed by THROWING a
+// SessionAuthorityError (SDC-AUTHORITY-UNAVAILABLE) instead of returning a refusal object. The examiner follows
+// the throw's exact code and reason; every other refusal assertion in the case stays. Source behaviour from
+// d02409a8a (git log -S unowned-retained-member: session-authority-domain-owner.mjs reconcile;
+// git log -S unknown-or-invalid-entry: model-family-host-store.mjs classifyEntry).
+function failClosedThrow(code, reasonSuffix) {
+  return (error) => error?.name === "SessionAuthorityError" && error.code === code
+    && typeof error.reason === "string" && error.reason.endsWith(reasonSuffix);
+}
+
 test("unsigned, wrong-predecessor, raced and partial successor transitions fail closed", () => {
   const f = fixture();
   try {
@@ -841,7 +851,8 @@ test("unsigned, wrong-predecessor, raced and partial successor transitions fail 
     marker.authoritySha256 = digest(valid.bundle);
     writeFileSync(markerPath, JSON.stringify(marker), { mode: 0o600 });
     assert.equal(f.controller.readState().code, "MODEL-FAMILY-STATE-UNCERTAIN");
-    assert.equal(invoke(f, key("partial-transition-no-fallback")).code, "MODEL-FAMILY-STATE-UNCERTAIN");
+    assert.throws(() => invoke(f, key("partial-transition-no-fallback")),
+      failClosedThrow("SDC-AUTHORITY-UNAVAILABLE", "unowned-retained-member"));
   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
@@ -877,7 +888,9 @@ function spawnTransitionWriter(rootDir, data) {
     "const d=JSON.parse(process.env.S4_TRANSITION_DATA);",
     "const s={readAuthorityInputs:()=>d.authorityInputs,readSuccessorAuthorityInputs:()=>d.successorInputs,readPinInputs:()=>[],readFreshDiscovery:()=>{throw Error('unused')},readCurrentCandidate:()=>({candidateCommit:'3333333333333333333333333333333333333333',candidateTree:'4444444444444444444444444444444444444444'}),launchDriver:()=>({ok:true})};",
     "const c=createModelFamilyHostController({rootDir:d.rootDir,trustedSources:s,clock:()=>Date.parse('2026-10-01T12:00:30.000Z'),authorityLifecycle:createModelFamilyHostAuthorityLifecycle({repository:inspectSignedDescriptorCustodyRepository((await import('node:path')).resolve(d.rootDir,'..','..'))})});",
-    "const r=c.transitionAuthority();process.stdout.write(JSON.stringify({ok:r.ok,code:r.code,generation:r.state?.generation})+'\\n');",
+    // QG-04 (E29 (3), AC-212): the registry lock is O_EXCL with no wait (SDC-LOCK-HELD registry-lock-held), so the
+    // contending child retries a bounded number of times on that exact code and reason only; the parent keeps every outcome assertion.
+    "const r=(()=>{for(let i=0;;i+=1){try{return c.transitionAuthority();}catch(e){if(e?.code!=='SDC-LOCK-HELD'||e?.reason!=='registry-lock-held'||i>=49)throw e;Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20);}}})();process.stdout.write(JSON.stringify({ok:r.ok,code:r.code,generation:r.state?.generation})+'\\n');",
   ].join("\n");
   return new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, ["--input-type=module", "-e", source], {
@@ -903,7 +916,15 @@ test("real competing transition and prepare serialize on the stored generation",
     const successorInputs = { bundle: next.bundle, routeSource: next.routeSource, trustAnchors };
     const authorityInputs = { bundle: f.data.bundle, routeSource: f.data.routeSource, trustAnchors, predecessor: null };
     const transitionPromise = spawnTransitionWriter(f.root, { authorityInputs, successorInputs });
-    const prepared = invoke(f, key("competing-transition-prepare"));
+    // QG-04 (E30): the registry lock is O_EXCL with no wait, so the parent's own competing invoke retries a bounded
+    // number of times on SDC-LOCK-HELD / registry-lock-held only; anything else, and the last failure, rethrows.
+    let prepared;
+    for (let attempt = 0; ; attempt += 1) {
+      try { prepared = invoke(f, key("competing-transition-prepare")); break; } catch (error) {
+        if (error?.code !== "SDC-LOCK-HELD" || error?.reason !== "registry-lock-held" || attempt >= 49) throw error;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+      }
+    }
     const transition = await transitionPromise;
     assert.equal(transition.ok, true, transition.code);
     assert.equal([true, false].includes(prepared.ok), true);
@@ -925,10 +946,13 @@ test("missing or corrupt private current state preserves active-family refusal a
     const result = f.controller.readState();
     assert.equal(result.ok, false);
     assert.equal(result.code, "MODEL-FAMILY-STATE-UNCERTAIN");
-    assert.equal(f.controller.prepare({ key: key("new"), assignment: route }).code, "MODEL-FAMILY-STATE-UNCERTAIN");
+    // QG-04 (E29 (2)): prepare over the unlinked current.json now throws; see failClosedThrow above.
+    assert.throws(() => f.controller.prepare({ key: key("new"), assignment: route }),
+      failClosedThrow("SDC-AUTHORITY-UNAVAILABLE", "model-family-host:unowned-retained-member"));
     writeFileSync(join(f.root, "model-family-host", "current.json"), "{\"partial\":", { mode: 0o600 });
     assert.equal(f.controller.readState().code, "MODEL-FAMILY-STATE-UNCERTAIN");
-    assert.equal(f.controller.prepare({ key: key("newer"), assignment: route }).code, "MODEL-FAMILY-STATE-UNCERTAIN");
+    assert.throws(() => f.controller.prepare({ key: key("newer"), assignment: route }),
+      failClosedThrow("SDC-AUTHORITY-UNAVAILABLE", "model-family-host:unknown-or-invalid-entry"));
   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
@@ -961,8 +985,8 @@ test("replaced receipt bytes are never repaired or overwritten; tampering blocks
     const before = readFileSync(receiptPath);
     assert.equal(statSync(receiptPath).nlink, 1);
     writeFileSync(receiptPath, "{}\n", { mode: 0o600 });
-    const replay = invoke(f);
-    assert.equal(replay.ok, false);
+    // QG-04 (E29 (2)): the replaced receipt is classified unknown-or-invalid-entry; invoke now throws (see helper above).
+    assert.throws(() => invoke(f), failClosedThrow("SDC-AUTHORITY-UNAVAILABLE", "model-family-host:unknown-or-invalid-entry"));
     assert.notDeepEqual(readFileSync(receiptPath), before);
     assert.equal(readHeldModelFamilyInvocation({ rootDir: f.root, key: key() }).ok, false);
   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
@@ -994,7 +1018,8 @@ function spawnConcurrentWriter(rootDir, hostData) {
     "readFreshDiscovery:()=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,40);const h=Object.freeze(Object.create(null)),v=d.preparation.discovery,fr=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(fr);Object.freeze(x)}return x};return {discoveryHost:{readDiscovery:x=>x===h?{ok:true,code:'DISCOVERY_READ',value:fr(v)}:{ok:false,code:'DISCOVERY_HANDLE_REQUIRED',retryable:false}},discoveryHandle:h,context:d.preparation.context};},",
     "readCurrentCandidate:()=>({candidateCommit:'3333333333333333333333333333333333333333',candidateTree:'4444444444444444444444444444444444444444'}),launchDriver:()=>({ok:true})};",
     "const c=createModelFamilyHostController({rootDir:d.rootDir,trustedSources:sources,clock:()=>Date.parse('2026-10-01T12:00:30.000Z'),authorityLifecycle:createModelFamilyHostAuthorityLifecycle({repository:inspectSignedDescriptorCustodyRepository((await import('node:path')).resolve(d.rootDir,'..','..'))})});",
-    "const r=c.prepare({key:d.key,assignment:d.assignment});",
+    // QG-04 (E29 (3), AC-212): bounded retry on the O_EXCL registry lock (exact code and reason only); see spawnTransitionWriter.
+    "const r=(()=>{for(let i=0;;i+=1){try{return c.prepare({key:d.key,assignment:d.assignment});}catch(e){if(e?.code!=='SDC-LOCK-HELD'||e?.reason!=='registry-lock-held'||i>=49)throw e;Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20);}}})();",
     "process.stdout.write(JSON.stringify({ok:r.ok,code:r.code,receiptSha256:r.value?.receipt.receiptSha256})+'\\n');",
   ].join("\n");
   return new Promise((resolvePromise, reject) => {
@@ -1012,6 +1037,9 @@ function spawnConcurrentWriter(rootDir, hostData) {
   });
 }
 
+// E30 (specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md): this case is a LATENT RED, deliberately left
+// failing; a member reserved by another process is refused as unowned. Bound to backlog item
+// 2026-10-19-a-member-reserved-by-another-process-is-refused-as-unowned.md. No retry on unowned-retained-member.
 test("real process contention serializes same-key replay and different invocation CAS generations", async () => {
   assert.equal(MODEL_FAMILY_HOST_STORE_LIMITS.casRetries, 2);
   for (const sameInvocation of [true, false]) {
