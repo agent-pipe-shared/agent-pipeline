@@ -6752,12 +6752,17 @@ export function createHumanGuardOverrideAuthorityProducerPort({repository: input
           // Genuine legacy unbound arms remain held; they cannot be attributed or
           // silently discharged by an observer, expiry, or process liveness.
           if (member.association?.state !== "unbound" || member.phase === "released") hgoAuthorityFailure("hgo:member-without-source-index");
-          const match = inventory.groups.get("capabilities").find(row => {
-            if (hgoRetiredExpired(row)) return false;
-            const cap = validatedCapability(inventory.paths, row.path);
-            return cap.status === "armed" && sha({repository, association: member.association, capabilitySha256: row.ref.sha256}) === member.bindingSha256;
-          });
-          if (!match) hgoAuthorityFailure("hgo:legacy-member-source-drift");
+          // PF-55: the legacy binding digest includes the repository's HEAD, so after any commit it no
+          // longer matches; the member's own source fact (path, bytes, size) still names its capability.
+          const armedAt = row => !hgoRetiredExpired(row) && validatedCapability(inventory.paths, row.path).status === "armed";
+          const match = inventory.groups.get("capabilities").find(row => armedAt(row)
+            && (sha({repository, association: member.association, capabilitySha256: row.ref.sha256}) === member.bindingSha256
+              || canonical([row.fact]) === canonical(member.sourceFacts)));
+          if (match) continue;
+          // A capability that is no longer armed at that path (consumed, swept, or gone) can never be
+          // consumed again, so its legacy arm is discharged. Different armed bytes at the same path are drift.
+          const at = new Set((member.sourceFacts ?? []).map(fact => fact.pathSha256));
+          if (inventory.groups.get("capabilities").some(row => at.has(row.fact.pathSha256) && armedAt(row))) hgoAuthorityFailure("hgo:legacy-member-source-drift");
           continue;
         }
         const observed = hgoAuthorityObserved(data);

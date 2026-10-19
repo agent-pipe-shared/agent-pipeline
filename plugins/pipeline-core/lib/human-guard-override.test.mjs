@@ -7162,6 +7162,35 @@ test("PF-53: expired artifacts of a retired schema do not block the authority in
   }
 });
 
+test("PF-55: a legacy armed-capability member still names its capability after a commit moves HEAD", () => {
+  const root = fixtureSignature();
+  try {
+    const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), toolInput = { file_path: "notes.md", content: "PF-55 legacy member\n" };
+    const request = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000 });
+    const plan = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath: script });
+    const reason = "PO attended PF-55 legacy member fixture";
+    const prepared = prepareHumanGuardOverrideAuthorization({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 2500, scriptPath: script });
+    assert.equal(armBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+      nowMs: 3000, scriptPath: script,
+    }).status, "armed");
+    const physical = realpathSync(root), portAt = () => createHumanGuardOverrideAuthorityProducerPort({ repository: inspectSignedDescriptorCustodyRepository(physical) });
+    const before = portAt(), [legacy] = before.readBaseline().legacyOperations;
+    assert.ok(legacy, "a capability armed outside the registry is a legacy operation");
+    const member = { ...before.observeOperation(legacy), memberId: "member-legacy", memberGeneration: 1 };
+    assert.doesNotThrow(() => before.reconcile({ producerRecord: {}, memberRecords: [member], releaseRecords: [] }));
+    writeFileSync(join(root, "committed.txt"), "moves HEAD\n");
+    git(root, "add", "committed.txt");
+    git(root, "commit", "-qm", "move HEAD");
+    assert.doesNotThrow(() => portAt().reconcile({ producerRecord: {}, memberRecords: [member], releaseRecords: [] }),
+      "the legacy binding digest includes HEAD; the member's source fact still names its capability");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("PF-53 (Critic F2): the repair an inventory-bound refusal names works at that bound, and new requests stop below it", () => {
   const root = fixture();
   try {
