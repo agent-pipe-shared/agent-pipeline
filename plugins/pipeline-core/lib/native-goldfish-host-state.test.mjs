@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { canonical } from "./po-approval-proof.mjs";
 import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
@@ -857,6 +858,45 @@ const cases = [
     mkdirSync(join(hgo,'plans'),{mode:0o700});writeFileSync(join(hgo,'plans/oversized.json'),'x'.repeat(1048577),{mode:0o600});
     const refused=dispatch('DELIVER-AC-1B','native-tool-two');
     assert.equal(refused.ok,false);assert.match(JSON.stringify(refused),/hgo:source-size-bound plans\/oversized\.json 1048577 bytes exceeds 1048576/u);
+  })},
+
+  { id: "NGHS33", name: "a catalogue written by another plugin version is migrated, and a successor of a commit-integrated slice dispatches after the update; another repository's catalogue is refused (PF-52)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const git=(...args)=>{const r=spawnSync('git',['-C',root,...args],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    const dispatch=(sliceId,dispatchId,toolUseId,candidate)=>{const binding={...makeBinding({dispatchId,commit:candidate.commit,tree:candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery:delivery(sliceId)};
+      const input=toolInput('claude',{root,session:'native-session-one',toolUseId,binding});
+      input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+`\nSlice: ${sliceId}\nWrite scope: src/change.mjs\n`;
+      return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));};
+    assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized','the catalogue an earlier plugin version wrote');
+    assert.equal(runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-1'),candidate:original.candidate,writeScope:['src/change.mjs']})).status,'required');
+    writeFileSync(join(root,'src/change.mjs'),'delivered by ITEM-AC-1\n');git('add','src/change.mjs');git('commit','-q','-m','fixture delivery','-m','AI-Assisted: true\nDispatch: ITEM-AC-1 (goldfish)\nCommit-Act: orchestrator');
+    const candidate={commit:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}')};
+    const registry=join(repository.commonDir,'agent-pipeline/session-authority'),cataloguePath=join(registry,'catalogue.json');
+    const rewrite=change=>{const value=JSON.parse(readFileSync(cataloguePath,'utf8'));change(value);writeFileSync(cataloguePath,canonical(value));};
+    const sha=value=>createHash('sha256').update(canonical(value)).digest('hex');
+    const update=index=>rewrite(value=>{value.participants[index]={...value.participants[index],sourceSha256:'f'.repeat(64)};value.participantSetSha256=sha(value.participants);});
+    const abandoned=join(repository.commonDir,'agent-pipeline/session-authority-abandoned');
+    const migrations=()=>readdirSync(abandoned).filter(name=>name.includes('-source-update-')&&!name.endsWith('-partial'));
+    const members=()=>{const out={};const walk=dir=>{for(const name of readdirSync(dir,{withFileTypes:true})){const path=join(dir,name.name);if(name.isDirectory())walk(path);else out[path.slice(registry.length)]=readFileSync(path,'utf8');}};if(existsSync(join(registry,'members')))walk(join(registry,'members'));return out;};
+    update(4);
+    const second=dispatch('ITEM-AC-2','DELIVER-AC-2','native-tool-two',candidate);
+    assert.equal(second.ok,true,JSON.stringify(second));
+    assert.equal(migrations().length,1);assert.equal(existsSync(join(abandoned,migrations()[0],'catalogue.json')),true,'the old catalogue is retained, not deleted');
+    const row=JSON.parse(readFileSync(join(root,'specs/unit/slice-queue.json'),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
+    assert.deepEqual(row.dependsOn,['ITEM-AC-1'],'the successor really depends on the commit-integrated slice');
+    const held=members();assert.ok(Object.keys(held).length>0,'the dispatch holds a registry member');
+    update(1);
+    const readiness=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));
+    assert.equal(readiness.status,'observed',JSON.stringify(readiness));assert.deepEqual(readiness.integrated,['ITEM-AC-1']);
+    assert.equal(migrations().length,2);assert.deepEqual(members(),held,'a second update rebinds the registry; every member survives byte for byte');
+    assert.notEqual(JSON.parse(readFileSync(cataloguePath,'utf8')).participants[1].sourceSha256,'f'.repeat(64));
+    rewrite(value=>{value.repositorySha256='e'.repeat(64);});
+    const foreign=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));
+    assert.equal(foreign.status,'refused');assert.match(JSON.stringify(foreign),/record-repository/u);
+    assert.equal(migrations().length,2,'another repository\'s catalogue is never migrated');
   })},
 
 ];

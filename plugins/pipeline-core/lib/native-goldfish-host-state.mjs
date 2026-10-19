@@ -1,6 +1,6 @@
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
-import { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
 // SPDX-License-Identifier: SUL-1.0
@@ -685,6 +685,8 @@ export function inspectSourceOwnedNativeConfiguredObservation({root,sessionId,to
 function publishNativeAuthorityState(commonDir,name,state){
   const repository=inspectSignedDescriptorCustodyRepository(state.root);
   if(repository.commonDir!==commonDir)throw nativeManagedFault('native-authority-common-drift');
+  // PF-52: a catalogue left by another plugin version is moved aside before presence is decided.
+  if(nativeManagedRegistryPresent(repository))migrateSourceUpdatedSessionAuthorityRegistry({repository});
   if(!nativeManagedRegistryPresent(repository)) {
     if(!state.delivery)return writeExclusive(commonDir,name,state);
     // D44: no production route created the session-authority registry, so the first governed item
