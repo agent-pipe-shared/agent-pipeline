@@ -45,6 +45,7 @@ import { dispatchBudgetLineForRole, parseDispatchSlice } from "../lib/dispatch-p
 import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
 import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
 
 export const DISPATCH_BINDING_SCHEMA = "pipeline.dispatch-briefing.binding.v1";
@@ -132,6 +133,14 @@ function defaultGit(root, args) {
   return execFileSync("git", ["--no-optional-locks", "-C", root, ...args], {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 30000,
   });
+}
+
+/** The governed queue row of a slice id, or null outside an approved item course (read-only). */
+function defaultQueueRow(root, sliceId) {
+  try {
+    const governed = resolveGovernedItemQueue({ root });
+    return governed.status === "required" ? governed.normalized.slices.find((row) => row.id === sliceId) ?? null : null;
+  } catch { return null; }
 }
 
 function defaultSpecPathFromState(root) {
@@ -399,6 +408,19 @@ export function generateDispatchBinding(options, deps = {}) {
     if (typeof declaredId !== "string" || !ITEM_ID.test(declaredId)) {
       itemId = `pipeline.${item}`;
       warnings.push({ code: "DBG-ITEM-ID-FALLBACK", path: itemPath, message: `${itemPath} has no usable id: frontmatter; fell back to ${itemId}` });
+    }
+  }
+
+  // PF-47: a dispatch id that already names a governed queue row must match it; the admission would refuse
+  // the drift later under another name, so the binding refuses now and names the row's exact scope.
+  const row = (deps.queueRow ?? defaultQueueRow)(root, dispatchId);
+  if (row && row.delivery?.status !== "unbound-legacy") {
+    if (row.state !== "ready") refuse("DBG-QUEUE-ROW-NOT-READY", `slice ${dispatchId} is ${row.state} in the governed queue and cannot be rebound; choose a new --dispatch-id`);
+    if (row.delivery?.itemId !== itemId) refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} belongs to item ${row.delivery?.itemId} in the governed queue, not ${itemId}; choose a new --dispatch-id`);
+    const scope = [...(row.writeScope ?? [])].sort();
+    if (JSON.stringify(scope) !== JSON.stringify(allowedPaths)) {
+      const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
+      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" first when it still holds a successor)`);
     }
   }
 

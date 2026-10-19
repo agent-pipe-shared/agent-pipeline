@@ -88,6 +88,7 @@ const depsOf = (fx, over = {}) => ({
   git: (_root, args) => (args[0] === "status" ? "" : args[1] === "HEAD^{tree}" ? TREE : COMMIT),
   resolveBaseline: () => ({ status: "ready", entries: [] }),
   defaultSpecPath: () => null,
+  queueRow: () => null,
   ...over,
 });
 
@@ -233,6 +234,23 @@ test("the skeleton names the slice and write scope the item admission reads (PF-
   const named = parseDispatchSlice(result.skeleton);
   assert.equal(named.sliceId, result.binding.itemDelivery.sliceId);
   assert.deepEqual(named.writeScope, result.binding.allowedPaths);
+});
+
+test("a dispatch id that names a governed queue row must match its write scope, item and state (PF-47)", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const first = runDispatchBriefing(argvOf(fx), depsOf(fx));
+  assert.equal(first.ok, true, JSON.stringify(first));
+  const row = { id: "ALF-T1", state: "ready", writeScope: [...first.binding.allowedPaths], delivery: { itemId: first.binding.itemDelivery.itemId } };
+  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => row })).ok, true, "the identical scope rebinds");
+  const wider = { ...row, writeScope: [...row.writeScope, "plugins/x/extra.mjs"] };
+  const drift = runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => wider }));
+  assert.equal(drift.code, "DBG-QUEUE-ROW-DRIFT");
+  assert.match(drift.message, /plugins\/x\/extra\.mjs/u);
+  assert.match(drift.message, new RegExp(`--check ${CHECK.replaceAll(".", "\\.")}`, "u"));
+  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => ({ ...row, state: "cancelled" }) })).code, "DBG-QUEUE-ROW-NOT-READY");
+  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => ({ ...row, delivery: { itemId: "other.item" } }) })).code, "DBG-QUEUE-ROW-DRIFT");
+  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { queueRow: () => ({ ...wider, state: "deferred", delivery: { status: "unbound-legacy" } }) })).ok, true, "a legacy row is rebound by the course writer");
 });
 
 const REFUSALS = [
