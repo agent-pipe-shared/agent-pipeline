@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, linkSync, renameSync, chmodSync, lstatSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, linkSync, renameSync, chmodSync, lstatSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -110,7 +110,21 @@ function withFixtureRoot(run) {
   mkdirSync(scratchBase, { recursive: true });
   const root = mkdtempSync(join(scratchBase, "dwp-parent-pin-"));
   try { return run(root); }
-  finally { rmSync(root, { recursive: true, force: true }); }
+  finally {
+    // A mode-change control leaves a non-writable directory behind; restore owner access
+    // before removal so fixture cleanup cannot mask the control's own result.
+    restoreOwnerAccess(root);
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+function restoreOwnerAccess(path) {
+  let info;
+  try { info = lstatSync(path); } catch { return; }
+  if (!info.isDirectory()) return;
+  try { chmodSync(path, 0o700); } catch { /* best effort */ }
+  let names = [];
+  try { names = readdirSync(path); } catch { /* best effort */ }
+  for (const name of names) restoreOwnerAccess(join(path, name));
 }
 
 // Reads the approved package; `mutation` (optional) fires once, inside the first final
