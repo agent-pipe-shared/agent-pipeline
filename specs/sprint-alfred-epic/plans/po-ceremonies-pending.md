@@ -28,5 +28,10 @@ exact change and why no agent can make it. Updated as entries are added or done.
 | Q4 | Is AC-264's plan-readiness clause required in 0.7.0? | AC-264 is otherwise delivered (58693aef2):<br>• NGHS17 is green (native-goldfish-host-state 24/24);<br>• the PO's design-approval output is pinned to the `--request` form with no guard-override wording.<br>Its remaining clause: before PO approval, plan readiness must prove that the approved package can actually be handed to delivery (criterion locators, check paths, dispatch admission). No such check exists. At plan time only `approve-plan` builds the accepted delivery contract, and it binds the manifest, approval and policy, not the hand-off. Building the check is new logic in the protected `scripts/pipeline-state.mjs`. | (a) Defer: the clause becomes a backlog item, and a hand-off failure still surfaces at the first dispatch, typed (recommended for 0.7.0). (b) Require it: a design spike, then a signed ceremony on `pipeline-state.mjs`. |
 | Q2 | A test run wrote into this checkout's live HGO ledger. | On 2026-10-19, one ALF-B4-HGO run with TMPDIR inside the checkout wrote one request and one `denied` audit entry under `.git/agent-pipeline/human-guard-overrides/`. Agents may not touch `.git`. Every later run uses a TMPDIR outside the checkout. | Keep the entry as a harmless audit trace, or remove it by hand. |
 
+Decided 2026-10-19: Q1 (a) as D27, Q2 keep as D28, Q3 (b) as D29, Q4 (b) as D30
+(po-decisions-2026-10-18.md). D29 and D30 each add a future signed ceremony, on
+`lib/guard/read-scope.mjs` and on `scripts/pipeline-state.mjs`. Both get their exact change
+here once the design work for them is done.
+
 Not a ceremony, but also waiting on the PO: a new candidate is stamped and pushed only when
 the PO calls for one (D18).
