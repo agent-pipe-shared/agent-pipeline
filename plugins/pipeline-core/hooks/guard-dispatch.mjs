@@ -756,7 +756,14 @@ if (isDirectInvocation(import.meta.url)) {
       !["direct", "codex"].includes(dispatch.transport)
       || !parseNativeGoldfishBriefing(dispatch.prompt).ok);
     if (governed.status === "refused" || unsupported) {
-      process.stderr.write(`BLOCKED (guard-dispatch): ${unsupported ? "SQ-NATIVE-ITEM-ADMISSION-REQUIRED" : governed.code}: ${governed.repair ?? "Use the authenticated native item admission; this transport has no qualified item reservation adapter."}\n`);
+      // PF-47: a queue-preparation refusal carries its own reason (and, where one exists, an exact repair);
+      // the generic transport text applies only to the unsupported-transport case.
+      const clean = (text) => String(text).replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 600);
+      const detail = unsupported
+        ? "Use the authenticated native item admission; this transport has no qualified item reservation adapter."
+        : [governed.reason ? `Reason: ${clean(governed.reason)}.` : "", governed.repair ? `Repair: ${clean(governed.repair)}` : ""].filter(Boolean).join(" ")
+          || "Use the authenticated native item admission; this transport has no qualified item reservation adapter.";
+      process.stderr.write(`BLOCKED (guard-dispatch): ${unsupported ? "SQ-NATIVE-ITEM-ADMISSION-REQUIRED" : governed.code}: ${detail}\n`);
       process.exit(2);
     }
   }
