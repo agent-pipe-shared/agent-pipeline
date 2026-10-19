@@ -27,6 +27,10 @@ import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./nat
 import { parseDispatchSlice } from "./dispatch-policy.mjs";
 import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
 import { isSafeTaskId } from "./dispatch-record.mjs";
+import { fileURLToPath } from "node:url";
+
+// Repairs name the absolute script, so a plain terminal can run them as printed (Critic F9).
+const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
 
 export const NATIVE_GOLDFISH_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v1";
 export const NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v2";
@@ -1071,7 +1075,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const readiness=dependsOn.length?observeGovernedItemIntegrationReadiness({root:physical}):null;
       const held=readiness?.status==='observed'?dependsOn.filter(id=>!readiness.integrated.includes(id)):[];
       if(held.length>0)return {status:'refused',code:'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',reason:`${heldDependencyReason(held,raw.slices)}; the queue was not written`,
-        repair:`a never-started dependency is released with: node <plugin-root>/scripts/slice-queue.mjs cancel <slice id> --reason "<why>"; a started one needs its "Dispatch: <slice id> (goldfish)" commit`};
+        repair:`a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>"; a started one needs its "Dispatch: <slice id> (goldfish)" commit`};
       // Approval, requester, candidate and preimage are checked again immediately
       // before publishing a fresh inode. Existing linked bytes remain unchanged.
       const after=observeCurrentPlanApprovalForCalibration({rootDir:physical});
@@ -1117,10 +1121,28 @@ function writeGovernedQueue(path,preimage,raw) {
   finally{if(fd!==undefined)closeSync(fd);try{unlinkSync(temp);}catch{}}
 }
 
+/** Critic F2: an AGY reservation that names the slice and is not released marks it started, as a native
+ * pending state does. A never-created registry has released nothing, so every such reservation counts. */
+function agyReservationNamesSlice({repository,boundary,sliceId}) {
+  const rank={reserved:0,armed:1,running:2,'terminal-observed':3},latest=new Map();
+  for(const row of readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']}).entries.filter(row=>row.value?.basis?.itemDelivery?.sliceId===sliceId)){
+    const prior=latest.get(row.value.operationId);
+    if(!prior||(rank[row.value.phase]??0)>(rank[prior.value.phase]??0)||row.value.phase===prior.value.phase&&(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);
+  }
+  if(!latest.size)return false;
+  let released=new Set();
+  try{
+    const port=createAgyFamilyDispatchAuthorityProducerPort({repository}),producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
+    released=new Set(producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}).record).filter(row=>row.phase==='released').map(row=>row.bindingSha256));
+  }catch(error){if(!sessionAuthorityRegistryAbsent(error))throw error;}
+  return [...latest.values()].some(row=>!released.has(row.value.bindingSha256));
+}
+
 /** PF-45: cancels a never-started slice of the governed item queue and releases the slices that wait on it.
- * Never started means no native dispatch state names the slice and no "Dispatch: <slice> (goldfish)" commit
- * after its base touches its write scope. Its id is removed from every dependsOn: nothing of it will be
- * delivered, so nothing may wait on it. The shared critic and an already cancelled slice are refused. */
+ * Never started means no native dispatch state and no unreleased AGY reservation names the slice, and no
+ * "Dispatch: <slice> (goldfish)" commit after its base touches its write scope. Its id is removed from every
+ * dependsOn: nothing of it will be delivered, so nothing may wait on it. The shared critic and an already
+ * cancelled slice are refused. */
 export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=false}={}) {
   try {
     if(typeof sliceId!=='string'||!ID.test(sliceId))return {status:'refused',code:'SQ-ITEM-CANCEL-INPUT',reason:'the slice id is not a queue slice id'};
@@ -1129,7 +1151,7 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
     const governed=resolveGovernedItemQueue({root:physical});
     if(governed.status!=='required')return governed.status==='refused'?governed:{status:'refused',code:'SQ-ITEM-CANCEL-NO-COURSE',reason:'no governed item queue exists for the approved feature'};
     const repository=inspectSignedDescriptorCustodyRepository(physical),path=resolve(physical,governed.path);
-    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},()=>{
+    return retryWhileSessionAuthorityLockHeld(entered=>withSessionAuthorityBoundary({repository},boundary=>{
       entered.value=true;
       // D51 (3): no bound session is required. Cancelling only releases (nothing of the slice is
       // delivered), and neither the agent's shell nor the PO's terminal ever carries a session binding.
@@ -1144,16 +1166,17 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
       if(readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:[row]}).includes(sliceId))
         return {status:'refused',code:'SQ-ITEM-CANCEL-INTEGRATED',reason:`slice ${sliceId} already has a "Dispatch: ${sliceId} (goldfish)" commit; it counts as integrated, its reservation no longer blocks, and it needs no cancel`};
       const hasNativeState=native.some(entry=>entry.relativePath.startsWith('pending-')&&entry.value?.delivery?.sliceId===sliceId);
-      if(hasNativeState&&started!==true)
-        return {status:'refused',code:'SQ-ITEM-CANCEL-STARTED',reason:`slice ${sliceId} has a native dispatch state, so it was started`,
-          repair:`if its Goldfish still runs, let it finish through its own delivery. If it no longer runs: node <plugin-root>/scripts/slice-queue.mjs cancel ${sliceId} --started --reason "<why>". With --started you assert that no Goldfish runs for it; its reservation then stops blocking and its write scope is no longer protected`};
+      const hasAgyState=!hasNativeState&&agyReservationNamesSlice({repository,boundary,sliceId});
+      if((hasNativeState||hasAgyState)&&started!==true)
+        return {status:'refused',code:'SQ-ITEM-CANCEL-STARTED',reason:`slice ${sliceId} has ${hasNativeState?'a native dispatch state':'an unreleased AGY reservation'}, so it was started`,
+          repair:`if its Goldfish still runs, let it finish through its own delivery. If it no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>". With --started you assert that no Goldfish runs for it; its reservation then stops blocking and its write scope is no longer protected`};
       row.state='cancelled';row.holdReason=reason.trim();
       const released=[];
       for(const other of raw.slices)if((other.dependsOn??[]).includes(sliceId)){other.dependsOn=other.dependsOn.filter(id=>id!==sliceId);released.push(other.id);}
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-cancelled-queue-invalid');
       writeGovernedQueue(path,preimage,raw);
       return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,released,queuePath:governed.path,
-        ...(hasNativeState?{started:true,note:'a started slice was cancelled on the caller\'s word that no Goldfish runs for it; its reservation no longer blocks and its write scope is no longer protected'}:{})};
+        ...(hasNativeState||hasAgyState?{started:true,note:'a started slice was cancelled on the caller\'s word that no Goldfish runs for it; its reservation no longer blocks and its write scope is no longer protected'}:{})};
     }));
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-CANCEL-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
 }
@@ -1510,7 +1533,7 @@ export function readSettledItemSliceIds({repository,boundary,governed=resolveGov
 /** The repair a reservation collision names: the slice that still holds it and the commands that release it. */
 export function itemReservationRepair(sliceId) {
   return typeof sliceId==='string'
-    ?`slice ${sliceId} still holds this reservation. If it delivered, its "Dispatch: ${sliceId} (goldfish)" commit releases it. If its Goldfish no longer runs: node <plugin-root>/scripts/slice-queue.mjs cancel ${sliceId} --started --reason "<why>"`
+    ?`slice ${sliceId} still holds this reservation. If it delivered, its "Dispatch: ${sliceId} (goldfish)" commit releases it. If its Goldfish no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>"`
     :'a reservation that names no slice holds this item; report it to the PO with the refusal';
 }
 function reservationFault(reason,sliceId){return Object.assign(nativeManagedFault(reason),{repair:itemReservationRepair(sliceId)});}

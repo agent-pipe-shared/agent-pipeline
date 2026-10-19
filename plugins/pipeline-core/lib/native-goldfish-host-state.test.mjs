@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { canonical } from "./po-approval-proof.mjs";
 import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
@@ -1011,6 +1011,30 @@ const cases = [
     assert.equal(cancelled.status,'cancelled',JSON.stringify(cancelled));assert.equal(cancelled.started,true);assert.equal(row('ITEM-AC-2').state,'cancelled');
     const third=dispatch('ITEM-AC-3','DELIVER-AC-3','native-tool-three',candidate);
     assert.equal(third.ok,true,JSON.stringify(third));assert.deepEqual(row('ITEM-AC-3').dependsOn,['ITEM-AC-1']);
+  })},
+
+  { id: "NGHS38", name: "a slice with an unreleased AGY reservation counts as started: its cancel needs --started, with or without a registry (Critic F2)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    const prepare=sliceId=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId),candidate:original.candidate,writeScope:['src/change.mjs']}));
+    assert.equal(prepare('ITEM-AC-1').status,'required');
+    // An AGY dispatch reserved ITEM-AC-1; nothing released it.
+    const journal=join(repository.commonDir,'agent-pipeline/run/agy-authority-contexts');mkdirSync(journal,{recursive:true,mode:0o700});chmodSync(journal,0o700);
+    const basis={association:{state:'unbound',target:null},candidate:repository.candidate,operationNonce:'a'.repeat(64),itemDelivery:{itemId:'AC-1',sliceId:'ITEM-AC-1',queuePath:'specs/unit/slice-queue.json',queueSha256:'b'.repeat(64),writeScope:['src/change.mjs']}};
+    const entry={schema:'pipeline.agy-authority-lifetime.v2',producerId:'agy-family-dispatch',repositorySha256:nativeManagedDigest({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir}),operationId:'a'.repeat(32),basis,bindingSha256:nativeManagedDigest(basis),phase:'armed',terminal:null,terminalEvidence:null,sourcePaths:[]};
+    writeFileSync(join(journal,`op.${entry.operationId}.1.json`),JSON.stringify(entry),{mode:0o600});
+    const cancel=(sliceId,started=false)=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'its AGY run stopped',started});
+    const absent=cancel('ITEM-AC-1');
+    assert.equal(absent.code,'SQ-ITEM-CANCEL-STARTED',JSON.stringify(absent));assert.match(absent.reason,/unreleased AGY reservation/u);assert.match(absent.repair,/slice-queue\.mjs cancel ITEM-AC-1 --started/u);
+    assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
+    const registered=cancel('ITEM-AC-1');
+    assert.equal(registered.code,'SQ-ITEM-CANCEL-STARTED',`a registry whose AGY producer released nothing keeps the slice started: ${JSON.stringify(registered)}`);
+    const forced=cancel('ITEM-AC-1',true);
+    assert.equal(forced.status,'cancelled',JSON.stringify(forced));assert.equal(forced.started,true);
+    // A slice no reservation names is still cancelled without --started.
+    assert.equal(prepare('ITEM-AC-2').status,'required');assert.equal(cancel('ITEM-AC-2').status,'cancelled');
   })},
 
 ];
