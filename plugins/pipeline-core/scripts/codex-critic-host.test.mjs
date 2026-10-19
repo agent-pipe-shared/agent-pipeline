@@ -3031,7 +3031,9 @@ async function signedPreparedCriticFixture(dutyId, root, childRoot) {
   const commonDir = join(root, ".git");
   mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
   // AC-212: the host's lifetimes reserve their members in the session-authority registry, so the checkout carries an initialized one.
-  prepareSessionAuthorityRegistryFixture({ root });
+  // The shared candidate repository must keep a clean `git status` (prepareNativeCritic refuses an unclean candidate), so the
+  // helper's two untracked authority inputs are excluded locally instead of committed (the candidate commit and tree stay unchanged).
+  prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true });
   const candidateCommit = run("git", ["rev-parse", "HEAD"], root);
   const candidateTree = run("git", ["rev-parse", "HEAD^{tree}"], root);
   const keyFor = invocationId => ({ runner, installationBindingSha256: sha("installation"), accountBindingSha256: sha("account"), sessionId: "critic-session", invocationId });

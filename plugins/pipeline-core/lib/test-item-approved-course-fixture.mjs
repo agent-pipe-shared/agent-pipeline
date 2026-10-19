@@ -32,7 +32,10 @@ export function nativeContractFixtureParent() {
 // creates a fresh Git checkout beneath nativeContractFixtureParent() (the authority walk refuses a group/world-writable
 // ancestor such as the OS temp directory); with `root` it initializes over that existing checkout and only adds the two
 // authority inputs when absent. Returns {repoDir,repository,root} where root is <commonDir>/agent-pipeline (mode 0700).
-export function prepareSessionAuthorityRegistryFixture({root=null,prefix='session-authority-fixture-'}={}) {
+// `excludeFromStatus` (default false, ALF-B6-MFF) keeps a caller's candidate repository reporting a clean `git status`: when set, the two
+// authority inputs this helper adds are listed in the checkout's local <commonDir>/info/exclude (never tracked, so the candidate
+// commit and tree are unchanged) instead of being left as untracked files a clean-candidate gate refuses.
+export function prepareSessionAuthorityRegistryFixture({root=null,prefix='session-authority-fixture-',excludeFromStatus=false}={}) {
  const repoDir=root??mkdtempSync(join(nativeContractFixtureParent(),prefix));
  if(root===null){const init=spawnSync('git',['-C',repoDir,'init','-q'],{encoding:'utf8'});if(init.status!==0)throw Error('session-authority fixture checkout unavailable');}
  mkdirSync(join(repoDir,'.claude'),{recursive:true,mode:0o700});
@@ -44,6 +47,12 @@ export function prepareSessionAuthorityRegistryFixture({root=null,prefix='sessio
   writeFileSync(state,JSON.stringify({schema:'pipeline.state.v0',activeFeature:{id:'unit',planPath:'specs/unit/prd.md',phase:'design'},planApproved:false,continuity}),{mode:0o600});
  }
  const repository=inspectSignedDescriptorCustodyRepository(repoDir);
+ if(excludeFromStatus){
+  const tracked=path=>spawnSync('git',['-C',repoDir,'ls-files','--error-unmatch','--',path],{encoding:'utf8'}).status===0;
+  const excludeFile=join(repository.commonDir,'info','exclude'),present=existsSync(excludeFile)?readFileSync(excludeFile,'utf8'):'';
+  const lines=['.claude/pipeline.yaml','.claude/pipeline-state.json'].filter(path=>!tracked(path)&&!present.split('\n').includes(path));
+  if(lines.length){mkdirSync(dirname(excludeFile),{recursive:true});writeFileSync(excludeFile,present+(present===''||present.endsWith('\n')?'':'\n')+lines.join('\n')+'\n');}
+ }
  const authorityRoot=join(repository.commonDir,'agent-pipeline');mkdirSync(authorityRoot,{recursive:true,mode:0o700});
  const ports=createSessionAuthorityParticipantPorts({repository});
  for(const row of ports)assert.doesNotThrow(()=>row.port.readBaseline(),row.producerId);
