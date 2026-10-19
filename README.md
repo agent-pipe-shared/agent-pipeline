@@ -188,14 +188,14 @@ enforcement, evidence, security, cost, and maintainer references in one order.
 For the normative contract, read [`docs/operating-model.md`](docs/operating-model.md).
 - [`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional Permission; see [`docs/licensing.md`](docs/licensing.md).
 
-> **Beta licensing outlook:** The current license permits internal use by a
-> commercial company; monetizing Agent-Pipeline itself already requires a
-> separate agreement. If Agent-Pipeline proves useful at broader scale, a
-> future version of this product may require payment for commercial use under
-> a clearly published, proportionate fair-use policy. No such fee, threshold,
-> or change is in force today. This notice does not amend the current license
-> or retroactively change the terms for copies already received. See
-> [Licensing](docs/licensing.md).
+> **Price today: 0 EUR.** That covers personal use and internal business use,
+> including inside a commercial company. Monetizing Agent-Pipeline itself
+> (sale, paid hosting or SaaS, white-label use, embedding in a paid product,
+> commercial redistribution) needs a separate agreement. Personal,
+> non-commercial use stays free of charge in future versions too. A future
+> version may introduce a fee for use by companies; copies already received
+> keep the license they came with. This notice does not amend the current
+> license. See [Licensing](docs/licensing.md).
 
 ### Maintainer and runtime reference
 
@@ -260,16 +260,15 @@ dauerhaften, später einsehbaren Nachweis.
 > für den Lifecycle und lies anschließend [Usage](docs/usage.md). Die weiteren Links sind
 > Nachschlagewerk.
 
-> **Lizenzausblick für die Beta:** Die geltende Lizenz erlaubt auch die interne
-> Nutzung in Unternehmen; wer Agent-Pipeline selbst vermarktet, benötigt schon
-> heute eine gesonderte Vereinbarung. Wenn sich Agent-Pipeline in breiterer
-> Nutzung bewährt, könnte eine künftige Version dieses Produkts für
-> kommerzielle Nutzung unter einer klar veröffentlichten, verhältnismäßigen
-> Fair-Use-Regelung kostenpflichtig werden. Heute gilt weder eine solche
-> Gebühr noch ein Schwellenwert oder eine entsprechende Lizenzänderung. Dieser
-> Hinweis ändert die geltende Lizenz nicht und stellt bereits erhaltene Kopien
-> nicht rückwirkend unter andere Bedingungen. Siehe
-> [Lizenzierung](docs/licensing.md).
+> **Preis heute: 0 EUR.** Das gilt für die private Nutzung und für die interne
+> Nutzung in Unternehmen, auch in einem kommerziellen Unternehmen. Wer
+> Agent-Pipeline selbst vermarktet (Verkauf, bezahltes Hosting oder SaaS,
+> White-Label, Einbau in ein bezahltes Produkt, kommerzielle Weitergabe),
+> braucht eine gesonderte Vereinbarung. Private, nicht kommerzielle Nutzung
+> bleibt auch in künftigen Versionen kostenlos. Eine künftige Version kann eine
+> Gebühr für die Nutzung durch Unternehmen einführen; bereits erhaltene Kopien
+> behalten die Lizenz, mit der sie kamen. Dieser Hinweis ändert die geltende
+> Lizenz nicht. Siehe [Lizenzierung](docs/licensing.md).
 
 > **Was du prüfen kannst:** kandidatengebundene Verify-Receipts,
 > Security-Scan-Status sowie erforderliche Review- und Freigabe-Nachweise. Ein

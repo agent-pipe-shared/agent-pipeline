@@ -28,18 +28,19 @@ governing `LICENSE` text:
   or commercial redistribution;
 - there is no automatic conversion to an OSI Open Source license.
 
-## Possible future commercial-use terms (informational)
+## Price today and future versions (informational)
 
-No new fee is announced for this beta. The current `LICENSE` governs this
-release: it permits internal business use, including within a commercial
-company, while monetizing Agent-Pipeline itself already requires a separate
-agreement as described above. If Agent-Pipeline proves useful at broader
-scale, a future version of this product may require payment for commercial
-use under a clearly published, proportionate fair-use policy. No pricing,
-threshold, or future license terms have been decided. Any such change would
-have to be stated for the relevant future version. This notice is not a
-license amendment, a request for payment, or a retroactive change to terms
-supplied with copies already received.
+The price today is 0 EUR, for personal use and for internal business use,
+including inside a commercial company. The current `LICENSE` governs this
+release. Monetizing Agent-Pipeline itself (sale, paid hosting or SaaS,
+white-label use, embedding in a paid product, commercial redistribution)
+requires a separate agreement, as described above.
+
+Personal, non-commercial use stays free of charge in future versions too. A
+future version may introduce a fee for use by companies. Any such fee would be
+stated for that version; copies already received keep the license they came
+with. This notice is not a license amendment, a request for payment, or a
+retroactive change to terms supplied with copies already received.
 
 `LICENSE` contains the governing text and `NOTICE` contains the project notice
 and commercial intake path. `third-party-licenses.json` is the explicit current

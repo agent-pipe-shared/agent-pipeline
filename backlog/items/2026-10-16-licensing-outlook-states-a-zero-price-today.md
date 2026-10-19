@@ -50,7 +50,7 @@ version, and commits that personal use stays free (PO statement 2026-10-16).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted into the local 0.7.0 candidate (PO decision D36, 2026-10-19).
+- **Rationale:** a documentation-only change that matches the current SUL-1.0 terms; the PO chose to take it now rather than just before the release.
+- **Assignment (if accepted):** the Elephant drafted the wording in `README.md` (English and its German reader aid) and `docs/licensing.md`; the final wording is the PO's, at acceptance.
+- **Date:** 2026-10-19
