@@ -19,9 +19,13 @@ copied from the source reports, and the source reports themselves stay local.
 
 | Finding | Package / AC | What is missing |
 |---|---|---|
-| Claude P0-2 `--by` used in the PO's name | G9 / AC-264 | Rule in roles/elephant.md; `--by` documented as a label, not authority. Role binding of `--by` is a design change (backlog) |
-| Claude P0-3 guard bypass via the PO running an agent-prepared step | G9 / AC-264 | Rule in roles/elephant.md: a protected change goes through the signed ceremony, never through the PO running an agent-prepared command |
-| Claude P0-5 hold point ignored | G9 / AC-264 | Templates seed a `hold-po` slice for each PO acceptance point |
+| Claude P0-2 `--by` used in the PO's name | G9 / AC-264 | Rule and label docs delivered in 4ea2b4031 (EL-36). Still open: role binding of `--by` is a design change (backlog) |
+| Claude P0-3 guard bypass via the PO running an agent-prepared step | G9 / AC-264 | Rule delivered in 4ea2b4031 (EL-37). Critic flag: built while the guards were dark |
+| Claude P0-5 hold point ignored | G9 / AC-264 | Blocked on a design decision (ALF-B23-G9C): the approved course carries no machine-readable PO acceptance point and there is no release primitive, so `hold-po` cannot be seeded (EL-04) |
+| 2026-10-19 incident: a test fixture wrote the real repository's governance record (state declined, guards silent) | BLOCKER | Fixtures never resolve to the enclosing repository: GIT_CEILING_DIRECTORIES in the fixture helpers, a root/common-dir assertion before any decide/apply, a tripwire against mutating the process's own root, and a regression case with TMPDIR inside a throwaway checkout |
+| Same incident: the sweep ran with TMPDIR inside the checkout | BLOCKER | The test runner refuses a TMPDIR inside any checkout and a cwd at the repository root |
+| Same incident: an active-to-declined flip was silent, and recovery was manual | HIGH | A flip to declined is reported loudly at preflight. A typed recovery exists for a pending enrollment retirement whose barrier no longer matches .git/config |
+| TP shell classifier gaps (ALF-B23-TPSHELL) | HIGH | `lib/protected-test-paths.mjs` misses `cp -t`, directory destinations and archive extraction. `guard-lifecycle-ready` main() has no try/catch. A TP-7 file re-copied by an unidentified writer is still unexplained |
 | Claude P1-1 entry gate contradicts itself | G10 / AC-127 | Replay on a greenfield fixture at HEAD; reopen only if it reproduces |
 | Claude P1-5 signing setup (trust file, recursive ACL advice) | G8 / AC-264 | Onboarding blocks on the trust-file problem, the signature helper creates the file, and no recursive takeown/icacls advice is ever emitted |
 | Claude P1-6 approved spec locks itself after one edit | G6 / AC-115 | Pre-edit warning, self-revert path, and a spec-amendment route without reopen-design |
