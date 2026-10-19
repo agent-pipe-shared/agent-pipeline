@@ -22,12 +22,13 @@
 //   4. The widened ACL touches only a record under this test's own temp directory.
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdtempSync, mkdirSync, openSync, rmSync} from 'node:fs';
-import {tmpdir, devNull} from 'node:os';
+import {mkdirSync, openSync, rmSync} from 'node:fs';
+import {devNull} from 'node:os';
 import {join} from 'node:path';
 import {createGovernanceScopeController} from './governance-scope.mjs';
 import {assessWindowsPrivatePath} from './windows-private-state.mjs';
 import {registerTestCaseCompletion} from './test-case-completion.mjs';
+import {assertFixtureIsolated, createFixtureBase, guardController} from './test-fixture-isolation.mjs';
 
 const completionCases = [];
 function test(name, run) {
@@ -48,14 +49,17 @@ test('win32: a record whose ACL is widened to Everyone is not secure and the con
   const limitation = icaclsHostLimitation();
   if (limitation) { t.skip(limitation); return; }
 
-  const base = mkdtempSync(join(tmpdir(), 'governance-scope-win32-acl-'));
-  t.after(() => rmSync(base, {recursive: true, force: true}));
+  // The base comes from createFixtureBase (Git ceiling + containment assertion); plan/apply run only after the assertion.
+  const made = createFixtureBase('governance-scope-win32-acl-');
+  const base = made.base;
+  t.after(() => { made.release(); rmSync(base, {recursive: true, force: true}); });
   const observer = assessWindowsPrivatePath(base);
   if (observer.status === 'unavailable') { t.skip('host limitation: native Windows DACL observation is unavailable (' + observer.reason + ')'); return; }
 
   const root = join(base, 'repo'), host = join(base, 'host-store');
   mkdirSync(root);
-  const controller = createGovernanceScopeController({hostStateRoot: host});
+  assertFixtureIsolated(root);
+  const controller = guardController(createGovernanceScopeController({hostStateRoot: host}));
   const plan = controller.planDecision({rootDir: root, decision: 'enroll', by: 'Fixture human answer'});
   const active = controller.applyDecision(plan, {activate: true, planSha256: plan.planSha256});
   assert.equal(active.state, 'active', 'fixture precondition: the non-Git enrollment must apply as active: ' + JSON.stringify(active));

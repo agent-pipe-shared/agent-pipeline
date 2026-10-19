@@ -12,12 +12,15 @@ import {dirname,join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createGovernanceScopeController,governanceEnrollmentRecoveryAction,readGovernanceEnrollmentRetirement} from '../governance-scope.mjs';
 import {hasCodexGitControlMount} from '../codex-host-layout.mjs';
+import {assertFixtureIsolated,createFixtureBase,guardController} from '../test-fixture-isolation.mjs';
 
 function fixture(t){
-  const base=mkdtempSync(join(tmpdir(),'gs-readonly-host-')),root=join(base,'repo'),host=join(base,'host-store');
+  // The base comes from createFixtureBase (Git ceiling + containment assertion); the controller is the guarded copy.
+  const made=createFixtureBase('gs-readonly-host-'),base=made.base,root=join(base,'repo'),host=join(base,'host-store');
   mkdirSync(root);
-  t.after(()=>{for(const p of [join(root,'.git'),join(base,'old-control')]){try{chmodSync(p,0o755);}catch{}}rmSync(base,{recursive:true,force:true});});
-  return {base,root,host,controller:createGovernanceScopeController({hostStateRoot:host})};
+  t.after(()=>{made.release();for(const p of [join(root,'.git'),join(base,'old-control')]){try{chmodSync(p,0o755);}catch{}}rmSync(base,{recursive:true,force:true});});
+  assertFixtureIsolated(root);
+  return {base,root,host,controller:guardController(createGovernanceScopeController({hostStateRoot:host}))};
 }
 function readonlyGit(root){const control=join(root,'.git');mkdirSync(control);chmodSync(control,0o555);return control;}
 function hostLimitation(){
@@ -26,7 +29,7 @@ function hostLimitation(){
   finally{rmSync(d,{recursive:true,force:true});}
 }
 function files(root,prefix=''){const out=[];for(const e of readdirSync(root,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const p=join(root,e.name);if(e.isDirectory())out.push(...files(p,prefix+e.name+'/'));else out.push([prefix+e.name,readFileSync(p).toString('hex')]);}return out;}
-function decide(controller,root,decision){const plan=controller.planDecision({rootDir:root,decision,by:'Fixture human answer'});return controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});}
+function decide(controller,root,decision){assertFixtureIsolated(root);const plan=controller.planDecision({rootDir:root,decision,by:'Fixture human answer'});return controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});}
 function put(root,path,bytes){const dest=join(root,path);mkdirSync(dirname(dest),{recursive:true});writeFileSync(dest,bytes);}
 const limit=hostLimitation();
 

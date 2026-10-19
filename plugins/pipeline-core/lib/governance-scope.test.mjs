@@ -14,6 +14,8 @@ import {chmodSync,existsSync,linkSync,mkdtempSync,mkdirSync,readFileSync,readdir
 import {tmpdir, devNull} from 'node:os';
 import {join,dirname} from 'node:path';
 import {createGovernanceScopeController,readGovernanceEnrollmentRetirement,governanceEnrollmentRecoveryAction} from './governance-scope.mjs';
+import {realpathSync} from 'node:fs';
+import {FixtureIsolationError,assertFixtureIsolated,createFixtureBase,discoverEnclosingRepository,guardController,isInside} from './test-fixture-isolation.mjs';
 import {hasCodexGitControlMount} from './codex-host-layout.mjs';
 import {loadRunnerProfilesV3Registry} from './runner-profiles-v3.mjs';
 import {codexCustomAgentSeed,planRuntimeProjectionV3} from './runtime-projection-v3.mjs';
@@ -24,10 +26,11 @@ import scopeSchema from '../schemas/pipeline.governance-scope.v1.json' with {typ
 function linkHostLimitation(){const d=mkdtempSync(join(tmpdir(),'host-probe-'));try{const file=join(d,'file'),sub=join(d,'sub');writeFileSync(file,'x');mkdirSync(sub);for(const [what,make] of [['file symlink',()=>symlinkSync(file,join(d,'fs'))],['directory symlink',()=>symlinkSync(sub,join(d,'ds'),'dir')],['hardlink',()=>linkSync(file,join(d,'hl'))]]){try{make();}catch(error){return 'host limitation: '+what+' creation is refused on this host ('+(error&&error.code)+')';}}return null;}finally{rmSync(d,{recursive:true,force:true});}}
 // Exact capability probe: returns a typed "host limitation: ..." reason when chmod on a temp-dir file cannot set and read back the POSIX mode bits the case relies on (native win32 maps chmod onto the read-only attribute only), else null.
 function modeBitHostLimitation(){const d=mkdtempSync(join(tmpdir(),'host-probe-'));try{const file=join(d,'file');writeFileSync(file,'x');for(const mode of [0o600,0o644]){chmodSync(file,mode);if((statSync(file).mode&0o777)!==mode)return 'host limitation: POSIX mode bits are not honoured on this host';}return null;}finally{rmSync(d,{recursive:true,force:true});}}
-function fixture(t,{git=false}={}){const base=mkdtempSync(join(tmpdir(),'governance-scope-')),root=join(base,'repo'),host=join(base,'host-store');mkdirSync(root);if(git){runGit(root,['init','--initial-branch=main']);runGit(root,['config','user.name','Fixture']);runGit(root,['config','user.email','fixture@example.invalid']);runGit(root,['commit','--allow-empty','-m','fixture']);}t.after(()=>rmSync(base,{recursive:true,force:true}));return{base,root,host,controller:createGovernanceScopeController({hostStateRoot:host})};}
+// Every fixture base comes from createFixtureBase (Git ceiling + containment assertion); the controller is the guarded copy, so no plan/apply can reach a repository outside the base.
+function fixture(t,{git=false}={}){const made=createFixtureBase('governance-scope-'),base=made.base,root=join(base,'repo'),host=join(base,'host-store');t.after(()=>{made.release();rmSync(base,{recursive:true,force:true});});mkdirSync(root);if(git){runGit(root,['init','--initial-branch=main']);runGit(root,['config','user.name','Fixture']);runGit(root,['config','user.email','fixture@example.invalid']);runGit(root,['commit','--allow-empty','-m','fixture']);}assertFixtureIsolated(root);return{base,root,host,controller:guardController(createGovernanceScopeController({hostStateRoot:host}))};}
 function runGit(root,args){const r=spawnSync('git',args,{cwd:root,encoding:'utf8',timeout:5000,shell:false});assert.equal(r.status,0,JSON.stringify({args,stderr:r.stderr,error:r.error?.code}));return r.stdout.trim();}
 function files(root,prefix=''){const result=[];for(const entry of readdirSync(root,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const path=join(root,entry.name),rel=prefix+entry.name;if(entry.isDirectory())result.push(...files(path,rel+'/'));else result.push([rel,readFileSync(path).toString('hex')]);}return result;}
-function decide(controller,root,decision){const plan=controller.planDecision({rootDir:root,decision,by:'Fixture human answer'});return controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});}
+function decide(controller,root,decision){assertFixtureIsolated(root);const plan=controller.planDecision({rootDir:root,decision,by:'Fixture human answer'});return controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});}
 function put(root,path,bytes){const dest=join(root,path);mkdirSync(dirname(dest),{recursive:true});writeFileSync(dest,bytes);}
 function fixtureYaml(value,indent=''){
   if(Array.isArray(value))return value.map(item=>item&&typeof item==='object'?indent+'-\n'+fixtureYaml(item,indent+'  '):indent+'- '+JSON.stringify(item)+'\n').join('');
@@ -47,7 +50,42 @@ test('actual Git config stores a parseable root-bound decision and preserves unr
 
 test('actual linked worktrees enroll independently; linked decline does not deactivate primary',t=>{const f=fixture(t,{git:true}),linked=join(f.base,'linked');runGit(f.root,['worktree','add','--detach',linked,'HEAD']);decide(f.controller,f.root,'enroll');decide(f.controller,linked,'enroll');decide(f.controller,linked,'decline');assert.equal(f.controller.observe({rootDir:f.root}).state,'active');assert.equal(f.controller.observe({rootDir:linked}).state,'declined');const child=join(f.root,'child');mkdirSync(child);assert.equal(f.controller.observe({rootDir:child}).root,f.root);assert.equal(f.controller.observe({rootDir:child}).state,'active');});
 
-test('non-Git decline persists only in sealed fixture host store and restores explicit enrollment',t=>{const f=fixture(t);const before=files(f.root);assert.equal(decide(f.controller,f.root,'decline').state,'declined');assert.deepEqual(files(f.root),before);const again=createGovernanceScopeController({hostStateRoot:f.host});assert.equal(again.observe({rootDir:f.root}).state,'declined');assert.equal(decide(again,f.root,'enroll').state,'active');assert.equal(again.observe({rootDir:f.root}).requiresEnforcement,true);});
+// Regression (backlog: test fixtures inside the checkout write the real repository). A git-less fixture whose base lies inside an
+// enclosing checkout resolves, in production discovery, to that checkout; the decline path must therefore be refused BEFORE any write.
+// Runs for both bases: the OS temp dir with TMPDIR pointed into a throwaway checkout, and the sanctioned repo-scratch leaf.
+async function fixtureEscapeRegression(t){
+ const outer=realpathSync(mkdtempSync(join(tmpdir(),'gs-escape-outer-'))),saved={};for(const key of ['TMPDIR','TMP','TEMP'])saved[key]=process.env[key];
+ t.after(()=>{for(const key of Object.keys(saved)){if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];}rmSync(outer,{recursive:true,force:true});});
+ runGit(outer,['init','--initial-branch=main']);runGit(outer,['config','user.name','Fixture']);runGit(outer,['config','user.email','fixture@example.invalid']);
+ put(outer,'project/pipeline-state.json',JSON.stringify({schema:'pipeline.state.v0',planApproved:false})+'\n');runGit(outer,['add','--all']);runGit(outer,['commit','-m','outer']);
+ const inner=join(outer,'scratch');mkdirSync(inner);for(const key of Object.keys(saved))process.env[key]=inner;
+ const configPath=join(outer,'.git','config'),statePath=join(outer,'project','pipeline-state.json'),snapshot=()=>({config:readFileSync(configPath).toString('hex'),state:readFileSync(statePath).toString('hex')}),before=snapshot();
+ const escaped=label=>error=>{assert.ok(error instanceof FixtureIsolationError&&error.code==='FIXTURE-ESCAPE',label+': '+error);return true;};
+ for(const [label,make] of [['OS temp dir, TMPDIR inside a checkout',()=>createFixtureBase('gs-escape-')],['repo-scratch leaf of a checkout',()=>createFixtureBase('gs-escape-',{location:'repo-scratch',repoBase:outer})]]){
+  const made=make();t.after(()=>made.release());assert.ok(isInside(outer,made.physicalBase),label+': the base must lie inside the throwaway checkout');
+  const root=join(made.base,'repo'),host=join(made.base,'host-store');mkdirSync(root);const raw=createGovernanceScopeController({hostStateRoot:host});
+  // Control: production discovery (an allow-listed Git environment, so the ceiling variable does not reach it) really resolves the git-less fixture to the enclosing checkout.
+  assert.equal(raw.observe({rootDir:root}).root,outer,label+': production discovery must resolve the git-less fixture to the enclosing checkout');
+  const plan=raw.planDecision({rootDir:root,decision:'decline',by:'Fixture human answer'});assert.equal(plan.root,outer,label+': the plan must target the enclosing checkout');
+  assert.throws(()=>assertFixtureIsolated(root),escaped(label));
+  assert.throws(()=>decide(raw,root,'decline'),escaped(label+' decide'));
+  const guarded=guardController(raw);
+  assert.throws(()=>guarded.planDecision({rootDir:root,decision:'decline',by:'Fixture human answer'}),escaped(label+' plan'));
+  assert.throws(()=>guarded.applyDecision(plan,{activate:true,planSha256:plan.planSha256}),escaped(label+' apply'));
+  assert.throws(()=>guarded.recordOnboardingEnrollment({rootDir:root,activate:true}),escaped(label+' onboarding'));
+  assert.throws(()=>assertFixtureIsolated(root,{startingRepositories:[{root:outer,commonDir:join(outer,'.git')}]}),error=>{assert.equal(error.code,'FIXTURE-TRIPWIRE');return true;});
+  const own=join(made.base,'own-repo');mkdirSync(own);runGit(own,['init','--initial-branch=main']);assert.equal(assertFixtureIsolated(own).repository.root,realpathSync(own),label+': a fixture that is its own repository stays allowed');
+  assert.deepEqual(snapshot(),before,label+': the enclosing checkout config and project state must be byte-unchanged');
+ }
+ // The live-incident shape: a git-less fixture in the sanctioned repo-scratch leaf of THIS checkout (D32). Only the assertion runs here, never the controller, so nothing is written whichever way discovery resolves.
+ {const real=createFixtureBase('gs-escape-real-',{location:'repo-scratch'});t.after(()=>{real.release();rmSync(real.base,{recursive:true,force:true});});const realRoot=join(real.base,'repo');mkdirSync(realRoot);
+  if(discoverEnclosingRepository(realRoot)===null)assert.equal(assertFixtureIsolated(realRoot).repository,null,'no enclosing repository: nothing to escape into');
+  else assert.throws(()=>assertFixtureIsolated(realRoot),error=>{assert.ok(error instanceof FixtureIsolationError&&['FIXTURE-TRIPWIRE','FIXTURE-ESCAPE'].includes(error.code),'real checkout repo-scratch leaf: '+error);return true;});}
+ assert.throws(()=>fixture(t),escaped('fixture()'));assert.deepEqual(snapshot(),before);
+}
+test('non-Git decline persists only in sealed fixture host store and restores explicit enrollment',async t=>{const f=fixture(t);const before=files(f.root);assert.equal(decide(f.controller,f.root,'decline').state,'declined');assert.deepEqual(files(f.root),before);const again=createGovernanceScopeController({hostStateRoot:f.host});assert.equal(again.observe({rootDir:f.root}).state,'declined');assert.equal(decide(again,f.root,'enroll').state,'active');assert.equal(again.observe({rootDir:f.root}).requiresEnforcement,true);
+ // The fixture-escape regression runs as a subtest of this case: the verify case set pins exactly RC14C001..RC14C023.
+ const escapeFailures=[];await t.test('a git-less fixture inside an enclosing checkout never reaches that checkout',async st=>{try{await fixtureEscapeRegression(st);}catch(error){escapeFailures.push(error);throw error;}});if(escapeFailures.length>0)throw escapeFailures[0];});
 
 test('existing exact onboarding consent qualifies partial enrollment; corrupt marker alone cannot activate',t=>{const f=fixture(t);const empty=files(f.base);assert.equal(readGovernanceEnrollmentRetirement({rootDir:f.root}),null);assert.deepEqual(files(f.base),empty);put(f.root,'.agent-pipeline/onboarding-consent.json',JSON.stringify({schema:'pipeline.onboarding-consent-marker.v1',status:'consent-given-onboarding-incomplete',consentGivenAt:'2026-09-28T00:00:00.000Z'}));const before=files(f.root);assert.equal(f.controller.observe({rootDir:f.root}).state,'active');assert.equal(readGovernanceEnrollmentRetirement({rootDir:f.root}),null);assert.deepEqual(files(f.root),before);put(f.root,'.agent-pipeline/onboarding-consent.json','{}');assert.equal(f.controller.observe({rootDir:f.root}).state,'inactive');const retained=files(f.base);assert.throws(()=>readGovernanceEnrollmentRetirement({rootDir:f.root}),error=>error.code==='GS-NONGIT-RETAINED-HISTORY');assert.deepEqual(files(f.base),retained);});
 
