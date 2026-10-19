@@ -4802,6 +4802,60 @@ test("HGO multi-file apply binds one complete external-repository path set and f
   }
 });
 
+// ALF-B7-HGO (QG-04, E17): pins the signed-route apply_patch preflight under the cross-repository class.
+// This pins EXISTING behaviour, so there is no RED on the current source. preflightPatchBeforeSignature() is not
+// exported; it is reached through prepareHumanGuardOverrideForSignature() and its injectable spawn. The files exist
+// only in the TARGET repository, so the real delegate itself proves the cwd as well as the spy does.
+test("ALF-B7-HGO: the signed-route apply_patch preflight runs one git apply --check in the bound target root with target-relative headers", () => {
+  const root = fixture();
+  const target = fixtureSignature();
+  try {
+    for (const name of ["a.mjs", "m.mjs", "z.mjs"]) writeFileSync(join(target, name), "old\n");
+    const paths = [join(target, "z.mjs"), join(target, "a.mjs"), join(target, "m.mjs")];
+    const toolInput = {
+      command: [
+        "*** Begin Patch",
+        ...paths.flatMap((path) => [`*** Update File: ${path}`, "@@", "-old", "+new"]),
+        "*** End Patch",
+      ].join("\n"),
+    };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
+      toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.equal(recorded.status, "planned");
+    assert.equal(recorded.root, target);
+
+    const applyCalls = [];
+    const spy = (command, args, options) => {
+      if (command === "git" && args[0] === "apply") {
+        applyCalls.push({ args, cwd: options?.cwd, diff: readFileSync(args[args.length - 1], "utf8") });
+      }
+      return spawnSync(command, args, options);
+    };
+    const prepared = prepareHumanGuardOverrideForSignature({
+      rootDir: recorded.root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 2000,
+      scriptPath, humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"), spawn: spy,
+    });
+    assert.equal(prepared.status, "prepared");
+    assert.equal(applyCalls.length, 1, "exactly one git apply call");
+    const [call] = applyCalls;
+    assert.deepEqual(call.args.slice(0, 2), ["apply", "--check"]);
+    assert.equal(realpathSync(call.cwd), realpathSync(target), "the check runs in the bound target root");
+    assert.notEqual(realpathSync(call.cwd), realpathSync(root), "never in the coordinator root");
+    for (const name of ["a.mjs", "m.mjs", "z.mjs"]) {
+      assert.ok(call.diff.includes(`--- a/${name}\n`), `target-relative header for ${name}`);
+      assert.ok(call.diff.includes(`+++ b/${name}\n`), `target-relative header for ${name}`);
+    }
+    assert.equal(call.diff.includes(target), false, "no absolute target path in the diff");
+    assert.equal(call.diff.includes(root), false, "no absolute coordinator path in the diff");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
 test("NOVA-HGOELIG-1: an out-of-root target reaches the identical plan/prepare/authorize-by-signature/consume/ledger route, honestly scoped", () => {
   const root = fixtureSignature();
   const outside = mkdtempSync(join(tmpdir(), "hgoelig-1-outside-"));
