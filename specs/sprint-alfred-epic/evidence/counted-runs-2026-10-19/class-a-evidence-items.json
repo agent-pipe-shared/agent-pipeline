@@ -1,0 +1,1306 @@
+{
+ "schema": "pipeline.alfred-counted-pin-run.v1",
+ "class": "A (evidence only)",
+ "measuredOn": "2026-10-19",
+ "host": "WSL Linux, node direct per file, private TMPDIR outside the checkout",
+ "runner": "scratch tooling (orchestrator), each test file once",
+ "head": "b8ca8fada",
+ "note": "Counts are the node test runner summary lines. allGreen means every test file the reader mapped to the item exited 0; it does not mean the item acceptance is fully covered (see uncovered).",
+ "items": [
+  {
+   "itemId": "pipeline.agy-el01-write-authorization-gap",
+   "ac": "AC-109",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs",
+     "exit": 0,
+     "tests": 3,
+     "pass": 3,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 6695,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/hooks/guard-el01-tripwire.test.mjs",
+     "exit": 0,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 10325,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "authenticated per-call carrier evidence that the caller is an admitted, owned worker",
+    "target path inside that worker's scope",
+    "fail closed when carrier evidence is missing or unauthenticated (pin file states AC-109 is PARTIAL; carrier unavailable, PO decision open)",
+    "tripwire fail-open conditions (e.g. any open dispatch record anywhere authorizes the write) are listed in the pin header but not pinned as refusals"
+   ]
+  },
+  {
+   "itemId": "pipeline.approval-verification-demands-head-equals-candidate",
+   "ac": "AC-114",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/approval-verification-demands-head-equals-candidate.test.mjs",
+     "exit": 0,
+     "tests": 9,
+     "pass": 9,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 5436,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
+     "exit": 0,
+     "tests": 3,
+     "pass": 3,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 2309,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+     "exit": 0,
+     "tests": 4,
+     "pass": 4,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 2593,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "no commit since 76fe529b3 touches the source fix itself per snapshot; the pin's full-package case AC-114-h is a typed skip on Windows and needs a Linux/WSL run to count"
+   ]
+  },
+  {
+   "itemId": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+   "ac": "AC-119",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs",
+     "exit": 0,
+     "tests": 9,
+     "pass": 9,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 1105,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+     "exit": 0,
+     "tests": 31,
+     "pass": 31,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 4134,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "symlinked-artifact case fails with EPERM on Windows (needs Linux run)",
+    "the 'established/active repository keeps ratcheting' model-gap clause is assigned to D3/D4 and has no pin",
+    "unverified whether the pin covers the win32 and POSIX dialect matrix and project-onboarding-v3 consumer named in the Proposal (pin body not read)"
+   ]
+  },
+  {
+   "itemId": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+   "ac": "AC-128",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs",
+     "exit": 0,
+     "tests": 15,
+     "pass": 14,
+     "fail": 0,
+     "skipped": 1,
+     "todo": 0,
+     "ms": 19839,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+     "exit": 1,
+     "tests": 391,
+     "pass": 362,
+     "fail": 26,
+     "skipped": 3,
+     "todo": 0,
+     "ms": 466180,
+     "failing": [
+      "inactive repositories remain silent for session writes and Bash; valid consent enforces readiness",
+      "bare invalid source, calibration, lock, runtime and consent markers stay inactive; valid consent enforces",
+      "evaluateLifecycleReadyGuard threads its own dependencies into governanceMarkers() and stays fail-open, not fail-closed, on a throwing loader",
+      "consumer sessions cannot mutate Pipeline sources, cachebusters or plugin installations",
+      "non-ready governed roots retain a narrow simple-command read-only diagnostic lane",
+      "NVA-CF-GITPIPEALLOWLIST: exactness -- outside-root reads, mutation, and unsafe composition stay refused",
+      "GUARDFIX-2: the newline-in--m refusal carries no mutating action, and states the structured commit shape as text",
+      "GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivation, and admits exactly that set",
+      "NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is admitted by the guard's real admission function, for every declared mutating subcommand",
+      "NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activate removed, stays refused for every declared subcommand"
+     ]
+    }
+   ],
+   "allGreen": false,
+   "uncovered": [
+    "live native Windows host run of in-repo reads (host item, not a pin)",
+    "directory-target Grep in-root lane: AP9 pins directory Grep as still refused (SEC-11), which differs from the 2026-10-05 note asking for in-root Grep lanes",
+    "win32 quoted-drive-path rewrite is not named by any case title"
+   ]
+  },
+  {
+   "itemId": "pipeline.desktop-app-support-is-unverified",
+   "ac": "AC-159",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs",
+     "exit": 0,
+     "tests": 15,
+     "pass": 10,
+     "fail": 0,
+     "skipped": 5,
+     "todo": 0,
+     "ms": 59,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "the four live Desktop-app points (bootstrap line, guard denial, background Goldfish, statusLine identity) are typed 'native: pending' skips, no real-host evidence",
+    "Linux/WSL host-limitation skip (K7)"
+   ]
+  },
+  {
+   "itemId": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+   "ac": "AC-160",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs",
+     "exit": 0,
+     "tests": 35,
+     "pass": 35,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 18754,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "no stated counted GREEN in any commit; symlink cases skip where the host cannot create file symlinks",
+    "any protected patch the cases depend on needs the PO signature"
+   ]
+  },
+  {
+   "itemId": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+   "ac": "AC-161",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs",
+     "exit": 0,
+     "tests": 10,
+     "pass": 10,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 9435,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "AC1a native-host case is a skip on non-native hosts; real Windows host run still needed",
+    "macOS held; Linux/WSL run still needed",
+    "no commit states a counted GREEN"
+   ]
+  },
+  {
+   "itemId": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+   "ac": "AC-162",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/dispatch-guard-rejects-built-in-capitalized-agent-types.test.mjs",
+     "exit": 0,
+     "tests": 14,
+     "pass": 14,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 1923,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
+     "exit": 1,
+     "tests": 66,
+     "pass": 63,
+     "fail": 3,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 24266,
+     "failing": [
+      "GD22 GD4 block  an incomplete Goldfish briefing",
+      "GD26 GD8 the real critic-review.md template, filled, is dispatchable",
+      "GD27 GD9 the real goldfish-task.md template, filled, is dispatchable"
+     ]
+    }
+   ],
+   "allGreen": false,
+   "uncovered": [
+    "no counted GREEN stated in any commit",
+    "item notes the hook file may be protected; whether the fix shipped as a signed package is not evidenced by the tests"
+   ]
+  },
+  {
+   "itemId": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+   "ac": "AC-164",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs",
+     "exit": 0,
+     "tests": 11,
+     "pass": 11,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 1933,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/windows-private-state-observation-memo.test.mjs",
+     "exit": 0,
+     "tests": 12,
+     "pass": 1,
+     "fail": 0,
+     "skipped": 11,
+     "todo": 0,
+     "ms": 50,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "the item's own verification (two linked worktrees share one claim registry and RC-1/RC-2 still hold) is not shown to be a case title in the pin by this read; pin body not read",
+    "real Windows host verification of the owner claim"
+   ]
+  },
+  {
+   "itemId": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+   "ac": "AC-167",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs",
+     "exit": 1,
+     "tests": 11,
+     "pass": 9,
+     "fail": 2,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 348,
+     "failing": [
+      "AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity",
+      "AC-167 control: the literal-variable and hook-action admissions are closed -- every other shape stays refused"
+     ]
+    }
+   ],
+   "allGreen": false,
+   "uncovered": [
+    "no run output tying a count to this pin since beb9142d2 (11/11 stated across the AC-167 pin)",
+    "the Proposal's 'pipeline-state.mjs inspect' and 'observation-governance-bootstrap.mjs' admissions are covered only if point 2 enumerates them; pin body not read"
+   ]
+  },
+  {
+   "itemId": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+   "ac": "AC-168",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/elephant-main-context-spent-on-wake-ups-and-inline-reads.test.mjs",
+     "exit": 0,
+     "tests": 8,
+     "pass": 8,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 54,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/scripts/elephant-context-measure.test.mjs",
+     "exit": 0,
+     "tests": 9,
+     "pass": 9,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 52,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "real before/after numbers on Elephant transcripts (host evidence)",
+    "PO target of at most 10 percent pipeline administration (PO decision on the acceptable target is open)",
+    "per-cause enforcement-layer measures beyond role text are not pinned as behaviour"
+   ]
+  },
+  {
+   "itemId": "pipeline.evidence-artifacts-carry-no-commit-identity",
+   "ac": "AC-170",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/evidence-artifacts-carry-no-commit-identity.test.mjs",
+     "exit": 0,
+     "tests": 12,
+     "pass": 12,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 1075,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/scripts/capture-evidence.test.mjs",
+     "exit": 0,
+     "tests": 47,
+     "pass": 47,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 1535,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "no commit states a counted GREEN; no uncovered acceptance clause found (the item's single clause is the header identity plus a pinning test)"
+   ]
+  },
+  {
+   "itemId": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+   "ac": "AC-171",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/existing-signing-key-reuse-deadlocks-onboarding.test.mjs",
+     "exit": 0,
+     "tests": 7,
+     "pass": 7,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 13706,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/scripts/po-human-approval-key-pairing.test.mjs",
+     "exit": 0,
+     "tests": 5,
+     "pass": 5,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 1785,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "verification in a real consumer onboarding (host item)",
+    "no commit states a counted GREEN"
+   ]
+  },
+  {
+   "itemId": "pipeline.foreign-worktree-closes-the-implementation-gate",
+   "ac": "AC-174",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs",
+     "exit": 0,
+     "tests": 18,
+     "pass": 17,
+     "fail": 0,
+     "skipped": 1,
+     "todo": 0,
+     "ms": 379,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "AC1 case 'original cause of a git failure retained as a fixed enum' is titled RED today and stays red until the protected patch is applied (PO signature)",
+    "WSL-registered /mnt foreign-worktree fixture is a host-limitation skip needing Linux/WSL"
+   ]
+  },
+  {
+   "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+   "ac": "AC-177",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+     "exit": 0,
+     "tests": 8,
+     "pass": 8,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 325,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "run on a real Git for Windows 2.56 host (host item)",
+    "no commit states a counted GREEN",
+    "protected sites routed through a signed package are not evidenced by this suite alone"
+   ]
+  },
+  {
+   "itemId": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+   "ac": "AC-180",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs",
+     "exit": 0,
+     "tests": 13,
+     "pass": 13,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 53,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.git-stash-list-classified-as-working-tree-write",
+   "ac": "AC-181",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs",
+     "exit": 0,
+     "tests": 33,
+     "pass": 33,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 378,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+     "exit": 0,
+     "tests": 34,
+     "pass": 34,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 379,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "Description's related parser symptom and the 2026-10-18 PF-16 observation (sed -i expression read as the written File: target) is not asserted by the pin (no sed case in it); it is not part of the Proposal, so unpinned"
+   ]
+  },
+  {
+   "itemId": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+   "ac": "AC-182",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/gitleaks-content-suppression-does-not-match-on-windows.test.mjs",
+     "exit": 0,
+     "tests": 26,
+     "pass": 25,
+     "fail": 0,
+     "skipped": 1,
+     "todo": 0,
+     "ms": 134,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs",
+     "exit": 0,
+     "tests": 44,
+     "pass": 38,
+     "fail": 0,
+     "skipped": 6,
+     "todo": 0,
+     "ms": 150,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "The backslash-relative separator shape is a typed skip on non-Windows hosts; its execution needs a native Windows run",
+    "gitleaks.test.mjs real-binary ledger failure is explicitly out of this item (detection-side)"
+   ]
+  },
+  {
+   "itemId": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+   "ac": "AC-184",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs",
+     "exit": 0,
+     "tests": 9,
+     "pass": 9,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 638,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs",
+     "exit": 0,
+     "tests": 1,
+     "pass": 1,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 92,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+   "ac": "AC-186",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs",
+     "exit": 0,
+     "tests": 6,
+     "pass": 6,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 53,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "Added 0.7.0 acceptance: for a product item the delivery route dispatches criterion-bound tests through a separate test-author dispatch and the implementer may not modify them",
+    "Added acceptance: the generated item briefing never assigns test ownership to the implementer",
+    "Added acceptance: a pin proving a consumer item course with a declared test-author route yields two dispatches with disjoint test and implementation write scopes"
+   ]
+  },
+  {
+   "itemId": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+   "ac": "AC-196",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/guard-push-treats-gitleaks-as-a-git-command.test.mjs",
+     "exit": 0,
+     "tests": 19,
+     "pass": 19,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 6761,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs",
+     "exit": 0,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 9641,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+     "exit": 0,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 107,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.handover-doc-committed-without-governance-classification",
+   "ac": "AC-198",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/handover-doc-committed-without-governance-classification.test.mjs",
+     "exit": 0,
+     "tests": 17,
+     "pass": 17,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 6974,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "The item's alternative of running the check inside the handover writer itself is not pinned (the Proposal allows either; the pin chooses the pre-commit hook)",
+    "Item Triage section is empty, so no commit names this fix; the pin is the only anchor found"
+   ]
+  },
+  {
+   "itemId": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+   "ac": "AC-205",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs",
+     "exit": 0,
+     "tests": 11,
+     "pass": 10,
+     "fail": 0,
+     "skipped": 1,
+     "todo": 0,
+     "ms": 320,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "Acceptance 4: disposition of existing stage-0-labeled design commits as provenance debt (a history disposition, named in the pin as not testable)",
+    "A live installed git commit-msg hook run is not exercised (pin header states it); the snapshot also lists a native-host check",
+    "Rejection of design (elephant) for production implementation files is covered only through the verifier path-count bound, which I did not read in the pin body"
+   ]
+  },
+  {
+   "itemId": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+   "ac": "AC-206",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs",
+     "exit": 1,
+     "tests": 8,
+     "pass": 7,
+     "fail": 1,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 3046,
+     "failing": [
+      "A1/A2 real closure test passes as a CLI on the live repo (GMWKC01 closed, GMWKC08 multi-report green)"
+     ]
+    },
+    {
+     "file": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+     "exit": 1,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 706,
+     "failing": []
+    }
+   ],
+   "allGreen": false,
+   "uncovered": [
+    "A2 states a red ratchet blocks the candidate stamp; the pin proves only a non-zero CLI exit, not that the candidate-stamp path consumes it (no test on the stamp wiring found)"
+   ]
+  },
+  {
+   "itemId": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+   "ac": "AC-210",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/mandatory-hook-readiness-returned-refusal-skips-rollback.test.mjs",
+     "exit": 0,
+     "tests": 8,
+     "pass": 8,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 30185,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs",
+     "exit": 0,
+     "tests": 9,
+     "pass": 9,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 22134,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.merge-commit-message-skips-conventional-type-check",
+   "ac": "AC-211",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/merge-commit-message-skips-conventional-type-check.test.mjs",
+     "exit": 0,
+     "tests": 10,
+     "pass": 9,
+     "fail": 0,
+     "skipped": 1,
+     "todo": 0,
+     "ms": 61,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "The original acceptance text is not available: find located no backlog file for this slug, and the pin header states it is reconstructed from the title and the Merge20 policy-seam proof, so R1-R5 cannot be checked against an original text",
+    "No commit naming the fix was found"
+   ]
+  },
+  {
+   "itemId": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+   "ac": "AC-214",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/model-role-confirmation-prompt-obscures-required-digest.test.mjs",
+     "exit": 0,
+     "tests": 9,
+     "pass": 9,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 665,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/scripts/model-role-bootstrap.test.mjs",
+     "exit": 0,
+     "tests": 19,
+     "pass": 19,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 733,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "Installed attended acceptance on the real hosts (snapshot native-host entry) is outside any committed test"
+   ]
+  },
+  {
+   "itemId": "pipeline.native-patch-rename-drops-protected-content-markers",
+   "ac": "AC-215",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/native-patch-rename-drops-protected-content-markers.test.mjs",
+     "exit": 0,
+     "tests": 14,
+     "pass": 14,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 2576,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs",
+     "exit": 1,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 129732,
+     "failing": []
+    }
+   ],
+   "allGreen": false,
+   "uncovered": [
+    "Clause 3 installed-guard retention of these controls needs a native-host run (item and snapshot say host run needed); the pin checks committed source only"
+   ]
+  },
+  {
+   "itemId": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+   "ac": "AC-216",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs",
+     "exit": 1,
+     "tests": 29,
+     "pass": 28,
+     "fail": 1,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 42117,
+     "failing": [
+      "alias and private-directory mode refusals (PU-ALIAS, PU-PRIVATE-MODE) need symlinks and mode bits"
+     ]
+    },
+    {
+     "file": "plugins/pipeline-core/lib/project-uninstall.test.mjs",
+     "exit": 0,
+     "tests": 17,
+     "pass": 17,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 25821,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/project-uninstall-contract.test.mjs",
+     "exit": 0,
+     "tests": 8,
+     "pass": 8,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 3595,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/scripts/project-reset-git-hooks.test.mjs",
+     "exit": 0,
+     "tests": 17,
+     "pass": 17,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 112465,
+     "failing": []
+    }
+   ],
+   "allGreen": false,
+   "uncovered": [
+    "--archive and --archive-private-state variants and a per-runner (Claude, Codex, agy) fixture matrix: no matching test title in the pin",
+    "Suggested Conventional Commit output and GIT-03 trailer relief in a declined repo (Proposal item 5): no pin found",
+    "alias and private-directory mode refusals are a typed skip on native Windows (needs Linux/WSL)",
+    "AC-109 carrier disposition is a PO decision, not testable",
+    "The pin test names were read from titles only; bodies not inspected, and project-uninstall*.test.mjs and project-reset-git-hooks.test.mjs were not opened"
+   ]
+  },
+  {
+   "itemId": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+   "ac": "AC-217",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs",
+     "exit": 1,
+     "tests": 13,
+     "pass": 12,
+     "fail": 1,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 835,
+     "failing": [
+      "A1: no \"NUL\" literal is a Node open target in any repository JS source"
+     ]
+    },
+    {
+     "file": "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+     "exit": 0,
+     "tests": 8,
+     "pass": 8,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 325,
+     "failing": []
+    }
+   ],
+   "allGreen": false,
+   "uncovered": [
+    "Possible conflict, not resolved: the pin's A2 explicitly allows GIT_CONFIG_GLOBAL set to the NUL spelling, while the item's clause 2 says git null-device values must use GIT_NULL_DEVICE and never the NUL literal; whether git-null-device-sites.test.mjs closes that clause was not verified",
+    "Windows Node 24 native run confirming no real nul file (native-host)"
+   ]
+  },
+  {
+   "itemId": "pipeline.plan-submission-must-not-require-separate-po-approval",
+   "ac": "AC-227",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs",
+     "exit": 0,
+     "tests": 21,
+     "pass": 21,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 3572,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.powershell-bypasses-onboarding-read-boundary",
+   "ac": "AC-228",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs",
+     "exit": 0,
+     "tests": 6,
+     "pass": 6,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 21689,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "live host permission boundary of Read/Grep/Glob outside the guard (the pin header names it as not claimed)",
+    "installed native Windows enforcement run (the pin runs the real guard function with a synthetic readiness probe, not a Windows host)"
+   ]
+  },
+  {
+   "itemId": "pipeline.project-resource-budget-headroom-is-not-reported",
+   "ac": "AC-233",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs",
+     "exit": 0,
+     "tests": 21,
+     "pass": 20,
+     "fail": 0,
+     "skipped": 1,
+     "todo": 0,
+     "ms": 936,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "no public original acceptance body exists (the pin binds the reconstruction in specs/sprint-alfred-epic/plans/acceptance-reconstruction/R1.md)",
+    "which surfaces must show the report (Quick, Verify, bootstrap) was still an open PO question in deabbe04a",
+    "symlink-alias CLI case is skipped on native Windows"
+   ]
+  },
+  {
+   "itemId": "pipeline.push-classifier-deny-list-does-not-converge",
+   "ac": "AC-235",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/push-classifier-deny-list-does-not-converge.test.mjs",
+     "exit": 0,
+     "tests": 28,
+     "pass": 28,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 63,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+     "exit": 0,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 107,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "Critic shape F5 (stale open-gap notes) is documentation, with no test pin"
+   ]
+  },
+  {
+   "itemId": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+   "ac": "AC-237",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs",
+     "exit": 0,
+     "tests": 5,
+     "pass": 5,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 53,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+     "exit": 0,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 107,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/hooks/guard-push-gitleaks-prefix.test.mjs",
+     "exit": 0,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 9641,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "Codex route not measured live (the item itself says so); the pin exercises commandIsGitPush only"
+   ]
+  },
+  {
+   "itemId": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+   "ac": "AC-247",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/scratch-must-remain-writable-across-lifecycle-states.test.mjs",
+     "exit": 0,
+     "tests": 11,
+     "pass": 11,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 8494,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "live readback that a blocked session can save a report without a PO override (native-host)",
+    "apply_patch/Codex adapter lane and the installed-guard sweep (the pin calls the lifecycle guard and rule matchers only)",
+    "the pin samples states by rotation rather than the full state x shape product, as its header states",
+    "directory/file symlink cases skip on hosts that cannot create them"
+   ]
+  },
+  {
+   "itemId": "pipeline.semgrep-console-coverage-note-has-no-test",
+   "ac": "AC-250",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/semgrep-console-coverage-note-has-no-test.test.mjs",
+     "exit": 0,
+     "tests": 7,
+     "pass": 7,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 703,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+   "ac": "AC-254",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/shell-classifier-faults-on-heredoc-body-text.test.mjs",
+     "exit": 0,
+     "tests": 7,
+     "pass": 7,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 92,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+   "ac": "AC-258",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs",
+     "exit": 0,
+     "tests": 16,
+     "pass": 15,
+     "fail": 0,
+     "skipped": 1,
+     "todo": 0,
+     "ms": 18406,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "the end-to-end three-runner happy-path test the acceptance defers to (2026-10-03-three-runner-happy-path-with-two-po-approvals.md) is not part of this pin",
+    "a durable PO-signed configuration layer that later migrations respect: only the mirror proof exists, and the live case is tagged RED needing protected patch ALF-C-AC258-REF",
+    "no JSON copy-back: only a code comment at line 97 states the proof import is agent-side; no dedicated import case seen",
+    "refreeze followed by a stale request handed over: partly via the drift cases, no direct refreeze case"
+   ]
+  },
+  {
+   "itemId": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+   "ac": "AC-263",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/source-agent-definition-change-locks-that-agent-until-install.test.mjs",
+     "exit": 0,
+     "tests": 6,
+     "pass": 6,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 340,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.transfer-redaction-alters-digest-bound-files",
+   "ac": "AC-265",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/transfer-redaction-alters-digest-bound-files.test.mjs",
+     "exit": 0,
+     "tests": 9,
+     "pass": 9,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 117,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "Proposal 3 (R7-3 long-term, bound artifacts tracked in the repository) is a superseding note, not testable acceptance",
+    "the original ad hoc bundler under scratch/ is not what the pin tests; it tests lib/bound-artifact-transfer.mjs"
+   ]
+  },
+  {
+   "itemId": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+   "ac": "AC-268",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs",
+     "exit": 0,
+     "tests": 16,
+     "pass": 16,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 81,
+     "failing": []
+    },
+    {
+     "file": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+     "exit": 0,
+     "tests": null,
+     "pass": null,
+     "fail": null,
+     "skipped": null,
+     "todo": null,
+     "ms": 107,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": []
+  },
+  {
+   "itemId": "pipeline.windows-greenfield-scratch-write-denied",
+   "ac": "AC-269",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs",
+     "exit": 1,
+     "tests": 12,
+     "pass": 9,
+     "fail": 2,
+     "skipped": 1,
+     "todo": 0,
+     "ms": 2073,
+     "failing": [
+      "W1: a physical root alias is resolved before containment (alias root and real root agree)",
+      "W3: the guard admits PowerShell New-Item and Set-Content/Add-Content for scratch in every non-ready status"
+     ]
+    }
+   ],
+   "allGreen": false,
+   "uncovered": [
+    "W5 fresh Windows intake completing end to end (needs a live Windows host; the pin names it as not claimed)",
+    "native-Windows spelling case is skipped off win32, the non-Windows case skipped on win32",
+    "tests run on only two representative non-ready statuses"
+   ]
+  },
+  {
+   "itemId": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+   "ac": "AC-272",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs",
+     "exit": 0,
+     "tests": 14,
+     "pass": 14,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 33491,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "a run on native Windows (the fsync EPERM is shown only as a host fact on the current host; F1 mode-bit case is host-limited and skipped there)"
+   ]
+  },
+  {
+   "itemId": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+   "ac": "AC-274",
+   "tests": [
+    {
+     "file": "plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs",
+     "exit": 0,
+     "tests": 7,
+     "pass": 7,
+     "fail": 0,
+     "skipped": 0,
+     "todo": 0,
+     "ms": 10899,
+     "failing": []
+    }
+   ],
+   "allGreen": true,
+   "uncovered": [
+    "the clause 'preserve prior onboarding and uninstall behavior' is not a named case (it relies on the existing suites)"
+   ]
+  }
+ ]
+}
