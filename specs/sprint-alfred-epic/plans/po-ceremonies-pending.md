@@ -12,5 +12,11 @@ exact change and why no agent can make it. Updated as entries are added or done.
 | C4 | human guard override (TP-5) | `harness/scripts/pipeline-state.test.mjs` | Replace the whole file with the prepared drop-in `scratch/c4h/pipeline-state.test.patched.mjs` (hunk ledger `scratch/c4h/edits.md`, hunks H2–H8). The hunks:<br>• the fixtures become git repositories under the checkout's scratch/;<br>• the plan-approval schema moves from v7 to v8;<br>• the PS08a v4 derivation is adjusted;<br>• the po-gate directory is created with mode 0700;<br>• RGt is retargeted per E18;<br>• HL-3a is retargeted per E12, with its tail dormant.<br>A scratch copy with only the import paths rewritten passes 530/530 (orchestrator run, 2026-10-19). Correction: an earlier C4 text named `plugins/pipeline-core/scripts/pipeline-state.test.mjs`. That file matches no TP pattern and is committed (5632bf6d9). | TP-5 protects this file. On 2026-10-19 it aborts after 0.3 s, so Full Verify measures nothing past PS06a. One whole-file Write ceremony: seed the request with the exact Write of the drop-in bytes, then retry that identical call | ready |
 | C5 | human guard override (TP-7) | `plugins/pipeline-core/hooks/guard-testpath-override.test.mjs` | To be prepared read-only as a drop-in under E16: its chat-armed cases (line ~197 uses the removed `isattyFn`/`readLineFn` injection) arm through the signature route instead. | TP-7 protects this file. On 2026-10-19 it aborts with no summary | analysis pending |
 
+## PO manual tasks (no ceremony)
+
+| # | Task | Why |
+|---|---|---|
+| T1 | Look in your real `~/.gemini/agent-pipeline/installed-plugin-attestations/` for `.json` / `.source.json` files that name a `scratch/agy-p18-02-first-start-*` path, and delete those by hand. | On 2026-10-19 the AC-111 pin was run once before its fix (2a51b7cdb). That run executed the real receipt writer against the real HOME. Agents may not read or change the real home, so only you can check. Every later run is confined to the fixture home. |
+
 Not a ceremony, but also waiting on the PO: a new candidate is stamped and pushed only when
 the PO calls for one (D18).
