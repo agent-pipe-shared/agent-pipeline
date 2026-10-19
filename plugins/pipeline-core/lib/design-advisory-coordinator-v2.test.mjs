@@ -17,6 +17,7 @@ import {loadRunnerProfilesV3Registry} from './runner-profiles-v3.mjs';
 import {coordinateDesignAdvisory} from './design-advisory-coordinator.mjs';
 import {runDesignAdvisoryCoordinator} from '../scripts/design-advisory-coordinator.mjs';
 import { devNull } from 'node:os';
+import {DESIGN_ADVISORY_COURSE_RETIRED} from './retired-design-codes.mjs';
 const args=f=>({repoRoot:f.root,featureId:'advisor-feature',authoringDispatchId:'elephant-author',sources:f.sources,reason:'risk-review',profile:'feature',dispatch:f.args.dispatch,route:f.route,hostExecution:f.execution});
 
 test('actual managed unknown answer finalizes initial course and restart does not launch another consultation',async t=>{
@@ -71,7 +72,12 @@ test('metadata export denial precedes invalid declared source content reads',asy
 
 test('caller supplied unbranded host object cannot mint a consultation course',async t=>{
  assert.equal((await coordinateDesignAdvisory({planPath:'legacy.md',specPath:'spec.md',invokeBridge:()=>{throw Error('must not launch');}})).code,'DAC-INITIAL-SOURCES-REQUIRED');
- await assert.rejects(runDesignAdvisoryCoordinator(['--runner','claude','--repo-root','/missing','--feature','legacy','--plan','legacy.md','--spec','spec.md','--decision','accept','--rationale-file','rationale.md']));
+ // The CLI entry is retired before parsing, state access or dispatch (AC-244 pin, test (i)): it now answers the legacy argv with the typed
+ // DESIGN-ADVISORY-COURSE-RETIRED refusal instead of rejecting on a usage error. The refusal is kept, never admitted; only its shape changed.
+ const retiredEntry=await runDesignAdvisoryCoordinator(['--runner','claude','--repo-root','/missing','--feature','legacy','--plan','legacy.md','--spec','spec.md','--decision','accept','--rationale-file','rationale.md']);
+ assert.equal(retiredEntry.ok,false);
+ assert.equal(retiredEntry.code,DESIGN_ADVISORY_COURSE_RETIRED);
+ assert.equal(retiredEntry.implementationAuthority,false);
  for(const runner of ['claude','antigravity']){
   const native=advisorHostFixture(t),route={model:null,effort:null,sourceSha256:designAdvisorValueSha256(loadRunnerProfilesV3Registry()),candidateCommit:native.candidate.commit};
   const input={...args(native),runner,route,hostExecution:createNativeInitialAdvisorExecution({runner})};
