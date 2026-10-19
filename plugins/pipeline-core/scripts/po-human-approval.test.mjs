@@ -196,9 +196,18 @@ function callWithLever(argv, dependencies, unguarded) {
     if (done) done();
     return true;
   };
-  try { return unguarded(argv, leveraged); } finally {
+  const restore = () => {
     if (hadOwnWrite) process.stdout.write = priorWrite; else delete process.stdout.write;
-  }
+  };
+  let result;
+  try { result = unguarded(argv, leveraged); } catch (error) { restore(); throw error; }
+  // ALF-B5-AC256 (QG-04): a portable Critic export request makes runHumanApproval return a Promise (the
+  // provider import finishes first, then the ceremony body writes its disclosure). The capture must stay in
+  // place until that Promise settles, or the disclosure the case asserts on would go to the real stdout.
+  // Every synchronous result is restored exactly as before.
+  if (typeof result?.then === "function") return result.finally(restore);
+  restore();
+  return result;
 }
 const runHumanApproval = (argv, dependencies) => callWithLever(argv, withFixtureHome(dependencies), runHumanApprovalUnguarded);
 const runForkDispositionApproval = async (argv, dependencies = {}) => callWithLever(argv, dependencies, runForkDispositionApprovalUnguarded);
@@ -1221,7 +1230,9 @@ function portableCriticSigningFixture() {
   return portableCriticExportRequest({ subject, approvalIntent });
 }
 
-test("sign-intent discloses a bound portable Critic export and no release authority", { skip: REQUIRES_OPENSSL }, () => {
+// ALF-B5-AC256 (QG-04): runHumanApproval returns a Promise for pipeline.portable-critic-export-request.v1, so this
+// case awaits it. Every assertion on the result and on the disclosure is unchanged.
+test("sign-intent discloses a bound portable Critic export and no release authority", { skip: REQUIRES_OPENSSL }, async () => {
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
@@ -1231,7 +1242,7 @@ test("sign-intent discloses a bound portable Critic export and no release author
     mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
     writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(request)}\n`);
     const prompts = [];
-    const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+    const result = await runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
       "--directory", dirs.directory, "--request", path],
     disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
       checkPortableCriticExportRequest: () => true }));
@@ -1245,22 +1256,26 @@ test("sign-intent discloses a bound portable Critic export and no release author
   } finally { cleanup(dirs); }
 });
 
-test("sign-intent rejects a changed or unbacked portable Critic request before signing", () => {
+// ALF-B5-AC256 (QG-04): the refusals of a portable Critic request now arrive as a rejected Promise, so both
+// refusals are asserted with assert.rejects (the same two messages). The unbacked-request refusal comes after
+// the signing readiness guarantee, so this fixture carries the committed trust anchor like its sibling above.
+test("sign-intent rejects a changed or unbacked portable Critic request before signing", async () => {
   const dirs = fixtureDirs();
   try {
     keyFixture(dirs.directory);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const request = portableCriticSigningFixture();
     const path = "scratch/portable-critic-export-request-fixture.json";
     mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
     request.subject.producer.verdictSha256 = "4".repeat(64);
     writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(request)}\n`);
-    assert.throws(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+    await assert.rejects(async () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
       "--directory", dirs.directory, "--request", path],
     { readConfirmation: () => { throw new Error("must not ask for approval"); } }),
     /portable Critic export request does not bind its exact subject/u);
     const valid = portableCriticSigningFixture();
     writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(valid)}\n`);
-    assert.throws(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+    await assert.rejects(async () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
       "--directory", dirs.directory, "--request", path],
     { readConfirmation: () => { throw new Error("must not ask for approval"); } }),
     /not bound to a current consumed private Critic review/u);
@@ -1428,6 +1443,10 @@ test("NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink pl
   const outsideDir = fixtureTemp("po-sign-intent-outside-target-");
   try {
     keyFixture(dirs.directory);
+    // ALF-B5-AC256 (QG-04): the signing readiness guarantee runs before the scratch-mirror hardening this case
+    // pins, and it refuses a key with no committed trust anchor (key-anchor-mismatch). The fixture now carries
+    // the anchor like its siblings; the symlink refusal and the untouched victim file are asserted unchanged.
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.gmw-reconcile-symlink-sibling-fixture").digest("hex");
     const scratchDir = join(dirs.repoRoot, "scratch");
     mkdirSync(scratchDir, { recursive: true });
@@ -2371,8 +2390,12 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
     // fix 2, 2026-08-18) and is exercised by its own positive-path test below,
     // so it is excluded from this negative loop. `release-preflight` was added
     // the same way (GF-105/ADR-0064 Decision 4) and is exercised by its own
-    // positive-path tests further below, so it is excluded here too.
-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight"].includes(entry))) {
+    // positive-path tests further below, so it is excluded here too. `interruption-promotion` is excluded
+    // for the same reason (ALF-B5-AC256, QG-04): prepare-critical composes it (the refused call reached the
+    // clean-candidate check instead of the Usage refusal), so asserting Usage for it is a premise the source
+    // no longer holds. This file holds NO positive-path test for interruption-promotion: that is a coverage
+    // gap, reported and not built here. Every other kind keeps the Usage assertion.
+    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion"].includes(entry))) {
       assert.throws(() => runHumanApproval([
         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
@@ -3828,6 +3851,23 @@ function treeListing(root) {
   return readdirSync(root, { recursive: true }).map((entry) => String(entry).replaceAll("\\", "/")).sort();
 }
 
+/**
+ * ALF-B5-AC256 (QG-04): the repository snapshots of the four setup cases below (PO-KEYDIR-01(A) x3, R7-6k) say
+ * "setup writes nothing into the repository". Since the ceremony wrapper runs every setup/sign-intent under an
+ * owned ceremony, the fixture repository's .git carries the wrapper's own private state
+ * (.git/agent-pipeline/chat-gate-ceremonies/* and .git/agent-pipeline/session-authority/*), which is written
+ * for ANY ceremony and is not a key-directory store. Exactly those two subtrees (with their root entries) and
+ * the bare .git/agent-pipeline container are removed from the repository snapshot; every other entry, including
+ * any other child of .git/agent-pipeline (a key-directory store would be one), still has to be unchanged.
+ * Only the repository-root snapshots use this; the git-common-dir, home and key-directory listings still use
+ * the unfiltered treeListing.
+ */
+const CEREMONY_OWNED_PRIVATE_STATE = Object.freeze([".git/agent-pipeline/chat-gate-ceremonies", ".git/agent-pipeline/session-authority"]);
+function repositoryTreeListing(root) {
+  return treeListing(root).filter((entry) => entry !== ".git/agent-pipeline"
+    && !CEREMONY_OWNED_PRIVATE_STATE.some((owned) => entry === owned || entry.startsWith(owned + "/")));
+}
+
 // R7-6-T11 (decision AC, r7-6-multi-key-aa.md): setup now writes the MACHINE-WIDE default; the legacy per-repository store is read-only.
 test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the MACHINE PLANE (decision AC), never the legacy REPO-SCOPED store or the repository; a later command resolves it without repeating --directory in the SAME repo and, the plane being machine-wide, in a DIFFERENT repo too", { skip: REQUIRES_OPENSSL }, () => {
   const dirs = fixtureDirs();
@@ -3840,7 +3880,7 @@ test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the M
     anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const repoRootA = resolve(dirs.repoRoot);
     const gitCommonDirFn = (repository) => (repository === repoRootA ? commonA : commonOther);
-    const repoBefore = treeListing(dirs.repoRoot);
+    const repoBefore = repositoryTreeListing(dirs.repoRoot);
     const setupResult = withEnvDirectory(undefined, () => runHumanApproval(
       ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
       { homedirFn: () => home, gitCommonDirFn },
@@ -3853,7 +3893,7 @@ test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the M
     assert.equal(realpathSync(plane.plane.poKeyDirectory), realpathSync(dirs.directory));
 
     // Nothing in the repository or the git-common-dir; the legacy store stays untouched.
-    assert.deepEqual(treeListing(dirs.repoRoot), repoBefore, "setup writes nothing into the repository");
+    assert.deepEqual(repositoryTreeListing(dirs.repoRoot), repoBefore, "setup writes nothing into the repository");
     assert.deepEqual(treeListing(commonA), [], "setup writes nothing into the git-common-dir");
     assert.equal(existsSync(repoScopeStorePath(commonA)), false, "the legacy per-repository store is not written");
 
@@ -3901,7 +3941,7 @@ test("PO-KEYDIR-01(A): a subsequent setup --directory <other-dir> never silently
     assert.equal(realpathSync(afterFirst.plane.poKeyDirectory), realpathSync(dirs.directory));
 
     keyFixture(otherDirs.directory);
-    const repositoriesBefore = [treeListing(dirs.repoRoot), treeListing(otherDirs.repoRoot)];
+    const repositoriesBefore = [repositoryTreeListing(dirs.repoRoot), repositoryTreeListing(otherDirs.repoRoot)];
     const second = withEnvDirectory(undefined, () => runHumanApproval(
       ["setup", "--repo-root", otherDirs.repoRoot, "--directory", otherDirs.directory], dependencies));
     assert.equal(second.ok, true, "setup itself must still succeed even though the plane write is skipped");
@@ -3910,7 +3950,7 @@ test("PO-KEYDIR-01(A): a subsequent setup --directory <other-dir> never silently
     assert.deepEqual(stored, afterFirst, "a different, already-set machine-wide poKeyDirectory must never be silently overwritten");
     assert.equal(realpathSync(stored.plane.poKeyDirectory), realpathSync(dirs.directory));
     assert.deepEqual(treeListing(common), [], "the legacy per-repository store is never written");
-    assert.deepEqual([treeListing(dirs.repoRoot), treeListing(otherDirs.repoRoot)], repositoriesBefore, "nothing is written into either repository");
+    assert.deepEqual([repositoryTreeListing(dirs.repoRoot), repositoryTreeListing(otherDirs.repoRoot)], repositoriesBefore, "nothing is written into either repository");
   } finally {
     cleanup(dirs);
     cleanup(otherDirs);
@@ -3928,14 +3968,14 @@ test("PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory 
     keyFixture(dirs.directory);
     const gitCommonDirFn = () => common;
     const before = readMachinePlane({ homedirFn: () => home });
-    const repoBefore = treeListing(dirs.repoRoot);
+    const repoBefore = repositoryTreeListing(dirs.repoRoot);
     const result = withEnvDirectory(undefined, () => runHumanApproval(["setup", "--repo-root", dirs.repoRoot], { homedirFn: () => home, gitCommonDirFn }));
     assert.equal(result.ok, true);
     const after = readMachinePlane({ homedirFn: () => home });
     assert.deepEqual(after, before, "a directory resolved FROM the plane must not trigger a redundant write back to it");
     assert.equal(existsSync(repoScopeStorePath(common)), false, "a plane-sourced directory must not be written into the repo-scoped store either");
     assert.deepEqual(treeListing(common), [], "nothing at all is written into the git-common-dir");
-    assert.deepEqual(treeListing(dirs.repoRoot), repoBefore, "nothing is written into the repository");
+    assert.deepEqual(repositoryTreeListing(dirs.repoRoot), repoBefore, "nothing is written into the repository");
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });
@@ -4079,7 +4119,7 @@ test("R7-6k: setup --directory on a home with no machine plane writes a new vali
   const common = repoScopeCommonDirFixture();
   try {
     keyFixture(dirs.directory);
-    const repoBefore = treeListing(dirs.repoRoot);
+    const repoBefore = repositoryTreeListing(dirs.repoRoot);
     const result = withEnvDirectory(undefined, () => runHumanApproval(
       ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
       { homedirFn: () => home, gitCommonDirFn: () => common },
@@ -4091,7 +4131,7 @@ test("R7-6k: setup --directory on a home with no machine plane writes a new vali
     for (const field of ["routing", "language", "session", "usage"]) assert.equal(plane.plane[field], null, `${field} stays not configured`);
     assert.deepEqual(treeListing(home).filter((entry) => !entry.startsWith(".agent-pipeline")), [], "nothing outside the plane directory is written into the home");
     assert.deepEqual(treeListing(common), [], "nothing is written into the git-common-dir: the legacy store is read-only");
-    assert.deepEqual(treeListing(dirs.repoRoot), repoBefore, "nothing is written into the repository");
+    assert.deepEqual(repositoryTreeListing(dirs.repoRoot), repoBefore, "nothing is written into the repository");
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });
@@ -5070,8 +5110,16 @@ function r76Spy(mode = "healthy", events = []) {
 /** One isolated machine: repo + external key directory (fixtureDirs), a fixture home
  * carrying the machine-wide plane, and an empty fixture git-common-dir. `plane` is
  * null (no machine-wide value), "own" (this fixture's key directory) or a path. */
-function r76Env({ plane = null } = {}) {
+function r76Env({ plane = null, keyDirectoryOutsideEveryRepository = false } = {}) {
   const dirs = fixtureDirs();
+  if (keyDirectoryOutsideEveryRepository) {
+    // ALF-B5-AC256 (QG-04): fixtureDirs() keeps the key directory under this checkout's own scratch/ (a repository
+    // working tree), where the signing spawn's working directory cannot be "outside every repository". A PO key
+    // directory lies outside every repository in production (set-po-key-directory refuses one inside), so the one
+    // case that asserts that placement opts into an OS-temporary key directory. Every other case is unchanged.
+    rmSync(dirs.directory, { recursive: true, force: true });
+    dirs.directory = outsideRepositoryTemp("r76-key-");
+  }
   const home = outsideRepositoryTemp("r76-home-");
   writeMachinePlane({
     schema: MACHINE_PLANE_SCHEMA, poKeyDirectory: plane === "own" ? dirs.directory : plane,
@@ -5203,15 +5251,44 @@ test("R7-6b(i): a spawn that cannot find openssl yields the typed openssl-not-on
   } finally { r76Release(env); }
 });
 
+/**
+ * A PATH directory that lets the ceremony wrapper start git and holds nothing else. The wrapper cannot start
+ * without git, which is why an empty PATH never reached the toolchain probe at all. On POSIX the git directory
+ * of a system install also holds openssl, so the directory is a fresh one carrying only a link to the real git
+ * executable; on native Windows the directory that holds git.exe is used as it is (Git for Windows keeps its
+ * openssl in a different directory).
+ */
+function r76GitOnlyPathDirectory() {
+  const key = Object.keys(process.env).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
+  const executable = process.platform === "win32" ? "git.exe" : "git";
+  const found = String(process.env[key] ?? "").split(process.platform === "win32" ? ";" : ":")
+    .find((entry) => entry !== "" && isAbsolute(entry) && existsSync(join(entry, executable)));
+  assert.ok(found, "git must be reachable on the PATH of the test process: the ceremony wrapper starts it");
+  if (process.platform === "win32") return { directory: found, created: false };
+  const directory = fixtureTemp("r76-gitonly-path-");
+  symlinkSync(realpathSync(join(found, executable)), join(directory, executable));
+  return { directory, created: true };
+}
+
+// ALF-B5-AC256 (QG-04, Elephant decision E21): with an EMPTY PATH this case never reached the toolchain probe,
+// because the ceremony wrapper could not start git (git could not start: spawnSync git ENOENT), and the premise
+// "a PATH with no openssl ends the lookup" cannot be built by emptying the PATH on a host where git is
+// reachable only through the PATH. The case is re-expressed with a PATH that holds git and no openssl, driven
+// through the existing platform dependency on the win32 dialect (which searches only PATH entries and the
+// Windows install roots and has no POSIX known-directory fallback, so the production resolver, were it used,
+// would find no openssl.exe either). The lookup stays the real one: no spawn stub. Under the central key lever
+// the spawn seam is the lever's own bare-name spawn, so the PATH is what makes openssl unreachable; the win32
+// dialect alone is not sufficient. The typed result and the no-prompt assertions are unchanged. No production
+// seam is added.
 test("R7-6b(i), real lookup: with a PATH holding no openssl at all the same typed openssl-not-on-path result ends sign-intent before any prompt", () => {
   const env = r76Env();
-  const emptyPath = fixtureTemp("r76-emptypath-");
+  const gitOnly = r76GitOnlyPathDirectory();
   try {
     r76KeyFixture(env);
-    const outcome = r76WithPath(emptyPath, () => r76Sign(env, null));
+    const outcome = r76WithPath(gitOnly.directory, () => r76Sign(env, null, { platform: "win32" }));
     r76AssertTyped(outcome, { cls: "openssl-not-on-path", findingId: "signing-toolchain", status: "attended" });
     assert.equal(r76Prompts(env), 0);
-  } finally { rmSync(emptyPath, { recursive: true, force: true }); r76Release(env); }
+  } finally { if (gitOnly.created) rmSync(gitOnly.directory, { recursive: true, force: true }); r76Release(env); }
 });
 
 /**
@@ -5344,7 +5421,7 @@ test("R7-6e (static): no code path in po-human-approval.mjs hands the injectable
 });
 
 test("R7-6e (dynamic): every spawn of sign-intent and its probe runs from an explicit working directory outside every repository, and the signing spawn from the PO key directory", () => {
-  const env = r76Env();
+  const env = r76Env({ keyDirectoryOutsideEveryRepository: true });
   const spy = r76Spy("healthy", env.events);
   try {
     r76KeyFixture(env);
