@@ -469,7 +469,12 @@ export async function prepareAgyFamilyNativeDispatch({ root, packet, sessionId, 
     nativeContexts.set(context, { entry, selected: selected.value.handle, receipt, consentAuthority, consentHandle: admitted.handle, consent: checked.projection,
       root, sessionId, descriptorSha256, resultPath, packet: structuredClone(packet), scope: structuredClone(scope), fallbackPolicy: structuredClone(fallbackPolicy), consumed: false, authorityLifetime, returnHandles: new Set() });
     return { ok: true, context, receipt: structuredClone(receipt), consent: checked.projection, assurance: authorityLifetime.requester.assurance };
-  } catch (error) { return { ok: false, code: error.code ?? "AGY-SESSION-FAMILY-PREPARATION-UNAVAILABLE", launcherCalls: 0, modelCalls: 0 }; }
+  } catch (error) {
+    // Critic F1 residual: a queue-preparation refusal carries its own reason and repair; pass them on.
+    return { ok: false, code: error.code ?? "AGY-SESSION-FAMILY-PREPARATION-UNAVAILABLE",
+      ...(typeof error.reason === "string" && error.reason ? { reason: error.reason } : {}),
+      ...(typeof error.repair === "string" && error.repair ? { repair: error.repair } : {}), launcherCalls: 0, modelCalls: 0 };
+  }
 }
 
 /** Internal next-slice seam: public receipts cannot resolve native result

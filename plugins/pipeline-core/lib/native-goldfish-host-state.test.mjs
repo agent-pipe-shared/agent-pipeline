@@ -822,6 +822,24 @@ const cases = [
     assert.equal(otherItem.code,'SQ-ITEM-BINDING-DRIFT',JSON.stringify(otherItem));assert.match(otherItem.reason,/in item/u);assert.match(otherItem.repair,/choose a new slice id/u);
   })},
 
+  { id: "NGHS31", name: "a dispatch whose dependency is integrated only by its Dispatch commit passes the final pre-launch publish, not just the admission (D40 at publish)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const git=(...args)=>{const r=spawnSync('git',['-C',root,...args],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+    const delivery=sliceId=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]});
+    assert.equal(runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery('ITEM-AC-1'),candidate:original.candidate,writeScope:['src/change.mjs']})).status,'required');
+    writeFileSync(join(root,'src/change.mjs'),'delivered by ITEM-AC-1\n');git('add','src/change.mjs');git('commit','-q','-m','fixture delivery','-m','AI-Assisted: true\nDispatch: ITEM-AC-1 (goldfish)\nCommit-Act: orchestrator');
+    const candidate={commit:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}')};
+    const binding={...makeBinding({dispatchId:'DELIVER-AC-2',commit:candidate.commit,tree:candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery:delivery('ITEM-AC-2')};
+    const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});
+    input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-2\nWrite scope: src/change.mjs\n';
+    const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));
+    assert.equal(prepared.ok,true,JSON.stringify(prepared));
+    const row=JSON.parse(readFileSync(join(root,'specs/unit/slice-queue.json'),'utf8')).slices.find(entry=>entry.id==='ITEM-AC-2');
+    assert.deepEqual(row.dependsOn,['ITEM-AC-1'],'the successor really depends on the commit-integrated slice');
+  })},
+
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

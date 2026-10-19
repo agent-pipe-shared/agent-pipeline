@@ -705,8 +705,12 @@ function publishNativeAuthorityState(commonDir,name,state){
       if(current.association.state!=='bound')throw nativeManagedFault('item-delivery-owner-unbound');
       const item=governed.normalized.slices.find(row=>row.id===state.delivery.sliceId);
       if(!item||item.state!=='ready')throw nativeManagedFault('item-delivery-not-ready');
+      // PF-49: one integration source for every check of a dispatch — native records united with the D40 commit
+      // evidence, exactly as observeGovernedItemIntegrationReadiness reads it for the admission before this.
       const integration=readNativeIntegratedSlices({governed,repository,boundary});
-      if(item.dependsOn.some(id=>!integration.integrated.includes(id)))throw nativeManagedFault('item-delivery-integration-dependency-held');
+      const integratedIds=new Set([...integration.integrated,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})]);
+      const heldIds=item.dependsOn.filter(id=>!integratedIds.has(id));
+      if(heldIds.length)throw nativeManagedFault(`item-delivery-integration-dependency-held: ${heldDependencyReason(heldIds,governed.normalized.slices)}`);
       const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
       const agyPort=createAgyFamilyDispatchAuthorityProducerPort({repository});
       const agyProducer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:agyPort});
