@@ -257,9 +257,10 @@ function deny(status = "partial") {
 // re-reads exactly once, after a 500 ms wait, when and only when the first observation is
 // lifecycleStatus "partial". A call-counting case whose claim is "readiness is consulted once per
 // write/Bash call" must therefore deny with a status that is not "partial"; the call-count
-// assertions in those cases are unchanged (no relaxation), and the "partial" re-read itself is
-// pinned by the sleepSyncFn-driven cases of the product's own suite. "continuity-damaged" is a
-// controlling non-ready status that opens no lane these cases' inputs touch.
+// assertions in those cases are unchanged (no relaxation); the "partial" re-read is the product's
+// ALF-C-PARWORK-M3 behaviour, pinned by the sleepSyncFn-driven case of
+// lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs and not by this file.
+// "continuity-damaged" is a controlling non-ready status that these cases' inputs do not admit.
 const NON_PARTIAL_DENIAL_STATUS = "continuity-damaged";
 
 test("ordinary non-governed repositories remain untouched and never inspect lifecycle", () => {
@@ -778,11 +779,19 @@ test("consumer sessions cannot mutate Pipeline sources, cachebusters or plugin i
       assert.equal(result.exitCode, 2, command);
       assert.match(result.stderr, /marketplace metadata/u, command);
     }
-    assert.equal(isForbiddenCrossRepositoryMutation(`git -C ${outside} status --short`, path), false);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`git -C ${outside} status --short`), {
+    // AC-197 group E2 (QG-04 justification, bounded to this one command): e02c40247 (AC-240) made a
+    // git -C form whose directory lies outside the project unadmittable for every subcommand, status
+    // included, so it is no longer a read-only diagnostic and the guard refuses it. The same
+    // outside-root command keeps its examiner, now as a refusal; the cross-repository-mutation
+    // classification of the command is unchanged (still false).
+    const outsideStatus = `git -C ${outside} status --short`;
+    assert.equal(isForbiddenCrossRepositoryMutation(outsideStatus, path), false);
+    assert.equal(isReadOnlyDiagnosticCommand(outsideStatus, path), false, outsideStatus);
+    const outsideStatusResult = evaluateLifecycleReadyGuard(bash(outsideStatus), {
       projectDir: path,
-      requireProjectOnboardingReadyFn() { throw new Error("read-only command must not inspect readiness"); },
-    }).exitCode, 0);
+      requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }; },
+    });
+    assert.equal(outsideStatusResult.exitCode, 2, outsideStatusResult.stderr);
   } finally {
     rmSync(path, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
@@ -1109,6 +1118,7 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
     writeFileSync(join(path, "specs", "hotfix.md"), "hotfix\n");
     mkdirSync(join(path, "plugins"), { recursive: true });
     symlinkSync(outside, join(path, "linked-outside"));
+    assert.equal(isReadOnlyDiagnosticCommand("git fetch origin refs/heads/main:refs/remotes/origin/main", path), false, "a refspec argument names more than a plain remote or ref and stays out of the lane");
     for (const command of [
       "pwd -P",
       "ls -la",
@@ -1132,7 +1142,10 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "git diff --check",
       "git rev-parse HEAD",
       "git config --get branch.main.remote",
-      "git fetch origin refs/heads/main:refs/remotes/origin/main",
+      // AC-197 group F (QG-04 justification, bounded to this list entry): e02c40247 (AC-240) admits a
+      // fetch only with plain remote and ref names, so the plain-name fetch stands in for the refspec
+      // spelling here; the refspec spelling keeps its examiner as a refusal asserted before this loop.
+      "git fetch origin main",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
@@ -2039,7 +2052,12 @@ test("NVA-CF-GITPIPEALLOWLIST: exactness -- outside-root reads, mutation, and un
   try {
     writeFileSync(join(outside, "secret.txt"), "synthetic passive-read fixture\n");
     const outsideRead = `git log ${join(outside, "secret.txt")} | head -5`;
-    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), true, outsideRead);
+    // AC-197 group E1 (QG-04 justification, bounded to this one assertion): b58dda23c (ALF-C-C6G1-CORR-A2)
+    // requires a log operand that is not a revision to resolve inside the project root, because a path
+    // outside the repository turns the read into a --no-index read. The outside-root log read named
+    // by this test therefore moves from the admitted lane to the refused list, which is what the
+    // test title already claims.
+    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), false, outsideRead);
     for (const command of [
       "git log | head -n 0",
       "git log | head -n 501",
@@ -2481,12 +2499,16 @@ test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and stat
     }
 
     // The remediation survives as message text, with pathspec on both calls and
-    // the same paths in each. A message file is unnecessary for this route.
+    // the same paths in each. AC-197 group G (QG-04 justification, bounded to the last two
+    // assertions of this block): PO decision D24 (po-decisions-2026-10-18) made the generator
+    // recommend a message file, git commit -F <msgfile> -- <paths>, for a parenthesised Dispatch
+    // role, because guard-push refuses the parenthesised --trailer spelling the old assertion
+    // required. The file-free form keeps the AI-Assisted trailer; the refused spelling must not return.
     assert.match(result.stderr, /git add -- <paths>/u);
     assert.match(result.stderr, /git commit -m /u);
     assert.match(result.stderr, /--trailer 'AI-Assisted: true'/u);
-    assert.match(result.stderr, /--trailer 'Dispatch: <task> \(<role>\)' -- <paths>/u);
-    assert.doesNotMatch(result.stderr, /msgfile/u);
+    assert.match(result.stderr, /git commit -F <msgfile> -- <paths>/u);
+    assert.doesNotMatch(result.stderr, /--trailer 'Dispatch:/u);
 
     // ...and the printed guarantee about the envelope is true again (guardrails/git.md: a gate
     // states what it actually enforces). "typed" was the weakening that let a mutation in.
@@ -5310,7 +5332,83 @@ function hgoGitFixture(mode) {
   return base;
 }
 
-/** Arms a real one-time capability via the chat-mode in-session path (denial -> plan -> prepare-authorization -> authorize --activate). */
+// AC-197 group D (QG-04 justification, E16): authorizeHumanGuardOverride() now runs the registered
+// attended chat-gate ceremony, which observes the REAL fd 0 and ignores the isattyFn/readLineFn
+// injection hgoArmByChat() used to pass; no test seam is added to any library. A case whose claim is
+// the chat route itself therefore runs the same library call in a child process whose fd 0 is a real
+// pseudo-terminal (python3's pty module, POSIX) and types the confirmation code into it. Where no pty
+// exists (native Windows, or a host without python3), HGO_CHAT_PTY_HOST_LIMIT is a typed host-limit
+// reason that skips the chat-route case with that reason named, instead of dropping it silently.
+const HGO_CHAT_PTY_HOST_LIMIT = (() => {
+  if (process.platform === "win32") return "host-limit: native Windows has no pseudo-terminal to attach as the attended chat ceremony's fd 0";
+  const probe = spawnSync("python3", ["-I", "-c", "import os, pty"], { encoding: "utf8" });
+  return probe.status === 0 ? false : "host-limit: " + process.platform + " host has no python3 pty module to attach as the attended chat ceremony's fd 0";
+})();
+// Same technique as runAttendedUnderPty() in lib/human-guard-override.test.mjs: wait for the ceremony's own
+// prompt marker on the pty master, then type the confirmation line, then drain to EOF.
+const HGO_PTY_PYTHON_DRIVER = [
+  "import os, pty, sys",
+  "typed = sys.argv[1].encode()",
+  "cmd = sys.argv[2:]",
+  "pid, fd = pty.fork()",
+  "if pid == 0:",
+  "    os.execvp(cmd[0], cmd)",
+  "out = b''",
+  "marker = b'Type the confirmation value'",
+  "seen = True",
+  "while marker not in out:",
+  "    try:",
+  "        chunk = os.read(fd, 4096)",
+  "    except OSError:",
+  "        chunk = b''",
+  "    if not chunk:",
+  "        seen = False",
+  "        break",
+  "    out += chunk",
+  "if seen:",
+  "    os.write(fd, typed + b'\\n')",
+  "while True:",
+  "    try:",
+  "        chunk = os.read(fd, 4096)",
+  "    except OSError:",
+  "        break",
+  "    if not chunk:",
+  "        break",
+  "    out += chunk",
+  "_, status = os.waitpid(pid, 0)",
+  "sys.stdout.write(out.decode('utf-8', 'replace')[-1500:])",
+  "sys.exit(os.waitstatus_to_exitcode(status))",
+].join("\n");
+const HGO_PTY_CHILD_SOURCE = [
+  'import { writeFileSync } from "node:fs";',
+  "import { authorizeHumanGuardOverride } from " + JSON.stringify(new URL("../lib/human-guard-override.mjs", import.meta.url).href) + ";",
+  "const input = JSON.parse(process.env.HGO_PTY_ARM);",
+  "let outcome;",
+  "try { outcome = { ok: true, result: authorizeHumanGuardOverride(input) }; }",
+  "catch (error) { outcome = { ok: false, code: error?.code ?? null, message: String(error?.message ?? error) }; }",
+  "writeFileSync(process.env.HGO_PTY_OUT, JSON.stringify(outcome));",
+].join("\n");
+/** Runs authorizeHumanGuardOverride() with a real pty on fd 0 and the confirmation typed into it. */
+function hgoAuthorizeUnderPty(authorizeInput, confirmation, cwd) {
+  assert.equal(HGO_CHAT_PTY_HOST_LIMIT, false, "a chat-route case must be skipped on a host without a pty");
+  const outDir = mkdtempSync(join(tmpdir(), "guard-lifecycle-hgo-pty-"));
+  try {
+    const outFile = join(outDir, "result.json");
+    const run = spawnSync("python3", ["-I", "-c", HGO_PTY_PYTHON_DRIVER, confirmation, process.execPath, "--input-type=module", "-e", HGO_PTY_CHILD_SOURCE], {
+      cwd, encoding: "utf8", timeout: 120000,
+      env: { ...process.env, HGO_PTY_ARM: JSON.stringify(authorizeInput), HGO_PTY_OUT: outFile },
+    });
+    let raw;
+    try { raw = readFileSync(outFile, "utf8"); } catch {
+      throw new Error("pty child produced no result (exit " + run.status + "): " + String(run.stdout).slice(-600) + String(run.stderr).slice(-300));
+    }
+    const outcome = JSON.parse(raw);
+    if (!outcome.ok) throw new Error("override activation refused (" + outcome.code + "): " + outcome.message);
+    return outcome.result;
+  } finally { rmSync(outDir, { recursive: true, force: true }); }
+}
+
+/** Arms a real one-time capability via the chat-mode in-session path (denial -> plan -> prepare-authorization -> authorize --activate), under a real pty. */
 function hgoArmByChat(root, toolInput, denials) {
   const shared = { rootDir: root, pluginRoot: HGO_PLUGIN_ROOT, scriptPath: HGO_OVERRIDE_SCRIPT };
   const recorded = recordHumanGuardDenial({ ...shared, toolName: "Bash", toolInput, denials });
@@ -5320,7 +5418,7 @@ function hgoArmByChat(root, toolInput, denials) {
   const prepared = prepareHumanGuardOverrideAuthorization({
     ...shared, requestSha256: recorded.requestSha256, planSha256: planned.planSha256, reason,
   });
-  const armed = authorizeHumanGuardOverride({
+  const armed = hgoAuthorizeUnderPty({
     ...shared,
     requestSha256: recorded.requestSha256,
     planSha256: planned.planSha256,
@@ -5328,8 +5426,7 @@ function hgoArmByChat(root, toolInput, denials) {
     reason,
     reasonSha256: prepared.reasonSha256,
     activate: true,
-    dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
-  });
+  }, `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}`, root);
   assert.equal(armed.status, "armed", `chat arm failed: ${JSON.stringify(armed)}`);
 }
 
@@ -5375,7 +5472,7 @@ function hgoArmBySignature(root, toolInput, denials, toolName = "Bash") {
   assert.equal(armed.status, "armed", `signature arm failed: ${JSON.stringify(armed)}`);
 }
 
-test("NOVA-LCR-HGO-1: a chat-armed capability admits the exact denied grammar command, for all three codes", () => {
+test("NOVA-LCR-HGO-1: a chat-armed capability admits the exact denied grammar command, for all three codes", { skip: HGO_CHAT_PTY_HOST_LIMIT }, () => {
   const roots = [];
   try {
     const cases = [
@@ -5618,7 +5715,7 @@ test("NOVA-XREPO-HGO-2: a signature-armed capability admits the exact cross-repo
   } finally { rmSync(sigRoot, { recursive: true, force: true }); }
 });
 
-test("NOVA-XREPO-HGO-3: a chat-armed capability admits the exact cross-repo command in a chat-mode repository", () => {
+test("NOVA-XREPO-HGO-3: a chat-armed capability admits the exact cross-repo command in a chat-mode repository", { skip: HGO_CHAT_PTY_HOST_LIMIT }, () => {
   const chatRoot = hgoGitFixture("chat");
   try {
     hgoArmByChat(chatRoot, { command: XREPO_COMMAND }, xrepoDenials());
@@ -5972,7 +6069,7 @@ test("NOVA-LCR-HGO-2: a consumed grammar capability admits the composed command 
     const command = `rg -n lifecycle --marker=${absMarker} relative-notes.txt | tee output.txt`;
     const toolInput = { command };
     const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
-    hgoArmByChat(chatRoot, toolInput, denials);
+    hgoArmBySignature(chatRoot, toolInput, denials); // AC-197 group D (E16): the claim is post-arming, so the capability is armed through the signature route
     const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
     assert.equal(result.exitCode, 0, `armed + ready did not admit: ${result.stderr}`);
     assert.match(
@@ -5989,7 +6086,7 @@ test("NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYC
     const command = `rg -n readiness --marker=${absMarker} relative-notes-b.txt | tee output-b.txt`;
     const toolInput = { command };
     const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
-    hgoArmByChat(chatRoot, toolInput, denials);
+    hgoArmBySignature(chatRoot, toolInput, denials); // AC-197 group D (E16): the claim is post-arming, so the capability is armed through the signature route
     const result = evaluateLifecycleReadyGuard(bash(command), {
       projectDir: chatRoot,
       requireProjectOnboardingReadyFn() { deny("partial"); },
@@ -6208,7 +6305,7 @@ test("NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_S
     const command = `rg -n lifecycle --note=${ONBOARDING_LAUNCH_SCRIPT} relative-notes.txt | tee output.txt`;
     const toolInput = { command };
     const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
-    hgoArmByChat(chatRoot, toolInput, denials);
+    hgoArmBySignature(chatRoot, toolInput, denials); // AC-197 group D (E16): the claim is post-arming, so the capability is armed through the signature route
     const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
     assert.equal(result.exitCode, 2, `armed LAUNCH_SCRIPT command was wrongly admitted: ${result.stderr}`);
     assert.match(result.stderr, /EXTERNAL ACTION REQUIRED/u);
@@ -7130,13 +7227,15 @@ test("read-only diagnostics accept host-visible external roots in every supporte
       `head -n 5 ${outsideFile}`,
       `rg -n Overall ${outsideFile}`,
       `cat ${outsideFile} | head -n 5`,
-      `git log ${outsideFile} | head -n 5`,
       `rg -n Overall ${outsideFile} | head -n 5`,
       `rg -n Overall ${outsideFile} && git status`,
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
       assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
     }
+    // AC-197 group E1 (QG-04 justification, bounded to this one command): b58dda23c (ALF-C-C6G1-CORR-A2) requires a log operand that is not a revision to resolve inside the project root, so this outside-root log read moved from the admitted list to a refusal assertion.
+    assert.equal(isReadOnlyDiagnosticCommand(`git log ${outsideFile} | head -n 5`, projectDir), false);
+    assert.equal(readScopeRun(`git log ${outsideFile} | head -n 5`, projectDir).exitCode, 2);
     assert.equal(readScopeRun("cat verify-latest.json", projectDir).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
@@ -7347,6 +7446,8 @@ test("passive reads accept leading tilde and symlink paths", () => {
       "cat ~/.ssh/id_rsa | head -n 5",
       "git log ~/.ssh/id_rsa | head -n 5",
       "rg private ~/.ssh/id_rsa | head -n 5",
+      // AC-197 group E1 (QG-04 justification, bounded to this one command): b58dda23c (ALF-C-C6G1-CORR-A2) requires a log operand that is not a revision to resolve inside the project root, so this outside-root log read moved from the admitted list to a refusal assertion.
+      `git log ${tildeFile} | head -n 5`,
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
       assert.equal(readScopeRun(command, projectDir).exitCode, 2, command);
@@ -7354,7 +7455,6 @@ test("passive reads accept leading tilde and symlink paths", () => {
     for (const command of [
       `cat ${tildeFile}`,
       `cat ${tildeFile} | head -n 5`,
-      `git log ${tildeFile} | head -n 5`,
       `rg private ${tildeFile} | head -n 5`,
       `cat ${linkPath}`,
       `cat ${linkPath} | head -n 5`,
@@ -7386,8 +7486,9 @@ test("passive reads accept host-resolved symlink-plus-dotdot paths", () => {
       "cat " + escaped,
       "cat " + escaped + " | head -n 5",
       "rg outside " + escaped + " | head -n 5",
-      "git log " + escaped + " | head -n 5",
     ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
+    // AC-197 group E1 (QG-04 justification, bounded to this one command): b58dda23c (ALF-C-C6G1-CORR-A2) requires a log operand that is not a revision to resolve inside the project root, so this outside-root log read moved from the admitted list to a refusal assertion.
+    assert.equal(isReadOnlyDiagnosticCommand("git log " + escaped + " | head -n 5", projectDir), false);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outsideRoot, { recursive: true, force: true });
@@ -7838,8 +7939,12 @@ test("TPSHELL-3: a PowerShell write cmdlet naming a protected test path is refus
  * the capability's single use is checked, because an override that stayed armed would be a
  * standing hole rather than one audited action.
  */
-test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signature-armed capability, once", () => {
-  for (const mode of ["chat", "signature"]) {
+// AC-197 group D (QG-04 justification, E16; bounded to how this case arms, no assertion of the body changed): the
+// chat half is the claim of this case and the attended chat ceremony now reads the real fd 0, so that half arms under a
+// real pseudo-terminal (hgoArmByChat) and the case carries the typed host-limit skip HGO_CHAT_PTY_HOST_LIMIT. A host
+// without a pty must not lose the signature half, so the same body also runs signature-only, without the skip, below.
+function tpShell4Lift(modes) {
+  for (const mode of modes) {
     const path = tpShellFixture(TPSHELL_RULES, { base: hgoGitFixture(mode) });
     try {
       const command = `cp scratch/fake.mjs ${TPSHELL_TARGET}`;
@@ -7880,6 +7985,12 @@ test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signatur
       assert.equal(tpShellRun(path, command).exitCode, 2, `the ${mode} capability was reusable`);
     } finally { rmSync(path, { recursive: true, force: true }); }
   }
+}
+test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signature-armed capability, once", { skip: HGO_CHAT_PTY_HOST_LIMIT }, () => {
+  tpShell4Lift(["chat", "signature"]);
+});
+test("TPSHELL-4: the shell-lane refusal is liftable by a real signature-armed capability, once, on every host", () => {
+  tpShell4Lift(["signature"]);
 });
 
 /**
@@ -8020,7 +8131,9 @@ test("DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while r
       `tee ${DEVPLANSHELL_TARGET}`,
       `sed -i s/a/b/ ${DEVPLANSHELL_TARGET}`,
       `node -e "require('fs').writeFileSync('${DEVPLANSHELL_TARGET}','x')"`,
-      `node scratch/probe.mjs`,
+      // AC-197 group I (QG-04 justification, bounded to the removal of one list entry): b41cae7e5 (ALF-C-P22-03B, AC-207) sanctions
+      // exactly one script directly under scratch/ run as node scratch/<name>.mjs with no argument, so that spelling is no longer a
+      // refused shell write and moved to the admitted list below. The test-runner, python and bash spellings stay refused.
       `node --test scratch/probe.test.mjs`,
       `python scratch/probe.py`,
       `bash scratch/probe.sh`,
@@ -8045,6 +8158,7 @@ test("DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while r
       `git add ${DEVPLANSHELL_TARGET}`,
       `git diff ${DEVPLANSHELL_TARGET}`,
       `git log ${DEVPLANSHELL_TARGET}`,
+      "node scratch/probe.mjs",
     ]) {
       const result = devPlanShellRun(path, command);
       assert.equal(result.exitCode, 0, `refused a read/unrelated command: ${command} -- ${result.stderr}`);
@@ -11398,15 +11512,17 @@ test("QP4-1 a single read-family command the grammar does not support is refused
     qp4WithoutAppDataRoots(() => {
       const fwd = qp4Fwd(path);
       const script = "plugins/pipeline-core/scripts/signed-quality-package.mjs";
-      // Every target below is INSIDE the project root; the commands are refused for their own flags or spelling only. The rg flag gaps themselves
-      // (--no-heading, -m N, a repeated -g) are NOT admitted by this package: they are refused with the truthful code until guard-command-grammar.mjs
-      // learns them in a separate, ordinary commit.
+      // Every target below is INSIDE the project root; the commands are refused for their own flags or spelling only. AC-197 group I
+      // (QG-04 justification, bounded to the flag in these inputs): 8d4b3613e (ALF-C-P1-10D) taught guard-command-grammar.mjs --no-heading,
+      // -m/--max-count and -g, so those spellings are admitted now and can no longer be the refusal examiner. The examiner keeps its purpose
+      // with --column, an rg flag that is in none of SEARCH_BOOLEAN, SEARCH_VALUE, FILE_BOOLEAN or FILE_VALUE and is still refused with the
+      // unsupported code. A repeated -g stays refused (only the type filters repeat).
       for (const command of [
-        `rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
-        `rg -n --no-heading "authorize-commit" ${fwd}/scratch`,
-        `rg -n --no-heading -m 20 "authorize-commit\\|\\"apply\\"" ${script}`,
-        `rg -n --no-heading -m 20 apply ${fwd}/${script} ${fwd}/plugins/pipeline-core/lib/a.mjs`,
-        `rg -m 5 apply ${script}`,
+        `rg -n --column "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
+        `rg -n --column "authorize-commit" ${fwd}/scratch`,
+        `rg -n --column -m 20 "authorize-commit\\|\\"apply\\"" ${script}`,
+        `rg -n --column -m 20 apply ${fwd}/${script} ${fwd}/plugins/pipeline-core/lib/a.mjs`,
+        `rg --column -m 5 apply ${script}`,
         `rg -n "authorize-commit" scratch -g "*.md" -g "*.txt"`,
         "rg --hidden --no-ignore apply .",
         "grep -R apply .",
@@ -11414,7 +11530,7 @@ test("QP4-1 a single read-family command the grammar does not support is refused
         "node --test-reporter-destination scratch/escaped.txt --test",
       ]) qp4RefuseUnsupported(command, path);
       // The refusal still states the complete admitted grammar and a machine-readable (empty) retry envelope.
-      const unsupported = qp4Refuse(`rg -n --no-heading apply ${script}`, path);
+      const unsupported = qp4Refuse(`rg -n --column apply ${script}`, path);
       assert.match(unsupported.text, /pipeline\.guard-retry-actions\.v1/u);
       assert.match(unsupported.text, /not a path|not reported as a read outside the project root/u);
       // Targets that really resolve outside the project keep the scope code. A plain outside file may be an admitted passive read (that policy is
@@ -11469,7 +11585,7 @@ test("QP4-3 R4 an existing in-root file through tail, wc and head is admitted; t
       const script = `${qp4Fwd(path)}/plugins/pipeline-core/scripts/signed-quality-package.mjs`;
       // Codex: PreToolUse {tool_name:"Bash", tool_input:{command}} -> isReadOnlyDiagnosticCommand(command, projectRoot) (codex-pretool-guard.mjs).
       // Codex has no Glob/Grep/Read tool at the adapter: supportedTools is exactly Bash, apply_patch, Edit, Write.
-      const codexRefused = { tool_name: "Bash", tool_input: { command: `rg -n --no-heading -m 20 apply ${script}` } };
+      const codexRefused = { tool_name: "Bash", tool_input: { command: `rg -n --column -m 20 apply ${script}` } };
       assert.equal(isReadOnlyDiagnosticCommand(codexRefused.tool_input.command, path), false);
       const codexVerdict = evaluateLifecycleReadyGuard(codexRefused, { projectDir: path });
       assert.equal(codexVerdict.exitCode, 2);
@@ -11480,7 +11596,7 @@ test("QP4-3 R4 an existing in-root file through tail, wc and head is admitted; t
       // Antigravity: {toolCall:{name:"run_command",args:{CommandLine,Cwd}}} normalizes to {tool_name:"Bash",tool_input:{command,cwd}};
       // its view_file/list_dir/find_by_name/grep_search calls are read-only short-circuits at the adapter and never reach this guard.
       const antigravity = (command) => ({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, cwd: path } });
-      const unsupported = evaluateLifecycleReadyGuard(antigravity(`rg -n --no-heading "authorize-commit" scratch -g "*.md" -g "*.txt"`), { projectDir: path });
+      const unsupported = evaluateLifecycleReadyGuard(antigravity(`rg -n --column "authorize-commit" scratch -g "*.md" -g "*.txt"`), { projectDir: path });
       assert.equal(unsupported.exitCode, 2);
       assert.match(String(unsupported.stderr), QP4_UNSUPPORTED);
       assert.doesNotMatch(String(unsupported.stderr), QP4_SCOPE);
@@ -11488,7 +11604,7 @@ test("QP4-3 R4 an existing in-root file through tail, wc and head is admitted; t
       assert.equal(scope.exitCode, 2);
       assert.match(String(scope.stderr), QP4_SCOPE);
       assert.doesNotMatch(String(scope.stderr), QP4_UNSUPPORTED);
-      assert.equal(evaluateLifecycleReadyGuard(antigravity("rg -n --no-heading apply scratch > out.txt"), { projectDir: path }).exitCode, 2);
+      assert.equal(evaluateLifecycleReadyGuard(antigravity("rg -n --column apply scratch > out.txt"), { projectDir: path }).exitCode, 2);
       assert.equal(evaluateLifecycleReadyGuard(antigravity("rg -n -e apply scratch/notes.md"), { projectDir: path }).exitCode, 0);
     });
   } finally {
@@ -11672,31 +11788,32 @@ test("QP4-7 R2-2 the outside-root label looks only at read targets: an rg/grep p
   const outside = qp4Fixture();
   try {
     qp4WithoutAppDataRoots(() => {
-      // In-root targets; the command is refused for the unsupported flag only. A pattern that looks like a path ("// TODO" is absolute, a tilde-prefixed
+      // In-root targets; the command is refused for the unsupported flag only (--column since 8d4b3613e admitted --no-heading, -m and -g;
+      // AC-197 group I, QG-04: the unsupported flag changed, every assertion about the label is unchanged). A pattern that looks like a path ("// TODO" is absolute, a tilde-prefixed
       // pattern is a home path) or an option value ("-g //x") must not turn that into a scope refusal.
       for (const command of [
-        `rg -n --no-heading "// TODO" scratch`,
-        `rg -n --no-heading "~/notes" scratch`,
-        `rg -n --no-heading "~notes" scratch`,
-        `rg -n --no-heading -e "// TODO" scratch`,
-        `rg -n --no-heading -e "~/x" -e "//y" scratch`,
-        `rg -n --no-heading --regexp "// TODO" scratch`,
-        `rg -n --no-heading -g "//x" apply scratch`,
-        `rg -n --no-heading --glob "~/x" apply scratch`,
-        `rg -n --no-heading -m 20 "// TODO" scratch`,
-        `rg -n --no-heading "// TODO" ${qp4Fwd(path)}/scratch/notes.md`,
-        `grep -n --no-heading "// TODO" scratch/notes.md`,
-        `grep -n -e "~/x" -m 5 scratch/notes.md`,
+        `rg -n --column "// TODO" scratch`,
+        `rg -n --column "~/notes" scratch`,
+        `rg -n --column "~notes" scratch`,
+        `rg -n --column -e "// TODO" scratch`,
+        `rg -n --column -e "~/x" -e "//y" scratch`,
+        `rg -n --column --regexp "// TODO" scratch`,
+        `rg -n --column -g "//x" apply scratch`,
+        `rg -n --column --glob "~/x" apply scratch`,
+        `rg -n --column -m 20 "// TODO" scratch`,
+        `rg -n --column "// TODO" ${qp4Fwd(path)}/scratch/notes.md`,
+        `grep -n --column "// TODO" scratch/notes.md`,
+        `grep -n --column -e "~/x" -m 5 scratch/notes.md`,
       ]) qp4RefuseUnsupported(command, path);
       // A target that really resolves outside the project still gets the scope code, however the pattern is spelled -- including a pattern FILE (-f), which the
       // command reads.
       const outsideFile = qp4Fwd(join(outside, "vault", "id_rsa"));
       for (const command of [
-        `rg -n --no-heading "// TODO" ${outsideFile}`,
-        `rg -n --no-heading -e "~/x" ${outsideFile}`,
-        `rg -n --no-heading -g "*.md" apply ${outsideFile}`,
-        `rg -n --no-heading "// TODO" scratch ${outsideFile}`,
-        `rg -n --no-heading -f ${outsideFile} scratch`,
+        `rg -n --column "// TODO" ${outsideFile}`,
+        `rg -n --column -e "~/x" ${outsideFile}`,
+        `rg -n --column -g "*.md" apply ${outsideFile}`,
+        `rg -n --column "// TODO" scratch ${outsideFile}`,
+        `rg -n --column -f ${outsideFile} scratch`,
         `grep -n -e apply ${outsideFile}`,
       ]) qp4RefuseOutside(command, path);
     });
