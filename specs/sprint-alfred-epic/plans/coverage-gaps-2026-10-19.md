@@ -61,6 +61,7 @@ copied from the source reports, and the source reports themselves stay local.
 - No Full Verify PASS on any host, no Critic batch, and no PO acceptance yet (stage 100 = 0).
 - Two records disagree on AC-175: E10 narrows it, while the batch table says closed-by-decision. E10 is later and governs.
 - D9's text was never persisted.
+- `hooks/guard-dispatch.test.mjs` GD22, GD26 and GD27 (incomplete briefing; the real critic-review.md and goldfish-task.md templates, filled, are dispatchable) are red at 38b3b8a65 with and without the 203a53687 template change. Cause not yet measured.
 
 ## Correction
 
