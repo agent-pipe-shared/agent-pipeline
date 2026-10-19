@@ -412,7 +412,7 @@ function assertCourseCriticEvidence(root, feature) {
   try { coverage = evaluateRepositoryCriticSkipCoverage({ root, taskIds: ids }); }
   catch { fail("CLOSE-CRITIC-EVIDENCE-UNAVAILABLE", "Critic evidence coverage for the feature's delivery course could not be evaluated"); }
   if (coverage.requiredTaskIds.length > 0) {
-    fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence; repair: run the Critic dispatch for each of them, bind its evidence to the dispatch record, then plan the transition again`);
+    fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence; repair: run the Critic dispatch for each of them, bind its evidence to the dispatch record, then plan the transition again; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; one full review plus at most three correction-diff reviews per declared batch; once spent, Elephant self-verification or an explicit PO decision, never another Critic`);
   }
 }
 async function transitionPlan(values) {

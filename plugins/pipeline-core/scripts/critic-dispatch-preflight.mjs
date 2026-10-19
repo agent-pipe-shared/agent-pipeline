@@ -386,7 +386,9 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       || admission.budgets.maxReviewRounds !== CRITIC_DISPATCH_LIMITS.criticRounds
       || admission.decision.mode !== expectedMode
       || (context.deltaRequestPath === null ? "full" : "delta") !== expectedMode) {
-      fail("CDP-COURSE-BUDGET", "Critic dispatch is limited to one full review and at most three correction-DIFF reviews per registered batch.");
+      const BUDGET_NEXT_STEP = "Critic budget spent (one full review plus at most three correction-diff reviews per declared batch): do not dispatch another Critic; the next step is Elephant self-verification, which cannot become PASS, or an explicit PO decision.";
+      fail("CDP-COURSE-BUDGET", `Critic dispatch is limited to one full review and at most three correction-DIFF reviews per registered batch. ${BUDGET_NEXT_STEP}`,
+        { nextStep: BUDGET_NEXT_STEP });
     }
     if (admission.source?.reviewUnit?.specPath !== spec) {
       fail("CDP-COURSE-CONTEXT", "The registered review unit must bind the requested feature Spec.");

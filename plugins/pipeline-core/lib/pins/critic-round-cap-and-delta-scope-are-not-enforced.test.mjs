@@ -91,3 +91,20 @@ test("AC3 guardrail and Elephant role contract state the delta-only, bounded fol
   const el = read("roles/elephant.md");
   assert.match(el, /maximum of three correction-diff reviews/u);
 });
+
+test("AC1 typed budget refusal names Elephant self-verification or an explicit PO decision as the next step (E3: one number, four calls)", () => {
+  const src = read("scripts/critic-dispatch-preflight.mjs");
+  assert.match(src, /CDP-COURSE-BUDGET/u);
+  assert.match(src, /nextStep: BUDGET_NEXT_STEP/u);
+  assert.match(src, /do not dispatch another Critic/u);
+  assert.match(src, /Elephant self-verification, which cannot become PASS, or an explicit PO decision/u);
+  assert.doesNotMatch(src, /at most one (?:re-review|follow-up)/iu);
+});
+
+test("AC3 coordinator next-action text offers the Critic dispatch only with the delta-only batch rule", () => {
+  const src = read("scripts/close-coordinator.mjs");
+  assert.match(src, /CLOSE-CRITIC-EVIDENCE-MISSING/u);
+  assert.match(src, /follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate/u);
+  assert.match(src, /one full review plus at most three correction-diff reviews per declared batch/u);
+  assert.match(src, /Elephant self-verification or an explicit PO decision/u);
+});
