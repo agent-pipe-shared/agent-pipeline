@@ -134,6 +134,9 @@ test("human recovery plan is read-only when automatic cleanup observation is una
       "retain-and-observe",
       "attended-host-recovery",
     ]);
+    // PF-44: the plan names the candidate that can clear the state; retaining is explicitly command-free.
+    assert.equal(planned.output.recommended, "attended-host-recovery");
+    assert.match(planned.output.candidates[0].note, /^no command: nothing is changed/u);
     assert.equal(planned.output.automaticMutation, false);
     assert.match(planned.output.planSha256, /^[a-f0-9]{64}$/u);
   } finally { rmSync(root, { recursive: true, force: true }); }

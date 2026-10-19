@@ -1959,7 +1959,8 @@ export function partialCleanupRecoveryResultCore({
             typed ? error.code : "cleanup_recovery_apply_failed",
             typed
               ? error.message
-              : "an automatic, digest-bound cleanup recovery attempt did not converge",
+              // PF-44: name the underlying failure instead of swallowing it.
+              : `an automatic, digest-bound cleanup recovery attempt did not converge (${String(error?.code ?? error?.name ?? "error").replace(/[^A-Za-z0-9_.:-]+/gu, "").slice(0, 80) || "error"}: ${String(error?.message ?? "").replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 200)})`,
             "retain the state and request an explicit authority decision; do not guess, replace, or delete a descriptor",
           )],
         });

@@ -138,6 +138,8 @@ function planHumanRecovery(repo, dependencies = {}) {
       id: "retain-and-observe",
       mutation: false,
       effect: "retain-exact-state",
+      // PF-44: retaining is the absence of an action, so it has no command; the state stays partial.
+      note: "no command: nothing is changed and onboarding stays partial; choose another candidate to clear it, or restart the session after a plugin update",
     },
   ];
   let offerAttendedRecovery = true;
@@ -235,6 +237,9 @@ function planHumanRecovery(repo, dependencies = {}) {
     root: repo,
     observed,
     candidates,
+    // PF-44: the least-authority candidate that can actually clear the state comes first.
+    recommended: ["archive-orphan-descriptor", "attended-host-recovery", "signed-descriptor-custody", "retain-and-observe"]
+      .find((id) => candidates.some((candidate) => candidate.id === id)),
     automaticMutation: false,
   };
   return { ...payload, planSha256: sha256(JSON.stringify(payload)) };
