@@ -1266,11 +1266,40 @@ export function observeGovernedItemIntegrationReadiness({root}={}) {
     const governed=resolveGovernedItemQueue({root});if(governed.status!=='required')return governed;
     const repository=inspectSignedDescriptorCustodyRepository(root),port=createNativeGoldfishAuthorityProducerPort({repository});
     return withSessionAuthorityBoundary({repository},boundary=>{
-      const {integrated}=readNativeIntegratedSlices({governed,repository,boundary});
+      const native=readNativeIntegratedSlices({governed,repository,boundary}).integrated;
+      const integrated=[...new Set([...native,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})])];
       const handle=Object.freeze({});itemReadinessHandles.set(handle,{queueSha256:nativeManagedDigest(governed.queue),integrated,observedAt:Date.now()});
       return {status:'observed',code:'SQ-ITEM-INTEGRATION-READBACK',handle,integrated:[...integrated]};
     });
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',reason:error.reason??error.message};}
+}
+/** D40: an orchestrator-committed slice is integrated for dependency admission only on commit
+ * evidence — a non-merge commit reachable from the candidate, strictly after the slice's base,
+ * whose trailers carry exactly `Dispatch: <slice> (goldfish)` and `Commit-Act: orchestrator`, and
+ * which touches the slice's write scope. D40a: a stopped attempt is superseded when a same-item
+ * slice that depends on it is integrated by that evidence. A git fault releases nothing. */
+export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,slices}) {
+  const run=args=>spawnSync('git',['-C',root,...args],{env:agyHostGitEnvironment(),shell:false,timeout:30000,maxBuffer:64*1024*1024,encoding:'utf8'});
+  const live=(slices??[]).filter(row=>row&&row.state!=='cancelled'&&row.tier!=='critic'&&Array.isArray(row.writeScope)&&row.writeScope.length>0
+    &&row.writeScope.every(path=>typeof path==='string')&&typeof row.delivery?.baseCommit==='string'&&/^[0-9a-f]{40}$/u.test(row.delivery.baseCommit));
+  if(!live.length||typeof candidateCommit!=='string'||!/^[0-9a-f]{40}$/u.test(candidateCommit))return [];
+  const log=run(['log','--no-merges','--fixed-strings','--grep=Commit-Act: orchestrator','--name-only',
+    '--format=%x1e%H%x00%(trailers:key=Dispatch,valueonly,separator=%x1f)%x00%(trailers:key=Commit-Act,valueonly,separator=%x1f)%x00',candidateCommit,'--']);
+  if(log.status!==0)return [];
+  const byId=new Map(live.map(row=>[row.id,row])),direct=new Set();
+  for(const record of log.stdout.split('\x1e')){
+    const [sha,dispatch='',act='',names='']=record.split('\x00');
+    if(!/^[0-9a-f]{40}$/u.test(sha?.trim()??'')||!act.split('\x1f').map(value=>value.trim()).includes('orchestrator'))continue;
+    const touched=names.split('\n').map(path=>path.trim()).filter(Boolean);
+    for(const value of dispatch.split('\x1f').map(entry=>entry.trim())){
+      const match=/^(\S+) \(goldfish\)$/u.exec(value),slice=match&&byId.get(match[1]);
+      if(!slice||direct.has(slice.id)||sha.trim()===slice.delivery.baseCommit||!touched.some(path=>scopesOverlap([path],slice.writeScope)))continue;
+      if(run(['merge-base','--is-ancestor',slice.delivery.baseCommit,sha.trim()]).status===0)direct.add(slice.id);
+    }
+  }
+  const superseded=live.filter(row=>!direct.has(row.id)&&live.some(next=>next.id!==row.id&&direct.has(next.id)&&(next.dependsOn??[]).includes(row.id)
+    &&typeof row.delivery.itemId==='string'&&next.delivery.itemId===row.delivery.itemId)).map(row=>row.id);
+  return [...direct,...superseded];
 }
 export function readGovernedItemIntegrationReadiness(handle,queue) {
   const held=itemReadinessHandles.get(handle);

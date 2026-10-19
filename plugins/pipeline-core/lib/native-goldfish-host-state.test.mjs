@@ -11,7 +11,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { bindNativeCodexStart, prepareNativeGoldfishHostState,
   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
-import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness } from "./native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices } from "./native-goldfish-host-state.mjs";
 import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
@@ -663,6 +663,44 @@ const cases = [
     assert.equal(Object.hasOwn(first, "completionRoute"), false);
     assert.equal(Object.hasOwn(second, "completionRoute"), false);
     assert.equal(JSON.stringify({ ...second, sessionId: first.sessionId, toolUseId: first.toolUseId }), JSON.stringify(first));
+  }) },
+
+  { id: "NGHS25", name: "an orchestrator-committed slice is integrated only on its own Dispatch and Commit-Act trailers inside base..candidate touching its write scope; a stopped attempt is superseded only by an integrated same-item successor (D40, D40a)", run: () => fixture(({ root }) => {
+    const git = (...args) => { const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
+    const commitFile = (path, body, ...paragraphs) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), body); git("add", path); git("commit", "-q", "-m", `fixture ${path}`, ...paragraphs.flatMap(p => ["-m", p])); return git("rev-parse", "HEAD"); };
+    const base = git("rev-parse", "HEAD");
+    commitFile("src/a.mjs", "a1\n", "AI-Assisted: true\nDispatch: S-A (goldfish)\nCommit-Act: orchestrator");
+    commitFile("src/b.mjs", "b1\n", "AI-Assisted: true\nDispatch: S-B (goldfish)");
+    commitFile("src/c.mjs", "c1\n", "AI-Assisted: true\nDispatch: S-OTHER (goldfish)\nCommit-Act: orchestrator");
+    commitFile("src/unrelated.mjs", "u1\n", "AI-Assisted: true\nDispatch: S-D (goldfish)\nCommit-Act: orchestrator");
+    commitFile("src/e.mjs", "e1\n", "AI-Assisted: true\nDispatch: S-E (goldfish)\nCommit-Act: orchestrator");
+    const afterE = git("rev-parse", "HEAD");
+    git("checkout", "-q", "-b", "side");
+    commitFile("src/f.mjs", "f1\n", "AI-Assisted: true\nDispatch: S-F (goldfish)\nCommit-Act: orchestrator");
+    git("checkout", "-q", "-");
+    const candidate = git("rev-parse", "HEAD");
+    const slice = (id, writeScope, extra = {}) => ({ id, state: "ready", dependsOn: [], writeScope, tier: "implementor", delivery: { itemId: `item-${id}`, criteria: ["AC-1"], baseCommit: base }, ...extra });
+    const slices = [
+      slice("S-A", ["src/a.mjs"]),
+      slice("S-B", ["src/b.mjs"]),
+      slice("S-C", ["src/c.mjs"]),
+      slice("S-D", ["src/d.mjs"]),
+      slice("S-E", ["src/e.mjs"], { delivery: { itemId: "item-S-E", criteria: ["AC-1"], baseCommit: afterE } }),
+      slice("S-F", ["src/f.mjs"]),
+      slice("S-G", ["src/g.mjs"], { delivery: { itemId: "item-S-G", criteria: ["AC-1"], baseCommit: "0".repeat(40) } }),
+      slice("STOPPED", ["src/a.mjs"], { delivery: { itemId: "item-S-A", criteria: ["AC-1"], baseCommit: base } }),
+      slice("STOPPED-OTHER-ITEM", ["src/a.mjs"]),
+      slice("STOPPED-NO-SUCCESSOR", ["src/b.mjs"], { delivery: { itemId: "item-S-B", criteria: ["AC-1"], baseCommit: base } }),
+    ];
+    slices[0].dependsOn = ["STOPPED", "STOPPED-OTHER-ITEM"];
+    slices[1].dependsOn = ["STOPPED-NO-SUCCESSOR"];
+    const integrated = readOrchestratorCommitIntegratedSlices({ root, candidateCommit: candidate, slices });
+    assert.deepEqual([...integrated].sort(), ["S-A", "STOPPED"], JSON.stringify(integrated));
+    // S-B lacks Commit-Act, S-C's commit names another slice, S-D's commit misses its write scope,
+    // S-E's commit predates its base, S-F's commit is not reachable from the candidate, S-G's base is unknown.
+    // STOPPED-OTHER-ITEM has a different item; STOPPED-NO-SUCCESSOR's same-item successor S-B is not integrated.
+    assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: base, slices }), [], "nothing after the base is visible from the base itself");
+    assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: "not-a-commit", slices }), [], "an unreadable candidate releases nothing and does not throw");
   }) },
 
 ];
