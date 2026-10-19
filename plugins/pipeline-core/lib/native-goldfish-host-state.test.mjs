@@ -11,7 +11,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { bindNativeCodexStart, prepareNativeGoldfishHostState,
   readNativeCodexPending, readNativeGoldfishPending } from "./native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "./native-goldfish-host-return.mjs";
-import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices } from "./native-goldfish-host-state.mjs";
+import { resolveGovernedItemQueue, executeGovernedItemDeliveryChecks, inspectGovernedItemDeliveryChecks, prepareGovernedItemQueue, checkpointNativeGoldfishItemDelivery, inspectNativeGoldfishItemDelivery, cancelNativeGoldfishItemDelivery, integrateNativeGoldfishItemDelivery, requalifyNativeGoldfishItemDelivery, amendNativeGoldfishItemWriteScope, observeGovernedItemIntegrationReadiness, readOrchestratorCommitIntegratedSlices, sessionAuthorityRegistryAbsent, createNativeGoldfishAuthorityProducerPort } from "./native-goldfish-host-state.mjs";
 import { createGovernanceScopeController } from "./governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
@@ -25,7 +25,7 @@ import { finalizeNativeGoldfishHostReturn } from "./native-goldfish-host-finaliz
 import { createAgyAuthorityJournalOwner } from "./agy-host-observed-store.mjs";
 import { nativeManagedDigest, nativeManagedCurrentOwner } from "./native-managed-authority-support.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner, CLAUDE_HOOK_SESSION_OWNER_SOURCE } from "./claude-hook-session-owner.mjs";
-import { initializeSessionAuthorityRegistry, refreshSourceOwnedDispatchAuthorityMember } from "./session-authority-registry.mjs";
+import { initializeSessionAuthorityRegistry, refreshSourceOwnedDispatchAuthorityMember, withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityProducerRecord } from "./session-authority-registry.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
 import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
 
@@ -665,12 +665,13 @@ const cases = [
     assert.equal(JSON.stringify({ ...second, sessionId: first.sessionId, toolUseId: first.toolUseId }), JSON.stringify(first));
   }) },
 
-  { id: "NGHS25", name: "an orchestrator-committed slice is integrated only on its own Dispatch and Commit-Act trailers inside base..candidate touching its write scope; a stopped attempt is superseded only by an integrated same-item successor (D40, D40a)", run: () => fixture(({ root }) => {
+  { id: "NGHS25", name: "a slice is integrated only on its own Goldfish Dispatch trailer in base..candidate touching its write scope; a stopped attempt is superseded only by an integrated same-item successor (D40, D40a, D40b)", run: () => fixture(({ root }) => {
     const git = (...args) => { const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
     const commitFile = (path, body, ...paragraphs) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), body); git("add", path); git("commit", "-q", "-m", `fixture ${path}`, ...paragraphs.flatMap(p => ["-m", p])); return git("rev-parse", "HEAD"); };
     const base = git("rev-parse", "HEAD");
     commitFile("src/a.mjs", "a1\n", "AI-Assisted: true\nDispatch: S-A (goldfish)\nCommit-Act: orchestrator");
     commitFile("src/b.mjs", "b1\n", "AI-Assisted: true\nDispatch: S-B (goldfish)");
+    commitFile("src/ele.mjs", "l1\n", "AI-Assisted: true\nDispatch: S-ELE (elephant)");
     commitFile("src/c.mjs", "c1\n", "AI-Assisted: true\nDispatch: S-OTHER (goldfish)\nCommit-Act: orchestrator");
     commitFile("src/unrelated.mjs", "u1\n", "AI-Assisted: true\nDispatch: S-D (goldfish)\nCommit-Act: orchestrator");
     commitFile("src/e.mjs", "e1\n", "AI-Assisted: true\nDispatch: S-E (goldfish)\nCommit-Act: orchestrator");
@@ -700,7 +701,8 @@ const cases = [
       slice("S-G", ["src/g.mjs"], { delivery: { itemId: "item-S-G", criteria: ["AC-1"], baseCommit: "0".repeat(40) } }),
       slice("STOPPED", ["src/a.mjs"], { delivery: { itemId: "item-S-A", criteria: ["AC-1"], baseCommit: base } }),
       slice("STOPPED-OTHER-ITEM", ["src/a.mjs"]),
-      slice("STOPPED-NO-SUCCESSOR", ["src/b.mjs"], { delivery: { itemId: "item-S-B", criteria: ["AC-1"], baseCommit: base } }),
+      slice("S-ELE", ["src/ele.mjs"]),
+      slice("STOPPED-NO-SUCCESSOR", ["src/ele.mjs"], { delivery: { itemId: "item-S-ELE", criteria: ["AC-1"], baseCommit: base } }),
       slice("S-H1", ["src/h.mjs"]),
       slice("S-H2", ["src/h.mjs"]),
       slice("S-CANCELLED", ["src/x.mjs"], { state: "cancelled", holdReason: "fixture" }),
@@ -710,19 +712,34 @@ const cases = [
       slice("HELD-PREDECESSOR", ["src/a.mjs"], { state: "hold-po", holdReason: "fixture", delivery: { itemId: "item-S-A", criteria: ["AC-1"], baseCommit: base } }),
     ];
     slices[0].dependsOn = ["STOPPED", "STOPPED-OTHER-ITEM", "HELD-PREDECESSOR"];
-    slices[1].dependsOn = ["STOPPED-NO-SUCCESSOR"];
+    slices.find(row => row.id === "S-ELE").dependsOn = ["STOPPED-NO-SUCCESSOR"];
     const integrated = readOrchestratorCommitIntegratedSlices({ root, candidateCommit: candidate, slices });
-    assert.deepEqual([...integrated].sort(), ["S-A", "S-H1", "S-H2", "STOPPED"], JSON.stringify(integrated));
-    // S-B lacks Commit-Act, S-C's commit names another slice, S-D's commit misses its write scope,
+    assert.deepEqual([...integrated].sort(), ["S-A", "S-B", "S-H1", "S-H2", "STOPPED"], JSON.stringify(integrated));
+    // S-B was committed by the Goldfish itself (Dispatch, no Commit-Act) and counts (D40b);
+    // S-ELE's commit carries an Elephant Dispatch trailer and does not count.
+    // S-C's commit names another slice, S-D's commit misses its write scope,
     // S-E's commit is its own base (not strictly after it), S-F's commit is not reachable from the candidate,
     // S-G's base is unknown, S-UNRELATED-BASE's base is not an ancestor of the qualifying commit,
     // S-CANCELLED and S-CRITIC are never released, and the merge commit naming S-M does not count.
     // Several Dispatch trailers on one commit release each named slice (S-H1, S-H2).
-    // STOPPED-OTHER-ITEM has a different item; STOPPED-NO-SUCCESSOR's same-item successor S-B is not integrated;
+    // STOPPED-OTHER-ITEM has a different item; STOPPED-NO-SUCCESSOR's same-item successor S-ELE is not integrated;
     // HELD-PREDECESSOR is not `ready`, so a same-item successor does not supersede it.
     assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: base, slices }), [], "nothing after the base is visible from the base itself");
     assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: "not-a-commit", slices }), [], "a malformed candidate releases nothing and does not throw");
     assert.deepEqual(readOrchestratorCommitIntegratedSlices({ root, candidateCommit: "f".repeat(40), slices }), [], "a git fault on an absent candidate releases nothing and does not throw");
+  }) },
+
+  { id: "NGHS26", name: "only the never-created session-authority catalogue counts as an absent native registry; any other fault still refuses readiness (PF-41)", run: () => fixture(({ root }) => {
+    const repository = inspectSignedDescriptorCustodyRepository(root);
+    let thrown = null;
+    try { withSessionAuthorityBoundary({ repository }, boundary => inspectSourceOwnedSessionAuthorityProducerRecord({ boundary, producerPort: createNativeGoldfishAuthorityProducerPort({ repository }) })); }
+    catch (error) { thrown = error; }
+    assert.ok(thrown, "an uninitialized repository has no producer record");
+    assert.equal(sessionAuthorityRegistryAbsent(thrown), true, JSON.stringify({ code: thrown.code, message: thrown.message }));
+    const other = Object.assign(new Error("ENOENT"), { code: "ENOENT", path: join(root, ".git/agent-pipeline/session-authority/members/x.json") });
+    assert.equal(sessionAuthorityRegistryAbsent(other), false, "a missing member record is a fault, not an absent registry");
+    assert.equal(sessionAuthorityRegistryAbsent(Object.assign(new Error("EACCES"), { code: "EACCES", path: thrown.path })), false, "an unreadable catalogue is a fault");
+    assert.equal(sessionAuthorityRegistryAbsent(null), false);
   }) },
 
 ];

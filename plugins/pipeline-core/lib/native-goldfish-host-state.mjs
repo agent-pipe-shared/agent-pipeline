@@ -40,6 +40,12 @@ const MAX_BYTES = 128 * 1024;
 const SUBDIRS = ["agent-pipeline", "run", "native-goldfish-host-commit"];
 
 function fail(code) { return { ok: false, code }; }
+// PF-42: a refusal names the exact line shape the briefing needs, so the caller does not have to guess it.
+function itemNotReadyReason(named, item) {
+  if (named.sliceId === null) return "the briefing names no single slice: field 6 (dispatch metadata) needs exactly one line `- Slice: <slice id>` and one line `- Write scope: <path>, <path>` matching the queue row";
+  if (!item) return `slice ${named.sliceId} is not in the governed queue; name an existing queue row in the \`- Slice: <slice id>\` line`;
+  return `slice ${item.id} is in state ${item.state}, not ready`;
+}
 function digest(value) { return createHash("sha256").update(value).digest("hex"); }
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).sort().join(",") === [...keys].sort().join(","); }
@@ -173,9 +179,12 @@ export function prepareNativeGoldfishHostState({ root, runner, input, subagentSt
   if (deliveryQueue.status === "required") {
     const named = parseDispatchSlice(fields.prompt);
     const item = deliveryQueue.normalized.slices.find(row => row.id === named.sliceId);
-    if (!item || item.state !== "ready") return fail("NGHS-ITEM-NOT-READY");
+    if (!item || item.state !== "ready") return { ...fail("NGHS-ITEM-NOT-READY"), reason: itemNotReadyReason(named, item) };
     if(item.delivery.criterionLocator&&!binding.itemDelivery)return fail("NGHS-ITEM-ORIGINAL-BRIEFING-REQUIRED");
-    if(item.dependsOn.length>0){const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});if(readiness.status!=='observed'||item.dependsOn.some(id=>!readiness.integrated.includes(id)))return fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD');}
+    if(item.dependsOn.length>0){const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
+      if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`};
+      const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
+      if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`held on ${held.slice(0,4).join(', ')}${held.length>4?` and ${held.length-4} more`:''}: no commit with a "Dispatch: <slice> (goldfish)" trailer after that slice's base touches its write scope`};}
     if (item.delivery.baseCommit !== binding.candidateCommit) return fail("NGHS-ITEM-BASE-MISMATCH");
     // Native adapters currently carry literal file paths. A glob/prefix queue
     // requires a separately admitted concrete path amendment; do not guess it.
@@ -1264,32 +1273,35 @@ const itemReadinessHandles=new WeakMap();
 export function observeGovernedItemIntegrationReadiness({root}={}) {
   try {
     const governed=resolveGovernedItemQueue({root});if(governed.status!=='required')return governed;
-    const repository=inspectSignedDescriptorCustodyRepository(root),port=createNativeGoldfishAuthorityProducerPort({repository});
-    return withSessionAuthorityBoundary({repository},boundary=>{
-      const native=readNativeIntegratedSlices({governed,repository,boundary}).integrated;
-      const integrated=[...new Set([...native,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})])];
-      const handle=Object.freeze({});itemReadinessHandles.set(handle,{queueSha256:nativeManagedDigest(governed.queue),integrated,observedAt:Date.now()});
-      return {status:'observed',code:'SQ-ITEM-INTEGRATION-READBACK',handle,integrated:[...integrated]};
-    });
+    const repository=inspectSignedDescriptorCustodyRepository(root);
+    // PF-41: a repository whose session-authority registry was never created holds no native
+    // integration record, so commit evidence alone decides; every other registry fault still refuses.
+    let native,nativeRegistry='read';
+    try{native=withSessionAuthorityBoundary({repository},boundary=>readNativeIntegratedSlices({governed,repository,boundary}).integrated);}
+    catch(error){if(!sessionAuthorityRegistryAbsent(error))throw error;native=[];nativeRegistry='absent';}
+    const integrated=[...new Set([...native,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})])];
+    const handle=Object.freeze({});itemReadinessHandles.set(handle,{queueSha256:nativeManagedDigest(governed.queue),integrated,observedAt:Date.now()});
+    return {status:'observed',code:'SQ-ITEM-INTEGRATION-READBACK',handle,integrated:[...integrated],nativeRegistry};
   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',reason:error.reason??error.message};}
 }
 /** D40: an orchestrator-committed slice is integrated for dependency admission only on commit
  * evidence — a non-merge commit reachable from the candidate, strictly after the slice's base,
- * whose trailers carry exactly `Dispatch: <slice> (goldfish)` and `Commit-Act: orchestrator`, and
- * which touches the slice's write scope. D40a: a stopped attempt is superseded when a same-item
+ * whose trailers carry exactly `Dispatch: <slice> (goldfish)`, and which touches the slice's write
+ * scope. D40b: the commit may be the orchestrator's (`Commit-Act: orchestrator`) or the Goldfish's
+ * own. D40a: a stopped attempt is superseded when a same-item
  * slice that depends on it is integrated by that evidence. A git fault releases nothing. */
 export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,slices}) {
   const run=args=>spawnSync('git',['-C',root,...args],{env:agyHostGitEnvironment(),shell:false,timeout:30000,maxBuffer:64*1024*1024,encoding:'utf8'});
   const live=(slices??[]).filter(row=>row&&row.state!=='cancelled'&&row.tier!=='critic'&&Array.isArray(row.writeScope)&&row.writeScope.length>0
     &&row.writeScope.every(path=>typeof path==='string')&&typeof row.delivery?.baseCommit==='string'&&/^[0-9a-f]{40}$/u.test(row.delivery.baseCommit));
   if(!live.length||typeof candidateCommit!=='string'||!/^[0-9a-f]{40}$/u.test(candidateCommit))return [];
-  const log=run(['log','--no-merges','--fixed-strings','--grep=Commit-Act: orchestrator','--name-only',
-    '--format=%x1e%H%x00%(trailers:key=Dispatch,valueonly,separator=%x1f)%x00%(trailers:key=Commit-Act,valueonly,separator=%x1f)%x00',candidateCommit,'--']);
+  const log=run(['log','--no-merges','--fixed-strings','--grep=(goldfish)','--name-only',
+    '--format=%x1e%H%x00%(trailers:key=Dispatch,valueonly,separator=%x1f)%x00',candidateCommit,'--']);
   if(log.status!==0)return [];
   const byId=new Map(live.map(row=>[row.id,row])),direct=new Set();
   for(const record of log.stdout.split('\x1e')){
-    const [sha,dispatch='',act='',names='']=record.split('\x00');
-    if(!/^[0-9a-f]{40}$/u.test(sha?.trim()??'')||!act.split('\x1f').map(value=>value.trim()).includes('orchestrator'))continue;
+    const [sha,dispatch='',names='']=record.split('\x00');
+    if(!/^[0-9a-f]{40}$/u.test(sha?.trim()??''))continue;
     const touched=names.split('\n').map(path=>path.trim()).filter(Boolean);
     for(const value of dispatch.split('\x1f').map(entry=>entry.trim())){
       const match=/^(\S+) \(goldfish\)$/u.exec(value),slice=match&&byId.get(match[1]);
@@ -1301,6 +1313,10 @@ export function readOrchestratorCommitIntegratedSlices({root,candidateCommit,sli
   const superseded=live.filter(row=>!direct.has(row.id)&&row.state==='ready'&&live.some(next=>next.id!==row.id&&direct.has(next.id)&&(next.dependsOn??[]).includes(row.id)
     &&typeof row.delivery.itemId==='string'&&next.delivery.itemId===row.delivery.itemId)).map(row=>row.id);
   return [...direct,...superseded];
+}
+/** Only the never-created registry catalogue counts as absent; a missing member or any other fault does not. */
+export function sessionAuthorityRegistryAbsent(error) {
+  return error?.code==='ENOENT'&&typeof error.path==='string'&&/[\\/]session-authority[\\/]catalogue\.json$/u.test(error.path);
 }
 export function readGovernedItemIntegrationReadiness(handle,queue) {
   const held=itemReadinessHandles.get(handle);
