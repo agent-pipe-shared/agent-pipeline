@@ -13,8 +13,10 @@ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
 import { registeredModelFamilyTaskRoutes } from "./model-family-route-source.mjs";
 import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
 import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
+import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+import { prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
 
-const sha = (value) => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
+const sha =(value) => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
 const runner = "codex";
 const taskRoute = "profile.feature.execution_phase";
 const sessionId = "session-1";
@@ -218,8 +220,16 @@ async function realS4EntryFixture(initialModels, { familyId = "sol", selectedMod
   const contractProbe = await actualS2OpaquePort({ models: initialModels, key: bindingKey, familyId });
   if (!contractProbe.ok) throw new Error(`S2 fixture contract probe: ${contractProbe.code}`);
   const authority = signedS4Authority(contractProbe.contractSha256, familyId, selectedModelId);
-  const commonDir = mkdtempSync(join(tmpdir(), "s5a-real-s4-"));
-  mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
+  // AC-212 (ALF-B5-MFI): production wiring binds the host store to the REAL Git authority repository
+  // (model-family-runtime-host.mjs store(): authorityRepositoryFromRoot(cwd).commonDir must equal the resolved common dir)
+  // and reserves every lifetime in the initialized session-authority registry, under a Source requester context. A plain
+  // temp directory is neither a repository nor a registry, so the fixture is a real checkout with an initialized registry
+  // and a controlled-method requester, the same shape model-family-main-prelaunch.test.mjs already uses.
+  const registry = prepareSessionAuthorityRegistryFixture({ prefix: "mfi-real-s4-" });
+  const repoDir = registry.repoDir;
+  const commonDir = registry.repository.commonDir;
+  const runtime = createControlledMethodRuntimeFixture({ repository: registry.repository,
+    fixtureRoot: join(commonDir, "agent-pipeline/controlled-method-fixtures/mfi-owner"), sessionId: "mfi-owner" });
   let models = initialModels;
   let captureCount = 0;
   let admissionCount = 0;
@@ -245,7 +255,7 @@ async function realS4EntryFixture(initialModels, { familyId = "sol", selectedMod
     ...(nativePort ? { admitNativeRequest: ({ rootDir, repositoryRoot, gitCommonDir, invocation, key, assignment, request }) => {
       admissionCount += 1;
       assert.equal(rootDir, join(commonDir, "agent-pipeline"));
-      assert.equal(repositoryRoot, commonDir);
+      assert.equal(repositoryRoot, repoDir);
       assert.equal(gitCommonDir, commonDir);
       assert.equal(invocation.schema, "pipeline.model-family-invocation.v2");
       assert.equal(invocation.kind, "model-family-invocation");
@@ -262,14 +272,18 @@ async function realS4EntryFixture(initialModels, { familyId = "sol", selectedMod
         : { ok: false, code: "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED" };
     },
   };
-  const runtimeHost = createModelFamilyRuntimeHost({ cwd: commonDir, resolveCommonDir: () => commonDir,
+  const runtimeHost = createModelFamilyRuntimeHost({ cwd: repoDir, resolveCommonDir: () => commonDir,
     trustedSources, clock: () => Date.parse("2026-10-01T12:00:30.000Z") });
-  const activated = runtimeHost.store().activate();
-  if (!activated.ok) { rmSync(commonDir, { recursive: true, force: true }); throw new Error(`S4 synthetic activation: ${activated.code}`); }
-  return { entry: createModelFamilyInvocationEntry({ runtimeHost, routeSource }),
+  const activated = runtime.run(() => runtimeHost.store().activate());
+  if (!activated.ok) { rmSync(repoDir, { recursive: true, force: true }); throw new Error(`S4 synthetic activation: ${activated.code}`); }
+  // Every registry-owned lifetime runs inside the controlled Source requester's authority context.
+  const rawEntry = createModelFamilyInvocationEntry({ runtimeHost, routeSource });
+  const entry = Object.freeze(Object.fromEntries(Object.entries(rawEntry)
+    .map(([name, method]) => [name, (...args) => runtime.run(() => method(...args))])));
+  return { entry,
     setModels(value) { models = value; }, captureCount: () => captureCount,
     admissionCount: () => admissionCount, nativeRequests,
-    cleanup() { rmSync(commonDir, { recursive: true, force: true }); } };
+    cleanup() { rmSync(repoDir, { recursive: true, force: true }); } };
 }
 
 const input = (overrides = {}) => ({ kind: "dispatch", runner, taskRoute, sessionId, invocationId,
