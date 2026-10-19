@@ -41,7 +41,9 @@ copied from the source reports, and the source reports themselves stay local.
 | AGY F-03 signature UX | AC-264 | No single PO command |
 | AC-264 plan-readiness hand-off | D30 | Lib, criterion-scan export and R1-R6 delivered in 7c2d7c6fc (Dispatch ALF-B27-D30B, RED first). The submit-plan/present-plan call sites are drafted as the D30 section of the C7 drop-in; a clone-based baseline-vs-patched proof is running. Open: the C7 ceremony, the Critic batch (flags: the check-path heuristic; a non-git governed root fails closed) and PO acceptance |
 | AC-147/209 catalog half | D29 | Codex-host session, then a ceremony on `lib/guard/read-scope.mjs` |
-| PF-21, PF-26, PF-27 | C2, C3, C1 | In source; effective once the ceremony runs |
+| PF-21, PF-26, PF-27 | C2, C3, C1 | In source; effective once the ceremony runs. C1 done in d233987f9 (guard-git 258/258); C2 and C3 open |
+| Protected TP-7 suite `guard-testpath-override` aborted with no summary | C5 / AC-197 (E16) | Done in 2094014d8, signed ceremony (22 pass, 0 fail, 2 pending). Critic security read on OT13 is open |
+| `hooks/codex-pretool-guard.test.mjs` red at HEAD | measurement | Read-only diagnosis: the shared ready-lifecycle fixture still expects the pre-1bd1d7bf6 architecture stop for a feature profile, while the current route stops at bootstrap-binding-required. Fixture fix to be dispatched. F1 round 3 (empty adapter output on two push shapes) is narrowed to lib/git-cmd.mjs classification, not confirmed |
 
 ## 0.7.0 backlog items with no AC row and no decision
 
@@ -61,6 +63,7 @@ copied from the source reports, and the source reports themselves stay local.
 - No Full Verify PASS on any host, no Critic batch, and no PO acceptance yet (stage 100 = 0).
 - Two records disagree on AC-175: E10 narrows it, while the batch table says closed-by-decision. E10 is later and governs.
 - D9's text was never persisted.
+- Antigravity installer option 2 (global topology refresh) ran `refreshed` on both PO machines on 2026-10-19: once on the previous build and once on the interim install d4b1a2796. This is the PO re-test that c2817be's stamp listed as pending. New finding from that run: its workspace-registry-rebind rewrites the tracked `.agents/plugins.json` to an absolute machine path. That edit is not committed and is left as the PO's install made it. It needs a backlog item (an installer must not write a machine path into a tracked file).
 - `hooks/guard-dispatch.test.mjs` GD22, GD26 and GD27 (incomplete briefing; the real critic-review.md and goldfish-task.md templates, filled, are dispatchable) were red at 38b3b8a65 with and without the 203a53687 template change. Fixed in 66aacfc2e (Dispatch ALF-B28-GD2, 66/66; RED baseline 63/66). They did not read the real checkout; the hook resolves CLAUDE_PROJECT_DIR, which is the fixture. The causes were two fixture defects: the enrolled fixture lacked project authority files (SQ-AUTHORITY-UNAVAILABLE masked the briefing finding), and GD8 filled an Opus model with no MP-07 rationale. Critic batch and PO acceptance are pending. Backlog observation (protected guard, not a 0.7.0 fix): guard-dispatch runs item admission before role preflight even when policy findings already exist, which hides the briefing finding. AC-260 binding note: the item's original acceptance concerns `design-workflow-signing-default.test.mjs`, already addressed by 32169fca8, 89d8446be and 087529609. This repair is a separate red-test fix bound to the same row.
 
 ## Correction
