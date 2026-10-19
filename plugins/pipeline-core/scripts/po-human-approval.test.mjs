@@ -303,6 +303,7 @@ import {
   HGO_SIGNATURE_REASON,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
+  prepareHumanGuardOverrideForSignature,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
@@ -3277,6 +3278,16 @@ function armHgoRequest(repoRoot, toolInput) {
     subjectSha256: prepared.selectionSha256,
     decision: "authorize",
   });
+  // ALF-B7-AC256 (QG-04, E22): classified as a FIXTURE GAP, not a product defect. The product change is the
+  // digest-keyed describer: sign-intent reads a private disclosure index (<intentSha256>.disclosure.json) that
+  // only prepareHumanGuardOverrideForSignature publishes, and performs no store scan. This helper rebuilt the
+  // intent independently and never published one, so the prompt lacked the eligible paths. Publish it through the
+  // same product step the operator runs and require it to key the independently rebuilt digest.
+  const signing = prepareHumanGuardOverrideForSignature({
+    rootDir: repoRoot, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, scriptPath,
+    humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+  });
+  assert.equal(signing.intentSha256, intent.sha256, "the published index must key the independently rebuilt intent digest");
   return { requestSha256: recorded.requestSha256, planSha256: plan.planSha256, intent };
 }
 
