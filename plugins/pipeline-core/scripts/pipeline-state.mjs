@@ -12939,8 +12939,24 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     if (!STATE_AUTHORITY_ENTRIES.has(sub) || (sub === "set-phase" && argv.includes("--verify-command"))) {
       // The original legacy route may contain an attended prompt. Inspect the
       // catalogue under common lock, then release it BEFORE that original route.
+      // PF-54 (D51 (1)): a route the State companion has not adopted writes the State outside the
+      // registry, as a commit or a checkout of the state file does; the next boundary entry heals
+      // that drift. It is refused only while a bound member of a State producer is armed or running.
       withSessionAuthorityBoundary({repository}, () => {
-        if (stateCataloguePresent(repository)) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-outer-companion-route-not-adopted");
+        if (!stateCataloguePresent(repository)) return;
+        let inFlight;
+        try {
+          const record = path => JSON.parse(readFileSync(join(repository.commonDir, path), "utf8"));
+          inFlight = ["onboarding-continuity", "state-push-challenge"].some(id => {
+            const path = join("agent-pipeline", "session-authority", "producers", `${id}.json`);
+            if (!existsSync(join(repository.commonDir, path))) return false;
+            return record(path).members.some(entry => {
+              const member = record(String(entry.memberRef.path).replace(/^\.git\//u, ""));
+              return member.association?.state === "bound" && ["armed", "running"].includes(member.phase);
+            });
+          });
+        } catch { stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-producer-unreadable"); }
+        if (inFlight) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-operation-in-flight");
       });
       return runStateSource(argv,deps);
     }
@@ -12959,7 +12975,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     if(owningFailureFrame!==null&&stateAuthorityInvocation===owningFailureFrame
         &&stateOwnedCompanionFailureFrames.has(owningFailureFrame)
         &&(error?.name==="SessionAuthorityError"||error instanceof OnboardingContinuityKickoffError))throw error;
-    console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}); no success is reported.`);
+    // D52 (2): the refusal names its reason and the general repair, never only a code.
+    console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}${typeof error?.reason === "string" ? `: ${error.reason.slice(0, 240)}` : ""}); no success is reported. Repair: node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} inspect --root ${dir} names the cause and the command that clears it.`);
     return 2;
   } finally {
     if(owningFailureFrame!==null)stateOwnedCompanionFailureFrames.delete(owningFailureFrame);
