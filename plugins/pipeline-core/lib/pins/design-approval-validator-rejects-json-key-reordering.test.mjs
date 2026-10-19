@@ -108,28 +108,35 @@ test('AC3: reordered requests still reject unknown properties, changed values an
  }
 });
 
-const hostLimited=e=>e?.reason==='WIN-AUTH-DACL';
+// QG-04: d02409a8a retired the design-workflow-package request from the po-human-approval sign-intent CLI, and E26
+// (specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md) retargets the two CLI cases: AC3 asserts the retirement
+// refusal (zero confirmations, zero signs) and AC4/AC5 sign in process with a disposable key. No CLI route or owned-authority DACL is involved.
 test('AC3: rejection happens before confirmation or key use for a reordered but altered request',t=>{
  const f=fixture(t);let confirmations=0,signs=0;
  const request=reverseKeys(f.request);request.approvalIntent.value.specSha256='b'.repeat(64);f.put(f.requestPath,bytes(request));
- try{runHumanApproval(['sign-intent','--repo-root',f.root,'--directory',f.keys,'--request',f.requestPath],{readConfirmation:()=>{confirmations++;return 'approve';},spawn:()=>{signs++;throw Error('Unexpected signing');}});assert.fail('expected refusal');}
- catch(e){if(hostLimited(e)){t.skip('host limitation: native Windows owned-authority DACL inspection (WIN-AUTH-DACL) refuses the CLI ceremony in this fixture');return;}assert.match(String(e?.message),/current, complete package/);}
+ assert.throws(()=>runHumanApproval(['sign-intent','--repo-root',f.root,'--directory',f.keys,'--request',f.requestPath],{readConfirmation:()=>{confirmations++;return 'approve';},spawn:()=>{signs++;throw Error('Unexpected signing');}}),/PO-HUMAN-REQUEST-RETIRED/);
  assert.equal(confirmations,0);assert.equal(signs,0);assert.equal(existsSync(join(f.keys,`proof-${f.request.approvalIntent.sha256}.json`)),false);
 });
 
-test('AC4/AC5: reordered request signs through the unchanged default validator with a disposable key and real OpenSSL, and the proof reads back for the ORIGINAL request',t=>{
- const f=fixture(t),prompts=[],reordered=reverseKeys(f.request);
+// QG-04: d02409a8a / E26 as above. The proof is made in process with the disposable fixture key over each request's own canonical intent digest.
+const proofFor=(f,request)=>({schema:'pipeline.po-approval-proof.v1',intentSha256:request.approvalIntent.sha256,keyReference:f.trustPolicy.keyReference,publicKey:f.publicKey,signatureBase64:sign(null,Buffer.from(request.approvalIntent.sha256,'utf8'),f.pair.privateKey).toString('base64')});
+test('AC4/AC5: a proof signed in process for the reordered request reads back through the unchanged default validator for the ORIGINAL request; an altered request proof is rejected',t=>{
+ const f=fixture(t),reordered=reverseKeys(f.request);
  assert.notEqual(JSON.stringify(reordered),JSON.stringify(f.request));
- f.put(f.requestPath,JSON.stringify(reordered));
- let result;try{result=runHumanApproval(['sign-intent','--repo-root',f.root,'--directory',f.keys,'--request',f.requestPath],{readConfirmation:p=>{prompts.push(p);return 'approve';}});}
- catch(e){if(hostLimited(e)){t.skip('host limitation: native Windows owned-authority DACL inspection (WIN-AUTH-DACL) refuses the CLI signing ceremony in this fixture; proof readback is covered by the AC5 case');return;}throw e;}
- assert.equal(result.ok,true,JSON.stringify(result));assert.equal(prompts.length,1);assert.match(prompts[0],new RegExp(f.request.approvalIntent.sha256));
- const proof=JSON.parse(readFileSync(result.paths.proof,'utf8'));
- // Proof readback against both spellings: the same canonical intent, so no new plan ceremony is needed for the already approved package.
+ assert.equal(canonical(reordered.approvalIntent),canonical(f.request.approvalIntent));
+ for(const [madeFor,signedRequest] of [['original',f.request],['reordered',reordered]]){
+  const proof=proofFor(f,signedRequest);
+  // Proof readback against both spellings: the same canonical intent, so no new plan ceremony is needed for the already approved package.
+  for(const [name,request] of [['original',f.request],['reordered',reordered]]){
+   assert.equal(proof.intentSha256,request.approvalIntent.sha256,`${madeFor}->${name}`);
+   assert.equal(verifyPoApprovalProof({intent:request.approvalIntent,proof,trustPolicy:f.trustPolicy}).verified,true,`${madeFor}->${name}`);
+   const verified=verifyDesignWorkflowPackageApproval({...f.binding,request,proof,anchors:[f.trustPolicy]});assert.equal(verified.ok,true,`${madeFor}->${name}: ${JSON.stringify(verified)}`);
+  }
+ }
+ // Negative: a proof made for an altered request does not read back for the original or the reordered request.
+ const altered=reverseKeys(f.request);altered.approvalIntent.sha256='e'.repeat(64);const alteredProof=proofFor(f,altered);
  for(const [name,request] of [['original',f.request],['reordered',reordered]]){
-  assert.equal(proof.intentSha256,request.approvalIntent.sha256,name);
-  assert.equal(verifyPoApprovalProof({intent:request.approvalIntent,proof,trustPolicy:f.trustPolicy}).verified,true,name);
-  const verified=verifyDesignWorkflowPackageApproval({...f.binding,request,proof,anchors:[f.trustPolicy]});assert.equal(verified.ok,true,`${name}: ${JSON.stringify(verified)}`);
+  assert.equal(verifyDesignWorkflowPackageApproval({...f.binding,request,proof:alteredProof,anchors:[f.trustPolicy]}).ok,false,name);
  }
 });
 
