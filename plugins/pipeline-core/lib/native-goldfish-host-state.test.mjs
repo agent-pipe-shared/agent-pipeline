@@ -892,6 +892,8 @@ const cases = [
     const readiness=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));
     assert.equal(readiness.status,'observed',JSON.stringify(readiness));assert.deepEqual(readiness.integrated,['ITEM-AC-1']);
     assert.equal(migrations().length,2);assert.deepEqual(members(),held,'a second update rebinds the registry; every member survives byte for byte');
+    const latest=JSON.parse(readFileSync(join(abandoned,migrations().sort().at(-1),'migration.json'),'utf8'));
+    assert.equal(latest.mode,'rebound',JSON.stringify(latest));
     assert.notEqual(JSON.parse(readFileSync(cataloguePath,'utf8')).participants[1].sourceSha256,'f'.repeat(64));
     rewrite(value=>{value.repositorySha256='e'.repeat(64);});
     const foreign=runtime.run(()=>observeGovernedItemIntegrationReadiness({root}));
@@ -911,6 +913,30 @@ const cases = [
     const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));
     assert.equal(prepared.ok,true,JSON.stringify(prepared));
     assert.equal(existsSync(join(repository.commonDir,'agent-pipeline/session-authority/catalogue.json')),true);
+  })},
+
+  { id: "NGHS35", name: "a catalogue whose producer structure changed is retained with a marker and the registry starts fresh; the dispatch still runs (PF-52, Critic F7/F9)", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,'initialized');
+    const cataloguePath=join(repository.commonDir,'agent-pipeline/session-authority/catalogue.json');
+    const value=JSON.parse(readFileSync(cataloguePath,'utf8'));
+    value.participants[2]={...value.participants[2],namespaceIds:[...value.participants[2].namespaceIds,'a-namespace-an-older-version-had']};
+    value.participantSetSha256=createHash('sha256').update(canonical(value.participants)).digest('hex');writeFileSync(cataloguePath,canonical(value));
+    const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-1',itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+    const binding={...makeBinding({dispatchId:'DELIVER-AC-1',commit:original.candidate.commit,tree:original.candidate.tree}),schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};
+    const input=toolInput('claude',{root,session:'native-session-one',toolUseId:'native-tool-one',binding});
+    input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+'\nSlice: ITEM-AC-1\nWrite scope: src/change.mjs\n';
+    const prepared=runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}));
+    assert.equal(prepared.ok,true,JSON.stringify(prepared));
+    const abandoned=join(repository.commonDir,'agent-pipeline/session-authority-abandoned');
+    const migrated=readdirSync(abandoned).filter(name=>name.includes('-source-update-'));
+    assert.equal(migrated.length,1);
+    const marker=JSON.parse(readFileSync(join(abandoned,migrated[0],'migration.json'),'utf8'));
+    assert.equal(marker.mode,'fresh');assert.equal(marker.oldParticipantSetSha256,value.participantSetSha256);assert.match(marker.cause,/structure changed/u);
+    assert.equal(existsSync(join(abandoned,migrated[0],'catalogue.json')),true,'the old catalogue is retained');
+    assert.notEqual(JSON.parse(readFileSync(cataloguePath,'utf8')).participantSetSha256,value.participantSetSha256,'a fresh catalogue of the installed sources');
   })},
 
 ];

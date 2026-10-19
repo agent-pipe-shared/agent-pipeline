@@ -7161,3 +7161,28 @@ test("PF-53: expired artifacts of a retired schema do not block the authority in
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("PF-53 (Critic F2): the repair an inventory-bound refusal names works at that bound, and new requests stop below it", () => {
+  const root = fixture();
+  try {
+    const physical = realpathSync(root), base = join(physical, ".git", "agent-pipeline", "human-guard-overrides");
+    const denyWrite = (content) => recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content }, denials: denial, nowMs: Date.now() });
+    assert.equal(typeof denyWrite("PF-53 audit seed\n").requestSha256, "string");
+    const digest = (value) => createHash("sha256").update(canonical(value)).digest("hex");
+    for (let n = 0; n < 4096; n++) {
+      const retired = { schema: "pipeline.human-guard-override-request.v2", root: physical, commandClass: `retired-${n}`,
+        mode: "standard", authorSourceRoot: null, expiresAt: "2026-08-31T10:00:00.000Z" };
+      writeFileSync(join(base, "requests", `${digest(retired)}.json`), JSON.stringify(retired), { mode: 0o600 });
+    }
+    const port = createHumanGuardOverrideAuthorityProducerPort({ repository: inspectSignedDescriptorCustodyRepository(physical) });
+    assert.throws(() => port.readBaseline(), /hgo:inventory-bound .*sweep-requests/u);
+    assert.throws(() => denyWrite("PF-53 one more\n"), /HGO-REQUEST-NAMESPACE-FULL|override request namespace holds/u);
+    const swept = sweepHumanGuardOverrideRequests({ rootDir: physical });
+    assert.equal(swept.status, "swept", JSON.stringify(swept));
+    assert.ok(swept.remainingEligible > 0, "one call removes a bounded batch; the refusal says to repeat it");
+    assert.doesNotThrow(() => port.readBaseline(), "below the bound again after one sweep");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

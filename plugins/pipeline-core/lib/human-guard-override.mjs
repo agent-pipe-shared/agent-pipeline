@@ -3887,6 +3887,10 @@ export function recordHumanGuardDenial({
   };
   const requestSha256 = sha(request);
   const path = requestPath(paths, requestSha256);
+  const held = existsSync(path) ? 0 : readdirSync(paths.requests).length;
+  if (held >= HGO_REQUEST_SOFT_CAP) {
+    fail("HGO-REQUEST-NAMESPACE-FULL", `the override request namespace holds ${held} requests (cap ${HGO_REQUEST_SOFT_CAP}); ${HGO_SWEEP_REPAIR}`);
+  }
   return hgoPlanningPublication({repo, paths, entry: "record-denial", intendedPath: path, inputSha256: requestSha256}, () => {
   if (!existsSync(path)) writeExclusive(path, Buffer.from(`${JSON.stringify(request)}\n`, "utf8"));
   else if (sha(readJson(path)) !== requestSha256) fail("HGO-REQUEST", "request replay conflicts");
@@ -6018,12 +6022,19 @@ function hgoSweepRequestsCore(rootDir) {
     return Object.freeze({status: "swept", removed: selected.length, retained: originalCount - selected.length, remainingEligible: eligible.length - selected.length});
   });
 }
+// PF-53 (Critic F2): sweep-requests is the repair the inventory-bound refusal names, so it must
+// run at that bound. It only removes, so it reads the inventory with the file-count and total-byte
+// bounds lifted; every per-file bound and every other check still applies.
+let hgoSweepBoundsLifted = false;
 export function sweepHumanGuardOverrideRequests({rootDir} = {}) {
+  const lifted = hgoSweepBoundsLifted;
+  hgoSweepBoundsLifted = true;
   try { return hgoSweepRequestsCore(rootDir); }
   catch (error) {
     if (error instanceof HumanGuardOverrideError) throw error;
     fail("HGO-SWEEP-CAS", "request cleanup did not complete; retain original ownership evidence");
   }
+  finally { hgoSweepBoundsLifted = lifted; }
 }
 
 function hgoAuthorityDirectory(path) {
@@ -6050,7 +6061,10 @@ function hgoAuthorityScopePresent(repository, path) {
 }
 const HGO_AUTHORITY_SOURCE_BOUND = 1048576, HGO_AUTHORITY_JOURNAL_BOUND = 67108864, HGO_AUTHORITY_INVENTORY_BOUND = 16777216;
 const HGO_AUTHORITY_JOURNALS = Object.freeze(["audit.jsonl", "command-offers.jsonl"]);
-const HGO_SWEEP_REPAIR = "remove expired requests with: node <plugin-root>/scripts/guard-human-override.mjs sweep-requests --repo <absolute-root>";
+const HGO_SWEEP_REPAIR = "remove expired requests with: node <plugin-root>/scripts/guard-human-override.mjs sweep-requests --repo <absolute-root>, repeated until it reports remainingEligible 0";
+// New requests stop below the inventory bound, so the namespace never reaches a state that
+// only a lifted-bound sweep can read (PF-53, Critic F2).
+const HGO_REQUEST_SOFT_CAP = 3072;
 function hgoAuthorityShownPath(local) {
   return local.replace(/\\/gu, "/").replace(/^agent-pipeline\/human-guard-overrides\//u, "");
 }
@@ -6058,7 +6072,6 @@ function hgoAuthorityJournal(local) { return HGO_AUTHORITY_JOURNALS.includes(hgo
 function hgoAuthorityBoundRepair(shown) {
   if (shown === "command-offers.jsonl") return "the journal rotates aside at the next guard denial; retry after one";
   if (shown === "audit.jsonl") return "the authenticated audit ledger cannot be rotated yet (backlog item hgo-audit-ledger-segment-checkpoint); report it";
-  if (shown.startsWith("requests/")) return HGO_SWEEP_REPAIR;
   return "this file is not written by the Pipeline at this size; move it out of the override namespace";
 }
 function hgoAuthorityPhysical(repository, path, namespaceId) {
@@ -6107,7 +6120,7 @@ function hgoAuthorityInventory(repository) {
   function file(path, namespaceId) {
     const observed = hgoAuthorityPhysical(repository, path, namespaceId);
     if (!hgoAuthorityJournal(relative(repository.commonDir, path))) total += observed.bytes.length;
-    if (++count > 4096 || total > HGO_AUTHORITY_INVENTORY_BOUND) {
+    if ((++count > 4096 || total > HGO_AUTHORITY_INVENTORY_BOUND) && !hgoSweepBoundsLifted) {
       hgoAuthorityFailure(`hgo:inventory-bound ${count} files (bound 4096), ${total} bytes outside the journals (bound ${HGO_AUTHORITY_INVENTORY_BOUND}); ${HGO_SWEEP_REPAIR}`);
     }
     groups.get(namespaceId).push(observed);
