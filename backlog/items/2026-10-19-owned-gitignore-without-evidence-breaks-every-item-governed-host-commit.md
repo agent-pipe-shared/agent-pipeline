@@ -24,6 +24,12 @@ changed paths no longer equal the paths the child claimed. Onboarding seeds `/ev
 The native-goldfish-host-state case NGHS17 fails with the same code and may have the same
 cause.
 
+The same class shows up a second time (ALF-B2-AC259, 2026-10-19). The signed quality package
+builds its isolated checkout under `<root>/scratch`, and `applyToMain` re-checks
+`git status --porcelain` while that checkout still exists. In a repository that does not ignore
+`scratch/`, the apply therefore always ends in `QUALITY-PACKAGE-BASE-DRIFT`. The Pipeline's own
+working directories count as drift whenever the consumer does not ignore them.
+
 ## Triggering situation
 
 An item-governed Claude or Codex Goldfish dispatch in a consumer whose `.gitignore` predates
@@ -40,3 +46,5 @@ entry in the refusal. Check whether NGHS17 shares this cause.
 - An item-governed host commit succeeds in a consumer whose `.gitignore` lacks `/evidence/`,
   or is refused with a code that names the missing ignore entry.
 - A pin covers that consumer shape.
+- The quality-package apply either excludes its own isolated checkout from the clean-tree check
+  or refuses with a code that names the missing `scratch/` ignore entry.
