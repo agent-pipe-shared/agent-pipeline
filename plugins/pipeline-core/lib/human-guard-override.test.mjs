@@ -544,6 +544,15 @@ function armBySignature(options) {
   });
 }
 
+/** Last audit events of a repository's HGO ledger, rendered for assertion messages only (never an assertion input). */
+function auditTail(root, count = 3) {
+  try {
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const lines = readFileSync(join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl"), "utf8").trim().split("\n");
+    return lines.slice(-count).map((line) => JSON.stringify(JSON.parse(line).event)).join(" | ");
+  } catch (error) { return "audit tail unavailable: " + error.code; }
+}
+
 test("ADR-0059 Decision 1: a valid, correctly-bound signed proof arms the identical v2 capability, consumable exactly like the chat path", () => {
   const root = fixtureSignature();
   try {
@@ -673,6 +682,19 @@ test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact m
     });
     assert.notEqual(first.intent.sha256, second.intent.sha256);
 
+    // ALF-B5-HGO (QG-04, E22): classified as a FIXTURE GAP, not a product defect. The resolver is digest-keyed:
+    // it reads a private disclosure index (<intentSha256>.disclosure.json) that only prepare-for-signature
+    // publishes, and performs no store scan. prepareSignedArming() rebuilds the intent independently, as an
+    // external signer would, and never published one. Publish it through the same product step the operator
+    // runs, and require it to key the independently rebuilt digest. The resolution claims below are unchanged.
+    for (const armed of [first, second]) {
+      const signing = prepareHumanGuardOverrideForSignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: armed.recorded.requestSha256, scriptPath: armed.scriptPath,
+        humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+      });
+      assert.equal(signing.intentSha256, armed.intent.sha256, "the published index must key the independently rebuilt intent digest");
+    }
+
     const resolvedSecond = describeHumanGuardOverrideSelection({
       rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: second.intent.sha256, scriptPath: second.scriptPath,
     });
@@ -705,11 +727,20 @@ test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact m
 test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() stays unresolved for a digest that matches no stored request", () => {
   const root = fixtureSignature();
   try {
-    prepareSignedArming(root, { toolName: "Write", toolInput: { file_path: "notes.md", content: "unrelated\n" }, denials: denial });
+    const stored = prepareSignedArming(root, { toolName: "Write", toolInput: { file_path: "notes.md", content: "unrelated\n" }, denials: denial });
+    // ALF-B5-HGO (QG-04, E22): publish the stored request's disclosure index (see the resolve case above), so the
+    // store is genuinely non-empty and the unknown digest is unresolved because it is unknown, not because nothing is indexed.
+    prepareHumanGuardOverrideForSignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: stored.recorded.requestSha256, scriptPath: stored.scriptPath,
+      humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+    });
     const unrelated = createHash("sha256").update("some other intent entirely").digest("hex");
     const record = describeHumanGuardOverrideSelection({ rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: unrelated, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs") });
     assert.equal(record.resolved, false);
-    assert.equal(record.code, "HGO-RECORD-DIGEST-MISMATCH");
+    // ALF-B5-HGO (QG-04, E22): product change. The resolver no longer scans stored requests for a recomputed match
+    // (HGO-RECORD-DIGEST-MISMATCH no longer exists in the library); it looks up one digest-keyed index, and a digest with
+    // no index is unresolved with HGO-RECORD-INDEX-UNAVAILABLE. The claim (unresolved, no lines) is unchanged.
+    assert.equal(record.code, "HGO-RECORD-INDEX-UNAVAILABLE");
     assert.deepEqual(record.lines, []);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -1791,14 +1822,27 @@ test("drift, expiry and concurrent consumption fail closed", () => {
       nowMs: 4000,
     }), { status: "invalid", code: "HGO-CONCURRENT-CONSUME" });
     rmSync(join(lockDir, `${plan.planSha256}.lock`));
-    assert.deepEqual(consumeHumanGuardOverride({
+    // ALF-B5-HGO (QG-04): newer typed verdict. The same path with different content is an authenticated, current-context
+    // input mismatch: replan / HGO-INPUT-MISMATCH naming the bound digests, no longer a bare "absent". The claim is unchanged:
+    // the drifted call is refused and consumes nothing -- the capability bytes are untouched, and the exact input is
+    // still armed (it reaches HGO-EXPIRED below rather than "absent" or a consumed record).
+    const capabilityFile = join(lockDir, "..", "capabilities", plan.planSha256 + ".json");
+    const armedBytes = readFileSync(capabilityFile, "utf8");
+    const mismatched = consumeHumanGuardOverride({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       toolName: "Write",
       toolInput: { ...toolInput, content: "drifted\n" },
       denials: denial,
       nowMs: 4000,
-    }), { status: "absent" });
+    });
+    assert.equal(mismatched.status, "replan");
+    assert.equal(mismatched.code, "HGO-INPUT-MISMATCH");
+    assert.equal(mismatched.inputMismatch.requestSha256, request.requestSha256);
+    assert.equal(mismatched.inputMismatch.planSha256, plan.planSha256);
+    assert.deepEqual(mismatched.inputMismatch.differingInputs, ["toolInputSha256"]);
+    assert.notEqual(mismatched.inputMismatch.expectedToolInputSha256, mismatched.inputMismatch.observedToolInputSha256);
+    assert.equal(readFileSync(capabilityFile, "utf8"), armedBytes, "a mismatched call must not mutate the armed capability");
     assert.deepEqual(consumeHumanGuardOverride({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
@@ -2369,14 +2413,15 @@ test("pipeline author repair binds one exact source root and action without Stat
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
     assert.equal(armed.status, "armed");
-    assert.deepEqual(consumeHumanGuardOverride({
+    const authorConsume = consumeHumanGuardOverride({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       toolName: "apply_patch",
       toolInput,
       denials: denial,
       nowMs: 4000,
-    }).status, "consumed");
+    });
+    assert.equal(authorConsume.status, "consumed", JSON.stringify(authorConsume) + " :: " + auditTail(root));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -3256,7 +3301,7 @@ test("policy-library and override-CLI drift invalidate the loaded plugin identit
   }
 });
 
-test("Antigravity HGO binds its own manifest through planning, arming, and consumption", () => {
+test("Antigravity HGO binds its own manifest through planning, arming, and consumption", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
   const plugin = mkdtempSync(join(tmpdir(), "human-guard-agy-plugin-"));
   const codexVersion = "0.7.0+codex.fixture";
@@ -3307,6 +3352,9 @@ test("Antigravity HGO binds its own manifest through planning, arming, and consu
     assert.equal(plan.plugin.version, agyVersion);
     const reason = "Attended Agy manifest binding";
     const prepared = prepareHumanGuardOverrideAuthorization({ rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 2500, scriptPath });
+    // ALF-B5-HGO (QG-04): the chat ceremony (committed push_approval "chat" fixture) now confirms on the real fd 0, so
+    // the injected readLineFn no longer reaches it; both arming calls run the unchanged library call under a real pty
+    // (armUnderPty, the same conversion NVA-G-EXPIREDARM received). Every manifest-binding assertion is unchanged.
     const authorization = {
       rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
@@ -3314,10 +3362,10 @@ test("Antigravity HGO binds its own manifest through planning, arming, and consu
       nowMs: 3000, scriptPath,
     };
     writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: "0.7.1+antigravity.fixture" }));
-    assert.throws(() => authorizeHumanGuardOverride(authorization),
+    assert.throws(() => armUnderPty(authorization),
       (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLUGIN-DRIFT");
     writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: agyVersion }));
-    const armed = authorizeHumanGuardOverride(authorization);
+    const armed = armUnderPty(authorization);
     assert.equal(armed.status, "armed");
     assert.deepEqual(consumeHumanGuardOverride({ ...shared, nowMs: 3500 }), { status: "replan", code: "HGO-DRIFT" });
     writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: "0.7.1+antigravity.fixture" }));
@@ -3510,14 +3558,24 @@ test("NVA-SIGDISCLOSE-1 Finding 6: a record that IS validated but is a legitimat
       reasonSha256: prepared.reasonSha256, activate: true,
       dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` }, nowMs: 3000, scriptPath,
     });
-    // A DIFFERENT, unrelated tool call -- the armed capability is well-formed and valid,
-    // it simply does not match. This must fall straight through to "absent", carrying no
-    // skippedInvalidRecords at all: a legitimate non-match is not a validation failure.
+    // A DIFFERENT, unrelated tool call -- the armed capability is well-formed and valid, it simply does not match.
+    // ALF-B5-HGO (QG-04): newer typed verdict. A native Write to a different file_path changes the eligible path set, which
+    // the consume-time native reclassification treats as drift, so the verdict is replan / HGO-DRIFT, no longer "absent".
+    // The exact key set still proves the security claim of this case: the record carries no skippedInvalidRecords at all (a
+    // legitimate non-match is not a validation failure), it consumes nothing and mutates nothing, and the exact input
+    // still consumes afterwards.
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const capabilityFile = join(common, "agent-pipeline", "human-guard-overrides", "capabilities", plan.planSha256 + ".json");
+    const armedBytes = readFileSync(capabilityFile, "utf8");
     const result = consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
       toolInput: { file_path: "unrelated.md", content: "unrelated\n" }, denials: denial, nowMs: 4000,
     });
-    assert.deepEqual(result, { status: "absent" });
+    assert.deepEqual(result, { status: "replan", code: "HGO-DRIFT" });
+    assert.equal(readFileSync(capabilityFile, "utf8"), armedBytes, "a non-matching call must not mutate the armed capability");
+    assert.equal(consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4500,
+    }).status, "consumed", "the exact bound input must still consume after a refused non-match");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -4721,10 +4779,11 @@ test("HGO multi-file apply binds one complete external-repository path set and f
     });
     assert.equal(reorderedConsume.status, "replan", "the exact tool-input digest must reject reordered patch text");
     assert.equal(reorderedConsume.code, "HGO-DRIFT");
-    assert.equal(consumeHumanGuardOverride({
+    const boundConsume = consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
       toolInput: boundInput, denials: denial, nowMs: 4000,
-    }).status, "consumed");
+    });
+    assert.equal(boundConsume.status, "consumed", JSON.stringify(boundConsume) + " :: " + auditTail(target, 4));
     assert.equal(consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
       toolInput: boundInput, denials: denial, nowMs: 4500,
@@ -5092,11 +5151,16 @@ test("NVA-HGOHEAD-1: a fresh repository with no commits (unborn HEAD) does not c
 
 test("Part A (a): a benign statusSha256/head/tree-only repository change between plan and arm does not block (proves the narrowing)", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
+  const outside = mkdtempSync(join(tmpdir(), "hgo-narrowing-a-outside-"));
   try {
-    const toolInput = { file_path: "notes.md", content: "narrowing a\n" };
+    // ALF-B5-HGO (QG-04): a native Write (Edit/Write/apply_patch) is bound to the signed candidate and now fails
+    // HGO-CANDIDATE-DRIFT when HEAD or the tree moves before arming -- the stricter native rule, pinned by the
+    // dedicated native case below. The NARROWING claim of this case concerns every other command class, so it is
+    // re-expressed on a non-native Bash command (an out-of-root copy); the assertions are unchanged.
+    const toolInput = { command: "cp README.md " + join(outside, "narrowing-a.txt") };
     const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
     const request = recordHumanGuardDenial({
-      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
     });
     const plan = planHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
@@ -5129,6 +5193,7 @@ test("Part A (a): a benign statusSha256/head/tree-only repository change between
     assert.equal(armed.status, "armed");
   } finally {
     rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
 
@@ -5306,11 +5371,16 @@ test("Part A (c): a hand-tampered byte in a pluginIdentity()-hashed file between
 
 test("Part A (d): a benign repository-only change between plan and arm does not trip HGO-PLUGIN-DRIFT (3c stayed narrow)", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
+  const outside = mkdtempSync(join(tmpdir(), "hgo-narrowing-d-outside-"));
   try {
-    const toolInput = { file_path: "notes.md", content: "narrowing d\n" };
+    // ALF-B5-HGO (QG-04): a native Write (Edit/Write/apply_patch) is bound to the signed candidate and now fails
+    // HGO-CANDIDATE-DRIFT when HEAD or the tree moves before arming -- the stricter native rule, pinned by the
+    // dedicated native case below. The NARROWING claim of this case concerns every other command class, so it is
+    // re-expressed on a non-native Bash command (an out-of-root copy); the assertions are unchanged.
+    const toolInput = { command: "cp README.md " + join(outside, "narrowing-d.txt") };
     const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
     const request = recordHumanGuardDenial({
-      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
     });
     const plan = planHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
@@ -5332,6 +5402,7 @@ test("Part A (d): a benign repository-only change between plan and arm does not 
     assert.equal(armed.status, "armed");
   } finally {
     rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
 
@@ -5359,11 +5430,16 @@ test("Part A (e): a commit landing on HEAD between signing and arming trips HGO-
 
 test("Part A (e): the chat path has no signedCandidate concept and cannot trip HGO-CANDIDATE-DRIFT even when HEAD moves before arming", { skip: PTY_HOST_LIMIT }, () => {
   const root = fixture();
+  const outside = mkdtempSync(join(tmpdir(), "hgo-narrowing-e-outside-"));
   try {
-    const toolInput = { file_path: "notes.md", content: "chat candidate drift\n" };
+    // ALF-B5-HGO (QG-04): a native Write (Edit/Write/apply_patch) is bound to the signed candidate and now fails
+    // HGO-CANDIDATE-DRIFT when HEAD or the tree moves before arming -- the stricter native rule, pinned by the
+    // dedicated native case below. The NARROWING claim of this case concerns every other command class, so it is
+    // re-expressed on a non-native Bash command (an out-of-root copy); the assertions are unchanged.
+    const toolInput = { command: "cp README.md " + join(outside, "narrowing-e.txt") };
     const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
     const request = recordHumanGuardDenial({
-      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
     });
     const plan = planHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
@@ -5389,6 +5465,47 @@ test("Part A (e): the chat path has no signedCandidate concept and cannot trip H
       "utf8",
     ));
     assert.equal(stored.signedCandidate, null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("Part A (e): a NATIVE Write on the chat route DOES fail HGO-CANDIDATE-DRIFT when HEAD moves before arming (the stricter native rule), and arms nothing", { skip: PTY_HOST_LIMIT }, () => {
+  const root = fixture();
+  try {
+    // ALF-B5-HGO (QG-04): new case. The narrowing cases above are re-expressed on a non-native command class; this one
+    // keeps the native Write coverage and asserts the stricter rule directly.
+    const toolInput = { file_path: "notes.md", content: "native chat candidate drift\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+    });
+    const reason = "Native Write candidate drift proof";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2500, scriptPath,
+    });
+    writeFileSync(join(root, "post-prepare-native.md"), "landed before arm\n");
+    git(root, "add", "post-prepare-native.md");
+    git(root, "commit", "-q", "-m", "commit before native chat-path arm");
+    assert.throws(
+      () => armUnderPty({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+        selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+        nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-CANDIDATE-DRIFT",
+    );
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    assert.equal(
+      existsSync(join(common, "agent-pipeline", "human-guard-overrides", "capabilities", plan.planSha256 + ".json")),
+      false,
+      "a refused native arm must write no capability",
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -5697,8 +5814,8 @@ test("Finding 3: two different non-null authorSourceRoot values for the same req
     const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
     const plansDir = join(common, "agent-pipeline", "human-guard-overrides", "plans");
     // The plans store never deep-validates plugin/repository/policy/preview content
-    // (validatedPlan() only checks the outer key set, schema, status and digest
-    // self-consistency) -- so a directly-fabricated, self-consistent record is a
+    // (validatedPlan() checks the outer key set, schema, status, digest self-consistency
+    // and, since persistedDenialsValid(), a well-formed denial/rationale list) -- so a directly-fabricated, self-consistent record is a
     // faithful, minimal probe of the storage keying itself, independent of the
     // author-repair eligibility gate (which forces exactly one resolved source root
     // per repository, and so cannot itself exercise two distinct persisted values).
@@ -5713,9 +5830,12 @@ test("Finding 3: two different non-null authorSourceRoot values for the same req
         toolName: "Write",
         toolInputSha256: humanGuardOverrideInternals.sha(`toolInput-${tag}`),
         commandClass: "exact-project-action",
-        denials: [],
+        // ALF-B5-HGO (QG-04): the persisted plan now requires a non-empty, well-formed denial list with one matching
+        // guardRationale row per denial. The record carries one, so the keying claim below is tested on a plan the
+        // store accepts; the independence assertions are unchanged.
+        denials: [{ guard: "guard-lifecycle-ready.mjs", sha256: humanGuardOverrideInternals.sha("denial-" + tag) }],
         policy: { tag },
-        preview: { tag },
+        preview: { tag, guardRationale: [{ guard: "guard-lifecycle-ready.mjs", denialSha256: humanGuardOverrideInternals.sha("denial-" + tag), rationale: "GUARD-DEVPLAN-SHELL" }] },
         eligiblePaths: [`plugins/pipeline-core/${tag}.mjs`],
         externalReadOnly: false,
         mode: "pipeline-author-repair",
