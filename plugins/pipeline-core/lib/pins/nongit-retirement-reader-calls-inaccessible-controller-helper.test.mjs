@@ -13,7 +13,8 @@
 // reader's own call (exact text, non-Git branch only) is pinned by the structural case at the end of this file.
 import assert from "node:assert/strict";
 import { tmpdir } from "node:os";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -148,4 +149,40 @@ test("structural: the reader's non-Git branch calls no module-scope inspect and 
   const OBSERVE_CALL = "defaultController.observe({rootDir:ctx.root})";
   assert.equal(branch.split(OBSERVE_CALL).length - 1, 1, `the non-Git branch must contain ${OBSERVE_CALL} exactly once`);
   assert.equal((branch.match(/\bobserve\(/g) ?? []).length, 1, "the non-Git branch must make no other observe( call (every observation uses the physical root)");
+});
+
+// AC-218 acceptance clause "preserve all 23 governance-scope callbacks and their exact completion policy". Behavioural, not
+// textual: run the real governance-scope.test.mjs with Verify's completion descriptor (fd 3) pointed at a file and read the
+// completion records back. 23 callbacks must be DECLARED individually (RC14C001..RC14C023, no envelope case) and the TERMINAL
+// record must dispose all 23 with no failure. The fixture root keeps the descriptor file out of the repository.
+test("governance-scope.test.mjs registers exactly its 23 callbacks individually under the completion policy and disposes all 23 without failure", { timeout: 300_000 }, () => {
+  const root = fixture();
+  try {
+    const logPath = join(root, "completion.jsonl");
+    const fd = openSync(logPath, "w");
+    let child;
+    try {
+      const env = { ...process.env, PIPELINE_VERIFY_CASE_COMPLETION_FD: "3" };
+      // Without these the child would report to this runner's node:test channel and inherit another suite's byte bound.
+      delete env.NODE_TEST_CONTEXT; delete env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES;
+      child = spawnSync(process.execPath, [join(HERE, "..", "governance-scope.test.mjs")], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe", fd], timeout: 280_000 });
+    } finally { closeSync(fd); }
+    assert.equal(child.status, 0, `governance-scope.test.mjs exited ${child.status} (${child.signal}): ${String(child.stderr).slice(-2000)}`);
+    const events = readFileSync(logPath, "utf8").split("\n").filter(Boolean).map((record) => JSON.parse(record));
+    const expectedIds = Array.from({ length: 23 }, (_, ordinal) => `RC14C${String(ordinal + 1).padStart(3, "0")}`);
+    const declared = events.filter((event) => event.event === "DECLARED");
+    const disposed = events.filter((event) => event.event === "DISPOSED");
+    const terminal = events.filter((event) => event.event === "TERMINAL");
+    assert.equal(declared.length, 1, "exactly one DECLARED record");
+    assert.deepEqual(declared[0].caseIds, expectedIds, "the 23 callbacks are declared individually, in order, with no envelope case");
+    assert.equal(declared[0].caseCount, 23);
+    assert.deepEqual(disposed.map((event) => event.id), expectedIds, "every callback is disposed exactly once, in declaration order");
+    assert.ok(disposed.every((event) => event.disposition !== "fail"), JSON.stringify(disposed.filter((event) => event.disposition === "fail")));
+    assert.equal(terminal.length, 1, "exactly one TERMINAL record");
+    assert.equal(terminal[0].declaredCount, 23);
+    assert.equal(terminal[0].disposedCount, 23);
+    assert.equal(terminal[0].counts.fail, 0);
+    assert.deepEqual(terminal[0].caseIds, expectedIds);
+    assert.equal(terminal[0].caseSetSha256, declared[0].caseSetSha256, "the terminal record binds the declared case set");
+  } finally { cleanup(); }
 });
