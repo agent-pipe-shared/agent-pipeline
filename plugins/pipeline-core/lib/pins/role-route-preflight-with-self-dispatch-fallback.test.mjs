@@ -12,9 +12,14 @@
  *  4. The producer failure output is surfaced: runCanonicalRoleFallback returns exitCode/stdout/stderr,
  *     and executeDesignCourseProducer returns a bounded, sanitized stderr TEXT (not only a byte count).
  *
- * HELD (not built here): 2b, the design course accepting a fallback result as the role's evidence.
- * A later run needs the consumer of runCanonicalRoleFallback output in design-course-session.mjs
- * (runDesignCourseV2) to route a "returned" fallback through the owning role's intake.
+ * 2b (built as a consumer function, NOT wired end to end): admitRoleFallbackEvidence in
+ * design-course-session.mjs accepts a "returned" runCanonicalRoleFallback result as the role's evidence
+ * with an honest assurance label and refuses implementor self-review. runDesignCourseV2 itself is
+ * behaviorally retired (ADR-0085, DESIGN-COURSE-RETIRED), so no live course path calls it; the
+ * end-to-end course clause stays HELD ("the course accepts that result as the role's evidence")
+ * until the Elephant decides how a retired course is re-targeted. This pin proves the admission
+ * function only, never that a course consumes it.
+ * P1-1 (role-dependent preflight, 0.7.0) is pinned in scripts/pipeline-start-preflight.test.mjs.
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -32,6 +37,8 @@ import {
   runCanonicalRoleFallback,
 } from "../role-dispatch-preflight.mjs";
 import { buildDesignCourseProducerAction, executeDesignCourseProducer } from "../../scripts/design-course-session.mjs";
+// Namespace import for the point-2b function: a missing export then fails its own cases (TypeError), not the whole file at link time.
+import * as designCourseSession from "../../scripts/design-course-session.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const pluginRoot = resolve(repoRoot, "plugins", "pipeline-core");
@@ -174,6 +181,93 @@ test("point 4a: runCanonicalRoleFallback surfaces exitCode, stdout and stderr of
     reasonCode: "RRP-X", launch: async () => { throw new Error("launcher exploded"); } });
   assert.equal(thrown.code, "RDF-LAUNCH-ERROR");
   assert.equal(thrown.output.stderr, "launcher exploded");
+});
+
+// --- Point 2b: admitRoleFallbackEvidence, a pure consumer of a runCanonicalRoleFallback result ------
+const AUTHOR = "pipeline-core:goldfish-implementor";
+const RFE_REASON = "RRP-NO-HOST-OBSERVATION";
+const returnedFallback = (role, index, stdout = `${role} findings`) => runCanonicalRoleFallback({ root: fixture,
+  packet: packetFor(role, index), runner: "claude", reasonCode: RFE_REASON, launch: async () => ({ exitCode: 0, stdout, stderr: "" }) });
+const admit = (fallbackResult, authorRole = AUTHOR) => designCourseSession.admitRoleFallbackEvidence({ fallbackResult, authorRole });
+const tampered = async (mutate) => { const value = structuredClone(await returnedFallback("critic", 70)); mutate(value); return value; };
+
+test("point 2b: a returned read-only critic or advisor fallback is admitted with its honest labels unchanged", async () => {
+  let index = 60;
+  for (const role of ["critic", "consult-advisor"]) {
+    const fallbackResult = await returnedFallback(role, ++index);
+    assert.equal(fallbackResult.code, "RDF-RETURNED", role);
+    const before = JSON.stringify(fallbackResult);
+    assert.deepEqual(admit(fallbackResult), {
+      schema: "pipeline.role-fallback-evidence-admission.v1", ok: true, route: "fallback-self-dispatch", reasonCode: RFE_REASON,
+      role: `pipeline-core:${role}`, assurance: "method-preparation-only", nativeProof: "unavailable",
+      evidenceStatus: "owning-role-intake-required", outputSha256: createHash("sha256").update(`${role} findings`).digest("hex"),
+      implementationAuthority: false,
+    }, role);
+    assert.equal(JSON.stringify(fallbackResult), before, `${role}: the admission is pure and does not touch its input`);
+  }
+});
+
+test("point 2b: a Goldfish producer is refused, even from a genuinely returned fallback", async () => {
+  const fallbackResult = await returnedFallback("goldfish-implementor", 62);
+  assert.equal(fallbackResult.code, "RDF-RETURNED");
+  assert.deepEqual(admit(fallbackResult, "pipeline-core:critic"), { schema: "pipeline.role-fallback-evidence-admission.v1", ok: false, code: "RFE-PRODUCER-GOLDFISH", implementationAuthority: false });
+  assert.equal(admit(await tampered((value) => { value.action.subagentType = "pipeline-core:plan-verifier"; })).code, "RFE-PRODUCER-NOT-ALLOWED");
+});
+
+test("point 2b: the implementor never reviews itself (producer equal to authorRole, prefixed or bare)", async () => {
+  for (const [role, index] of [["critic", 63], ["consult-advisor", 64]]) {
+    const fallbackResult = await returnedFallback(role, index);
+    for (const authorRole of [`pipeline-core:${role}`, role]) {
+      assert.equal(admit(fallbackResult, authorRole).code, "RFE-SELF-REVIEW", `${role} authored by ${authorRole}`);
+    }
+  }
+  const critic = await returnedFallback("critic", 65);
+  for (const authorRole of [undefined, "", 7, null]) {
+    // Called directly: the `admit` helper above would replace an undefined authorRole with its default.
+    const refusal = designCourseSession.admitRoleFallbackEvidence({ fallbackResult: critic, authorRole });
+    assert.equal(refusal.code, "RFE-AUTHOR-ROLE-INVALID", String(authorRole));
+  }
+});
+
+test("point 2b: a failed, unlaunched or malformed result is refused", async () => {
+  const failed = await runCanonicalRoleFallback({ root: fixture, packet: packetFor("critic", 66), runner: "claude", reasonCode: RFE_REASON,
+    launch: async () => ({ exitCode: 3, stdout: "partial", stderr: "boom" }) });
+  const thrown = await runCanonicalRoleFallback({ root: fixture, packet: packetFor("critic", 67), runner: "claude", reasonCode: RFE_REASON,
+    launch: async () => { throw new Error("launcher exploded"); } });
+  const unlaunched = await runCanonicalRoleFallback({ root: fixture, packet: packetFor("critic", 68), runner: "claude", reasonCode: RFE_REASON });
+  const prepared = prepareCanonicalRoleFallback({ root: fixture, packet: packetFor("critic", 69), runner: "claude", reasonCode: RFE_REASON });
+  for (const [label, value] of [["failed", failed], ["launch error", thrown], ["no launcher", unlaunched], ["prepared only", prepared]]) {
+    assert.equal(admit(value).code, "RFE-RESULT-NOT-RETURNED", label);
+  }
+  for (const value of [undefined, null, "returned", [], {}, { status: "returned", code: "RDF-RETURNED" }]) {
+    assert.equal(admit(value).code, "RFE-RESULT-MALFORMED", JSON.stringify(value));
+  }
+  assert.equal(admit(await tampered((value) => { value.output = { exitCode: 0, stdout: 7, stderr: "" }; })).code, "RFE-RESULT-MALFORMED");
+  assert.equal(admit(await tampered((value) => { delete value.output; })).code, "RFE-RESULT-MALFORMED");
+  assert.equal(admit(await tampered((value) => { value.action = null; })).code, "RFE-RESULT-MALFORMED");
+  for (const refusal of [admit(failed), admit(undefined)]) assert.equal(refusal.implementationAuthority, false);
+});
+
+test("point 2b: only the honest fallback labels are admitted (no native claim, no accepted evidence)", async () => {
+  const cases = [
+    ["route", (value) => { value.route = "native"; }, "RFE-LABEL-MISMATCH"],
+    ["assurance", (value) => { value.assurance = "native-proof"; }, "RFE-LABEL-MISMATCH"],
+    ["nativeProof", (value) => { value.nativeProof = "available"; }, "RFE-LABEL-MISMATCH"],
+    ["evidenceStatus", (value) => { value.evidenceStatus = "accepted"; }, "RFE-LABEL-MISMATCH"],
+    ["reasonCode empty", (value) => { value.reasonCode = ""; }, "RFE-REASON-MISSING"],
+    ["reasonCode absent", (value) => { delete value.reasonCode; }, "RFE-REASON-MISSING"],
+  ];
+  for (const [label, mutate, code] of cases) assert.equal(admit(await tampered(mutate)).code, code, label);
+});
+
+test("point 2b: the dispatched action must be a fresh-context, read-only native subagent", async () => {
+  const cases = [
+    ["readOnly false", (value) => { value.action.readOnly = false; }, "RFE-ACTION-NOT-READ-ONLY"],
+    ["readOnly absent", (value) => { delete value.action.readOnly; }, "RFE-ACTION-NOT-READ-ONLY"],
+    ["freshContext false", (value) => { value.action.freshContext = false; }, "RFE-ACTION-NOT-FRESH-CONTEXT"],
+    ["other kind", (value) => { value.action.kind = "shell-command"; }, "RFE-ACTION-INVALID"],
+  ];
+  for (const [label, mutate, code] of cases) assert.equal(admit(await tampered(mutate)).code, code, label);
 });
 
 // --- Point 4b: executeDesignCourseProducer surfaces a bounded, sanitized stderr text -----------

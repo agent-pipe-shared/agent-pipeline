@@ -665,6 +665,182 @@ test("a soft plugin refresh still exposes the not-ready project's onboarding act
   assert.equal(result.nextAction.argv[0], join(result.pluginRoot, "scripts", "onboarding-init.mjs"));
   assert.equal(result.nextAction.expected.schema, "pipeline.onboarding-init.v1");
 });
+// AC-245 / P1-1 (role-dependent preflight). A Goldfish or Critic reads the same preflight but is never
+// handed an Elephant/Coordinator action (onboarding, hook provisioning/refresh, attestation setup). The
+// observed `status` stays the diagnosis; only the executable parts are withheld, and `roleScope` names
+// what was withheld. The Elephant envelope is unchanged (no `roleScope` key).
+function executableActionPaths(value, path = "$", found = []) {
+  if (Array.isArray(value)) { value.forEach((entry, index) => executableActionPaths(entry, `${path}[${index}]`, found)); return found; }
+  if (value === null || typeof value !== "object") return found;
+  for (const [key, entry] of Object.entries(value)) {
+    const here = `${path}.${key}`;
+    if (key === "executable" && typeof entry === "string") found.push(here);
+    else if (["setupAction", "installCommand", "terminalTemplate", "repairAction"].includes(key) && entry !== null && entry !== undefined) found.push(here);
+    else executableActionPaths(entry, here, found);
+  }
+  return found;
+}
+const notOnboarded = () => {
+  throw new ProjectOnboardingReadyError("PORG-NOT-READY", "raw lifecycle message", { intent: "bootstrap", lifecycleStatus: "kickoff-required" });
+};
+
+test("AC-245 P1-1: a Goldfish or Critic never receives the onboarding action; the Elephant still does", () => {
+  for (const [label, requireProjectOnboardingReadyFn] of [["not-onboarded", notOnboarded], ["ready", undefined]]) {
+    const run = (role) => preflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd: ROOT_CURRENT,
+      ...(requireProjectOnboardingReadyFn ? { requireProjectOnboardingReadyFn } : {}), ...(role ? { role } : {}) });
+    const elephant = run(undefined);
+    assert.equal(elephant.status, "ready", label);
+    assert.equal(elephant.nextAction.kind, "command", `${label}: the Elephant keeps its action`);
+    assert.equal("roleScope" in elephant, false, `${label}: the Elephant envelope has no roleScope`);
+    assert.deepEqual(run("elephant").nextAction, elephant.nextAction, label);
+    for (const role of ["goldfish", "critic"]) {
+      const scoped = run(role);
+      assert.equal(scoped.status, "ready", `${label}/${role}: status is still the observed diagnosis`);
+      assert.equal(scoped.nextAction, null, `${label}/${role}`);
+      assert.deepEqual(executableActionPaths(scoped), [], `${label}/${role}: no executable action anywhere in the envelope`);
+      assert.equal(scoped.roleScope.schema, "pipeline.preflight-role-scope.v1");
+      assert.equal(scoped.roleScope.role, role);
+      assert.ok(scoped.roleScope.coordinatorActionsWithheld.includes("nextAction"), `${label}/${role}`);
+    }
+  }
+});
+
+test("AC-245 P1-1: hook provisioning is not an action for a Goldfish or Critic, its repair text is not carried", () => {
+  const checks = (state) => [
+    { id: "pre-commit-hook", status: state, repairAction: "node plugins/pipeline-core/scripts/pre-commit-hook-install.mjs --install" },
+    { id: "commit-msg-hook", status: state, repairAction: "node plugins/pipeline-core/scripts/commit-msg-hook-install.mjs --install" },
+    { id: "pre-push-hook", status: "decline", repairAction: null },
+  ];
+  const run = (role) => preflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd: ROOT_CURRENT,
+    checkCloneProvisioningFn: () => ({ schema: "pipeline.clone-provisioning-report.v1", status: "provisioning-required", checks: checks("install") }),
+    ...(role ? { role } : {}) });
+  const elephant = run(undefined);
+  assert.equal(elephant.status, "hook-provisioning-required");
+  assert.equal(elephant.nextAction.requiresConfirmation, true, "the Elephant keeps the provisioning action");
+  assert.ok(elephant.cloneProvisioning.checks.some((entry) => typeof entry.repairAction === "string"));
+  for (const role of ["goldfish", "critic"]) {
+    const scoped = run(role);
+    assert.equal(scoped.status, "hook-provisioning-required", `${role}: the diagnosis stays visible`);
+    assert.equal(scoped.nextAction, null, role);
+    assert.deepEqual(executableActionPaths(scoped), [], `${role}: no repair text or executable action`);
+    assert.ok(scoped.roleScope.coordinatorActionsWithheld.includes("nextAction"), role);
+  }
+});
+
+test("AC-245 P1-1: the attestation setup action is not carried to a Goldfish or Critic", (t) => {
+  const base = mkdtempSync(join(tmpdir(), "preflight-role-attest-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const installedRoot = join(base, "cache", "pipeline-core", "0.4.5-test");
+  const marketplaceRoot = join(base, "marketplace");
+  const registrySourcePluginRoot = join(marketplaceRoot, "plugins", "pipeline-core");
+  mkdirSync(join(installedRoot, "scripts"), { recursive: true });
+  mkdirSync(registrySourcePluginRoot, { recursive: true });
+  const scriptUrl = pathToFileURL(join(installedRoot, "scripts", "pipeline-start-preflight.mjs")).href;
+  const localPluginList = () => JSON.stringify({ installed: [{
+    pluginId: "pipeline-core@agent-pipeline-local", name: "pipeline-core", marketplaceName: "agent-pipeline-local",
+    version: "0.4.5+test", installed: true, enabled: true,
+    source: { source: "local", path: registrySourcePluginRoot },
+    marketplaceSource: { sourceType: "local", source: marketplaceRoot },
+  }], available: [] });
+  const run = (role) => preflight({ env: {}, pluginList: localPluginList, read: () => manifest, scriptUrl,
+    verifyLocalInstalledPluginReceiptFn: () => ({ schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-LOCATOR-UNAVAILABLE"] }),
+    resolveCodexAttestationSourceFn: () => ({ status: "registry-source", sourcePluginRoot: null, reasonCodes: [] }),
+    ...(role ? { role } : {}) });
+  const elephant = run(undefined);
+  assert.equal(elephant.status, "plugin-attestation-required");
+  assert.equal(elephant.nextAction.kind, "host-postinstall", "the Elephant keeps the attestation setup action");
+  for (const role of ["goldfish", "critic"]) {
+    const scoped = run(role);
+    assert.equal(scoped.status, "plugin-attestation-required", `${role}: the diagnosis stays visible`);
+    assert.equal(scoped.installedPluginAttestation.reasonCodes[0], "IPA-HOST-LOCATOR-UNAVAILABLE", role);
+    assert.equal(scoped.nextAction, null, role);
+    assert.equal("setupAction" in scoped.installedPluginAttestation, false, role);
+    assert.deepEqual(executableActionPaths(scoped), [], role);
+    assert.ok(scoped.roleScope.coordinatorActionsWithheld.includes("installedPluginAttestation.setupAction"), role);
+  }
+});
+
+test("AC-245 P1-1: a Goldfish or Critic preflight names the declared host boundary for admitted test commands", () => {
+  const run = (role, env) => preflight({ env, pluginList: pluginList(), read: () => manifest, cwd: ROOT_CURRENT, role });
+  for (const role of ["goldfish", "critic"]) {
+    assert.deepEqual(run(role, {}).roleScope.testCommands, { executionBoundary: "default", route: "default" }, role);
+    const wsl = run(role, { WSL_DISTRO_NAME: "Ubuntu" });
+    assert.equal(wsl.executionBoundary, "host-authorized-wsl", `${role}: Codex under WSL declares the host boundary`);
+    assert.deepEqual(wsl.roleScope.testCommands, { executionBoundary: "host-authorized-wsl", route: "host-boundary-from-first-call" }, role);
+  }
+});
+
+test("AC-245 P1-1: the Elephant envelope is byte-identical; a scoped envelope differs only by roleScope and the withheld actions", () => {
+  const run = (role) => preflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd: ROOT_CURRENT, ...(role ? { role } : {}) });
+  const elephant = run(undefined);
+  for (const other of ["elephant", "coordinator"]) {
+    assert.equal(JSON.stringify(run(other)), JSON.stringify(elephant), `role ${other} is not scoped`);
+  }
+  for (const role of ["goldfish", "critic"]) {
+    const scoped = run(role);
+    assert.deepEqual(Object.keys(scoped).filter((key) => key !== "roleScope"), Object.keys(elephant), `${role}: same key set plus roleScope`);
+    for (const key of ["schema", "status", "statusScope", "version", "pluginRoot", "executionBoundary", "rulesetSource", "effectiveDecisions", "bootstrapPayload"]) {
+      assert.deepEqual(scoped[key], elephant[key], `${role}: ${key} is unchanged`);
+    }
+  }
+});
+
+test("AC-245 P1-1: a non-executable advisory nextAction stays for a Goldfish or Critic", () => {
+  const run = (role) => preflight({ env: {}, pluginList: pluginList("0.4.5+new"), read: () => manifest, cwd: ROOT_CURRENT, ...(role ? { role } : {}) });
+  const elephant = run(undefined);
+  assert.equal(elephant.status, "plugin-refresh-required");
+  assert.equal(elephant.nextAction.kind, "advisory");
+  for (const role of ["goldfish", "critic"]) {
+    const scoped = run(role);
+    assert.deepEqual(scoped.nextAction, elephant.nextAction, `${role}: the advisory is not an executable action`);
+    assert.equal(scoped.roleScope.coordinatorActionsWithheld.includes("nextAction"), false, role);
+  }
+});
+
+test("AC-245 P1-1: the pre-push installCommand is withheld from a Goldfish or Critic, its diagnosis stays", () => {
+  const observation = {
+    schema: "pipeline.pre-push-hook-observation.v1", state: "installed-but-stale", code: "HOOK-SNAPSHOT-STALE", installed: false,
+    detail: "the pipeline-owned hook is intact but bound to an older plugin distribution; run the installer update",
+    installCommand: { kind: "command", executable: "node", argv: ["scripts/pre-push-hook-install.mjs", "--install"], cwd: ROOT_CURRENT, mutation: true, requiresConfirmation: false },
+  };
+  const run = (role) => preflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd: ROOT_CURRENT,
+    observePrePushHookInstallationFn: () => observation, ...(role ? { role } : {}) });
+  const elephant = run(undefined);
+  assert.deepEqual(elephant.prePushHook.installCommand, observation.installCommand, "the Elephant keeps the installer command");
+  for (const role of ["goldfish", "critic"]) {
+    const scoped = run(role);
+    assert.equal(scoped.prePushHook.installCommand, null, role);
+    assert.equal(scoped.prePushHook.state, "installed-but-stale", `${role}: the state stays visible`);
+    assert.equal(scoped.prePushHook.code, "HOOK-SNAPSHOT-STALE", role);
+    assert.deepEqual(executableActionPaths(scoped), [], role);
+    assert.ok(scoped.roleScope.coordinatorActionsWithheld.includes("prePushHook.installCommand"), role);
+  }
+});
+
+test("AC-245 P1-1: the executable architecture proposal is withheld from a Goldfish or Critic; an advisory orientation stays", () => {
+  const orientationOf = (status, physicalStatus) => ({
+    schema: "pipeline.architecture-adoption-orientation.v1", status, root: ROOT_CURRENT,
+    adoption: { state: "deferred-valid-until-review", scope: ["src/"], decisionRef: "po-architecture-17", coverageClass: "excepted", confidence: "measured" },
+    physicalMap: { greenfieldScaffold: false, status: physicalStatus },
+    guidance: "Preserve the decision and materialize the map before implementation.",
+  });
+  const run = (orientation, role) => preflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd: ROOT_CURRENT,
+    observeArchitectureAdoptionOrientationFn: () => orientation, ...(role ? { role } : {}) });
+  const missingMap = orientationOf("decision-recorded", "missing");
+  assert.equal(run(missingMap, undefined).architectureOrientation.nextAction.kind, "command", "the Elephant keeps the proposal command");
+  for (const role of ["goldfish", "critic"]) {
+    const scoped = run(missingMap, role);
+    assert.equal(scoped.architectureOrientation.nextAction, null, role);
+    assert.equal(scoped.architectureOrientation.adoption.decisionRef, "po-architecture-17", `${role}: the decision readback stays`);
+    assert.equal(scoped.architectureOrientation.physicalMap.status, "missing", `${role}: the diagnosis stays`);
+    assert.deepEqual(executableActionPaths(scoped), [], role);
+    assert.ok(scoped.roleScope.coordinatorActionsWithheld.includes("architectureOrientation.nextAction"), role);
+    const advisory = run(orientationOf("design-pending", "present-unvalidated"), role);
+    assert.equal(advisory.architectureOrientation.nextAction.kind, "advisory", `${role}: an advisory orientation action is not executable`);
+    assert.equal(advisory.roleScope.coordinatorActionsWithheld.includes("architectureOrientation.nextAction"), false, role);
+  }
+});
+
 test("NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged", () => {
   const cwd = ROOT_CURRENT;
   const result = preflight({

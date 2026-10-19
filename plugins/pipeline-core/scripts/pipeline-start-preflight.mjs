@@ -1854,7 +1854,7 @@ export function observePipelineStartPreflight({
     // `status` or the exit code.
     ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHookUnseenRemotePush: unseenRemotePush } : {}),
   };
-  const envelope = {
+  const fullEnvelope = {
     ...result,
     cloneProvisioning,
     mandatoryHookReadiness,
@@ -1863,6 +1863,9 @@ export function observePipelineStartPreflight({
     // preflight readback; no cached or static skill-size surrogate is used.
     bootstrapPayload: normalBootstrapPayloadReceipt(result),
   };
+  // AC-245 / P1-1: a Goldfish or Critic gets the same diagnosis but never an executable Elephant/Coordinator
+  // action. Every other role passes through as the very same object, so its envelope stays byte-identical.
+  const envelope = role === "goldfish" || role === "critic" ? scopePreflightToRole(fullEnvelope, { role }) : fullEnvelope;
   // HOOKREFRESH (Ruling 69): the model-role readback is attached AFTER the payload measurement above,
   // so the measured budget is unchanged. Without the seam the plain envelope is returned, byte-identical
   // to before, which keeps every synchronous caller and the pinned key set unchanged.
@@ -1915,6 +1918,84 @@ function planMandatoryHookRefresh({ role, baseStatus, gatedStatus, cloneProvisio
       refreshes,
     },
   };
+}
+
+export const PREFLIGHT_ROLE_SCOPE_SCHEMA = "pipeline.preflight-role-scope.v1";
+
+const carriesExecutableAction = (action) => action !== null && typeof action === "object"
+  && (typeof action.executable === "string" || (Array.isArray(action.argv) && action.argv.length > 0));
+
+/** A copy of `entries` with every non-null `repairAction` set to null, and whether any was set. */
+function withoutRepairActions(entries) {
+  if (!Array.isArray(entries)) return { entries, removed: false };
+  let removed = false;
+  const next = entries.map((entry) => {
+    if (entry === null || typeof entry !== "object" || entry.repairAction === null || entry.repairAction === undefined) return entry;
+    removed = true;
+    return { ...entry, repairAction: null };
+  });
+  return { entries: next, removed };
+}
+
+/**
+ * AC-245 / P1-1 (role-dependent preflight). For a Goldfish or Critic the envelope keeps the whole diagnosis
+ * (`status`, reason codes, states, advisory text) but carries no executable Elephant/Coordinator action:
+ * an action with an `executable` or a non-empty `argv` becomes null (a non-executable advisory stays),
+ * `installedPluginAttestation.setupAction`/`terminalTemplate` are dropped, `prePushHook.installCommand` and the
+ * `repairAction` strings of the hook reports become null. `roleScope` names what was withheld and routes
+ * admitted test commands to the declared execution boundary from the first call. Pure: it builds new objects
+ * and never mutates the envelope it is given.
+ */
+export function scopePreflightToRole(envelope, { role }) {
+  const withheld = new Set();
+  const scoped = { ...envelope };
+  if (carriesExecutableAction(scoped.nextAction)) {
+    scoped.nextAction = null;
+    withheld.add("nextAction");
+  }
+  if (scoped.installedPluginAttestation !== null && typeof scoped.installedPluginAttestation === "object") {
+    const { setupAction, terminalTemplate, ...rest } = scoped.installedPluginAttestation;
+    if (setupAction !== undefined) withheld.add("installedPluginAttestation.setupAction");
+    if (terminalTemplate !== undefined) withheld.add("installedPluginAttestation.terminalTemplate");
+    if (setupAction !== undefined || terminalTemplate !== undefined) scoped.installedPluginAttestation = rest;
+  }
+  const prePush = scoped.prePushHook;
+  if (prePush !== null && typeof prePush === "object" && prePush.installCommand !== null && prePush.installCommand !== undefined) {
+    scoped.prePushHook = { ...prePush, installCommand: null };
+    withheld.add("prePushHook.installCommand");
+  }
+  const orientation = scoped.architectureOrientation;
+  if (orientation !== null && typeof orientation === "object" && carriesExecutableAction(orientation.nextAction)) {
+    scoped.architectureOrientation = { ...orientation, nextAction: null };
+    withheld.add("architectureOrientation.nextAction");
+  }
+  if (scoped.cloneProvisioning !== null && typeof scoped.cloneProvisioning === "object") {
+    const checks = withoutRepairActions(scoped.cloneProvisioning.checks);
+    if (checks.removed) {
+      scoped.cloneProvisioning = { ...scoped.cloneProvisioning, checks: checks.entries };
+      withheld.add("cloneProvisioning.repairAction");
+    }
+  }
+  if (scoped.mandatoryHookReadiness !== null && typeof scoped.mandatoryHookReadiness === "object") {
+    for (const key of ["required", "nonGating"]) {
+      const list = withoutRepairActions(scoped.mandatoryHookReadiness[key]);
+      if (list.removed) {
+        scoped.mandatoryHookReadiness = { ...scoped.mandatoryHookReadiness, [key]: list.entries };
+        withheld.add("mandatoryHookReadiness.repairAction");
+      }
+    }
+  }
+  const executionBoundary = scoped.executionBoundary;
+  scoped.roleScope = {
+    schema: PREFLIGHT_ROLE_SCOPE_SCHEMA,
+    role,
+    coordinatorActionsWithheld: [...withheld].sort(),
+    testCommands: {
+      executionBoundary,
+      route: executionBoundary === "default" ? "default" : "host-boundary-from-first-call",
+    },
+  };
+  return scoped;
 }
 
 const MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE = "MODEL-ROLE-BOOTSTRAP-UNAVAILABLE";

@@ -370,6 +370,57 @@ export function executeDesignCourseProducer(action, dependencies = {}) {
     implementationAuthority: false };
 }
 
+export const ROLE_FALLBACK_ADMISSION_SCHEMA = "pipeline.role-fallback-evidence-admission.v1";
+const ROLE_FALLBACK_PRODUCERS = Object.freeze(["pipeline-core:critic", "pipeline-core:consult-advisor"]);
+const ROLE_FALLBACK_REASON = /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/u;
+const bareRole = (value) => String(value).replace(/^pipeline-core:/u, "");
+
+/**
+ * AC-245 point 2b: PURE admission of a `runCanonicalRoleFallback` result as a role's evidence. It reads
+ * nothing, runs nothing and writes nothing; the result is either `{ ok: true, ... }` carrying the unchanged
+ * honest labels (`assurance: method-preparation-only`, `nativeProof: unavailable`, `evidenceStatus:
+ * owning-role-intake-required`) and the sha256 of the producer's stdout, or `{ ok: false, code }` with a typed
+ * `RFE-*` code. It never grants implementation authority, and the owning role's own intake still applies.
+ * Wiring it into a course is a separate step: the v2 course is retired (ADR-0085, DESIGN-COURSE-RETIRED), so
+ * the end-to-end "the course accepts it" clause stays held and no live path calls this function.
+ * Only a fresh-context, read-only `pipeline-core:critic` / `pipeline-core:consult-advisor` result is admitted;
+ * a Goldfish producer and a producer equal to `authorRole` (prefixed or bare) are refused as self-review.
+ */
+export function admitRoleFallbackEvidence({ fallbackResult, authorRole } = {}) {
+  const refuse = (code) => ({ schema: ROLE_FALLBACK_ADMISSION_SCHEMA, ok: false, code, implementationAuthority: false });
+  const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  try {
+    if (!isRecord(fallbackResult) || !isRecord(fallbackResult.action) || typeof fallbackResult.action.subagentType !== "string") {
+      return refuse("RFE-RESULT-MALFORMED");
+    }
+    if (typeof authorRole !== "string" || authorRole.length === 0) return refuse("RFE-AUTHOR-ROLE-INVALID");
+    const { action } = fallbackResult;
+    const producer = bareRole(action.subagentType);
+    if (/^goldfish(?:-|$)/u.test(producer)) return refuse("RFE-PRODUCER-GOLDFISH");
+    if (!ROLE_FALLBACK_PRODUCERS.includes(action.subagentType)) return refuse("RFE-PRODUCER-NOT-ALLOWED");
+    if (producer === bareRole(authorRole)) return refuse("RFE-SELF-REVIEW");
+    if (fallbackResult.status !== "returned" || fallbackResult.code !== "RDF-RETURNED") return refuse("RFE-RESULT-NOT-RETURNED");
+    if (fallbackResult.route !== "fallback-self-dispatch" || fallbackResult.assurance !== "method-preparation-only"
+      || fallbackResult.nativeProof !== "unavailable" || fallbackResult.evidenceStatus !== "owning-role-intake-required") {
+      return refuse("RFE-LABEL-MISMATCH");
+    }
+    if (typeof fallbackResult.reasonCode !== "string" || !ROLE_FALLBACK_REASON.test(fallbackResult.reasonCode)) return refuse("RFE-REASON-MISSING");
+    if (action.kind !== "runner-native-subagent") return refuse("RFE-ACTION-INVALID");
+    if (action.freshContext !== true) return refuse("RFE-ACTION-NOT-FRESH-CONTEXT");
+    if (action.readOnly !== true) return refuse("RFE-ACTION-NOT-READ-ONLY");
+    const { output } = fallbackResult;
+    if (!isRecord(output) || output.exitCode !== 0 || typeof output.stdout !== "string") return refuse("RFE-RESULT-MALFORMED");
+    return {
+      schema: ROLE_FALLBACK_ADMISSION_SCHEMA, ok: true, route: fallbackResult.route, reasonCode: fallbackResult.reasonCode,
+      role: action.subagentType, assurance: fallbackResult.assurance, nativeProof: fallbackResult.nativeProof,
+      evidenceStatus: fallbackResult.evidenceStatus, outputSha256: sha(Buffer.from(output.stdout, "utf8")),
+      implementationAuthority: false,
+    };
+  } catch {
+    return refuse("RFE-RESULT-MALFORMED");
+  }
+}
+
 function sourceReferencesFromProducerResult(producerResult, runner) {
   if (!producerResult || typeof producerResult !== "object" || producerResult.implementationAuthority !== false
     || !["answered", "unavailable-pending-final-approval"].includes(producerResult.status)) fail("DESIGN-COURSE-ADVISOR-RESULT-INVALID");
