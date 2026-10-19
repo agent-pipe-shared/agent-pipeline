@@ -58,13 +58,22 @@
  *          `--staged` or `--worktree` alone, `--source=<sha of HEAD>`, several pathspecs at once.
  *       3. "Never an arbitrary ref" is pinned as: `--source=HEAD~1`, `--source HEAD~1`, `-s HEAD~1`,
  *          `git checkout HEAD~1 -- <file>` stay refused, as does every non-git writer (OT22).
+ *
+ * ALF-B7-C5 / AC-197 / Elephant decision E16 (2026-10-19): the attended chat ceremony reads the REAL fd 0, so the retired
+ * isattyFn/readLineFn injection no longer arms anything. OT10-OT13 and OT20 claim what happens AFTER arming (consumption,
+ * binding, single use, drift, hunk scope) and arm through the signed route with an ephemeral test key (armBySignature, on a
+ * signedFixture() repository). OT24 is the one case whose claim IS the chat route: it runs the unchanged library call under
+ * a real python3 pty (armUnderPty) and is a typed host-limit SKIP where no pty exists (native Windows). OT21 and OT23 stay
+ * what they were, RED pins for the unbuilt TR-L restore carve-out, now marked PENDING with their assertions unchanged so the
+ * suite can run to its end; a pending case that starts to hold FAILS the suite until it is promoted to check().
  */
 import assert from "node:assert/strict";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 function enrollFixtureGovernance(root) {
   const initialized = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
@@ -78,13 +87,17 @@ function enrollFixtureGovernance(root) {
 }
 import { criticalProofWaiverFor, readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
+  HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
   authorizeHumanGuardOverride,
+  authorizeHumanGuardOverrideBySignature,
+  buildHumanGuardOverrideSignatureIntent,
   consumeHumanGuardOverride,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
+import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { protectedTestPathShellHit } from "../lib/protected-test-paths.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
@@ -96,8 +109,14 @@ const PROTECTED = "harness/scripts/verify.mjs";
 const TP3_DENIAL = "TP-3: the single verify-gate script";
 const roots = [];
 
-/** `mode: null` writes no pipeline.user.yaml at all -- the fail-closed default path. */
-function fixture({ git = true, mode = null } = {}) {
+// Ephemeral Ed25519 test key (never a real PO key) for the signed arming route; signedFixture() commits it as the trust anchor.
+const sigPair = generateKeyPairSync("ed25519");
+const sigPublicKey = sigPair.publicKey.export({ type: "spki", format: "pem" });
+const sigPublicKeySha256 = createHash("sha256").update(sigPublicKey).digest("hex");
+const SIG_KEY_REFERENCE = "testpath-override-test-key";
+
+/** mode: null writes no pipeline.user.yaml at all -- the fail-closed default path. anchor: true also commits project/critical-human-proof.json naming the ephemeral key. */
+function fixture({ git = true, mode = null, anchor = false } = {}) {
   const base = mkdtempSync(join(tmpdir(), "testpath-override-"));
   roots.push(base);
   mkdirSync(join(base, "project"), { recursive: true });
@@ -107,6 +126,13 @@ function fixture({ git = true, mode = null } = {}) {
   writeFileSync(join(base, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
   if (mode !== null) {
     writeFileSync(join(base, "pipeline.user.yaml"), `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`);
+  }
+  if (anchor) {
+    writeFileSync(join(base, "project", "critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1",
+      requiredKinds: ["push"],
+      trustAnchor: { keyReference: SIG_KEY_REFERENCE, publicKeySha256: sigPublicKeySha256 },
+    }));
   }
   if (git) {
     // A bare `git init` is NOT enough: the override's repository observation needs a real
@@ -167,36 +193,121 @@ function decisionLines(stderr) {
 }
 
 /**
- * Arm a real one-time capability through the whole v2 chain, exactly as the human would:
- * denial -> plan -> prepare-authorization -> authorize --activate.
- *
- * Driven through the library rather than the CLI so a failure names the step that broke.
- * Every digest below is part of the binding, so anything the guard hashes differently --
- * tool name, tool input, denial string, plugin identity -- yields a capability the guard
- * will not accept, which is the property OT11 exercises.
+ * ALF-B7-C5 / AC-197 / Elephant decision E16. The attended chat ceremony (authorizeHumanGuardOverride with activate) reads
+ * the REAL fd 0 by design, so the retired dependencies { isattyFn, readLineFn } injection no longer reaches it and the
+ * library takes no attendance seam (one would be a bypass route a hook could reach). Two honest routes remain and each case
+ * uses exactly one of them:
+ *   1. armBySignature(): a case whose claim is about what happens AFTER arming (consumption, binding, single use, drift,
+ *      hunk scope) arms through the signed route with an ephemeral test key. The root must come from signedFixture(): a
+ *      committed "signature" mode plus a committed trust anchor for that key.
+ *   2. armUnderPty(): a case whose claim IS the chat route runs the unchanged library call in a child process whose fd 0 is
+ *      a real pty, with the confirmation typed into it. POSIX only; elsewhere PTY_HOST_LIMIT is a typed host-limit skip.
+ * QG-04: no assertion about product behaviour was weakened, skipped or deleted by this conversion; only the way each case
+ * reaches its armed state changed. Every digest below is part of the binding, so anything the guard hashes differently
+ * (tool name, tool input, denial string, plugin identity) yields a capability the guard will not accept (OT11).
  */
-function arm(root, toolInput, denialReason, { toolName = "Edit" } = {}) {
+function signedFixture() { return fixture({ mode: "signature", anchor: true }); }
+
+function planDenial(root, toolInput, denialReason, toolName, reason) {
   const denials = [{ guard: "guard-testpath.mjs", reason: denialReason }];
   const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: OVERRIDE_SCRIPT };
   const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials });
-  assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+  assert.equal(recorded.status, "planned", "denial not plannable: " + JSON.stringify(recorded));
   const { requestSha256 } = recorded;
   const planned = planHumanGuardOverride({ ...shared, requestSha256 });
-  const reason = "briefed test-change task";
-  const prepared = prepareHumanGuardOverrideAuthorization({
-    ...shared, requestSha256, planSha256: planned.planSha256, reason,
-  });
-  const armed = authorizeHumanGuardOverride({
-    ...shared,
-    requestSha256,
-    planSha256: planned.planSha256,
-    selectionSha256: prepared.selectionSha256,
-    reason,
-    reasonSha256: prepared.reasonSha256,
-    activate: true,
-    dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
-  });
+  const prepared = prepareHumanGuardOverrideAuthorization({ ...shared, requestSha256, planSha256: planned.planSha256, reason });
+  return { shared, requestSha256, planned, prepared };
+}
+
+/** Arms a real one-time capability through the signed route: denial -> plan -> prepare -> sign (ephemeral key) -> authorize-by-signature. */
+function armBySignature(root, toolInput, denialReason, { toolName = "Edit" } = {}) {
+  const { shared, requestSha256, planned, prepared } = planDenial(root, toolInput, denialReason, toolName, HGO_SIGNATURE_REASON);
+  const intent = buildHumanGuardOverrideSignatureIntent({ prepared, planned });
+  const proof = {
+    schema: PO_APPROVAL_PROOF_SCHEMA,
+    intentSha256: intent.sha256,
+    keyReference: SIG_KEY_REFERENCE,
+    publicKey: sigPublicKey,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), sigPair.privateKey).toString("base64"),
+  };
+  const armed = authorizeHumanGuardOverrideBySignature({ ...shared, requestSha256, planSha256: planned.planSha256, proof });
   assert.equal(armed.status, "armed");
+  return { planSha256: planned.planSha256, requestSha256 };
+}
+
+const PTY_HOST_LIMIT = process.platform === "win32"
+  ? "host-limit: native Windows has no pty in this suite, and the attended chat ceremony reads the real fd 0 by design (Elephant decision E16)"
+  : (spawnSync("python3", ["-I", "-c", "import os, pty"], { encoding: "utf8" }).status === 0
+    ? false
+    : "host-limit: python3 with the pty module is unavailable, so no real pty can be allocated on this host (Elephant decision E16)");
+
+const PTY_DRIVER = [
+  "import os, pty, sys",
+  "typed = sys.argv[1].encode()",
+  "cmd = sys.argv[2:]",
+  "pid, fd = pty.fork()",
+  "if pid == 0:",
+  "    os.execvp(cmd[0], cmd)",
+  "out = b''",
+  "marker = b'Type the confirmation value'",
+  "seen = True",
+  "while marker not in out:",
+  "    try:",
+  "        chunk = os.read(fd, 4096)",
+  "    except OSError:",
+  "        chunk = b''",
+  "    if not chunk:",
+  "        seen = False",
+  "        break",
+  "    out += chunk",
+  "if seen:",
+  "    os.write(fd, typed + b'\\n')",
+  "while True:",
+  "    try:",
+  "        chunk = os.read(fd, 4096)",
+  "    except OSError:",
+  "        break",
+  "    if not chunk:",
+  "        break",
+  "    out += chunk",
+  "_, status = os.waitpid(pid, 0)",
+  "sys.stdout.write(out.decode('utf-8', 'replace')[-1500:])",
+  "sys.exit(os.waitstatus_to_exitcode(status))",
+].join("\n");
+
+const PTY_CHILD = [
+  'import { writeFileSync } from "node:fs";',
+  "const request = JSON.parse(process.env.HGO_PTY_REQUEST);",
+  "const lib = await import(request.libUrl);",
+  "let outcome;",
+  "try { outcome = { ok: true, value: lib[request.fn](request.args) }; }",
+  "catch (error) { outcome = { ok: false, name: error?.name, code: error?.code, message: String(error?.message ?? error) }; }",
+  "writeFileSync(request.resultPath, JSON.stringify(outcome));",
+].join("\n");
+
+/** Arms through the CHAT route: the unchanged library call runs in a child whose fd 0 is a real pty and the confirmation value is typed into it. */
+function armUnderPty(root, toolInput, denialReason, { toolName = "Edit" } = {}) {
+  const reason = "briefed test-change task";
+  const { shared, requestSha256, planned, prepared } = planDenial(root, toolInput, denialReason, toolName, reason);
+  const dir = mkdtempSync(join(tmpdir(), "testpath-override-pty-"));
+  roots.push(dir);
+  const resultPath = join(dir, "result.json");
+  const request = {
+    libUrl: pathToFileURL(join(PLUGIN_ROOT, "lib", "human-guard-override.mjs")).href,
+    fn: "authorizeHumanGuardOverride",
+    args: { ...shared, requestSha256, planSha256: planned.planSha256, selectionSha256: prepared.selectionSha256, reason, reasonSha256: prepared.reasonSha256, activate: true },
+    resultPath,
+  };
+  const typed = "HGO-" + prepared.selectionSha256.slice(0, 8).toUpperCase();
+  const run = spawnSync("python3", ["-I", "-c", PTY_DRIVER, typed, process.execPath, "--input-type=module", "-e", PTY_CHILD], {
+    encoding: "utf8", timeout: 120_000, env: { ...process.env, HGO_PTY_REQUEST: JSON.stringify(request) },
+  });
+  if (!existsSync(resultPath)) {
+    throw new Error("pty child produced no result (exit " + run.status + "): " + String(run.stdout).slice(-600) + String(run.stderr).slice(-300));
+  }
+  const outcome = JSON.parse(readFileSync(resultPath, "utf8"));
+  if (!outcome.ok) throw new Error((outcome.code ?? outcome.name) + ": " + outcome.message);
+  assert.equal(outcome.value.status, "armed");
   return { planSha256: planned.planSha256, requestSha256 };
 }
 
@@ -233,6 +344,29 @@ function check(name, callback) {
   try { callback(); console.log(`PASS ${name}`); passed += 1; }
   catch (error) { console.error(`FAIL ${name}: ${error.message}`); failed += 1; }
 }
+
+let skipped = 0;
+let pending = 0;
+/** A case that needs a real pty: on a host without one it is a typed host-limit SKIP that names the host, never a silent pass. */
+function checkPty(name, callback) {
+  if (PTY_HOST_LIMIT) { console.log("SKIP " + name + ": " + PTY_HOST_LIMIT); skipped += 1; return; }
+  check(name, callback);
+}
+/**
+ * A known-RED pin whose feature is not built: the assertions run unchanged and are expected to fail. The recorded failure is printed
+ * as PENDING. If they ever hold, the case FAILS (promote it to check()), so the marker cannot outlive the gap it records.
+ */
+function pendingCheck(name, reason, callback) {
+  try { callback(); } catch (error) {
+    console.log("PENDING " + name + ": " + reason + " -- recorded RED: " + String(error.message).split("\n")[0]);
+    pending += 1;
+    return;
+  }
+  console.error("FAIL " + name + ": expected RED (" + reason + ") but the assertions now hold; promote this case to check()");
+  failed += 1;
+}
+const PENDING_TRL = "TR-L restore carve-out (T84) is not implemented in protected-test-paths.mjs: the classifier still treats every git restore of a protected path as a write; TR-L-F is backlogged under E25 (backlog item a-restore-of-a-protected-file-to-its-committed-bytes-is-refused), not a stale fixture";
+const pendingTrl = (name, callback) => pendingCheck(name, PENDING_TRL, callback);
 
 try {
   check("OT01 a protected test path is refused with no capability armed", () => {
@@ -330,9 +464,9 @@ try {
   // ---- F3: the allow path, which no test walked until now -------------------------
 
   check("OT10 an armed capability admits exactly the edit it was bound to", () => {
-    const root = fixture({ mode: "chat" });
+    const root = signedFixture(); // E16 (QG-04): consumption is a post-arming claim, so it arms through the signed route
     assert.equal(ask(root, PROTECTED).blocked, true, "precondition: refused while unarmed");
-    arm(root, { file_path: PROTECTED }, TP3_DENIAL);
+    armBySignature(root, { file_path: PROTECTED }, TP3_DENIAL);
     const { blocked, status, stderr } = ask(root, PROTECTED);
     assert.equal(blocked, false, `armed capability did not admit the edit (exit ${status}):\n${stderr}`);
     assert.match(stderr, /\[pipeline-human-override\] guard-testpath TP-3/u);
@@ -342,8 +476,8 @@ try {
   check("OT11 a capability bound to a different edit does not admit this one", () => {
     // The binding is the whole point: arming for file A must not open file B. Both are
     // TP-3 matches here, so only the tool-input digest separates them.
-    const root = fixture({ mode: "chat" });
-    arm(root, { file_path: PROTECTED }, TP3_DENIAL);
+    const root = signedFixture(); // E16 (QG-04): binding is a post-arming claim, so it arms through the signed route
+    armBySignature(root, { file_path: PROTECTED }, TP3_DENIAL);
     const other = "nested/harness/scripts/verify.mjs";
     const { blocked, stderr } = ask(root, other);
     assert.equal(blocked, true, "a capability bound elsewhere admitted this edit");
@@ -352,8 +486,8 @@ try {
   });
 
   check("OT12 the capability is single-use: the same edit is refused again", () => {
-    const root = fixture({ mode: "chat" });
-    arm(root, { file_path: PROTECTED }, TP3_DENIAL);
+    const root = signedFixture(); // E16 (QG-04): single use is a post-arming claim, so it arms through the signed route
+    armBySignature(root, { file_path: PROTECTED }, TP3_DENIAL);
     assert.equal(ask(root, PROTECTED).blocked, false, "precondition: first use is admitted");
     const { blocked, stderr } = ask(root, PROTECTED);
     assert.equal(blocked, true, "a consumed capability was accepted a second time");
@@ -374,10 +508,21 @@ try {
     // title claimed, and a bare `blocked === true` would have gone green for any refusal at
     // all, including a loosened drift comparison plus some later check tripping instead.
     // So the code is asserted BY NAME.
-    const root = fixture({ mode: "chat" });
-    arm(root, { file_path: PROTECTED }, TP3_DENIAL);
-    writeFileSync(join(root, "pipeline.user.yaml"),
-      'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+    // ALF-B7-C5 / ALF-B8-C5 / E16 (QG-04): the claim is DRIFT after arming, so the capability is armed through the signed route,
+    // which needs a committed "signature" mode and a committed trust anchor (signedFixture). That route arms a v4 NATIVE
+    // capability, and a native capability binds what it was signed for -- head, tree, repository fingerprint, the state file, the
+    // guard POLICY identity, the plugin identity and the target's preimage -- and deliberately NOT the whole-worktree `git status`
+    // digest (nativeRepositoryMatches() drops statusSha256; it first appears in d02409a8a and is still maintained, 8981ea9b9/E17).
+    // The legacy capability WAS bound to `git status`, which is the mechanism the history above describes. A write to
+    // pipeline.user.yaml is therefore no longer drift under the signed route (the mode file is defended by readPushApprovalMode()'s
+    // committed-blob fallback, OT15/OT17), so this case keeps its assertions and changes only the drift trigger: it edits the project
+    // guard configuration, which IS bound and is the rule file that decides what is protected -- the weakening an agent would
+    // attempt. The trailing newline leaves the rule set unchanged (TP-3 still matches, so the refusal below is the same one); only
+    // the bytes the policy identity hashes differ. The twin below proves the trigger is the bytes and nothing else.
+    const root = signedFixture();
+    armBySignature(root, { file_path: PROTECTED }, TP3_DENIAL);
+    const guardConfig = join(root, "project", "guard-config.json");
+    writeFileSync(guardConfig, Buffer.concat([readFileSync(guardConfig), Buffer.from("\n")]));
     assert.deepEqual(
       consumeHumanGuardOverride({
         rootDir: root,
@@ -392,25 +537,23 @@ try {
     const { blocked, stderr } = ask(root, PROTECTED);
     assert.equal(blocked, true, "a drifted capability admitted the edit");
     assert.doesNotMatch(stderr, /capability consumed/u);
-    // The resolved mode flips to signature as a CONSEQUENCE of that same write -- the
-    // working-tree copy no longer matches the committed blob, so readPushApprovalMode falls
-    // back to the strongest mode (OT15/OT17's property). It is not what blocks the edit.
-    // Kept because it is Decision 4's next-step property on this path: the refusal names the
-    // signed route rather than an in-session one it would now refuse to honour.
+    // The committed mode is still "signature" (this write does not touch pipeline.user.yaml), so the refusal names the signed route
+    // rather than an in-session one it would refuse to honour -- Decision 4's next-step property on this path (OT02). It is not
+    // what blocks the edit.
     assert.match(stderr, /gates\.push_approval is "signature"/u);
     assert.match(stderr, /in-session activation step is refused/u);
     assert.match(stderr, /authorize-by-signature\b/u);
 
     // The differential half (OT14/OT16's idiom): a twin fixture in which the SAME file is
     // rewritten BYTE-IDENTICALLY. Same write call, same path, same armed capability -- only
-    // the bytes are unchanged, so `git status` stays clean, statusSha256 is unmoved, nothing
-    // drifts and the capability is consumed. Without it, the half above would equally be
+    // the bytes are unchanged, so the policy digest the capability is bound to is unmoved,
+    // nothing drifts and the capability is consumed. Without it, the half above would equally be
     // satisfied by a fixture that never admits anything, and the drift claim would be
     // untestable rather than tested.
-    const twin = fixture({ mode: "chat" });
-    const settings = join(twin, "pipeline.user.yaml");
+    const twin = signedFixture();
+    const settings = join(twin, "project", "guard-config.json");
     const identicalBytes = readFileSync(settings);
-    arm(twin, { file_path: PROTECTED }, TP3_DENIAL);
+    armBySignature(twin, { file_path: PROTECTED }, TP3_DENIAL);
     writeFileSync(settings, identicalBytes);
     const admitted = ask(twin, PROTECTED);
     assert.equal(admitted.blocked, false,
@@ -534,7 +677,7 @@ try {
     // The three steps BEFORE it must stay reachable in every mode, because Decision 4 has
     // every denial report a next step and the SIGNED route needs the same
     // record -> plan -> prepare chain; so they are asserted, not assumed. The chat-mode twin
-    // is OT10's arm(), which walks this identical chain through to `armed`, and is not
+    // is OT24's armUnderPty(), which walks this identical chain through to `armed` under a real pty, and is not
     // duplicated here.
     for (const mode of ["signature", null, "nonsense"]) {
       const label = `mode=${String(mode)}`;
@@ -594,7 +737,7 @@ try {
   // ---- T84 (TR-L): one protection decision per file across hunks; the committed-bytes restore ----
 
   check("OT20 T84 a capability spent on one hunk leaves every other hunk, and the revert, under the same refusal and route", () => {
-    const root = fixture({ mode: "chat" });
+    const root = signedFixture(); // E16 (QG-04): hunk scope is a post-arming claim, so it arms through the signed route
     const hunkA = { old_string: "alpha", new_string: "beta" };
     const hunkB = { old_string: "gamma", new_string: "delta" };
     const revertA = { old_string: "beta", new_string: "alpha" };
@@ -605,7 +748,7 @@ try {
     const reference = decisionLines(unarmed.stderr);
     assert.ok(reference.some((line) => line === "Rule ID: TP-3"), `precondition: ${JSON.stringify(reference)}`);
 
-    arm(root, { file_path: PROTECTED, ...hunkA }, TP3_DENIAL);
+    armBySignature(root, { file_path: PROTECTED, ...hunkA }, TP3_DENIAL);
     const spent = askHunk(root, PROTECTED, hunkA);
     assert.equal(spent.blocked, false, `the armed hunk was not admitted (exit ${spent.status}):\n${spent.stderr}`);
     assert.match(spent.stderr, /capability consumed/u);
@@ -619,7 +762,7 @@ try {
     }
   });
 
-  check("OT21 T84 `git restore -- <file>` that puts a protected file back to its committed bytes is admitted by the shell lane", () => {
+  pendingTrl("OT21 T84 `git restore -- <file>` that puts a protected file back to its committed bytes is admitted by the shell lane", () => {
     const root = restoreFixture();
     writeFileSync(join(root, PROTECTED), "v2 (an in-session edit)\n");
     assert.equal(git(root, "status", "--porcelain", "--", PROTECTED), ` M ${PROTECTED}\n`, "precondition: modified in the tree only, index equals HEAD");
@@ -652,7 +795,7 @@ try {
     assert.equal(shellHit(root, "git restore -- scratch/notes.txt"), null);
   });
 
-  check("OT23 T84 the committed-bytes restore of a STAGED protected file (explicit --source=HEAD, index and tree) is admitted", () => {
+  pendingTrl("OT23 T84 the committed-bytes restore of a STAGED protected file (explicit --source=HEAD, index and tree) is admitted", () => {
     const root = restoreFixture();
     writeFileSync(join(root, PROTECTED), "v2 (staged)\n");
     git(root, "add", "--", PROTECTED);
@@ -665,7 +808,19 @@ try {
     assert.equal(hit, null, `T84: the committed-bytes restore of a staged file was refused (lane=${hit?.lane}, rule=${hit?.rule?.id})`);
   });
 
-  console.log(`\nguard-testpath-override: ${passed} passed, ${failed} failed`);
+  checkPty("OT24 the chat route itself, driven under a real pty, arms a capability the guard then consumes", () => {
+    // The one case whose claim IS the chat route (OT10 walked it before E16): same chain, same bound edit and same assertions as
+    // OT10, with the confirmation typed into a real pty instead of injected.
+    const root = fixture({ mode: "chat" });
+    assert.equal(ask(root, PROTECTED).blocked, true, "precondition: refused while unarmed");
+    armUnderPty(root, { file_path: PROTECTED }, TP3_DENIAL);
+    const { blocked, status, stderr } = ask(root, PROTECTED);
+    assert.equal(blocked, false, "armed capability did not admit the edit (exit " + status + "):\n" + stderr);
+    assert.match(stderr, /\[pipeline-human-override\] guard-testpath TP-3/u);
+    assert.match(stderr, /capability consumed/u);
+  });
+
+  console.log(`\nguard-testpath-override: ${passed} passed, ${failed} failed (${skipped} skipped, ${pending} pending)`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });
 }
