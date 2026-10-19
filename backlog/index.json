@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a1c3d246e130dbf5d008f441894c52b8ca45484b24db49a590e9c0940903f7a0"
+    "transitionHead": "22dc0918e90d63d2b0e132aaaa6b44fb04f01dfb1489c17652ed456db07ca224"
   },
   "counts": {
-    "open": 235,
+    "open": 236,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -9327,6 +9327,16 @@
       "closureRepository": "self",
       "closureCommit": "67db3432fe06ccee3a89e5362317c8997a3ed3a0",
       "closureEvidence": "backlog/items/2026-08-18-resume-hint-test-unregistered-in-verify-gate.md"
+    },
+    {
+      "id": "pipeline.retired-design-route-admit-tails-are-not-re-expressed-on-the-review-receipt-route",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-10-19",
+      "source": "Elephant decision E15 (2026-10-19): the admit-side tails that ceremony C4 leaves dormant in pipeline-state.test.mjs",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
