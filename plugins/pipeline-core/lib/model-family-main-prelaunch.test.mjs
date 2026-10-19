@@ -18,6 +18,7 @@ import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.m
 import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
 import { initializeSessionAuthorityRegistry } from "./session-authority-registry.mjs";
 import { createControlledMethodRuntimeFixture } from "./session-requester-bridge.mjs";
+import { nativeContractFixtureParent } from "./test-item-approved-course-fixture.mjs";
 
 const sha = (value) => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
 const taskRoute = "profile.synthetic_main";
@@ -60,7 +61,9 @@ async function signedRunnerFixture(runner, createAdapter) {
   const sessionId = `host-${runner}-session`, installationBindingSha256 = sha(`${runner}-install`);
   const accountBindingSha256 = sha(`${runner}-account`), hostProcessBindingSha256 = sha(`${runner}-process`);
   const adapterContractSha256 = sha(`${runner}-synthetic-contract`);
-  const repoDir = mkdtempSync(join(tmpdir(), `main-positive-${runner}-`));
+  // The authority walk refuses a group/world-writable ancestor (a shared /tmp on Linux): build the checkout beneath the
+  // owned checkout's scratch/, the same convention the native-goldfish fixtures use.
+  const repoDir = mkdtempSync(join(nativeContractFixtureParent(), `main-positive-${runner}-`));
   execFileSync("git", ["init", "-q"], { cwd: repoDir, stdio: "ignore" });
   const commonDir = join(repoDir, ".git");
   mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });

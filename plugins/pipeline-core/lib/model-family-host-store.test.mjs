@@ -3,9 +3,16 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, linkSync, symlinkSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+// Production-shaped fixtures: a real Git checkout whose authority lifecycle is built the way model-family-runtime-host.mjs builds it.
+import { mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { nativeContractFixtureParent } from "./test-item-approved-course-fixture.mjs";
+import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+import { createModelFamilyHostAuthorityLifecycle } from "./model-family-host-store.mjs";
+import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+import { initializeSessionAuthorityRegistry } from "./session-authority-registry.mjs";
 import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
 import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
 import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
@@ -192,8 +199,32 @@ function fixture({ preparation = null, bundleChangeOnRecheck = false, taskRoute 
     readCurrentCandidate() { return { ...currentCandidate }; },
     launchDriver() { launched += 1; return { ok: true, value: { launched: true } }; },
   };
-  const root = mkdtempSync(join(tmpdir(), "model-family-host-store-fixture-"));
-  return { root, source, controller: createModelFamilyHostController({ rootDir: root, trustedSources: source, clock: () => now }),
+  // The authority walk refuses any group/world-writable ancestor, so the checkout cannot live under a shared /tmp:
+  // it is created beneath the owned checkout's scratch/ (the same convention the native-goldfish fixtures use).
+  const repoDir = mkdtempSync(join(nativeContractFixtureParent(), "model-family-host-store-fixture-"));
+  execFileSync("git", ["init", "-q"], { cwd: repoDir, stdio: "ignore" });
+  // The session-authority registry only initializes over a repository that carries a manifest and a pipeline State
+  // with a continuity object; the host's lifetimes reserve their members in that registry (same inputs as the prelaunch fixture).
+  mkdirSync(join(repoDir, ".claude"), { recursive: true, mode: 0o700 });
+  writeFileSync(join(repoDir, ".claude/pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const ref = (path) => ({ path, sha256: "a".repeat(64) });
+  const continuity = { schema: "pipeline.continuity.v0", featureId: "unit", revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+    authority: { prd: ref("specs/unit/prd.md"), spec: ref("specs/unit/spec.md"), result: null },
+    queueHead: { packageId: "unit-package", actionId: "host-store-fixture", nextAction: "dispatch", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, closeTransition: null,
+    capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+  writeFileSync(join(repoDir, ".claude/pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0",
+    activeFeature: { id: "unit", planPath: "specs/unit/prd.md", phase: "design" }, planApproved: false, continuity }), { mode: 0o600 });
+  const repository = inspectSignedDescriptorCustodyRepository(repoDir);
+  const root = join(repository.commonDir, "agent-pipeline");
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  const ports = createSessionAuthorityParticipantPorts({ repository });
+  for (const row of ports) assert.doesNotThrow(() => row.port.readBaseline(), row.producerId);
+  const initialized = initializeSessionAuthorityRegistry({ repository }, ports);
+  assert.equal(initialized.status, "initialized", JSON.stringify(initialized));
+  const authorityLifecycle = createModelFamilyHostAuthorityLifecycle({ repository });
+  return { root, repoDir, authorityLifecycle, source, controller: createModelFamilyHostController({ rootDir: root, trustedSources: source, clock: () => now, authorityLifecycle }),
     data, setNow(value) { now = value; }, setCandidate(value) { currentCandidate = { ...value }; },
     currentCandidate: () => ({ ...currentCandidate }), counts: () => ({ authorityReads, preparations, launched }) };
 }
@@ -243,7 +274,7 @@ test("activation marker plus generation index qualify a fresh invocation; failed
     const launched = f.controller.launch({ invocation: result.value, packetBindingSha256: result.value.receipt.packetBindingSha256 });
     assert.equal(launched.code, "MODEL-FAMILY-LAUNCH-FAILED");
     assert.deepEqual(f.controller.readState().state.watermarks[0].version, [6, 2]);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("trusted asynchronous driver success is awaited while synchronous success remains synchronous", async () => {
@@ -273,7 +304,7 @@ test("trusted asynchronous driver success is awaited while synchronous success r
       packetBindingSha256: held.value.receipt.packetBindingSha256 });
     assert.equal(typeof synchronous?.then, "undefined", "legacy synchronous driver callers stay synchronous");
     assert.equal(synchronous.value.launched, "sync");
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("S4 private driver context carries the original sealed invocation and admitted immutable request once", async () => {
@@ -324,7 +355,7 @@ test("S4 private driver context carries the original sealed invocation and admit
       packetBindingSha256: prepared.value.receipt.packetBindingSha256,
       nativeRequestCapability: capability.value }).code, "MODEL-FAMILY-NATIVE-CAPABILITY-REQUIRED");
     assert.equal(drivers, 1, "neither context nor admitted request replays to a second driver call");
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("S4 trusted driver can complete a correlated synthetic profile-main operation from the original handle", async () => {
@@ -374,7 +405,7 @@ test("S4 trusted driver can complete a correlated synthetic profile-main operati
     assert.equal(applied.binding.authoritySha256, receipt.authoritySha256);
     assert.equal(applied.binding.adapterContractSha256, receipt.adapterContractSha256);
     assert.equal(applied.binding.packetBindingSha256, receipt.packetBindingSha256);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("profile-main boundary refuses duty routes and existing-main switches before configured operations", async () => {
@@ -405,7 +436,7 @@ test("profile-main boundary refuses duty routes and existing-main switches befor
         packetBindingSha256: receipt.packetBindingSha256, nativeRequestCapability: capability.value });
       assert.equal(launched.code, "MAIN_PRELAUNCH_REQUEST_REFUSED");
       assert.equal(calls, 0);
-    } finally { rmSync(f.root, { recursive: true, force: true }); }
+    } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
   }
 });
 
@@ -445,7 +476,7 @@ test("main launch revalidates the sealed candidate after asynchronous config app
     const result = await launchPromise;
     assert.equal(result.code, "MAIN_PRELAUNCH_RECHECK_REFUSED");
     assert.equal(launchCount, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("main launch revalidates signed authority after asynchronous config application", async () => {
@@ -484,7 +515,7 @@ test("main launch revalidates signed authority after asynchronous config applica
     const result = await launchPromise;
     assert.equal(result.code, "MAIN_PRELAUNCH_RECHECK_REFUSED");
     assert.equal(launchCount, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("async driver rejection, malformed results, and unknown dispositions fail closed while unqualified is typed", async () => {
@@ -512,7 +543,7 @@ test("async driver rejection, malformed results, and unknown dispositions fail c
     const unqualified = await launch();
     assert.equal(unqualified.code, "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED");
     assert.equal(unqualified.retryable, false);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("ordinary repository candidates reuse signed family authority while receipts and replays retain exact candidate bytes", () => {
@@ -542,7 +573,7 @@ test("ordinary repository candidates reuse signed family authority while receipt
       packetBindingSha256: firstReceipt.packetBindingSha256 });
     assert.equal(staleLaunch.code, "MODEL-FAMILY-CANDIDATE-SUPERSEDED");
     assert.equal(f.counts().launched, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("current-candidate callback failures and non-closed or invalid OID values refuse before receipt admission", () => {
@@ -557,7 +588,7 @@ test("current-candidate callback failures and non-closed or invalid OID values r
     assert.equal(invoke(f, key("candidate-invalid-oid")).code, "MODEL-FAMILY-CANDIDATE-SHAPE");
     assert.equal(f.controller.readState().receipts.length, 0);
     assert.equal(f.counts().launched, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("candidate drift between preparation capture and locked CAS refuses without sealing", () => {
@@ -572,7 +603,7 @@ test("candidate drift between preparation capture and locked CAS refuses without
     assert.equal(reads, 2);
     assert.equal(f.controller.readState().receipts.length, 0);
     assert.equal(f.counts().launched, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("candidate drift at the final prelaunch check prevents the native driver call", () => {
@@ -588,7 +619,7 @@ test("candidate drift at the final prelaunch check prevents the native driver ca
     assert.equal(launched.code, "MODEL-FAMILY-CANDIDATE-SUPERSEDED");
     assert.equal(reads, 2);
     assert.equal(f.counts().launched, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("S2 opaque discovery handle is consumed by the host; ordinary JSON and foreign bindings are refused", async () => {
@@ -613,7 +644,7 @@ test("S2 opaque discovery handle is consumed by the host; ordinary JSON and fore
       accountBindingSha256: sha("other-account") } });
     const wrongAccount = invoke(f, key("wrong-account"));
     assert.equal(wrongAccount.code, "MODEL-FAMILY-DISCOVERY-CONTEXT-MISMATCH");
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("freshness accepts a preparation younger than sixty seconds and rejects one older than sixty", () => {
@@ -624,7 +655,7 @@ test("freshness accepts a preparation younger than sixty seconds and rejects one
     assert.equal(invoke(f, key("fresh-under-sixty")).ok, true);
     f.setNow(Date.parse("2026-10-01T12:01:00.001Z"));
     assert.equal(invoke(f, key("stale-over-sixty")).code, "DISCOVERY_STALE");
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("writer contention performs exactly two bounded CAS retries and never launches", () => {
@@ -641,7 +672,7 @@ test("writer contention performs exactly two bounded CAS retries and never launc
     assert.equal(result.code, "CONCURRENT_RESELECTION_REQUIRED");
     assert.equal(preparations, MODEL_FAMILY_HOST_STORE_LIMITS.casRetries + 1);
     assert.equal(f.counts().launched, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("same-key replay returns original held bytes without resolving a newer selection", () => {
@@ -659,7 +690,7 @@ test("same-key replay returns original held bytes without resolving a newer sele
     const offline = readHeldModelFamilyInvocation({ rootDir: f.root, key: key() });
     assert.equal(offline.ok, true, offline.code);
     assert.equal(offline.value.receiptSha256, first.value.receipt.receiptSha256);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("expired preparation and a disappeared newer head refuse without lowering the watermark", () => {
@@ -680,7 +711,7 @@ test("expired preparation and a disappeared newer head refuse without lowering t
     const stale = invoke(f, key("invoke-3"));
     assert.equal(stale.ok, false);
     assert.match(stale.code, /STALE/u);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("policy supersession during locked CAS and source freshness cancel the unlaunched attempt", () => {
@@ -702,7 +733,7 @@ test("policy supersession during locked CAS and source freshness cancel the unla
     assert.equal(result.code, "MODEL-FAMILY-AUTHORITY-SUPERSEDED");
     assert.equal(f.controller.readState().state.generation, 0);
     assert.equal(f.counts().launched, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("pin and unpin decisions changing during CAS cancel both raced selections", () => {
@@ -726,7 +757,7 @@ test("pin and unpin decisions changing during CAS cancel both raced selections",
     const unpinRace = invoke(f, key("unpin-race"));
     assert.equal(unpinRace.code, "MODEL-FAMILY-PIN-SUPERSEDED");
     assert.equal(f.controller.readState().state.generation, 0);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("freshly signed authority successor CAS preserves watermarks and held receipt bytes", () => {
@@ -768,7 +799,7 @@ test("freshly signed authority successor CAS preserves watermarks and held recei
     const rollback = invoke(f, key("same-family-after-new-family"));
     assert.equal(rollback.code, "DOWNGRADE_REFUSED");
     assert.equal(f.controller.readState().state.generation, changed.state.generation);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("unsigned, wrong-predecessor, raced and partial successor transitions fail closed", () => {
@@ -811,7 +842,7 @@ test("unsigned, wrong-predecessor, raced and partial successor transitions fail 
     writeFileSync(markerPath, JSON.stringify(marker), { mode: 0o600 });
     assert.equal(f.controller.readState().code, "MODEL-FAMILY-STATE-UNCERTAIN");
     assert.equal(invoke(f, key("partial-transition-no-fallback")).code, "MODEL-FAMILY-STATE-UNCERTAIN");
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("a prepare racing transition wins one generation CAS before successor transition retries", () => {
@@ -835,16 +866,17 @@ test("a prepare racing transition wins one generation CAS before successor trans
     assert.equal(transition.state.generation, 2);
     assert.equal(transition.state.invocationIndex.length, 1);
     assert.equal(transition.state.authoritySha256, digest(next.bundle));
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 function spawnTransitionWriter(rootDir, data) {
   const moduleUrl = new URL("./model-family-host-store.mjs", import.meta.url).href;
   const source = [
-    `import { createModelFamilyHostController } from ${JSON.stringify(moduleUrl)};`,
+    `import { createModelFamilyHostController, createModelFamilyHostAuthorityLifecycle } from ${JSON.stringify(moduleUrl)};`,
+    `import { inspectSignedDescriptorCustodyRepository } from ${JSON.stringify(new URL("./worktree-lifecycle.mjs", import.meta.url).href)};`,
     "const d=JSON.parse(process.env.S4_TRANSITION_DATA);",
     "const s={readAuthorityInputs:()=>d.authorityInputs,readSuccessorAuthorityInputs:()=>d.successorInputs,readPinInputs:()=>[],readFreshDiscovery:()=>{throw Error('unused')},readCurrentCandidate:()=>({candidateCommit:'3333333333333333333333333333333333333333',candidateTree:'4444444444444444444444444444444444444444'}),launchDriver:()=>({ok:true})};",
-    "const c=createModelFamilyHostController({rootDir:d.rootDir,trustedSources:s,clock:()=>Date.parse('2026-10-01T12:00:30.000Z')});",
+    "const c=createModelFamilyHostController({rootDir:d.rootDir,trustedSources:s,clock:()=>Date.parse('2026-10-01T12:00:30.000Z'),authorityLifecycle:createModelFamilyHostAuthorityLifecycle({repository:inspectSignedDescriptorCustodyRepository((await import('node:path')).resolve(d.rootDir,'..','..'))})});",
     "const r=c.transitionAuthority();process.stdout.write(JSON.stringify({ok:r.ok,code:r.code,generation:r.state?.generation})+'\\n');",
   ].join("\n");
   return new Promise((resolvePromise, reject) => {
@@ -882,7 +914,7 @@ test("real competing transition and prepare serialize on the stored generation",
     assert.equal(state.state.authoritySha256, digest(next.bundle));
     assert.equal(state.receipts.length, prepared.ok ? 1 : 0);
     assert.equal(state.state.generation, prepared.ok ? 2 : 1);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("missing or corrupt private current state preserves active-family refusal and never falls back", () => {
@@ -897,7 +929,7 @@ test("missing or corrupt private current state preserves active-family refusal a
     writeFileSync(join(f.root, "model-family-host", "current.json"), "{\"partial\":", { mode: 0o600 });
     assert.equal(f.controller.readState().code, "MODEL-FAMILY-STATE-UNCERTAIN");
     assert.equal(f.controller.prepare({ key: key("newer"), assignment: route }).code, "MODEL-FAMILY-STATE-UNCERTAIN");
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("symlink roots, hard-linked receipts, and malformed private JSON fail closed", () => {
@@ -912,11 +944,11 @@ test("symlink roots, hard-linked receipts, and malformed private JSON fail close
     assert.equal(f.controller.readState().ok, false);
     unlinkSync(join(f.root, "model-family-host/receipts", "hardlink.json"));
     symlinkSync(f.root, link, "dir");
-    const aliased = createModelFamilyHostController({ rootDir: link, trustedSources: f.source });
+    const aliased = createModelFamilyHostController({ rootDir: link, trustedSources: f.source, authorityLifecycle: f.authorityLifecycle });
     assert.equal(aliased.readState().ok, false);
     writeFileSync(receiptPath, "{\"duplicate\":1,\"duplicate\":2}", { mode: 0o600 });
     assert.equal(f.controller.readState().ok, false);
-  } finally { rmSync(f.root, { recursive: true, force: true }); try { unlinkSync(link); } catch {} }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); try { unlinkSync(link); } catch {} }
 });
 
 test("replaced receipt bytes are never repaired or overwritten; tampering blocks offline readback", () => {
@@ -933,7 +965,7 @@ test("replaced receipt bytes are never repaired or overwritten; tampering blocks
     assert.equal(replay.ok, false);
     assert.notDeepEqual(readFileSync(receiptPath), before);
     assert.equal(readHeldModelFamilyInvocation({ rootDir: f.root, key: key() }).ok, false);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
 });
 
 test("schemas are closed and bind unique invocation identity, assignment, candidate, generation and watermarks", () => {
@@ -955,12 +987,13 @@ test("schemas are closed and bind unique invocation identity, assignment, candid
 function spawnConcurrentWriter(rootDir, hostData) {
   const moduleUrl = new URL("./model-family-host-store.mjs", import.meta.url).href;
   const source = [
-    `import { createModelFamilyHostController } from ${JSON.stringify(moduleUrl)};`,
+    `import { createModelFamilyHostController, createModelFamilyHostAuthorityLifecycle } from ${JSON.stringify(moduleUrl)};`,
+    `import { inspectSignedDescriptorCustodyRepository } from ${JSON.stringify(new URL("./worktree-lifecycle.mjs", import.meta.url).href)};`,
     "const d=JSON.parse(process.env.S4_HOST_DATA);",
     "const sources={readAuthorityInputs:()=>d.authorityInputs,readPinInputs:()=>[],",
     "readFreshDiscovery:()=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,40);const h=Object.freeze(Object.create(null)),v=d.preparation.discovery,fr=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(fr);Object.freeze(x)}return x};return {discoveryHost:{readDiscovery:x=>x===h?{ok:true,code:'DISCOVERY_READ',value:fr(v)}:{ok:false,code:'DISCOVERY_HANDLE_REQUIRED',retryable:false}},discoveryHandle:h,context:d.preparation.context};},",
     "readCurrentCandidate:()=>({candidateCommit:'3333333333333333333333333333333333333333',candidateTree:'4444444444444444444444444444444444444444'}),launchDriver:()=>({ok:true})};",
-    "const c=createModelFamilyHostController({rootDir:d.rootDir,trustedSources:sources,clock:()=>Date.parse('2026-10-01T12:00:30.000Z')});",
+    "const c=createModelFamilyHostController({rootDir:d.rootDir,trustedSources:sources,clock:()=>Date.parse('2026-10-01T12:00:30.000Z'),authorityLifecycle:createModelFamilyHostAuthorityLifecycle({repository:inspectSignedDescriptorCustodyRepository((await import('node:path')).resolve(d.rootDir,'..','..'))})});",
     "const r=c.prepare({key:d.key,assignment:d.assignment});",
     "process.stdout.write(JSON.stringify({ok:r.ok,code:r.code,receiptSha256:r.value?.receipt.receiptSha256})+'\\n');",
   ].join("\n");
@@ -998,7 +1031,7 @@ test("real process contention serializes same-key replay and different invocatio
       assert.equal(state.receipts.length, sameInvocation ? 1 : 2);
       assert.deepEqual(state.receipts.map((item) => item.storeGeneration).sort(), sameInvocation ? [1] : [1, 2]);
       if (sameInvocation) assert.equal(results.filter((item) => item.code === "MODEL-FAMILY-REPLAY").length, 1);
-    } finally { rmSync(f.root, { recursive: true, force: true }); }
+    } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
   }
 });
 
