@@ -662,7 +662,93 @@ export const ALLOWLIST = Object.freeze([
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/reader-review-protocol.md\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/doc-reader-terminal-binding.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "value.verify === \"node harness/scripts/verify.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
+
+  // --- ALF-B7-CSP (the AC-11 real-ALLOWLIST closing check): the
+  // findings below entered the plugin tree in d02409a8a (the Alfred Main
+  // checkpoint), except the sanctioned-args-scripts.mjs line (e23569401). Each
+  // was classified individually as Class B (none is a consumer leak); each entry
+  // matches only the exact text it names, never a directory or a pattern.
+  //
+  // The draft ADR is a byte-identical vendored copy of docs/adr/ (generator
+  // entry in generate-vendored-canon.mjs); it is fixed at the origin, never here.
+  { file: "plugins/pipeline-core/docs/adr/draft-item-owned-egm-retained-quality-gates.md", match: "guardrails/quality-gates.md, harness/definition-of-done.md,", reason: vendoredCanonAllowlistReason("docs/adr/draft-item-owned-egm-retained-quality-gates.md") }, // L97
+  { file: "plugins/pipeline-core/docs/adr/draft-item-owned-egm-retained-quality-gates.md", match: "harness/review-protocol.md and dispatch/review checklists.", reason: vendoredCanonAllowlistReason("docs/adr/draft-item-owned-egm-retained-quality-gates.md") }, // L98
+  // The doc-reader libs name the source checkout's reader protocol and binding
+  // checker only behind sourceIdentity(root), which is true solely for a checkout
+  // that is the Agent Pipeline source repository itself.
+  {
+    file: "plugins/pipeline-core/lib/doc-reader-default-observers.mjs",
+    match: "sourceIdentity(root)?['docs/product-capability-inventory.json','governance/observation-doc-governance.json','harness/reader-review-protocol.md']",
+    reason: sourceReaderReleaseGateAllowlistReason(),
+  },
+  {
+    file: "plugins/pipeline-core/lib/doc-reader-default-observers.mjs",
+    match: "if(sourceIdentity(root)){requireFact(request.binding.path===`${scope.evidenceRoot}/record.json`);const {checkReaderBinding}=await import(pathToFileURL(fileURLToPath(new URL('../../../harness/scripts/check-doc-reader-binding.mjs',import.meta.url))))",
+    reason: sourceReaderReleaseGateAllowlistReason(),
+  },
+  {
+    file: "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+    match: "readerProtocolSha256:'harness/reader-review-protocol.md'",
+    reason:
+      "Class B: the canonical-source key of the reader-input bundle. It names the repository document that the hash-pinned " +
+      "plugin mirror plugins/pipeline-core/reader-inputs/reader-review-protocol.md reproduces; the snapshot compares it " +
+      "against the manifest's canonicalSourcePath label and a consumer reads the plugin mirror, never this path. Self-application " +
+      "only (ADR-0015), not a consumer instruction.",
+  },
+  {
+    file: "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+    match: "tracked('harness/reader-review-protocol.md')&&tracked('harness/scripts/check-doc-reader-binding.mjs')",
+    reason: sourceReaderReleaseGateAllowlistReason(),
+  },
+  // lib/guard/sanctioned-args-scripts.mjs is protected and is deliberately not edited.
+  {
+    file: "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+    match: "resolve(root, \"harness/scripts/check-observation-governance.mjs\")",
+    reason:
+      "Class B: canonicalSanctionedScript() adds the checkout-root-resolved spelling of this repository's own " +
+      "check-observation-governance.mjs to the set of canonical sanctioned script spellings, so the guard recognizes that one " +
+      "self-application command (the Observation-governance step pipeline-start/SKILL.md and the command-catalogue.mjs entry above " +
+      "already scope to the Pipeline's own source checkout, ADR-0015). In a consumer project the resolved path does not exist, so " +
+      "the entry is an inert no-op, never an instruction.",
+  },
+  // reader-inputs/ holds hash-pinned mirrors of canonical documents (verified by
+  // lib/doc-reader-documentation-snapshot.mjs against the manifest's sha256 entries
+  // and its own digest). No generator exists in this repository, and a hand edit
+  // would break the pin, so the allowlist is the only valid place for these.
+  {
+    file: "plugins/pipeline-core/reader-inputs/manifest.json",
+    match: "\"canonicalSourcePath\":\"harness/reader-review-protocol.md\"",
+    reason: readerInputMirrorAllowlistReason("The manifest records each mirror's canonicalSourcePath label next to the pluginPath a consumer actually reads."),
+  },
+  {
+    file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json",
+    match: "\"verify-phase:harness/scripts/verify.mjs:",
+    reason: readerInputMirrorAllowlistReason("This match admits only the `verify-phase:harness/scripts/verify.mjs:<phase>` evidence-identifier namespace of the capability inventory (one entry for the whole namespace rather than one per phase identifier); it is a label naming a Verify phase, not a path a consumer opens."),
+  },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/check-doc-contracts.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/check-doc-contracts.test.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/check-error-register.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/check-error-register.test.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/generate-agent-obligations.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/generate-agent-obligations.test.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/self-verify-selection.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/self-verify-selection.test.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/validate-manifest.test.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"harness/scripts/verify.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"setup:setup.mjs:setup\"", reason: readerInputMirrorAllowlistReason("Exact quoted setup-capability identifier.") },
+  { file: "plugins/pipeline-core/reader-inputs/product-capability-inventory.json", match: "\"setup.mjs\"", reason: readerInputMirrorAllowlistReason("Exact quoted evidence-file reference for a capability record.") },
+  { file: "plugins/pipeline-core/reader-inputs/reader-review-protocol.md", match: "`harness/scripts/check-doc-reader-binding.mjs` owns the sixteen public document", reason: readerInputMirrorAllowlistReason("The mirrored reader protocol names the source checkout's binding checker as the owner of the public document set.") }, // L38
+  { file: "plugins/pipeline-core/reader-inputs/reader-review-protocol.md", match: "node harness/scripts/check-doc-reader-binding.mjs \\", reason: readerInputMirrorAllowlistReason("The mirrored reader protocol shows the source checkout's binding-check command.") }, // L184
 ]);
+
+function readerInputMirrorAllowlistReason(detail) {
+  return (
+    "Class B: a hash-pinned reader-input mirror (pipeline.doc-reader-input-bundle.v1) of a canonical document of this " +
+    "repository, consumed only as bytes to hash and never resolved as a path or run as a command by a consumer. " +
+    `${detail} The mirror has no generator in this repository and cannot be hand-edited without breaking its pin; ` +
+    "self-application only (ADR-0015)."
+  );
+}
 
 function posixPath(value) {
   return value.split(sep).join("/");
