@@ -782,10 +782,11 @@ test("consumer sessions cannot mutate Pipeline sources, cachebusters or plugin i
     // AC-197 group E2 (QG-04 justification, bounded to this one command): e02c40247 (AC-240) made a
     // git -C form whose directory lies outside the project unadmittable for every subcommand, status
     // included, so it is no longer a read-only diagnostic and the guard refuses it. The same
-    // outside-root command keeps its examiner, now as a refusal; the cross-repository-mutation
-    // classification of the command is unchanged (still false).
+    // outside-root command keeps its examiner, now as a refusal; its cross-repository-mutation
+    // classification follows from e02c40247 together with po-commands.mjs:295: a git -C directory
+    // outside the root that is not a read-only diagnostic is classified as a mutation (true).
     const outsideStatus = `git -C ${outside} status --short`;
-    assert.equal(isForbiddenCrossRepositoryMutation(outsideStatus, path), false);
+    assert.equal(isForbiddenCrossRepositoryMutation(outsideStatus, path), true);
     assert.equal(isReadOnlyDiagnosticCommand(outsideStatus, path), false, outsideStatus);
     const outsideStatusResult = evaluateLifecycleReadyGuard(bash(outsideStatus), {
       projectDir: path,
