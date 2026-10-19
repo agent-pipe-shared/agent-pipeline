@@ -332,6 +332,7 @@
           "docs/adr/draft-item-owned-egm-retained-quality-gates.md",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.json",
           "docs/adr/draft-model-family-approval-and-automatic-version-upgrades.md",
+          "docs/adr/draft-po-acceptance-points.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-repair-availability.json",
           "docs/adr/draft-repair-availability.md",
