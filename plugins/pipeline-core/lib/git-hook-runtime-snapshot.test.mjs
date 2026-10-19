@@ -5,7 +5,7 @@
 // removed before a test ends.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, linkSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -71,6 +71,14 @@ test("an aliased (symlink) source catalog is refused", (t) => {
   writeFileSync(target, REAL_CATALOG);
   try { symlinkSync(target, join(f.plugin, CATALOG), "file"); } catch (error) { t.skip("symlink creation unavailable: " + error.code); return; }
   assert.notEqual(codeOf(() => publish(f)), null);
+});
+
+test("an aliased (hardlinked) source catalog is refused on every host, with no symlink privilege needed", (t) => {
+  const f = fixture(t, { catalog: false });
+  const target = join(f.plugin, "elsewhere.json");
+  writeFileSync(target, REAL_CATALOG);
+  linkSync(target, join(f.plugin, CATALOG));
+  assert.equal(codeOf(() => publish(f)), "PU-FILE");
 });
 
 test("only the named catalog is admitted from the plugin root: other root files are not copied", (t) => {
