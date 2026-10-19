@@ -1,9 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes } from 'node:crypto';
-import { constants, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hostname } from 'node:os';
 import { canonical } from './po-approval-proof.mjs';
+import { observeLinuxProcess } from './native-platform-process-observer.mjs';
 import { inspectSignedDescriptorCustodyRepository, withSignedDescriptorCustodyManifestLock } from './worktree-lifecycle.mjs';
 import { inspectSourceOwnedDescriptorHandle } from './session-requester-bridge.mjs';
 import * as onboarding from './onboarding-continuity.mjs';
@@ -114,7 +116,98 @@ export function createSessionAuthorityMethodStageObserver({onStage}){if(typeof o
 export function withSessionAuthorityMethodStages({observer},callback){if(!stageBrands.has(observer)||typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','unbranded-stage-observer');return stageContext.run(observer,callback);}
 function stage(name,record,memberRef,releaseRef=null){const observer=stageContext.getStore();if(observer)observer.onStage(freeze({stage:name,producerId:record.producerId,memberId:record.memberId,memberGeneration:record.memberGeneration,memberRef,releaseRef}));}
 
-export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}privateDirectories(repo,`${ROOT}/registry.lock`);const path=`${ROOT}/registry.lock`,abs=safePath(repo,path),bytes=Buffer.from(canonical({schema:'pipeline.session-authority-lock.v1',repositorySha256:repoDigest(repo),nonce:randomBytes(32).toString('hex')}));let fd,nativeLock;try{if(process.platform==='win32')nativeLock=nativeLockCreate(abs,bytes);else fd=openSync(abs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}catch{fail('SDC-LOCK-HELD','registry-lock-held');}if(process.platform!=='win32'){try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}}const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;});}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
+// FB3-PF-55: the registry lock names its owner. A lock outlives its holder when the holder is killed
+// (a hook at its host timeout) or when a failed domain transition retains it; before, no one could
+// tell such a lock from a live one, and every repair needed the lock it was meant to repair. A lock
+// whose owner is provably gone is retired (moved aside, never deleted) on the next entry. A lock
+// whose owner cannot be judged refuses and names `release-lock`; a live one names `wait`.
+const LOCK_PATH=`${ROOT}/registry.lock`;
+const REPAIR_SCRIPT=fileURLToPath(new URL('../scripts/session-authority-repair.mjs',import.meta.url));
+const hostSha256=()=>hash(hostname());
+function lockOwner(){
+  let observed=null;if(process.platform==='linux'){try{observed=observeLinuxProcess(process.pid);}catch{observed=null;}}
+  return {pid:process.pid,hostSha256:hostSha256(),process:observed?{start:observed.start,bootSha256:observed.bootSha256}:null,acquiredAt:new Date().toISOString()};
+}
+/** live | dead | unknown. Dead only on proof: no such process, a zombie, another boot or a reused pid. */
+export function judgeSessionAuthorityLockOwner(value,{observe=observeLinuxProcess,platform=process.platform,host=hostSha256()}={}){
+  const owner=value?.owner;
+  if(!owner||typeof owner!=='object'||!Number.isSafeInteger(owner.pid)||owner.pid<1||owner.hostSha256!==host)return 'unknown';
+  if(platform!=='linux'||!owner.process||typeof owner.process.start!=='string'||typeof owner.process.bootSha256!=='string')return 'unknown';
+  let observed;try{observed=observe(owner.pid);}catch{return 'unknown';}
+  if(observed===null||['Z','X'].includes(observed.state))return 'dead';
+  return observed.bootSha256!==owner.process.bootSha256||observed.start!==owner.process.start?'dead':'live';
+}
+/** The lock as a reader sees it, without taking it: absent, or its bytes, identity, owner and age. */
+export function inspectSessionAuthorityLock({repository:input,judge=judgeSessionAuthorityLockOwner}={}){
+  const repo=repository(input);return freeze(observeLock(repo,judge));
+}
+function observeLock(repo,judge=judgeSessionAuthorityLockOwner){
+  const abs=safePath(repo,LOCK_PATH);let stat;
+  try{stat=lstatSync(abs);}catch(error){if(error?.code==='ENOENT')return {status:'absent'};throw error;}
+  let bytes=Buffer.alloc(0);
+  if(stat.isFile()&&stat.size<=65536){try{bytes=readFileSync(abs);}catch(error){if(error?.code==='ENOENT')return {status:'absent'};throw error;}}
+  let value=null;try{value=JSON.parse(bytes.toString('utf8'));}catch{value=null;}
+  const acquiredAt=typeof value?.owner?.acquiredAt==='string'?value.owner.acquiredAt:null;
+  const since=Date.parse(acquiredAt??'')||stat.mtimeMs;
+  return {status:'held',owner:judge(value),pid:Number.isSafeInteger(value?.owner?.pid)?value.owner.pid:null,schema:typeof value?.schema==='string'?value.schema:null,
+    acquiredAt:acquiredAt??new Date(stat.mtimeMs).toISOString(),ageSeconds:Math.max(0,Math.round((Date.now()-since)/1000)),
+    sha256:hash(bytes),dev:String(stat.dev),ino:String(stat.ino)};
+}
+/** Moves exactly the observed lock aside. A lock created after it was observed is put back, never removed. */
+function retireLock(repo,observed,cause){
+  const dir=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-registry-lock`;
+  privateDirectories(repo,`${dir}/marker`);
+  const lockAbs=safePath(repo,LOCK_PATH),asideAbs=safePath(repo,`${dir}/registry.lock`);
+  try{renameSync(lockAbs,asideAbs);}catch(error){if(error?.code==='ENOENT')return null;throw error;}
+  const moved=lstatSync(asideAbs),bytes=readFileSync(asideAbs);
+  if(String(moved.dev)!==observed.dev||String(moved.ino)!==observed.ino||hash(bytes)!==observed.sha256){
+    try{linkSync(asideAbs,lockAbs);unlinkSync(asideAbs);}catch{}
+    fail('SDC-LOCK-HELD','registry-lock-changed-while-retiring');
+  }
+  syncDirectory(dirname(lockAbs));
+  try{writeFileSync(safePath(repo,`${dir}/retire.json`),canonical({schema:'pipeline.session-authority-lock-retirement.v1',cause,owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,retiredAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{}
+  return dir;
+}
+function lockHeldFault(repo,observed,reason){
+  const root=repo.primaryRoot,who=observed.pid===null?'an owner it does not record':`pid ${observed.pid}`;
+  const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-LOCK-HELD';error.reason=reason;
+  error.lock=freeze({owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,ageSeconds:observed.ageSeconds});
+  error.repair=observed.owner==='live'
+    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s). Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
+    :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
+  throw error;
+}
+/** Takes the registry lock, retiring a lock whose owner is provably gone; otherwise refuses naming owner, age and repair. */
+function acquireRegistryLock(repo,lockSchema,heldReason){
+  privateDirectories(repo,LOCK_PATH);
+  const abs=safePath(repo,LOCK_PATH);
+  for(let attempt=0;;attempt+=1){
+    const bytes=Buffer.from(canonical({schema:lockSchema,repositorySha256:repoDigest(repo),nonce:randomBytes(32).toString('hex'),owner:lockOwner()}));
+    let fd,nativeLock;
+    try{if(process.platform==='win32')nativeLock=nativeLockCreate(abs,bytes);else fd=openSync(abs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}
+    catch(error){
+      if(attempt>=2||(process.platform!=='win32'&&error?.code!=='EEXIST'))fail('SDC-LOCK-HELD',heldReason);
+      const observed=observeLock(repo);
+      if(observed.status==='absent')continue;
+      if(observed.owner==='dead'){retireLock(repo,observed,'the recorded owner process is gone');continue;}
+      lockHeldFault(repo,observed,heldReason);
+    }
+    if(process.platform!=='win32'){try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}}
+    return {abs,nativeLock};
+  }
+}
+/** FB3-PF-55 repair: retires a lock whose owner is not confirmed alive, on the caller's word that no Pipeline
+ * process runs. It never takes the lock itself. A live owner is refused. */
+export function releaseSessionAuthorityLock({repository:input,reason,judge=judgeSessionAuthorityLockOwner}={}){
+  if(typeof reason!=='string'||!reason.trim()||reason.length>500||/[\u0000-\u001f\u007f]/u.test(reason))fail('SDC-AUTHORITY-UNAVAILABLE','release-lock-reason');
+  const repo=repository(input),observed=observeLock(repo,judge);
+  if(observed.status==='absent')return freeze({status:'absent'});
+  if(observed.owner==='live')lockHeldFault(repo,observed,'registry-lock-owner-alive');
+  const aside=retireLock(repo,observed,`released by repair: ${reason.trim()}`);
+  return freeze(aside===null?{status:'absent'}:{status:'released',aside,owner:observed.owner,pid:observed.pid,ageSeconds:observed.ageSeconds});
+}
+
+export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;});}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
 function boundary(token){const found=boundaryBrands.get(token);if(!found||boundaryContext.getStore()?.token!==token)fail('SDC-AUTHORITY-UNAVAILABLE','expired-boundary');repository(found.repository);return found.repository;}
 
 function participant(def){const [producerId,,prefix,kinds,namespaceIds,paths]=def;const sourcePaths=paths.map(path=>`plugins/pipeline-core/${path}`).sort();const sources=sourcePaths.map(path=>{const abs=fileURLToPath(new URL(`../${path.slice('plugins/pipeline-core/'.length)}`,import.meta.url));const s=lstatSync(abs);if(!s.isFile()||s.isSymbolicLink())fail('SDC-AUTHORITY-UNAVAILABLE',`${producerId}:source-file`);return {path,sha256:hash(process.platform==='win32'?nativeSourceRead(abs,SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes).bytes:readFileSync(abs))};});return freeze({producerId,kinds:[...kinds],sourcePaths,sourceSha256:digest(sources),namespaceIds:[...namespaceIds]});}
@@ -719,10 +812,7 @@ export function executeSourceOwnedLegacySessionAuthorityOperation(input,operatio
     if(!equal(nested.repo,repo)||!equal(readRaw(repo,`${ROOT}/registry.lock`).ref,nested.lock))fail('SDC-LOCK-HELD','legacy-nested-lock');
     return run();
   }
-  privateDirectories(repo,`${ROOT}/registry.lock`);
-  const lockPath=`${ROOT}/registry.lock`,abs=safePath(repo,lockPath),bytes=Buffer.from(canonical({schema:'pipeline.session-authority-legacy-lock.v1',repositorySha256:repoDigest(repo),nonce:randomBytes(32).toString('hex')}));
-  let fd,nativeLock;try{if(process.platform==='win32')nativeLock=nativeLockCreate(abs,bytes);else fd=openSync(abs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}catch{fail('SDC-LOCK-HELD','legacy-registry-lock-held');}
-  if(process.platform!=='win32'){try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}}
+  const lockPath=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-legacy-lock.v2','legacy-registry-lock-held');
   const lock=readRaw(repo,lockPath).ref;
   try{return legacyControlContext.run({repo,lock,custody,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})},run);}finally{
     if(!equal(readRaw(repo,lockPath).ref,lock))fail('SDC-LOCK-HELD','legacy-lock-ownership-changed');

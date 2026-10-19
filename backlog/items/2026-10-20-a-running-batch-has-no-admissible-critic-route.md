@@ -25,6 +25,15 @@ preflight refused the same way (`CCA-REVIEW-UNIT-REQUIRED`), so the Critic of e6
 advisory, with no finalizer receipt. Every binding nevertheless reports
 `criticDecision.appliedRow: T1`.
 
+Measured on 2026-10-20 by reading the code: no production route writes
+`specs/<feature>/design/critic-review-unit.json`. Only tests write it, in
+`scripts/critic-dispatch-preflight.test.mjs`, `lib/critic-generic-batch.test.mjs` and
+`scripts/session-critic-finalizer.test.mjs`. `featureReviewUnit`
+(`lib/critic-course-admission.mjs`) needs that unit as an immutable, non-authority `design`
+artifact in the feature's genesis manifest. So course admission refuses
+`CCA-REVIEW-UNIT-REQUIRED` for every feature, not only for a running batch. A running feature
+cannot add it later, because the genesis manifest is fixed.
+
 ## Acceptance
 
 - The review unit is created, or required with a named command, when a feature enters

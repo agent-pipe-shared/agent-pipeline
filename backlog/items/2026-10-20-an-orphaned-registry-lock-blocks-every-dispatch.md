@@ -63,3 +63,26 @@ Causes, read from `lib/session-authority-registry.mjs`:
 - `inspect` names `wait` or `release-lock` for a held lock, never a repair that needs the lock.
 - Tests cover a dead-owner lock, a legacy lock without owner, a live-owner lock, `release-lock`
   and `wait`, and that the boundary still works after each.
+
+## Not in this item
+
+- **The retain itself.** `executeSourceOwnedSessionAuthorityDomainTransition` sets
+  `retainDomainTransition` on any error, including errors before its first publication, where
+  nothing partial exists. Narrowing it to a fault after the first publication is a separate
+  change. With this item a retained lock no longer outlives its process: once the holder exits,
+  its owner is gone and the next entry retires it.
+- **A half-published transition** (a member republished, its producer record not yet saved)
+  is not healed by D51 (1), which heals namespace drift only. After the lock is retired, the
+  registry read refuses it with its own `SDC-AUTHORITY-CAS` reason, and `inspect` names
+  `move-aside`, which works again because the lock is free.
+
+## Progress (2026-10-20, Elephant under D51 (4)/D55, not yet reviewed)
+
+- The boundary lock and the legacy control lock record their owner (schema v2) and share one
+  acquisition, which retires a gone owner's lock under
+  `session-authority-abandoned/<time>-<nonce>-registry-lock/` with a `retire.json`.
+- `session-authority-repair.mjs` reads the lock without taking it: `inspect` reports it and
+  names `wait`, `heal` or `release-lock` first; `release-lock` and `wait --timeout` are new
+  verbs; a lock refusal carries owner, age and the repair.
+- SAR08 covers a legacy lock, a gone owner (retired by the next dispatch), a live owner,
+  `release-lock` and `wait`. It is red on e6fec04a0 and green here.

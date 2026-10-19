@@ -4,7 +4,9 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { devNull } from "node:os";
+import { createHash } from "node:crypto";
+import { devNull, hostname } from "node:os";
+import { observeLinuxProcess } from "../lib/native-platform-process-observer.mjs";
 import { join } from "node:path";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
@@ -196,6 +198,56 @@ const cases = [
     const rebound = run({ env, scratchDeps: owner(4343, true) }, "heal", "--root", root).result;
     assert.equal(rebound.scratchBound, "bound");
     assert.ok(existsSync(join(root, rebound.scratchBinding.scratchRelativePath)));
+  }) },
+  { id: "SAR08", name: "an orphaned registry lock never blocks for good: a gone owner is retired on the next dispatch, an unjudgeable one is named and released with release-lock, a live one is named with wait (FB3-PF-55, FB3-PF-56)", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const { repository, dispatch } = course(root);
+    assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
+    const lockPath = join(repository.commonDir, "agent-pipeline/session-authority/registry.lock");
+    const abandoned = join(repository.commonDir, "agent-pipeline/session-authority-abandoned");
+    const asides = () => existsSync(abandoned) ? readdirSync(abandoned).filter((name) => name.endsWith("-registry-lock")) : [];
+    const sha = (text) => createHash("sha256").update(text).digest("hex");
+    const writeLock = (value) => writeFileSync(lockPath, JSON.stringify(value), { mode: 0o600, flag: "wx" });
+    const own = observeLinuxProcess(process.pid);
+    const owner = (pid, process) => ({ pid, hostSha256: sha(hostname()), process, acquiredAt: new Date(Date.now() - 3600000).toISOString() });
+
+    // A lock left by a version that recorded no owner: it cannot be judged, so it is named, never taken over.
+    writeLock({ schema: "pipeline.session-authority-lock.v1", repositorySha256: "a".repeat(64), nonce: "b".repeat(64) });
+    const legacy = repair("inspect", "--root", root).result;
+    assert.equal(legacy.lock.status, "held"); assert.equal(legacy.lock.owner, "unknown");
+    assert.match(legacy.next[0].command, / release-lock --root .* --no-pipeline-running --reason/u, JSON.stringify(legacy.next));
+    assert.equal(legacy.next.some((row) => / move-aside /u.test(row.command)), false, "a held lock must not be answered with a repair that needs the lock");
+    const healRefused = repair("heal", "--root", root);
+    assert.equal(healRefused.code, 2); assert.equal(healRefused.result.code, "SAR-LOCK-HELD"); assert.match(healRefused.result.repair, / release-lock --root /u);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, false, "a dispatch is refused while the lock is held");
+    assert.equal(repair("release-lock", "--root", root, "--reason", "x").result.code, "SAR-ARGS");
+    const released = repair("release-lock", "--root", root, "--no-pipeline-running", "--reason", "no Pipeline process runs");
+    assert.equal(released.code, 0, JSON.stringify(released.result)); assert.equal(released.result.status, "released");
+    assert.equal(existsSync(lockPath), false); assert.equal(asides().length, 1);
+    assert.match(readFileSync(join(abandoned, asides()[0], "retire.json"), "utf8"), /released by repair: no Pipeline process runs/u);
+    assert.equal(existsSync(join(abandoned, asides()[0], "registry.lock")), true, "the released lock is retained, not deleted");
+
+    // A lock whose recorded owner process is gone is retired by the next dispatch itself.
+    const gone = spawnSync(process.execPath, ["-e", ""]).pid;
+    writeLock({ schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "c".repeat(64), owner: owner(gone, { start: "1", bootSha256: own.bootSha256 }) });
+    assert.equal(repair("inspect", "--root", root).result.lock.owner, "dead");
+    const next = dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one");
+    assert.equal(next.ok, true, JSON.stringify(next));
+    assert.equal(asides().length, 2); assert.equal(existsSync(lockPath), false);
+
+    // A live owner is named with wait, and release-lock refuses it.
+    writeLock({ schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "d".repeat(64), owner: owner(process.pid, { start: own.start, bootSha256: own.bootSha256 }) });
+    const live = repair("inspect", "--root", root).result;
+    assert.equal(live.lock.owner, "live"); assert.match(live.next[0].command, / wait --root .* --timeout 120/u);
+    const refused = repair("release-lock", "--root", root, "--no-pipeline-running", "--reason", "x");
+    assert.equal(refused.code, 2); assert.equal(refused.result.code, "SAR-LOCK-HELD"); assert.match(refused.result.repair, / wait --root /u);
+    let clock = 0;
+    const waitRun = (...argv) => { let text = ""; const code = runSessionAuthorityRepair(argv, (chunk) => { text += chunk; }, { waitDeps: { now: () => clock, pause: (ms) => { clock += ms; } } }); return { code, result: JSON.parse(text) }; };
+    const timedOut = waitRun("wait", "--root", root, "--timeout", "2");
+    assert.equal(timedOut.code, 2); assert.equal(timedOut.result.code, "SAR-WAIT-TIMEOUT"); assert.equal(timedOut.result.lock.pid, process.pid);
+    assert.equal(waitRun("wait", "--root", root, "--timeout", "0").result.code, "SAR-ARGS");
+    rmSync(lockPath);
+    assert.equal(waitRun("wait", "--root", root, "--timeout", "2").result.status, "lock-free");
   }) },
 ];
 

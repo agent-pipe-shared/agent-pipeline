@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// session-authority-repair.mjs <inspect|heal|move-aside> --root <root> [--no-goldfish-running --reason "<why>"]
+// session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait> --root <root> [--no-goldfish-running | --no-pipeline-running] [--reason "<why>"] [--timeout <seconds>]
 //
 // D52 (2), PF-55: the general repair every SDC-AUTHORITY-* refusal names. None of the verbs needs a bound
 // session, so each runs from the agent's shell and from the PO's terminal alike.
@@ -20,6 +20,12 @@
 //               (retained, never deleted) and the next governed dispatch initializes it fresh (D44). Requires
 //               --no-goldfish-running (the caller asserts that no Goldfish or other authority operation runs)
 //               and --reason.
+//   release-lock FB3-PF-55: retires a registry lock whose owner cannot be confirmed alive (a lock left by an
+//               older version records none), on the caller's word (--no-pipeline-running) and with --reason.
+//               It never takes the lock itself, refuses a live owner, and retains the lock aside. A lock whose
+//               owner is provably gone needs no command: the next boundary entry retires it.
+//   wait        FB3-PF-56: waits up to --timeout seconds (1-600, default 60) until the lock is free or its owner
+//               is gone, so a loop waits instead of retrying blind.
 //
 // Prints one JSON result. Exit 0: inspected | healed | moved-aside. Exit 2: refused (typed SAR-* code).
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -29,7 +35,7 @@ import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
-import { inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+import { inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 import { readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
 import { bindScratchDescriptor, inspectScratchBinding, resolveRunnerHostPid } from "../lib/session-cleanup-recovery.mjs";
 
@@ -48,21 +54,33 @@ export function sessionAuthorityRepairCommand(root, verb = "inspect") {
   return `node ${SELF} ${verb} --root ${root}`;
 }
 
+// Each verb's own assertion flag and value flags (FB3-PF-55: release-lock, wait).
+const ASSERTION = { "move-aside": "no-goldfish-running", "release-lock": "no-pipeline-running" };
+const VALUES = { inspect: ["root"], heal: ["root"], "move-aside": ["root", "reason"], "release-lock": ["root", "reason"], wait: ["root", "timeout"] };
+const validReason = (reason) => typeof reason === "string" && reason.trim() !== "" && reason.length <= 500 && !/[\u0000-\u001f\u007f]/u.test(reason);
+
 function parse(argv) {
   const [verb, ...rest] = argv;
-  if (!["inspect", "heal", "move-aside"].includes(verb)) return { error: "usage: session-authority-repair.mjs <inspect|heal|move-aside> --root <root>" };
+  if (!Object.hasOwn(VALUES, verb)) return { error: "usage: session-authority-repair.mjs <inspect|heal|move-aside|release-lock|wait> --root <root>" };
   const flags = {};
   for (let index = 0; index < rest.length; index += 1) {
     const name = rest[index]?.startsWith("--") ? rest[index].slice(2) : null;
-    if (name === "no-goldfish-running" && verb === "move-aside") { if (flags[name]) return { error: "--no-goldfish-running given twice" }; flags[name] = true; continue; }
-    if (!["root", ...(verb === "move-aside" ? ["reason"] : [])].includes(name)) return { error: `unknown argument ${String(rest[index]).slice(0, 40)}` };
+    if (name !== null && name === ASSERTION[verb]) { if (flags[name]) return { error: `--${name} given twice` }; flags[name] = true; continue; }
+    if (!VALUES[verb].includes(name)) return { error: `unknown argument ${String(rest[index]).slice(0, 40)}` };
     const value = rest[index + 1];
     if (typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(flags, name)) return { error: `--${name} needs one value` };
     flags[name] = value; index += 1;
   }
   if (!flags.root) return { error: "--root <root> is required" };
-  if (verb === "move-aside" && (flags["no-goldfish-running"] !== true || typeof flags.reason !== "string" || !flags.reason.trim() || flags.reason.length > 500 || /[\u0000-\u001f\u007f]/u.test(flags.reason)))
+  if (verb === "move-aside" && (flags["no-goldfish-running"] !== true || !validReason(flags.reason)))
     return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs) and --reason \"<one line>\"" };
+  if (verb === "release-lock" && (flags["no-pipeline-running"] !== true || !validReason(flags.reason)))
+    return { error: "release-lock needs --no-pipeline-running (you assert that no Pipeline process runs for this repository) and --reason \"<one line>\"" };
+  if (verb === "wait") {
+    const timeout = flags.timeout === undefined ? 60 : Number(flags.timeout);
+    if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600) return { error: "--timeout needs whole seconds from 1 to 600" };
+    flags.timeout = timeout;
+  }
   return { verb, flags };
 }
 
@@ -140,12 +158,29 @@ function bindScratch(root, scratch) {
 }
 
 // `afterHeal`: heal just ran, so whatever it did not clear needs the next narrower command, not heal again.
+/** FB3-PF-55: the registry lock, read without taking it, and the one repair that does not need it. */
+function lockReport(repository) {
+  try { return inspectSessionAuthorityLock({ repository }); }
+  catch (error) { return { status: "unreadable", reason: short(error) }; }
+}
+function lockStep(root, lock) {
+  if (lock.status !== "held") return null;
+  const who = lock.pid === null ? "an owner it does not record" : `pid ${lock.pid}`;
+  if (lock.owner === "live") return { why: `the registry lock is held by a running Pipeline process (${who}, for ${lock.ageSeconds}s); wait for it to finish`, command: `${sessionAuthorityRepairCommand(root, "wait")} --timeout 120` };
+  if (lock.owner === "dead") return { why: `the registry lock's owner (${who}) is gone; the next boundary entry retires it`, command: sessionAuthorityRepairCommand(root, "heal") };
+  return { why: `the registry lock is held by ${who} for ${lock.ageSeconds}s and that owner cannot be confirmed alive or gone; release it once no Pipeline process runs for this repository`, command: `${sessionAuthorityRepairCommand(root, "release-lock")} --no-pipeline-running --reason "<why>"` };
+}
+
 function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   // The strict read is what every boundary operation performs; the per-producer report explains it.
+  const lock = lockReport(repository);
   const registry = { ...producerReport(repository), read: inspectSessionAuthorityRegistryRead({ repository }) };
   const reservations = reservationReport(repository, root);
   const scratchBinding = scratchReport(root, scratch);
   const next = [];
+  // A held lock comes first: every other repair needs the lock (FB3-PF-55).
+  const held = lockStep(root, lock);
+  if (held) next.push(held);
   const open = reservations.filter((row) => row.sliceId && row.settled === null);
   const cancelCommand = (sliceId) => `node ${SLICE_QUEUE} cancel ${sliceId} --started --reason "<why>"`;
   for (const row of open) next.push({ why: `slice ${row.sliceId} still holds its item reservation; if it delivered, commit its work with the trailer "Dispatch: ${row.sliceId} (goldfish)"; if its Goldfish no longer runs, cancel it`, command: cancelCommand(row.sliceId) });
@@ -162,9 +197,31 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   const stuck = [...drifted.filter((row) => afterHeal || row.inFlight > 0), ...broken];
   // A strict-read refusal that heal does not explain has no narrower repair.
   const healable = (reason) => !afterHeal && (reason === "catalogue-source-closure" || drifted.some((row) => row.inFlight === 0 && reason === `${row.producerId}:namespace-drift`));
-  const unexplained = registry.read.status === "refused" && !healable(registry.read.reason);
+  // A read refused only because the lock is held is explained by the lock step, not by move-aside.
+  const unexplained = registry.read.status === "refused" && !healable(registry.read.reason) && !(held && registry.read.code === "SDC-LOCK-HELD");
   if (registry.status === "unreadable" || stuck.length || unexplained) next.push({ why: `${[...stuck.map((row) => `${row.producerId} ${row.status}${row.drifted?.length ? ` (${row.drifted.join(", ")})` : ""}${row.reason ? `: ${row.reason}` : ""}`), ...(unexplained ? [`the registry read refuses: ${registry.read.code} ${registry.read.reason}`] : [])].join("; ") || `the registry does not read: ${registry.reason}`}. Last resort once no Goldfish runs: the registry is retained aside and starts fresh`, command: `${sessionAuthorityRepairCommand(root, "move-aside")} --no-goldfish-running --reason "<why>"` });
-  return { registry, reservations, scratchBinding, next };
+  return { lock, registry, reservations, scratchBinding, next };
+}
+
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/** FB3-PF-56: a bounded wait for the registry lock, so a goal loop waits instead of retrying blind. */
+function waitForLock(repository, root, timeoutSeconds, { now = Date.now, pause = sleep } = {}) {
+  const deadline = now() + timeoutSeconds * 1000;
+  for (;;) {
+    const lock = lockReport(repository);
+    if (lock.status === "absent") return { status: "lock-free" };
+    if (lock.status === "held" && lock.owner === "dead") return { status: "lock-owner-gone", next: [lockStep(root, lock)] };
+    if (now() >= deadline) return { status: "refused", code: "SAR-WAIT-TIMEOUT", reason: `the registry lock is still held after ${timeoutSeconds}s`, lock, next: [lockStep(root, lock)].filter(Boolean) };
+    pause(Math.min(500, Math.max(1, deadline - now())));
+  }
+}
+
+function lockRefusal(error, root) {
+  const lock = error?.lock ?? null;
+  const reason = lock ? `the registry lock is held (${lock.pid === null ? "owner not recorded" : `pid ${lock.pid}`}, ${lock.owner}, ${lock.ageSeconds}s)` : "another Pipeline operation holds the registry lock";
+  return { status: "refused", code: "SAR-LOCK-HELD", reason, ...(lock ? { lock } : {}),
+    repair: typeof error?.repair === "string" ? error.repair : `${sessionAuthorityRepairCommand(root, "wait")} --timeout 120` };
 }
 
 function markers(repository) {
@@ -173,7 +230,7 @@ function markers(repository) {
 }
 
 // `env` carries the session identity for the scratch binding; only the command line passes the process's own.
-export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.write(text), { env = {}, scratchDeps = {} } = {}) {
+export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.write(text), { env = {}, scratchDeps = {}, waitDeps = {} } = {}) {
   const emit = (value, code) => { out(`${JSON.stringify({ schema: SCHEMA, ...value })}\n`); return code; };
   const scratch = { env, deps: scratchDeps };
   const parsed = parse(argv);
@@ -182,6 +239,16 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   try { root = realpathSync(resolve(parsed.flags.root)); if (!statSync(root).isDirectory()) throw new Error("not a directory"); repository = inspectSignedDescriptorCustodyRepository(root); }
   catch (error) { return emit({ status: "refused", code: "SAR-ROOT", reason: `--root is not a Pipeline repository: ${short(error)}` }, 2); }
   if (parsed.verb === "inspect") return emit({ status: "inspected", ...inspect(repository, root, { scratch }) }, 0);
+  if (parsed.verb === "wait") { const waited = waitForLock(repository, root, parsed.flags.timeout, waitDeps); return emit(waited, waited.status === "refused" ? 2 : 0); }
+  if (parsed.verb === "release-lock") {
+    // Never takes the lock it releases (FB3-PF-55); a live owner is refused with the wait command.
+    try {
+      const released = releaseSessionAuthorityLock({ repository, reason: parsed.flags.reason.trim() });
+      return emit({ ...released, ...inspect(repository, root, { scratch }) }, 0);
+    } catch (error) {
+      return emit(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error) }, 2);
+    }
+  }
   const before = new Set(markers(repository));
   // Independent of the registry, so a registry refusal below never leaves it unrepaired.
   const scratchBound = parsed.verb === "heal" ? bindScratch(root, scratch) : null;
@@ -189,7 +256,7 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
     if (parsed.verb === "heal") retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, () => { entered.value = true; return null; }));
     else retryWhileSessionAuthorityLockHeld((entered) => { const moved = moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }); return moved; });
   } catch (error) {
-    return emit({ status: "refused", code: error?.code === "SDC-LOCK-HELD" ? "SAR-LOCK-HELD" : "SAR-UNAVAILABLE", reason: error?.code === "SDC-LOCK-HELD" ? "another Pipeline operation holds the registry lock; retry once it finished" : short(error), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
+    return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error) }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
   }
   const retained = markers(repository).filter((name) => !before.has(name));
   return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
