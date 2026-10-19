@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-10-19T12:10:21.967Z",
+  "updatedAt": "2026-10-19T12:13:08.598Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -64,22 +64,22 @@
   "pushApproval": {
     "lastApproved": {
       "approvedBy": "APS",
-      "approvedAt": "2026-10-19T12:10:21.967Z",
-      "forCommit": "d189539f717907107dc5175e2b16f725954ea18a",
+      "approvedAt": "2026-10-19T12:13:08.598Z",
+      "forCommit": "6c9286765841ac215251536f0d8119d950d5f9d8",
       "criticalProof": {
-        "proofSha256": "b8c04c91dc43a113ccf04b52a04aafbeb5b0bb9cca17432a1e431b3476852f32",
-        "intentSha256": "be0de47954121f4693b13854548a33c806ad13d8434487cfde022f209dc85e16",
+        "proofSha256": "c65245e3e67bfc825c6475bd781df990167f76eb12270079096adf9978852d17",
+        "intentSha256": "590422d052dd9e1444b8165f42becebc8d9e74a962df6a38a30ec426682af569",
         "action": {
           "kind": "push",
-          "subjectSha256": "e423f399c9f8d31d6b5e929c31742d22b4b36851693b8113feefab7bad549789",
-          "expiresAt": "2026-10-19T13:07:33.030Z"
+          "subjectSha256": "b3e56f6cf4f7e6d26a4673fe0d06ce55c07b56b0aaf9df25508751185736f074",
+          "expiresAt": "2026-10-19T13:12:10.425Z"
         },
         "proof": {
           "schema": "pipeline.po-approval-proof.v1",
-          "intentSha256": "be0de47954121f4693b13854548a33c806ad13d8434487cfde022f209dc85e16",
+          "intentSha256": "590422d052dd9e1444b8165f42becebc8d9e74a962df6a38a30ec426682af569",
           "keyReference": "local-po-key",
           "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
-          "signatureBase64": "htJb2ufWWQGsNHMIMaF4F5Wm9DbcQxmiCiFnx7kAvbR/WOW9upMw4ruKLpc4pI6GNr5hdL2zAYXNqODPadxiCQ=="
+          "signatureBase64": "WTYxpt3ZyBSjTLFj52fd18xrYFNZvsR8t1IocNE05l2JNUDsfLkU38QJp3IeeusG1DkkwbVF+KPfI0ZSiOJaBA=="
         }
       },
       "remote": "origin",
@@ -226,6 +226,11 @@
       "proofSha256": "b8c04c91dc43a113ccf04b52a04aafbeb5b0bb9cca17432a1e431b3476852f32",
       "kind": "push",
       "consumedAt": "2026-10-19T12:10:21.967Z"
+    },
+    {
+      "proofSha256": "c65245e3e67bfc825c6475bd781df990167f76eb12270079096adf9978852d17",
+      "kind": "push",
+      "consumedAt": "2026-10-19T12:13:08.598Z"
     }
   ],
   "phoenixEpicHistory": {
