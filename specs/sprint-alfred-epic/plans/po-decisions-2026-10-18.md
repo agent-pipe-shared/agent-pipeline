@@ -65,6 +65,16 @@ A catalogue of another repository is never migrated and stays refused. Migrating
 - **A half-initialized registry.** A fresh registry whose final read-back fails is moved aside instead of leaving a catalogue nothing can read (live: `HGO-CAPABILITY` from `reconcile`, which also validated retired capabilities).
 
 Live run on this repository: the pre-migration version, plus these fixes, initialized the registry. A changed producer source then reproduced `catalogue-source-closure`. The D48 code migrated it by rebinding (readiness `observed`, 675 slices, native registry read), and a second read was stable. Built by the Elephant under the D40 exception; Critic review follows. | PF-53 |
+| D50 (2026-10-19, PO: "nie etwas voll blockierend … es muss immer eine Reparatur/Fallback geben für Agent und/oder PO"; the PO's main project was stuck after installing the d5686dc candidate) | Fix now: PF-55. No refusal may be a dead end; each needs a repair that the agent session or a plain PO terminal can run, and a refused operation leaves no state behind. Measured on this repository after the c27576438 push, read-only (`scratch/d50/drift-probe.mjs`): the fresh catalogue of 20:15 was already unreadable (`SDC-AUTHORITY-CAS: onboarding-continuity:namespace-drift`). Three producers drifted:
+- **onboarding-continuity and state-push-challenge.** Both bind the bytes and inode of `project/pipeline-state.json`, and push-prepare's fold rewrote that file 2 minutes later.
+- **human-guard-override.** Its legacy armed-capability members bind HEAD (`repository.candidate`), so every commit is drift (`hgo:legacy-member-source-drift`).
+
+The same drift makes the D48 rebind fault and fall back to fresh (live at 18:04 UTC), which drops the release records. A delivered slice's native reservation is released only by a native integration record, never by D40/D40b commit evidence, so it then blocks its item, criterion and write scope for good. The PO's main project shows the rest:
+- a dispatch refused after `prepareGovernedItemQueue` leaves its queue row;
+- a member reserved before the baseline capture is left orphaned;
+- `slice-queue.mjs cancel` needs a bound session that neither the agent nor a terminal has.
+
+Built by the Elephant: no Goldfish can launch on this repository while the registry is unreadable. PO ratification is pending (Q10). | PF-55, Q10 |
 | D41 (2026-10-19, answers Q6) | Option (a): a Goldfish delivers ALF-F7B-PRETOOL-PARITY first, after the PO has installed a build carrying D40; ALF-B30-CODEXPG follows. | Q6 |
 | D42 (2026-10-19, Q7, Elephant proposal awaiting the PO's OK; the PO asked whether to commit the file) | `.agents/plugins.json` is not committed: the AGY installer's edit is an absolute, machine-bound path and would break the other machine. It is restored for Verify and the push, and the PO re-runs the AGY installer afterwards. The installer writing a machine path into a tracked file becomes a backlog item. | Q7 |
 
